@@ -1,0 +1,501 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-marcellus), Georgia, serif;
+  --font-mono: ui-monospace, monospace;
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+/* ── Crystal Rose Design Tokens ──────────────────────────────── */
+:root {
+  /* Brand colors */
+  --cr-primary: #5a3d34;
+  --cr-secondary: #fcf4f1;
+  --cr-accent: #c4b29f;
+  --cr-white: #ffffff;
+  --cr-divider: rgba(196, 178, 159, 0.1);
+  --cr-dark-divider: rgba(255, 255, 255, 0.1);
+  --cr-error: rgb(230, 87, 87);
+
+  /* Mapped to shadcn tokens */
+  --background: #fcf4f1;
+  --foreground: #5a3d34;
+  --card: #ffffff;
+  --card-foreground: #5a3d34;
+  --popover: #ffffff;
+  --popover-foreground: #5a3d34;
+  --primary: #5a3d34;
+  --primary-foreground: #ffffff;
+  --secondary: #fcf4f1;
+  --secondary-foreground: #5a3d34;
+  --muted: #f5e8e3;
+  --muted-foreground: #8a6d62;
+  --accent: #c4b29f;
+  --accent-foreground: #5a3d34;
+  --destructive: rgb(230, 87, 87);
+  --border: rgba(196, 178, 159, 0.3);
+  --input: rgba(196, 178, 159, 0.3);
+  --ring: #c4b29f;
+  --radius: 0.5rem;
+}
+
+/* ── Base Styles ──────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--cr-white);
+    color: var(--cr-primary);
+    font-family: var(--font-sora), sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* RTL support */
+  body.rtl {
+    direction: rtl;
+    text-align: right;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-marcellus), serif;
+    font-weight: 400;
+    color: var(--cr-primary);
+    line-height: 1.2;
+  }
+
+  h1 { font-size: clamp(36px, 5vw, 60px); }
+  h2 { font-size: clamp(28px, 4vw, 48px); }
+  h3 { font-size: clamp(20px, 2.5vw, 28px); }
+  h4 { font-size: 20px; }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.3s ease;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  p {
+    margin-bottom: 1rem;
+    line-height: 1.7;
+  }
+}
+
+/* ── Dark Section (brown bg) ─────────────────────────────────── */
+.dark-section {
+  background-color: var(--cr-primary) !important;
+  color: var(--cr-white);
+}
+.dark-section h1,
+.dark-section h2,
+.dark-section h3,
+.dark-section h4,
+.dark-section p,
+.dark-section span,
+.dark-section a {
+  color: var(--cr-white);
+}
+
+/* ── BG Section (cream bg) ───────────────────────────────────── */
+.bg-section {
+  background-color: var(--cr-secondary);
+}
+
+/* ── Section padding ─────────────────────────────────────────── */
+.section-padding {
+  padding: 100px 0;
+}
+@media (max-width: 768px) {
+  .section-padding {
+    padding: 60px 0;
+  }
+}
+
+/* ── Container ───────────────────────────────────────────────── */
+.cr-container {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ── Section tag (small label above heading) ─────────────────── */
+.section-tag {
+  display: inline-block;
+  font-family: var(--font-sora), sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--cr-accent);
+  margin-bottom: 12px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--cr-primary);
+  color: var(--cr-white);
+  font-family: var(--font-sora), sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 14px 28px;
+  border-radius: 50px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  text-decoration: none;
+}
+.btn-primary:hover {
+  background-color: #3d2820;
+  color: var(--cr-white);
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: transparent;
+  color: var(--cr-primary);
+  font-family: var(--font-sora), sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 13px 28px;
+  border-radius: 50px;
+  border: 1.5px solid var(--cr-accent);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+.btn-outline:hover {
+  background-color: var(--cr-primary);
+  color: var(--cr-white);
+  border-color: var(--cr-primary);
+}
+
+/* ── Readmore link ───────────────────────────────────────────── */
+.readmore-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--cr-primary);
+  transition: gap 0.3s ease;
+}
+.readmore-btn:hover {
+  gap: 14px;
+}
+.dark-section .readmore-btn {
+  color: var(--cr-white);
+}
+
+/* ── Divider ─────────────────────────────────────────────────── */
+.cr-divider {
+  border: none;
+  border-top: 1px solid var(--cr-divider);
+  margin: 0;
+}
+.dark-section .cr-divider {
+  border-color: var(--cr-dark-divider);
+}
+
+/* ── Preloader ───────────────────────────────────────────────── */
+.preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background-color: var(--cr-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+.preloader.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+.preloader-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--cr-divider);
+  border-top-color: var(--cr-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ── Keyframes ───────────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes countUp {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Animation utility classes ───────────────────────────────── */
+.animate-fade-in-up {
+  animation: fadeInUp 0.7s ease forwards;
+}
+.animate-fade-in {
+  animation: fadeIn 0.7s ease forwards;
+}
+.animate-slide-in-left {
+  animation: slideInLeft 0.7s ease forwards;
+}
+.animate-slide-in-right {
+  animation: slideInRight 0.7s ease forwards;
+}
+.animate-scale-in {
+  animation: scaleIn 0.7s ease forwards;
+}
+
+/* WOW / scroll reveal initial state */
+.wow {
+  visibility: hidden;
+}
+.wow.animated {
+  visibility: visible;
+}
+
+/* Stagger delays for list animations */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+
+/* ── Image anime (border-radius fade in) ─────────────────────── */
+.image-anime {
+  border-radius: 12px;
+  overflow: hidden;
+}
+.image-anime img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+.image-anime:hover img {
+  transform: scale(1.04);
+}
+
+/* ── Custom cursor ───────────────────────────────────────────── */
+.cb-cursor {
+  pointer-events: none;
+  position: fixed;
+  z-index: 99999;
+  width: 12px;
+  height: 12px;
+  background: var(--cr-primary);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: transform 0.1s ease, width 0.2s ease, height 0.2s ease, opacity 0.2s ease;
+  mix-blend-mode: normal;
+}
+.cb-cursor.cursor-grow {
+  width: 40px;
+  height: 40px;
+  opacity: 0.4;
+}
+@media (max-width: 768px) {
+  .cb-cursor { display: none; }
+}
+
+/* ── Swiper overrides ────────────────────────────────────────── */
+.swiper-pagination-bullet {
+  background: var(--cr-accent);
+  opacity: 0.5;
+  width: 8px;
+  height: 8px;
+  transition: all 0.3s ease;
+}
+.swiper-pagination-bullet-active {
+  background: var(--cr-white);
+  opacity: 1;
+  width: 24px;
+  border-radius: 4px;
+}
+.dark-section .swiper-pagination-bullet-active {
+  background: var(--cr-white);
+}
+
+/* ── Service category filter pills ──────────────────────────── */
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-radius: 50px;
+  border: 1.5px solid var(--cr-accent);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: transparent;
+  color: var(--cr-primary);
+}
+.filter-pill.active,
+.filter-pill:hover {
+  background-color: var(--cr-primary);
+  color: var(--cr-white);
+  border-color: var(--cr-primary);
+}
+
+/* ── Booking/Auth modal overlay ──────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+.modal-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+.modal-box {
+  background: var(--cr-white);
+  border-radius: 20px;
+  padding: 40px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  transform: translateY(20px);
+  transition: transform 0.3s ease;
+}
+.modal-overlay.open .modal-box {
+  transform: translateY(0);
+}
+
+/* ── Form inputs ─────────────────────────────────────────────── */
+.cr-input {
+  width: 100%;
+  padding: 14px 18px;
+  border: 1.5px solid var(--cr-accent);
+  border-radius: 10px;
+  font-family: var(--font-sora), sans-serif;
+  font-size: 14px;
+  color: var(--cr-primary);
+  background: var(--cr-white);
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+.cr-input:focus {
+  border-color: var(--cr-primary);
+}
+.cr-input::placeholder {
+  color: var(--cr-accent);
+}
+
+/* ── Scrollbar styling ───────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--cr-secondary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--cr-accent);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cr-primary);
+}
