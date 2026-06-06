@@ -1,101 +1,254 @@
 "use client";
 
-import { Check } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export function OurJourneySection() {
   const { t, isRTL } = useLanguage();
 
   return (
-    <section
-      className="dark-section section-padding"
-      style={{
-        position: "relative",
-        overflow: "hidden",
-        backgroundImage: "url(/images/journey-bg-shape.svg)",
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: isRTL ? "right top" : "left top",
-        backgroundSize: "auto",
-      }}
-    >
-      <div className="cr-container" style={{ position: "relative", zIndex: 1 }}>
-        <div className={`flex flex-col gap-12 lg:gap-16 items-center ${isRTL ? "lg:flex-row-reverse" : "lg:flex-row"}`}>
+    <section className="bg-white section-padding" style={{ overflow: "hidden" }}>
+      <div className="cr-container" style={{ maxWidth: "1480px" }}>
 
-          {/* Image */}
-          <div className="flex-1 w-full max-w-[480px] lg:max-w-none">
-            <div className="overflow-hidden rounded-2xl" style={{ aspectRatio: "5/4" }}>
-              <img
-                src="/images/assets/dr-hanan-11.jpg"
-                alt="Your journey with Crystal Rose"
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            </div>
+        {/* Dark brown curved card */}
+        <div
+          style={{
+            position: "relative",
+            backgroundColor: "var(--cr-primary, #414E36)",
+            borderRadius: "60px",
+            overflow: "hidden",
+            padding: "clamp(40px, 6vw, 72px) clamp(24px, 5vw, 72px)",
+          }}
+        >
+          {/* Leaf ornament — top right */}
+          <div
+            className="pointer-events-none absolute select-none"
+            style={{
+              top: "-10px",
+              right: isRTL ? "auto" : "-10px",
+              left: isRTL ? "-10px" : "auto",
+              width: "200px",
+              height: "200px",
+              opacity: 0.08,
+              transform: isRTL ? "scaleX(-1)" : "none",
+            }}
+          >
+            <Image src="/images/footer-bg-shape.svg" alt="" fill className="object-contain" />
           </div>
 
-          {/* Content */}
-          <div className="flex-1" style={{ textAlign: isRTL ? "right" : "left" }}>
-            <span
-              className="section-tag"
-              style={{ color: "var(--cr-accent)" }}
+          {/* Leaf ornament — bottom right */}
+          <div
+            className="pointer-events-none absolute select-none"
+            style={{
+              bottom: "-10px",
+              right: isRTL ? "auto" : "-10px",
+              left: isRTL ? "-10px" : "auto",
+              width: "180px",
+              height: "180px",
+              opacity: 0.06,
+              transform: isRTL ? "scaleX(-1) rotate(90deg)" : "rotate(90deg)",
+            }}
+          >
+            <Image src="/images/footer-bg-shape.svg" alt="" fill className="object-contain" />
+          </div>
+
+          <div style={{ position: "relative", zIndex: 1, direction: isRTL ? "rtl" : "ltr" }}>
+
+            {/* Tag */}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "14px",
+              }}
             >
-              {t.aboutPage.storiesTag}
-            </span>
-            <h2 className="mt-3 mb-6" style={{ color: "#fff" }}>
+              <img src="/images/main_logo.png" alt="" style={{ width: 18, height: 18, objectFit: "contain", filter: "brightness(0) saturate(0) invert(1) opacity(0.6)" }} />
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  letterSpacing: "0.2em",
+                  color: "rgba(255,255,255,0.6)",
+                  textTransform: "uppercase",
+                }}
+              >
+                {t.aboutPage.storiesTag}
+              </span>
+            </div>
+
+            {/* Heading */}
+            <h2
+              style={{
+                margin: "0 0 28px",
+                fontSize: "clamp(26px, 3.5vw, 40px)",
+                lineHeight: 1.15,
+                fontWeight: 400,
+                color: "#fff",
+                fontFamily: "var(--font-marcellus), serif",
+              }}
+            >
               {t.aboutPage.storiesHeading}
             </h2>
 
-            <ul style={{ listStyle: "none", margin: "0 0 32px", padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+            {/* 2×2 Checklist grid */}
+            <ul
+              style={{
+                listStyle: "none",
+                margin: "0 0 28px",
+                padding: 0,
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "14px 40px",
+              }}
+            >
               {t.aboutPage.storiesList.map((item) => (
-                <li key={item} style={{ display: "flex", alignItems: "center", gap: 12, flexDirection: isRTL ? "row-reverse" : "row" }}>
+                <li
+                  key={item}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                  }}
+                >
                   <span
                     style={{
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "5px",
+                      background: "rgba(255,255,255,0.12)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      width: 24,
-                      height: 24,
-                      borderRadius: "50%",
-                      background: "rgba(255,255,255,0.12)",
-                      color: "#fff",
                       flexShrink: 0,
                     }}
                   >
-                    <Check size={13} strokeWidth={2.5} />
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                      <path d="M2.5 6L5 8.5L9.5 3.5" stroke="rgba(255,255,255,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </span>
-                  <span style={{ fontSize: 14, color: "rgba(255,255,255,0.85)" }}>{item}</span>
+                  <span style={{ fontSize: "13.5px", color: "rgba(255,255,255,0.82)", fontWeight: 500 }}>
+                    {item}
+                  </span>
                 </li>
               ))}
             </ul>
 
-            {/* Journey highlight cards */}
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", flexDirection: isRTL ? "row-reverse" : "row" }}>
+            {/* Divider */}
+            <div style={{ height: "1px", background: "rgba(255,255,255,0.12)", marginBottom: "28px" }} />
+
+            {/* Journey items row */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "16px",
+                marginBottom: "32px",
+              }}
+            >
               {t.aboutPage.journeyItems.map((item, i) => (
                 <div
                   key={item}
                   style={{
-                    flex: "1 1 200px",
                     display: "flex",
                     alignItems: "center",
-                    gap: 14,
+                    gap: "14px",
                     flexDirection: isRTL ? "row-reverse" : "row",
-                    padding: "16px 18px",
-                    borderRadius: 12,
-                    background: "rgba(255,255,255,0.07)",
-                    border: "1px solid rgba(255,255,255,0.1)",
                   }}
                 >
-                  <img
-                    src={i === 0 ? "/images/icon-journey-1.svg" : "/images/icon-journey-2.svg"}
-                    alt=""
-                    aria-hidden="true"
-                    style={{ width: 36, height: 36, flexShrink: 0 }}
-                  />
-                  <span style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>{item}</span>
+                  {/* Circular icon */}
+                  <div
+                    style={{
+                      width: "52px",
+                      height: "52px",
+                      borderRadius: "50%",
+                      background: "rgba(255,255,255,0.1)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <img
+                      src={i === 0 ? "/images/icon-journey-1.svg" : "/images/icon-journey-2.svg"}
+                      alt=""
+                      aria-hidden="true"
+                      style={{
+                        width: 26,
+                        height: 26,
+                        filter: "brightness(0) invert(1)",
+                        opacity: 0.85,
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: "14px", fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>
+                    {item}
+                  </span>
                 </div>
               ))}
             </div>
+
+            {/* CTA buttons */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                flexDirection: isRTL ? "row-reverse" : "row",
+              }}
+            >
+              <Link
+                href="/contact"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "12px 26px",
+                  borderRadius: "30px",
+                  background: "rgba(255,255,255,0.12)",
+                  border: "1.5px solid rgba(255,255,255,0.25)",
+                  color: "#fff",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  transition: "all 0.25s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+                }}
+              >
+                Contact Us
+              </Link>
+              <Link
+                href="/contact"
+                aria-label="Contact us"
+                style={{
+                  width: "44px",
+                  height: "44px",
+                  borderRadius: "50%",
+                  background: "rgba(255,255,255,0.15)",
+                  border: "1.5px solid rgba(255,255,255,0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  textDecoration: "none",
+                  transition: "all 0.25s ease",
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+                  <path d="M5 13L13 5M13 5H6M13 5V12" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+            </div>
+
           </div>
         </div>
+
       </div>
     </section>
   );

@@ -25,19 +25,9 @@ function IconFacebook() {
   );
 }
 
-function IconWhatsApp() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.126.554 4.12 1.524 5.849L.057 23.571a.5.5 0 0 0 .614.614l5.782-1.497A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.694-.504-5.232-1.385l-.374-.218-3.883 1.005 1.032-3.768-.236-.387A9.96 9.96 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
-    </svg>
-  );
-}
-
-const SOCIAL_LINKS: Array<{ label: string; href: string; Icon: () => React.JSX.Element }> = [
-  { label: "Instagram", href: "https://instagram.com", Icon: IconInstagram },
+const SOCIAL_LINKS = [
   { label: "Facebook", href: "https://facebook.com", Icon: IconFacebook },
-  { label: "WhatsApp", href: "https://wa.me/201125787019", Icon: IconWhatsApp },
+  { label: "Instagram", href: "https://instagram.com", Icon: IconInstagram },
 ];
 
 export function SiteFooter() {
@@ -45,304 +35,629 @@ export function SiteFooter() {
 
   return (
     <footer
-      className="dark-section"
-      style={{ position: "relative", overflow: "hidden" }}
+      className="bg-white"
+      style={{ padding: "0 0 40px 0", overflow: "hidden" }}
     >
-      {/* Background shape */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          right: isRTL ? "auto" : 0,
-          left: isRTL ? 0 : "auto",
-          width: "400px",
-          height: "400px",
-          opacity: 0.1,
-          pointerEvents: "none",
-        }}
-      >
-        <Image
-          src="/images/footer-bg-shape.svg"
-          alt=""
-          width={400}
-          height={400}
-          style={{ objectFit: "contain" }}
-          aria-hidden
-        />
-      </div>
-
-      <div className="cr-container" style={{ position: "relative" }}>
-        {/* Main 4-column grid */}
+      <div className="cr-container" style={{ maxWidth: "1480px" }}>
+        {/* Curved Card Container with Dark Brown Background */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "48px",
-            padding: "80px 0 60px",
-            direction: isRTL ? "rtl" : "ltr",
+            position: "relative",
+            backgroundColor: "var(--cr-primary, #414E36)",
+            borderRadius: "60px",
+            border: "1px solid rgba(196,174,124,0.35)",
+            overflow: "hidden",
+            padding: "clamp(40px, 6vw, 70px) clamp(24px, 5vw, 64px)",
           }}
         >
-          {/* Column 1: Logo + description + social */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            <Link href="/" style={{ display: "inline-block" }}>
-              <Image
-                src="/images/logo.png"
-                alt="Crystal Rose Clinics"
-                width={140}
-                height={48}
-                style={{ objectFit: "contain" }}
-              />
-            </Link>
-            <p
-              style={{
-                fontSize: "14px",
-                lineHeight: 1.75,
-                color: "rgba(255,255,255,0.72)",
-                margin: 0,
-                maxWidth: "280px",
-              }}
-            >
-              {t.footer.description}
-            </p>
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              {SOCIAL_LINKS.map(({ label, href, Icon }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={label}
+          {/* Leaf corner decorations (four corners) */}
+          {/* Top-Right */}
+          <div
+            className="pointer-events-none absolute select-none opacity-[0.05] w-[280px] h-[280px]"
+            style={{
+              top: "-50px",
+              right: "-50px",
+              transform: isRTL ? "scaleX(-1)" : "none",
+            }}
+          >
+            <Image
+              src="/images/footer-bg-shape.svg"
+              alt=""
+              fill
+              className="object-contain"
+            />
+          </div>
+
+          {/* Bottom-Left */}
+          <div
+            className="pointer-events-none absolute select-none opacity-[0.05] w-[280px] h-[280px]"
+            style={{
+              bottom: "-50px",
+              left: "-50px",
+              transform: isRTL ? "scaleX(-1) rotate(90deg)" : "rotate(90deg)",
+            }}
+          >
+            <Image
+              src="/images/footer-bg-shape.svg"
+              alt=""
+              fill
+              className="object-contain"
+            />
+          </div>
+
+          {/* Top-Left */}
+          <div
+            className="pointer-events-none absolute select-none opacity-[0.05] w-[260px] h-[260px]"
+            style={{
+              top: "-30px",
+              left: "-30px",
+              transform: "rotate(-90deg)",
+            }}
+          >
+            <Image
+              src="/images/footer-bg-shape.svg"
+              alt=""
+              fill
+              className="object-contain"
+            />
+          </div>
+
+          {/* Bottom-Right */}
+          <div
+            className="pointer-events-none absolute select-none opacity-[0.05] w-[260px] h-[260px]"
+            style={{
+              bottom: "-30px",
+              right: "-30px",
+              transform: "rotate(180deg)",
+            }}
+          >
+            <Image
+              src="/images/footer-bg-shape.svg"
+              alt=""
+              fill
+              className="object-contain"
+            />
+          </div>
+
+          <style>{`
+            .ft-top-row {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              gap: 32px;
+              margin-bottom: 48px;
+            }
+            .ft-newsletter-wrapper {
+              display: flex;
+              align-items: center;
+              background-color: #1F251A;
+              border: 1px solid rgba(255, 255, 255, 0.1);
+              border-radius: 30px;
+              padding: 5px;
+              padding-left: 20px;
+              width: 100%;
+              max-width: 400px;
+              transition: border-color 0.3s ease;
+            }
+            .ft-newsletter-wrapper:focus-within {
+              border-color: var(--color-brand-sand);
+            }
+            .ft-newsletter-input {
+              background: transparent;
+              border: none;
+              outline: none;
+              color: #fff;
+              font-size: 14px;
+              flex-grow: 1;
+              font-family: inherit;
+            }
+            .ft-newsletter-input::placeholder {
+              color: rgba(255, 255, 255, 0.4);
+            }
+            
+            .ft-columns-grid {
+              display: grid;
+              grid-template-columns: 1.2fr 0.9fr 0.9fr;
+              gap: 48px;
+              margin-bottom: 32px;
+            }
+            
+            .ft-social-btn {
+              width: 38px;
+              height: 38px;
+              border-radius: 50%;
+              border: 1.5px solid rgba(255,255,255,0.25);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: rgba(255,255,255,0.8);
+              transition: all 0.25s ease;
+              flex-shrink: 0;
+            }
+            .ft-social-btn:hover {
+              background: rgba(255,255,255,0.1);
+              color: #fff;
+              border-color: rgba(255,255,255,0.5);
+            }
+
+            .ft-contact-section {
+              border-top: 1px solid rgba(255,255,255,0.1);
+              padding-top: 32px;
+              margin-bottom: 32px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+            }
+            .ft-contact-subrow {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 40px;
+              align-items: center;
+            }
+            .ft-contact-item {
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+            }
+            .ft-contact-row-content {
+              display: flex;
+              align-items: center;
+              gap: 10px;
+            }
+            .ft-contact-divider {
+              width: 1px;
+              height: 28px;
+              background-color: rgba(255, 255, 255, 0.15);
+            }
+
+            /* RTL adjustments */
+            .rtl .ft-top-row {
+              flex-direction: row-reverse;
+            }
+            .rtl .ft-newsletter-wrapper {
+              padding-left: 5px;
+              padding-right: 20px;
+              flex-direction: row-reverse;
+            }
+            .rtl .ft-newsletter-input {
+              text-align: right;
+            }
+            .rtl .ft-columns-grid {
+              direction: rtl;
+            }
+            .rtl .ft-contact-section {
+              direction: rtl;
+            }
+            .rtl .ft-contact-subrow {
+              flex-direction: row-reverse;
+            }
+            .rtl .ft-contact-row-content {
+              flex-direction: row-reverse;
+            }
+            .rtl .ft-bottom-bar {
+              flex-direction: row-reverse;
+              direction: rtl;
+            }
+
+            @media (max-width: 1024px) {
+              .ft-top-row {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                gap: 24px;
+              }
+              .rtl .ft-top-row {
+                flex-direction: column;
+              }
+              .ft-columns-grid {
+                grid-template-columns: 1fr;
+                gap: 40px;
+                text-align: center;
+              }
+              .rtl .ft-columns-grid {
+                text-align: center;
+              }
+              .ft-col-1-desc {
+                margin: 0 auto !important;
+              }
+              .ft-social-row {
+                justify-content: center !important;
+              }
+              .ft-links-list {
+                justify-content: center !important;
+              }
+              .ft-hours-row {
+                justify-content: center !important;
+              }
+              .ft-contact-subrow {
+                flex-direction: column !important;
+                align-items: center;
+                gap: 20px;
+              }
+              .ft-contact-divider {
+                display: none;
+              }
+              .ft-contact-item {
+                align-items: center;
+              }
+              .ft-contact-row-content {
+                justify-content: center !important;
+              }
+            }
+          `}</style>
+
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              direction: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            {/* ── Top Row: Tagline & Newsletter ── */}
+            <div className="ft-top-row">
+              {/* Heading */}
+              <h2
+                className="font-heading"
+                style={{
+                  margin: 0,
+                  fontSize: "clamp(24px, 3.5vw, 36px)",
+                  lineHeight: 1.15,
+                  color: "#fff",
+                  fontWeight: 400,
+                  maxWidth: "460px",
+                  textAlign: isRTL ? "right" : "left",
+                }}
+              >
+                {isRTL
+                  ? "أحدث الرؤى والأفكار في مجال الجمال والرعاية الطبية"
+                  : "Latest insights on beauty & medical care"}
+              </h2>
+
+              {/* Newsletter subscription form */}
+              <div className="ft-newsletter-wrapper">
+                <input
+                  type="email"
+                  className="ft-newsletter-input"
+                  placeholder={isRTL ? "أدخل بريدك الإلكتروني" : "Enter your email"}
+                  aria-label="Email address"
+                />
+                <button
+                  type="button"
                   style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     width: "38px",
                     height: "38px",
                     borderRadius: "50%",
-                    border: "1.5px solid rgba(255,255,255,0.2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "rgba(255,255,255,0.75)",
-                    transition: "all 0.25s ease",
+                    backgroundColor: "var(--color-brand-sand)",
+                    color: "var(--color-brand-dark, #1F251A)",
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "transform 0.25s ease",
                     flexShrink: 0,
                   }}
-                  onMouseEnter={(e) => {
-                    const el = e.currentTarget as HTMLAnchorElement;
-                    el.style.background = "rgba(255,255,255,0.15)";
-                    el.style.color = "#fff";
-                    el.style.borderColor = "rgba(255,255,255,0.5)";
-                  }}
-                  onMouseLeave={(e) => {
-                    const el = e.currentTarget as HTMLAnchorElement;
-                    el.style.background = "transparent";
-                    el.style.color = "rgba(255,255,255,0.75)";
-                    el.style.borderColor = "rgba(255,255,255,0.2)";
+                  onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                >
+                  <svg width="15" height="15" viewBox="0 0 18 18" fill="none">
+                    <path
+                      d="M5 13L13 5M13 5H6M13 5V12"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* ── Middle Row: Columns Grid ── */}
+            <div className="ft-columns-grid">
+              {/* Column 1: Description & Social */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                <p
+                  className="ft-col-1-desc"
+                  style={{
+                    fontSize: "14px",
+                    lineHeight: 1.75,
+                    color: "rgba(255,255,255,0.72)",
+                    margin: 0,
+                    maxWidth: "340px",
                   }}
                 >
-                  <Icon />
-                </a>
-              ))}
-            </div>
-          </div>
+                  {isRTL
+                    ? "نغير حياتك من خلال طب الجلدية والجراحة التجميلية المتخصصة وعلاجات الليزر ورعاية الأسنان المتكاملة."
+                    : "Transforming lives with expert dermatology, cosmetic surgery, laser treatments, and comprehensive dental care."}
+                </p>
+                <div
+                  className="ft-social-row"
+                  style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
+                >
+                  {SOCIAL_LINKS.map(({ label, href, Icon }) => (
+                    <a
+                      key={label}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={label}
+                      className="ft-social-btn"
+                    >
+                      <Icon />
+                    </a>
+                  ))}
+                </div>
+              </div>
 
-          {/* Column 2: Quick links */}
-          <div>
-            <h4
-              style={{
-                fontSize: "16px",
-                fontWeight: 600,
-                color: "#fff",
-                marginBottom: "20px",
-                fontFamily: "var(--font-sora), sans-serif",
-                textTransform: "capitalize",
-              }}
-            >
-              {t.footer.quickLinks}
-            </h4>
-            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
-              {t.footer.links.map((label, i) => (
-                <li key={i}>
-                  <Link
-                    href={QUICK_LINK_HREFS[i] ?? "#"}
+              {/* Column 2: Quick Links (arranged horizontally) */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                <h4
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 600,
+                    color: "var(--color-brand-sand)",
+                    margin: 0,
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {t.footer.quickLinks}
+                </h4>
+                <ul
+                  className="ft-links-list"
+                  style={{
+                    listStyle: "none",
+                    margin: 0,
+                    padding: 0,
+                    display: "flex",
+                    flexDirection: "row",
+                    gap: "20px",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {t.footer.links.map((label, i) => (
+                    <li key={i}>
+                      <Link
+                        href={QUICK_LINK_HREFS[i] ?? "#"}
+                        style={{
+                          fontSize: "14px",
+                          color: "rgba(255,255,255,0.72)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          transition: "color 0.2s ease",
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = "#fff"}
+                        onMouseLeave={(e) => e.currentTarget.style.color = "rgba(255,255,255,0.72)"}
+                      >
+                        <span
+                          style={{
+                            width: "5px",
+                            height: "5px",
+                            borderRadius: "50%",
+                            background: "var(--color-brand-sand)",
+                            flexShrink: 0,
+                          }}
+                        />
+                        {label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Column 3: Open Hours (arranged horizontally) */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                <h4
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 600,
+                    color: "var(--color-brand-sand)",
+                    margin: 0,
+                  }}
+                >
+                  {t.footer.openHours}
+                </h4>
+                <div
+                  className="ft-hours-row"
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    gap: "24px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.72)" }}>
+                    {t.footer.hoursLine1}
+                  </p>
+                  <p style={{ margin: 0, fontSize: "14px", color: "var(--color-brand-sand)", fontWeight: 500 }}>
+                    {t.footer.hoursLine2}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Contact Info Section (divided into Row 1: Contact/E-Mail, Row 2: Address) ── */}
+            <div className="ft-contact-section">
+              {/* Row 1: Phone and E-Mail */}
+              <div className="ft-contact-subrow">
+                {/* Contact phone */}
+                <div className="ft-contact-item">
+                  <span
                     style={{
-                      fontSize: "14px",
-                      color: "rgba(255,255,255,0.72)",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      transition: "color 0.2s ease, gap 0.2s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      const el = e.currentTarget as HTMLAnchorElement;
-                      el.style.color = "#fff";
-                    }}
-                    onMouseLeave={(e) => {
-                      const el = e.currentTarget as HTMLAnchorElement;
-                      el.style.color = "rgba(255,255,255,0.72)";
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "var(--color-brand-sand)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
                     }}
                   >
-                    <span
-                      style={{
-                        width: "5px",
-                        height: "5px",
-                        borderRadius: "50%",
-                        background: "var(--cr-accent)",
-                        flexShrink: 0,
-                      }}
-                    />
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Column 3: Open hours */}
-          <div>
-            <h4
-              style={{
-                fontSize: "16px",
-                fontWeight: 600,
-                color: "#fff",
-                marginBottom: "20px",
-                fontFamily: "var(--font-sora), sans-serif",
-              }}
-            >
-              {t.footer.openHours}
-            </h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <div
-                style={{
-                  padding: "14px 16px",
-                  borderRadius: "10px",
-                  background: "rgba(255,255,255,0.07)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                }}
-              >
-                <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.9)" }}>
-                  {t.footer.hoursLine1}
-                </p>
-              </div>
-              <div
-                style={{
-                  padding: "14px 16px",
-                  borderRadius: "10px",
-                  background: "rgba(255,255,255,0.07)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                }}
-              >
-                <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.9)" }}>
-                  {t.footer.hoursLine2}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Column 4: Contact info */}
-          <div>
-            <h4
-              style={{
-                fontSize: "16px",
-                fontWeight: 600,
-                color: "#fff",
-                marginBottom: "20px",
-                fontFamily: "var(--font-sora), sans-serif",
-              }}
-            >
-              {t.footer.contact}
-            </h4>
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              {/* Phone */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", flexDirection: isRTL ? "row-reverse" : "row" }}>
-                <Image
-                  src="/images/icon-phone.svg"
-                  alt=""
-                  width={18}
-                  height={18}
-                  style={{ marginTop: "2px", opacity: 0.8, flexShrink: 0 }}
-                  aria-hidden
-                />
-                <div>
-                  <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.72)" }}>
+                    {isRTL ? "اتصل بنا:" : "Contact:"}
+                  </span>
+                  <div className="ft-contact-row-content">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--color-brand-sand)"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                    </svg>
                     <a
                       href="tel:+201125787019"
-                      style={{ color: "inherit", transition: "color 0.2s ease" }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "#fff"; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.72)"; }}
+                      style={{
+                        fontSize: "14px",
+                        color: "rgba(255,255,255,0.85)",
+                        textDecoration: "none",
+                        fontWeight: 500,
+                      }}
+                      className="hover:underline"
                     >
                       (+20) 01125787019
                     </a>
-                  </p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Email */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", flexDirection: isRTL ? "row-reverse" : "row" }}>
-                <Image
-                  src="/images/icon-mail.svg"
-                  alt=""
-                  width={18}
-                  height={18}
-                  style={{ marginTop: "2px", opacity: 0.8, flexShrink: 0 }}
-                  aria-hidden
-                />
-                <div>
-                  <p style={{ margin: "0 0 2px", fontSize: "12px", color: "var(--cr-accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {t.footer.email}
-                  </p>
-                  <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.72)" }}>
+                {/* Vertical Divider */}
+                <div className="ft-contact-divider" />
+
+                {/* E-Mail */}
+                <div className="ft-contact-item">
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "var(--color-brand-sand)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    {isRTL ? "البريد الإلكتروني:" : "E-Mail:"}
+                  </span>
+                  <div className="ft-contact-row-content">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--color-brand-sand)"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
                     <a
                       href="mailto:info@crystalroseclinics.com"
-                      style={{ color: "inherit", transition: "color 0.2s ease" }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "#fff"; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.72)"; }}
+                      style={{
+                        fontSize: "14px",
+                        color: "rgba(255,255,255,0.85)",
+                        textDecoration: "none",
+                        fontWeight: 500,
+                      }}
+                      className="hover:underline"
                     >
                       info@crystalroseclinics.com
                     </a>
-                  </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Address */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", flexDirection: isRTL ? "row-reverse" : "row" }}>
-                <Image
-                  src="/images/icon-location.svg"
-                  alt=""
-                  width={18}
-                  height={18}
-                  style={{ marginTop: "2px", opacity: 0.8, flexShrink: 0 }}
-                  aria-hidden
-                />
-                <div>
-                  <p style={{ margin: "0 0 2px", fontSize: "12px", color: "var(--cr-accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {t.footer.address}
-                  </p>
-                  <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.72)" }}>
-                    Cairo, Egypt
-                  </p>
+              {/* Row 2: Address (full width below phone/email) */}
+              <div className="ft-contact-item">
+                <span
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "var(--color-brand-sand)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {isRTL ? "العنوان:" : "Address:"}
+                </span>
+                <div className="ft-contact-row-content">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--color-brand-sand)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      color: "rgba(255,255,255,0.85)",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {isRTL
+                      ? "٣٦ أ شارع النزهة، أرض الجولف، مصر الجديدة، القاهرة."
+                      : "36 A El-Nozha St, Ard El Golf, Nasr City."}
+                  </span>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Bottom bar */}
-        <div
-          style={{
-            borderTop: "1px solid rgba(255,255,255,0.1)",
-            padding: "24px 0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexDirection: isRTL ? "row-reverse" : "row",
-            flexWrap: "wrap",
-            gap: "12px",
-          }}
-        >
-          <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.55)" }}>
-            {t.footer.copyright}
-          </p>
-          <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.55)" }}>
-            {t.footer.poweredBy}
-          </p>
+            {/* ── Bottom Bar: Copyright & Powered By ── */}
+            <div
+              className="ft-bottom-bar"
+              style={{
+                borderTop: "1px solid rgba(255,255,255,0.1)",
+                paddingTop: "24px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "12px",
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "13px",
+                  color: "rgba(255,255,255,0.55)",
+                }}
+              >
+                {t.footer.copyright}
+              </p>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "13px",
+                  color: "rgba(255,255,255,0.55)",
+                }}
+              >
+                {isRTL ? (
+                  <>
+                    تطوير بواسطة{" "}
+                    <span style={{ color: "var(--color-brand-sand)", fontWeight: 700 }}>
+                      Octpoli
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    Powered by{" "}
+                    <span style={{ color: "var(--color-brand-sand)", fontWeight: 700 }}>
+                      Octpoli
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </footer>

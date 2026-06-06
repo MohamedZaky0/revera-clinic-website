@@ -17,7 +17,7 @@ export const translations: Record<"en" | "ar", Translation> = {
     hero: {
       slides: [
         {
-          welcome: "Welcome to Crystal Rose Clinics",
+          welcome: "Welcome to Revera Clinics",
           heading: "Transform Your Beauty Naturally!",
           description:
             "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
@@ -26,7 +26,7 @@ export const translations: Record<"en" | "ar", Translation> = {
           reviewCount: "(1000+ review)",
         },
         {
-          welcome: "Welcome to Crystal Rose Clinics",
+          welcome: "Welcome to Revera Clinics",
           heading: "Advanced Medical Care You Can Trust!",
           description:
             "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and dental services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
@@ -35,7 +35,7 @@ export const translations: Record<"en" | "ar", Translation> = {
           reviewCount: "(1000+ review)",
         },
         {
-          welcome: "Welcome to Crystal Rose Clinics",
+          welcome: "Welcome to Revera Clinics",
           heading: "Your Beauty & Health Journey Starts Here!",
           description:
             "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and dental care for all ages.",
@@ -48,9 +48,9 @@ export const translations: Record<"en" | "ar", Translation> = {
     about: {
       tag: "About Us",
       subtitle: "Your journey to beauty and wellness",
-      heading: "Welcome to Crystal Rose",
+      heading: "Welcome to Revera",
       description:
-        "Welcome to Crystal Rose Clinics, operated by ABU OBEID Group Co. and under the supervision of Dr. Mahmoud Nasr Abu Obeid, Consultant Surgical Dermatologist with over 15 years of experience. We believe in providing comprehensive medical care enhanced through advanced techniques and personalized treatment.",
+        "Welcome to Revera Clinics, operated by ABU OBEID Group Co. and under the supervision of Dr. Mahmoud Nasr Abu Obeid, Consultant Surgical Dermatologist with over 15 years of experience. We believe in providing comprehensive medical care enhanced through advanced techniques and personalized treatment.",
       services: [
         "Dermatology & Laser Treatments",
         "Cosmetic & Plastic Surgery",
@@ -152,7 +152,7 @@ export const translations: Record<"en" | "ar", Translation> = {
       tag: "Our Mission",
       heading: "A message from Dr. Mahmoud Nasr Abu Obeid",
       quote:
-        '"Throughout my 15+ years career in surgical dermatology and plastic surgery, I have witnessed the transformative power of advanced medical care and personalized treatment. At Crystal Rose Clinics, we don\'t just provide treatments – we understand your unique needs and create comprehensive solutions. Everyone deserves to feel beautiful, confident, and healthy. Using evidence-based methods and cutting-edge techniques, we\'re here to guide you on your journey to lasting beauty and wellness."',
+        '"Throughout my 15+ years career in surgical dermatology and plastic surgery, I have witnessed the transformative power of advanced medical care and personalized treatment. At Revera Clinics, we don\'t just provide treatments – we understand your unique needs and create comprehensive solutions. Everyone deserves to feel beautiful, confident, and healthy. Using evidence-based methods and cutting-edge techniques, we\'re here to guide you on your journey to lasting beauty and wellness."',
       doctorName: "Dr. Mahmoud Nasr Abu Obeid",
       doctorTitle: "Consultant Surgical Dermatologist - MRCS Edinburgh, UK",
       doctorInfo: "Worked in Saudi Arabia, USA & Egypt",
@@ -168,12 +168,12 @@ export const translations: Record<"en" | "ar", Translation> = {
           role: "Client",
         },
         {
-          text: '"Crystal Rose Clinics is very professional, skilled and highly experienced medical center. Dr. Mahmoud provides the most effective and advanced dermatology treatments."',
+          text: '"Revera Clinics is very professional, skilled and highly experienced medical center. Dr. Mahmoud provides the most effective and advanced dermatology treatments."',
           author: "Sarah Ahmed",
           role: "Client",
         },
         {
-          text: '"Very professional and knowledgeable. Dr. Mahmoud was very welcoming and informative about skin care and treatments. The results were amazing. I definitely recommend Crystal Rose Clinics!"',
+          text: '"Very professional and knowledgeable. Dr. Mahmoud was very welcoming and informative about skin care and treatments. The results were amazing. I definitely recommend Revera Clinics!"',
           author: "Omar Abdel Meguid",
           role: "Client",
         },
@@ -223,7 +223,7 @@ export const translations: Record<"en" | "ar", Translation> = {
       labels: { service: "Service", date: "Date", time: "Time", provider: "Provider" },
     },
     auth: {
-      title: "Welcome to Crystal Rose",
+      title: "Welcome to Revera",
       subtitle: "Enter your phone number to get started",
       phonePlaceholder: "Phone Number",
       phoneHint: "Egyptian phone number (11 digits, starts with 01)",
@@ -244,7 +244,7 @@ export const translations: Record<"en" | "ar", Translation> = {
       aboutTag: "About Us",
       aboutHeading: "Your beauty journey with us",
       aboutDescription:
-        "Welcome to Crystal Rose Clinics, operated by ABU OBEID Group Co. and under the supervision of Dr. Mahmoud Nasr Abu Obeid, Consultant Surgical Dermatologist with over 15 years of experience. We believe beauty and health are unique reflections of personalized care, enhanced through advanced medical techniques and comprehensive treatment plans designed just for you.",
+        "Welcome to Revera Clinics, operated by ABU OBEID Group Co. and under the supervision of Dr. Mahmoud Nasr Abu Obeid, Consultant Surgical Dermatologist with over 15 years of experience. We believe beauty and health are unique reflections of personalized care, enhanced through advanced medical techniques and comprehensive treatment plans designed just for you.",
       aboutList: [
         "Dermatology & Laser Treatments",
         "Cosmetic & Plastic Surgery",
@@ -284,7 +284,7 @@ export const translations: Record<"en" | "ar", Translation> = {
       faqHeading: "Got questions? We've got answers!",
       faqs: [
         {
-          question: "1. What services does Crystal Rose Clinics offer?",
+          question: "1. What services does Revera Clinics offer?",
           answer:
             "We provide comprehensive medical services including dermatology, cosmetic and plastic surgery, laser treatments, and dental care. Our services use evidence-based medical techniques to understand your unique needs and provide personalized treatment plans tailored to your beauty and health goals.",
         },

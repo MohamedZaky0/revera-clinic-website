@@ -4,7 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { HeroSlider } from "@/components/HeroSlider";
 import { AboutSection } from "@/components/AboutSection";
 import { OurResults } from "@/components/OurResults";
-import { ServicesSection } from "@/components/ServicesSection";
+import { HomeServicesSection } from "@/components/HomeServicesSection";
 import { WhatWeDo } from "@/components/WhatWeDo";
 import { IntroVideo } from "@/components/IntroVideo";
 import { WhyChooseUs } from "@/components/WhyChooseUs";
@@ -30,7 +30,7 @@ export default function Home() {
         </section>
         <OurResults />
         <section id="services">
-          <ServicesSection />
+          <HomeServicesSection />
         </section>
         <WhatWeDo />
         <IntroVideo />

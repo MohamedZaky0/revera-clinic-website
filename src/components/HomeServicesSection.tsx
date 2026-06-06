@@ -106,8 +106,8 @@ function CategoryCard({ label, sublabel, onClick }: CategoryCardProps) {
         minWidth: 280,
         padding: "48px 32px",
         borderRadius: 24,
-        border: hovered ? "1.5px solid var(--cr-primary)" : "1.5px solid rgba(90, 61, 52, 0.18)",
-        background: hovered ? "var(--cr-white)" : "var(--cr-secondary)",
+        border: hovered ? "1.5px solid var(--cr-primary)" : "1.5px solid rgba(90, 106, 81, 0.15)",
+        background: "var(--cr-white)",
         color: "var(--cr-primary)",
         display: "flex",
         flexDirection: "column",
@@ -119,10 +119,9 @@ function CategoryCard({ label, sublabel, onClick }: CategoryCardProps) {
         position: "relative",
         boxShadow: hovered 
           ? "0 12px 30px rgba(90, 61, 52, 0.08)" 
-          : "none",
+          : "0 4px 12px rgba(90, 61, 52, 0.02)",
       }}
     >
-
       <div 
         style={{ 
           color: "var(--cr-primary)", 
@@ -138,6 +137,7 @@ function CategoryCard({ label, sublabel, onClick }: CategoryCardProps) {
           color: "var(--cr-primary)",
           transition: "color 0.3s",
           marginBottom: 6,
+          fontWeight: 400,
         }}>
           {label}
         </div>
@@ -174,7 +174,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        backgroundColor: "var(--cr-secondary)",
+        backgroundColor: "var(--cr-white)",
         borderRadius: 24,
         overflow: "hidden",
         border: "1px solid rgba(90, 106, 81, 0.2)",
@@ -299,7 +299,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
             pointerEvents: "none",
             transition: "width 180ms ease, height 180ms ease, border 180ms ease, opacity 180ms ease, transform 180ms ease",
             opacity: showCursor && hovered ? 1 : 0,
-            boxShadow: hovered ? "0 6px 18px rgba(0,0,0,0.12)" : "none",
+            boxShadow: hovered ? "0 6px 18px rgba(0, 0, 0, 0.76)" : "none",
           }}>
             <div style={{
               position: "absolute",
@@ -323,7 +323,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
   );
 }
 
-export function ServicesSection() {
+export function HomeServicesSection() {
   const { t, language, isRTL } = useLanguage();
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
 
@@ -333,22 +333,20 @@ export function ServicesSection() {
     ? "اكتشف خدماتنا الطبية المتخصصة المصممة لتعزيز صحتك وجمالك العام."
     : "Discover our specialized medical services designed to support your health and overall wellness.";
 
-  const handleBook = () => window.dispatchEvent(new CustomEvent("open-booking"));
-
   return (
     <section
       id="services"
       className="bg-white section-padding"
-      style={{ overflow: "hidden", paddingBottom: activeCategory ? "100px" : "20px" }}
+      style={{ overflow: "hidden", paddingBottom: "100px" }}
     >
       <div className="cr-container" style={{ maxWidth: "1480px" }}>
         <div
-          className={`services-card-wrapper ${!activeCategory ? "phase-1" : ""}`}
+          className="services-card-wrapper"
           style={{
             position: "relative",
-            backgroundColor: "transparent",
+            backgroundColor: "var(--cr-secondary)",
             borderRadius: "32px",
-            border: "none",
+            border: "1px solid rgba(90, 106, 81, 0.25)",
             overflow: "hidden",
           }}
         >
@@ -363,6 +361,17 @@ export function ServicesSection() {
             }}
           >
             <img src="/images/why-choose-bg-shape.svg" alt="" className="w-full h-full object-contain" />
+          </div>
+
+          {/* Top-Right: Dots */}
+          <div
+            className="absolute top-10 pointer-events-none select-none opacity-[0.12] w-[180px] h-[180px]"
+            style={{
+              left: isRTL ? "40px" : "auto",
+              right: isRTL ? "auto" : "40px",
+            }}
+          >
+            <img src="/images/faq-dot-img.svg" alt="" className="w-full h-full object-contain" />
           </div>
 
           {/* Bottom-Right: Waves */}
@@ -380,73 +389,128 @@ export function ServicesSection() {
           <div style={{ position: "relative", zIndex: 10 }} className="services-card-inner">
             {/* ── Header ── */}
             <div style={{ textAlign: "center", marginBottom: 40 }}>
-              {activeCategory ? (
-                <>
-                  <div
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 8,
-                      flexDirection: isRTL ? "row-reverse" : "row"
-                    }}
-                  >
-                  </div>
-                  <h2 style={{ maxWidth: 640, margin: "0 auto", lineHeight: 1.2, fontFamily: "var(--font-marcellus), serif", color: "var(--cr-primary)",fontSize: "clamp(20px, 3.5vw, 24px)",fontWeight: 400, }}>
-                    {t.services.selectCategory}
-                  </h2>
-                </>
-              ) : (
-                <h2 style={{
-                  maxWidth: 640,
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  marginBottom: 14,
+                  flexDirection: isRTL ? "row-reverse" : "row"
+                }}
+              >
+                <img src="/images/main_logo.png" alt="" style={{ width: 18, height: 18, objectFit: "contain", opacity: 0.8 }} />
+                <span className="section-tag mb-0">{t.services.tag}</span>
+              </div>
+              <h2 style={{
+                maxWidth: 760,
+                margin: "0 auto 14px",
+                lineHeight: 1.2,
+                fontFamily: "var(--font-marcellus), serif",
+                color: "var(--cr-primary)",
+                fontSize: "clamp(26px, 4vw, 42px)",
+                fontWeight: 400,
+              }}>
+                {t.services.heading}
+              </h2>
+              {!activeCategory && (
+                <p style={{
                   margin: "0 auto",
-                  lineHeight: 1.2,
-                  fontFamily: "var(--font-marcellus), serif",
-                  color: "var(--cr-primary)",
-                  fontSize: "clamp(20px, 3.5vw, 24px)",
-                  fontWeight: 400,
+                  fontFamily: "var(--font-sora), sans-serif",
+                  fontSize: "14px",
+                  color: "var(--color-brand-secondary)",
+                  fontWeight: 500,
                 }}>
                   {t.services.selectCategory}
-                </h2>
+                </p>
               )}
             </div>
 
             {/* ── Phase 1: category picker ── */}
             {!activeCategory && (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, minmax(250px, 1fr))",
-                  gap: 24,
-                  maxWidth: 1400,
-                  margin: "0 auto",
-                  width: "100%",
-                  justifyContent: "center",
-                  position: "relative",
-                }}
-                className="services-cat-grid"
-              >
-                <CategoryCard
-                  label={language === "ar" ? "الجلدية والتجميل" : "Dermatology & Aesthetic"}
-                  sublabel={language === "ar" ? "جلدية وتجميل" : "Skin & Aesthetic"}
-                  onClick={() => setActiveCategory("dermatology")}
-                />
-                <CategoryCard
-                  label={language === "ar" ? "النساء والتوليد" : "Gynecology"}
-                  sublabel={language === "ar" ? "صحة المرأة" : "Women’s Health"}
-                  onClick={() => setActiveCategory("gynecology")}
-                />
-                <CategoryCard
-                  label={language === "ar" ? "العلاج الطبيعي" : "Physical Therapy"}
-                  sublabel={language === "ar" ? "إعادة التأهيل" : "Rehabilitation"}
-                  onClick={() => setActiveCategory("physiotherapy")}
-                />
-                <CategoryCard
-                  label={language === "ar" ? "تقويم العظام والتغذية" : "Osteopathy & Nutrition"}
-                  sublabel={language === "ar" ? "صحة العظام" : "Bone & Nutrition"}
-                  onClick={() => setActiveCategory("osteopathy")}
-                />
-              </div>
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(4, minmax(250px, 1fr))",
+                    gap: 24,
+                    maxWidth: 1400,
+                    margin: "0 auto",
+                    width: "100%",
+                    justifyContent: "center",
+                    position: "relative",
+                  }}
+                  className="services-cat-grid"
+                >
+                  <CategoryCard
+                    label={language === "ar" ? "الجلدية والتجميل" : "Dermatology & Aesthetic"}
+                    sublabel={language === "ar" ? "جلدية وتجميل" : "Skin & Aesthetic"}
+                    onClick={() => setActiveCategory("dermatology")}
+                  />
+                  <CategoryCard
+                    label={language === "ar" ? "النساء والتوليد" : "Gynecology"}
+                    sublabel={language === "ar" ? "صحة المرأة" : "Women’s Health"}
+                    onClick={() => setActiveCategory("gynecology")}
+                  />
+                  <CategoryCard
+                    label={language === "ar" ? "العلاج الطبيعي" : "Physical Therapy"}
+                    sublabel={language === "ar" ? "إعادة التأهيل" : "Rehabilitation"}
+                    onClick={() => setActiveCategory("physiotherapy")}
+                  />
+                  <CategoryCard
+                    label={language === "ar" ? "تقويم العظام والتغذية" : "Osteopathy & Nutrition"}
+                    sublabel={language === "ar" ? "صحة العظام" : "Bone & Nutrition"}
+                    onClick={() => setActiveCategory("osteopathy")}
+                  />
+                </div>
+
+                {/* ── Bottom CTA banner row ── */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "10px",
+                    marginTop: "48px",
+                    fontSize: "14px",
+                    fontFamily: "var(--font-sora), sans-serif",
+                    color: "var(--cr-primary)",
+                    flexWrap: "wrap",
+                    textAlign: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      backgroundColor: "var(--color-brand-secondary)",
+                      color: "#fff",
+                      padding: "4px 10px",
+                      borderRadius: "20px",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {t.services.freeLabel}
+                  </span>
+                  <span style={{ fontWeight: 500 }}>
+                    {t.services.ctaText}{" "}
+                    <a
+                      href="#appointment"
+                      style={{
+                        fontWeight: 600,
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        window.dispatchEvent(new CustomEvent("open-booking"));
+                      }}
+                    >
+                      {t.services.ctaBtn}
+                    </a>
+                  </span>
+                </div>
+              </>
             )}
 
             {/* ── Phase 2: pill tabs + swiper ── */}
@@ -513,18 +577,12 @@ export function ServicesSection() {
 
       <style>{`
         .services-card-wrapper {
-          padding: 80px 48px 40px;
-        }
-        .services-card-wrapper.phase-1 {
-          padding: 80px 48px 10px;
+          padding: 80px 48px;
         }
         @media (max-width: 768px) {
           .services-card-wrapper {
             padding: 48px 24px 30px;
             border-radius: 24px !important;
-          }
-          .services-card-wrapper.phase-1 {
-            padding: 48px 24px 10px;
           }
         }
         .services-swiper-wrap .swiper-button-prev,

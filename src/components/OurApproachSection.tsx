@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export function OurApproachSection() {
@@ -38,90 +39,303 @@ export function OurApproachSection() {
   return (
     <section
       ref={sectionRef}
-      className="section-padding"
-      style={{
-        background: "var(--cr-secondary)",
-        backgroundImage: "url(/images/approach-bg-shape.svg)",
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: isRTL ? "left center" : "right center",
-        backgroundSize: "contain",
-      }}
+      className="bg-white section-padding"
+      style={{ overflow: "hidden" }}
     >
-      <div className="cr-container">
-        <div className={`flex flex-col gap-12 lg:gap-16 items-center ${isRTL ? "lg:flex-row-reverse" : "lg:flex-row"}`}>
-
-          {/* Text column */}
-          <div className={`flex-1 ${reveal}`}>
-            <span className="section-tag">{t.aboutPage.servicesTag}</span>
-            <h2 className="mt-3 mb-5">{t.aboutPage.servicesHeading}</h2>
-            <p className="mb-8 text-base leading-relaxed" style={{ color: "var(--cr-muted-foreground, #8a6d62)" }}>
-              {t.aboutPage.servicesDescription}
-            </p>
-
-            <div className="flex flex-col gap-6">
-              {approachItems.map((item) => (
-                <div
-                  key={item.title}
-                  className={`flex gap-4 ${isRTL ? "flex-row-reverse" : ""}`}
-                >
-                  <div
-                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl"
-                    style={{ backgroundColor: "#fff", boxShadow: "0 2px 12px rgba(90,61,52,0.1)" }}
-                  >
-                    <img src={item.icon} alt={item.title} style={{ width: 32, height: 32 }} />
-                  </div>
-                  <div className={isRTL ? "text-right" : ""}>
-                    <h3
-                      className="mb-1 text-base font-semibold"
-                      style={{ color: "var(--cr-primary)" }}
-                    >
-                      {item.title}
-                    </h3>
-                    <p className="text-sm leading-relaxed" style={{ color: "var(--cr-muted-foreground, #8a6d62)" }}>
-                      {item.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+      <div className="cr-container" style={{ maxWidth: "1480px" }}>
+        {/* Curved card — beige background */}
+        <div
+          style={{
+            position: "relative",
+            backgroundColor: "var(--cr-secondary, #EDF1EC)",
+            borderRadius: "60px",
+            border: "1px solid rgba(196,174,124,0.3)",
+            overflow: "hidden",
+            padding: "clamp(40px, 6vw, 72px) clamp(24px, 5vw, 72px)",
+          }}
+        >
+          {/* Leaf ornament — top left */}
+          <div
+            className="pointer-events-none absolute select-none w-[220px] h-[220px]"
+            style={{
+              top: "-20px",
+              left: isRTL ? "auto" : "-20px",
+              right: isRTL ? "-20px" : "auto",
+              opacity: 0.12,
+              transform: isRTL ? "scaleX(-1) rotate(-90deg)" : "rotate(-90deg)",
+            }}
+          >
+            <Image src="/images/why-choose-bg-shape.svg" alt="" fill className="object-contain" />
           </div>
 
-          {/* Image column */}
-          <div className={`flex-1 w-full max-w-[480px] lg:max-w-none ${revealDelay}`}>
-            <div className="relative">
-              <div className="relative overflow-hidden rounded-2xl" style={{ aspectRatio: "4/5" }}>
-                <img
-                  src="/images/assets/dr-hanan-18.jpg"
-                  alt="Our Approach"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          {/* Leaf ornament — bottom right */}
+          <div
+            className="pointer-events-none absolute select-none w-[220px] h-[220px]"
+            style={{
+              bottom: "-20px",
+              right: isRTL ? "auto" : "-20px",
+              left: isRTL ? "-20px" : "auto",
+              opacity: 0.10,
+              transform: isRTL ? "scaleX(-1) rotate(90deg)" : "rotate(90deg)",
+            }}
+          >
+            <Image src="/images/why-choose-bg-shape.svg" alt="" fill className="object-contain" />
+          </div>
+
+          <style>{`
+            .oas2-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: clamp(32px, 5vw, 64px);
+              align-items: center;
+              position: relative;
+              z-index: 10;
+            }
+            .oas2-item-card {
+              background: #fff;
+              border-radius: 20px;
+              padding: 28px 24px;
+              display: flex;
+              flex-direction: column;
+              gap: 20px;
+              box-shadow: 0 2px 16px rgba(90,61,52,0.06);
+              margin-top: 24px;
+            }
+            .oas2-item {
+              display: flex;
+              align-items: flex-start;
+              gap: 16px;
+            }
+            .rtl-oas2 .oas2-item {
+              flex-direction: row-reverse;
+              text-align: right;
+            }
+            .oas2-icon {
+              width: 52px;
+              height: 52px;
+              border-radius: 50%;
+              background-color: rgba(90,61,52,0.08);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+            }
+            .oas2-img-wrapper {
+              position: relative;
+              width: 100%;
+            }
+            .oas2-clinic-img {
+              position: relative;
+              width: 100%;
+              aspect-ratio: 4 / 3.2;
+              border-radius: 24px;
+              overflow: hidden;
+              box-shadow: 0 8px 28px rgba(90,61,52,0.12);
+            }
+            .oas2-doctor-img {
+              position: absolute;
+              bottom: -16px;
+              left: isRTL ? auto : 24px;
+              width: 140px;
+              height: 160px;
+              border-radius: 80px 80px 80px 80px;
+              overflow: hidden;
+              border: 4px solid #fff;
+              box-shadow: 0 6px 20px rgba(0,0,0,0.14);
+            }
+            .oas2-support-badge {
+              position: absolute;
+              top: 16px;
+              right: 16px;
+              background: var(--cr-primary, #414E36);
+              border-radius: 14px;
+              padding: 12px 18px;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              box-shadow: 0 4px 16px rgba(90,61,52,0.25);
+            }
+            .rtl-oas2 .oas2-support-badge {
+              right: auto;
+              left: 16px;
+            }
+            @media (max-width: 1024px) {
+              .oas2-grid {
+                grid-template-columns: 1fr;
+                gap: 40px;
+              }
+              .oas2-text-col {
+                text-align: center;
+              }
+              .rtl-oas2 .oas2-item {
+                justify-content: center;
+                flex-direction: row;
+                text-align: left;
+              }
+            }
+          `}</style>
+
+          <div
+            className={`oas2-grid ${isRTL ? "rtl-oas2" : ""}`}
+            style={{ direction: isRTL ? "rtl" : "ltr" }}
+          >
+            {/* LEFT: text + white card */}
+            <div className={`oas2-text-col ${reveal}`}>
+              {/* Tag */}
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "14px",
+                }}
+              >
+                <img src="/images/main_logo.png" alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    letterSpacing: "0.2em",
+                    color: "var(--color-brand-secondary)",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {t.aboutPage.servicesTag}
+                </span>
+              </div>
+
+              {/* Heading */}
+              <h2
+                style={{
+                  margin: "0 0 16px 0",
+                  fontSize: "clamp(26px, 3.5vw, 40px)",
+                  lineHeight: 1.15,
+                  fontWeight: 400,
+                  color: "var(--cr-primary)",
+                  fontFamily: "var(--font-marcellus), serif",
+                }}
+              >
+                {t.aboutPage.servicesHeading}
+              </h2>
+
+              {/* Description */}
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "14px",
+                  lineHeight: 1.75,
+                  color: "var(--cr-muted-foreground, #5A6A51)",
+                }}
+              >
+                {t.aboutPage.servicesDescription}
+              </p>
+
+              {/* White card with approach items */}
+              <div className="oas2-item-card">
+                {approachItems.map((item, i) => (
+                  <div key={item.title}>
+                    {i > 0 && (
+                      <div style={{ borderTop: "1px solid rgba(196,174,124,0.25)", marginBottom: "20px" }} />
+                    )}
+                    <div className="oas2-item">
+                      <div className="oas2-icon">
+                        <img
+                          src={item.icon}
+                          alt={item.title}
+                          style={{ width: 24, height: 24, filter: "brightness(0) saturate(100%) invert(20%) sepia(25%) saturate(500%) hue-rotate(340deg)" }}
+                        />
+                      </div>
+                      <div>
+                        <h3
+                          style={{
+                            margin: "0 0 6px 0",
+                            fontSize: "15px",
+                            fontWeight: 600,
+                            color: "var(--cr-primary)",
+                          }}
+                        >
+                          {item.title}
+                        </h3>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: "13px",
+                            lineHeight: 1.7,
+                            color: "var(--cr-muted-foreground, #5A6A51)",
+                          }}
+                        >
+                          {item.description}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* RIGHT: clinic room image + doctor portrait + support badge */}
+            <div className={`oas2-img-wrapper ${revealDelay}`}>
+              {/* Clinic/room image */}
+              <div className="oas2-clinic-img">
+                <Image
+                  src="/images/assets/04252364-cb0b-478d-b995-69ccec4d93c9.jpg"
+                  alt="Revera Clinic"
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 480px"
+                  style={{ objectFit: "cover", objectPosition: "center" }}
                 />
               </div>
 
-              {/* 24/7 badge */}
+              {/* Doctor portrait — overlapping bottom-left */}
               <div
                 style={{
                   position: "absolute",
-                  bottom: 24,
-                  left: isRTL ? "auto" : 24,
-                  right: isRTL ? 24 : "auto",
-                  background: "var(--cr-primary)",
-                  borderRadius: 12,
-                  padding: "12px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+                  bottom: "-20px",
+                  left: isRTL ? "auto" : "24px",
+                  right: isRTL ? "24px" : "auto",
+                  width: "130px",
+                  height: "155px",
+                  borderRadius: "70px",
+                  overflow: "hidden",
+                  border: "4px solid #fff",
+                  boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
                 }}
               >
-                <img src="/images/icon-phone.svg" alt="support" style={{ width: 20, height: 20, filter: "brightness(0) invert(1)" }} />
+                <Image
+                  src="/images/assets/dr-hanan-8.png"
+                  alt="Doctor"
+                  fill
+                  sizes="130px"
+                  style={{ objectFit: "cover", objectPosition: "center top" }}
+                />
+              </div>
+
+              {/* 24/7 Support badge — top right */}
+              <div className="oas2-support-badge">
+                <img
+                  src="/images/icon-phone.svg"
+                  alt="support"
+                  style={{ width: 20, height: 20, filter: "brightness(0) invert(1)" }}
+                />
                 <div>
-                  <p className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.7)", marginBottom: 2 }}>
+                  <p
+                    style={{
+                      margin: "0 0 2px 0",
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color: "#fff",
+                    }}
+                  >
                     {t.aboutPage.supportLabel}
                   </p>
                   <a
                     href={`tel:${t.aboutPage.phone.replace(/\s/g, "")}`}
-                    className="text-sm font-bold"
-                    style={{ color: "#fff" }}
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: "rgba(255,255,255,0.85)",
+                      textDecoration: "none",
+                    }}
                   >
                     {t.aboutPage.phone}
                   </a>
