@@ -11,9 +11,9 @@ import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 
 export const metadata: Metadata = {
-  title: "Services - Crystal Rose Clinics | Medical Center",
+  title: "Services - Revera Clinics | Medical Center",
   description:
-    "Explore Crystal Rose Clinics' comprehensive dermatology, cosmetic surgery, laser, and dental services.",
+    "Explore Revera Clinics' comprehensive dermatology & aesthetic, gynecology, physical therapy, and osteopathy & nutrition services.",
 };
 
 export default function ServicesPage() {

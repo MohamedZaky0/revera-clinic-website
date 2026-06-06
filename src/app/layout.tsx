@@ -18,12 +18,12 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Crystal Rose Clinics - Medical Center",
+  title: "Revera Clinics - Medical Center",
   description:
     "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
   icons: {
-    icon: "/images/logo.png",
-    apple: "/images/logo.png",
+    icon: "/images/main_logo.png",
+    apple: "/images/main_logo.png",
   },
 };
 

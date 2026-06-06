@@ -37,123 +37,362 @@ export function WhyChooseUs() {
   }`;
 
   return (
-    <section ref={sectionRef} className="bg-section section-padding relative overflow-hidden">
-      {/* Decorative background shape */}
-      <div
-        className="pointer-events-none absolute right-0 top-0 h-full w-1/2 select-none opacity-10"
-        aria-hidden="true"
-      >
-        <Image
-          src="/images/why-choose-bg-shape.svg"
-          alt=""
-          fill
-          sizes="50vw"
-          className="object-contain object-right-top"
-        />
-      </div>
-
-      <div className="cr-container relative z-10">
+    <section
+      ref={sectionRef}
+      id="why-choose-us"
+      className="bg-white section-padding"
+      style={{ overflow: "hidden" }}
+    >
+      <div className="cr-container" style={{ maxWidth: "1480px" }}>
+        {/* Rounded Card Wrapper with Beige Background */}
         <div
-          className={`flex flex-col items-center gap-12 lg:gap-16 ${
-            isRTL ? "lg:flex-row-reverse" : "lg:flex-row"
-          }`}
+          style={{
+            position: "relative",
+            backgroundColor: "var(--cr-secondary, #EDF1EC)",
+            borderRadius: "32px",
+            border: "1px solid rgba(196,174,124,0.35)",
+            overflow: "hidden",
+            padding: "clamp(40px, 6vw, 80px) clamp(24px, 5vw, 72px)",
+          }}
         >
-          {/* ── Left: text column ── */}
-          <div className={`flex-1 ${textReveal}`}>
-            {/* Experience badge */}
-            <div className="mb-4 inline-flex items-center gap-2">
-              <span
-                className="rounded-full px-4 py-1.5 text-xs font-semibold tracking-wide"
-                style={{
-                  backgroundColor: "var(--cr-primary)",
-                  color: "var(--cr-white)",
-                }}
-              >
-                {t.whyChooseUs.yearsLabel}
-              </span>
+          {/* Curved section background decorations */}
+          <div
+            className="pointer-events-none absolute inset-0 select-none opacity-[0.15]"
+            aria-hidden="true"
+            style={{
+              transform: isRTL ? "scaleX(-1)" : "none",
+            }}
+          >
+            <Image
+              src="/images/why-choose-bg-shape.svg"
+              alt=""
+              fill
+              className="object-cover"
+              priority
+            />
+          </div>
+
+          <style>{`
+            .wcu-grid {
+              display: grid;
+              grid-template-columns: 1fr 1.2fr;
+              gap: clamp(40px, 6vw, 80px);
+              align-items: center;
+              position: relative;
+              z-index: 10;
+            }
+            .wcu-image-col {
+              position: relative;
+              width: 100%;
+              display: flex;
+              justify-content: center;
+            }
+            .wcu-image-container {
+              position: relative;
+              width: 100%;
+              height: 450px;
+              max-width: 460px;
+            }
+            .wcu-left-img {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 250px;
+              height: 330px;
+              border-radius: 30px;
+              overflow: hidden;
+              box-shadow: 0 12px 32px rgba(90, 61, 52, 0.08);
+            }
+            .wcu-right-backing {
+              position: absolute;
+              bottom: 0;
+              right: 0;
+              width: 280px;
+              height: 330px;
+              background-color: var(--color-brand-secondary);
+              border-radius: 30px;
+              z-index: 2;
+              box-shadow: 0 12px 32px rgba(90, 61, 52, 0.12);
+            }
+            .wcu-right-img {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 235px;
+              height: 100%;
+              border-radius: 30px;
+              overflow: hidden;
+            }
+            .wcu-vertical-text {
+              position: absolute;
+              right: 0;
+              top: 0;
+              bottom: 0;
+              width: 45px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .wcu-vertical-span {
+              transform: rotate(-90deg);
+              transform-origin: center;
+              white-space: nowrap;
+              font-size: 11px;
+              font-weight: 700;
+              letter-spacing: 0.15em;
+              color: #fff;
+              text-transform: uppercase;
+            }
+
+            /* RTL support classes */
+            .rtl .wcu-left-img {
+              left: auto;
+              right: 0;
+            }
+            .rtl .wcu-right-backing {
+              right: auto;
+              left: 0;
+            }
+            .rtl .wcu-right-img {
+              left: auto;
+              right: 0;
+            }
+            .rtl .wcu-vertical-text {
+              right: auto;
+              left: 0;
+            }
+            .rtl .wcu-vertical-span {
+              transform: rotate(90deg);
+            }
+
+            @media (max-width: 1024px) {
+              .wcu-grid {
+                grid-template-columns: 1fr;
+                gap: 50px;
+              }
+              .wcu-text-col {
+                text-align: center;
+              }
+              .wcu-tag-row {
+                justify-content: center !important;
+              }
+              .wcu-contact-row {
+                justify-content: center !important;
+              }
+            }
+
+            @media (max-width: 480px) {
+              .wcu-image-container {
+                height: 330px;
+                max-width: 325px;
+              }
+              .wcu-left-img {
+                width: 175px;
+                height: 245px;
+                border-radius: 20px;
+              }
+              .wcu-right-backing {
+                width: 200px;
+                height: 245px;
+                border-radius: 20px;
+              }
+              .wcu-right-img {
+                width: 165px;
+                border-radius: 20px;
+              }
+              .wcu-vertical-text {
+                width: 35px;
+              }
+              .wcu-vertical-span {
+                font-size: 8px;
+                letter-spacing: 0.1em;
+              }
+            }
+          `}</style>
+
+          <div className="wcu-grid" style={{ direction: isRTL ? "rtl" : "ltr" }}>
+            {/* ── Left Column: Overlapping Images ── */}
+            <div className="wcu-image-col">
+              <div className={`wcu-image-container ${imageReveal}`}>
+                {/* Dentist room / purple chair image */}
+                <div className="wcu-left-img">
+                  <Image
+                    src="/images/assets/04252364-cb0b-478d-b995-69ccec4d93c9.jpg"
+                    alt="Dental clinic room — Revera Clinics"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 400px"
+                    style={{ objectFit: "cover", objectPosition: "center" }}
+                  />
+                </div>
+
+                {/* Backing box containing treatment image + vertical experience text */}
+                <div className="wcu-right-backing">
+                  {/* Doctor performing treatment image */}
+                  <div className="wcu-right-img">
+                    <Image
+                      src="/images/assets/bda0b3ec-1372-4aba-ba33-7d58aa317501.jpg"
+                      alt="Skin treatment — Revera Clinics"
+                      fill
+                      sizes="(max-width: 768px) 100vw, 400px"
+                      style={{ objectFit: "cover", objectPosition: "center" }}
+                    />
+                  </div>
+
+                  {/* Vertical Experience text */}
+                  <div className="wcu-vertical-text">
+                    <span className="wcu-vertical-span">
+                      {t.whyChooseUs.yearsLabel}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <span className="section-tag block">{t.whyChooseUs.tag}</span>
-
-            <h2 className="mb-5 mt-2">{t.whyChooseUs.heading}</h2>
-
-            <p
-              className="mb-8 text-base leading-relaxed"
-              style={{ color: "var(--muted-foreground)" }}
-            >
-              {t.whyChooseUs.description}
-            </p>
-
-            {/* Quote card */}
+            {/* ── Right Column: Text & Content ── */}
             <div
-              className="rounded-2xl bg-white p-8 shadow-md"
-              style={{ border: "1px solid var(--border)" }}
+              className={`wcu-text-col ${textReveal}`}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                textAlign: isRTL ? "right" : "left",
+              }}
             >
-              {/* Large opening quote mark */}
-              <span
-                className="mb-3 block font-heading text-5xl leading-none"
-                style={{ color: "var(--cr-accent)" }}
-                aria-hidden="true"
+              {/* Tag with Golden Icon */}
+              <div
+                className="wcu-tag-row"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "16px",
+                  justifyContent: "flex-start",
+                }}
               >
-                &ldquo;
-              </span>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--color-brand-secondary)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    letterSpacing: "0.2em",
+                    color: "var(--color-brand-secondary)",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {t.whyChooseUs.tag}
+                </span>
+              </div>
 
+              {/* Main Heading */}
+              <h2
+                className="font-heading"
+                style={{
+                  margin: "0 0 16px 0",
+                  fontSize: "clamp(26px, 3.5vw, 40px)",
+                  lineHeight: 1.15,
+                  fontWeight: 400,
+                  color: "var(--cr-primary, #1F251A)",
+                }}
+              >
+                {t.whyChooseUs.heading}
+              </h2>
+
+              {/* Description Paragraph */}
               <p
-                className="mb-6 text-sm italic leading-relaxed"
-                style={{ color: "var(--muted-foreground)" }}
+                style={{
+                  margin: "0 0 24px 0",
+                  fontSize: "15px",
+                  lineHeight: 1.7,
+                  color: "var(--cr-primary, #1F251A)",
+                  opacity: 0.75,
+                }}
+              >
+                {t.whyChooseUs.description}
+              </p>
+
+              {/* Premium Italic Blockquote */}
+              <p
+                className="font-heading italic"
+                style={{
+                  margin: "0 0 32px 0",
+                  fontSize: "clamp(15px, 1.8vw, 17px)",
+                  lineHeight: 1.6,
+                  color: "var(--cr-primary, #1F251A)",
+                  fontWeight: 500,
+                  opacity: 0.9,
+                }}
               >
                 {t.whyChooseUs.quote}
               </p>
 
-              {/* Contact row */}
+              {/* Contact Info Row */}
               <div
-                className={`flex items-center gap-3 border-t pt-5 ${
-                  isRTL ? "flex-row-reverse" : ""
-                }`}
-                style={{ borderColor: "var(--border)" }}
+                className="wcu-contact-row"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "14px",
+                  justifyContent: "flex-start",
+                  flexDirection: isRTL ? "row-reverse" : "row",
+                }}
               >
-                <span
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-                  style={{ backgroundColor: "var(--cr-secondary)" }}
+                {/* Circular Phone Button */}
+                <a
+                  href={`tel:${t.whyChooseUs.phone.replace(/\s/g, "")}`}
+                  style={{
+                    display: "flex",
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    backgroundColor: "#1F251A",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--color-brand-secondary)",
+                    transition: "transform 0.3s ease, background-color 0.3s ease",
+                    flexShrink: 0,
+                  }}
+                  className="hover:scale-108"
                 >
-                  <Phone
-                    size={15}
-                    strokeWidth={2}
-                    style={{ color: "var(--cr-primary)" }}
-                  />
-                </span>
-                <div className={isRTL ? "text-right" : "text-left"}>
-                  <p
-                    className="mb-0 text-xs font-semibold uppercase tracking-wider"
-                    style={{ color: "var(--cr-accent)" }}
-                  >
+                  <Phone size={18} fill="currentColor" stroke="none" />
+                </a>
+
+                {/* Contact Labels */}
+                <div
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 600,
+                    color: "var(--cr-primary, #1F251A)",
+                    display: "flex",
+                    gap: "6px",
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                  }}
+                >
+                  <span style={{ color: "var(--color-brand-secondary)" }}>
                     {t.whyChooseUs.contactLabel}
-                  </p>
+                  </span>
                   <a
                     href={`tel:${t.whyChooseUs.phone.replace(/\s/g, "")}`}
-                    className="text-sm font-semibold"
-                    style={{ color: "var(--cr-primary)" }}
+                    style={{
+                      color: "var(--cr-primary, #1F251A)",
+                      textDecoration: "none",
+                      transition: "color 0.2s ease",
+                    }}
+                    className="hover:text-brand-secondary hover:underline"
                   >
                     {t.whyChooseUs.phone}
                   </a>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* ── Right: doctor image ── */}
-          <div
-            className={`w-full max-w-[460px] flex-1 lg:max-w-none ${imageReveal}`}
-          >
-            <div className="image-anime relative aspect-[4/5] w-full">
-              <Image
-                src="/images/assets/dr-hanan-pp.jpg"
-                alt="Dr. Hanan — Crystal Rose Clinics"
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover"
-                priority
-              />
             </div>
           </div>
         </div>

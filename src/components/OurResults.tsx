@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination } from "swiper/modules";
+import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
@@ -100,11 +100,23 @@ function StatCounter({ stat, active, isRTL }: StatCounterProps) {
         style={{ backgroundColor: "var(--cr-secondary)" }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={stat.icon} alt={stat.label} width={28} height={28} />
+        <img
+          src={stat.icon}
+          alt={stat.label}
+          width={28}
+          height={28}
+          style={{
+            filter: "brightness(0) saturate(100%) invert(26%) sepia(21%) saturate(718%) hue-rotate(53deg) brightness(96%) contrast(88%)"
+          }}
+        />
       </div>
       <div
         className="font-heading text-4xl font-normal leading-none"
-        style={{ color: "var(--cr-primary)" }}
+        style={{
+          color: "var(--cr-primary)",
+          transform: stat.value === "10K+" ? (isRTL ? "translateX(-6px)" : "translateX(6px)") : "none",
+          display: "inline-block",
+        }}
         aria-label={`${stat.value} ${stat.label}`}
       >
         {isRTL
@@ -113,7 +125,7 @@ function StatCounter({ stat, active, isRTL }: StatCounterProps) {
       </div>
       <p
         className="mb-0 text-sm font-medium"
-        style={{ color: "var(--cr-muted-foreground, #8a6d62)" }}
+        style={{ color: "var(--cr-muted-foreground, #5A6A51)" }}
       >
         {stat.label}
       </p>
@@ -185,9 +197,10 @@ export function OurResults() {
         {/* Before / After Swiper */}
         <div className="mb-16">
           <Swiper
-            modules={[Navigation, Pagination]}
+            modules={[Navigation, Pagination, Autoplay]}
             navigation
             pagination={{ clickable: true }}
+            autoplay={{ delay: 5000, disableOnInteraction: false }}
             spaceBetween={24}
             slidesPerView={1}
             breakpoints={{
@@ -250,7 +263,7 @@ function BeforeAfterSlide({ pair, isRTL }: BeforeAfterSlideProps) {
         />
         <span
           className="absolute bottom-3 left-3 rounded-full px-3 py-1 text-xs font-semibold text-white"
-          style={{ backgroundColor: "rgba(90,61,52,0.75)" }}
+          style={{ backgroundColor: "rgba(31, 37, 26, 0.8)" }}
         >
           {beforeLabel}
         </span>
@@ -267,7 +280,7 @@ function BeforeAfterSlide({ pair, isRTL }: BeforeAfterSlideProps) {
         />
         <span
           className="absolute bottom-3 left-3 rounded-full px-3 py-1 text-xs font-semibold text-white"
-          style={{ backgroundColor: "rgba(196,178,159,0.85)" }}
+          style={{ backgroundColor: "rgba(90, 106, 81, 0.85)" }}
         >
           {afterLabel}
         </span>

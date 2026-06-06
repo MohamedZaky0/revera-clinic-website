@@ -8,8 +8,8 @@ import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 
 export const metadata: Metadata = {
-  title: "Blog - Crystal Rose Clinics | Medical Center",
-  description: "Latest insights on beauty, skincare, and medical care from Crystal Rose Clinics.",
+  title: "Blog - Revera Clinics | Medical Center",
+  description: "Latest insights on beauty, skincare, and medical care from Revera Clinics.",
 };
 
 export default function BlogPage() {

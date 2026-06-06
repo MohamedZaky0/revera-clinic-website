@@ -1,6 +1,5 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export function BlogGrid() {
@@ -18,34 +17,17 @@ export function BlogGrid() {
             direction: isRTL ? "rtl" : "ltr",
           }}
         >
-          {t.blogPage.posts.map((post, i) => (
+          {t.blogPage.posts.map((post) => (
             <article
               key={post.slug}
               className="blog-card"
-              style={{
-                borderRadius: 16,
-                overflow: "hidden",
-                background: "#fff",
-                boxShadow: "0 4px 24px rgba(90,61,52,0.06)",
-                transition: "transform 0.3s ease, box-shadow 0.3s ease",
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget;
-                el.style.transform = "translateY(-6px)";
-                el.style.boxShadow = "0 12px 36px rgba(90,61,52,0.14)";
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget;
-                el.style.transform = "translateY(0)";
-                el.style.boxShadow = "0 4px 24px rgba(90,61,52,0.06)";
-              }}
             >
               {/* Featured image */}
-              <div style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden" }}>
+              <div className="blog-card-img-wrap">
                 <img
                   src={post.image}
                   alt={post.title}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.5s ease" }}
+                  className="blog-card-img"
                 />
               </div>
 
@@ -57,7 +39,7 @@ export function BlogGrid() {
                   justifyContent: "space-between",
                   flexDirection: isRTL ? "row-reverse" : "row",
                   gap: 16,
-                  padding: "22px 24px",
+                  padding: "0 4px",
                 }}
               >
                 <h2
@@ -74,19 +56,17 @@ export function BlogGrid() {
                 </h2>
                 <span
                   aria-hidden
-                  style={{
-                    flexShrink: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 44,
-                    height: 44,
-                    borderRadius: "50%",
-                    background: "var(--cr-secondary)",
-                    color: "var(--cr-primary)",
-                  }}
+                  className="blog-arrow-btn"
                 >
-                  <ArrowRight size={18} style={{ transform: isRTL ? "scaleX(-1)" : "none" }} />
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <path
+                      d="M4 14L14 4M14 4H6M14 4V12"
+                      stroke="#ffffff"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </span>
               </div>
             </article>
@@ -95,6 +75,42 @@ export function BlogGrid() {
       </div>
 
       <style>{`
+        .blog-card {
+          display: block;
+          cursor: pointer;
+          background: transparent;
+        }
+        .blog-card-img-wrap {
+          position: relative;
+          aspect-ratio: 1/1;
+          border-radius: 24px;
+          overflow: hidden;
+          margin-bottom: 20px;
+        }
+        .blog-card-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.4s ease;
+        }
+        .blog-card:hover .blog-card-img {
+          transform: scale(1.04);
+        }
+        .blog-arrow-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: var(--color-brand-secondary);
+          color: #ffffff;
+          flex-shrink: 0;
+          transition: background-color 0.3s ease, transform 0.3s ease;
+        }
+        .blog-card:hover .blog-arrow-btn {
+          background: var(--color-brand-primary);
+        }
         @media (max-width: 992px) {
           .blog-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }

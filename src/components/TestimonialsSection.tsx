@@ -1,153 +1,350 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay, Pagination } from "swiper/modules";
-import "swiper/css";
-import "swiper/css/pagination";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export function TestimonialsSection() {
   const { t, isRTL } = useLanguage();
+  const sectionRef = useRef<HTMLElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const revealClass = `transition-all duration-700 ${
+    isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+  }`;
+
+  // Slice reviews to show exactly index 1, 2, and 3 (Aya, Sarah, Omar) as shown in the mockup screenshot
+  const displayReviews =
+    t.testimonials.reviews.length > 3
+      ? t.testimonials.reviews.slice(1, 4)
+      : t.testimonials.reviews;
 
   return (
-    <section className="dark-section section-padding relative overflow-hidden">
-      {/* Decorative background shape */}
-      <div className="pointer-events-none absolute inset-0 z-0">
-        <Image
-          src="/images/testimonials-bg-shape.png"
-          alt=""
-          fill
-          sizes="100vw"
-          className="object-cover opacity-10"
-          aria-hidden="true"
-        />
-      </div>
-
-      <div className="cr-container relative z-10">
+    <section
+      ref={sectionRef}
+      id="our-mission"
+      className="bg-white section-padding"
+      style={{ overflow: "hidden" }}
+    >
+      <div className="cr-container" style={{ maxWidth: "1480px" }}>
+        {/* Curved Card Container with Dark Brown Background */}
         <div
-          className={`flex flex-col gap-12 lg:gap-16 lg:items-start ${
-            isRTL ? "lg:flex-row-reverse" : "lg:flex-row"
-          }`}
+          style={{
+            position: "relative",
+            backgroundColor: "var(--cr-primary, #414E36)",
+            borderRadius: "32px",
+            border: "1px solid rgba(196,174,124,0.35)",
+            overflow: "hidden",
+            padding: "clamp(40px, 6vw, 80px) clamp(24px, 5vw, 72px)",
+          }}
         >
-          {/* Left: Doctor quote card */}
-          <div className="flex-1">
-            <span className="section-tag">{t.testimonials.tag}</span>
+          {/* Subtle dot pattern overlay */}
+          <div
+            className="pointer-events-none absolute inset-0 select-none opacity-[0.06]"
+            aria-hidden="true"
+          >
+            <Image
+              src="/images/faq-dot-img.svg"
+              alt=""
+              fill
+              className="object-cover"
+              priority
+            />
+          </div>
 
-            <h2 className="mt-3 mb-8 leading-snug">{t.testimonials.heading}</h2>
+          <style>{`
+            .tm-grid-top {
+              display: grid;
+              grid-template-columns: 1fr 1.50fr;
+              gap: clamp(32px, 5vw, 60px);
+              align-items: center;
+              position: relative;
+              z-index: 10;
+            }
+            .tm-doctor-img-wrapper {
+              position: relative;
+              width: 100%;
+              aspect-ratio: 1.25;
+              border-radius: 24px;
+              overflow: hidden;
+              box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            }
+            .tm-grid-bottom {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 48px;
+              position: relative;
+              z-index: 10;
+            }
 
-            {/* Quote */}
-            <p
-              className="mb-8 text-base italic leading-relaxed"
-              style={{ color: "rgba(255,255,255,0.85)" }}
-            >
-              {t.testimonials.quote}
-            </p>
+            @media (max-width: 1024px) {
+              .tm-grid-top {
+                grid-template-columns: 1fr;
+                gap: 40px;
+              }
+              .tm-text-col {
+                text-align: center !important;
+              }
+              .tm-tag-row {
+                justify-content: center !important;
+              }
+              .tm-doctor-img-wrapper {
+                max-width: 440px;
+                margin: 0 auto;
+              }
+              .tm-grid-bottom {
+                grid-template-columns: 1fr;
+                gap: 40px;
+              }
+            }
+          `}</style>
 
-            {/* Doctor info */}
-            <div
-              className={`flex items-center gap-4 ${isRTL ? "flex-row-reverse" : ""}`}
-            >
-              <div
-                className="relative shrink-0 overflow-hidden rounded-full"
-                style={{ width: 70, height: 70 }}
-              >
+          <div
+            className={revealClass}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              direction: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            {/* ── Top Row: Doctor Image & Mission Text ── */}
+            <div className="tm-grid-top">
+              {/* Doctor portrait wrapper */}
+              <div className="tm-doctor-img-wrapper">
                 <Image
                   src="/images/assets/dr-hanan-pp.jpg"
                   alt={t.testimonials.doctorName}
                   fill
-                  sizes="70px"
-                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 450px"
+                  style={{ objectFit: "cover", objectPosition: "center top" }}
+                  priority
                 />
               </div>
-              <div className={isRTL ? "text-right" : "text-left"}>
-                <p className="mb-0.5 text-sm font-semibold" style={{ color: "var(--cr-white)" }}>
-                  {t.testimonials.doctorName}
+
+              {/* Mission text details */}
+              <div
+                className="tm-text-col"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  textAlign: isRTL ? "right" : "left",
+                }}
+              >
+                {/* Gold logo tagline */}
+                <div
+                  className="tm-tag-row"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    marginBottom: "16px",
+                    justifyContent: "flex-start",
+                  }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--color-brand-sand)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                  </svg>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      letterSpacing: "0.2em",
+                      color: "var(--color-brand-sand)",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {t.testimonials.tag}
+                  </span>
+                </div>
+
+                {/* Heading */}
+                <h2
+                  className="font-heading"
+                  style={{
+                    margin: "0 0 20px 0",
+                    fontSize: "clamp(24px, 3.5vw, 36px)",
+                    lineHeight: 1.15,
+                    fontWeight: 400,
+                    color: "#fff",
+                  }}
+                >
+                  {t.testimonials.heading}
+                </h2>
+
+                {/* Doctor's message */}
+                <p
+                  style={{
+                    margin: "0 0 24px 0",
+                    fontSize: "15px",
+                    lineHeight: 1.75,
+                    color: "rgba(255, 255, 255, 0.85)",
+                    fontWeight: 400,
+                  }}
+                >
+                  {t.testimonials.quote}
                 </p>
-                <p className="mb-0.5 text-xs" style={{ color: "var(--cr-accent)" }}>
-                  {t.testimonials.doctorTitle}
-                </p>
-                <p className="mb-0 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
-                  {t.testimonials.doctorInfo}
-                </p>
+
+                {/* Doctor footer details */}
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: "4px" }}
+                >
+                  <h4
+                    className="font-heading"
+                    style={{
+                      margin: 0,
+                      fontSize: "17px",
+                      fontWeight: 500,
+                      color: "#fff",
+                    }}
+                  >
+                    {t.testimonials.doctorName}
+                  </h4>
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      color: "var(--color-brand-sand)",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {t.testimonials.doctorTitle}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      color: "rgba(255, 255, 255, 0.6)",
+                    }}
+                  >
+                    {t.testimonials.doctorInfo}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Right: Reviews swiper */}
-          <div className="flex-1 w-full">
-            <Swiper
-              modules={[Autoplay, Pagination]}
-              autoplay={{ delay: 4000, disableOnInteraction: false }}
-              pagination={{ clickable: true }}
-              loop
-              slidesPerView={1}
-              dir={isRTL ? "rtl" : "ltr"}
-              key={isRTL ? "rtl" : "ltr"}
-              className="pb-10"
-            >
-              {t.testimonials.reviews.map((review, i) => (
-                <SwiperSlide key={i}>
-                  <div
-                    className="rounded-2xl p-8"
-                    style={{ backgroundColor: "var(--cr-white)" }}
+            {/* Horizontal divider line */}
+            <div
+              style={{
+                height: "1px",
+                backgroundColor: "rgba(196, 174, 124, 0.15)",
+                margin: "48px 0",
+              }}
+            />
+
+            {/* ── Bottom Row: Testimonials Grid ── */}
+            <div className="tm-grid-bottom">
+              {displayReviews.map((review, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    gap: "24px",
+                    textAlign: isRTL ? "right" : "left",
+                  }}
+                >
+                  {/* Testimonial Quote Text */}
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "14.5px",
+                      lineHeight: 1.65,
+                      color: "rgba(255, 255, 255, 0.9)",
+                      fontWeight: 400,
+                    }}
                   >
-                    {/* Large quote mark */}
+                    {review.text}
+                  </p>
+
+                  {/* Author Row */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      flexDirection: isRTL ? "row-reverse" : "row",
+                    }}
+                  >
+                    {/* Golden outline logo badge */}
                     <div
-                      className="mb-4 font-serif leading-none select-none"
                       style={{
-                        fontSize: 80,
-                        lineHeight: 0.8,
-                        color: "var(--cr-accent)",
-                        opacity: 0.6,
+                        display: "flex",
+                        width: "36px",
+                        height: "36px",
+                        borderRadius: "50%",
+                        border: "1px solid rgba(242, 239, 233, 0.3)",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: "rgba(255, 255, 255, 0.05)",
+                        flexShrink: 0,
                       }}
-                      aria-hidden="true"
                     >
-                      &ldquo;
+                      <Image
+                        src="/images/main_logo.png"
+                        alt=""
+                        width={20}
+                        height={20}
+                        style={{ objectFit: "contain" }}
+                      />
                     </div>
 
-                    <p
-                      className="mb-6 text-sm leading-relaxed"
-                      style={{ color: "var(--cr-primary)" }}
-                    >
-                      {review.text}
-                    </p>
-
-                    {/* Author row */}
+                    {/* Author Details */}
                     <div
-                      className={`flex items-center gap-3 ${isRTL ? "flex-row-reverse" : ""}`}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        textAlign: isRTL ? "right" : "left",
+                      }}
                     >
-                      <div
-                        className="relative shrink-0 overflow-hidden rounded-full"
-                        style={{ width: 50, height: 50 }}
+                      <span
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#fff",
+                        }}
                       >
-                        <Image
-                          src="/images/author-2.jpg"
-                          alt={review.author}
-                          fill
-                          sizes="50px"
-                          className="object-cover"
-                        />
-                      </div>
-                      <div className={isRTL ? "text-right" : "text-left"}>
-                        <p
-                          className="mb-0 text-sm font-semibold"
-                          style={{ color: "var(--cr-primary)" }}
-                        >
-                          {review.author}
-                        </p>
-                        <p
-                          className="mb-0 text-xs"
-                          style={{ color: "var(--cr-accent)" }}
-                        >
-                          {review.role}
-                        </p>
-                      </div>
+                        {review.author}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--color-brand-sand)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {review.role}
+                      </span>
                     </div>
                   </div>
-                </SwiperSlide>
+                </div>
               ))}
-            </Swiper>
+            </div>
           </div>
         </div>
       </div>

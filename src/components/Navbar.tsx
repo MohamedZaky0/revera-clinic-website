@@ -5,13 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Phone, ChevronDown } from "lucide-react";
 
 const NAV_LINKS = [
   { key: "home" as const, href: "/" },
   { key: "about" as const, href: "/about" },
   { key: "services" as const, href: "/services" },
   { key: "blog" as const, href: "/blog" },
-  { key: "medicalTourism" as const, href: "/" },
   { key: "contact" as const, href: "/contact" },
 ];
 
@@ -20,6 +20,7 @@ export function Navbar() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
@@ -28,6 +29,16 @@ export function Navbar() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setLangOpen(false);
+    };
+    if (langOpen) {
+      document.addEventListener("click", handleClickOutside);
+    }
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [langOpen]);
 
   const handleBooking = () => {
     window.dispatchEvent(new CustomEvent("open-booking"));
@@ -57,14 +68,14 @@ export function Navbar() {
             alignItems: "center",
             justifyContent: "space-between",
             flexDirection: isRTL ? "row-reverse" : "row",
-            height: "80px",
-            gap: "24px",
+            height: "112px",
+            gap: "28px",
           }}
         >
           {/* Logo */}
           <Link href="/" style={{ flexShrink: 0 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/logo.png" alt="Crystal Rose Clinics" style={{ width: "auto", height: "44px" }} />
+            <img src="/images/main_logo.png" alt="Revera Clinics" style={{ width: "auto", height: "72px" }} />
           </Link>
 
           {/* Desktop nav links */}
@@ -73,7 +84,7 @@ export function Navbar() {
               display: "flex",
               alignItems: "center",
               flexDirection: isRTL ? "row-reverse" : "row",
-              gap: "4px",
+              gap: "10px",
               listStyle: "none",
               margin: 0,
               padding: 0,
@@ -87,12 +98,12 @@ export function Navbar() {
                 <Link
                   href={href}
                   style={{
-                    padding: "8px 14px",
-                    borderRadius: "6px",
-                    fontSize: "14px",
-                    fontWeight: isActive(href) ? 600 : 400,
+                    padding: "10px 18px",
+                    borderRadius: "8px",
+                    fontSize: "16px",
+                    fontWeight: isActive(href) ? 700 : 500,
                     color: "var(--cr-primary)",
-                    opacity: isActive(href) ? 1 : 0.75,
+                    opacity: isActive(href) ? 1 : 0.85,
                     transition: "all 0.2s ease",
                     whiteSpace: "nowrap",
                   }}
@@ -115,69 +126,193 @@ export function Navbar() {
           {/* Right controls */}
           <div
             style={{
+              display: "flex",
               alignItems: "center",
               flexDirection: isRTL ? "row-reverse" : "row",
-              gap: "12px",
+              gap: "24px",
               flexShrink: 0,
             }}
             className="hidden md:flex"
           >
-            {/* Language switcher */}
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            {/* Phone */}
+            <a
+              href="tel:+201125787019"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                color: "var(--cr-primary)",
+                textDecoration: "none",
+                fontSize: "15px",
+                fontWeight: 500,
+                transition: "opacity 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.opacity = "0.7";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.opacity = "1";
+              }}
+            >
+              <Phone size={18} strokeWidth={1.5} />
+              <span>(+20) 01125787019</span>
+            </a>
+
+            {/* Language dropdown */}
+            <div style={{ position: "relative" }}>
               <button
-                onClick={() => setLanguage("en")}
+                onClick={() => setLangOpen(!langOpen)}
                 style={{
-                  background: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  background: "transparent",
                   border: "none",
-                  padding: "2px",
                   cursor: "pointer",
-                  opacity: language === "en" ? 1 : 0.45,
-                  transition: "opacity 0.2s ease",
-                  borderRadius: "3px",
-                  outline: language === "en" ? "2px solid var(--cr-accent)" : "none",
-                  outlineOffset: "2px",
+                  padding: "8px 14px",
+                  color: "var(--cr-primary)",
+                  fontSize: "15px",
+                  fontWeight: 500,
+                  borderRadius: "8px",
+                  transition: "background 0.2s ease",
                 }}
-                aria-label="Switch to English"
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(90,61,52,0.05)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!langOpen) {
+                    (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                  }
+                }}
               >
                 <Image
                   src="/images/flag/en.png"
                   alt="English"
-                  width={24}
-                  height={24}
-                  style={{ display: "block", borderRadius: "2px" }}
+                  width={20}
+                  height={14}
+                  style={{ borderRadius: "2px" }}
                 />
+                <span>English</span>
+                <ChevronDown size={16} />
               </button>
-              <button
-                onClick={() => setLanguage("ar")}
-                style={{
-                  background: "none",
-                  border: "none",
-                  padding: "2px",
-                  cursor: "pointer",
-                  opacity: language === "ar" ? 1 : 0.45,
-                  transition: "opacity 0.2s ease",
-                  borderRadius: "3px",
-                  outline: language === "ar" ? "2px solid var(--cr-accent)" : "none",
-                  outlineOffset: "2px",
-                }}
-                aria-label="Switch to Arabic"
-              >
-                <Image
-                  src="/images/flag/ar.png"
-                  alt="عربي"
-                  width={24}
-                  height={24}
-                  style={{ display: "block", borderRadius: "2px" }}
-                />
-              </button>
+
+              {langOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: isRTL ? "auto" : 0,
+                    left: isRTL ? 0 : "auto",
+                    marginTop: "8px",
+                    background: "white",
+                    border: "1px solid var(--cr-divider)",
+                    borderRadius: "8px",
+                    boxShadow: "0 4px 12px rgba(90,61,52,0.1)",
+                    zIndex: 1000,
+                    minWidth: "150px",
+                    overflow: "hidden",
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      setLanguage("en");
+                      setLangOpen(false);
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 16px",
+                      background: language === "en" ? "rgba(90,61,52,0.05)" : "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      color: "var(--cr-primary)",
+                      fontSize: "14px",
+                      textAlign: isRTL ? "right" : "left",
+                      transition: "background 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (language !== "en") {
+                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(90,61,52,0.03)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (language !== "en") {
+                        (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                      }
+                    }}
+                  >
+                    <Image src="/images/flag/en.png" alt="English" width={18} height={12} style={{ borderRadius: "2px" }} />
+                    <span>English</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLanguage("ar");
+                      setLangOpen(false);
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 16px",
+                      background: language === "ar" ? "rgba(90,61,52,0.05)" : "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      color: "var(--cr-primary)",
+                      fontSize: "14px",
+                      textAlign: isRTL ? "right" : "left",
+                      transition: "background 0.2s ease",
+                      borderTop: "1px solid var(--cr-divider)",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (language !== "ar") {
+                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(90,61,52,0.03)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (language !== "ar") {
+                        (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                      }
+                    }}
+                  >
+                    <Image src="/images/flag/ar.png" alt="عربي" width={18} height={12} style={{ borderRadius: "2px" }} />
+                    <span>العربية</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            <button onClick={handleAuth} className="btn-outline">
+            {/* Login button */}
+            <button
+              onClick={handleAuth}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                background: "transparent",
+                color: "var(--cr-primary)",
+                border: "1.5px solid var(--cr-primary)",
+                padding: "10px 20px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: 600,
+                transition: "all 0.2s ease",
+                whiteSpace: "nowrap",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-primary)";
+                (e.currentTarget as HTMLButtonElement).style.color = "white";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
+              }}
+            >
+              {/* TODO: Add login icon */}
               {t.nav.login}
-            </button>
-
-            <button onClick={handleBooking} className="btn-primary">
-              {t.nav.makeAppointment}
             </button>
           </div>
 
@@ -270,64 +405,122 @@ export function Navbar() {
 
             <div
               style={{
-                padding: "0 16px",
+                padding: "16px",
                 display: "flex",
                 flexDirection: "column",
-                gap: "10px",
+                gap: "12px",
+                borderTop: "1px solid var(--cr-divider)",
               }}
             >
+              {/* Mobile phone */}
+              <a
+                href="tel:+201125787019"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  color: "var(--cr-primary)",
+                  textDecoration: "none",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                }}
+              >
+                <Phone size={18} strokeWidth={1.5} />
+                <span>(+20) 01125787019</span>
+              </a>
+
+              {/* Mobile language selector */}
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <button
                   onClick={() => setLanguage("en")}
                   style={{
-                    background: "none",
-                    border: "none",
-                    padding: "2px",
+                    background: language === "en" ? "rgba(90,61,52,0.1)" : "transparent",
+                    border: "1px solid var(--cr-accent)",
+                    padding: "8px 12px",
                     cursor: "pointer",
-                    opacity: language === "en" ? 1 : 0.45,
-                    borderRadius: "3px",
-                    outline: language === "en" ? "2px solid var(--cr-accent)" : "none",
-                    outlineOffset: "2px",
+                    borderRadius: "4px",
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    fontSize: "13px",
+                    color: "var(--cr-primary)",
+                    fontWeight: language === "en" ? 600 : 400,
+                    transition: "all 0.2s ease",
                   }}
                   aria-label="Switch to English"
                 >
                   <Image
                     src="/images/flag/en.png"
                     alt="English"
-                    width={24}
-                    height={16}
-                    style={{ display: "block", borderRadius: "2px", height: "auto" }}
+                    width={16}
+                    height={12}
+                    style={{ borderRadius: "2px" }}
                   />
+                  <span>English</span>
                 </button>
                 <button
                   onClick={() => setLanguage("ar")}
                   style={{
-                    background: "none",
-                    border: "none",
-                    padding: "2px",
+                    background: language === "ar" ? "rgba(90,61,52,0.1)" : "transparent",
+                    border: "1px solid var(--cr-accent)",
+                    padding: "8px 12px",
                     cursor: "pointer",
-                    opacity: language === "ar" ? 1 : 0.45,
-                    borderRadius: "3px",
-                    outline: language === "ar" ? "2px solid var(--cr-accent)" : "none",
-                    outlineOffset: "2px",
+                    borderRadius: "4px",
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    fontSize: "13px",
+                    color: "var(--cr-primary)",
+                    fontWeight: language === "ar" ? 600 : 400,
+                    transition: "all 0.2s ease",
                   }}
                   aria-label="Switch to Arabic"
                 >
                   <Image
                     src="/images/flag/ar.png"
                     alt="عربي"
-                    width={24}
-                    height={16}
-                    style={{ display: "block", borderRadius: "2px", height: "auto" }}
+                    width={16}
+                    height={12}
+                    style={{ borderRadius: "2px" }}
                   />
+                  <span>العربية</span>
                 </button>
               </div>
 
-              <button onClick={handleAuth} className="btn-outline" style={{ textAlign: "center", justifyContent: "center" }}>
+              {/* Mobile login button */}
+              <button
+                onClick={() => {
+                  handleAuth();
+                  setMenuOpen(false);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  background: "var(--cr-primary)",
+                  color: "white",
+                  border: "none",
+                  padding: "12px 20px",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  transition: "all 0.2s ease",
+                  width: "100%",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.9";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
+                }}
+              >
                 {t.nav.login}
-              </button>
-              <button onClick={handleBooking} className="btn-primary" style={{ textAlign: "center", justifyContent: "center" }}>
-                {t.nav.makeAppointment}
               </button>
             </div>
           </div>
