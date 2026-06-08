@@ -98,6 +98,7 @@ export interface Translation {
       message: string;
     };
     sendBtn: string;
+    whatsappBtn: string;
   };
   footer: {
     blogHeading: string;

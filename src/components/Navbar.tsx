@@ -136,7 +136,7 @@ export function Navbar() {
           >
             {/* Phone */}
             <a
-              href="tel:+201125787019"
+              href="tel:+201035595691"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -155,7 +155,7 @@ export function Navbar() {
               }}
             >
               <Phone size={18} strokeWidth={1.5} />
-              <span>(+20) 01125787019</span>
+              <span>(+20) 01035595691</span>
             </a>
 
             {/* Language dropdown */}
@@ -414,7 +414,7 @@ export function Navbar() {
             >
               {/* Mobile phone */}
               <a
-                href="tel:+201125787019"
+                href="tel:+201035595691"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -426,7 +426,7 @@ export function Navbar() {
                 }}
               >
                 <Phone size={18} strokeWidth={1.5} />
-                <span>(+20) 01125787019</span>
+                <span>(+20) 01035595691</span>
               </a>
 
               {/* Mobile language selector */}

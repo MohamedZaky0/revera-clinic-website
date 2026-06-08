@@ -243,8 +243,8 @@ export function AboutSection() {
                   className="group inline-flex items-center gap-3.5 bg-[#414E36] hover:bg-[#2e3a26] text-white text-sm font-semibold py-3 px-6 rounded-full transition-all duration-300 shadow-md hover:shadow-lg"
                   type="button"
                 >
-                  <span className="tracking-wide capitalize">{t.about.readMore}</span>
-                  <span 
+                  <span className="tracking-wide">{t.about.readMore}</span>
+                  <span
                     className="flex h-7 w-7 items-center justify-center rounded-full bg-[#5A6A51] text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300"
                   >
                     <ArrowUpRight size={14} strokeWidth={2.5} />

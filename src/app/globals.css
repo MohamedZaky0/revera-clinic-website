@@ -180,7 +180,7 @@
   .blog-card:hover,
   .contact-card:hover {
     transform: translateY(-2px) scale(1.01);
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 16px 32px rgba(90, 61, 52, 0.10);
   }
 
   img,
@@ -756,4 +756,87 @@ body::-webkit-scrollbar-corner {
 
 .rotate-self:hover {
   animation-duration: 3s;
+}
+
+/* ── Hero section ─────────────────────────────────────────────── */
+@keyframes hero-ken-burns {
+  from { transform: scale(1); }
+  to   { transform: scale(1.07); }
+}
+
+@keyframes hero-word-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-line-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Ken Burns fires only on the active slide's image wrapper */
+.swiper-slide-active .hero-kb {
+  animation: hero-ken-burns 8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.hero-kb {
+  transform-origin: center;
+  transition: none; /* neutralise global wildcard transition */
+}
+
+.hero-word {
+  display: inline-block;
+  opacity: 0;
+  transition: none; /* neutralise global wildcard transition */
+  animation: hero-word-enter 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--wi, 0) * 65ms + 120ms);
+}
+
+.hero-line {
+  opacity: 0;
+  transition: none; /* neutralise global wildcard transition */
+  animation: hero-line-enter 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  /* delay set inline per-element */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swiper-slide-active .hero-kb { animation: none; }
+  .hero-word { animation: none; opacity: 1; transform: none; }
+  .hero-line { animation: none; opacity: 1; transform: none; }
+
+  section,
+  header,
+  footer,
+  article,
+  aside,
+  nav,
+  .cr-container,
+  .section-padding,
+  .bg-white,
+  .section-tag,
+  .hero-slide,
+  .card,
+  .testimonial-card,
+  .faq-item,
+  .service-card,
+  .appointment-card,
+  .blog-card,
+  .contact-card {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    animation: none;
+  }
 }
