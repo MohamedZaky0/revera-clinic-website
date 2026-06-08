@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useLanguage } from "@/contexts/LanguageContext";
 
+const WHATSAPP_NUMBER = "201035595691";
+
 export function AppointmentSection() {
   const { t, isRTL } = useLanguage();
   const sectionRef = useRef<HTMLElement>(null);
@@ -277,7 +279,10 @@ export function AppointmentSection() {
 
               {/* Form */}
               <form
-                onSubmit={(e) => e.preventDefault()}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  window.dispatchEvent(new CustomEvent("open-booking"));
+                }}
                 className="flex flex-col gap-4"
                 noValidate
               >
@@ -322,7 +327,7 @@ export function AppointmentSection() {
                   style={{ minHeight: "120px" }}
                 />
 
-                {/* Submit button */}
+                {/* Submit → opens booking modal */}
                 <button
                   type="submit"
                   style={{
@@ -347,6 +352,45 @@ export function AppointmentSection() {
                 >
                   {t.appointment.sendBtn}
                 </button>
+
+                {/* WhatsApp alternative */}
+                <a
+                  href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "10px",
+                    padding: "13px 28px",
+                    borderRadius: "30px",
+                    backgroundColor: "transparent",
+                    border: "1.5px solid #25D366",
+                    color: "#1a8a45",
+                    fontSize: "15px",
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    transition: "all 0.3s ease",
+                    letterSpacing: "0.03em",
+                    width: "100%",
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#25D366";
+                    e.currentTarget.style.color = "#fff";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                    e.currentTarget.style.color = "#1a8a45";
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.104.547 4.079 1.503 5.797L.057 23.882l6.263-1.43A11.948 11.948 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.015-1.376l-.36-.214-3.719.849.878-3.61-.234-.37A9.818 9.818 0 1112 21.818z"/>
+                  </svg>
+                  {t.appointment.whatsappBtn}
+                </a>
               </form>
             </div>
           </div>

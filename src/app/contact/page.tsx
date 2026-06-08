@@ -10,7 +10,7 @@ import { AuthModal } from "@/components/AuthModal";
 export const metadata: Metadata = {
   title: "Contact Us - Revera Clinics | Medical Center",
   description:
-    "Get in touch with Revera Clinics. Visit us at 36 A El-Nozha St, Ard El Golf, Nasr City, or call (+20) 01125787019.",
+    "Get in touch with Revera Clinics. Visit us at 36 A El-Nozha St, Ard El Golf, Nasr City, or call (+20) 01035595691.",
 };
 
 export default function ContactPage() {
