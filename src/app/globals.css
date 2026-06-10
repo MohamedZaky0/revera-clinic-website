@@ -180,7 +180,7 @@
   .blog-card:hover,
   .contact-card:hover {
     transform: translateY(-2px) scale(1.01);
-    box-shadow: 0 16px 32px rgba(90, 61, 52, 0.10);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
   }
 
   img,
@@ -711,7 +711,7 @@
 /* ── Scrollbar styling ───────────────────────────────────────── */
 html,
 body {
-  scrollbar-color: var(--color-brand-secondary) rgba(65, 78, 54, 0.12);
+  scrollbar-color: rgba(124, 141, 109, 0.95) transparent;
   scrollbar-width: thin;
 }
 *::-webkit-scrollbar,
@@ -719,28 +719,61 @@ html::-webkit-scrollbar,
 body::-webkit-scrollbar {
   width: 10px;
   height: 10px;
+  background: transparent;
 }
 *::-webkit-scrollbar-track,
 html::-webkit-scrollbar-track,
 body::-webkit-scrollbar-track {
-  background: rgba(65, 78, 54, 0.08);
+  background: transparent;
 }
 *::-webkit-scrollbar-thumb,
 html::-webkit-scrollbar-thumb,
 body::-webkit-scrollbar-thumb {
-  background: var(--color-brand-secondary);
+  background: linear-gradient(180deg, rgba(88, 106, 82, 0.95), rgba(66, 81, 63, 0.95));
   border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.6);
+  border: 0 none;
+  min-height: 28px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 *::-webkit-scrollbar-thumb:hover,
 html::-webkit-scrollbar-thumb:hover,
 body::-webkit-scrollbar-thumb:hover {
-  background: var(--color-brand-primary);
+  background: linear-gradient(180deg, rgba(104, 123, 99, 0.95), rgba(83, 101, 81, 0.95));
+}
+*::-webkit-scrollbar-thumb:active,
+html::-webkit-scrollbar-thumb:active,
+body::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, rgba(115, 134, 110, 0.95), rgba(97, 114, 95, 0.95));
 }
 *::-webkit-scrollbar-corner,
 html::-webkit-scrollbar-corner,
 body::-webkit-scrollbar-corner {
-  background: rgba(65, 78, 54, 0.08);
+  background: transparent;
+}
+
+.custom-scrollbar {
+  scrollbar-color: rgba(88, 106, 82, 0.95) transparent;
+  scrollbar-width: thin;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(125, 146, 106, 0.95), rgba(89, 106, 80, 0.95));
+  border-radius: 999px;
+  border: 0 none;
+  min-height: 28px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(146, 164, 126, 0.95), rgba(108, 126, 97, 0.95));
+}
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ── Central badge rotation ─────────────────────────────────── */
@@ -758,7 +791,7 @@ body::-webkit-scrollbar-corner {
   animation-duration: 3s;
 }
 
-/* ── Hero section ─────────────────────────────────────────────── */
+/* -- Hero section --------------------------------------------------------- */
 @keyframes hero-ken-burns {
   from { transform: scale(1); }
   to   { transform: scale(1.07); }

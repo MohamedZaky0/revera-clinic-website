@@ -17,29 +17,29 @@ export const translations: Record<"en" | "ar", Translation> = {
     hero: {
       slides: [
         {
-          welcome: "Revera Clinics",
-          heading: "The Clinic You've Been Looking For.",
+          welcome: "Welcome to Revera Clinics",
+          heading: "Transform Your Beauty Naturally!",
           description:
-            "Revera is New Cairo's destination for women who want visible results. Expert dermatology, cosmetic surgery, and laser care in a setting that respects your time and your standards.",
-          bookBtn: "Reserve a Consultation",
+            "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
+          bookBtn: "Book Appointment",
           rating: "4.5",
           reviewCount: "(1000+ review)",
         },
         {
-          welcome: "Revera Clinics",
-          heading: "15 Years of Results. Designed for You.",
+          welcome: "Welcome to Revera Clinics",
+          heading: "Advanced Medical Care You Can Trust!",
           description:
-            "Dr. Mahmoud Nasr Abu Obeid, MRCS Edinburgh, has spent his career delivering precise skin outcomes. Every treatment plan at Revera is built around your specific concerns, not a standard protocol.",
-          bookBtn: "Reserve a Consultation",
+            "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and dental services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
+          bookBtn: "Book Appointment",
           rating: "4.5",
           reviewCount: "(1000+ review)",
         },
         {
-          welcome: "Revera Clinics",
-          heading: "This Is What the Right Clinic Feels Like.",
+          welcome: "Welcome to Revera Clinics",
+          heading: "Your Beauty & Health Journey Starts Here!",
           description:
-            "From first consultation to final result, Revera is built for the woman who values quality and privacy above all. Limited monthly appointments. Reserve yours.",
-          bookBtn: "Reserve a Consultation",
+            "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and dental care for all ages.",
+          bookBtn: "Book Appointment",
           rating: "4.5",
           reviewCount: "(1000+ review)",
         },
@@ -47,22 +47,22 @@ export const translations: Record<"en" | "ar", Translation> = {
     },
     about: {
       tag: "About Us",
-      subtitle: "Precision care for women who expect more.",
-      heading: "Where Expertise Meets Care",
+      subtitle: "Your journey to beauty and wellness",
+      heading: "Welcome to Revera",
       description:
-        "Revera Clinics operates under the direct supervision of Dr. Mahmoud Nasr Abu Obeid, Consultant Surgical Dermatologist, MRCS Edinburgh, with 15 years of experience across Egypt, Saudi Arabia, and the USA. Every treatment plan is personal. Every result is the standard we hold ourselves to.",
+        "Welcome to Revera Clinics, operated by ABU OBEID Group Co. and under the supervision of Dr. Mahmoud Nasr Abu Obeid, Consultant Surgical Dermatologist with over 15 years of experience. We believe in providing comprehensive medical care enhanced through advanced techniques and personalized treatment.",
       services: [
         "Dermatology & Laser Treatments",
         "Cosmetic & Plastic Surgery",
         "Dental Care Services",
       ],
-      needHelp: "Need Help?",
-      phone: "(+20) 01035595691",
-      readMore: "Reserve a Consultation",
+      needHelp: "Need Help!",
+      phone: "(+20) 01125787019",
+      readMore: "more about",
     },
     results: {
       tag: "See the Difference",
-      heading: "Real Patients. Real Results.",
+      heading: "Real client transformations & inspiring results",
       stats: [
         { value: "20+", label: "Years Of Experience" },
         { value: "10K+", label: "Happy clients" },
@@ -73,7 +73,7 @@ export const translations: Record<"en" | "ar", Translation> = {
     services: {
       tag: "Services",
       heading:
-        "Expert treatments designed for your skin and your goals.",
+        "Explore our comprehensive dermatology, cosmetic surgery, and dental services",
       selectCategory: "Select a category to view services",
       categories: [
         { id: "dental", label: "Dental Clinic", sublabel: "عياده اسنان" },
@@ -85,14 +85,14 @@ export const translations: Record<"en" | "ar", Translation> = {
       errorText: "Unable to load services at the moment. Please try again later.",
       retryBtn: "Retry",
       freeLabel: "Free",
-      ctaText: "Ready to start?",
-      ctaBtn: "Book a Consultation",
+      ctaText: "Let's make something great work together.",
+      ctaBtn: "Get Free Quote",
     },
     whatWeDo: {
       tag: "what we do",
-      heading: "Everything Your Skin and Confidence Need.",
+      heading: "Transforming lives through advanced medical care",
       description:
-        "From precision dermatology to cosmetic surgery and dental care, Revera covers every dimension of aesthetic health. One clinic. One doctor who knows your history. Consistent, expert results.",
+        "We specialize in transforming lives through comprehensive medical services, helping you achieve your beauty and health goals with advanced treatments and optimal care.",
       services: [
         "Dermatology & Cosmetic Dermatology",
         "Laser Treatments",
@@ -107,52 +107,52 @@ export const translations: Record<"en" | "ar", Translation> = {
     whyChooseUs: {
       yearsLabel: "15+ years experience",
       tag: "why choose us",
-      heading: "Why Women Choose Revera",
+      heading: "Experience advanced medical care with expert guidance",
       description:
-        "Revera does not compete on price. It competes on outcomes. Board-certified surgical dermatology, a clinic designed for privacy, and treatment plans that hold to one standard: what actually works for your skin.",
+        "Experience personalized care and transformative results with evidence-based medical techniques, dedicated to helping you achieve lasting beauty and wellness.",
       quote:
-        '"Skin responds to precision, not promises. At Revera, every patient receives a plan built specifically for her condition, her timeline, and her goals. My job is to earn your trust through results, not marketing."',
+        '"Delivering Exceptional Medical Care Through Expert Dermatology, Cosmetic Surgery, Hospitality, and Dental Care. Personalized Solutions For Your Beauty and Health, Boost Confidence, and Ensure Outstanding Results with Professional Support Every Step of Your Journey."',
       contactLabel: "Contact Us:",
-      phone: "(+20) 01035595691",
+      phone: "(+20) 01125787019",
     },
     howItWorks: {
       tag: "how it works",
-      heading: "Your Journey at Revera",
+      heading: "Simple steps to beauty transformations",
       description:
-        "From first contact to lasting results, every step is guided, explained, and built around your specific needs. Nothing is rushed. Everything is intentional.",
+        "Discover a seamless process designed to enhance your beauty and health through personalized consultations, customized treatment plans, and dedicated medical support. We guide you every step toward achieving your beauty and wellness goals.",
       contactBtn: "contact us",
       steps: [
         {
           number: "1.",
-          title: "Consultation",
+          title: "Initial Consultation",
           description:
-            "A private one-on-one with Dr. Abu Obeid. Your skin concerns, your history, your goals. We listen before we suggest anything.",
+            "A comprehensive medical evaluation to understand your beauty and health goals, current condition, and treatment needs.",
         },
         {
           number: "2.",
-          title: "Your Plan",
+          title: "Customized Treatment Plan",
           description:
-            "A treatment program built for your skin, your timeline, and your expectations. No standard protocols.",
+            "A tailored medical treatment program designed specifically for your needs, condition, and beauty objectives.",
         },
         {
           number: "3.",
-          title: "Treatment",
+          title: "Treatment & Care",
           description:
-            "Expert care in a space designed for your comfort and privacy. From preparation to procedure, you are in capable hands.",
+            "Professional medical treatment and support to help you achieve optimal results with expert care.",
         },
         {
           number: "4.",
-          title: "Follow-Up",
+          title: "Follow-up & Monitoring",
           description:
-            "We monitor your results and adjust as needed. Your outcome is our ongoing responsibility, not a one-time visit.",
+            "Regular follow-ups to monitor your progress and make necessary adjustments to ensure optimal and lasting results.",
         },
       ],
     },
     testimonials: {
-      tag: "From Our Patients",
+      tag: "Our Mission",
       heading: "A message from Dr. Mahmoud Nasr Abu Obeid",
       quote:
-        '"Over 15 years in surgical dermatology, I have seen what precision medicine can do when it is built around the individual, not a protocol. At Revera, we do not offer the same treatment to every patient. We listen, we assess, and we build a plan that is yours alone. Confidence is not a luxury. With the right care, it is achievable."',
+        '"Throughout my 15+ years career in surgical dermatology and plastic surgery, I have witnessed the transformative power of advanced medical care and personalized treatment. At Revera Clinics, we don\'t just provide treatments – we understand your unique needs and create comprehensive solutions. Everyone deserves to feel beautiful, confident, and healthy. Using evidence-based methods and cutting-edge techniques, we\'re here to guide you on your journey to lasting beauty and wellness."',
       doctorName: "Dr. Mahmoud Nasr Abu Obeid",
       doctorTitle: "Consultant Surgical Dermatologist - MRCS Edinburgh, UK",
       doctorInfo: "Worked in Saudi Arabia, USA & Egypt",
@@ -163,7 +163,7 @@ export const translations: Record<"en" | "ar", Translation> = {
           role: "Client",
         },
         {
-          text: '"أنا بشكر دكتور محمود نصر على المجهود الرائع اللي بذله معايا، كنت بعاني من مشاكل في البشرة ومكنتش متخيلة إني هوصل للنتيجة دي. الحمد لله بمجهودات د. محمود في عيادات ريفيرا حصل تغيير كبير في بشرتي وثقتي بنفسي!"',
+          text: '"أنا بشكر دكتور محمود نصر على المجهود الرائع اللي بذله معايا، كنت بعاني من مشاكل في البشرة ومكنتش متخيلة إني هوصل للنتيجة دي. الحمد لله بمجهودات د. محمود في عيادات كريستال روز حصل تغيير كبير في بشرتي وثقتي بنفسي!"',
           author: "Aya Mahmoud",
           role: "Client",
         },
@@ -180,8 +180,8 @@ export const translations: Record<"en" | "ar", Translation> = {
       ],
     },
     appointment: {
-      tag: "Get Started",
-      heading: "Reserve Your Consultation",
+      tag: "Message Us",
+      heading: "Send us a message!",
       fields: {
         firstName: "First Name",
         lastName: "Last Name",
@@ -189,13 +189,12 @@ export const translations: Record<"en" | "ar", Translation> = {
         phone: "Phone",
         message: "Message",
       },
-      sendBtn: "Book a Consultation",
-      whatsappBtn: "WhatsApp Us",
+      sendBtn: "Send Message",
     },
     footer: {
-      blogHeading: "Skin knowledge from our experts",
+      blogHeading: "Latest insights on beauty & medical care",
       description:
-        "A premium dermatology and cosmetic clinic in New Cairo, built for women who value expertise, privacy, and results that last.",
+        "Transforming lives with expert dermatology, cosmetic surgery, laser treatments, and comprehensive dental care.",
       quickLinks: "quick link",
       links: ["Home", "About us", "services", "Contact us"],
       openHours: "Open Hours:",
@@ -209,8 +208,8 @@ export const translations: Record<"en" | "ar", Translation> = {
     },
     booking: {
       title: "Book Your Service",
-      subtitle: "Select your preferred date and time",
-      steps: ["Select Date", "Select Time", "Confirm"],
+      subtitle: "Select your preferred service, date and time",
+      steps: ["Select Service", "Select Date", "Select Time", "Confirm"],
       selectDate: "Select Your Preferred Date",
       selectTime: "Select Your Preferred Time",
       confirmTitle: "Confirm Your Booking",
@@ -263,7 +262,7 @@ export const translations: Record<"en" | "ar", Translation> = {
       hairCareDescription:
         "We combine advanced cosmetic surgery with personalized care that delivers lasting results. Get the professional guidance you need for a more confident, beautiful you.",
       supportLabel: "24/7 Support",
-      phone: "(+20) 01035595691",
+      phone: "(+20) 01125787019",
       whatWeDoHeading: "Complete care for your beauty",
       whatWeDoDescription:
         "We provide comprehensive medical solutions including dermatology treatments, cosmetic surgery procedures, laser treatments, and dental care for complete wellness.",
@@ -341,9 +340,9 @@ export const translations: Record<"en" | "ar", Translation> = {
       locationTitle: "Location",
       locationText: "36 A El-Nozha St, Ard El Golf, Nasr City.",
       contactTitle: "Contact Us",
-      phone: "(+20) 01035595691",
+      phone: "(+20) 01125787019",
       emailTitle: "Email",
-      email: "info@reveraclinics.com",
+      email: "info@crystalroseclinics.com",
       formHeading: "Have any questions?",
       fields: {
         firstName: "First Name",
@@ -372,29 +371,29 @@ export const translations: Record<"en" | "ar", Translation> = {
     hero: {
       slides: [
         {
-          welcome: "عيادات ريفيرا",
-          heading: "العيادة التي كنتِ تبحثين عنها.",
+          welcome: "مرحباً بكم في عيادات كريستال روز",
+          heading: "حوّل جمالك بشكل طبيعي!",
           description:
-            "ريفيرا هي وجهة نساء القاهرة الجديدة اللواتي يُردن نتائج حقيقية. طب جلدية متخصص وجراحة تجميلية وليزر في مكان يحترم وقتكِ ومعاييركِ.",
-          bookBtn: "احجزي استشارتكِ",
+            "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية مصممة لمساعدتك على تحقيق أهدافك في الجمال والصحة من خلال تقنيات طبية متقدمة.",
+          bookBtn: "احجز موعدًا",
           rating: "4.5",
           reviewCount: "(1000+ تقييم)",
         },
         {
-          welcome: "عيادات ريفيرا",
-          heading: "15 عاماً من النتائج. مُصمَّمة لكِ.",
+          welcome: "مرحباً بكم في عيادات كريستال روز",
+          heading: "رعاية طبية متقدمة يمكنك الوثوق بها!",
           description:
-            "دكتور محمود نصر أبو عبيد، حاصل على MRCS من إدنبرة، أمضى مسيرته في تحقيق أفضل نتائج الجلد. كل خطة علاج في ريفيرا مبنية على احتياجاتكِ أنتِ، لا على بروتوكول عام.",
-          bookBtn: "احجزي استشارتكِ",
+            "اكتشف خدمات شاملة في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان المصممة لاحتياجاتك الفريدة. مع أكثر من 15 عامًا من الخبرة المهنية، نحن هنا لإرشادك نحو الجمال الدائم والعافية.",
+          bookBtn: "احجز موعدًا",
           rating: "4.5",
           reviewCount: "(1000+ تقييم)",
         },
         {
-          welcome: "عيادات ريفيرا",
-          heading: "هكذا تبدو العيادة المناسبة.",
+          welcome: "مرحباً بكم في عيادات كريستال روز",
+          heading: "رحلتك نحو الجمال والصحة تبدأ هنا!",
           description:
-            "من أول استشارة حتى آخر نتيجة، ريفيرا مُصمَّمة للمرأة التي تُقدّر الجودة والخصوصية. عدد محدود من المواعيد شهرياً. احجزي مكانكِ.",
-          bookBtn: "احجزي استشارتكِ",
+            "عيادات متخصصة تحت إشراف طبي كامل تقدم خدمات في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان لجميع الأعمار.",
+          bookBtn: "احجز موعدًا",
           rating: "4.5",
           reviewCount: "(1000+ تقييم)",
         },
@@ -402,22 +401,22 @@ export const translations: Record<"en" | "ar", Translation> = {
     },
     about: {
       tag: "من نحن",
-      subtitle: "رعاية دقيقة للمرأة التي تستحق الأفضل.",
-      heading: "حيث تلتقي الخبرة بالاهتمام",
+      subtitle: "رحلتك نحو الجمال والعافية",
+      heading: "مرحباً بكم في كريستال روز",
       description:
-        "عيادات ريفيرا تعمل تحت الإشراف المباشر للدكتور محمود نصر أبو عبيد، استشاري جراحة الجلدية، MRCS إدنبرة، بخبرة تمتد لأكثر من 15 عاماً في مصر والمملكة العربية السعودية والولايات المتحدة. كل خطة علاج شخصية. كل نتيجة هي المعيار الذي نلتزم به.",
+        "مرحباً بكم في عيادات كريستال روز، التي تديرها مجموعة أبو عبيد وتعمل تحت إشراف الدكتور محمود نصر أبو عبيد، استشاري جراحة الجلدية بخبرة تزيد عن 15 عامًا. نؤمن بتقديم رعاية طبية شاملة معززة بالتقنيات المتقدمة والعلاج الشخصي.",
       services: [
         "الجلدية وعلاجات الليزر",
         "الجراحة التجميلية والتشكيلية",
         "خدمات طب الأسنان",
       ],
-      needHelp: "تحتاجين مساعدة؟",
-      phone: "(+20) 01035595691",
-      readMore: "احجزي استشارة",
+      needHelp: "تحتاج مساعدة!",
+      phone: "(+20) 01125787019",
+      readMore: "اعرف أكثر",
     },
     results: {
       tag: "شاهد الفرق",
-      heading: "مريضات حقيقيات. نتائج حقيقية.",
+      heading: "تحولات عملائنا الحقيقية ونتائج ملهمة",
       stats: [
         { value: "+20", label: "سنوات من الخبرة" },
         { value: "+10K", label: "عميل سعيد" },
@@ -428,7 +427,7 @@ export const translations: Record<"en" | "ar", Translation> = {
     services: {
       tag: "الخدمات",
       heading:
-        "علاجات متخصصة مُصممة لبشرتكِ وأهدافكِ.",
+        "استكشف خدمات الجلدية والجراحة التجميلية والأسنان الشاملة لدينا",
       selectCategory: "اختر فئة لعرض الخدمات",
       categories: [
         { id: "dental", label: "عيادة الأسنان", sublabel: "Dental Clinic" },
@@ -440,14 +439,14 @@ export const translations: Record<"en" | "ar", Translation> = {
       errorText: "تعذّر تحميل الخدمات في الوقت الحالي. يرجى المحاولة مرة أخرى.",
       retryBtn: "إعادة المحاولة",
       freeLabel: "مجاني",
-      ctaText: "هل أنتِ مستعدة لبدء رحلتكِ؟",
-      ctaBtn: "احجزي استشارة",
+      ctaText: "لنصنع شيئاً رائعاً معاً.",
+      ctaBtn: "احصل على عرض مجاني",
     },
     whatWeDo: {
       tag: "ما نقدمه",
-      heading: "كل ما تحتاجه بشرتكِ وثقتكِ.",
+      heading: "تحويل الحياة من خلال الرعاية الطبية المتقدمة",
       description:
-        "من طب الجلدية الدقيق إلى الجراحة التجميلية وطب الأسنان، ريفيرا تغطي كل جوانب الصحة الجمالية. عيادة واحدة. طبيب يعرف تاريخكِ. نتائج متسقة ومحترفة.",
+        "نتخصص في تحويل الحياة من خلال الخدمات الطبية الشاملة، مما يساعدك على تحقيق أهداف الجمال والصحة بعلاجات متقدمة ورعاية مثلى.",
       services: [
         "الجلدية والجلدية التجميلية",
         "علاجات الليزر",
@@ -462,52 +461,52 @@ export const translations: Record<"en" | "ar", Translation> = {
     whyChooseUs: {
       yearsLabel: "+15 سنة خبرة",
       tag: "لماذا تختارنا",
-      heading: "لماذا تختار النساء ريفيرا",
+      heading: "اختبر الرعاية الطبية المتقدمة مع إرشاد خبير",
       description:
-        "ريفيرا لا تنافس على السعر. تنافس على النتائج. طب جلدية جراحي معتمد، وعيادة مصممة للخصوصية، وخطط علاج تلتزم بمعيار واحد: ما يناسب بشرتكِ فعلاً.",
+        "استمتع بالرعاية الشخصية والنتائج التحويلية بتقنيات طبية مبنية على الأدلة، مكرسة لمساعدتك على تحقيق الجمال والعافية الدائمين.",
       quote:
-        '"البشرة تستجيب للدقة، لا للوعود. في ريفيرا، كل مريضة تحصل على خطة مبنية خصيصاً لحالتها وجدولها الزمني وأهدافها. مهمتي أن أكسب ثقتكِ من خلال النتائج، لا التسويق."',
+        '"تقديم رعاية طبية استثنائية من خلال طب الجلدية والجراحة التجميلية والضيافة وطب الأسنان على مستوى عالٍ من الخبرة. حلول مخصصة لجمالك وصحتك، تعزيز الثقة بالنفس، وضمان نتائج متميزة بدعم احترافي في كل خطوة من رحلتك."',
       contactLabel: "تواصل معنا:",
-      phone: "(+20) 01035595691",
+      phone: "(+20) 01125787019",
     },
     howItWorks: {
       tag: "كيف يعمل",
-      heading: "رحلتكِ في ريفيرا",
+      heading: "خطوات بسيطة لتحولات الجمال",
       description:
-        "من أول تواصل حتى النتائج الدائمة، كل خطوة مُرشَدة ومُفسَّرة ومُصممة حول احتياجاتكِ الخاصة. لا شيء مستعجل. كل شيء مدروس.",
+        "اكتشف عملية سلسة مصممة لتعزيز جمالك وصحتك من خلال استشارات شخصية وخطط علاجية مخصصة ودعم طبي متخصص. نرشدك في كل خطوة نحو تحقيق أهداف الجمال والعافية.",
       contactBtn: "تواصل معنا",
       steps: [
         {
           number: "١.",
-          title: "الاستشارة",
+          title: "الاستشارة الأولية",
           description:
-            "جلسة خاصة مع الدكتور أبو عبيد. مخاوف بشرتكِ، تاريخكِ الطبي، وأهدافكِ. نستمع قبل أن نقترح أي شيء.",
+            "تقييم طبي شامل لفهم أهدافك في الجمال والصحة وحالتك الراهنة واحتياجاتك العلاجية.",
         },
         {
           number: "٢.",
-          title: "خطتكِ",
+          title: "خطة العلاج المخصصة",
           description:
-            "برنامج علاجي مبني خصيصاً لبشرتكِ وجدولكِ الزمني وتوقعاتكِ. لا بروتوكولات عامة.",
+            "برنامج علاجي طبي مصمم خصيصاً لاحتياجاتك وحالتك وأهدافك الجمالية.",
         },
         {
           number: "٣.",
-          title: "العلاج",
+          title: "العلاج والرعاية",
           description:
-            "رعاية متخصصة في مكان مُصمَّم لراحتكِ وخصوصيتكِ. من التحضير حتى الإجراء، أنتِ في أيدٍ أمينة.",
+            "علاج طبي احترافي ودعم مستمر لمساعدتك على تحقيق نتائج مثالية بخبرة متميزة.",
         },
         {
           number: "٤.",
-          title: "المتابعة",
+          title: "المتابعة والمراقبة",
           description:
-            "نراقب نتائجكِ ونعدّل وفقاً للحاجة. نتيجتكِ هي مسؤوليتنا المستمرة، لا زيارة واحدة.",
+            "متابعات منتظمة لرصد تقدمك وإجراء التعديلات اللازمة لضمان نتائج مثالية ودائمة.",
         },
       ],
     },
     testimonials: {
-      tag: "من مريضاتنا",
+      tag: "رسالتنا",
       heading: "رسالة من د. محمود نصر أبو عبيد",
       quote:
-        '"على مدار أكثر من 15 عاماً في جراحة الجلدية، رأيت ما تستطيع فعله الطب الدقيق حين يُبنى حول الفرد لا حول بروتوكول. في ريفيرا، لا نقدم نفس العلاج لكل مريضة. نستمع، نُقيّم، ونضع خطة هي خطتكِ وحدكِ. الثقة بالنفس ليست رفاهية. مع الرعاية الصحيحة، هي قابلة للتحقيق."',
+        '"على مدار مسيرتي المهنية التي تمتد لأكثر من 15 عامًا في جراحة الجلدية والجراحة التجميلية، شهدت القوة التحويلية للرعاية الطبية المتقدمة والعلاج الشخصي. في عيادات كريستال روز، لا نقدم العلاجات فحسب - بل نفهم احتياجاتك الفريدة ونبتكر حلولاً شاملة. يستحق كل شخص أن يشعر بالجمال والثقة والصحة. باستخدام أساليب مبنية على الأدلة وتقنيات متطورة، نحن هنا لإرشادك في رحلتك نحو الجمال والعافية الدائمين."',
       doctorName: "د. محمود نصر أبو عبيد",
       doctorTitle: "استشاري جراحة الجلدية - MRCS إدنبرة، المملكة المتحدة",
       doctorInfo: "عمل في المملكة العربية السعودية والولايات المتحدة ومصر",
@@ -518,25 +517,25 @@ export const translations: Record<"en" | "ar", Translation> = {
           role: "عميلة",
         },
         {
-          text: '"أنا بشكر دكتور محمود نصر على المجهود الرائع اللي بذله معايا، كنت بعاني من مشاكل في البشرة ومكنتش متخيلة إني هوصل للنتيجة دي. الحمد لله بمجهودات د. محمود في عيادات ريفيرا حصل تغيير كبير في بشرتي وثقتي بنفسي!"',
+          text: '"أنا بشكر دكتور محمود نصر على المجهود الرائع اللي بذله معايا، كنت بعاني من مشاكل في البشرة ومكنتش متخيلة إني هوصل للنتيجة دي. الحمد لله بمجهودات د. محمود في عيادات كريستال روز حصل تغيير كبير في بشرتي وثقتي بنفسي!"',
           author: "آية محمود",
           role: "عميلة",
         },
         {
-          text: '"عيادات ريفيرا محترفة جداً وذات مهارة وخبرة عالية. يقدم الدكتور محمود أكثر علاجات الجلدية فعالية وتطوراً."',
+          text: '"عيادات كريستال روز محترفة جداً وذات مهارة وخبرة عالية. يقدم الدكتور محمود أكثر علاجات الجلدية فعالية وتطوراً."',
           author: "سارة أحمد",
           role: "عميلة",
         },
         {
-          text: '"محترف جداً ومتمكن. كان الدكتور محمود مرحباً جداً ومفيداً في شرح العناية بالبشرة والعلاجات. كانت النتائج مذهلة. أنصح بشدة بعيادات ريفيرا!"',
+          text: '"محترف جداً ومتمكن. كان الدكتور محمود مرحباً جداً ومفيداً في شرح العناية بالبشرة والعلاجات. كانت النتائج مذهلة. أنصح بشدة بعيادات كريستال روز!"',
           author: "عمر عبد المجيد",
           role: "عميل",
         },
       ],
     },
     appointment: {
-      tag: "ابدئي الآن",
-      heading: "احجزي استشارتكِ",
+      tag: "راسلنا",
+      heading: "أرسل لنا رسالة!",
       fields: {
         firstName: "الاسم الأول",
         lastName: "اسم العائلة",
@@ -544,13 +543,12 @@ export const translations: Record<"en" | "ar", Translation> = {
         phone: "رقم الهاتف",
         message: "الرسالة",
       },
-      sendBtn: "احجزي استشارة",
-      whatsappBtn: "راسلينا عبر واتساب",
+      sendBtn: "إرسال الرسالة",
     },
     footer: {
-      blogHeading: "معرفة البشرة من خبرائنا",
+      blogHeading: "أحدث المقالات حول الجمال والرعاية الطبية",
       description:
-        "عيادة جلدية وتجميلية متميزة في القاهرة الجديدة، مُصممة للمرأة التي تُقدّر الخبرة والخصوصية ونتائج تدوم.",
+        "تحويل الحياة من خلال طب الجلدية والجراحة التجميلية وعلاجات الليزر ورعاية طب الأسنان الشاملة.",
       quickLinks: "روابط سريعة",
       links: ["الرئيسية", "من نحن", "الخدمات", "اتصل بنا"],
       openHours: "ساعات العمل:",
@@ -564,8 +562,8 @@ export const translations: Record<"en" | "ar", Translation> = {
     },
     booking: {
       title: "احجز خدمتك",
-      subtitle: "اختر التاريخ والوقت المناسبين لك",
-      steps: ["اختر التاريخ", "اختر الوقت", "تأكيد"],
+      subtitle: "اختر الخدمة والتاريخ والوقت المناسبين لك",
+      steps: ["اختر الخدمة", "اختر التاريخ", "اختر الوقت", "تأكيد"],
       selectDate: "اختر تاريخك المفضل",
       selectTime: "اختر وقتك المفضل",
       confirmTitle: "تأكيد حجزك",
@@ -581,9 +579,9 @@ export const translations: Record<"en" | "ar", Translation> = {
     aboutPage: {
       pageTitle: "من نحن",
       aboutTag: "من نحن",
-      aboutHeading: "قصتنا",
+      aboutHeading: "رحلتك الجمالية معنا",
       aboutDescription:
-        "عيادات ريفيرا تعمل تحت الإشراف المباشر للدكتور محمود نصر أبو عبيد، استشاري جراحة الجلدية، MRCS إدنبرة، بخبرة تمتد لأكثر من 15 عاماً في مصر والمملكة العربية السعودية والولايات المتحدة. نؤمن بأن الجمال والصحة نتاج رعاية شخصية دقيقة، لا بروتوكولات عامة.",
+        "مرحباً بكم في عيادات كريستال روز، التي تديرها مجموعة أبو عبيد وتعمل تحت إشراف الدكتور محمود نصر أبو عبيد، استشاري جراحة الجلدية بخبرة تزيد عن 15 عامًا. نؤمن بأن الجمال والصحة انعكاسات فريدة للرعاية الشخصية، معززة بالتقنيات الطبية المتقدمة وخطط العلاج الشاملة المصممة خصيصاً لك.",
       aboutList: [
         "الجلدية وعلاجات الليزر",
         "الجراحة التجميلية والتشكيلية",
@@ -601,7 +599,7 @@ export const translations: Record<"en" | "ar", Translation> = {
       hairCareDescription:
         "نجمع بين الجراحة التجميلية المتقدمة والرعاية الشخصية لتحقيق نتائج دائمة. احصل على التوجيه المهني الذي تحتاجه لتصبح أكثر ثقة وجمالاً.",
       supportLabel: "دعم على مدار الساعة",
-      phone: "(+20) 01035595691",
+      phone: "(+20) 01125787019",
       whatWeDoHeading: "رعاية شاملة لجمالك",
       whatWeDoDescription:
         "نقدم حلولاً طبية شاملة تشمل علاجات الجلدية وإجراءات الجراحة التجميلية وعلاجات الليزر وطب الأسنان لرفاهية كاملة.",
@@ -623,7 +621,7 @@ export const translations: Record<"en" | "ar", Translation> = {
       faqHeading: "لديك أسئلة؟ لدينا إجابات!",
       faqs: [
         {
-          question: "١. ما الخدمات التي تقدمها عيادات ريفيرا؟",
+          question: "١. ما الخدمات التي تقدمها عيادات كريستال روز؟",
           answer:
             "نقدم خدمات طبية شاملة تشمل الجلدية والجراحة التجميلية والتشكيلية وعلاجات الليزر وطب الأسنان. تستخدم خدماتنا تقنيات طبية مبنية على الأدلة لفهم احتياجاتك الفريدة وتقديم خطط علاجية مخصصة تتناسب مع أهدافك الجمالية والصحية.",
         },
@@ -679,9 +677,9 @@ export const translations: Record<"en" | "ar", Translation> = {
       locationTitle: "الموقع",
       locationText: "36 أ شارع النزهة، أرض الجولف، مدينة نصر.",
       contactTitle: "اتصل بنا",
-      phone: "(+20) 01035595691",
+      phone: "(+20) 01125787019",
       emailTitle: "البريد الإلكتروني",
-      email: "info@reveraclinics.com",
+      email: "info@crystalroseclinics.com",
       formHeading: "هل لديك أسئلة؟",
       fields: {
         firstName: "الاسم الأول",
@@ -693,7 +691,7 @@ export const translations: Record<"en" | "ar", Translation> = {
       submitBtn: "إرسال الآن",
     },
     auth: {
-      title: "مرحباً بك في ريفيرا",
+      title: "مرحباً بك في كريستال روز",
       subtitle: "أدخل رقم هاتفك للبدء",
       phonePlaceholder: "رقم الهاتف",
       phoneHint: "رقم هاتف مصري (11 رقمًا، يبدأ بـ 01)",

@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, type CSSProperties } from "react";
 import Image from "next/image";
 import { Swiper, SwiperSlide } from "swiper/react";
 import type { Swiper as SwiperType } from "swiper";
@@ -24,7 +24,7 @@ function HeadingWords({ text }: { text: string }) {
         <span key={i}>
           <span
             className="hero-word"
-            style={{ "--wi": i } as React.CSSProperties}
+            style={{ "--wi": i } as CSSProperties}
           >
             {word}
           </span>
@@ -45,8 +45,6 @@ export function HeroSlider() {
     window.dispatchEvent(new CustomEvent("open-booking"));
   }, []);
 
-  // Delay content key flip until the preloader has had time to exit (800ms fade
-  // starts at 800ms; we flip at 950ms so words animate in as the preloader clears).
   useEffect(() => {
     const timer = setTimeout(() => setHeroReady(true), 950);
     return () => clearTimeout(timer);
@@ -60,12 +58,7 @@ export function HeroSlider() {
   const wordCount = slide.heading.split(" ").length;
   const descDelay = wordCount * 65 + 200;
   const ctaDelay = wordCount * 65 + 360;
-
-  // 'pre' key keeps the initial content mounted (animations run hidden under
-  // the preloader). At 950ms the key flips to activeIndex, remounting the div
-  // and restarting all animations with the scene now visible.
   const contentKey = heroReady ? activeIndex : "pre";
-
   const slideLabel = `${String(activeIndex + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
 
   return (
@@ -77,7 +70,6 @@ export function HeroSlider() {
         backgroundColor: "var(--color-brand-primary-deep, #2E3A26)",
       }}
     >
-      {/* Background images — cross-fade via Swiper EffectFade */}
       <Swiper
         modules={[Autoplay, EffectFade]}
         effect="fade"
@@ -105,7 +97,6 @@ export function HeroSlider() {
         ))}
       </Swiper>
 
-      {/* Gradient: dark olive pools at the base, lifts to clear above midpoint */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-10"
@@ -115,7 +106,6 @@ export function HeroSlider() {
         }}
       />
 
-      {/* Content — key flips after preloader clears, then on each slide change */}
       <div
         key={contentKey}
         dir={isRTL ? "rtl" : "ltr"}
@@ -126,7 +116,6 @@ export function HeroSlider() {
           paddingInlineEnd: "clamp(28px, 5vw, 60px)",
         }}
       >
-        {/* Heading — word-by-word stagger entrance */}
         <h1
           className="mt-0 mb-5"
           style={{
@@ -143,7 +132,6 @@ export function HeroSlider() {
           <HeadingWords text={slide.heading} />
         </h1>
 
-        {/* Description */}
         <p
           className="hero-line mt-0 mb-8"
           style={{
@@ -158,7 +146,6 @@ export function HeroSlider() {
           {slide.description}
         </p>
 
-        {/* CTAs */}
         <div
           className="hero-line flex flex-wrap items-center gap-4"
           style={{ animationDelay: `${ctaDelay}ms` }}
@@ -172,7 +159,6 @@ export function HeroSlider() {
             <ArrowRight size={15} strokeWidth={2.5} />
           </button>
 
-          {/* Google Reviews — the one purposeful glass element in the hero */}
           <div
             className="flex items-center gap-3 rounded-full"
             style={{
@@ -224,8 +210,6 @@ export function HeroSlider() {
         </div>
       </div>
 
-      {/* Slide counter — sits outside the keyed content div so it never
-          remounts; transitions via the global opacity transition instead */}
       <div
         aria-label={`Slide ${activeIndex + 1} of ${slides.length}`}
         className="absolute z-20"
@@ -243,10 +227,11 @@ export function HeroSlider() {
         {slideLabel}
       </div>
 
-      {/* Accessible live announcement for screen readers */}
       <div className="sr-only" role="status" aria-live="polite">
         {slide.heading}
       </div>
     </section>
   );
 }
+
+

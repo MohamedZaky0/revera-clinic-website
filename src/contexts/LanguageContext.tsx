@@ -31,14 +31,7 @@ function getInitialLanguage(): Language {
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  // Always start with "en" so SSR and initial client render match,
-  // then read localStorage/URL params after hydration completes.
-  const [language, setLanguageState] = useState<Language>("en");
-
-  useEffect(() => {
-    const initial = getInitialLanguage();
-    if (initial !== "en") setLanguageState(initial);
-  }, []);
+  const [language, setLanguageState] = useState<Language>(getInitialLanguage);
 
   useEffect(() => {
     const dir: Direction = language === "ar" ? "rtl" : "ltr";

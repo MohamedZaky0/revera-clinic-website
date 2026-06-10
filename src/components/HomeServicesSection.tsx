@@ -2,52 +2,9 @@
 
 import { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type Category = "dermatology" | "gynecology" | "physiotherapy" | "osteopathy";
-
-interface ServiceItem {
-  id: number;
-  en: string;
-  ar: string;
-  // cost: number;
-  img: string;
-  cat: Category;
-  unit: string;
-}
+import { Category, ServiceItem, SERVICES } from "@/lib/services";
 
 // ── Service categories and items for Revera Clinics
-const SERVICES: ServiceItem[] = [
-  // Dermatology & Aesthetic
-  { id: 1, en: "Skin Dermatology Clinics", ar: "عيادات الجلدية", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b14740791dd.jfif", cat: "dermatology", unit: "session" },
-  { id: 2, en: "Skin Care Treatments", ar: "تجميل البشرة", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b13668aa956.jpg", cat: "dermatology", unit: "session" },
-  { id: 3, en: "Skin Care Sessions", ar: "جلسات العناية بالبشرة", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b140dc917ce.jpg", cat: "dermatology", unit: "session" },
-  { id: 4, en: "Hair & Scalp Treatment", ar: "علاج الشعر والتساقط", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b145bf8a5d8.jpg", cat: "dermatology", unit: "session" },
-  { id: 5, en: "Laser Hair Removal", ar: "إزالة الشعر بالليزر (رجالي ونسائي)", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b15909e6605.jpg", cat: "dermatology", unit: "session" },
-  { id: 6, en: "Therapeutic Laser", ar: "الليزر العلاجي", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b1672cb2d0a.jpeg", cat: "dermatology", unit: "session" },
-  { id: 7, en: "Aesthetic Injections (Botox/Filler/Plasma)", ar: "حقن تجميلية (بوتوكس / فيلر / بلازما)", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b147c7d1149.jpg", cat: "dermatology", unit: "session" },
-
-  // Gynecology
-  { id: 11, en: "Gynecology Clinics", ar: "النساء والتوليد", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b167b6acadc.jpg", cat: "gynecology", unit: "session" },
-  { id: 12, en: "Pregnancy Follow-Up", ar: "متابعة الحمل", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b1699d40d92.jpg", cat: "gynecology", unit: "session" },
-  { id: 13, en: "Infertility & Fertility Treatment", ar: "علاج العقم وتأخر الإنجاب", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b164f794a42.jpg", cat: "gynecology", unit: "session" },
-  { id: 14, en: "Women’s Aesthetic Treatments", ar: "التجميل النسائي", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b158ea64e65.jpg", cat: "gynecology", unit: "session" },
-  { id: 15, en: "Laser Vaginal Rejuvenation", ar: "ليزر تجديد المهبل", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b140dc917ce.jpg", cat: "gynecology", unit: "session" },
-  { id: 16, en: "Vaginal Tightening", ar: "شد المهبل (Tightening)", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b145bf8a5d8.jpg", cat: "gynecology", unit: "session" },
-  { id: 17, en: "Marital & Family Counseling", ar: "الاستشارات الزوجية والأسرية", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b1672cb2d0a.jpeg", cat: "gynecology", unit: "session" },
-
-  // Physical Therapy
-  { id: 21, en: "Physical Therapy", ar: "العلاج الطبيعي", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b158ea64e65.jpg", cat: "physiotherapy", unit: "session" },
-  { id: 22, en: "Rehabilitation", ar: "إعادة التأهيل", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b167b6acadc.jpg", cat: "physiotherapy", unit: "session" },
-  { id: 23, en: "Posture & Motion Improvement", ar: "تحسين القوام والحركة", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b1699d40d92.jpg", cat: "physiotherapy", unit: "session" },
-
-  // Osteopathy & Nutrition
-  { id: 31, en: "Osteopathy", ar: "تقويم العظام", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b14740791dd.jfif", cat: "osteopathy", unit: "session" },
-  { id: 32, en: "Therapeutic Nutrition", ar: "التغذية العلاجية", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b148b6a5d8.jpg", cat: "osteopathy", unit: "session" },
-  { id: 33, en: "Weight Loss Programs", ar: "برامج إنقاص الوزن", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b140dc917ce.jpg", cat: "osteopathy", unit: "session" },
-  { id: 34, en: "Body Contouring & Shaping", ar: "تنسيق القوام", img: "https://octopii-prod-space.ams3.cdn.digitaloceanspaces.com/uploads/services/69b145bf8a5d8.jpg", cat: "osteopathy", unit: "session" },
-];
 
 // ── Flower icon (inline SVG matching original) ─────────────────────────────
 
@@ -160,28 +117,39 @@ interface ServiceCardProps {
   service: ServiceItem;
   lang: string;
   descText: string;
+  isRTL: boolean;
 }
 
-function ServiceCard({ service, lang, descText }: ServiceCardProps) {
+function ServiceCard({ service, lang, descText, isRTL }: ServiceCardProps) {
   const [hovered, setHovered] = useState(false);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
   const [showCursor, setShowCursor] = useState(false);
   const title = lang === "ar" ? service.ar : service.en;
+  const arrowTransform = isRTL
+    ? `scaleX(-1) rotate(${hovered ? 45 : 0}deg)`
+    : `rotate(${hovered ? 45 : 0}deg)`;
   // const price = `${service.cost.toLocaleString()} EGP`;
 
   return (
     <div
+      className="service-card"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        backgroundColor: "var(--cr-white)",
+        backgroundColor: "var(--cr-secondary)",
         borderRadius: 24,
         overflow: "hidden",
-        border: "1px solid rgba(90, 106, 81, 0.2)",
-        boxShadow: "0 2px 20px rgba(90,61,52,0.08)",
+        border: `1px solid ${hovered ? "rgba(90, 106, 81, 0.5)" : "rgba(90, 106, 81, 0.2)"}`,
+        boxShadow: hovered
+          ? "0 16px 48px rgba(90, 61, 52, 0.18), 0 4px 12px rgba(90, 61, 52, 0.10)"
+          : "0 2px 20px rgba(90, 61, 52, 0.08)",
         display: "flex",
         flexDirection: "column",
         height: "100%",
+        transform: hovered ? "translateY(-5px)" : "translateY(0)",
+        transition: "box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s ease",
+        cursor: "pointer",
+        willChange: "transform, box-shadow",
       }}>
       <div style={{ padding: 24, flex: 1, display: "flex", flexDirection: "column", gap: 24 }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
@@ -200,12 +168,13 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
             width: 44,
             height: 44,
             borderRadius: "50%",
-            backgroundColor: "rgba(90, 106, 81, 0.12)",
+            backgroundColor: hovered ? "rgba(65, 78, 54, 0.20)" : "rgba(90, 106, 81, 0.12)",
             display: "grid",
             placeItems: "center",
             flexShrink: 0,
-            transition: "transform 0.28s ease, background-color 0.28s ease",
-            transform: hovered ? "rotate(45deg)" : "rotate(0deg)",
+            transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.28s ease",
+            transform: arrowTransform,
+            transformOrigin: "center center",
           }}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M4 14L14 4M14 4H6M14 4V12" stroke="#414E36" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -226,6 +195,11 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
 
         <div
           style={{ position: "relative", width: "100%", height: 220, borderRadius: 24, overflow: "hidden", cursor: showCursor ? "none" : "pointer" }}
+          onClick={() => {
+            try {
+              window.dispatchEvent(new CustomEvent('open-booking', { detail: { serviceId: service.id } }));
+            } catch (e) {}
+          }}
           onMouseEnter={() => {
             setShowCursor(true);
             if (typeof document !== 'undefined') {
@@ -262,8 +236,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
               height: "100%",
               objectFit: "cover",
               display: "block",
-              transform: hovered ? "scale(1.06) rotate(-1deg)" : "scale(1) rotate(0deg)",
-              transition: "transform 700ms cubic-bezier(0.2,0.9,0.2,1)",
+              transition: "transform 0.4s ease, filter 0.4s ease, opacity 0.4s ease",
               willChange: "transform",
             }}
           />
@@ -564,7 +537,7 @@ export function HomeServicesSection() {
                     gap: 40,
                   }}>
                     {filtered.map((svc) => (
-                      <ServiceCard key={svc.id} service={svc} lang={language} descText={descText} />
+                      <ServiceCard key={svc.id} service={svc} lang={language} descText={descText} isRTL={isRTL} />
                     ))}
                   </div>
                 </div>

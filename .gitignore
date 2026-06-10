@@ -8,8 +8,7 @@ node_modules/
 out/
 build/
 dist/
-.claude/
-.impeccable/
+
 # Environment
 .env
 .env.local

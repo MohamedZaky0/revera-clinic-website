@@ -121,6 +121,33 @@ export function Navbar() {
                 </Link>
               </li>
             ))}
+
+            {/* Make Appointment CTA next to Contact */}
+            <li>
+              <button
+                onClick={handleBooking}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: "8px",
+                  background: "var(--cr-primary)",
+                  color: "var(--cr-white)",
+                  border: "none",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "transform 0.12s ease, opacity 0.12s ease",
+                  whiteSpace: "nowrap",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.9";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
+                }}
+              >
+                {t.nav.makeAppointment}
+              </button>
+              </li>
           </ul>
 
           {/* Right controls */}
@@ -136,7 +163,7 @@ export function Navbar() {
           >
             {/* Phone */}
             <a
-              href="tel:+201035595691"
+              href="tel:+201125787019"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -155,7 +182,7 @@ export function Navbar() {
               }}
             >
               <Phone size={18} strokeWidth={1.5} />
-              <span>(+20) 01035595691</span>
+              <span>(+20) 01125787019</span>
             </a>
 
             {/* Language dropdown */}
@@ -286,29 +313,22 @@ export function Navbar() {
 
             {/* Login button */}
             <button
-              onClick={handleAuth}
+              disabled
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
                 background: "transparent",
-                color: "var(--cr-primary)",
-                border: "1.5px solid var(--cr-primary)",
+                color: "rgba(65, 78, 54, 0.45)",
+                border: "1.5px solid rgba(65, 78, 54, 0.25)",
                 padding: "10px 20px",
                 borderRadius: "6px",
-                cursor: "pointer",
+                cursor: "not-allowed",
                 fontSize: "14px",
                 fontWeight: 600,
                 transition: "all 0.2s ease",
                 whiteSpace: "nowrap",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-primary)";
-                (e.currentTarget as HTMLButtonElement).style.color = "white";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
+                opacity: 0.65,
               }}
             >
               {/* TODO: Add login icon */}
@@ -412,9 +432,32 @@ export function Navbar() {
                 borderTop: "1px solid var(--cr-divider)",
               }}
             >
+              {/* Mobile Make Appointment */}
+              <button
+                onClick={() => handleBooking()}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  background: "var(--cr-primary)",
+                  color: "var(--cr-white)",
+                  border: "none",
+                  padding: "12px 20px",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  transition: "all 0.12s ease",
+                  width: "100%",
+                }}
+              >
+                {t.nav.makeAppointment}
+              </button>
+
               {/* Mobile phone */}
               <a
-                href="tel:+201035595691"
+                href="tel:+201125787019"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -426,7 +469,7 @@ export function Navbar() {
                 }}
               >
                 <Phone size={18} strokeWidth={1.5} />
-                <span>(+20) 01035595691</span>
+                <span>(+20) 01125787019</span>
               </a>
 
               {/* Mobile language selector */}
@@ -493,31 +536,23 @@ export function Navbar() {
 
               {/* Mobile login button */}
               <button
-                onClick={() => {
-                  handleAuth();
-                  setMenuOpen(false);
-                }}
+                disabled
                 style={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "6px",
-                  background: "var(--cr-primary)",
-                  color: "white",
+                  background: "rgba(65, 78, 54, 0.12)",
+                  color: "rgba(255, 255, 255, 0.7)",
                   border: "none",
                   padding: "12px 20px",
                   borderRadius: "6px",
-                  cursor: "pointer",
+                  cursor: "not-allowed",
                   fontSize: "14px",
                   fontWeight: 600,
                   transition: "all 0.2s ease",
                   width: "100%",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.9";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
+                  opacity: 0.65,
                 }}
               >
                 {t.nav.login}
