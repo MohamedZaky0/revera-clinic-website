@@ -41,6 +41,7 @@ export function SiteFooter() {
       <div className="cr-container" style={{ maxWidth: "1480px" }}>
         {/* Curved Card Container with Dark Brown Background */}
         <div
+          className="ft-rounded-card"
           style={{
             position: "relative",
             backgroundColor: "var(--cr-primary, #414E36)",

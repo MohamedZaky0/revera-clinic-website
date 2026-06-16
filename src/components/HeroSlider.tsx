@@ -65,7 +65,7 @@ export function HeroSlider() {
 
   return (
     <section
-      className="relative mx-6 my-8 overflow-hidden rounded-[32px]"
+      className="relative mx-2 my-3 sm:mx-4 sm:my-5 md:mx-6 md:my-8 overflow-hidden rounded-[20px] sm:rounded-[28px] md:rounded-[32px]"
       style={{
         height: "calc(100svh - 176px)",
         minHeight: "380px",

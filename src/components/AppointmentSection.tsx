@@ -41,6 +41,7 @@ export function AppointmentSection() {
       <div className="cr-container" style={{ maxWidth: "1480px" }}>
         {/* Curved Card Container with Beige Background */}
         <div
+          className="ap-rounded-card"
           style={{
             position: "relative",
             backgroundColor: "var(--cr-secondary, #EDF1EC)",

@@ -189,7 +189,7 @@ export function ContactPageContent() {
                 {t.contactPage.formHeading}
               </h2>
               <form onSubmit={handleSubmit}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                <div className="contact-form-inner" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                   <input
                     className="contact-input"
                     style={inputStyle}
@@ -268,6 +268,7 @@ export function ContactPageContent() {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Branch switcher pills */}
               <div 
+                className="contact-branch-switcher"
                 style={{ 
                   display: "flex", 
                   gap: 8, 
@@ -347,9 +348,16 @@ export function ContactPageContent() {
         }
         @media (max-width: 992px) {
           .contact-info-grid { grid-template-columns: 1fr !important; }
+          .contact-info-grid > div:first-child { text-align: center; }
           .contact-form-grid { grid-template-columns: 1fr !important; }
         }
-        @media (max-width: 600px) {
+        @media (max-width: 768px) {
+          .contact-cards { grid-template-columns: 1fr 1fr !important; }
+          .contact-form-inner { grid-template-columns: 1fr !important; }
+          .contact-branch-switcher { flex-wrap: wrap; justify-content: center; border-radius: 16px !important; }
+          .contact-branch-switcher button { flex: 1; min-width: 130px; font-size: 12px !important; padding: 8px 12px !important; }
+        }
+        @media (max-width: 500px) {
           .contact-cards { grid-template-columns: 1fr !important; }
         }
       `}</style>

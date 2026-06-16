@@ -496,6 +496,15 @@ export function ServicesSection() {
           .services-card-wrapper.phase-1 {
             padding: 48px 24px 10px;
           }
+          .services-cat-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .services-cat-grid {
+            grid-template-columns: 1fr !important;
+            max-width: 320px !important;
+          }
         }
         .services-swiper-wrap .swiper-button-prev,
         .services-swiper-wrap .swiper-button-next {

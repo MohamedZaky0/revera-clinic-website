@@ -91,7 +91,7 @@ export function Navbar() {
               flex: 1,
               justifyContent: "center",
             }}
-            className="hidden md:flex"
+            className="hidden lg:flex"
           >
             {NAV_LINKS.map(({ key, href }) => (
               <li key={key}>
@@ -163,7 +163,7 @@ export function Navbar() {
               gap: "24px",
               flexShrink: 0,
             }}
-            className="hidden md:flex"
+            className="hidden lg:flex"
           >
             {/* Phone */}
             <a
@@ -352,7 +352,7 @@ export function Navbar() {
               flexDirection: "column",
               gap: "5px",
             }}
-            className="flex md:hidden"
+            className="flex lg:hidden"
           >
             <span
               style={{

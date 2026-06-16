@@ -419,7 +419,7 @@ export function HomeServicesSection() {
                     justifyContent: "center",
                     position: "relative",
                   }}
-                  className="services-cat-grid"
+                  className="services-cat-grid hs-cat-grid"
                 >
                   <CategoryCard
                     label={language === "ar" ? "الجلدية والتجميل" : "Dermatology & Aesthetic"}
@@ -541,7 +541,7 @@ export function HomeServicesSection() {
 
                 {/* Services grid */}
                 <div style={{ marginBottom: 48 }} className="services-grid-wrap">
-                  <div style={{
+                  <div className="hs-svc-grid" style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(3, minmax(180px, 1fr))",
                     gap: 40,
@@ -566,6 +566,21 @@ export function HomeServicesSection() {
           .services-card-wrapper {
             padding: 48px 24px 30px;
             border-radius: 24px !important;
+          }
+          .hs-cat-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .hs-svc-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .hs-cat-grid {
+            grid-template-columns: 1fr !important;
+            max-width: 320px !important;
+          }
+          .hs-svc-grid {
+            grid-template-columns: 1fr !important;
           }
         }
         .services-swiper-wrap .swiper-button-prev,
