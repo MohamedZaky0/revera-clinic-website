@@ -278,7 +278,7 @@ export function OurApproachSection() {
               {/* Clinic/room image */}
               <div className="oas2-clinic-img">
                 <Image
-                  src="/images/assets/04252364-cb0b-478d-b995-69ccec4d93c9.jpg"
+                  src="/images/clinic/room.jpg"
                   alt="Revera Clinic"
                   fill
                   sizes="(max-width: 1024px) 100vw, 480px"
@@ -287,6 +287,7 @@ export function OurApproachSection() {
               </div>
 
               {/* Doctor portrait — overlapping bottom-left */}
+              {/* 
               <div
                 style={{
                   position: "absolute",
@@ -302,7 +303,7 @@ export function OurApproachSection() {
                 }}
               >
                 <Image
-                  src="/images/assets/dr-hanan-8.png"
+                  src="/images/doctor/portrait-about.png"
                   alt="Doctor"
                   fill
                   sizes="130px"

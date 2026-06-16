@@ -205,7 +205,7 @@ export function AppointmentSection() {
                 {/* Headset support woman image */}
                 <div className="ap-image-container">
                   <Image
-                    src="/images/assets/support-agent.png"
+                    src="/images/clinic/support-agent.jpg"
                     alt="Contact support — Revera Clinics"
                     fill
                     sizes="(max-width: 768px) 100vw, 400px"

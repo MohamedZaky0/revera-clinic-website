@@ -73,7 +73,7 @@ export function IntroVideo() {
           >
             {/* Thumbnail image */}
             <Image
-              src="/images/assets/h6.jpg"
+              src="/images/clinic/video-thumbnail.jpg"
               alt="Revera Clinics — Introduction Video"
               fill
               sizes="(max-width: 768px) 100vw, 1480px"

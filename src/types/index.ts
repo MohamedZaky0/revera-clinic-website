@@ -190,8 +190,10 @@ export interface Translation {
     reachOutDescription: string;
     locationTitle: string;
     locationText: string;
+    locationTextZayed: string;
     contactTitle: string;
     phone: string;
+    phoneZayed: string;
     emailTitle: string;
     email: string;
     formHeading: string;

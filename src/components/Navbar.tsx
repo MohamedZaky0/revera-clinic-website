@@ -124,8 +124,10 @@ export function Navbar() {
 
             {/* Make Appointment CTA next to Contact */}
             <li>
-              <button
-                onClick={handleBooking}
+              <a
+                href="https://wa.me/201035595691?text=Hello%20Revera%2C%20I%27d%20love%20to%20schedule%20a%20consultation%20at%20your%20New%20Cairo%20branch.%20Please%20let%20me%20know%20your%20earliest%20availability.%20Thank%20you."
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   padding: "10px 16px",
                   borderRadius: "8px",
@@ -137,16 +139,18 @@ export function Navbar() {
                   cursor: "pointer",
                   transition: "transform 0.12s ease, opacity 0.12s ease",
                   whiteSpace: "nowrap",
+                  textDecoration: "none",
+                  display: "inline-block",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.9";
+                  (e.currentTarget as HTMLAnchorElement).style.opacity = "0.9";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
+                  (e.currentTarget as HTMLAnchorElement).style.opacity = "1";
                 }}
               >
                 {t.nav.makeAppointment}
-              </button>
+              </a>
               </li>
           </ul>
 
@@ -163,7 +167,7 @@ export function Navbar() {
           >
             {/* Phone */}
             <a
-              href="tel:+201125787019"
+              href="tel:+201035595691"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -182,7 +186,7 @@ export function Navbar() {
               }}
             >
               <Phone size={18} strokeWidth={1.5} />
-              <span>(+20) 01125787019</span>
+              <span>(+20) 01035595691</span>
             </a>
 
             {/* Language dropdown */}
@@ -217,7 +221,7 @@ export function Navbar() {
                   alt="English"
                   width={20}
                   height={14}
-                  style={{ borderRadius: "2px" }}
+                  style={{ width: "auto", height: "auto", borderRadius: "2px" }}
                 />
                 <span>English</span>
                 <ChevronDown size={16} />
@@ -270,7 +274,7 @@ export function Navbar() {
                       }
                     }}
                   >
-                    <Image src="/images/flag/en.png" alt="English" width={18} height={12} style={{ borderRadius: "2px" }} />
+                    <Image src="/images/flag/en.png" alt="English" width={18} height={12} style={{ width: "auto", height: "auto", borderRadius: "2px" }} />
                     <span>English</span>
                   </button>
                   <button
@@ -433,8 +437,10 @@ export function Navbar() {
               }}
             >
               {/* Mobile Make Appointment */}
-              <button
-                onClick={() => handleBooking()}
+              <a
+                href="https://wa.me/201035595691?text=Hello%20Revera%2C%20I%27d%20love%20to%20schedule%20a%20consultation%20at%20your%20New%20Cairo%20branch.%20Please%20let%20me%20know%20your%20earliest%20availability.%20Thank%20you."
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -450,14 +456,15 @@ export function Navbar() {
                   fontWeight: 600,
                   transition: "all 0.12s ease",
                   width: "100%",
+                  textDecoration: "none",
                 }}
               >
                 {t.nav.makeAppointment}
-              </button>
+              </a>
 
               {/* Mobile phone */}
               <a
-                href="tel:+201125787019"
+                href="tel:+201035595691"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -469,7 +476,7 @@ export function Navbar() {
                 }}
               >
                 <Phone size={18} strokeWidth={1.5} />
-                <span>(+20) 01125787019</span>
+                <span>(+20) 01035595691</span>
               </a>
 
               {/* Mobile language selector */}
@@ -499,7 +506,7 @@ export function Navbar() {
                     alt="English"
                     width={16}
                     height={12}
-                    style={{ borderRadius: "2px" }}
+                    style={{ width: "auto", height: "auto", borderRadius: "2px" }}
                   />
                   <span>English</span>
                 </button>

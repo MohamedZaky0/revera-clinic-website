@@ -26,8 +26,8 @@ function IconFacebook() {
 }
 
 const SOCIAL_LINKS = [
-  { label: "Facebook", href: "https://facebook.com", Icon: IconFacebook },
-  { label: "Instagram", href: "https://instagram.com", Icon: IconInstagram },
+  { label: "Facebook", href: "https://www.facebook.com/profile.php?id=61587039173147", Icon: IconFacebook },
+  { label: "Instagram", href: "https://www.instagram.com/reveraclinics/", Icon: IconInstagram },
 ];
 
 export function SiteFooter() {
@@ -508,18 +508,22 @@ export function SiteFooter() {
                     >
                       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                     </svg>
-                    <a
-                      href="tel:+201125787019"
-                      style={{
-                        fontSize: "14px",
-                        color: "rgba(255,255,255,0.85)",
-                        textDecoration: "none",
-                        fontWeight: 500,
-                      }}
-                      className="hover:underline"
-                    >
-                      (+20) 01125787019
-                    </a>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <a
+                        href="tel:+201035595691"
+                        style={{ fontSize: "14px", color: "rgba(255,255,255,0.85)", textDecoration: "none", fontWeight: 500 }}
+                        className="hover:underline"
+                      >
+                        {isRTL ? "القاهرة الجديدة: (+20) 01035595691" : "New Cairo: (+20) 01035595691"}
+                      </a>
+                      <a
+                        href="tel:+201023122323"
+                        style={{ fontSize: "14px", color: "rgba(255,255,255,0.85)", textDecoration: "none", fontWeight: 500 }}
+                        className="hover:underline"
+                      >
+                        {isRTL ? "الشيخ زايد: (+20) 01023122323" : "Sheikh Zayed: (+20) 01023122323"}
+                      </a>
+                    </div>
                   </div>
                 </div>
 
@@ -554,7 +558,7 @@ export function SiteFooter() {
                       <polyline points="22,6 12,13 2,6" />
                     </svg>
                     <a
-                      href="mailto:info@crystalroseclinics.com"
+                      href="mailto:info@reveraclinics.com"
                       style={{
                         fontSize: "14px",
                         color: "rgba(255,255,255,0.85)",
@@ -563,7 +567,7 @@ export function SiteFooter() {
                       }}
                       className="hover:underline"
                     >
-                      info@crystalroseclinics.com
+                      info@reveraclinics.com
                     </a>
                   </div>
                 </div>
@@ -596,17 +600,14 @@ export function SiteFooter() {
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                     <circle cx="12" cy="10" r="3" />
                   </svg>
-                  <span
-                    style={{
-                      fontSize: "14px",
-                      color: "rgba(255,255,255,0.85)",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {isRTL
-                      ? "٣٦ أ شارع النزهة، أرض الجولف، مصر الجديدة، القاهرة."
-                      : "36 A El-Nozha St, Ard El Golf, Nasr City."}
-                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: "14px", color: "rgba(255,255,255,0.85)", fontWeight: 500 }}>
+                      {isRTL ? "القاهرة الجديدة: مركز أوزون الطبي، C261" : "New Cairo: Ozone Medical Center, C261"}
+                    </span>
+                    <span style={{ fontSize: "14px", color: "rgba(255,255,255,0.85)", fontWeight: 500 }}>
+                      {isRTL ? "الشيخ زايد: عيادات النداء، بيفرلي هيلز 209" : "Sheikh Zayed: Elnada Clinics, Beverly Hills 209"}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -644,14 +645,14 @@ export function SiteFooter() {
                   <>
                     تطوير بواسطة{" "}
                     <span style={{ color: "var(--color-brand-sand)", fontWeight: 700 }}>
-                      Octpoli
+                      IOX Solutions
                     </span>
                   </>
                 ) : (
                   <>
                     Powered by{" "}
                     <span style={{ color: "var(--color-brand-sand)", fontWeight: 700 }}>
-                      Octpoli
+                      IOX Solutions
                     </span>
                   </>
                 )}

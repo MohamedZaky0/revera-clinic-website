@@ -76,7 +76,7 @@ export function AboutSection() {
                 }`}
               >
                 <Image
-                  src="/images/assets/dr-hanan-8.png"
+                  src="/images/doctor/portrait-about.jpg"
                   alt="Dr. Mahmoud Nasr Abu Obeid"
                   fill
                   sizes="(max-width: 1024px) 50vw, 25vw"
@@ -92,7 +92,7 @@ export function AboutSection() {
                 }`}
               >
                 <Image
-                  src="/images/assets/dr-hanan-pp.jpg"
+                  src="/images/doctor/portrait-main.jpg"
                   alt="Dr. Mahmoud Nasr Abu Obeid"
                   fill
                   sizes="(max-width: 1024px) 50vw, 25vw"
@@ -103,7 +103,7 @@ export function AboutSection() {
 
               {/* Central Rose Badge Shield - Sitting Over Bottom Overlap */}
               <div 
-                className={`absolute z-30 w-20 h-20 rounded-full bg-white shadow-xl flex items-center justify-center p-3.5 transition-transform duration-300 hover:scale-110 bottom-[74px] ${
+                className={`absolute z-30 w-20 h-20 rounded-full bg-white shadow-xl flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-110 bottom-[74px] ${
                   isRTL 
                     ? "right-[56%] translate-x-1/2" 
                     : "left-[56%] -translate-x-1/2"
@@ -112,7 +112,8 @@ export function AboutSection() {
                 <img
                   src="/images/main_logo.png"
                   alt="Revera logo"
-                  className="w-full h-full object-contain animate-[spin_6s_linear_infinite]"
+                  className="w-full h-full object-contain"
+                  style={{ transform: "scale(1.7)" }}
                 />
               </div>
             </div>
@@ -178,7 +179,7 @@ export function AboutSection() {
               <div className={`md:col-span-5 ${isRTL ? "md:order-1" : "md:order-2"}`}>
                 <div className="relative aspect-[16/10] w-full rounded-[20px] overflow-hidden shadow-md transition-transform duration-500 hover:scale-[1.03]">
                   <Image
-                    src="/images/assets/h7.jpg"
+                    src="/images/clinic/interior.jpg"
                     alt="Revera Clinics Interior"
                     fill
                     sizes="(max-width: 768px) 100vw, 250px"

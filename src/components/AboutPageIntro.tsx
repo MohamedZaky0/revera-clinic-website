@@ -120,6 +120,7 @@ export function AboutPageIntro() {
               display: flex;
               align-items: center;
               justify-content: center;
+              overflow: hidden;
               box-shadow: 0 4px 20px rgba(90,61,52,0.12);
               z-index: 5;
             }
@@ -207,7 +208,7 @@ export function AboutPageIntro() {
                 {/* Main portrait */}
                 <div className="api-main-img">
                   <Image
-                    src="/images/assets/dr-hanan-8.png"
+                    src="/images/doctor/portrait-about.png"
                     alt="Dr. Mahmoud Nasr Abu Obeid"
                     fill
                     sizes="(max-width: 1024px) 100vw, 420px"
@@ -223,14 +224,14 @@ export function AboutPageIntro() {
                     alt="Revera Clinics"
                     width={88}
                     height={88}
-                    style={{ objectFit: "contain" }}
+                    style={{ objectFit: "contain", width: "auto", height: "auto", transform: "scale(1.7)" }}
                   />
                 </div>
 
                 {/* Second portrait — clinic / room image */}
                 <div className="api-second-img">
                   <Image
-                    src="/images/assets/04252364-cb0b-478d-b995-69ccec4d93c9.jpg"
+                    src="/images/clinic/room.jpg"
                     alt="Revera Clinics"
                     fill
                     sizes="180px"

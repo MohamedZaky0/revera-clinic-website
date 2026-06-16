@@ -40,6 +40,24 @@ The clinic is a destination, not a waiting room. Patients should feel they are e
 4. **Bilingual by design, not by translation.** Arabic/RTL is not a toggle afterthought — it must be a first-class layout mode. Typography, spacing, and component direction should be designed for both reading directions.
 5. **Show expertise, don't describe it.** Credentials, results, and testimonials speak louder than adjectives like "advanced" or "world-class". Concrete evidence over marketing language.
 
+## Business Information
+
+### Working Hours
+- **Daily: 10:00 AM – 10:00 PM** (open 7 days a week, no days off)
+
+### Locations
+
+| Branch | Address | Phone | Maps |
+|--------|---------|-------|------|
+| **New Cairo (Tagamoa)** | Ozone Medical Center, C261 | (+20) 01035595691 | [Google Maps](https://maps.app.goo.gl/sXQXDW3A7DdZSRJZ9) |
+| **Sheikh Zayed** | Elnada Clinics, Beverly Hills 209 | (+20) 01023122323 | [Google Maps](https://maps.app.goo.gl/7ig2Q9iCY9uszyHq9) |
+
+### Social Media
+- **Instagram:** https://www.instagram.com/reveraclinics/
+- **Facebook:** https://www.facebook.com/profile.php?id=61587039173147
+
+---
+
 ## Accessibility & Inclusion
 
 WCAG 2.1 AA minimum. Key considerations: body text contrast must meet 4.5:1 against all background tones (the olive/ivory combination needs verification); bilingual content must maintain RTL text rendering without layout breaks; animation must respect `prefers-reduced-motion`; booking forms must be keyboard-navigable and screen-reader accessible.

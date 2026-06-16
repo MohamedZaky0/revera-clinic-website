@@ -47,10 +47,11 @@ function ArrowIcon() {
 interface CategoryCardProps {
   label: string;
   sublabel: string;
+  image: string;
   onClick: () => void;
 }
 
-function CategoryCard({ label, sublabel, onClick }: CategoryCardProps) {
+function CategoryCard({ label, sublabel, image, onClick }: CategoryCardProps) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -79,13 +80,9 @@ function CategoryCard({ label, sublabel, onClick }: CategoryCardProps) {
           : "0 4px 12px rgba(90, 61, 52, 0.02)",
       }}
     >
-      <div 
-        style={{ 
-          color: "var(--cr-primary)", 
-          transition: "color 0.3s" 
-        }}
-      >
-        <FlowerIcon />
+      <div style={{ width: "100%", height: 140, borderRadius: 16, overflow: "hidden", marginBottom: 4 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       </div>
       <div>
         <div style={{
@@ -112,6 +109,13 @@ function CategoryCard({ label, sublabel, onClick }: CategoryCardProps) {
 }
 
 // ── Service card (phase 2) ────────────────────────────────────────────────────
+
+const CATEGORY_IMAGES: Record<Category, string> = {
+  dermatology: "/images/services/dermatology-service.jpg",
+  gynecology: "/images/services/gyna-service.jpg",
+  physiotherapy: "/images/services/physicaltherapy_service.png",
+  osteopathy: "/images/services/nutrition_service.png",
+};
 
 interface ServiceCardProps {
   service: ServiceItem;
@@ -196,9 +200,11 @@ function ServiceCard({ service, lang, descText, isRTL }: ServiceCardProps) {
         <div
           style={{ position: "relative", width: "100%", height: 220, borderRadius: 24, overflow: "hidden", cursor: showCursor ? "none" : "pointer" }}
           onClick={() => {
-            try {
-              window.dispatchEvent(new CustomEvent('open-booking', { detail: { serviceId: service.id } }));
-            } catch (e) {}
+            // try {
+            //   window.dispatchEvent(new CustomEvent('open-booking', { detail: { serviceId: service.id } }));
+            // } catch (e) {}
+            const msg = encodeURIComponent(`Hello Revera, I'm interested in booking "${service.en}". Please let me know your availability at your New Cairo branch. Thank you.`);
+            window.open(`https://wa.me/201035595691?text=${msg}`, '_blank');
           }}
           onMouseEnter={() => {
             setShowCursor(true);
@@ -229,7 +235,7 @@ function ServiceCard({ service, lang, descText, isRTL }: ServiceCardProps) {
           }}
         >
           <img
-            src="/images/assets/blog-3.webp"
+            src={service.img}
             alt={title}
             style={{
               width: "100%",
@@ -418,21 +424,25 @@ export function HomeServicesSection() {
                   <CategoryCard
                     label={language === "ar" ? "الجلدية والتجميل" : "Dermatology & Aesthetic"}
                     sublabel={language === "ar" ? "جلدية وتجميل" : "Skin & Aesthetic"}
+                    image={CATEGORY_IMAGES.dermatology}
                     onClick={() => setActiveCategory("dermatology")}
                   />
                   <CategoryCard
                     label={language === "ar" ? "النساء والتوليد" : "Gynecology"}
-                    sublabel={language === "ar" ? "صحة المرأة" : "Women’s Health"}
+                    sublabel={language === "ar" ? "صحة المرأة" : "Women's Health"}
+                    image={CATEGORY_IMAGES.gynecology}
                     onClick={() => setActiveCategory("gynecology")}
                   />
                   <CategoryCard
                     label={language === "ar" ? "العلاج الطبيعي" : "Physical Therapy"}
                     sublabel={language === "ar" ? "إعادة التأهيل" : "Rehabilitation"}
+                    image={CATEGORY_IMAGES.physiotherapy}
                     onClick={() => setActiveCategory("physiotherapy")}
                   />
                   <CategoryCard
                     label={language === "ar" ? "تقويم العظام والتغذية" : "Osteopathy & Nutrition"}
                     sublabel={language === "ar" ? "صحة العظام" : "Bone & Nutrition"}
+                    image={CATEGORY_IMAGES.osteopathy}
                     onClick={() => setActiveCategory("osteopathy")}
                   />
                 </div>

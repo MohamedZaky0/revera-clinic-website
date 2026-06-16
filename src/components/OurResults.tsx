@@ -25,11 +25,14 @@ interface StatItem {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const BEFORE_AFTER_PAIRS: BeforeAfterPair[] = [1, 2, 3, 4, 5, 6].map((n) => ({
-  id: n,
-  before: `/images/assets/diffrent/${n}a.jpg`,
-  after: `/images/assets/diffrent/${n}b.jpg`,
-}));
+const BEFORE_AFTER_PAIRS: BeforeAfterPair[] = [
+  { id: 1, before: "/images/before-after/1-before.jpeg", after: "/images/before-after/1-after.jpeg" },
+  { id: 2, before: "/images/before-after/2-before.jpeg", after: "/images/before-after/2-after.jpeg" },
+  { id: 3, before: "/images/before-after/3-before.jpeg", after: "/images/before-after/3-after.jpeg" },
+  { id: 4, before: "/images/before-after/4-before.jpg",  after: "/images/before-after/4-after.jpg" },
+  { id: 5, before: "/images/before-after/5-before.jpg",  after: "/images/before-after/5-after.jpg" },
+  { id: 6, before: "/images/before-after/6-before.jpg",  after: "/images/before-after/6-after.jpg" },
+];
 
 const STAT_ICONS: string[] = [
   "/images/icon-facts-counter-1.svg",
@@ -210,9 +213,9 @@ export function OurResults() {
             key={isRTL ? "rtl" : "ltr"}
             className="results-swiper"
           >
-            {BEFORE_AFTER_PAIRS.map((pair) => (
+            {BEFORE_AFTER_PAIRS.map((pair, i) => (
               <SwiperSlide key={pair.id}>
-                <BeforeAfterSlide pair={pair} isRTL={isRTL} />
+                <BeforeAfterSlide pair={pair} isRTL={isRTL} priority={i === 0} />
               </SwiperSlide>
             ))}
           </Swiper>
@@ -244,9 +247,10 @@ export function OurResults() {
 interface BeforeAfterSlideProps {
   pair: BeforeAfterPair;
   isRTL: boolean;
+  priority?: boolean;
 }
 
-function BeforeAfterSlide({ pair, isRTL }: BeforeAfterSlideProps) {
+function BeforeAfterSlide({ pair, isRTL, priority = false }: BeforeAfterSlideProps) {
   const beforeLabel = isRTL ? "قبل" : "Before";
   const afterLabel = isRTL ? "بعد" : "After";
 
@@ -260,6 +264,7 @@ function BeforeAfterSlide({ pair, isRTL }: BeforeAfterSlideProps) {
           fill
           sizes="(max-width: 768px) 50vw, 25vw"
           className="object-cover"
+          priority={priority}
         />
         <span
           className="absolute bottom-3 left-3 rounded-full px-3 py-1 text-xs font-semibold text-white"
@@ -277,6 +282,7 @@ function BeforeAfterSlide({ pair, isRTL }: BeforeAfterSlideProps) {
           fill
           sizes="(max-width: 768px) 50vw, 25vw"
           className="object-cover"
+          priority={priority}
         />
         <span
           className="absolute bottom-3 left-3 rounded-full px-3 py-1 text-xs font-semibold text-white"

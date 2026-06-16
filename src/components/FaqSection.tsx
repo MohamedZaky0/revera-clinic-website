@@ -86,7 +86,7 @@ export function FaqSection() {
               }}
             >
               <Image
-                src="/images/assets/dr-hanan-pp.jpg"
+                src="/images/doctor/portrait-main.jpg"
                 alt="Doctor consultation"
                 fill
                 sizes="(max-width: 1024px) 100vw, 240px"
@@ -109,7 +109,7 @@ export function FaqSection() {
               }}
             >
               <Image
-                src="/images/assets/dr-hanan-cc.jpg"
+                src="/images/doctor/portrait-faq.jpg"
                 alt="Doctor"
                 fill
                 sizes="(max-width: 1024px) 100vw, 280px"

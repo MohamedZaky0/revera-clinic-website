@@ -130,7 +130,7 @@ export function TestimonialsSection() {
               {/* Doctor portrait wrapper */}
               <div className="tm-doctor-img-wrapper">
                 <Image
-                  src="/images/assets/dr-hanan-pp.jpg"
+                  src="/images/clinic/clinic.jpeg"
                   alt={t.testimonials.doctorName}
                   fill
                   sizes="(max-width: 768px) 100vw, 450px"
@@ -310,7 +310,7 @@ export function TestimonialsSection() {
                         alt=""
                         width={20}
                         height={20}
-                        style={{ objectFit: "contain" }}
+                        style={{ objectFit: "contain", width: "auto", height: "auto" }}
                       />
                     </div>
 

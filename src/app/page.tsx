@@ -32,13 +32,13 @@ export default function Home() {
         <section id="services">
           <HomeServicesSection />
         </section>
-        <WhatWeDo />
-        <IntroVideo />
+        {/* <WhatWeDo /> */}
+        {/* <IntroVideo /> */}
         <WhyChooseUs />
-        <section id="how-it-works">
+        {/* <section id="how-it-works">
           <HowItWorks />
-        </section>
-        <TestimonialsSection />
+        </section> */}
+        {/* <TestimonialsSection /> */}
         <section id="appointment">
           <AppointmentSection />
         </section>
