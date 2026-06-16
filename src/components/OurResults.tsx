@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
@@ -144,6 +144,13 @@ export function OurResults() {
   const headerRef = useRef<HTMLDivElement>(null);
   const [statsVisible, setStatsVisible] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(false);
+  const [failedIds, setFailedIds] = useState<Set<number>>(new Set());
+
+  const handlePairError = useCallback((id: number) => {
+    setFailedIds((prev) => new Set([...prev, id]));
+  }, []);
+
+  const validPairs = BEFORE_AFTER_PAIRS.filter((p) => !failedIds.has(p.id));
 
   // Stats data merged with icons
   const statsWithIcons: StatItem[] = t.results.stats.map((s, i) => ({
@@ -213,9 +220,9 @@ export function OurResults() {
             key={isRTL ? "rtl" : "ltr"}
             className="results-swiper"
           >
-            {BEFORE_AFTER_PAIRS.map((pair, i) => (
+            {validPairs.map((pair, i) => (
               <SwiperSlide key={pair.id}>
-                <BeforeAfterSlide pair={pair} isRTL={isRTL} priority={i === 0} />
+                <BeforeAfterSlide pair={pair} isRTL={isRTL} priority={i === 0} onError={handlePairError} />
               </SwiperSlide>
             ))}
           </Swiper>
@@ -248,9 +255,10 @@ interface BeforeAfterSlideProps {
   pair: BeforeAfterPair;
   isRTL: boolean;
   priority?: boolean;
+  onError?: (id: number) => void;
 }
 
-function BeforeAfterSlide({ pair, isRTL, priority = false }: BeforeAfterSlideProps) {
+function BeforeAfterSlide({ pair, isRTL, priority = false, onError }: BeforeAfterSlideProps) {
   const beforeLabel = isRTL ? "قبل" : "Before";
   const afterLabel = isRTL ? "بعد" : "After";
 
@@ -265,6 +273,7 @@ function BeforeAfterSlide({ pair, isRTL, priority = false }: BeforeAfterSlidePro
           sizes="(max-width: 768px) 50vw, 25vw"
           className="object-cover"
           priority={priority}
+          onError={() => onError?.(pair.id)}
         />
         <span
           className="absolute bottom-3 left-3 rounded-full px-3 py-1 text-xs font-semibold text-white"
@@ -283,6 +292,7 @@ function BeforeAfterSlide({ pair, isRTL, priority = false }: BeforeAfterSlidePro
           sizes="(max-width: 768px) 50vw, 25vw"
           className="object-cover"
           priority={priority}
+          onError={() => onError?.(pair.id)}
         />
         <span
           className="absolute bottom-3 left-3 rounded-full px-3 py-1 text-xs font-semibold text-white"

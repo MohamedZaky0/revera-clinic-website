@@ -158,22 +158,22 @@ export const translations: Record<"en" | "ar", Translation> = {
       doctorInfo: "New Cairo · Egypt",
       reviews: [
         {
-          text: '"دكتور محمود ممتاز جداً وروحه حلوة وأسلوبه رائع في الشرح. النتيجة اللي وصلتلها في بشرتي معاه ممتازة 🥰 بجد شكراً جداً وأنا لسه مستمرة معاه ودايماً من تميز لتميز 💐"',
+          text: '"Dr. Sarah is absolutely wonderful — her technique is precise and her guidance throughout the treatment was exceptional. The results surpassed all my expectations. I\'m still continuing with her at Revera and it just keeps getting better!"',
           author: "Samar Sayed",
           role: "Client",
         },
         {
-          text: '"أنا بشكر دكتور محمود نصر على المجهود الرائع اللي بذله معايا، كنت بعاني من مشاكل في البشرة ومكنتش متخيلة إني هوصل للنتيجة دي. الحمد لله بمجهودات د. محمود في عيادات كريستال روز حصل تغيير كبير في بشرتي وثقتي بنفسي!"',
+          text: '"I am truly grateful to Dr. Arwa for her dedication and expertise. I had been struggling with skin concerns for years, and the transformation I\'ve experienced at Revera Clinics has completely changed how I feel about myself!"',
           author: "Aya Mahmoud",
           role: "Client",
         },
         {
-          text: '"Revera Clinics is very professional, skilled and highly experienced medical center. Dr. Mahmoud provides the most effective and advanced dermatology treatments."',
+          text: '"Revera Clinics is incredibly professional, skilled, and experienced. Dr. Rana delivers the most effective and advanced dermatology treatments I have ever received."',
           author: "Sarah Ahmed",
           role: "Client",
         },
         {
-          text: '"Very professional and knowledgeable. Dr. Mahmoud was very welcoming and informative about skin care and treatments. The results were amazing. I definitely recommend Revera Clinics!"',
+          text: '"Very professional and attentive. Dr. Omaima was extremely welcoming and thorough in explaining every step of my treatment plan. The results were beyond amazing. I cannot recommend Revera Clinics enough!"',
           author: "Omar Abdel Meguid",
           role: "Client",
         },
@@ -515,22 +515,22 @@ export const translations: Record<"en" | "ar", Translation> = {
       doctorInfo: "القاهرة الجديدة · مصر",
       reviews: [
         {
-          text: '"دكتور محمود ممتاز جداً وروحه حلوة وأسلوبه رائع في الشرح. النتيجة اللي وصلتلها في بشرتي معاه ممتازة 🥰 بجد شكراً جداً وأنا لسه مستمرة معاه ودايماً من تميز لتميز 💐"',
+          text: '"د. سارة ممتازة جداً وأسلوبها في الشرح رائع وطريقتها في العلاج دقيقة جداً. النتيجة اللي وصلتلها معاها فاقت توقعاتي تماماً 🥰 بجد شكراً جداً وأنا لسه مستمرة معاها 💐"',
           author: "سمر سيد",
           role: "عميلة",
         },
         {
-          text: '"أنا بشكر دكتور محمود نصر على المجهود الرائع اللي بذله معايا، كنت بعاني من مشاكل في البشرة ومكنتش متخيلة إني هوصل للنتيجة دي. الحمد لله بمجهودات د. محمود في عيادات كريستال روز حصل تغيير كبير في بشرتي وثقتي بنفسي!"',
+          text: '"أنا بشكر د. أروى على المجهود الرائع اللي بذلته معايا، كنت بعاني من مشاكل في البشرة ومكنتش متخيلة إني هوصل للنتيجة دي. الحمد لله بمجهودات د. أروى في عيادات ريفيرا حصل تغيير كبير في بشرتي وثقتي بنفسي!"',
           author: "آية محمود",
           role: "عميلة",
         },
         {
-          text: '"عيادات كريستال روز محترفة جداً وذات مهارة وخبرة عالية. يقدم الدكتور محمود أكثر علاجات الجلدية فعالية وتطوراً."',
+          text: '"عيادات ريفيرا محترفة جداً وذات مهارة وخبرة عالية. تقدم الدكتورة رنا أكثر علاجات الجلدية فعالية وتطوراً."',
           author: "سارة أحمد",
           role: "عميلة",
         },
         {
-          text: '"محترف جداً ومتمكن. كان الدكتور محمود مرحباً جداً ومفيداً في شرح العناية بالبشرة والعلاجات. كانت النتائج مذهلة. أنصح بشدة بعيادات كريستال روز!"',
+          text: '"محترفة جداً ومتمكنة. كانت الدكتورة أميمة مرحبة جداً ومفيدة في شرح كل خطوة من خطوات خطة علاجي. كانت النتائج مذهلة. أنصح بشدة بعيادات ريفيرا!"',
           author: "عمر عبد المجيد",
           role: "عميل",
         },
