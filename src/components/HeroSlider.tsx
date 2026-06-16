@@ -42,7 +42,9 @@ export function HeroSlider() {
   const slides = t.hero.slides;
 
   const openBooking = useCallback(() => {
-    window.dispatchEvent(new CustomEvent("open-booking"));
+    // window.dispatchEvent(new CustomEvent("open-booking"));
+    const msg = encodeURIComponent("Hello Revera, I'd love to schedule a consultation. Please let me know your earliest availability. Thank you.");
+    window.open(`https://wa.me/201035595691?text=${msg}`, "_blank");
   }, []);
 
   useEffect(() => {
