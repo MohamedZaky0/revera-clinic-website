@@ -139,7 +139,11 @@ export function BookingModal() {
     if (!open || !serviceId) return;
     fetch(`/api/availability?serviceId=${serviceId}&days=30`).then(r => r.json()).then((data) => {
       const map: Record<string, number> = {};
-      data.forEach((d: { date: string; approvedCount: number }) => { map[d.date] = d.approvedCount; });
+      if (Array.isArray(data)) {
+        data.forEach((d: { date: string; approvedCount: number }) => { map[d.date] = d.approvedCount; });
+      } else {
+        console.error("Fetch availability expected array, got", data);
+      }
       setDisabledDates(map);
     }).catch(()=>{});
   }, [open, serviceId]);
@@ -158,8 +162,13 @@ export function BookingModal() {
       .then(r=>r.json())
       .then((list)=>{
         if (active) {
-          const slots = list.map((i: { timeSlot?: string | null }) => i.timeSlot).filter(Boolean) as string[];
-          setTakenSlots(slots);
+          if (Array.isArray(list)) {
+            const slots = list.map((i: { timeSlot?: string | null }) => i.timeSlot).filter(Boolean) as string[];
+            setTakenSlots(slots);
+          } else {
+            console.error("Fetch reservations expected array, got", list);
+            setTakenSlots([]);
+          }
         }
       })
       .catch(()=>{

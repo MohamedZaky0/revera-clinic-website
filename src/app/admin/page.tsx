@@ -800,17 +800,36 @@ export default function AdminPage() {
     fetch("/api/reservations?status=pending")
       .then((r) => r.json())
       .then((data) => {
-        setRequests(data);
+        if (Array.isArray(data)) {
+          setRequests(data);
+        } else {
+          console.error("fetchRequests: expected array, got", data);
+          setRequests([]);
+        }
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        console.error("fetchRequests error:", err);
+        setRequests([]);
+        setLoading(false);
+      });
   }
 
   function fetchAllReservations() {
     fetch("/api/reservations")
       .then((r) => r.json())
-      .then((data) => setAllReservations(data))
-      .catch(() => {});
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setAllReservations(data);
+        } else {
+          console.error("fetchAllReservations: expected array, got", data);
+          setAllReservations([]);
+        }
+      })
+      .catch((err) => {
+        console.error("fetchAllReservations error:", err);
+        setAllReservations([]);
+      });
   }
 
   async function openApprove(r: Req) {

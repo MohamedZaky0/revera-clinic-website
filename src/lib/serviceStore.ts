@@ -20,7 +20,9 @@ export function getDynamicCategories(): LocalCategory[] {
     const raw = localStorage.getItem(CATEGORIES_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as LocalCategory[];
-      return parsed.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+      if (Array.isArray(parsed)) {
+        return parsed.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+      }
     }
     
     // Seed default categories
@@ -51,19 +53,21 @@ export function getDynamicServices(): ServiceItem[] {
     const raw = localStorage.getItem(SERVICES_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as ServiceItem[];
-      let changed = false;
-      const migrated = parsed.map(item => {
-        const defaultSvc = SERVICES.find(s => s.id === item.id);
-        if (defaultSvc && item.img !== defaultSvc.img) {
-          changed = true;
-          return { ...item, img: defaultSvc.img };
+      if (Array.isArray(parsed)) {
+        let changed = false;
+        const migrated = parsed.map(item => {
+          const defaultSvc = SERVICES.find(s => s.id === item.id);
+          if (defaultSvc && item.img !== defaultSvc.img) {
+            changed = true;
+            return { ...item, img: defaultSvc.img };
+          }
+          return item;
+        });
+        if (changed) {
+          localStorage.setItem(SERVICES_KEY, JSON.stringify(migrated));
         }
-        return item;
-      });
-      if (changed) {
-        localStorage.setItem(SERVICES_KEY, JSON.stringify(migrated));
+        return migrated.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
       }
-      return migrated.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
     }
 
     // Seed default services
