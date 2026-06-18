@@ -362,18 +362,22 @@ export default function AdminPage() {
       });
   }
 
-  const handleAddProvider = async () => {
-    const name = window.prompt("Enter new doctor's name:");
-    if (!name) return;
-    const servicesStr = window.prompt("Enter services (comma-separated, e.g., Laser, Dermatology):");
-    const services = servicesStr ? servicesStr.split(",").map(s => s.trim()) : [];
-    
+  const handleAddProvider = () => {
+    setProviderName("");
+    setProviderRating("5.0");
+    setProviderSelectedServices([]);
+    setShowAddProviderModal(true);
+  };
+
+  const handleSaveNewProvider = async () => {
+    if (!providerName.trim()) return;
+
     const newProvider = {
-      name,
-      services,
+      name: providerName.trim(),
+      services: providerSelectedServices,
       bookings: 0,
-      more: services.length > 2 ? services.length - 2 : 0,
-      rating: 5,
+      more: providerSelectedServices.length > 2 ? providerSelectedServices.length - 2 : 0,
+      rating: parseFloat(providerRating) || 5.0,
     };
 
     try {
@@ -385,6 +389,7 @@ export default function AdminPage() {
       if (!res.ok) throw new Error("Save failed");
       const saved = await res.json();
       setProviders(prev => [...prev, saved]);
+      setShowAddProviderModal(false);
     } catch (err) {
       alert("Failed to add provider: " + err);
     }
@@ -440,6 +445,12 @@ export default function AdminPage() {
   const [localCategories, setLocalCategories] = useState<LocalCategory[]>([]);
   // Delete Category confirmation target
   const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<LocalCategory | null>(null);
+
+  // Providers modal state variables
+  const [showAddProviderModal, setShowAddProviderModal] = useState(false);
+  const [providerName, setProviderName] = useState("");
+  const [providerRating, setProviderRating] = useState("5.0");
+  const [providerSelectedServices, setProviderSelectedServices] = useState<string[]>([]);
 
   // Service modal and drag-and-drop state variables
   const [editingService, setEditingService] = useState<ServiceItem | null>(null);
@@ -1736,63 +1747,116 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
-                      <Filter size={16} /> Filter
-                    </button>
-                    <button 
-                      onClick={handleAddProvider}
-                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                    >
-                      <Plus size={16} /> Add
-                    </button>
-                  </div>
+                  {providerTab === "Providers" ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
+                        <Filter size={16} /> Filter
+                      </button>
+                      <button 
+                        onClick={handleAddProvider}
+                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                      >
+                        <Plus size={16} /> Add
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button className="inline-flex items-center gap-2 rounded-3xl bg-[#7F56D9]/10 text-[#7F56D9] px-4 py-3 text-sm font-semibold transition hover:bg-[#7F56D9]/15">
+                        Show Filters
+                      </button>
+                      <button className="inline-flex items-center gap-2 rounded-3xl bg-[#7F56D9]/10 text-[#7F56D9] px-4 py-3 text-sm font-semibold transition hover:bg-[#7F56D9]/15">
+                        Monthly Report
+                      </button>
+                      <button className="inline-flex items-center gap-2 rounded-3xl bg-[#7F56D9]/10 text-[#7F56D9] px-4 py-3 text-sm font-semibold transition hover:bg-[#7F56D9]/15">
+                        Provider Report
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                  <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                    <span>Name</span>
-                    <span>Bookings</span>
-                    <span>Services</span>
-                    <span>Rating</span>
-                  </div>
-                  <div className="divide-y divide-[#E6E9EB]">
-                    {providers.map((provider) => (
-                      <div key={provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
-                        <span className="font-semibold text-[#1F251A]">{provider.name}</span>
-                        <span>{provider.bookings}</span>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {provider.services.map((service: string) => (
-                            <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
-                              {service}
+                {providerTab === "Providers" ? (
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                      <span>Name</span>
+                      <span>Bookings</span>
+                      <span>Services</span>
+                      <span>Rating</span>
+                    </div>
+                    <div className="divide-y divide-[#E6E9EB]">
+                      {providers.map((provider) => (
+                        <div key={provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
+                          <span className="font-semibold text-[#1F251A]">{provider.name}</span>
+                          <span>{provider.bookings}</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {provider.services.map((service: string) => (
+                              <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
+                                {service}
+                              </span>
+                            ))}
+                            {provider.more > 0 && (
+                              <span className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36]">
+                                +{provider.more}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="inline-flex items-center gap-2 text-[#5A6A51]">
+                              <Star size={16} className="text-[#C4AE7C]" />
+                              {provider.rating}
                             </span>
-                          ))}
-                          <span className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36]">
-                            +{provider.more}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="inline-flex items-center gap-2 text-[#5A6A51]">
-                            <Star size={16} className="text-[#C4AE7C]" />
-                            {provider.rating}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]">
-                              <Info size={16} />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteProvider(provider.id, provider.name)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-[#FFF5F5] text-red-600 transition hover:bg-red-100"
-                              title="Delete provider"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]">
+                                <Info size={16} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteProvider(provider.id, provider.name)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-[#FFF5F5] text-red-600 transition hover:bg-red-100"
+                                title="Delete provider"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[1200px] text-sm text-left">
+                        <thead>
+                          <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[10px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                            <th className="px-6 py-4">ID</th>
+                            <th className="px-6 py-4">Provider Name</th>
+                            <th className="px-6 py-4">Provider Phone</th>
+                            <th className="px-6 py-4">Branch</th>
+                            <th className="px-6 py-4">Check In Date</th>
+                            <th className="px-6 py-4">Check In Time</th>
+                            <th className="px-6 py-4">Check Out Time</th>
+                            <th className="px-6 py-4">Delay</th>
+                            <th className="px-6 py-4">Early Departure</th>
+                            <th className="px-6 py-4">Working Duration</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4 text-center">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td colSpan={12} className="px-6 py-24 text-center text-[#5A6A51] font-medium bg-white">
+                              <div className="flex flex-col items-center justify-center gap-3">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EDF1EC] text-[#5A6A51]">
+                                  <CalendarDays size={20} />
+                                </div>
+                                <p className="text-sm font-semibold text-[#1F251A]">No data available!</p>
+                              </div>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
           )}
@@ -2214,6 +2278,111 @@ export default function AdminPage() {
                         className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
                       >
                         Yes, Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── ADD NEW PROVIDER (DOCTOR) MODAL ── */}
+              {showAddProviderModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto">
+                  <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 animate-fadeIn flex flex-col max-h-[90vh]">
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between border-b border-[#414E36]/10 px-6 py-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-[#1F251A]">Add New Doctor / Provider</h3>
+                        <p className="text-sm text-[#5A6A51]">Register a new healthcare provider and assign their services.</p>
+                      </div>
+                      <button
+                        onClick={() => setShowAddProviderModal(false)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] hover:bg-[#F9F9F7]"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Modal Body */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                      {/* Name input */}
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Doctor's Full Name</label>
+                        <input
+                          type="text"
+                          value={providerName}
+                          onChange={(e) => setProviderName(e.target.value)}
+                          placeholder="e.g. Dr. Radwa Seif"
+                          className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                        />
+                      </div>
+
+                      {/* Rating input */}
+                      <div>
+                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Rating (0.0 - 5.0)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="5"
+                          value={providerRating}
+                          onChange={(e) => setProviderRating(e.target.value)}
+                          placeholder="e.g. 5.0"
+                          className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                        />
+                      </div>
+
+                      {/* Services checklist grouped by category */}
+                      <div>
+                        <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Select Provided Services</label>
+                        <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2">
+                          {localCategories.map((cat) => {
+                            const catSvcs = localServices.filter(s => s.cat === cat.key);
+                            if (catSvcs.length === 0) return null;
+                            return (
+                              <div key={cat.key} className="space-y-2 border border-[#414E36]/10 rounded-xl p-4 bg-[#F9F9F7]">
+                                <h4 className="text-xs font-bold text-[#414E36] border-b border-[#414E36]/10 pb-1.5">{cat.en}</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                                  {catSvcs.map((svc) => {
+                                    const isChecked = providerSelectedServices.includes(svc.en);
+                                    return (
+                                      <label key={svc.id} className="flex items-start gap-2.5 text-xs text-[#1F251A] cursor-pointer hover:text-[#414E36] transition select-none">
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={() => {
+                                            if (isChecked) {
+                                              setProviderSelectedServices(prev => prev.filter(s => s !== svc.en));
+                                            } else {
+                                              setProviderSelectedServices(prev => [...prev, svc.en]);
+                                            }
+                                          }}
+                                          className="mt-0.5 h-3.5 w-3.5 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C]"
+                                        />
+                                        <span>{svc.en}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 px-6 py-4 bg-[#F9F9F7] rounded-b-2xl">
+                      <button
+                        onClick={() => setShowAddProviderModal(false)}
+                        className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveNewProvider}
+                        className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#2e3a26]"
+                      >
+                        Save Provider
                       </button>
                     </div>
                   </div>
