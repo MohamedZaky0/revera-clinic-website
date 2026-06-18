@@ -13,9 +13,83 @@ export interface LocalCategory {
 
 export type ServiceToggleState = Record<number, { visible: boolean; active: boolean }>;
 
+// Flags to prevent redundant parallel sync requests
+let isCategoriesSyncing = false;
+let isServicesSyncing = false;
+
+async function syncCategoriesFromDb() {
+  if (typeof window === "undefined" || isCategoriesSyncing) return;
+  isCategoriesSyncing = true;
+  try {
+    const res = await fetch("/api/categories");
+    if (!res.ok) throw new Error("Fetch failed");
+    const dbCats = await res.json() as LocalCategory[];
+    if (Array.isArray(dbCats) && dbCats.length > 0) {
+      const localRaw = localStorage.getItem(CATEGORIES_KEY);
+      if (localRaw !== JSON.stringify(dbCats)) {
+        localStorage.setItem(CATEGORIES_KEY, JSON.stringify(dbCats));
+        window.dispatchEvent(new StorageEvent("storage", { key: CATEGORIES_KEY }));
+      }
+    }
+  } catch (err) {
+    console.warn("Background categories sync failed:", err);
+  } finally {
+    isCategoriesSyncing = false;
+  }
+}
+
+async function syncServicesFromDb() {
+  if (typeof window === "undefined" || isServicesSyncing) return;
+  isServicesSyncing = true;
+  try {
+    const res = await fetch("/api/services");
+    if (!res.ok) throw new Error("Fetch failed");
+    const dbSvcs = await res.json() as ServiceItem[];
+    if (Array.isArray(dbSvcs) && dbSvcs.length > 0) {
+      const localRaw = localStorage.getItem(SERVICES_KEY);
+      if (localRaw !== JSON.stringify(dbSvcs)) {
+        localStorage.setItem(SERVICES_KEY, JSON.stringify(dbSvcs));
+        window.dispatchEvent(new StorageEvent("storage", { key: SERVICES_KEY }));
+      }
+    }
+  } catch (err) {
+    console.warn("Background services sync failed:", err);
+  } finally {
+    isServicesSyncing = false;
+  }
+}
+
+async function syncCategoriesToDb(categories: LocalCategory[]) {
+  try {
+    await fetch("/api/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(categories),
+    });
+  } catch (err) {
+    console.error("Failed to sync categories to Supabase:", err);
+  }
+}
+
+async function syncServicesToDb(services: ServiceItem[]) {
+  try {
+    await fetch("/api/services", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(services),
+    });
+  } catch (err) {
+    console.error("Failed to sync services to Supabase:", err);
+  }
+}
+
 /** Helper to get dynamic categories, seeding with defaults if empty */
 export function getDynamicCategories(): LocalCategory[] {
   if (typeof window === "undefined") return [];
+
+  // Trigger background synchronization
+  syncCategoriesFromDb();
+
   try {
     const raw = localStorage.getItem(CATEGORIES_KEY);
     if (raw) {
@@ -33,6 +107,10 @@ export function getDynamicCategories(): LocalCategory[] {
       sortOrder: index,
     }));
     localStorage.setItem(CATEGORIES_KEY, JSON.stringify(defaults));
+    
+    // Sync seeded defaults to Supabase
+    syncCategoriesToDb(defaults);
+
     return defaults.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   } catch {
     return [];
@@ -44,11 +122,18 @@ export function saveDynamicCategories(categories: LocalCategory[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
   window.dispatchEvent(new StorageEvent("storage", { key: CATEGORIES_KEY }));
+
+  // Save changes to Supabase
+  syncCategoriesToDb(categories);
 }
 
 /** Helper to get dynamic services, seeding with defaults if empty */
 export function getDynamicServices(): ServiceItem[] {
   if (typeof window === "undefined") return [];
+
+  // Trigger background synchronization
+  syncServicesFromDb();
+
   try {
     const raw = localStorage.getItem(SERVICES_KEY);
     if (raw) {
@@ -65,6 +150,7 @@ export function getDynamicServices(): ServiceItem[] {
         });
         if (changed) {
           localStorage.setItem(SERVICES_KEY, JSON.stringify(migrated));
+          syncServicesToDb(migrated);
         }
         return migrated.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
       }
@@ -78,6 +164,10 @@ export function getDynamicServices(): ServiceItem[] {
       sortOrder: s.sortOrder ?? 0,
     }));
     localStorage.setItem(SERVICES_KEY, JSON.stringify(defaults));
+
+    // Sync seeded defaults to Supabase
+    syncServicesToDb(defaults);
+
     return defaults.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   } catch {
     return [];
@@ -89,6 +179,9 @@ export function saveDynamicServices(services: ServiceItem[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(SERVICES_KEY, JSON.stringify(services));
   window.dispatchEvent(new StorageEvent("storage", { key: SERVICES_KEY }));
+
+  // Save changes to Supabase
+  syncServicesToDb(services);
 }
 
 /** Read the current toggle state from localStorage */
@@ -115,8 +208,16 @@ export function setServiceToggle(
     [id]: { ...(current[id] ?? { visible: true, active: true }), [field]: value },
   };
   localStorage.setItem(TOGGLES_KEY, JSON.stringify(updated));
-  // Notify other components in the same session
   window.dispatchEvent(new StorageEvent("storage", { key: TOGGLES_KEY }));
+
+  // Find matching service and update its values to trigger Supabase sync
+  const services = getDynamicServices();
+  const target = services.find(s => s.id === id);
+  if (target) {
+    if (field === "visible") target.visible = value;
+    if (field === "active") target.active = value;
+    saveDynamicServices(services);
+  }
 }
 
 /** Returns true if the service with the given id is active (should be shown to users) */

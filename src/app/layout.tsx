@@ -1,21 +1,6 @@
 import type { Metadata } from "next";
-import { Marcellus, Sora } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
-
-const marcellus = Marcellus({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-marcellus",
-  display: "swap",
-});
-
-const sora = Sora({
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800"],
-  subsets: ["latin"],
-  variable: "--font-sora",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Revera Clinics - Medical Center",
@@ -33,10 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${marcellus.variable} ${sora.variable}`}
-    >
+    <html lang="en">
       <body>
         <LanguageProvider>{children}</LanguageProvider>
       </body>

@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Sora:wght@100;200;300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -33,6 +34,10 @@
 
 /* ── Revera Design Tokens ──────────────────────────────── */
 :root {
+  /* Fonts */
+  --font-sora: 'Sora', sans-serif;
+  --font-marcellus: 'Marcellus', serif;
+
   /* Brand colors */
   --color-brand-primary: #414E36;    /* Deep Olive Green */
   --color-brand-dark: #1F251A;       /* Deepest Olive-Black */

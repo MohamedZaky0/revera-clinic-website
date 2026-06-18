@@ -320,6 +320,26 @@ export function HomeServicesSection() {
     setDynamicServices(getDynamicServices());
     setDynamicCategories(getDynamicCategories());
 
+    fetch("/api/services")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setDynamicServices(data);
+          localStorage.setItem("revera_dynamic_services", JSON.stringify(data));
+        }
+      })
+      .catch((err) => console.error("HomeServicesSection: fetch services failed", err));
+
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setDynamicCategories(data);
+          localStorage.setItem("revera_dynamic_categories", JSON.stringify(data));
+        }
+      })
+      .catch((err) => console.error("HomeServicesSection: fetch categories failed", err));
+
     const handleStorage = () => {
       setServiceToggles(getServiceToggles());
       setDynamicServices(getDynamicServices());

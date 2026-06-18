@@ -117,27 +117,30 @@ const overviewCards = [
   { label: "Open requests", value: "9", accent: "bg-[#C4AE7C]/10", icon: FileText },
 ];
 
-const PROVIDERS = [
+const DEFAULT_PROVIDERS = [
   {
+    id: "seed-1",
     name: "Dr. Ahmed Medhat",
     bookings: 0,
     services: ["Tattoo Removal (Small)", "Tattoo Removal (Medium)"],
     more: 4,
-    rating: 0,
+    rating: 5,
   },
   {
+    id: "seed-2",
     name: "Dr. Radwa Seif",
     bookings: 0,
     services: ["Physio: Basic Relief (3)", "Physio: Standard Recovery (6)"],
     more: 4,
-    rating: 0,
+    rating: 5,
   },
   {
+    id: "seed-3",
     name: "Dr. Sara El Gamel",
     bookings: 1,
     services: ["Half Arm", "Full Arms"],
     more: 14,
-    rating: 0,
+    rating: 5,
   },
 ];
 
@@ -340,6 +343,66 @@ const MOCK_PAYROLL = [
 export default function AdminPage() {
   const [requests, setRequests] = useState<Req[]>([]);
   const [allReservations, setAllReservations] = useState<Req[]>([]);
+  const [providers, setProviders] = useState<any[]>(DEFAULT_PROVIDERS);
+
+  function fetchProviders() {
+    fetch("/api/providers")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setProviders(data);
+        } else {
+          setProviders(DEFAULT_PROVIDERS);
+        }
+      })
+      .catch((err) => {
+        console.error("fetchProviders error:", err);
+        setProviders(DEFAULT_PROVIDERS);
+      });
+  }
+
+  const handleAddProvider = async () => {
+    const name = window.prompt("Enter new doctor's name:");
+    if (!name) return;
+    const servicesStr = window.prompt("Enter services (comma-separated, e.g., Laser, Dermatology):");
+    const services = servicesStr ? servicesStr.split(",").map(s => s.trim()) : [];
+    
+    const newProvider = {
+      name,
+      services,
+      bookings: 0,
+      more: services.length > 2 ? services.length - 2 : 0,
+      rating: 5,
+    };
+
+    try {
+      const res = await fetch("/api/providers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newProvider),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      const saved = await res.json();
+      setProviders(prev => [...prev, saved]);
+    } catch (err) {
+      alert("Failed to add provider: " + err);
+    }
+  };
+
+  const handleDeleteProvider = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
+    try {
+      const res = await fetch(`/api/providers?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      setProviders(prev => prev.filter(p => p.id !== id));
+    } catch (err) {
+      // Fallback local filter if seed provider has no db ID
+      setProviders(prev => prev.filter(p => p.name !== name));
+      console.warn("Deleted locally, DB delete failed:", err);
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Req | null>(null);
   const [viewingBooking, setViewingBooking] = useState<Req | null>(null);
@@ -586,6 +649,26 @@ export default function AdminPage() {
     const storedToggles = getServiceToggles();
     const defaults = Object.fromEntries(svcs.map((s) => [s.id, { visible: true, active: true }]));
     setServiceToggles({ ...defaults, ...storedToggles });
+
+    fetch("/api/services")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setLocalServices(data);
+          localStorage.setItem("revera_dynamic_services", JSON.stringify(data));
+        }
+      })
+      .catch((err) => console.error("Admin: fetch services failed", err));
+
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setLocalCategories(data);
+          localStorage.setItem("revera_dynamic_categories", JSON.stringify(data));
+        }
+      })
+      .catch((err) => console.error("Admin: fetch categories failed", err));
   }, []);
   const BRANCHES = ["Zayed", "Maadi", "Heliopolis", "New Cairo"];
 
@@ -787,6 +870,7 @@ export default function AdminPage() {
   useEffect(() => {
     fetchRequests();
     fetchAllReservations();
+    fetchProviders();
   }, []);
 
   useEffect(() => {
@@ -1637,7 +1721,10 @@ export default function AdminPage() {
                     <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
                       <Filter size={16} /> Filter
                     </button>
-                    <button className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]">
+                    <button 
+                      onClick={handleAddProvider}
+                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                    >
                       <Plus size={16} /> Add
                     </button>
                   </div>
@@ -1651,12 +1738,12 @@ export default function AdminPage() {
                     <span>Rating</span>
                   </div>
                   <div className="divide-y divide-[#E6E9EB]">
-                    {PROVIDERS.map((provider) => (
+                    {providers.map((provider) => (
                       <div key={provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
                         <span className="font-semibold text-[#1F251A]">{provider.name}</span>
                         <span>{provider.bookings}</span>
                         <div className="flex flex-wrap items-center gap-2">
-                          {provider.services.map((service) => (
+                          {provider.services.map((service: string) => (
                             <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
                               {service}
                             </span>
@@ -1670,9 +1757,18 @@ export default function AdminPage() {
                             <Star size={16} className="text-[#C4AE7C]" />
                             {provider.rating}
                           </span>
-                          <button className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]">
-                            <Info size={16} />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]">
+                              <Info size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteProvider(provider.id, provider.name)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-[#FFF5F5] text-red-600 transition hover:bg-red-100"
+                              title="Delete provider"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -6439,7 +6535,7 @@ export default function AdminPage() {
               onChange={(e) => setDoctorName(e.target.value)}
               className="mb-6 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
             >
-              {PROVIDERS.map((p) => (
+              {providers.map((p) => (
                 <option key={p.name} value={p.name}>
                   {p.name}
                 </option>
@@ -6764,7 +6860,7 @@ export default function AdminPage() {
                       }}
                       className="w-full rounded-xl border border-[#414E36]/10 bg-[#FBFBF9] px-3 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer"
                     >
-                      {PROVIDERS.map((p) => (
+                      {providers.map((p) => (
                         <option key={p.name} value={p.name}>
                           {p.name}
                         </option>
@@ -7036,7 +7132,7 @@ export default function AdminPage() {
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C] cursor-pointer font-semibold"
                 >
                   <option value="All">All Doctors</option>
-                  {PROVIDERS.map(p => (
+                  {providers.map(p => (
                     <option key={p.name} value={p.name}>{p.name}</option>
                   ))}
                 </select>
@@ -7267,7 +7363,7 @@ export default function AdminPage() {
                       onChange={(e) => setNewPatientDoctor(e.target.value)}
                       className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer font-semibold"
                     >
-                      {PROVIDERS.map(p => (
+                      {providers.map(p => (
                         <option key={p.name} value={p.name}>{p.name}</option>
                       ))}
                     </select>
