@@ -1761,13 +1761,13 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center gap-3">
-                      <button className="inline-flex items-center gap-2 rounded-3xl bg-[#7F56D9]/10 text-[#7F56D9] px-4 py-3 text-sm font-semibold transition hover:bg-[#7F56D9]/15">
+                      <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-5 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
                         Show Filters
                       </button>
-                      <button className="inline-flex items-center gap-2 rounded-3xl bg-[#7F56D9]/10 text-[#7F56D9] px-4 py-3 text-sm font-semibold transition hover:bg-[#7F56D9]/15">
+                      <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-5 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
                         Monthly Report
                       </button>
-                      <button className="inline-flex items-center gap-2 rounded-3xl bg-[#7F56D9]/10 text-[#7F56D9] px-4 py-3 text-sm font-semibold transition hover:bg-[#7F56D9]/15">
+                      <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-5 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
                         Provider Report
                       </button>
                     </div>
