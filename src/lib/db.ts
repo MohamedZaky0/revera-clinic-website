@@ -9,24 +9,26 @@ const { Pool } = pkg;
 // Reuse pool across hot-reloads in dev
 const globalForPg = globalThis as unknown as { _pgPool?: InstanceType<typeof Pool> };
 
-if (!globalForPg._pgPool) {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('Missing DATABASE_URL environment variable. Add it to your .env.local file.');
+export function getPool() {
+  if (!globalForPg._pgPool) {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error('Missing DATABASE_URL environment variable. Add it to your .env.local file.');
+    }
+    globalForPg._pgPool = new Pool({
+      connectionString,
+      ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
   }
-  globalForPg._pgPool = new Pool({
-    connectionString,
-    ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-  });
+  return globalForPg._pgPool;
 }
 
-export const pool = globalForPg._pgPool!;
-
 export async function query<T extends QueryResultRow = any>(text: string, params?: unknown[]) {
-  const client = await pool.connect();
+  const poolInstance = getPool();
+  const client = await poolInstance.connect();
   try {
     const result = await client.query<T>(text, params);
     return result;
