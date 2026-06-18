@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { getSupabaseServer } from '@/lib/supabaseServer';
 
 function formatDate(d: Date) {
   const y = d.getFullYear();
@@ -25,31 +25,29 @@ export async function GET(req: Request) {
   }
 
   try {
-    const conditions: string[] = [`status = 'approved'`, `date = ANY($1)`];
-    const values: unknown[] = [dateKeys];
-    let idx = 2;
+    let query = getSupabaseServer()
+      .from('reservations')
+      .select('date, time_slot')
+      .eq('status', 'approved')
+      .in('date', dateKeys);
 
     if (serviceId) {
-      conditions.push(`service_id = $${idx++}`);
-      values.push(Number(serviceId));
+      query = query.eq('service_id', Number(serviceId));
     }
 
-    const sql = `
-      SELECT date, time_slot
-      FROM reservations
-      WHERE ${conditions.join(' AND ')}
-    `;
+    const { data: rows, error } = await query;
 
-    const result = await query(sql, values);
-
-    const rows = result.rows as Array<{ date: any; time_slot: string | null }>;
+    if (error) {
+      throw error;
+    }
 
     // Group by date
     const groupedByDate = new Map<string, string[]>();
     for (const key of dateKeys) {
       groupedByDate.set(key, []);
     }
-    for (const row of rows) {
+
+    for (const row of rows || []) {
       const key = String(row.date).slice(0, 10);
       if (groupedByDate.has(key)) {
         if (row.time_slot) groupedByDate.get(key)!.push(row.time_slot);

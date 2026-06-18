@@ -1,17 +1,15 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { getSupabaseServer } from '@/lib/supabaseServer';
 
 /**
- * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
- * toISOString().slice(0,10) on a UTC-midnight Date is always correct (no tz shift).
- * String() on a Date gives "Mon Jun 22 ..." which breaks everything — never use that.
+ * Parses dynamic or standard ISO date formats to a raw YYYY-MM-DD string.
  */
 function fmtDate(d: unknown): string {
   if (d instanceof Date) return d.toISOString().slice(0, 10);
   return String(d).slice(0, 10); // already a YYYY-MM-DD string
 }
 
-function mapRow(r: Record<string, unknown>) {
+function mapRow(r: any) {
   return {
     id: r.id,
     serviceId: r.service_id,
@@ -36,20 +34,29 @@ export async function GET(req: Request) {
   const serviceId = params.get('serviceId');
   const date = params.get('date');
 
-  const conditions: string[] = [];
-  const values: unknown[] = [];
-  let idx = 1;
-
-  if (status)    { conditions.push(`status = $${idx++}`);     values.push(status); }
-  if (serviceId) { conditions.push(`service_id = $${idx++}`); values.push(Number(serviceId)); }
-  if (date)      { conditions.push(`date = $${idx++}`);       values.push(date); }
-
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-  const sql = `SELECT * FROM reservations ${where} ORDER BY created_at DESC`;
-
   try {
-    const result = await query(sql, values);
-    return NextResponse.json(result.rows.map(mapRow));
+    let query = getSupabaseServer()
+      .from('reservations')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+    if (serviceId) {
+      query = query.eq('service_id', Number(serviceId));
+    }
+    if (date) {
+      query = query.eq('date', date);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json((data || []).map(mapRow));
   } catch (err) {
     console.error('GET /api/reservations error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
@@ -64,25 +71,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  const sql = `
-    INSERT INTO reservations (service_id, date, requested_time, name, email, phone, notes, status, time_slot, session_type)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', NULL, $8)
-    RETURNING *
-  `;
-  const values = [
-    Number(serviceId), 
-    date, 
-    requestedTime || null, 
-    name, 
-    email, 
-    phone, 
-    notes || '', 
-    sessionType || 'in_person'
-  ];
-
   try {
-    const result = await query(sql, values);
-    return NextResponse.json(mapRow(result.rows[0]), { status: 201 });
+    const { data, error } = await getSupabaseServer()
+      .from('reservations')
+      .insert({
+        service_id: Number(serviceId),
+        date,
+        requested_time: requestedTime || null,
+        name,
+        email,
+        phone,
+        notes: notes || '',
+        status: 'pending',
+        time_slot: null,
+        session_type: sessionType || 'in_person'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json(mapRow(data), { status: 201 });
   } catch (err) {
     console.error('POST /api/reservations error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
@@ -98,72 +109,86 @@ export async function PATCH(req: Request) {
   const { action, timeSlot, status, doctorName, notes, sessionType } = body;
 
   try {
-    const found = await query('SELECT * FROM reservations WHERE id = $1', [id]);
-    if (found.rows.length === 0) {
+    const { data: target, error: getErr } = await getSupabaseServer()
+      .from('reservations')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (getErr) throw getErr;
+    if (!target) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    const target = found.rows[0];
 
     if (action === 'approve') {
       if (!timeSlot) return NextResponse.json({ error: 'Missing timeSlot' }, { status: 400 });
 
-      const bookedRes = await query(
-        `SELECT COUNT(*) FROM reservations WHERE service_id = $1 AND date = $2 AND status = 'approved'`,
-        [target.service_id, target.date]
-      );
-      if (Number(bookedRes.rows[0].count) >= 8) {
+      const { count: approvedCount, error: countErr } = await getSupabaseServer()
+        .from('reservations')
+        .select('*', { count: 'exact', head: true })
+        .eq('service_id', target.service_id)
+        .eq('date', target.date)
+        .eq('status', 'approved');
+
+      if (countErr) throw countErr;
+      if ((approvedCount || 0) >= 8) {
         return NextResponse.json({ error: 'Day is fully booked' }, { status: 400 });
       }
 
-      const slotRes = await query(
-        `SELECT COUNT(*) FROM reservations WHERE service_id = $1 AND date = $2 AND status = 'approved' AND time_slot = $3`,
-        [target.service_id, target.date, timeSlot]
-      );
-      if (Number(slotRes.rows[0].count) > 0) {
+      const { count: slotCount, error: slotErr } = await getSupabaseServer()
+        .from('reservations')
+        .select('*', { count: 'exact', head: true })
+        .eq('service_id', target.service_id)
+        .eq('date', target.date)
+        .eq('status', 'approved')
+        .eq('time_slot', timeSlot);
+
+      if (slotErr) throw slotErr;
+      if ((slotCount || 0) > 0) {
         return NextResponse.json({ error: 'Time slot already taken' }, { status: 400 });
       }
 
-      const updated = await query(
-        `UPDATE reservations SET status = 'approved', time_slot = $1, doctor_name = $2 WHERE id = $3 RETURNING *`,
-        [timeSlot, doctorName || null, id]
-      );
-      return NextResponse.json(mapRow(updated.rows[0]));
+      const { data: updated, error: updateErr } = await getSupabaseServer()
+        .from('reservations')
+        .update({
+          status: 'approved',
+          time_slot: timeSlot,
+          doctor_name: doctorName || null
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateErr) throw updateErr;
+      return NextResponse.json(mapRow(updated));
 
     } else if (action === 'reject') {
-      const updated = await query(
-        `UPDATE reservations SET status = 'rejected' WHERE id = $1 RETURNING *`,
-        [id]
-      );
-      return NextResponse.json(mapRow(updated.rows[0]));
+      const { data: updated, error: updateErr } = await getSupabaseServer()
+        .from('reservations')
+        .update({ status: 'rejected' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateErr) throw updateErr;
+      return NextResponse.json(mapRow(updated));
 
     } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined) {
-      const fields: string[] = [];
-      const values: unknown[] = [];
-      let idx = 1;
+      const updates: Record<string, any> = {};
+      if (status) updates.status = status;
+      if (notes !== undefined) updates.notes = notes;
+      if (doctorName !== undefined) updates.doctor_name = doctorName;
+      if (sessionType !== undefined) updates.session_type = sessionType;
 
-      if (status) {
-        fields.push(`status = $${idx++}`);
-        values.push(status);
-      }
-      if (notes !== undefined) {
-        fields.push(`notes = $${idx++}`);
-        values.push(notes);
-      }
-      if (doctorName !== undefined) {
-        fields.push(`doctor_name = $${idx++}`);
-        values.push(doctorName);
-      }
-      if (sessionType !== undefined) {
-        fields.push(`session_type = $${idx++}`);
-        values.push(sessionType);
-      }
+      const { data: updated, error: updateErr } = await getSupabaseServer()
+        .from('reservations')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
 
-      values.push(id);
-      const updated = await query(
-        `UPDATE reservations SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
-        values
-      );
-      return NextResponse.json(mapRow(updated.rows[0]));
+      if (updateErr) throw updateErr;
+      return NextResponse.json(mapRow(updated));
     } else {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
@@ -180,11 +205,23 @@ export async function DELETE(req: Request) {
 
   try {
     if (id === 'all') {
-      await query('TRUNCATE TABLE reservations RESTART IDENTITY');
+      const { error } = await getSupabaseServer()
+        .from('reservations')
+        .delete()
+        .not('id', 'is', null);
+
+      if (error) throw error;
       return NextResponse.json({ success: true, message: 'All reservations cleared' });
     }
-    const deleted = await query('DELETE FROM reservations WHERE id = $1 RETURNING *', [id]);
-    if (deleted.rows.length === 0) {
+
+    const { data, error } = await getSupabaseServer()
+      .from('reservations')
+      .delete()
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
     return NextResponse.json({ success: true, message: 'Reservation deleted' });
