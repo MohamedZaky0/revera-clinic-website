@@ -127,6 +127,19 @@ export function saveDynamicCategories(categories: LocalCategory[]): void {
   syncCategoriesToDb(categories);
 }
 
+export function sortServices(services: ServiceItem[]): ServiceItem[] {
+  const categories = getDynamicCategories();
+  const catSortMap = new Map<string, number>(categories.map((c, i) => [c.key, c.sortOrder ?? i]));
+  return [...services].sort((a, b) => {
+    const catAOrder = catSortMap.get(a.cat) ?? 999;
+    const catBOrder = catSortMap.get(b.cat) ?? 999;
+    if (catAOrder !== catBOrder) {
+      return catAOrder - catBOrder;
+    }
+    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+  });
+}
+
 /** Helper to get dynamic services, seeding with defaults if empty */
 export function getDynamicServices(): ServiceItem[] {
   if (typeof window === "undefined") return [];
@@ -152,7 +165,7 @@ export function getDynamicServices(): ServiceItem[] {
           localStorage.setItem(SERVICES_KEY, JSON.stringify(migrated));
           syncServicesToDb(migrated);
         }
-        return migrated.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+        return sortServices(migrated);
       }
     }
 
@@ -168,7 +181,7 @@ export function getDynamicServices(): ServiceItem[] {
     // Sync seeded defaults to Supabase
     syncServicesToDb(defaults);
 
-    return defaults.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    return sortServices(defaults);
   } catch {
     return [];
   }

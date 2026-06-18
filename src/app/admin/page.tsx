@@ -10,6 +10,7 @@ import {
   saveDynamicCategories, 
   getDynamicServices, 
   saveDynamicServices,
+  sortServices,
   LocalCategory 
 } from "@/lib/serviceStore";
 import {
@@ -516,10 +517,7 @@ export default function AdminPage() {
       return matched ? { ...s, sortOrder: matched.sortOrder } : s;
     });
 
-    const sortedAllServices = updatedAllServices.sort((a, b) => {
-      if (a.cat !== b.cat) return 0;
-      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
-    });
+    const sortedAllServices = sortServices(updatedAllServices);
 
     setLocalServices(sortedAllServices);
     saveDynamicServices(sortedAllServices);
@@ -545,6 +543,11 @@ export default function AdminPage() {
 
     setLocalCategories(updatedCategories);
     saveDynamicCategories(updatedCategories);
+
+    // Re-sort services using the new categories ordering and save
+    const reSortedServices = sortServices(localServices);
+    setLocalServices(reSortedServices);
+    saveDynamicServices(reSortedServices);
   };
 
   function toggleCategoryExpand(cat: string) {
@@ -555,7 +558,7 @@ export default function AdminPage() {
     setLocalCategories(updatedCats);
     saveDynamicCategories(updatedCats);
 
-    const updatedSvcs = localServices.filter(s => s.cat !== catKey);
+    const updatedSvcs = sortServices(localServices.filter(s => s.cat !== catKey));
     setLocalServices(updatedSvcs);
     saveDynamicServices(updatedSvcs);
 
@@ -654,8 +657,9 @@ export default function AdminPage() {
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
-          setLocalServices(data);
-          localStorage.setItem("revera_dynamic_services", JSON.stringify(data));
+          const sorted = sortServices(data);
+          setLocalServices(sorted);
+          localStorage.setItem("revera_dynamic_services", JSON.stringify(sorted));
         }
       })
       .catch((err) => console.error("Admin: fetch services failed", err));
@@ -664,8 +668,10 @@ export default function AdminPage() {
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
-          setLocalCategories(data);
-          localStorage.setItem("revera_dynamic_categories", JSON.stringify(data));
+          const sortedCats = data.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+          setLocalCategories(sortedCats);
+          localStorage.setItem("revera_dynamic_categories", JSON.stringify(sortedCats));
+          setLocalServices(prev => sortServices(prev));
         }
       })
       .catch((err) => console.error("Admin: fetch categories failed", err));
@@ -2183,7 +2189,7 @@ export default function AdminPage() {
                       </button>
                       <button
                         onClick={() => {
-                          const updated = localServices.filter(s => s.id !== deleteServiceTarget.id);
+                          const updated = sortServices(localServices.filter(s => s.id !== deleteServiceTarget.id));
                           setLocalServices(updated);
                           saveDynamicServices(updated);
                           setDeleteServiceTarget(null);
@@ -2235,7 +2241,8 @@ export default function AdminPage() {
                         onClick={() => {
                           if (!newCategoryNameEn.trim()) return;
                           const key = newCategoryNameEn.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-                          const updated = [...localCategories, { key, en: newCategoryNameEn.trim(), ar: "" }];
+                          const nextSortOrder = Math.max(0, ...localCategories.map(c => c.sortOrder ?? 0)) + 1;
+                          const updated = [...localCategories, { key, en: newCategoryNameEn.trim(), ar: "", sortOrder: nextSortOrder }];
                           setLocalCategories(updated);
                           saveDynamicCategories(updated);
                           setExpandedCategories(prev => ({ ...prev, [key]: true }));
@@ -2671,17 +2678,18 @@ export default function AdminPage() {
                               return s;
                             });
                             
-                            setLocalServices(updatedServices);
-                            saveDynamicServices(updatedServices);
+                            const sortedServices = sortServices(updatedServices);
+                            setLocalServices(sortedServices);
+                            saveDynamicServices(sortedServices);
 
                             const defaultBranch = serviceBranchPricing.find(b => b.isDefault);
                             if (defaultBranch) {
-                              setServiceToggle(editingService.id, "active", defaultBranch.status);
-                              setServiceToggle(editingService.id, "visible", defaultBranch.visible);
-                              setServiceToggles(prev => ({
-                                ...prev,
-                                [editingService.id]: { visible: defaultBranch.visible, active: defaultBranch.status }
-                              }));
+                                setServiceToggle(editingService.id, "active", defaultBranch.status);
+                                setServiceToggle(editingService.id, "visible", defaultBranch.visible);
+                                setServiceToggles(prev => ({
+                                  ...prev,
+                                  [editingService.id]: { visible: defaultBranch.visible, active: defaultBranch.status }
+                                }));
                             }
                           } else {
                             // Add mode
@@ -2705,8 +2713,9 @@ export default function AdminPage() {
                             };
 
                             const updatedServices = [...localServices, newService];
-                            setLocalServices(updatedServices);
-                            saveDynamicServices(updatedServices);
+                            const sortedServices = sortServices(updatedServices);
+                            setLocalServices(sortedServices);
+                            saveDynamicServices(sortedServices);
 
                             const defaultBranch = serviceBranchPricing.find(b => b.isDefault);
                             const isDefaultActive = defaultBranch ? defaultBranch.status : true;

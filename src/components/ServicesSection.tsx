@@ -9,6 +9,7 @@ import {
   ServiceToggleState, 
   getDynamicServices, 
   getDynamicCategories, 
+  sortServices,
   LocalCategory 
 } from "@/lib/serviceStore";
 
@@ -312,8 +313,9 @@ export function ServicesSection() {
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
-          setDynamicServices(data);
-          localStorage.setItem("revera_dynamic_services", JSON.stringify(data));
+          const sorted = sortServices(data);
+          setDynamicServices(sorted);
+          localStorage.setItem("revera_dynamic_services", JSON.stringify(sorted));
         }
       })
       .catch((err) => console.error("ServicesSection: fetch services failed", err));
@@ -322,8 +324,10 @@ export function ServicesSection() {
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
-          setDynamicCategories(data);
-          localStorage.setItem("revera_dynamic_categories", JSON.stringify(data));
+          const sortedCats = data.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+          setDynamicCategories(sortedCats);
+          localStorage.setItem("revera_dynamic_categories", JSON.stringify(sortedCats));
+          setDynamicServices(prev => sortServices(prev));
         }
       })
       .catch((err) => console.error("ServicesSection: fetch categories failed", err));
