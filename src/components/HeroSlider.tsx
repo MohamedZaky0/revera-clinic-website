@@ -11,9 +11,9 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { ArrowRight, Star } from "lucide-react";
 
 const SLIDE_IMAGES = [
-  "/images/assets/hero-bg.jpg",
-  "/images/assets/dr-hanan-19.jpg",
-  "/images/assets/c1621013-7911-431e-983f-ae7d904815f8.jpg",
+  "/images/hero/slide-1.jpg",
+  "/images/hero/slide-2.jpg",
+  "/images/hero/slide-3.jpg",
 ] as const;
 
 function HeadingWords({ text }: { text: string }) {
@@ -42,7 +42,9 @@ export function HeroSlider() {
   const slides = t.hero.slides;
 
   const openBooking = useCallback(() => {
-    window.dispatchEvent(new CustomEvent("open-booking"));
+    // window.dispatchEvent(new CustomEvent("open-booking"));
+    const msg = encodeURIComponent("Hello Revera, I'd love to schedule a consultation. Please let me know your earliest availability. Thank you.");
+    window.open(`https://wa.me/201035595691?text=${msg}`, "_blank");
   }, []);
 
   useEffect(() => {
@@ -63,7 +65,7 @@ export function HeroSlider() {
 
   return (
     <section
-      className="relative mx-6 my-8 overflow-hidden rounded-[32px]"
+      className="relative mx-2 my-3 sm:mx-4 sm:my-5 md:mx-6 md:my-8 overflow-hidden rounded-[20px] sm:rounded-[28px] md:rounded-[32px]"
       style={{
         height: "calc(100svh - 176px)",
         minHeight: "380px",
@@ -89,6 +91,7 @@ export function HeroSlider() {
                 alt=""
                 fill
                 priority={i === 0}
+                loading={src === "/images/hero/slide-2.jpg" ? "eager" : undefined}
                 style={{ objectFit: "cover", objectPosition: "center top" }}
                 sizes="100vw"
               />

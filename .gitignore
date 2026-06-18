@@ -47,3 +47,12 @@ next-env.d.ts
 
 # Local temp files
 temp/
+
+# Database & local DB setup scripts
+db/
+*.db
+*.sqlite
+init_revera.mjs
+setup_revera_db.mjs
+check_bookings.mjs
+supabase-booking-schema.sql

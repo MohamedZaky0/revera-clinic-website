@@ -11,7 +11,7 @@ const NAV_LINKS = [
   { key: "home" as const, href: "/" },
   { key: "about" as const, href: "/about" },
   { key: "services" as const, href: "/services" },
-  { key: "blog" as const, href: "/blog" },
+  // { key: "blog" as const, href: "/blog" },
   { key: "contact" as const, href: "/contact" },
 ];
 
@@ -63,35 +63,27 @@ export function Navbar() {
     >
       <div className="cr-container">
         <nav
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexDirection: isRTL ? "row-reverse" : "row",
-            height: "112px",
-            gap: "28px",
-          }}
+          className={`h-16 lg:h-28 flex items-center justify-between gap-4 lg:gap-7 ${
+            isRTL ? "flex-row-reverse" : "flex-row"
+          }`}
         >
           {/* Logo */}
-          <Link href="/" style={{ flexShrink: 0 }}>
+          <Link href="/" className="shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/main_logo.png" alt="Revera Clinics" style={{ width: "auto", height: "72px" }} />
+            <img src="/images/main_logo.png" alt="Revera Clinics" className="h-10 lg:h-[72px] w-auto" />
           </Link>
 
           {/* Desktop nav links */}
           <ul
+            className={`hidden lg:flex items-center flex-1 justify-center ${
+              isRTL ? "flex-row-reverse" : "flex-row"
+            }`}
             style={{
-              display: "flex",
-              alignItems: "center",
-              flexDirection: isRTL ? "row-reverse" : "row",
               gap: "10px",
               listStyle: "none",
               margin: 0,
               padding: 0,
-              flex: 1,
-              justifyContent: "center",
             }}
-            className="hidden md:flex"
           >
             {NAV_LINKS.map(({ key, href }) => (
               <li key={key}>
@@ -124,8 +116,10 @@ export function Navbar() {
 
             {/* Make Appointment CTA next to Contact */}
             <li>
-              <button
-                onClick={handleBooking}
+              <a
+                href="https://wa.me/201035595691?text=Hello%20Revera%2C%20I%27d%20love%20to%20schedule%20a%20consultation%20at%20your%20New%20Cairo%20branch.%20Please%20let%20me%20know%20your%20earliest%20availability.%20Thank%20you."
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   padding: "10px 16px",
                   borderRadius: "8px",
@@ -137,33 +131,33 @@ export function Navbar() {
                   cursor: "pointer",
                   transition: "transform 0.12s ease, opacity 0.12s ease",
                   whiteSpace: "nowrap",
+                  textDecoration: "none",
+                  display: "inline-block",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.9";
+                  (e.currentTarget as HTMLAnchorElement).style.opacity = "0.9";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
+                  (e.currentTarget as HTMLAnchorElement).style.opacity = "1";
                 }}
               >
                 {t.nav.makeAppointment}
-              </button>
+              </a>
               </li>
           </ul>
 
           {/* Right controls */}
           <div
+            className={`hidden lg:flex items-center shrink-0 ${
+              isRTL ? "flex-row-reverse" : "flex-row"
+            }`}
             style={{
-              display: "flex",
-              alignItems: "center",
-              flexDirection: isRTL ? "row-reverse" : "row",
               gap: "24px",
-              flexShrink: 0,
             }}
-            className="hidden md:flex"
           >
             {/* Phone */}
             <a
-              href="tel:+201125787019"
+              href="tel:+201035595691"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -182,7 +176,7 @@ export function Navbar() {
               }}
             >
               <Phone size={18} strokeWidth={1.5} />
-              <span>(+20) 01125787019</span>
+              <span>(+20) 01035595691</span>
             </a>
 
             {/* Language dropdown */}
@@ -217,7 +211,7 @@ export function Navbar() {
                   alt="English"
                   width={20}
                   height={14}
-                  style={{ borderRadius: "2px" }}
+                  style={{ width: "auto", height: "auto", borderRadius: "2px" }}
                 />
                 <span>English</span>
                 <ChevronDown size={16} />
@@ -270,7 +264,7 @@ export function Navbar() {
                       }
                     }}
                   >
-                    <Image src="/images/flag/en.png" alt="English" width={18} height={12} style={{ borderRadius: "2px" }} />
+                    <Image src="/images/flag/en.png" alt="English" width={18} height={12} style={{ width: "auto", height: "auto", borderRadius: "2px" }} />
                     <span>English</span>
                   </button>
                   <button
@@ -348,7 +342,7 @@ export function Navbar() {
               flexDirection: "column",
               gap: "5px",
             }}
-            className="flex md:hidden"
+            className="flex lg:hidden"
           >
             <span
               style={{
@@ -433,8 +427,10 @@ export function Navbar() {
               }}
             >
               {/* Mobile Make Appointment */}
-              <button
-                onClick={() => handleBooking()}
+              <a
+                href="https://wa.me/201035595691?text=Hello%20Revera%2C%20I%27d%20love%20to%20schedule%20a%20consultation%20at%20your%20New%20Cairo%20branch.%20Please%20let%20me%20know%20your%20earliest%20availability.%20Thank%20you."
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -450,14 +446,15 @@ export function Navbar() {
                   fontWeight: 600,
                   transition: "all 0.12s ease",
                   width: "100%",
+                  textDecoration: "none",
                 }}
               >
                 {t.nav.makeAppointment}
-              </button>
+              </a>
 
               {/* Mobile phone */}
               <a
-                href="tel:+201125787019"
+                href="tel:+201035595691"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -469,7 +466,7 @@ export function Navbar() {
                 }}
               >
                 <Phone size={18} strokeWidth={1.5} />
-                <span>(+20) 01125787019</span>
+                <span>(+20) 01035595691</span>
               </a>
 
               {/* Mobile language selector */}
@@ -499,7 +496,7 @@ export function Navbar() {
                     alt="English"
                     width={16}
                     height={12}
-                    style={{ borderRadius: "2px" }}
+                    style={{ width: "auto", height: "auto", borderRadius: "2px" }}
                   />
                   <span>English</span>
                 </button>

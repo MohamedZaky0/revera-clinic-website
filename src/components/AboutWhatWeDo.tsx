@@ -212,7 +212,7 @@ export function AboutWhatWeDo() {
             style={{ aspectRatio: "3/4", boxShadow: "0 4px 20px rgba(90,61,52,0.08)" }}
           >
             <img
-              src="/images/assets/h7.jpg"
+              src="/images/clinic/interior.jpg"
               alt="Revera care"
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
@@ -303,7 +303,7 @@ export function AboutWhatWeDo() {
           <div className="awwd-arch-wrapper">
             <div className="awwd-arch-img">
               <Image
-                src="/images/assets/h6.jpg"
+                src="/images/clinic/video-thumbnail.jpg"
                 alt="Doctor performing treatment"
                 fill
                 sizes="(max-width: 1024px) 100vw, 380px"

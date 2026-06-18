@@ -45,10 +45,10 @@ export function OurApproachSection() {
       <div className="cr-container" style={{ maxWidth: "1480px" }}>
         {/* Curved card — beige background */}
         <div
+          className="rounded-[24px] sm:rounded-[60px]"
           style={{
             position: "relative",
             backgroundColor: "var(--cr-secondary, #EDF1EC)",
-            borderRadius: "60px",
             border: "1px solid rgba(196,174,124,0.3)",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 72px) clamp(24px, 5vw, 72px)",
@@ -173,6 +173,17 @@ export function OurApproachSection() {
                 text-align: left;
               }
             }
+            @media (max-width: 640px) {
+              .oas2-support-badge {
+                position: relative !important;
+                top: auto !important;
+                right: auto !important;
+                left: auto !important;
+                margin: 20px auto 0 !important;
+                width: fit-content;
+                justify-content: center;
+              }
+            }
           `}</style>
 
           <div
@@ -278,7 +289,7 @@ export function OurApproachSection() {
               {/* Clinic/room image */}
               <div className="oas2-clinic-img">
                 <Image
-                  src="/images/assets/04252364-cb0b-478d-b995-69ccec4d93c9.jpg"
+                  src="/images/clinic/room.jpg"
                   alt="Revera Clinic"
                   fill
                   sizes="(max-width: 1024px) 100vw, 480px"
@@ -287,6 +298,7 @@ export function OurApproachSection() {
               </div>
 
               {/* Doctor portrait — overlapping bottom-left */}
+              {/* 
               <div
                 style={{
                   position: "absolute",
@@ -302,7 +314,7 @@ export function OurApproachSection() {
                 }}
               >
                 <Image
-                  src="/images/assets/dr-hanan-8.png"
+                  src="/images/doctor/portrait-about.png"
                   alt="Doctor"
                   fill
                   sizes="130px"

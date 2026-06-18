@@ -87,7 +87,7 @@ export function WhatWeDo() {
                 }}
               >
                 <Image
-                  src="/images/assets/04252364-cb0b-478d-b995-69ccec4d93c9.jpg"
+                  src="/images/clinic/room.jpg"
                   alt="Dental clinic — Revera Clinics"
                   fill
                   sizes="(max-width: 768px) 100vw, 33vw"
@@ -276,7 +276,7 @@ export function WhatWeDo() {
                 }}
               >
                 <Image
-                  src="/images/assets/bda0b3ec-1372-4aba-ba33-7d58aa317501.jpg"
+                  src="/images/clinic/treatment.jpg"
                   alt="Treatment — Revera Clinics"
                   fill
                   sizes="(max-width: 768px) 100vw, 30vw"

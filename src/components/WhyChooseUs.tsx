@@ -217,9 +217,10 @@ export function WhyChooseUs() {
                 {/* Dentist room / purple chair image */}
                 <div className="wcu-left-img">
                   <Image
-                    src="/images/assets/04252364-cb0b-478d-b995-69ccec4d93c9.jpg"
+                    src="/images/clinic/treatment.jpg"
                     alt="Dental clinic room — Revera Clinics"
                     fill
+                    priority
                     sizes="(max-width: 768px) 100vw, 400px"
                     style={{ objectFit: "cover", objectPosition: "center" }}
                   />
@@ -230,7 +231,7 @@ export function WhyChooseUs() {
                   {/* Doctor performing treatment image */}
                   <div className="wcu-right-img">
                     <Image
-                      src="/images/assets/bda0b3ec-1372-4aba-ba33-7d58aa317501.jpg"
+                      src="/images/clinic/room.jpg"
                       alt="Skin treatment — Revera Clinics"
                       fill
                       sizes="(max-width: 768px) 100vw, 400px"

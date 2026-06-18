@@ -3,15 +3,15 @@
 import { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const MAP_SRC_HELIOPOLIS =
-  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d6904.937408173035!2d31.344078574424366!3d30.08076017747633!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x14583f0a0ca9dc7b%3A0x6f41d86e4d54e318!2sCrystal%20Rose%20Clinics!5e0!3m2!1sar!2seg!4v1770066634433!5m2!1sar!2seg";
+const MAP_SRC_NEWCAIRO =
+  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3455.240762823598!2d31.451330111694702!3d30.001242420510955!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x145823da15b7dca9%3A0xb388d9b9c32ebce5!2sRevera%20Clinic%20-%20Tagamoa%20Branch!5e0!3m2!1sen!2sit!4v1781634264961!5m2!1sen!2sit";
 
 const MAP_SRC_ZAYED =
-  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d13818.175141203006!2d30.985958!3d30.025114!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x145857211db4ab09%3A0x3b1cc70bf9561bd0!2sSheikh%20Zayed%20City%2C%20Giza%20Governorate!5e0!3m2!1sen!2seg!4v1717392211904!5m2!1sen!2seg";
+  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3452.9529642711104!2d30.9335256!3d30.066882699999997!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x145859626e72e263%3A0x148f1e87e5c115c0!2sEl%20nada%20CLINICS%20complex!5e0!3m2!1sen!2sit!4v1781634456678!5m2!1sen!2sit";
 
 export function ContactPageContent() {
   const { t, isRTL, language } = useLanguage();
-  const [activeLocation, setActiveLocation] = useState<"heliopolis" | "zayed">("heliopolis");
+  const [activeLocation, setActiveLocation] = useState<"newcairo" | "zayed">("newcairo");
   const [form, setForm] = useState({ fname: "", lname: "", phone: "", email: "", message: "" });
 
   const infoItems = [
@@ -23,12 +23,12 @@ export function ContactPageContent() {
         </svg>
       ),
       title: t.contactPage.locationTitle,
-      value: activeLocation === "heliopolis" 
-        ? t.contactPage.locationText 
-        : (language === "ar" ? "مجمع زايد ديونز، بلوك 2، مدينة الشيخ زايد، الجيزة." : "Zayed Dunes Complex, Block 2, Sheikh Zayed City, Giza."),
-      href: activeLocation === "heliopolis" 
-        ? "https://maps.app.goo.gl/QGDpn48cHuDUSpYB7" 
-        : "https://maps.app.goo.gl/H4vJmSND2oN2sD8T9",
+      value: activeLocation === "newcairo"
+        ? t.contactPage.locationText
+        : t.contactPage.locationTextZayed,
+      href: activeLocation === "newcairo"
+        ? "https://maps.app.goo.gl/sXQXDW3A7DdZSRJZ9"
+        : "https://maps.app.goo.gl/7ig2Q9iCY9uszyHq9",
     },
     {
       icon: (
@@ -38,8 +38,8 @@ export function ContactPageContent() {
         </svg>
       ),
       title: t.contactPage.contactTitle,
-      value: t.contactPage.phone,
-      href: `tel:${t.contactPage.phone.replace(/\s/g, "")}`,
+      value: activeLocation === "newcairo" ? t.contactPage.phone : t.contactPage.phoneZayed,
+      href: `tel:${(activeLocation === "newcairo" ? t.contactPage.phone : t.contactPage.phoneZayed).replace(/\s/g, "")}`,
     },
     {
       icon: (
@@ -189,7 +189,7 @@ export function ContactPageContent() {
                 {t.contactPage.formHeading}
               </h2>
               <form onSubmit={handleSubmit}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                <div className="contact-form-inner" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                   <input
                     className="contact-input"
                     style={inputStyle}
@@ -268,6 +268,7 @@ export function ContactPageContent() {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Branch switcher pills */}
               <div 
+                className="contact-branch-switcher"
                 style={{ 
                   display: "flex", 
                   gap: 8, 
@@ -279,7 +280,7 @@ export function ContactPageContent() {
               >
                 <button
                   type="button"
-                  onClick={() => setActiveLocation("heliopolis")}
+                  onClick={() => setActiveLocation("newcairo")}
                   style={{
                     padding: "8px 24px",
                     borderRadius: 50,
@@ -289,11 +290,11 @@ export function ContactPageContent() {
                     fontWeight: 600,
                     cursor: "pointer",
                     transition: "all 0.3s ease",
-                    backgroundColor: activeLocation === "heliopolis" ? "var(--cr-primary)" : "transparent",
-                    color: activeLocation === "heliopolis" ? "#ffffff" : "var(--cr-primary)",
+                    backgroundColor: activeLocation === "newcairo" ? "var(--cr-primary)" : "transparent",
+                    color: activeLocation === "newcairo" ? "#ffffff" : "var(--cr-primary)",
                   }}
                 >
-                  {language === "ar" ? "فرع مصر الجديدة" : "Heliopolis Branch"}
+                  {language === "ar" ? "فرع القاهرة الجديدة" : "New Cairo Branch"}
                 </button>
                 <button
                   type="button"
@@ -327,7 +328,7 @@ export function ContactPageContent() {
                 }}
               >
                 <iframe
-                  src={activeLocation === "heliopolis" ? MAP_SRC_HELIOPOLIS : MAP_SRC_ZAYED}
+                  src={activeLocation === "newcairo" ? MAP_SRC_NEWCAIRO : MAP_SRC_ZAYED}
                   title="Revera Clinics location"
                   style={{ border: 0, width: "100%", height: "100%", minHeight: 440 }}
                   allowFullScreen
@@ -347,9 +348,16 @@ export function ContactPageContent() {
         }
         @media (max-width: 992px) {
           .contact-info-grid { grid-template-columns: 1fr !important; }
+          .contact-info-grid > div:first-child { text-align: center; }
           .contact-form-grid { grid-template-columns: 1fr !important; }
         }
-        @media (max-width: 600px) {
+        @media (max-width: 768px) {
+          .contact-cards { grid-template-columns: 1fr 1fr !important; }
+          .contact-form-inner { grid-template-columns: 1fr !important; }
+          .contact-branch-switcher { flex-wrap: wrap; justify-content: center; border-radius: 16px !important; }
+          .contact-branch-switcher button { flex: 1; min-width: 130px; font-size: 12px !important; padding: 8px 12px !important; }
+        }
+        @media (max-width: 500px) {
           .contact-cards { grid-template-columns: 1fr !important; }
         }
       `}</style>

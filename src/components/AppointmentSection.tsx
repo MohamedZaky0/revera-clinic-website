@@ -41,10 +41,10 @@ export function AppointmentSection() {
       <div className="cr-container" style={{ maxWidth: "1480px" }}>
         {/* Curved Card Container with Beige Background */}
         <div
+          className="ap-rounded-card rounded-[24px] sm:rounded-[60px]"
           style={{
             position: "relative",
             backgroundColor: "var(--cr-secondary, #EDF1EC)",
-            borderRadius: "60px",
             border: "1px solid rgba(196,174,124,0.35)",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 80px) clamp(24px, 5vw, 72px)",
@@ -205,7 +205,7 @@ export function AppointmentSection() {
                 {/* Headset support woman image */}
                 <div className="ap-image-container">
                   <Image
-                    src="/images/assets/support-agent.png"
+                    src="/images/clinic/support-agent.jpg"
                     alt="Contact support — Revera Clinics"
                     fill
                     sizes="(max-width: 768px) 100vw, 400px"

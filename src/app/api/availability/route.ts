@@ -1,12 +1,5 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const DATA_PATH = path.resolve(process.cwd(), 'data', 'reservations.json');
-
-function readData() {
-  try { return JSON.parse(fs.readFileSync(DATA_PATH, 'utf8') || '[]'); } catch (e) { return []; }
-}
+import { query } from '@/lib/db';
 
 function formatDate(d: Date) {
   const y = d.getFullYear();
@@ -19,21 +12,58 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const params = url.searchParams;
   const serviceId = params.get('serviceId');
-  // default window: next 30 days
   const days = Number(params.get('days') || '30');
 
-  const data = readData();
-
-  const results: { date: string; approvedCount: number; approvedSlots: string[] }[] = [];
   const today = new Date();
-  today.setHours(0,0,0,0);
-  for (let i=0;i<days;i++){
+  today.setHours(0, 0, 0, 0);
+
+  const dateKeys: string[] = [];
+  for (let i = 0; i < days; i++) {
     const d = new Date(today);
-    d.setDate(today.getDate()+i);
-    const key = formatDate(d);
-    const approved = data.filter((r: any) => r.status === 'approved' && r.date === key && (!serviceId || String(r.serviceId) === serviceId));
-    results.push({ date: key, approvedCount: approved.length, approvedSlots: approved.map((a:any)=>a.timeSlot).filter(Boolean) });
+    d.setDate(today.getDate() + i);
+    dateKeys.push(formatDate(d));
   }
 
-  return NextResponse.json(results);
+  try {
+    const conditions: string[] = [`status = 'approved'`, `date = ANY($1)`];
+    const values: unknown[] = [dateKeys];
+    let idx = 2;
+
+    if (serviceId) {
+      conditions.push(`service_id = $${idx++}`);
+      values.push(Number(serviceId));
+    }
+
+    const sql = `
+      SELECT date, time_slot
+      FROM reservations
+      WHERE ${conditions.join(' AND ')}
+    `;
+
+    const result = await query(sql, values);
+
+    const rows = result.rows as Array<{ date: any; time_slot: string | null }>;
+
+    // Group by date
+    const groupedByDate = new Map<string, string[]>();
+    for (const key of dateKeys) {
+      groupedByDate.set(key, []);
+    }
+    for (const row of rows) {
+      const key = String(row.date).slice(0, 10);
+      if (groupedByDate.has(key)) {
+        if (row.time_slot) groupedByDate.get(key)!.push(row.time_slot);
+      }
+    }
+
+    const output = dateKeys.map((key) => {
+      const slots = groupedByDate.get(key) ?? [];
+      return { date: key, approvedCount: slots.length, approvedSlots: slots };
+    });
+
+    return NextResponse.json(output);
+  } catch (err) {
+    console.error('GET /api/availability error:', err);
+    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+  }
 }
