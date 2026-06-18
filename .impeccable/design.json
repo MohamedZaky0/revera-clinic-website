@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-07T00:00:00.000Z",
+  "title": "Design System: Revera Clinics",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Deep Olive Green",
+        "canonical": "oklch(38% 0.042 135)",
+        "tonalRamp": [
+          "oklch(12% 0.032 135)",
+          "oklch(20% 0.038 135)",
+          "oklch(28% 0.040 135)",
+          "oklch(38% 0.042 135)",
+          "oklch(50% 0.040 135)",
+          "oklch(62% 0.034 135)",
+          "oklch(76% 0.024 135)",
+          "oklch(92% 0.012 135)"
+        ]
+      },
+      "primary-dark": {
+        "role": "primary",
+        "displayName": "Deepest Olive-Black",
+        "canonical": "oklch(20% 0.028 135)",
+        "tonalRamp": [
+          "oklch(10% 0.018 135)",
+          "oklch(16% 0.024 135)",
+          "oklch(22% 0.028 135)",
+          "oklch(30% 0.032 135)",
+          "oklch(42% 0.038 135)",
+          "oklch(56% 0.034 135)",
+          "oklch(72% 0.022 135)",
+          "oklch(90% 0.010 135)"
+        ]
+      },
+      "primary-deep": {
+        "role": "primary",
+        "displayName": "Deeper Sage Hover",
+        "canonical": "oklch(30% 0.038 135)",
+        "tonalRamp": [
+          "oklch(12% 0.030 135)",
+          "oklch(20% 0.034 135)",
+          "oklch(30% 0.038 135)",
+          "oklch(40% 0.040 135)",
+          "oklch(52% 0.038 135)",
+          "oklch(65% 0.030 135)",
+          "oklch(78% 0.022 135)",
+          "oklch(92% 0.012 135)"
+        ]
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Muted Sage Olive",
+        "canonical": "oklch(50% 0.038 135)",
+        "tonalRamp": [
+          "oklch(18% 0.028 135)",
+          "oklch(28% 0.034 135)",
+          "oklch(38% 0.038 135)",
+          "oklch(50% 0.038 135)",
+          "oklch(62% 0.032 135)",
+          "oklch(72% 0.025 135)",
+          "oklch(82% 0.018 135)",
+          "oklch(94% 0.009 135)"
+        ]
+      },
+      "accent": {
+        "role": "tertiary",
+        "displayName": "Warm Royal Gold",
+        "canonical": "oklch(73% 0.068 82)",
+        "tonalRamp": [
+          "oklch(20% 0.042 82)",
+          "oklch(35% 0.056 82)",
+          "oklch(48% 0.066 82)",
+          "oklch(60% 0.070 82)",
+          "oklch(73% 0.068 82)",
+          "oklch(82% 0.055 82)",
+          "oklch(90% 0.038 82)",
+          "oklch(96% 0.018 82)"
+        ]
+      },
+      "sand": {
+        "role": "neutral",
+        "displayName": "Sophisticated Sand",
+        "canonical": "oklch(95% 0.010 80)",
+        "tonalRamp": [
+          "oklch(40% 0.018 80)",
+          "oklch(55% 0.016 80)",
+          "oklch(68% 0.014 80)",
+          "oklch(78% 0.012 80)",
+          "oklch(88% 0.011 80)",
+          "oklch(95% 0.010 80)",
+          "oklch(97% 0.006 80)",
+          "oklch(99% 0.003 80)"
+        ]
+      },
+      "light": {
+        "role": "neutral",
+        "displayName": "Luxurious Warm Ivory",
+        "canonical": "oklch(98% 0.003 80)",
+        "tonalRamp": [
+          "oklch(50% 0.008 80)",
+          "oklch(62% 0.007 80)",
+          "oklch(74% 0.006 80)",
+          "oklch(84% 0.005 80)",
+          "oklch(91% 0.004 80)",
+          "oklch(95% 0.004 80)",
+          "oklch(98% 0.003 80)",
+          "oklch(99.5% 0.001 80)"
+        ]
+      },
+      "tint": {
+        "role": "neutral",
+        "displayName": "Sage Tint Canvas",
+        "canonical": "oklch(94% 0.014 135)",
+        "tonalRamp": [
+          "oklch(30% 0.020 135)",
+          "oklch(46% 0.022 135)",
+          "oklch(60% 0.020 135)",
+          "oklch(72% 0.018 135)",
+          "oklch(82% 0.016 135)",
+          "oklch(88% 0.015 135)",
+          "oklch(94% 0.014 135)",
+          "oklch(98% 0.007 135)"
+        ]
+      },
+      "error": {
+        "role": "error",
+        "displayName": "Error Red",
+        "canonical": "oklch(60% 0.18 20)",
+        "tonalRamp": [
+          "oklch(25% 0.14 20)",
+          "oklch(38% 0.16 20)",
+          "oklch(50% 0.18 20)",
+          "oklch(60% 0.18 20)",
+          "oklch(68% 0.16 20)",
+          "oklch(76% 0.13 20)",
+          "oklch(85% 0.09 20)",
+          "oklch(95% 0.04 20)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero headings and page-level statements. Never more than one per section." },
+      "headline": { "displayName": "Headline", "purpose": "Section headings (h2). Primary reading anchor per content zone." },
+      "title": { "displayName": "Title", "purpose": "Sub-headings, card titles, modal titles (h3). Inherits Marcellus roman weight." },
+      "body": { "displayName": "Body", "purpose": "All prose. Line length capped 65-75ch. Line-height 1.7 for sustained reading comfort." },
+      "label": { "displayName": "Label", "purpose": "Section category tags and badges. Sparingly — not above every heading by default." }
+    },
+    "shadows": [
+      { "name": "resting-surface", "value": "0 2px 20px rgba(90, 61, 52, 0.08)", "purpose": "Cards, navbar on scroll, dropdowns. Warm ambient presence at rest." },
+      { "name": "hover-lift", "value": "0 16px 32px rgba(0, 0, 0, 0.08)", "purpose": "Cards and interactive surfaces on hover. Always paired with translateY(-2px) scale(1.01)." },
+      { "name": "dropdown-modal", "value": "0 4px 12px rgba(90, 61, 52, 0.10)", "purpose": "Language selector dropdown, modal box. More presence to confirm layer separation." }
+    ],
+    "motion": [
+      { "name": "section-appear", "value": "perspective(1200px) translateY(42px) rotateX(8deg) scale(0.98) → identity", "duration": "1s", "easing": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Section-level entrance. Applied to sections, cards, .section-padding, .hero-slide, and named card classes." },
+      { "name": "hover-lift", "value": "translateY(-2px) scale(1.01)", "duration": "0.24s", "easing": "ease", "purpose": "Hover response on interactive cards and section-tags." },
+      { "name": "card-arrow-rotate", "value": "rotate(0deg) → rotate(45deg)", "duration": "0.28s", "easing": "ease", "purpose": "The 44px circle arrow icon on service cards. Signature interaction gesture." },
+      { "name": "image-pan", "value": "scale(1) rotate(0deg) → scale(1.06) rotate(-1deg)", "duration": "700ms", "easing": "cubic-bezier(0.2, 0.9, 0.2, 1)", "purpose": "Service card image on hover. Slower than standard to feel physical, not digital." },
+      { "name": "readmore-gap", "value": "gap: 8px → gap: 14px", "duration": "0.3s", "easing": "ease", "purpose": "Readmore link: the gap between label and arrow widens on hover. The direction is the delight." },
+      { "name": "preloader-spin-slow", "value": "rotate(360deg)", "duration": "2.6s", "easing": "linear", "purpose": "Outer gold arc ring." },
+      { "name": "preloader-spin-reverse", "value": "rotate(-360deg)", "duration": "1.9s", "easing": "linear", "purpose": "Inner gold arc ring — opposite direction." },
+      { "name": "reduced-motion-override", "value": "opacity 0 → opacity 1", "duration": "0.4s", "easing": "ease", "purpose": "Fallback for prefers-reduced-motion: replace all transform animations with a fade." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "768px", "purpose": "Section padding reduces to 60px; navbar shows hamburger; service grids collapse." },
+      { "name": "container", "value": "1320px", "purpose": "Max-width for cr-container. Beyond this, margins grow and content stays centered." },
+      { "name": "container-wide", "value": "1480px", "purpose": "Used by HomeServicesSection for the wider services wrapper." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main CTA. Pill-shaped, olive fill. Used for 'Book Appointment', 'View Services', primary page actions.",
+      "html": "<button class=\"ds-btn-primary\">Book Appointment</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; background-color: #414E36; color: #FBFBF9; font-family: 'Sora', ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 500; padding: 14px 28px; border-radius: 50px; border: none; cursor: pointer; transition: background-color 0.3s ease, transform 0.2s ease; text-decoration: none; } .ds-btn-primary:hover { background-color: #2E3A26; transform: translateY(-1px); } .ds-btn-primary:focus-visible { outline: 2px solid #C4AE7C; outline-offset: 3px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary CTA. Same pill shape, no fill. Sand border at rest. Used for 'Learn More', 'View All'.",
+      "html": "<button class=\"ds-btn-outline\">Learn More</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; gap: 8px; background-color: transparent; color: #1F251A; font-family: 'Sora', ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 500; padding: 13px 28px; border-radius: 50px; border: 1.5px solid #F2EFE9; cursor: pointer; transition: background-color 0.3s ease, color 0.3s ease; text-decoration: none; } .ds-btn-outline:hover, .ds-btn-outline:focus-visible { background-color: rgba(251, 251, 249, 0.5); color: #1F251A; outline: none; }"
+    },
+    {
+      "name": "Filter Pill",
+      "kind": "chip",
+      "refersTo": "filter-pill",
+      "description": "Category selector for services and blog. Gold border at rest, olive fill on active.",
+      "html": "<button class=\"ds-filter-pill active\">Dermatology</button>",
+      "css": ".ds-filter-pill { display: inline-flex; align-items: center; gap: 10px; padding: 10px 20px; border-radius: 50px; border: 1.5px solid #C4AE7C; font-family: 'Sora', ui-sans-serif, sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.3s ease; background: transparent; color: #414E36; } .ds-filter-pill.active, .ds-filter-pill:hover { background-color: #414E36; color: #FBFBF9; border-color: #414E36; } .ds-filter-pill:focus-visible { outline: 2px solid #C4AE7C; outline-offset: 3px; }"
+    },
+    {
+      "name": "Service Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Content card with title, body, image, and rotating arrow icon. Signature component.",
+      "html": "<div class=\"ds-service-card\"><div class=\"ds-service-card-body\"><div class=\"ds-service-card-header\"><h3 class=\"ds-service-card-title\">Skin Dermatology Clinics</h3><div class=\"ds-arrow-icon\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\"><path d=\"M4 14L14 4M14 4H6M14 4V12\" stroke=\"#414E36\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></div></div><p class=\"ds-service-card-desc\">Specialized care for all skin conditions, from diagnostics to advanced dermatology treatments.</p><div class=\"ds-service-card-image\"><img src=\"https://via.placeholder.com/400x220\" alt=\"Dermatology\" /></div></div></div>",
+      "css": ".ds-service-card { background-color: #FBFBF9; border-radius: 24px; overflow: hidden; border: 1px solid rgba(90, 106, 81, 0.2); box-shadow: 0 2px 20px rgba(90, 61, 52, 0.08); display: flex; flex-direction: column; height: 100%; transition: transform 0.24s ease, box-shadow 0.24s ease; } .ds-service-card:hover { transform: translateY(-2px) scale(1.01); box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08); } .ds-service-card-body { padding: 24px; flex: 1; display: flex; flex-direction: column; gap: 24px; } .ds-service-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; } .ds-service-card-title { margin: 0; font-family: 'Marcellus', Georgia, serif; font-size: 24px; font-weight: 400; color: #414E36; line-height: 1.1; flex: 1; } .ds-arrow-icon { width: 44px; height: 44px; border-radius: 50%; background-color: rgba(90, 106, 81, 0.12); display: grid; place-items: center; flex-shrink: 0; transition: transform 0.28s ease; } .ds-service-card:hover .ds-arrow-icon { transform: rotate(45deg); } .ds-service-card-desc { margin: 0; font-family: 'Sora', ui-sans-serif, sans-serif; font-size: 14px; color: #5A6A51; line-height: 1.8; } .ds-service-card-image { width: 100%; height: 220px; border-radius: 24px; overflow: hidden; } .ds-service-card-image img { width: 100%; height: 100%; object-fit: cover; transition: transform 700ms cubic-bezier(0.2, 0.9, 0.2, 1); } .ds-service-card:hover .ds-service-card-image img { transform: scale(1.06) rotate(-1deg); }"
+    },
+    {
+      "name": "Category Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Large selection card for service categories. Centered icon + serif label + Sora sublabel. Hover: border shifts to olive.",
+      "html": "<button class=\"ds-category-card\"><svg width=\"44\" height=\"44\" viewBox=\"0 0 44 44\" fill=\"none\"><circle cx=\"22\" cy=\"22\" r=\"20\" stroke=\"#414E36\" stroke-width=\"1\"/><circle cx=\"22\" cy=\"22\" r=\"10\" fill=\"#C4AE7C\" fill-opacity=\"0.4\"/></svg><div class=\"ds-category-label\">Dermatology &amp; Aesthetic</div><div class=\"ds-category-sublabel\">Skin &amp; Aesthetic</div></button>",
+      "css": ".ds-category-card { flex: 1; min-width: 280px; padding: 48px 32px; border-radius: 24px; border: 1.5px solid rgba(90, 106, 81, 0.15); background: #FBFBF9; color: #414E36; display: flex; flex-direction: column; align-items: center; gap: 16px; cursor: pointer; transition: all 0.3s ease; text-align: center; box-shadow: 0 4px 12px rgba(90, 61, 52, 0.02); } .ds-category-card:hover { border-color: #414E36; box-shadow: 0 12px 30px rgba(90, 61, 52, 0.08); } .ds-category-label { font-family: 'Marcellus', Georgia, serif; font-size: 22px; color: #414E36; margin-bottom: 6px; font-weight: 400; } .ds-category-sublabel { font-family: 'Sora', ui-sans-serif, sans-serif; font-size: 13px; color: #5A6A51; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Form input. Gold border at rest, olive on focus. Placeholder uses gold color.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Your name\" />",
+      "css": ".ds-input { width: 100%; padding: 14px 18px; border: 1.5px solid #C4AE7C; border-radius: 10px; font-family: 'Sora', ui-sans-serif, sans-serif; font-size: 14px; color: #414E36; background: #FBFBF9; outline: none; transition: border-color 0.3s ease; box-sizing: border-box; } .ds-input:focus { border-color: #414E36; } .ds-input::placeholder { color: #C4AE7C; }"
+    },
+    {
+      "name": "Navigation Bar",
+      "kind": "nav",
+      "refersTo": "button-outline",
+      "description": "Sticky header. Transparent at top, ivory on scroll with warm shadow. Logo left, links centered, actions right.",
+      "html": "<header class=\"ds-navbar\"><div class=\"ds-navbar-inner\"><a href=\"/\" class=\"ds-navbar-brand\">Revera Clinics</a><nav class=\"ds-nav-links\"><a href=\"/\" class=\"ds-nav-link active\">Home</a><a href=\"/about\" class=\"ds-nav-link\">About Us</a><a href=\"/services\" class=\"ds-nav-link\">Services</a></nav><div class=\"ds-navbar-actions\"><a href=\"tel:+20\" class=\"ds-nav-phone\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012 1.18 2 2 0 014 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z\" stroke=\"#414E36\" stroke-width=\"1.5\"/></svg>(+20) 01125787019</a><button class=\"ds-btn-outline\" style=\"font-size:14px;padding:10px 20px;\">Login</button></div></div></header>",
+      "css": ".ds-navbar { position: sticky; top: 0; z-index: 100; background: rgba(255, 255, 255, 0.98); box-shadow: 0 2px 20px rgba(90, 61, 52, 0.08); } .ds-navbar-inner { max-width: 1320px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 80px; gap: 28px; } .ds-navbar-brand { font-family: 'Marcellus', Georgia, serif; font-size: 22px; font-weight: 400; color: #414E36; text-decoration: none; flex-shrink: 0; } .ds-nav-links { display: flex; align-items: center; gap: 4px; flex: 1; justify-content: center; } .ds-nav-link { padding: 10px 18px; border-radius: 8px; font-family: 'Sora', ui-sans-serif, sans-serif; font-size: 16px; font-weight: 500; color: #414E36; text-decoration: none; opacity: 0.85; transition: opacity 0.2s ease; white-space: nowrap; } .ds-nav-link.active { font-weight: 700; opacity: 1; } .ds-nav-link:hover { opacity: 1; } .ds-navbar-actions { display: flex; align-items: center; gap: 24px; flex-shrink: 0; } .ds-nav-phone { display: flex; align-items: center; gap: 8px; color: #414E36; text-decoration: none; font-family: 'Sora', ui-sans-serif, sans-serif; font-size: 14px; font-weight: 500; transition: opacity 0.2s ease; } .ds-nav-phone:hover { opacity: 0.7; } .ds-btn-outline { display: inline-flex; align-items: center; background-color: transparent; color: #1F251A; font-family: 'Sora', ui-sans-serif, sans-serif; font-size: 14px; font-weight: 500; padding: 10px 20px; border-radius: 50px; border: 1.5px solid #F2EFE9; cursor: pointer; transition: background-color 0.3s ease; } .ds-btn-outline:hover { background-color: rgba(251, 251, 249, 0.5); }"
+    },
+    {
+      "name": "Section Label Tag",
+      "kind": "custom",
+      "refersTo": "label",
+      "description": "Small all-caps Sora tag used selectively above section headings. Not above every section — only where category context genuinely aids navigation.",
+      "html": "<span class=\"ds-section-tag\">Services</span>",
+      "css": ".ds-section-tag { display: inline-block; font-family: 'Sora', ui-sans-serif, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: #5A6A51; margin-bottom: 12px; }"
+    },
+    {
+      "name": "Readmore Link",
+      "kind": "custom",
+      "refersTo": "button-outline",
+      "description": "Directional text link with arrow. Gap between label and arrow widens on hover — the direction is the delight.",
+      "html": "<a href=\"#\" class=\"ds-readmore\">Read more <svg width=\"14\" height=\"14\" viewBox=\"0 0 18 18\" fill=\"none\"><path d=\"M4 14L14 4M14 4H6M14 4V12\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></a>",
+      "css": ".ds-readmore { display: inline-flex; align-items: center; gap: 8px; font-family: 'Sora', ui-sans-serif, sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #414E36; text-decoration: none; transition: gap 0.3s ease; } .ds-readmore:hover { gap: 14px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Botanical Sanctuary",
+    "overview": "A clinic that grows from its landscape. The space is olive-green rooms, warm-toned instruments, natural materials held in careful order. Patients enter somewhere that takes both their appearance and their time seriously — the calm precision of a surgeon, the welcoming stillness of a cultivated garden. Science and nature are not in tension here; they are one system.\n\nThe palette descends from this: deep olive green carries authority without coldness, warm royal gold marks precision without display, warm ivory and sage tint form the canvas the way stone and linen form a room. Nothing announces itself. The luxury is the absence of noise.\n\nThis system rejects three anti-patterns by name. The first is the generic pharma palette: cold blue-and-white clinical hygiene photography that could belong to any hospital anywhere. The second is the overcrowded low-budget clinic template: competing fonts, banner overload, no visual hierarchy. The third is the sterile SaaS shell: metric-hero layouts, rounded-card grids, gradient CTAs designed for a subscription product, not a body and a physician.",
+    "keyCharacteristics": [
+      "Deep olive green and warm gold are the dominant color voices; the ivory canvas recedes entirely",
+      "Marcellus serif headings carry old-world authority; Sora body text is precise and legible",
+      "Animation is intentional: 3D perspective entrance, custom preloader arcs, subtle hover lifts — not a reflex applied to every element equally",
+      "Full bilingual (EN/AR) — RTL is a first-class layout mode, not a toggle",
+      "Warm olive-brown ambient shadows throughout; cold gray is prohibited"
+    ],
+    "rules": [
+      { "name": "The Gold Restraint Rule", "body": "Gold (#C4AE7C) appears on input borders, focus states, and decorative accents — never on primary text or buttons. The moment it appears in more than 15% of a screen, reduce it. Its warmth reads only because it is rare.", "section": "colors" },
+      { "name": "The Warm Shadow Rule", "body": "Shadows use rgba(90, 61, 52, …) — an olive-brown tint — never neutral gray or pure black. Cold shadows break the sanctuary atmosphere. If a shadow looks gray, it's wrong.", "section": "elevation" },
+      { "name": "The Marcellus Weight Rule", "body": "Marcellus ships in one weight (regular 400). Do not attempt to bold headings by adding font-weight: 700; the font has no bold variant and the browser will synthesize a distorted stroke. Size and scale carry heading hierarchy; weight does not.", "section": "typography" },
+      { "name": "The RTL Symmetry Rule", "body": "All font sizes, line heights, and spacing scale identically in Arabic mode. The body.rtl class flips text direction; it changes nothing else. Do not introduce Arabic-only size overrides unless a specific glyph set demands it.", "section": "typography" },
+      { "name": "The Flat-At-Rest Rule", "body": "Shadows are permanent structural elements (not hover-only), but the hover state amplifies them. Every interactive surface has a resting shadow and a lifted shadow — two tiers of elevation that make the hover gesture feel physical.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use rgba(90, 61, 52, …) — the warm olive-brown — as the shadow tint on every box-shadow.",
+      "Do let body text sit at #1F251A on #FBFBF9 backgrounds. Verify contrast before introducing any secondary text color.",
+      "Do use Marcellus at regular weight (400) for all headings. Never synthesize bold.",
+      "Do apply text-wrap: balance on h1–h3 elements, particularly in bilingual mode.",
+      "Do animate the arrow icon (44px circle, rotate(45deg) on hover) on every interactive card. It is the system's characteristic gesture.",
+      "Do add @media (prefers-reduced-motion: reduce) fallbacks for all transform-based animations.",
+      "Do use gold (#C4AE7C) for input borders at rest and focus rings on non-input elements."
+    ],
+    "donts": [
+      "Don't use generic pharma blue-and-white. No cold clinical palette, no stock-photo white hallways.",
+      "Don't let the layout become overcrowded. No competing font families, no banner stacking.",
+      "Don't use the SaaS metric-hero template: big stat + small label + gradient accent.",
+      "Don't use gradient text (background-clip: text). Gold is too specific a brand signal to dissolve.",
+      "Don't use border-left greater than 1px as an accent stripe on cards or callouts.",
+      "Don't add uppercase tracked section eyebrows above every heading. The section-tag class is used selectively.",
+      "Don't use cold gray box-shadows. If a shadow looks neutral or blue-shifted, replace it with the warm olive-brown tint.",
+      "Don't introduce a fourth typeface. Marcellus + Sora is the system.",
+      "Don't build RTL as an afterthought. Arabic mode must mirror layout direction, not just swap text."
+    ]
+  }
+}
