@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 
+function fmtCreatedAt(val: unknown): string {
+  if (!val) return "";
+  const d = new Date(String(val));
+  if (isNaN(d.getTime())) return String(val);
+  const datePart = d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  let timePart = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true });
+  timePart = timePart.toLowerCase();
+  return `${datePart} ${timePart}`;
+}
+
 function mapServiceRow(r: any) {
   return {
     id: r.id,
@@ -19,7 +29,7 @@ function mapServiceRow(r: any) {
     branchPricing: r.branch_pricing,
     visible: r.visible,
     active: r.active,
-    createdAt: r.created_at,
+    createdAt: fmtCreatedAt(r.created_at),
   };
 }
 

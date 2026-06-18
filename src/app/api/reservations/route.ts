@@ -9,6 +9,16 @@ function fmtDate(d: unknown): string {
   return String(d).slice(0, 10); // already a YYYY-MM-DD string
 }
 
+function fmtCreatedAt(val: unknown): string {
+  if (!val) return "";
+  const d = new Date(String(val));
+  if (isNaN(d.getTime())) return String(val);
+  const datePart = d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  let timePart = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true });
+  timePart = timePart.toLowerCase();
+  return `${datePart} ${timePart}`;
+}
+
 function mapRow(r: any) {
   return {
     id: r.id,
@@ -23,7 +33,7 @@ function mapRow(r: any) {
     timeSlot: r.time_slot,
     sessionType: r.session_type,
     doctorName: r.doctor_name,
-    createdAt: r.created_at,
+    createdAt: fmtCreatedAt(r.created_at),
   };
 }
 
