@@ -660,6 +660,19 @@ export default function AdminPage() {
           const sorted = sortServices(data);
           setLocalServices(sorted);
           localStorage.setItem("revera_dynamic_services", JSON.stringify(sorted));
+
+          // Merge backend status and visibility toggles into serviceToggles state and persist
+          setServiceToggles((prev) => {
+            const merged = { ...prev };
+            sorted.forEach((svc) => {
+              merged[svc.id] = {
+                visible: svc.visible !== undefined ? svc.visible : (prev[svc.id]?.visible ?? true),
+                active: svc.active !== undefined ? svc.active : (prev[svc.id]?.active ?? true),
+              };
+            });
+            localStorage.setItem("revera_service_toggles", JSON.stringify(merged));
+            return merged;
+          });
         }
       })
       .catch((err) => console.error("Admin: fetch services failed", err));
@@ -1839,7 +1852,7 @@ export default function AdminPage() {
               {/* Category Accordions */}
               <div className="flex flex-col gap-4">
                 {localCategories.map((cat) => {
-                  const catServices = (groupedServices[cat.key] ?? []).filter((svc) => (serviceToggles[svc.id]?.visible ?? true));
+                  const catServices = groupedServices[cat.key] ?? [];
                   const isExpanded = expandedCategories[cat.key] ?? true;
                   const hasMatch = catServices.length > 0;
                   if (serviceSearch.trim() && !hasMatch) return null;
@@ -1970,7 +1983,8 @@ export default function AdminPage() {
                                   {catServices.map((svc) => {
                                     const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
                                     const isInactive = !toggles.active;
-                                    const rowFaded = isInactive;
+                                    const isInvisible = !toggles.visible;
+                                    const rowFaded = isInactive || isInvisible;
                                     return (
                                       <tr
                                         key={svc.id}
@@ -2020,6 +2034,9 @@ export default function AdminPage() {
                                             <p className={`font-semibold ${ rowFaded ? "line-through text-[#5A6A51]" : "text-[#1F251A]" }`}>{svc.en}</p>
                                             {isInactive && (
                                               <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-500">Inactive</span>
+                                            )}
+                                            {isInvisible && (
+                                              <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-600">Hidden</span>
                                             )}
                                           </div>
                                         </td>

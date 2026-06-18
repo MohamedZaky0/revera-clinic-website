@@ -133,6 +133,19 @@ export function BookingModal() {
           const sorted = sortServices(data);
           setDynamicServices(sorted);
           localStorage.setItem("revera_dynamic_services", JSON.stringify(sorted));
+
+          // Merge backend status and visibility toggles into serviceToggles state and persist
+          setServiceToggles((prev) => {
+            const merged = { ...prev };
+            sorted.forEach((svc) => {
+              merged[svc.id] = {
+                visible: svc.visible !== undefined ? svc.visible : (prev[svc.id]?.visible ?? true),
+                active: svc.active !== undefined ? svc.active : (prev[svc.id]?.active ?? true),
+              };
+            });
+            localStorage.setItem("revera_service_toggles", JSON.stringify(merged));
+            return merged;
+          });
         }
       })
       .catch((err) => console.error("BookingModal: fetch services failed", err));
