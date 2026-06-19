@@ -56,3 +56,7 @@ init_revera.mjs
 setup_revera_db.mjs
 check_bookings.mjs
 supabase-booking-schema.sql
+
+DESIGN.md
+
+PRODUCT.md

@@ -13,14 +13,17 @@ function mapProviderRow(r: any) {
 }
 
 function mapProviderToDb(p: any) {
-  return {
-    id: p.id || undefined,
+  const row: any = {
     name: p.name,
     bookings_count: p.bookings || 0,
     services: p.services || [],
     more_count: p.more || 0,
     rating: p.rating || 0,
   };
+  if (p.id) {
+    row.id = p.id;
+  }
+  return row;
 }
 
 export async function GET(req: Request) {

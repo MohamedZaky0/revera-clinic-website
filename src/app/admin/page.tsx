@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import ReactDOM from "react-dom";
 import { ServiceItem } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -418,7 +419,6 @@ export default function AdminPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [providerTab, setProviderTab] = useState<"Providers" | "Attendance">("Providers");
   const [branch, setBranch] = useState("Zayed");
-  const [lang, setLang] = useState<"EN" | "AR">("AR");
   const [notifCount] = useState(1);
   const [customerSearch, setCustomerSearch] = useState("");
   const [couponSearch, setCouponSearch] = useState("");
@@ -451,6 +451,14 @@ export default function AdminPage() {
   const [providerName, setProviderName] = useState("");
   const [providerRating, setProviderRating] = useState("5.0");
   const [providerSelectedServices, setProviderSelectedServices] = useState<string[]>([]);
+  const providerModalBodyRef = useRef<HTMLDivElement>(null);
+
+  // Reset modal body scroll to top each time it opens
+  useEffect(() => {
+    if (showAddProviderModal && providerModalBodyRef.current) {
+      providerModalBodyRef.current.scrollTop = 0;
+    }
+  }, [showAddProviderModal]);
 
   // Service modal and drag-and-drop state variables
   const [editingService, setEditingService] = useState<ServiceItem | null>(null);
@@ -1066,6 +1074,7 @@ export default function AdminPage() {
   );
 
   return (
+    <>
     <div className="min-h-screen bg-[#F2EFE9] text-[#1F251A]">
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[280px_1fr]">
         {/* Backdrop for mobile sidebar */}
@@ -1668,13 +1677,6 @@ export default function AdminPage() {
               >
                 <Menu size={18} />
               </button>
-              <button
-                onClick={() => setLang(lang === "AR" ? "EN" : "AR")}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36] text-sm font-bold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26]"
-                title="Toggle language"
-              >
-                {lang === "AR" ? "ع" : "EN"}
-              </button>
               <div className="relative">
                 <select
                   value={branch}
@@ -1858,6 +1860,7 @@ export default function AdminPage() {
                   </div>
                 )}
               </div>
+
             </section>
           )}
 
@@ -2284,110 +2287,6 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* ── ADD NEW PROVIDER (DOCTOR) MODAL ── */}
-              {showAddProviderModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto">
-                  <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 animate-fadeIn flex flex-col max-h-[90vh]">
-                    {/* Modal Header */}
-                    <div className="flex items-center justify-between border-b border-[#414E36]/10 px-6 py-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-[#1F251A]">Add New Doctor / Provider</h3>
-                        <p className="text-sm text-[#5A6A51]">Register a new healthcare provider and assign their services.</p>
-                      </div>
-                      <button
-                        onClick={() => setShowAddProviderModal(false)}
-                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] hover:bg-[#F9F9F7]"
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    {/* Modal Body */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                      {/* Name input */}
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Doctor's Full Name</label>
-                        <input
-                          type="text"
-                          value={providerName}
-                          onChange={(e) => setProviderName(e.target.value)}
-                          placeholder="e.g. Dr. Radwa Seif"
-                          className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
-                        />
-                      </div>
-
-                      {/* Rating input */}
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Rating (0.0 - 5.0)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          max="5"
-                          value={providerRating}
-                          onChange={(e) => setProviderRating(e.target.value)}
-                          placeholder="e.g. 5.0"
-                          className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
-                        />
-                      </div>
-
-                      {/* Services checklist grouped by category */}
-                      <div>
-                        <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Select Provided Services</label>
-                        <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2">
-                          {localCategories.map((cat) => {
-                            const catSvcs = localServices.filter(s => s.cat === cat.key);
-                            if (catSvcs.length === 0) return null;
-                            return (
-                              <div key={cat.key} className="space-y-2 border border-[#414E36]/10 rounded-xl p-4 bg-[#F9F9F7]">
-                                <h4 className="text-xs font-bold text-[#414E36] border-b border-[#414E36]/10 pb-1.5">{cat.en}</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
-                                  {catSvcs.map((svc) => {
-                                    const isChecked = providerSelectedServices.includes(svc.en);
-                                    return (
-                                      <label key={svc.id} className="flex items-start gap-2.5 text-xs text-[#1F251A] cursor-pointer hover:text-[#414E36] transition select-none">
-                                        <input
-                                          type="checkbox"
-                                          checked={isChecked}
-                                          onChange={() => {
-                                            if (isChecked) {
-                                              setProviderSelectedServices(prev => prev.filter(s => s !== svc.en));
-                                            } else {
-                                              setProviderSelectedServices(prev => [...prev, svc.en]);
-                                            }
-                                          }}
-                                          className="mt-0.5 h-3.5 w-3.5 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C]"
-                                        />
-                                        <span>{svc.en}</span>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Modal Footer */}
-                    <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 px-6 py-4 bg-[#F9F9F7] rounded-b-2xl">
-                      <button
-                        onClick={() => setShowAddProviderModal(false)}
-                        className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSaveNewProvider}
-                        className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#2e3a26]"
-                      >
-                        Save Provider
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* ── ADD CATEGORY MODAL ── */}
               {showAddCategoryModal && (
@@ -6730,11 +6629,24 @@ export default function AdminPage() {
               onChange={(e) => setDoctorName(e.target.value)}
               className="mb-6 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
             >
-              {providers.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.name}
-                </option>
-              ))}
+              {(() => {
+                const bookedServiceName = localServices.find(s => Number(s.id) === Number(selected.serviceId))?.en ?? "";
+                const eligibleProviders = bookedServiceName
+                  ? providers.filter(p => p.services.includes(bookedServiceName))
+                  : [];
+                if (eligibleProviders.length === 0) {
+                  return (
+                    <option value="" disabled>
+                      — No doctors available for this service —
+                    </option>
+                  );
+                }
+                return eligibleProviders.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.name}
+                  </option>
+                ));
+              })()}
             </select>
 
             <div className="flex flex-wrap gap-3">
@@ -7042,9 +6954,10 @@ export default function AdminPage() {
                       </div>
                     </div>
                     <select
-                      value={viewingBooking.doctorName || "Dr. Sara El Gamel"}
+                      value={viewingBooking.doctorName || ""}
                       onChange={async (e) => {
                         const newDoc = e.target.value;
+                        if (!newDoc) return;
                         await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json" },
@@ -7055,11 +6968,24 @@ export default function AdminPage() {
                       }}
                       className="w-full rounded-xl border border-[#414E36]/10 bg-[#FBFBF9] px-3 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer"
                     >
-                      {providers.map((p) => (
-                        <option key={p.name} value={p.name}>
-                          {p.name}
-                        </option>
-                      ))}
+                      {(() => {
+                        const bookedServiceName = localServices.find(s => Number(s.id) === Number(viewingBooking.serviceId))?.en ?? "";
+                        const eligibleProviders = bookedServiceName
+                          ? providers.filter(p => p.services.includes(bookedServiceName))
+                          : [];
+                        if (eligibleProviders.length === 0) {
+                          return (
+                            <option value="" disabled>
+                              — No doctors available for this service —
+                            </option>
+                          );
+                        }
+                        return eligibleProviders.map((p) => (
+                          <option key={p.name} value={p.name}>
+                            {p.name}
+                          </option>
+                        ));
+                      })()}
                     </select>
                   </div>
 
@@ -7558,9 +7484,22 @@ export default function AdminPage() {
                       onChange={(e) => setNewPatientDoctor(e.target.value)}
                       className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer font-semibold"
                     >
-                      {providers.map(p => (
-                        <option key={p.name} value={p.name}>{p.name}</option>
-                      ))}
+                      {(() => {
+                        const bookedServiceName = localServices.find(s => Number(s.id) === Number(newPatientService))?.en ?? "";
+                        const eligibleProviders = bookedServiceName
+                          ? providers.filter(p => p.services.includes(bookedServiceName))
+                          : [];
+                        if (eligibleProviders.length === 0) {
+                          return (
+                            <option value="" disabled>
+                              — No doctors available for this service —
+                            </option>
+                          );
+                        }
+                        return eligibleProviders.map(p => (
+                          <option key={p.name} value={p.name}>{p.name}</option>
+                        ));
+                      })()}
                     </select>
                   </div>
                 )}
@@ -7710,5 +7649,112 @@ export default function AdminPage() {
       )}
 
     </div>
+
+    {/* ── ADD NEW PROVIDER (DOCTOR) MODAL (Portal → renders into document.body to escape parent containers) ── */}
+    {showAddProviderModal && typeof document !== "undefined" && ReactDOM.createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/40 py-10 px-4 backdrop-blur-sm overflow-y-auto">
+        <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 animate-fadeIn flex flex-col max-h-[85vh]">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between border-b border-[#414E36]/10 px-6 py-4">
+            <div>
+              <h3 className="text-lg font-semibold text-[#1F251A]">Add New Doctor / Provider</h3>
+              <p className="text-sm text-[#5A6A51]">Register a new healthcare provider and assign their services.</p>
+            </div>
+            <button
+              onClick={() => setShowAddProviderModal(false)}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] hover:bg-[#F9F9F7]"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Modal Body */}
+          <div ref={providerModalBodyRef} className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* Name input */}
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Doctor's Full Name</label>
+              <input
+                type="text"
+                value={providerName}
+                onChange={(e) => setProviderName(e.target.value)}
+                placeholder="e.g. Dr. Radwa Seif"
+                className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+              />
+            </div>
+
+            {/* Rating input */}
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Rating (0.0 - 5.0)</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="5"
+                value={providerRating}
+                onChange={(e) => setProviderRating(e.target.value)}
+                placeholder="e.g. 5.0"
+                className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+              />
+            </div>
+
+            {/* Services checklist grouped by category */}
+            <div>
+              <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Select Provided Services</label>
+              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2">
+                {localCategories.map((cat) => {
+                  const catSvcs = localServices.filter(s => s.cat === cat.key);
+                  if (catSvcs.length === 0) return null;
+                  return (
+                    <div key={cat.key} className="space-y-2 border border-[#414E36]/10 rounded-xl p-4 bg-[#F9F9F7]">
+                      <h4 className="text-xs font-bold text-[#414E36] border-b border-[#414E36]/10 pb-1.5">{cat.en}</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                        {catSvcs.map((svc) => {
+                          const isChecked = providerSelectedServices.includes(svc.en);
+                          return (
+                            <label key={svc.id} className="flex items-start gap-2.5 text-xs text-[#1F251A] cursor-pointer hover:text-[#414E36] transition select-none">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isChecked) {
+                                    setProviderSelectedServices(prev => prev.filter(s => s !== svc.en));
+                                  } else {
+                                    setProviderSelectedServices(prev => [...prev, svc.en]);
+                                  }
+                                }}
+                                className="mt-0.5 h-3.5 w-3.5 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C]"
+                              />
+                              <span>{svc.en}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 px-6 py-4 bg-[#F9F9F7] rounded-b-2xl">
+            <button
+              onClick={() => setShowAddProviderModal(false)}
+              className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveNewProvider}
+              className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#2e3a26]"
+            >
+              Save Provider
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 }

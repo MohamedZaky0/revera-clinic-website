@@ -120,11 +120,10 @@ function StatCounter({ stat, active, isRTL }: StatCounterProps) {
           transform: stat.value === "10K+" ? (isRTL ? "translateX(-6px)" : "translateX(6px)") : "none",
           display: "inline-block",
         }}
+        dir="ltr"
         aria-label={`${stat.value} ${stat.label}`}
       >
-        {isRTL
-          ? `${suffix}${count}`
-          : `${count}${suffix}`}
+        {`${count}${suffix}`}
       </div>
       <p
         className="mb-0 text-sm font-medium"
@@ -200,7 +199,16 @@ export function OurResults() {
             headerVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           }`}
         >
-          <span className="section-tag">{t.results.tag}</span>
+          <span
+            className="section-tag"
+            style={{
+              justifyContent: "center",
+              display: "inline-flex",
+            }}
+          >
+            <img src="/images/main_logo.png" alt="" style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }} />
+            {t.results.tag}
+          </span>
           <h2 className="mt-3 max-w-2xl mx-auto">{t.results.heading}</h2>
         </div>
 

@@ -421,10 +421,10 @@ export const translations: Record<"en" | "ar", Translation> = {
       tag: "شاهد الفرق",
       heading: "تحولات عملائنا الحقيقية ونتائج ملهمة",
       stats: [
-        { value: "+20", label: "سنوات من الخبرة" },
-        { value: "+10K", label: "عميل سعيد" },
-        { value: "+20", label: "برنامج ناجح" },
-        { value: "+50K", label: "استشارة مقدمة" },
+        { value: "20+", label: "سنوات من الخبرة" },
+        { value: "10K+", label: "عميل سعيد" },
+        { value: "20+", label: "برنامج ناجح" },
+        { value: "50K+", label: "استشارة مقدمة" },
       ],
     },
     services: {

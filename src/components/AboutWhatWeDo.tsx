@@ -187,8 +187,8 @@ export function AboutWhatWeDo() {
             left: auto;
             right: -10px;
           }
-          .rtl-awwd .awwd-checklist li { flex-direction: row-reverse; }
-          .rtl-awwd .awwd-btn-row { flex-direction: row-reverse; }
+          .rtl-awwd .awwd-checklist li { flex-direction: row; }
+          .rtl-awwd .awwd-btn-row { flex-direction: row; }
           .rtl-awwd .awwd-ba-side-label.before-label { right: auto; left: 10px; }
           .rtl-awwd .awwd-ba-side-label.after-label  { left: auto; right: 10px; }
 
@@ -224,27 +224,13 @@ export function AboutWhatWeDo() {
             style={{ textAlign: isRTL ? "right" : "left" }}
           >
             {/* Tag */}
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                marginBottom: "14px",
-              }}
+            <span
+              className="section-tag"
+              style={{ marginBottom: "14px" }}
             >
-              <img src="/images/main_logo.png" alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  letterSpacing: "0.2em",
-                  color: "var(--color-brand-secondary)",
-                  textTransform: "uppercase",
-                }}
-              >
-                {t.whatWeDo.tag}
-              </span>
-            </div>
+              <img src="/images/main_logo.png" alt="" style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }} />
+              {t.whatWeDo.tag}
+            </span>
 
             {/* Heading */}
             <h2
@@ -292,7 +278,13 @@ export function AboutWhatWeDo() {
                 {t.whatWeDo.learnMore}
               </Link>
               <Link href="/services" className="awwd-arrow-btn" aria-label="Learn more">
-                <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 18 18"
+                  fill="none"
+                  style={{ transform: isRTL ? "scaleX(-1)" : "none" }}
+                >
                   <path d="M5 13L13 5M13 5H6M13 5V12" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </Link>

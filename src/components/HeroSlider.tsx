@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useCallback, useEffect, type CSSProperties } from "react";
 import Image from "next/image";
@@ -8,7 +8,7 @@ import { Autoplay, EffectFade } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { ArrowRight, Star } from "lucide-react";
+import { ArrowRight, ArrowLeft, Star } from "lucide-react";
 
 const SLIDE_IMAGES = [
   "/images/hero/slide-1.jpg",
@@ -65,6 +65,7 @@ export function HeroSlider() {
 
   return (
     <section
+      dir="ltr"
       className="relative mx-2 my-3 sm:mx-4 sm:my-5 md:mx-6 md:my-8 overflow-hidden rounded-[20px] sm:rounded-[28px] md:rounded-[32px]"
       style={{
         height: "calc(100svh - 176px)",
@@ -159,7 +160,10 @@ export function HeroSlider() {
             style={{ fontSize: "15px" }}
           >
             {slide.bookBtn}
-            <ArrowRight size={15} strokeWidth={2.5} />
+            {isRTL
+              ? <ArrowLeft size={15} strokeWidth={2.5} />
+              : <ArrowRight size={15} strokeWidth={2.5} />
+            }
           </button>
 
           <div
@@ -218,7 +222,9 @@ export function HeroSlider() {
         className="absolute z-20"
         style={{
           bottom: "clamp(40px, 6svh, 72px)",
-          insetInlineEnd: "clamp(28px, 5vw, 60px)",
+          ...(isRTL
+            ? { left: "clamp(28px, 5vw, 60px)" }
+            : { right: "clamp(28px, 5vw, 60px)" }),
           color: "rgba(251,251,249,0.48)",
           fontSize: "11px",
           fontFamily: "var(--font-sora), sans-serif",

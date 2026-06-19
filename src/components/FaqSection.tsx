@@ -54,7 +54,7 @@ export function FaqSection() {
             text-align: left;
           }
           .rtl-faq .faq-question-btn {
-            flex-direction: row-reverse;
+            flex-direction: row;
             text-align: right;
           }
           .faq-answer-wrap {
@@ -143,31 +143,19 @@ export function FaqSection() {
           <div style={{ textAlign: isRTL ? "right" : "left" }}>
 
             {/* Tag */}
-            <div
+            <span
+              className="section-tag"
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
                 marginBottom: "14px",
               }}
             >
               <img
                 src="/images/main_logo.png"
                 alt=""
-                style={{ width: 18, height: 18, objectFit: "contain" }}
+                style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }}
               />
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  letterSpacing: "0.2em",
-                  color: "var(--color-brand-secondary)",
-                  textTransform: "uppercase",
-                }}
-              >
-                {t.aboutPage.faqTag}
-              </span>
-            </div>
+              {t.aboutPage.faqTag}
+            </span>
 
             {/* Heading */}
             <h2

@@ -430,19 +430,15 @@ export function HomeServicesSection() {
           <div style={{ position: "relative", zIndex: 10 }} className="services-card-inner">
             {/* ── Header ── */}
             <div style={{ textAlign: "center", marginBottom: 40 }}>
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  marginBottom: 14,
-                  flexDirection: isRTL ? "row-reverse" : "row"
-                }}
-              >
-                <img src="/images/main_logo.png" alt="" style={{ width: 18, height: 18, objectFit: "contain", opacity: 0.8 }} />
-                <span className="section-tag mb-0">{t.services.tag}</span>
-              </div>
+                <span
+                  className="section-tag"
+                  style={{
+                    marginBottom: 14,
+                  }}
+                >
+                  <img src="/images/main_logo.png" alt="" style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }} />
+                  {t.services.tag}
+                </span>
               <h2 style={{
                 maxWidth: 760,
                 margin: "0 auto 14px",

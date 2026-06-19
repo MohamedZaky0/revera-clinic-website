@@ -107,7 +107,7 @@ export function OurApproachSection() {
               gap: 16px;
             }
             .rtl-oas2 .oas2-item {
-              flex-direction: row-reverse;
+              flex-direction: row;
               text-align: right;
             }
             .oas2-icon {
@@ -193,27 +193,13 @@ export function OurApproachSection() {
             {/* LEFT: text + white card */}
             <div className={`oas2-text-col ${reveal}`}>
               {/* Tag */}
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "14px",
-                }}
+              <span
+                className="section-tag"
+                style={{ marginBottom: "14px" }}
               >
-                <img src="/images/main_logo.png" alt="" style={{ width: 18, height: 18, objectFit: "contain" }} />
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    letterSpacing: "0.2em",
-                    color: "var(--color-brand-secondary)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {t.aboutPage.servicesTag}
-                </span>
-              </div>
+                <img src="/images/main_logo.png" alt="" style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }} />
+                {t.aboutPage.servicesTag}
+              </span>
 
               {/* Heading */}
               <h2
@@ -347,7 +333,9 @@ export function OurApproachSection() {
                       fontWeight: 600,
                       color: "rgba(255,255,255,0.85)",
                       textDecoration: "none",
+                      display: "inline-block",
                     }}
+                    dir="ltr"
                   >
                     {t.aboutPage.phone}
                   </a>
