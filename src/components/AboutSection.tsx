@@ -76,7 +76,7 @@ export function AboutSection() {
                 }`}
               >
                 <Image
-                  src="/images/doctor/portrait-about.jpg"
+                  src="/images/doctor/portrait-main.jpg"
                   alt="Dr. X"
                   fill
                   sizes="(max-width: 1024px) 50vw, 25vw"
