@@ -77,7 +77,7 @@ export function AboutSection() {
               >
                 <Image
                   src="/images/doctor/portrait-about.jpg"
-                  alt="Dr. Mahmoud Nasr Abu Obeid"
+                  alt="Dr. X"
                   fill
                   sizes="(max-width: 1024px) 50vw, 25vw"
                   className="object-cover object-top"
@@ -92,8 +92,8 @@ export function AboutSection() {
                 }`}
               >
                 <Image
-                  src="/images/doctor/portrait-main.jpg"
-                  alt="Dr. Mahmoud Nasr Abu Obeid"
+                  src="/images/doctor/portrait-about.jpg"
+                  alt="Dr. Arwa"
                   fill
                   sizes="(max-width: 1024px) 50vw, 25vw"
                   className="object-cover object-top"
@@ -101,6 +101,7 @@ export function AboutSection() {
                 />
               </div>
 
+              {/* Central Rose Badge Shield - Sitting Over Bottom Overlap */}
               <div 
                 className={`absolute z-30 w-20 h-20 rounded-full bg-white shadow-xl flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-110 bottom-[74px] ${
                   isRTL 
@@ -108,14 +109,12 @@ export function AboutSection() {
                     : "left-[56%] -translate-x-1/2"
                 }`}
               >
-                <div className="w-full h-full animate-[spin_10s_linear_infinite] flex items-center justify-center">
-                  <img
-                    src="/images/main_logo.png"
-                    alt="Revera logo"
-                    className="w-full h-full object-contain"
-                    style={{ transform: "scale(1.7)" }}
-                  />
-                </div>
+                <img
+                  src="/images/main_logo.png"
+                  alt="Revera logo"
+                  className="w-full h-full object-contain"
+                  style={{ transform: "scale(1.7)" }}
+                />
               </div>
             </div>
           </div>
@@ -124,10 +123,12 @@ export function AboutSection() {
           <div className={`flex-1 ${textReveal}`}>
             
             {/* Tagline Row */}
-            <span className="section-tag mb-3">
-              <img src="/images/main_logo.png" alt="" className="w-10 h-10 object-contain opacity-80" />
-              {t.about.tag}
-            </span>
+            <div className={`flex items-center gap-2 mb-3 ${isRTL ? "flex-row-reverse justify-start" : ""}`}>
+              <img src="/images/main_logo.png" alt="" className="w-5 h-5 object-contain" />
+              <span className="section-tag mb-0 font-sans tracking-[0.15em] font-semibold text-xs text-[#5A6A51] uppercase">
+                {t.about.tag}
+              </span>
+            </div>
 
             {/* Subtitle / Main Heading */}
             <h2 
@@ -156,7 +157,9 @@ export function AboutSection() {
                   {t.about.services.map((service) => (
                     <li 
                       key={service} 
-                      className="flex items-center gap-3.5"
+                      className={`flex items-center gap-3.5 ${
+                        isRTL ? "flex-row-reverse" : ""
+                      }`}
                     >
                       <span
                         className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white shadow-sm"
@@ -188,12 +191,14 @@ export function AboutSection() {
 
             {/* ── Bottom Premium Help & Action Banner ── */}
             <div
-              className="bg-[#EDF1EC] p-6 md:p-8 rounded-[24px] flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm border border-[#F2EFE9]/30"
+              className={`bg-[#EDF1EC] p-6 md:p-8 rounded-[24px] flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm border border-[#F2EFE9]/30 ${
+                isRTL ? "sm:flex-row-reverse" : ""
+              }`}
             >
               {/* Left Side: Phone call details */}
               <div
                 className={`flex items-center gap-4 ${
-                  isRTL ? "text-right" : "text-left"
+                  isRTL ? "flex-row-reverse text-right" : "text-left"
                 }`}
               >
                 <div
@@ -226,7 +231,6 @@ export function AboutSection() {
                   <a
                     href={`tel:${t.about.phone.replace(/\s/g, "")}`}
                     className="text-lg font-normal text-[#414E36] font-heading hover:text-[#5A6A51] transition-colors"
-                    dir="ltr"
                   >
                     {t.about.phone}
                   </a>
@@ -244,7 +248,7 @@ export function AboutSection() {
                   <span 
                     className="flex h-7 w-7 items-center justify-center rounded-full bg-[#5A6A51] text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300"
                   >
-                    <ArrowUpRight size={14} strokeWidth={2.5} style={{ transform: isRTL ? "scaleX(-1)" : "none" }} />
+                    <ArrowUpRight size={14} strokeWidth={2.5} />
                   </span>
                 </button>
               </div>
