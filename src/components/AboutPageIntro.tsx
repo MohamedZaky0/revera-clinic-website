@@ -32,10 +32,10 @@ export function AboutPageIntro() {
       <div className="cr-container" style={{ maxWidth: "1480px" }}>
         {/* Curved card container with beige background */}
         <div
+          className="rounded-[24px] sm:rounded-[60px]"
           style={{
             position: "relative",
             backgroundColor: "var(--cr-secondary, #EDF1EC)",
-            borderRadius: "60px",
             border: "1px solid rgba(196,174,124,0.35)",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 80px) clamp(24px, 5vw, 72px)",
@@ -155,7 +155,7 @@ export function AboutPageIntro() {
               flex-shrink: 0;
             }
             .rtl .api-checklist li {
-              flex-direction: row-reverse;
+              flex-direction: row;
             }
             .api-cta-row {
               display: flex;
@@ -164,7 +164,7 @@ export function AboutPageIntro() {
               flex-wrap: wrap;
             }
             .rtl .api-cta-row {
-              flex-direction: row-reverse;
+              flex-direction: row;
             }
             .api-phone-block {
               display: flex;
@@ -172,7 +172,7 @@ export function AboutPageIntro() {
               gap: 12px;
             }
             .rtl .api-phone-block {
-              flex-direction: row-reverse;
+              flex-direction: row;
             }
             @media (max-width: 1024px) {
               .api-grid {
@@ -251,34 +251,19 @@ export function AboutPageIntro() {
               }}
             >
               {/* Tag */}
-              <div
+              <span
+                className="section-tag"
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
                   marginBottom: "12px",
-                  justifyContent: isRTL ? "flex-end" : "flex-start",
                 }}
               >
-                <svg
-                  width="16" height="16" viewBox="0 0 24 24" fill="none"
-                  stroke="var(--cr-accent, #C4AE7C)" strokeWidth="2"
-                  strokeLinecap="round" strokeLinejoin="round"
-                >
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                </svg>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    letterSpacing: "0.2em",
-                    color: "var(--color-brand-secondary)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {t.aboutPage.aboutTag}
-                </span>
-              </div>
+                <img
+                  src="/images/main_logo.png"
+                  alt=""
+                  style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }}
+                />
+                {t.aboutPage.aboutTag}
+              </span>
 
               {/* Heading */}
               <h2
@@ -358,7 +343,9 @@ export function AboutPageIntro() {
                         fontWeight: 600,
                         textDecoration: "none",
                         transition: "color 0.2s ease",
+                        display: "inline-block",
                       }}
+                      dir="ltr"
                       className="text-[#414E36] hover:text-[#5A6A51]"
                     >
                       {t.aboutPage.phone}
@@ -402,7 +389,13 @@ export function AboutPageIntro() {
                       flexShrink: 0,
                     }}
                   >
-                    <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 18 18"
+                      fill="none"
+                      style={{ transform: isRTL ? "scaleX(-1)" : "none" }}
+                    >
                       <path d="M5 13L13 5M13 5H6M13 5V12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </span>

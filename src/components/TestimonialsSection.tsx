@@ -148,41 +148,28 @@ export function TestimonialsSection() {
                   textAlign: isRTL ? "right" : "left",
                 }}
               >
-                {/* Gold logo tagline */}
-                <div
-                  className="tm-tag-row"
+                <span
+                  className="section-tag"
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
                     marginBottom: "16px",
-                    justifyContent: "flex-start",
+                    color: "var(--color-brand-sand)",
                   }}
                 >
                   <svg
-                    width="18"
-                    height="18"
+                    width="40"
+                    height="40"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="var(--color-brand-sand)"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    style={{ flexShrink: 0 }}
                   >
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                   </svg>
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      letterSpacing: "0.2em",
-                      color: "var(--color-brand-sand)",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {t.testimonials.tag}
-                  </span>
-                </div>
+                  {t.testimonials.tag}
+                </span>
 
                 {/* Heading */}
                 <h2
@@ -288,7 +275,7 @@ export function TestimonialsSection() {
                       display: "flex",
                       alignItems: "center",
                       gap: "12px",
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: "row",
                     }}
                   >
                     {/* Golden outline logo badge */}

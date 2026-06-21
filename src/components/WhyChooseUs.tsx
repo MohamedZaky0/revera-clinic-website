@@ -259,40 +259,19 @@ export function WhyChooseUs() {
               }}
             >
               {/* Tag with Golden Icon */}
-              <div
-                className="wcu-tag-row"
+              <span
+                className="section-tag"
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
                   marginBottom: "16px",
-                  justifyContent: "flex-start",
                 }}
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--color-brand-secondary)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                </svg>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    letterSpacing: "0.2em",
-                    color: "var(--color-brand-secondary)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {t.whyChooseUs.tag}
-                </span>
-              </div>
+                <img
+                  src="/images/main_logo.png"
+                  alt=""
+                  style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }}
+                />
+                {t.whyChooseUs.tag}
+              </span>
 
               {/* Main Heading */}
               <h2
@@ -344,7 +323,7 @@ export function WhyChooseUs() {
                   alignItems: "center",
                   gap: "14px",
                   justifyContent: "flex-start",
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: "row",
                 }}
               >
                 {/* Circular Phone Button */}
@@ -358,7 +337,7 @@ export function WhyChooseUs() {
                     backgroundColor: "#1F251A",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "var(--color-brand-secondary)",
+                    color: "#FFFFFF",
                     transition: "transform 0.3s ease, background-color 0.3s ease",
                     flexShrink: 0,
                   }}
@@ -375,7 +354,7 @@ export function WhyChooseUs() {
                     color: "var(--cr-primary, #1F251A)",
                     display: "flex",
                     gap: "6px",
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: "row",
                   }}
                 >
                   <span style={{ color: "var(--color-brand-secondary)" }}>
@@ -387,7 +366,9 @@ export function WhyChooseUs() {
                       color: "var(--cr-primary, #1F251A)",
                       textDecoration: "none",
                       transition: "color 0.2s ease",
+                      display: "inline-block",
                     }}
+                    dir="ltr"
                     className="hover:text-brand-secondary hover:underline"
                   >
                     {t.whyChooseUs.phone}

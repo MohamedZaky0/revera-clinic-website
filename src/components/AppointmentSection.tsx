@@ -41,11 +41,10 @@ export function AppointmentSection() {
       <div className="cr-container" style={{ maxWidth: "1480px" }}>
         {/* Curved Card Container with Beige Background */}
         <div
-          className="ap-rounded-card"
+          className="ap-rounded-card rounded-[24px] sm:rounded-[60px]"
           style={{
             position: "relative",
             backgroundColor: "var(--cr-secondary, #EDF1EC)",
-            borderRadius: "60px",
             border: "1px solid rgba(196,174,124,0.35)",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 80px) clamp(24px, 5vw, 72px)",
@@ -227,40 +226,19 @@ export function AppointmentSection() {
               }}
             >
               {/* Gold tagline icon */}
-              <div
-                className="ap-tag-row"
+              <span
+                className="section-tag"
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
                   marginBottom: "16px",
-                  justifyContent: "flex-start",
                 }}
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--color-brand-secondary)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                </svg>
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    letterSpacing: "0.2em",
-                    color: "var(--color-brand-secondary)",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {t.appointment.tag}
-                </span>
-              </div>
+                <img
+                  src="/images/main_logo.png"
+                  alt=""
+                  style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }}
+                />
+                {t.appointment.tag}
+              </span>
 
               {/* Title */}
               <h2

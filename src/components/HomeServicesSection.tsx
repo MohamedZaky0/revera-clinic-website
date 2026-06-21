@@ -1,8 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Category, ServiceItem, SERVICES } from "@/lib/services";
+import { Category, ServiceItem } from "@/lib/services";
+import { 
+  getServiceToggles, 
+  isServiceActive, 
+  ServiceToggleState, 
+  getDynamicServices, 
+  getDynamicCategories, 
+  sortServices,
+  LocalCategory 
+} from "@/lib/serviceStore";
 
 // ── Service categories and items for Revera Clinics
 
@@ -43,6 +52,13 @@ function ArrowIcon() {
 }
 
 // ── Category card (phase 1) ───────────────────────────────────────────────────
+
+const CATEGORY_IMAGES: Record<string, string> = {
+  dermatology: "/images/services/dermatology-service.jpg",
+  gynecology: "/images/services/gyna-service.jpg",
+  physiotherapy: "/images/services/physicaltherapy_service.png",
+  osteopathy: "/images/services/nutrition_service.png",
+};
 
 interface CategoryCardProps {
   label: string;
@@ -109,13 +125,6 @@ function CategoryCard({ label, sublabel, image, onClick }: CategoryCardProps) {
 }
 
 // ── Service card (phase 2) ────────────────────────────────────────────────────
-
-const CATEGORY_IMAGES: Record<Category, string> = {
-  dermatology: "/images/services/dermatology-service.jpg",
-  gynecology: "/images/services/gyna-service.jpg",
-  physiotherapy: "/images/services/physicaltherapy_service.png",
-  osteopathy: "/images/services/nutrition_service.png",
-};
 
 interface ServiceCardProps {
   service: ServiceItem;
@@ -200,9 +209,6 @@ function ServiceCard({ service, lang, descText, isRTL }: ServiceCardProps) {
         <div
           style={{ position: "relative", width: "100%", height: 220, borderRadius: 24, overflow: "hidden", cursor: showCursor ? "none" : "pointer" }}
           onClick={() => {
-            // try {
-            //   window.dispatchEvent(new CustomEvent('open-booking', { detail: { serviceId: service.id } }));
-            // } catch (e) {}
             const msg = encodeURIComponent(`Hello Revera, I'm interested in booking "${service.en}". Please let me know your availability at your New Cairo branch. Thank you.`);
             window.open(`https://wa.me/201035595691?text=${msg}`, '_blank');
           }}
@@ -305,8 +311,64 @@ function ServiceCard({ service, lang, descText, isRTL }: ServiceCardProps) {
 export function HomeServicesSection() {
   const { t, language, isRTL } = useLanguage();
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
+  const [serviceToggles, setServiceToggles] = useState<ServiceToggleState>({});
+  const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>([]);
+  const [dynamicCategories, setDynamicCategories] = useState<LocalCategory[]>([]);
 
-  const filtered = activeCategory ? SERVICES.filter(s => s.cat === activeCategory) : [];
+  // Sync with admin localStorage on mount and when admin changes toggles
+  useEffect(() => {
+    setServiceToggles(getServiceToggles());
+    setDynamicServices(getDynamicServices());
+    setDynamicCategories(getDynamicCategories());
+
+    fetch("/api/services")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const sorted = sortServices(data);
+          setDynamicServices(sorted);
+          localStorage.setItem("revera_dynamic_services", JSON.stringify(sorted));
+
+          // Merge backend status and visibility toggles into serviceToggles state and persist
+          setServiceToggles((prev) => {
+            const merged = { ...prev };
+            sorted.forEach((svc) => {
+              merged[svc.id] = {
+                visible: svc.visible !== undefined ? svc.visible : (prev[svc.id]?.visible ?? true),
+                active: svc.active !== undefined ? svc.active : (prev[svc.id]?.active ?? true),
+              };
+            });
+            localStorage.setItem("revera_service_toggles", JSON.stringify(merged));
+            return merged;
+          });
+        }
+      })
+      .catch((err) => console.error("HomeServicesSection: fetch services failed", err));
+
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const sortedCats = data.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+          setDynamicCategories(sortedCats);
+          localStorage.setItem("revera_dynamic_categories", JSON.stringify(sortedCats));
+          setDynamicServices(prev => sortServices(prev));
+        }
+      })
+      .catch((err) => console.error("HomeServicesSection: fetch categories failed", err));
+
+    const handleStorage = () => {
+      setServiceToggles(getServiceToggles());
+      setDynamicServices(getDynamicServices());
+      setDynamicCategories(getDynamicCategories());
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  // Only show services that are active & visible in admin
+  const activeServices = dynamicServices.filter(s => isServiceActive(s.id, serviceToggles));
+  const filtered = activeCategory ? activeServices.filter(s => s.cat === activeCategory) : [];
 
   const descText = language === "ar"
     ? "اكتشف خدماتنا الطبية المتخصصة المصممة لتعزيز صحتك وجمالك العام."
@@ -368,19 +430,15 @@ export function HomeServicesSection() {
           <div style={{ position: "relative", zIndex: 10 }} className="services-card-inner">
             {/* ── Header ── */}
             <div style={{ textAlign: "center", marginBottom: 40 }}>
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  marginBottom: 14,
-                  flexDirection: isRTL ? "row-reverse" : "row"
-                }}
-              >
-                <img src="/images/main_logo.png" alt="" style={{ width: 18, height: 18, objectFit: "contain", opacity: 0.8 }} />
-                <span className="section-tag mb-0">{t.services.tag}</span>
-              </div>
+                <span
+                  className="section-tag"
+                  style={{
+                    marginBottom: 14,
+                  }}
+                >
+                  <img src="/images/main_logo.png" alt="" style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }} />
+                  {t.services.tag}
+                </span>
               <h2 style={{
                 maxWidth: 760,
                 margin: "0 auto 14px",
@@ -411,7 +469,7 @@ export function HomeServicesSection() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(4, minmax(250px, 1fr))",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
                     gap: 24,
                     maxWidth: 1400,
                     margin: "0 auto",
@@ -421,30 +479,21 @@ export function HomeServicesSection() {
                   }}
                   className="services-cat-grid hs-cat-grid"
                 >
-                  <CategoryCard
-                    label={language === "ar" ? "الجلدية والتجميل" : "Dermatology & Aesthetic"}
-                    sublabel={language === "ar" ? "جلدية وتجميل" : "Skin & Aesthetic"}
-                    image={CATEGORY_IMAGES.dermatology}
-                    onClick={() => setActiveCategory("dermatology")}
-                  />
-                  <CategoryCard
-                    label={language === "ar" ? "النساء والتوليد" : "Gynecology"}
-                    sublabel={language === "ar" ? "صحة المرأة" : "Women's Health"}
-                    image={CATEGORY_IMAGES.gynecology}
-                    onClick={() => setActiveCategory("gynecology")}
-                  />
-                  <CategoryCard
-                    label={language === "ar" ? "العلاج الطبيعي" : "Physical Therapy"}
-                    sublabel={language === "ar" ? "إعادة التأهيل" : "Rehabilitation"}
-                    image={CATEGORY_IMAGES.physiotherapy}
-                    onClick={() => setActiveCategory("physiotherapy")}
-                  />
-                  <CategoryCard
-                    label={language === "ar" ? "تقويم العظام والتغذية" : "Osteopathy & Nutrition"}
-                    sublabel={language === "ar" ? "صحة العظام" : "Bone & Nutrition"}
-                    image={CATEGORY_IMAGES.osteopathy}
-                    onClick={() => setActiveCategory("osteopathy")}
-                  />
+                  {dynamicCategories.length === 0 ? (
+                    <div style={{ textAlign: "center", gridColumn: "1 / -1", padding: "40px 0", color: "var(--color-brand-secondary)" }}>
+                      {language === "ar" ? "لا توجد أقسام متاحة حالياً" : "No categories available yet."}
+                    </div>
+                  ) : (
+                    dynamicCategories.map((cat) => (
+                      <CategoryCard
+                        key={cat.key}
+                        label={language === "ar" && cat.ar ? cat.ar : cat.en}
+                        sublabel={language === "ar" ? "اضغط للتفاصيل" : "Click for details"}
+                        image={CATEGORY_IMAGES[cat.key] || "/images/services/dermatology-service.jpg"}
+                        onClick={() => setActiveCategory(cat.key)}
+                      />
+                    ))
+                  )}
                 </div>
 
                 {/* ── Bottom CTA banner row ── */}
@@ -507,19 +556,13 @@ export function HomeServicesSection() {
                   marginBottom: 40,
                   flexWrap: "wrap",
                 }}>
-                  {(["dermatology", "gynecology", "physiotherapy", "osteopathy"] as Category[]).map((cat) => {
-                    const isActive = cat === activeCategory;
-                    const label = cat === "dermatology"
-                      ? (language === "ar" ? "الجلدية والتجميل" : "Dermatology & Aesthetic")
-                      : cat === "gynecology"
-                        ? (language === "ar" ? "النساء والتوليد" : "Gynecology")
-                        : cat === "physiotherapy"
-                          ? (language === "ar" ? "العلاج الطبيعي" : "Physical Therapy")
-                          : (language === "ar" ? "تقويم العظام والتغذية" : "Osteopathy & Nutrition");
+                  {dynamicCategories.map((cat) => {
+                    const isActive = cat.key === activeCategory;
+                    const label = language === "ar" && cat.ar ? cat.ar : cat.en;
                     return (
                       <button
-                        key={cat}
-                        onClick={() => setActiveCategory(cat)}
+                        key={cat.key}
+                        onClick={() => setActiveCategory(cat.key)}
                         style={{
                           padding: "10px 28px",
                           borderRadius: 50,

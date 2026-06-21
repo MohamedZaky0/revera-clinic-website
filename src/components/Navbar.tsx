@@ -60,38 +60,27 @@ export function Navbar() {
         background: scrolled ? "rgba(255,255,255,0.98)" : "transparent",
         boxShadow: scrolled ? "0 2px 20px rgba(90,61,52,0.08)" : "none",
       }}
+      dir={isRTL ? "rtl" : "ltr"}
     >
       <div className="cr-container">
         <nav
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexDirection: isRTL ? "row-reverse" : "row",
-            height: "112px",
-            gap: "28px",
-          }}
+          className="h-16 lg:h-28 flex items-center justify-between gap-4 lg:gap-7"
         >
           {/* Logo */}
-          <Link href="/" style={{ flexShrink: 0 }}>
+          <Link href="/" className="shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/main_logo.png" alt="Revera Clinics" style={{ width: "auto", height: "72px" }} />
+            <img src="/images/main_logo.png" alt="Revera Clinics" className="h-10 lg:h-[72px] w-auto" />
           </Link>
 
           {/* Desktop nav links */}
           <ul
+            className="hidden lg:flex items-center flex-1 justify-center flex-row"
             style={{
-              display: "flex",
-              alignItems: "center",
-              flexDirection: isRTL ? "row-reverse" : "row",
               gap: "10px",
               listStyle: "none",
               margin: 0,
               padding: 0,
-              flex: 1,
-              justifyContent: "center",
             }}
-            className="hidden lg:flex"
           >
             {NAV_LINKS.map(({ key, href }) => (
               <li key={key}>
@@ -156,18 +145,15 @@ export function Navbar() {
 
           {/* Right controls */}
           <div
+            className="hidden lg:flex items-center shrink-0 flex-row"
             style={{
-              display: "flex",
-              alignItems: "center",
-              flexDirection: isRTL ? "row-reverse" : "row",
               gap: "24px",
-              flexShrink: 0,
             }}
-            className="hidden lg:flex"
           >
             {/* Phone */}
             <a
               href="tel:+201035595691"
+              dir="ltr"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -186,7 +172,7 @@ export function Navbar() {
               }}
             >
               <Phone size={18} strokeWidth={1.5} />
-              <span>(+20) 01035595691</span>
+              <span>(+20) 01125787019</span>
             </a>
 
             {/* Language dropdown */}
@@ -217,13 +203,13 @@ export function Navbar() {
                 }}
               >
                 <Image
-                  src="/images/flag/en.png"
-                  alt="English"
+                  src={language === "ar" ? "/images/flag/ar.png" : "/images/flag/en.png"}
+                  alt={language === "ar" ? "Arabic" : "English"}
                   width={20}
                   height={14}
                   style={{ width: "auto", height: "auto", borderRadius: "2px" }}
                 />
-                <span>English</span>
+                <span>{language === "ar" ? "العربية" : "English"}</span>
                 <ChevronDown size={16} />
               </button>
 

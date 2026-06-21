@@ -41,11 +41,10 @@ export function SiteFooter() {
       <div className="cr-container" style={{ maxWidth: "1480px" }}>
         {/* Curved Card Container with Dark Brown Background */}
         <div
-          className="ft-rounded-card"
+          className="ft-rounded-card rounded-[24px] sm:rounded-[60px]"
           style={{
             position: "relative",
             backgroundColor: "var(--cr-primary, #414E36)",
-            borderRadius: "60px",
             border: "1px solid rgba(196,174,124,0.35)",
             overflow: "hidden",
             padding: "clamp(40px, 6vw, 70px) clamp(24px, 5vw, 64px)",
@@ -213,12 +212,12 @@ export function SiteFooter() {
 
             /* RTL adjustments */
             .rtl .ft-top-row {
-              flex-direction: row-reverse;
+              flex-direction: row;
             }
             .rtl .ft-newsletter-wrapper {
               padding-left: 5px;
               padding-right: 20px;
-              flex-direction: row-reverse;
+              flex-direction: row;
             }
             .rtl .ft-newsletter-input {
               text-align: right;
@@ -230,13 +229,13 @@ export function SiteFooter() {
               direction: rtl;
             }
             .rtl .ft-contact-subrow {
-              flex-direction: row-reverse;
+              flex-direction: row;
             }
             .rtl .ft-contact-row-content {
-              flex-direction: row-reverse;
+              flex-direction: row;
             }
             .rtl .ft-bottom-bar {
-              flex-direction: row-reverse;
+              flex-direction: row;
               direction: rtl;
             }
 
@@ -341,7 +340,13 @@ export function SiteFooter() {
                   onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
                   onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                 >
-                  <svg width="15" height="15" viewBox="0 0 18 18" fill="none">
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 18 18"
+                    fill="none"
+                    style={{ transform: isRTL ? "scaleX(-1)" : "none" }}
+                  >
                     <path
                       d="M5 13L13 5M13 5H6M13 5V12"
                       stroke="currentColor"

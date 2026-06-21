@@ -2,7 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { CATEGORY_LABELS, Category, SERVICES } from "@/lib/services";
+import { Category, ServiceItem } from "@/lib/services";
+import { 
+  getServiceToggles, 
+  isServiceActive, 
+  ServiceToggleState, 
+  getDynamicServices, 
+  getDynamicCategories, 
+  sortServices,
+  LocalCategory 
+} from "@/lib/serviceStore";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -31,6 +40,14 @@ function to24(slot: string) {
   return `${hh}:${mm}`;
 }
 
+/** Format a local Date to YYYY-MM-DD without UTC conversion */
+function toLocalDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-GB", {
     weekday: "short",
@@ -53,6 +70,7 @@ export function BookingModal() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState("");
+  const [sessionType, setSessionType] = useState<"in_person" | "online">("in_person");
   const [confirmed, setConfirmed] = useState(false);
   const [disabledDates, setDisabledDates] = useState<Record<string, number>>({});
   const [takenSlots, setTakenSlots] = useState<string[]>([]);
@@ -69,6 +87,7 @@ export function BookingModal() {
     setEmail('');
     setPhone('');
     setNotes("");
+    setSessionType("in_person");
     setConfirmed(false);
   }, []);
 
@@ -79,14 +98,17 @@ export function BookingModal() {
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail as any;
+      const detail = (e as CustomEvent).detail as { serviceId?: number } | null;
       const id = detail?.serviceId ?? null;
       setServiceId(id);
       if (id) {
-        const selected = SERVICES.find((service) => service.id === id);
-        setSelectedCategory(selected?.cat ?? "dermatology");
+        const svcs = getDynamicServices();
+        const selected = svcs.find((service) => service.id === id);
+        const cats = getDynamicCategories();
+        setSelectedCategory(selected?.cat ?? cats[0]?.key ?? "dermatology");
       } else {
-        setSelectedCategory("dermatology");
+        const cats = getDynamicCategories();
+        setSelectedCategory(cats[0]?.key ?? "dermatology");
       }
       setOpen(true);
     };
@@ -94,24 +116,104 @@ export function BookingModal() {
     return () => window.removeEventListener("open-booking", handler);
   }, []);
 
+  // Sync service toggle state from admin localStorage
+  const [serviceToggles, setServiceToggles] = useState<ServiceToggleState>({});
+  const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>([]);
+  const [dynamicCategories, setDynamicCategories] = useState<LocalCategory[]>([]);
+
+  useEffect(() => {
+    setServiceToggles(getServiceToggles());
+    setDynamicServices(getDynamicServices());
+    setDynamicCategories(getDynamicCategories());
+
+    fetch("/api/services")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const sorted = sortServices(data);
+          setDynamicServices(sorted);
+          localStorage.setItem("revera_dynamic_services", JSON.stringify(sorted));
+
+          // Merge backend status and visibility toggles into serviceToggles state and persist
+          setServiceToggles((prev) => {
+            const merged = { ...prev };
+            sorted.forEach((svc) => {
+              merged[svc.id] = {
+                visible: svc.visible !== undefined ? svc.visible : (prev[svc.id]?.visible ?? true),
+                active: svc.active !== undefined ? svc.active : (prev[svc.id]?.active ?? true),
+              };
+            });
+            localStorage.setItem("revera_service_toggles", JSON.stringify(merged));
+            return merged;
+          });
+        }
+      })
+      .catch((err) => console.error("BookingModal: fetch services failed", err));
+
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const sortedCats = data.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+          setDynamicCategories(sortedCats);
+          localStorage.setItem("revera_dynamic_categories", JSON.stringify(sortedCats));
+          setDynamicServices(prev => sortServices(prev));
+        }
+      })
+      .catch((err) => console.error("BookingModal: fetch categories failed", err));
+
+    const handleStorage = () => {
+      setServiceToggles(getServiceToggles());
+      setDynamicServices(getDynamicServices());
+      setDynamicCategories(getDynamicCategories());
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
   // Fetch availability for next 30 days when modal opens or service changes
   useEffect(() => {
     if (!open || !serviceId) return;
     fetch(`/api/availability?serviceId=${serviceId}&days=30`).then(r => r.json()).then((data) => {
       const map: Record<string, number> = {};
-      data.forEach((d: any) => { map[d.date] = d.approvedCount; });
+      if (Array.isArray(data)) {
+        data.forEach((d: { date: string; approvedCount: number }) => { map[d.date] = d.approvedCount; });
+      } else {
+        console.error("Fetch availability expected array, got", data);
+      }
       setDisabledDates(map);
     }).catch(()=>{});
   }, [open, serviceId]);
 
   // Fetch taken time slots for a single selected date
   useEffect(() => {
-    if (!serviceId || !selectedDate) { setTakenSlots([]); return; }
-    const date = selectedDate.toISOString().slice(0,10);
-    fetch(`/api/reservations?serviceId=${serviceId}&date=${date}&status=approved`).then(r=>r.json()).then((list)=>{
-      const slots = list.map((i:any)=>i.timeSlot).filter(Boolean);
-      setTakenSlots(slots);
-    }).catch(()=>setTakenSlots([]));
+    let active = true;
+    if (!serviceId || !selectedDate) {
+      Promise.resolve().then(() => {
+        if (active) setTakenSlots([]);
+      });
+      return;
+    }
+    const date = toLocalDateStr(selectedDate);
+    fetch(`/api/reservations?serviceId=${serviceId}&date=${date}&status=approved`)
+      .then(r=>r.json())
+      .then((list)=>{
+        if (active) {
+          if (Array.isArray(list)) {
+            const slots = list.map((i: { timeSlot?: string | null }) => i.timeSlot).filter(Boolean) as string[];
+            setTakenSlots(slots);
+          } else {
+            console.error("Fetch reservations expected array, got", list);
+            setTakenSlots([]);
+          }
+        }
+      })
+      .catch(()=>{
+        if (active) setTakenSlots([]);
+      });
+    return () => {
+      active = false;
+    };
   }, [serviceId, selectedDate]);
 
   // Close on Escape key
@@ -140,9 +242,10 @@ export function BookingModal() {
     if (!serviceId || !selectedDate || !selectedTime || !name || !email || !phone) return;
     const payload = {
       serviceId,
-      date: selectedDate.toISOString().slice(0,10),
+      date: toLocalDateStr(selectedDate),
       requestedTime: selectedTime,
       name, email, phone, notes,
+      sessionType,
     };
     fetch('/api/reservations', { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } })
       .then(r => r.json())
@@ -150,8 +253,10 @@ export function BookingModal() {
       .catch(() => setConfirmed(true));
   }
 
-  const selectedService = serviceId ? SERVICES.find((service) => service.id === serviceId) : undefined;
-  const servicesForCategory = SERVICES.filter((service) => service.cat === selectedCategory);
+  const selectedService = serviceId ? dynamicServices.find((service) => service.id === serviceId) : undefined;
+  // Filter out services that admin marked as inactive or hidden
+  const activeServices = dynamicServices.filter(s => isServiceActive(s.id, serviceToggles));
+  const servicesForCategory = activeServices.filter((service) => service.cat === selectedCategory);
 
   const canNext =
     (step === 1 && serviceId !== null) ||
@@ -282,13 +387,13 @@ export function BookingModal() {
                   {t.booking.labels.service}
                 </p>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {(Object.keys(CATEGORY_LABELS) as Category[]).map((category) => {
-                    const label = isRTL ? CATEGORY_LABELS[category].ar : CATEGORY_LABELS[category].en;
-                    const isActive = selectedCategory === category;
+                  {dynamicCategories.map((category) => {
+                    const label = isRTL && category.ar ? category.ar : category.en;
+                    const isActive = selectedCategory === category.key;
                     return (
                       <button
-                        key={category}
-                        onClick={() => setSelectedCategory(category)}
+                        key={category.key}
+                        onClick={() => setSelectedCategory(category.key)}
                         className="rounded-full px-4 py-2 text-xs font-semibold transition-colors"
                         style={{
                           backgroundColor: isActive ? "var(--cr-primary)" : "var(--cr-secondary)",
@@ -338,7 +443,7 @@ export function BookingModal() {
                   {days.map((day, i) => {
                     const isSelected =
                       selectedDate?.toDateString() === day.toDateString();
-                    const key = day.toISOString().slice(0,10);
+                    const key = toLocalDateStr(day);
                     const isDisabled = (disabledDates[key] ?? 0) >= 8;
                     return (
                       <button
@@ -442,6 +547,35 @@ export function BookingModal() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={t.booking.notes}
                 />
+
+                {/* Session Type Selectors */}
+                <label className="block mb-2 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
+                  {isRTL ? "مكان الجلسة" : "Session Type"}
+                </label>
+                <div className="flex gap-4 mb-4">
+                  <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer text-[#1F251A]">
+                    <input
+                      type="radio"
+                      name="sessionType"
+                      value="in_person"
+                      checked={sessionType === "in_person"}
+                      onChange={() => setSessionType("in_person")}
+                      className="accent-[#414E36]"
+                    />
+                    {isRTL ? "في العيادة (In Person)" : "In Person"}
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer text-[#1F251A]">
+                    <input
+                      type="radio"
+                      name="sessionType"
+                      value="online"
+                      checked={sessionType === "online"}
+                      onChange={() => setSessionType("online")}
+                      className="accent-[#414E36]"
+                    />
+                    {isRTL ? "أونلاين (Online)" : "Online"}
+                  </label>
+                </div>
 
                 <label className="block mb-1 text-xs font-semibold">Name</label>
                 <input className="cr-input mb-2" value={name} onChange={(e)=>setName(e.target.value)} />

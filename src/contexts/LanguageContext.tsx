@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import { usePathname } from "next/navigation";
 import type { Language, Direction, Translation } from "@/types";
 import { translations } from "@/lib/translations";
 
@@ -32,30 +33,36 @@ function getInitialLanguage(): Language {
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>(getInitialLanguage);
+  const pathname = usePathname();
+  const isAdmin = pathname?.startsWith("/admin");
+
+  const currentLang = isAdmin ? "en" : language;
 
   useEffect(() => {
-    const dir: Direction = language === "ar" ? "rtl" : "ltr";
-    document.documentElement.lang = language;
+    const dir: Direction = currentLang === "ar" ? "rtl" : "ltr";
+    document.documentElement.lang = currentLang;
     document.documentElement.dir = dir;
     document.body.className = dir;
-    localStorage.setItem("cr-language", language);
 
-    const url = new URL(window.location.href);
-    url.searchParams.set("lang", language);
-    window.history.replaceState({}, "", url.toString());
-  }, [language]);
+    if (!isAdmin) {
+      localStorage.setItem("cr-language", language);
+      const url = new URL(window.location.href);
+      url.searchParams.set("lang", language);
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [language, currentLang, isAdmin]);
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
   }, []);
 
-  const direction: Direction = language === "ar" ? "rtl" : "ltr";
+  const direction: Direction = currentLang === "ar" ? "rtl" : "ltr";
   const value: LanguageContextValue = {
-    language,
+    language: currentLang,
     direction,
-    t: translations[language],
+    t: translations[currentLang],
     setLanguage,
-    isRTL: language === "ar",
+    isRTL: currentLang === "ar",
   };
 
   return (

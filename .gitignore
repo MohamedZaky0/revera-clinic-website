@@ -67,7 +67,15 @@ v8_context_snapshot.bin
 vk_swiftshader*
 vulkan-1.dll
 
-# MD Files
+# Database & local DB setup scripts
+db/
+*.db
+*.sqlite
+init_revera.mjs
+setup_revera_db.mjs
+check_bookings.mjs
+supabase-booking-schema.sql
+
+DESIGN.md
+
 PRODUCT.md
-revera-brand-identity.md
-IMAGES-GUIDE.md

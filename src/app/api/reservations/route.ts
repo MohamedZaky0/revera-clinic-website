@@ -1,34 +1,40 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { getSupabaseServer } from '@/lib/supabaseServer';
 
-const DATA_PATH = path.resolve(process.cwd(), 'data', 'reservations.json');
-
-type Reservation = {
-  id: string;
-  serviceId: number;
-  date: string; // yyyy-mm-dd
-  requestedTime?: string | null; // optional user-picked time (display)
-  name: string;
-  email: string;
-  phone: string;
-  notes?: string;
-  status: 'pending' | 'approved' | 'rejected';
-  timeSlot?: string | null; // assigned time when approved, HH:MM 24h
-  createdAt: string;
-};
-
-function readData(): Reservation[] {
-  try {
-    const raw = fs.readFileSync(DATA_PATH, 'utf8');
-    return JSON.parse(raw || '[]');
-  } catch (e) {
-    return [];
-  }
+/**
+ * Parses dynamic or standard ISO date formats to a raw YYYY-MM-DD string.
+ */
+function fmtDate(d: unknown): string {
+  if (d instanceof Date) return d.toISOString().slice(0, 10);
+  return String(d).slice(0, 10); // already a YYYY-MM-DD string
 }
 
-function writeData(items: Reservation[]) {
-  fs.writeFileSync(DATA_PATH, JSON.stringify(items, null, 2), 'utf8');
+function fmtCreatedAt(val: unknown): string {
+  if (!val) return "";
+  const d = new Date(String(val));
+  if (isNaN(d.getTime())) return String(val);
+  const datePart = d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  let timePart = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true });
+  timePart = timePart.toLowerCase();
+  return `${datePart} ${timePart}`;
+}
+
+function mapRow(r: any) {
+  return {
+    id: r.id,
+    serviceId: r.service_id,
+    date: fmtDate(r.date),
+    requestedTime: r.requested_time,
+    name: r.name,
+    email: r.email,
+    phone: r.phone,
+    notes: r.notes,
+    status: r.status,
+    timeSlot: r.time_slot,
+    sessionType: r.session_type,
+    doctorName: r.doctor_name,
+    createdAt: fmtCreatedAt(r.created_at),
+  };
 }
 
 export async function GET(req: Request) {
@@ -38,77 +44,199 @@ export async function GET(req: Request) {
   const serviceId = params.get('serviceId');
   const date = params.get('date');
 
-  const data = readData();
-  let out = data;
-  if (status) out = out.filter((r) => r.status === status);
-  if (serviceId) out = out.filter((r) => String(r.serviceId) === serviceId);
-  if (date) out = out.filter((r) => r.date === date);
+  try {
+    let query = getSupabaseServer()
+      .from('reservations')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  return NextResponse.json(out);
+    if (status) {
+      query = query.eq('status', status);
+    }
+    if (serviceId) {
+      query = query.eq('service_id', Number(serviceId));
+    }
+    if (date) {
+      query = query.eq('date', date);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json((data || []).map(mapRow));
+  } catch (err) {
+    console.error('GET /api/reservations error:', err);
+    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const { serviceId, date, requestedTime, name, email, phone, notes } = body;
+  const { serviceId, date, requestedTime, name, email, phone, notes, sessionType } = body;
+
   if (!serviceId || !date || !name || !email || !phone) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  const data = readData();
-  const id = String(Date.now()) + '-' + Math.floor(Math.random() * 1000);
-  const item: Reservation = {
-    id,
-    serviceId: Number(serviceId),
-    date,
-    requestedTime: requestedTime || null,
-    name,
-    email,
-    phone,
-    notes: notes || '',
-    status: 'pending',
-    timeSlot: null,
-    createdAt: new Date().toISOString(),
-  };
-  data.push(item);
-  writeData(data);
-  return NextResponse.json(item, { status: 201 });
+  try {
+    const { data, error } = await getSupabaseServer()
+      .from('reservations')
+      .insert({
+        service_id: Number(serviceId),
+        date,
+        requested_time: requestedTime || null,
+        name,
+        email,
+        phone,
+        notes: notes || '',
+        status: 'pending',
+        time_slot: null,
+        session_type: sessionType || 'in_person'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json(mapRow(data), { status: 201 });
+  } catch (err) {
+    console.error('POST /api/reservations error:', err);
+    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+  }
 }
 
 export async function PATCH(req: Request) {
   const url = new URL(req.url);
-  const params = url.searchParams;
-  const id = params.get('id');
+  const id = url.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
   const body = await req.json();
-  const { action, timeSlot, status } = body; // action: approve/reject
+  const { action, timeSlot, status, doctorName, notes, sessionType } = body;
 
-  const data = readData();
-  const idx = data.findIndex((r) => r.id === id);
-  if (idx === -1) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  try {
+    const { data: target, error: getErr } = await getSupabaseServer()
+      .from('reservations')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
 
-  const target = data[idx];
-
-  if (action === 'approve') {
-    if (!timeSlot) return NextResponse.json({ error: 'Missing timeSlot' }, { status: 400 });
-    // check already approved count for this service+date
-    const approved = data.filter((r) => r.serviceId === target.serviceId && r.date === target.date && r.status === 'approved');
-    if (approved.length >= 8) {
-      return NextResponse.json({ error: 'Day is fully booked' }, { status: 400 });
+    if (getErr) throw getErr;
+    if (!target) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    // ensure timeSlot not already taken
-    if (approved.some((a) => a.timeSlot === timeSlot)) {
-      return NextResponse.json({ error: 'Time slot already taken' }, { status: 400 });
+
+    if (action === 'approve') {
+      if (!timeSlot) return NextResponse.json({ error: 'Missing timeSlot' }, { status: 400 });
+
+      const { count: approvedCount, error: countErr } = await getSupabaseServer()
+        .from('reservations')
+        .select('*', { count: 'exact', head: true })
+        .eq('service_id', target.service_id)
+        .eq('date', target.date)
+        .eq('status', 'approved');
+
+      if (countErr) throw countErr;
+      if ((approvedCount || 0) >= 8) {
+        return NextResponse.json({ error: 'Day is fully booked' }, { status: 400 });
+      }
+
+      const { count: slotCount, error: slotErr } = await getSupabaseServer()
+        .from('reservations')
+        .select('*', { count: 'exact', head: true })
+        .eq('service_id', target.service_id)
+        .eq('date', target.date)
+        .eq('status', 'approved')
+        .eq('time_slot', timeSlot);
+
+      if (slotErr) throw slotErr;
+      if ((slotCount || 0) > 0) {
+        return NextResponse.json({ error: 'Time slot already taken' }, { status: 400 });
+      }
+
+      const { data: updated, error: updateErr } = await getSupabaseServer()
+        .from('reservations')
+        .update({
+          status: 'approved',
+          time_slot: timeSlot,
+          doctor_name: doctorName || null
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateErr) throw updateErr;
+      return NextResponse.json(mapRow(updated));
+
+    } else if (action === 'reject') {
+      const { data: updated, error: updateErr } = await getSupabaseServer()
+        .from('reservations')
+        .update({ status: 'rejected' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateErr) throw updateErr;
+      return NextResponse.json(mapRow(updated));
+
+    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined) {
+      const updates: Record<string, any> = {};
+      if (status) updates.status = status;
+      if (notes !== undefined) updates.notes = notes;
+      if (doctorName !== undefined) updates.doctor_name = doctorName;
+      if (sessionType !== undefined) updates.session_type = sessionType;
+
+      const { data: updated, error: updateErr } = await getSupabaseServer()
+        .from('reservations')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateErr) throw updateErr;
+      return NextResponse.json(mapRow(updated));
+    } else {
+      return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
-    data[idx] = { ...target, status: 'approved', timeSlot };
-  } else if (action === 'reject') {
-    data[idx] = { ...target, status: 'rejected' };
-  } else if (status) {
-    data[idx] = { ...target, status };
-  } else {
-    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+  } catch (err) {
+    console.error('PATCH /api/reservations error:', err);
+    return NextResponse.json({ error: 'Database error' }, { status: 500 });
   }
+}
 
-  writeData(data);
-  return NextResponse.json(data[idx]);
+export async function DELETE(req: Request) {
+  const url = new URL(req.url);
+  const id = url.searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+  try {
+    if (id === 'all') {
+      const { error } = await getSupabaseServer()
+        .from('reservations')
+        .delete()
+        .not('id', 'is', null);
+
+      if (error) throw error;
+      return NextResponse.json({ success: true, message: 'All reservations cleared' });
+    }
+
+    const { data, error } = await getSupabaseServer()
+      .from('reservations')
+      .delete()
+      .eq('id', id)
+      .select();
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, message: 'Reservation deleted' });
+  } catch (err) {
+    console.error('DELETE /api/reservations error:', err);
+    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+  }
 }

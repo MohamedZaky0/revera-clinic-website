@@ -92,11 +92,8 @@ export function HowItWorks() {
           }
 
           /* RTL adjustments */
-          .rtl .hiw-left-col {
-            align-items: flex-end;
-          }
           .rtl .hiw-step-item {
-            flex-direction: row-reverse;
+            flex-direction: row;
           }
 
           /* Desktop specific alignment: make left part sit higher */
@@ -156,40 +153,19 @@ export function HowItWorks() {
             }}
           >
             {/* Tag with Golden Icon */}
-            <div
-              className="hiw-tag-row"
+            <span
+              className="section-tag"
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
                 marginBottom: "16px",
-                justifyContent: "flex-start",
               }}
             >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--color-brand-secondary)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-              </svg>
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  letterSpacing: "0.2em",
-                  color: "var(--color-brand-secondary)",
-                  textTransform: "uppercase",
-                }}
-              >
-                {t.howItWorks.tag}
-              </span>
-            </div>
+              <img
+                src="/images/main_logo.png"
+                alt=""
+                style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }}
+              />
+              {t.howItWorks.tag}
+            </span>
 
             {/* Title */}
             <h2
@@ -225,7 +201,7 @@ export function HowItWorks() {
                 display: "flex",
                 alignItems: "center",
                 gap: "10px",
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: "row",
                 width: "100%",
                 justifyContent: "flex-start",
               }}
@@ -278,7 +254,13 @@ export function HowItWorks() {
                   e.currentTarget.style.transform = "scale(1)";
                 }}
               >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 18 18"
+                  fill="none"
+                  style={{ transform: isRTL ? "scaleX(-1)" : "none" }}
+                >
                   <path
                     d="M5 13L13 5M13 5H6M13 5V12"
                     stroke="currentColor"

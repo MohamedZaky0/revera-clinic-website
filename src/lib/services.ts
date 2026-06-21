@@ -1,4 +1,4 @@
-export type Category = "dermatology" | "gynecology" | "physiotherapy" | "osteopathy";
+export type Category = string;
 
 export interface ServiceItem {
   id: number;
@@ -7,6 +7,23 @@ export interface ServiceItem {
   img: string;
   cat: Category;
   unit: string;
+  price?: number;
+  createdAt?: string;
+  sortOrder?: number;
+  duration?: string;
+  descriptionEn?: string;
+  descriptionAr?: string;
+  isShared?: boolean;
+  enableReminder?: boolean;
+  visible?: boolean;
+  active?: boolean;
+  branchPricing?: Array<{
+    name: string;
+    price: number;
+    visible: boolean;
+    status: boolean;
+    isDefault?: boolean;
+  }>;
 }
 
 export const SERVICES: ServiceItem[] = [

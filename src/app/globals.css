@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Sora:wght@100;200;300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -33,6 +34,10 @@
 
 /* ── Revera Design Tokens ──────────────────────────────── */
 :root {
+  /* Fonts */
+  --font-sora: 'Sora', sans-serif;
+  --font-marcellus: 'Marcellus', serif;
+
   /* Brand colors */
   --color-brand-primary: #414E36;    /* Deep Olive Green */
   --color-brand-dark: #1F251A;       /* Deepest Olive-Black */
@@ -202,7 +207,8 @@
   }
 
   .section-tag {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     transform: translateY(0);
   }
 
@@ -321,14 +327,23 @@
 
 /* ── Section tag (small label above heading) ─────────────────── */
 .section-tag {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 10px;
   font-family: var(--font-sora), sans-serif;
-  font-size: 11px;
+  font-size: 22px;
   font-weight: 600;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--color-brand-secondary);
   margin-bottom: 12px;
+}
+
+/* English (LTR) — uppercase Latin letters render larger, scale down slightly */
+[dir="ltr"] .section-tag {
+  font-size: 15px;
+  letter-spacing: 0.18em;
 }
 
 /* ── Buttons ─────────────────────────────────────────────────── */
