@@ -187,8 +187,6 @@ export function AboutWhatWeDo() {
             left: auto;
             right: -10px;
           }
-          .rtl-awwd .awwd-checklist li { flex-direction: row; }
-          .rtl-awwd .awwd-btn-row { flex-direction: row; }
           .rtl-awwd .awwd-ba-side-label.before-label { right: auto; left: 10px; }
           .rtl-awwd .awwd-ba-side-label.after-label  { left: auto; right: 10px; }
 
@@ -212,7 +210,7 @@ export function AboutWhatWeDo() {
             style={{ aspectRatio: "3/4", boxShadow: "0 4px 20px rgba(90,61,52,0.08)" }}
           >
             <img
-              src="/images/clinic/interior.jpg"
+              src={t.aboutPage.whatWeDoImage1 || "/images/clinic/interior.jpg"}
               alt="Revera care"
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
@@ -223,14 +221,33 @@ export function AboutWhatWeDo() {
             className="awwd-center-col"
             style={{ textAlign: isRTL ? "right" : "left" }}
           >
-            {/* Tag */}
-            <span
-              className="section-tag"
-              style={{ marginBottom: "14px" }}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "10px",
+                marginBottom: "14px",
+                direction: isRTL ? "rtl" : "ltr",
+              }}
             >
-              <img src="/images/main_logo.png" alt="" style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }} />
-              {t.whatWeDo.tag}
-            </span>
+              <img 
+                src="/images/main_logo.png" 
+                alt="" 
+                style={{ width: 44, height: 44, objectFit: "contain", flexShrink: 0 }} 
+              />
+              <span
+                style={{
+                  fontSize: "20px",
+                  fontWeight: 700,
+                  letterSpacing: isRTL ? "normal" : "0.2em",
+                  color: "var(--color-brand-secondary)",
+                  textTransform: "uppercase",
+                  lineHeight: "normal",
+                }}
+              >
+                {t.whatWeDo.tag}
+              </span>
+            </div>
 
             {/* Heading */}
             <h2
@@ -278,10 +295,10 @@ export function AboutWhatWeDo() {
                 {t.whatWeDo.learnMore}
               </Link>
               <Link href="/services" className="awwd-arrow-btn" aria-label="Learn more">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 18 18"
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 18 18" 
                   fill="none"
                   style={{ transform: isRTL ? "scaleX(-1)" : "none" }}
                 >
@@ -295,11 +312,12 @@ export function AboutWhatWeDo() {
           <div className="awwd-arch-wrapper">
             <div className="awwd-arch-img">
               <Image
-                src="/images/clinic/video-thumbnail.jpg"
+                src={t.aboutPage.whatWeDoImage2 || "/images/clinic/video-thumbnail.jpg"}
                 alt="Doctor performing treatment"
                 fill
                 sizes="(max-width: 1024px) 100vw, 380px"
                 style={{ objectFit: "cover", objectPosition: "center top" }}
+                unoptimized
               />
             </div>
 

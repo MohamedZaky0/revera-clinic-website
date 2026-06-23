@@ -54,7 +54,6 @@ export function FaqSection() {
             text-align: left;
           }
           .rtl-faq .faq-question-btn {
-            flex-direction: row;
             text-align: right;
           }
           .faq-answer-wrap {
@@ -86,9 +85,10 @@ export function FaqSection() {
               }}
             >
               <Image
-                src="/images/doctor/portrait-main.jpg"
+                src={t.aboutPage.faqImage1 || "/images/doctor/portrait-main.jpg"}
                 alt="Doctor consultation"
                 fill
+                unoptimized
                 sizes="(max-width: 1024px) 100vw, 240px"
                 style={{ objectFit: "cover", objectPosition: "center top" }}
               />
@@ -109,9 +109,10 @@ export function FaqSection() {
               }}
             >
               <Image
-                src="/images/doctor/portrait-faq.jpg"
+                src={t.aboutPage.faqImage2 || "/images/doctor/portrait-faq.jpg"}
                 alt="Doctor"
                 fill
+                unoptimized
                 sizes="(max-width: 1024px) 100vw, 280px"
                 style={{ objectFit: "cover", objectPosition: "center top" }}
               />
@@ -142,20 +143,33 @@ export function FaqSection() {
           {/* ── Right: FAQ accordion ── */}
           <div style={{ textAlign: isRTL ? "right" : "left" }}>
 
-            {/* Tag */}
-            <span
-              className="section-tag"
+            <div
               style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "10px",
                 marginBottom: "14px",
+                direction: isRTL ? "rtl" : "ltr",
               }}
             >
               <img
                 src="/images/main_logo.png"
                 alt=""
-                style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }}
+                style={{ width: 44, height: 44, objectFit: "contain", flexShrink: 0 }}
               />
-              {t.aboutPage.faqTag}
-            </span>
+              <span
+                style={{
+                  fontSize: "20px",
+                  fontWeight: 700,
+                  letterSpacing: isRTL ? "normal" : "0.2em",
+                  color: "var(--color-brand-secondary)",
+                  textTransform: "uppercase",
+                  lineHeight: "normal",
+                }}
+              >
+                {t.aboutPage.faqTag}
+              </span>
+            </div>
 
             {/* Heading */}
             <h2

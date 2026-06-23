@@ -217,10 +217,11 @@ export function WhyChooseUs() {
                 {/* Dentist room / purple chair image */}
                 <div className="wcu-left-img">
                   <Image
-                    src="/images/clinic/treatment.jpg"
+                    src={t.whyChooseUs.image1 || "/images/clinic/treatment.jpg"}
                     alt="Dental clinic room — Revera Clinics"
                     fill
                     priority
+                    unoptimized
                     sizes="(max-width: 768px) 100vw, 400px"
                     style={{ objectFit: "cover", objectPosition: "center" }}
                   />
@@ -231,9 +232,10 @@ export function WhyChooseUs() {
                   {/* Doctor performing treatment image */}
                   <div className="wcu-right-img">
                     <Image
-                      src="/images/clinic/room.jpg"
+                      src={t.whyChooseUs.image2 || "/images/clinic/room.jpg"}
                       alt="Skin treatment — Revera Clinics"
                       fill
+                      unoptimized
                       sizes="(max-width: 768px) 100vw, 400px"
                       style={{ objectFit: "cover", objectPosition: "center" }}
                     />
@@ -259,19 +261,42 @@ export function WhyChooseUs() {
               }}
             >
               {/* Tag with Golden Icon */}
-              <span
-                className="section-tag"
+              <div
+                className="wcu-tag-row"
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
                   marginBottom: "16px",
+                  direction: isRTL ? "rtl" : "ltr",
                 }}
               >
-                <img
-                  src="/images/main_logo.png"
-                  alt=""
-                  style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }}
-                />
-                {t.whyChooseUs.tag}
-              </span>
+                <svg
+                  width="40"
+                  height="40"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--color-brand-secondary)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ flexShrink: 0 }}
+                >
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+                <span
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: 700,
+                    letterSpacing: isRTL ? "normal" : "0.2em",
+                    color: "var(--color-brand-secondary)",
+                    textTransform: "uppercase",
+                    lineHeight: "normal",
+                  }}
+                >
+                  {t.whyChooseUs.tag}
+                </span>
+              </div>
 
               {/* Main Heading */}
               <h2
@@ -323,7 +348,6 @@ export function WhyChooseUs() {
                   alignItems: "center",
                   gap: "14px",
                   justifyContent: "flex-start",
-                  flexDirection: "row",
                 }}
               >
                 {/* Circular Phone Button */}
@@ -337,7 +361,7 @@ export function WhyChooseUs() {
                     backgroundColor: "#1F251A",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "#FFFFFF",
+                    color: "var(--color-brand-accent, #C4AE7C)",
                     transition: "transform 0.3s ease, background-color 0.3s ease",
                     flexShrink: 0,
                   }}
@@ -354,7 +378,6 @@ export function WhyChooseUs() {
                     color: "var(--cr-primary, #1F251A)",
                     display: "flex",
                     gap: "6px",
-                    flexDirection: "row",
                   }}
                 >
                   <span style={{ color: "var(--color-brand-secondary)" }}>
@@ -366,9 +389,7 @@ export function WhyChooseUs() {
                       color: "var(--cr-primary, #1F251A)",
                       textDecoration: "none",
                       transition: "color 0.2s ease",
-                      display: "inline-block",
                     }}
-                    dir="ltr"
                     className="hover:text-brand-secondary hover:underline"
                   >
                     {t.whyChooseUs.phone}

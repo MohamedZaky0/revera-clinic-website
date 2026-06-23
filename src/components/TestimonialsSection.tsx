@@ -148,11 +148,15 @@ export function TestimonialsSection() {
                   textAlign: isRTL ? "right" : "left",
                 }}
               >
-                <span
-                  className="section-tag"
+                {/* Gold logo tagline */}
+                <div
+                  className="tm-tag-row"
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
                     marginBottom: "16px",
-                    color: "var(--color-brand-sand)",
+                    direction: isRTL ? "rtl" : "ltr",
                   }}
                 >
                   <svg
@@ -168,8 +172,19 @@ export function TestimonialsSection() {
                   >
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                   </svg>
-                  {t.testimonials.tag}
-                </span>
+                  <span
+                    style={{
+                      fontSize: "20px",
+                      fontWeight: 700,
+                      letterSpacing: isRTL ? "normal" : "0.2em",
+                      color: "var(--color-brand-sand)",
+                      textTransform: "uppercase",
+                      lineHeight: "normal",
+                    }}
+                  >
+                    {t.testimonials.tag}
+                  </span>
+                </div>
 
                 {/* Heading */}
                 <h2
@@ -275,7 +290,6 @@ export function TestimonialsSection() {
                       display: "flex",
                       alignItems: "center",
                       gap: "12px",
-                      flexDirection: "row",
                     }}
                   >
                     {/* Golden outline logo badge */}

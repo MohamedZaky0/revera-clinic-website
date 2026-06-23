@@ -9,7 +9,6 @@ import {
   ServiceToggleState, 
   getDynamicServices, 
   getDynamicCategories, 
-  sortServices,
   LocalCategory 
 } from "@/lib/serviceStore";
 
@@ -321,42 +320,6 @@ export function HomeServicesSection() {
     setDynamicServices(getDynamicServices());
     setDynamicCategories(getDynamicCategories());
 
-    fetch("/api/services")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const sorted = sortServices(data);
-          setDynamicServices(sorted);
-          localStorage.setItem("revera_dynamic_services", JSON.stringify(sorted));
-
-          // Merge backend status and visibility toggles into serviceToggles state and persist
-          setServiceToggles((prev) => {
-            const merged = { ...prev };
-            sorted.forEach((svc) => {
-              merged[svc.id] = {
-                visible: svc.visible !== undefined ? svc.visible : (prev[svc.id]?.visible ?? true),
-                active: svc.active !== undefined ? svc.active : (prev[svc.id]?.active ?? true),
-              };
-            });
-            localStorage.setItem("revera_service_toggles", JSON.stringify(merged));
-            return merged;
-          });
-        }
-      })
-      .catch((err) => console.error("HomeServicesSection: fetch services failed", err));
-
-    fetch("/api/categories")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const sortedCats = data.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-          setDynamicCategories(sortedCats);
-          localStorage.setItem("revera_dynamic_categories", JSON.stringify(sortedCats));
-          setDynamicServices(prev => sortServices(prev));
-        }
-      })
-      .catch((err) => console.error("HomeServicesSection: fetch categories failed", err));
-
     const handleStorage = () => {
       setServiceToggles(getServiceToggles());
       setDynamicServices(getDynamicServices());
@@ -430,15 +393,28 @@ export function HomeServicesSection() {
           <div style={{ position: "relative", zIndex: 10 }} className="services-card-inner">
             {/* ── Header ── */}
             <div style={{ textAlign: "center", marginBottom: 40 }}>
-                <span
-                  className="section-tag"
-                  style={{
-                    marginBottom: 14,
-                  }}
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  marginBottom: 14,
+                  direction: isRTL ? "rtl" : "ltr",
+                }}
+              >
+                <img 
+                  src="/images/main_logo.png" 
+                  alt="" 
+                  style={{ width: 44, height: 44, objectFit: "contain", opacity: 0.8, flexShrink: 0 }} 
+                />
+                <span 
+                  className="section-tag mb-0"
+                  style={{ fontSize: "20px", letterSpacing: isRTL ? "normal" : "0.15em" }}
                 >
-                  <img src="/images/main_logo.png" alt="" style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }} />
                   {t.services.tag}
                 </span>
+              </div>
               <h2 style={{
                 maxWidth: 760,
                 margin: "0 auto 14px",

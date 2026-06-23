@@ -154,25 +154,17 @@ export function AboutPageIntro() {
               justify-content: center;
               flex-shrink: 0;
             }
-            .rtl .api-checklist li {
-              flex-direction: row;
-            }
+            /* RTL adjustments */
             .api-cta-row {
               display: flex;
               align-items: center;
               gap: 16px;
               flex-wrap: wrap;
             }
-            .rtl .api-cta-row {
-              flex-direction: row;
-            }
             .api-phone-block {
               display: flex;
               align-items: center;
               gap: 12px;
-            }
-            .rtl .api-phone-block {
-              flex-direction: row;
             }
             @media (max-width: 1024px) {
               .api-grid {
@@ -251,19 +243,36 @@ export function AboutPageIntro() {
               }}
             >
               {/* Tag */}
-              <span
-                className="section-tag"
+              <div
                 style={{
-                  marginBottom: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "14px",
+                  direction: isRTL ? "rtl" : "ltr",
                 }}
               >
-                <img
-                  src="/images/main_logo.png"
-                  alt=""
-                  style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }}
-                />
-                {t.aboutPage.aboutTag}
-              </span>
+                <svg
+                  width="40" height="40" viewBox="0 0 24 24" fill="none"
+                  stroke="var(--cr-accent, #C4AE7C)" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round"
+                  style={{ flexShrink: 0 }}
+                >
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+                <span
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: 700,
+                    letterSpacing: isRTL ? "normal" : "0.2em",
+                    color: "var(--color-brand-secondary)",
+                    textTransform: "uppercase",
+                    lineHeight: "normal",
+                  }}
+                >
+                  {t.aboutPage.aboutTag}
+                </span>
+              </div>
 
               {/* Heading */}
               <h2
@@ -343,9 +352,7 @@ export function AboutPageIntro() {
                         fontWeight: 600,
                         textDecoration: "none",
                         transition: "color 0.2s ease",
-                        display: "inline-block",
                       }}
-                      dir="ltr"
                       className="text-[#414E36] hover:text-[#5A6A51]"
                     >
                       {t.aboutPage.phone}
@@ -389,10 +396,10 @@ export function AboutPageIntro() {
                       flexShrink: 0,
                     }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 18 18"
+                    <svg 
+                      width="14" 
+                      height="14" 
+                      viewBox="0 0 18 18" 
                       fill="none"
                       style={{ transform: isRTL ? "scaleX(-1)" : "none" }}
                     >

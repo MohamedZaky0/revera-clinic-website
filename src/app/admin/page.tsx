@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
-import ReactDOM from "react-dom";
-import { ServiceItem } from "@/lib/services";
+import { useEffect, useMemo, useState } from "react";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
 import { 
   getServiceToggles, 
   setServiceToggle, 
@@ -11,12 +11,15 @@ import {
   saveDynamicCategories, 
   getDynamicServices, 
   saveDynamicServices,
-  sortServices,
   LocalCategory 
 } from "@/lib/serviceStore";
+import { compressImage } from "@/lib/image";
+import { Branch } from "@/types";
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
   BarChart3,
   Bell,
   Box,
@@ -65,6 +68,8 @@ import {
   Users,
   Trash2,
   GripVertical,
+  X,
+  ListOrdered,
 } from "lucide-react";
 
 type Req = {
@@ -81,33 +86,16 @@ type Req = {
   sessionType?: string;
   doctorName?: string | null;
   createdAt?: string;
+  branchId?: string | null;
 };
 
-const SLOTS = [
-  "12:00",
-  "12:30",
-  "13:00",
-  "13:30",
-  "14:00",
-  "14:30",
-  "15:00",
-  "15:30",
-];
+const SLOTS = ALL_15MIN_SLOTS;
 
 const SIDEBAR_ITEMS = [
   { label: "Bookings", icon: CalendarDays },
   { label: "Customers", icon: Users },
   { label: "Providers", icon: ShieldCheck },
   { label: "Services", icon: Layers },
-  { label: "Target Bonuses", icon: Trophy },
-  { label: "Prescriptions", icon: FileText },
-  { label: "Coupons", icon: Ticket },
-  { label: "E-Commerce", icon: ShoppingBag },
-  { label: "Finances", icon: CircleDollarSign, submenu: true },
-  { label: "Insights", icon: BarChart3 },
-  { label: "Reports", icon: FileText, submenu: true },
-  { label: "Inventory", icon: Package, submenu: true },
-  { label: "SMS Management", icon: MessageSquare, submenu: true },
   { label: "Settings", icon: Settings, submenu: true },
   { label: "Logout", icon: LogOut },
 ];
@@ -119,30 +107,27 @@ const overviewCards = [
   { label: "Open requests", value: "9", accent: "bg-[#C4AE7C]/10", icon: FileText },
 ];
 
-const DEFAULT_PROVIDERS = [
+const PROVIDERS = [
   {
-    id: "seed-1",
     name: "Dr. Ahmed Medhat",
     bookings: 0,
     services: ["Tattoo Removal (Small)", "Tattoo Removal (Medium)"],
     more: 4,
-    rating: 5,
+    rating: 0,
   },
   {
-    id: "seed-2",
     name: "Dr. Radwa Seif",
     bookings: 0,
     services: ["Physio: Basic Relief (3)", "Physio: Standard Recovery (6)"],
     more: 4,
-    rating: 5,
+    rating: 0,
   },
   {
-    id: "seed-3",
     name: "Dr. Sara El Gamel",
     bookings: 1,
     services: ["Half Arm", "Full Arms"],
     more: 14,
-    rating: 5,
+    rating: 0,
   },
 ];
 
@@ -345,71 +330,6 @@ const MOCK_PAYROLL = [
 export default function AdminPage() {
   const [requests, setRequests] = useState<Req[]>([]);
   const [allReservations, setAllReservations] = useState<Req[]>([]);
-  const [providers, setProviders] = useState<any[]>(DEFAULT_PROVIDERS);
-
-  function fetchProviders() {
-    fetch("/api/providers")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setProviders(data);
-        } else {
-          setProviders(DEFAULT_PROVIDERS);
-        }
-      })
-      .catch((err) => {
-        console.error("fetchProviders error:", err);
-        setProviders(DEFAULT_PROVIDERS);
-      });
-  }
-
-  const handleAddProvider = () => {
-    setProviderName("");
-    setProviderRating("5.0");
-    setProviderSelectedServices([]);
-    setShowAddProviderModal(true);
-  };
-
-  const handleSaveNewProvider = async () => {
-    if (!providerName.trim()) return;
-
-    const newProvider = {
-      name: providerName.trim(),
-      services: providerSelectedServices,
-      bookings: 0,
-      more: providerSelectedServices.length > 2 ? providerSelectedServices.length - 2 : 0,
-      rating: parseFloat(providerRating) || 5.0,
-    };
-
-    try {
-      const res = await fetch("/api/providers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newProvider),
-      });
-      if (!res.ok) throw new Error("Save failed");
-      const saved = await res.json();
-      setProviders(prev => [...prev, saved]);
-      setShowAddProviderModal(false);
-    } catch (err) {
-      alert("Failed to add provider: " + err);
-    }
-  };
-
-  const handleDeleteProvider = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
-    try {
-      const res = await fetch(`/api/providers?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Delete failed");
-      setProviders(prev => prev.filter(p => p.id !== id));
-    } catch (err) {
-      // Fallback local filter if seed provider has no db ID
-      setProviders(prev => prev.filter(p => p.name !== name));
-      console.warn("Deleted locally, DB delete failed:", err);
-    }
-  };
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Req | null>(null);
   const [viewingBooking, setViewingBooking] = useState<Req | null>(null);
@@ -418,7 +338,8 @@ export default function AdminPage() {
   const [activeNav, setActiveNav] = useState("Bookings");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [providerTab, setProviderTab] = useState<"Providers" | "Attendance">("Providers");
-  const [branch, setBranch] = useState("Zayed");
+  const [branch, setBranch] = useState<string>(""); // branch id; empty = all branches
+  const [lang, setLang] = useState<"EN" | "AR">("EN");
   const [notifCount] = useState(1);
   const [customerSearch, setCustomerSearch] = useState("");
   const [couponSearch, setCouponSearch] = useState("");
@@ -445,20 +366,6 @@ export default function AdminPage() {
   const [localCategories, setLocalCategories] = useState<LocalCategory[]>([]);
   // Delete Category confirmation target
   const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<LocalCategory | null>(null);
-
-  // Providers modal state variables
-  const [showAddProviderModal, setShowAddProviderModal] = useState(false);
-  const [providerName, setProviderName] = useState("");
-  const [providerRating, setProviderRating] = useState("5.0");
-  const [providerSelectedServices, setProviderSelectedServices] = useState<string[]>([]);
-  const providerModalBodyRef = useRef<HTMLDivElement>(null);
-
-  // Reset modal body scroll to top each time it opens
-  useEffect(() => {
-    if (showAddProviderModal && providerModalBodyRef.current) {
-      providerModalBodyRef.current.scrollTop = 0;
-    }
-  }, [showAddProviderModal]);
 
   // Service modal and drag-and-drop state variables
   const [editingService, setEditingService] = useState<ServiceItem | null>(null);
@@ -536,7 +443,10 @@ export default function AdminPage() {
       return matched ? { ...s, sortOrder: matched.sortOrder } : s;
     });
 
-    const sortedAllServices = sortServices(updatedAllServices);
+    const sortedAllServices = updatedAllServices.sort((a, b) => {
+      if (a.cat !== b.cat) return 0;
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    });
 
     setLocalServices(sortedAllServices);
     saveDynamicServices(sortedAllServices);
@@ -562,11 +472,6 @@ export default function AdminPage() {
 
     setLocalCategories(updatedCategories);
     saveDynamicCategories(updatedCategories);
-
-    // Re-sort services using the new categories ordering and save
-    const reSortedServices = sortServices(localServices);
-    setLocalServices(reSortedServices);
-    saveDynamicServices(reSortedServices);
   };
 
   function toggleCategoryExpand(cat: string) {
@@ -577,7 +482,7 @@ export default function AdminPage() {
     setLocalCategories(updatedCats);
     saveDynamicCategories(updatedCats);
 
-    const updatedSvcs = sortServices(localServices.filter(s => s.cat !== catKey));
+    const updatedSvcs = localServices.filter(s => s.cat !== catKey);
     setLocalServices(updatedSvcs);
     saveDynamicServices(updatedSvcs);
 
@@ -595,6 +500,7 @@ export default function AdminPage() {
   const [scheduleDate, setScheduleDate] = useState<Date>(() => new Date());
   const [scheduleProviderFilter, setScheduleProviderFilter] = useState<string>("All");
   const [scheduleServiceFilter, setScheduleServiceFilter] = useState<string>("All");
+  const [scheduleReservations, setScheduleReservations] = useState<Req[]>([]);
 
   // Quick Actions states
   const [showCancellationsModal, setShowCancellationsModal] = useState(false);
@@ -621,6 +527,9 @@ export default function AdminPage() {
   const [newPatientDoctor, setNewPatientDoctor] = useState("Dr. Sara El Gamel");
   const [newPatientNotes, setNewPatientNotes] = useState("");
   const [newPatientStatus, setNewPatientStatus] = useState("approved");
+  const [newPatientBranch, setNewPatientBranch] = useState("");
+  const [approveUnavailableSlots, setApproveUnavailableSlots] = useState<string[]>([]);
+  const [manualUnavailableSlots, setManualUnavailableSlots] = useState<string[]>([]);
 
   const filteredReservations = useMemo(() => {
     return allReservations.filter((r) => {
@@ -657,6 +566,31 @@ export default function AdminPage() {
   // per-service toggle state: visible & status
   const [serviceToggles, setServiceToggles] = useState<Record<number, { visible: boolean; active: boolean }>>({});
 
+  // Force English/LTR context on Admin page
+  useEffect(() => {
+    const prevDir = document.documentElement.dir;
+    const prevLang = document.documentElement.lang;
+    const prevBodyClass = document.body.className;
+
+    const applyOverride = () => {
+      document.documentElement.dir = "ltr";
+      document.documentElement.lang = "en";
+      document.body.className = "ltr";
+    };
+
+    applyOverride();
+    const timer = setTimeout(applyOverride, 0);
+    const timer2 = setTimeout(applyOverride, 50);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(timer2);
+      document.documentElement.dir = prevDir || "ltr";
+      document.documentElement.lang = prevLang || "en";
+      document.body.className = prevBodyClass || "ltr";
+    };
+  }, []);
+
   useEffect(() => {
     const svcs = getDynamicServices();
     const cats = getDynamicCategories();
@@ -671,44 +605,8 @@ export default function AdminPage() {
     const storedToggles = getServiceToggles();
     const defaults = Object.fromEntries(svcs.map((s) => [s.id, { visible: true, active: true }]));
     setServiceToggles({ ...defaults, ...storedToggles });
-
-    fetch("/api/services")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const sorted = sortServices(data);
-          setLocalServices(sorted);
-          localStorage.setItem("revera_dynamic_services", JSON.stringify(sorted));
-
-          // Merge backend status and visibility toggles into serviceToggles state and persist
-          setServiceToggles((prev) => {
-            const merged = { ...prev };
-            sorted.forEach((svc) => {
-              merged[svc.id] = {
-                visible: svc.visible !== undefined ? svc.visible : (prev[svc.id]?.visible ?? true),
-                active: svc.active !== undefined ? svc.active : (prev[svc.id]?.active ?? true),
-              };
-            });
-            localStorage.setItem("revera_service_toggles", JSON.stringify(merged));
-            return merged;
-          });
-        }
-      })
-      .catch((err) => console.error("Admin: fetch services failed", err));
-
-    fetch("/api/categories")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const sortedCats = data.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-          setLocalCategories(sortedCats);
-          localStorage.setItem("revera_dynamic_categories", JSON.stringify(sortedCats));
-          setLocalServices(prev => sortServices(prev));
-        }
-      })
-      .catch((err) => console.error("Admin: fetch categories failed", err));
   }, []);
-  const BRANCHES = ["Zayed", "Maadi", "Heliopolis", "New Cairo"];
+  // BRANCHES is now derived from the real branches state loaded from Supabase
 
   const [prescriptionsExpanded, setPrescriptionsExpanded] = useState(false);
   const [prescriptionsSearch, setPrescriptionsSearch] = useState("");
@@ -727,6 +625,17 @@ export default function AdminPage() {
     const q = serviceSearch.toLowerCase();
     return localServices.filter((s) => s.en.toLowerCase().includes(q) || s.cat.toLowerCase().includes(q));
   }, [serviceSearch, localServices]);
+
+  const allServicesList = useMemo(() => {
+    const map = new Map<string, { id: number; en: string; ar?: string }>();
+    SERVICES.forEach(s => {
+      map.set(s.en, { id: s.id, en: s.en, ar: s.ar });
+    });
+    localServices.forEach(s => {
+      map.set(s.en, { id: s.id, en: s.en, ar: s.ar });
+    });
+    return Array.from(map.values()).sort((a, b) => a.en.localeCompare(b.en));
+  }, [localServices]);
 
   const totalServicePages = Math.ceil(filteredServices.length / SERVICE_PAGE_SIZE);
   const pagedServices = filteredServices.slice((servicePage - 1) * SERVICE_PAGE_SIZE, servicePage * SERVICE_PAGE_SIZE);
@@ -805,6 +714,135 @@ export default function AdminPage() {
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
   const [smsExpanded, setSMSExpanded] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
+  const [pagesSettingsTab, setPagesSettingsTab] = useState<"Home" | "About Us" | "Services">("Home");
+  const [homeHeroSlides, setHomeHeroSlides] = useState<any[]>([
+    {
+      welcome: "Welcome to Revera Clinics",
+      heading: "Transform Your Beauty Naturally!",
+      description: "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
+      bookBtn: "Book Appointment",
+      rating: "4.5",
+      reviewCount: "(1000+ review)",
+      image: "/images/hero/slide-1.jpg"
+    },
+    {
+      welcome: "Welcome to Revera Clinics",
+      heading: "Advanced Medical Care You Can Trust!",
+      description: "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and dental services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
+      bookBtn: "Book Appointment",
+      rating: "4.5",
+      reviewCount: "(1000+ review)",
+      image: "/images/hero/slide-2.jpg"
+    },
+    {
+      welcome: "Welcome to Revera Clinics",
+      heading: "Your Beauty & Health Journey Starts Here!",
+      description: "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and dental care for all ages.",
+      bookBtn: "Book Appointment",
+      rating: "4.5",
+      reviewCount: "(1000+ review)",
+      image: "/images/hero/slide-3.jpg"
+    }
+  ]);
+  const [homeHeroSlidesAr, setHomeHeroSlidesAr] = useState<any[]>([
+    {
+      welcome: "مرحباً بكم في عيادات كريستال روز",
+      heading: "حوّل جمالك بشكل طبيعي!",
+      description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية مصممة لمساعدتك على تحقيق أهدافك في الجمال والصحة من خلال تقنيات طبية متقدمة.",
+      bookBtn: "احجز موعدًا",
+      rating: "4.5",
+      reviewCount: "(1000+ تقييم)",
+      image: "/images/hero/slide-1.jpg"
+    },
+    {
+      welcome: "مرحباً بكم في عيادات كريستال روز",
+      heading: "رعاية طبية متقدمة يمكنك الوثوق بها!",
+      description: "اكتشف خدمات شاملة في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان المصممة لاحتياجاتك الفريدة. مع أكثر من 15 عامًا من الخبرة المهنية، نحن هنا لإرشادك نحو الجمال الدائم والعافية.",
+      bookBtn: "احجز موعدًا",
+      rating: "4.5",
+      reviewCount: "(1000+ تقييم)",
+      image: "/images/hero/slide-2.jpg"
+    },
+    {
+      welcome: "مرحباً بكم في عيادات كريستال روز",
+      heading: "رحلتك نحو الجمال والصحة تبدأ هنا!",
+      description: "عيادات متخصصة تحت إشراف طبي كامل تقدم خدمات في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان لجميع الأعمار.",
+      bookBtn: "احجز موعدًا",
+      rating: "4.5",
+      reviewCount: "(1000+ تقييم)",
+      image: "/images/hero/slide-3.jpg"
+    }
+  ]);
+  const [providers, setProviders] = useState<any[]>(PROVIDERS);
+  
+  // Custom provider modal states
+  const [showProviderModal, setShowProviderModal] = useState(false);
+  const [providerModalMode, setProviderModalMode] = useState<"add" | "edit">("add");
+  const [providerEditingId, setProviderEditingId] = useState<string | null>(null);
+  const [providerFormName, setProviderFormName] = useState("");
+  const [providerFormRating, setProviderFormRating] = useState(5);
+  const [providerFormMore, setProviderFormMore] = useState(0);
+  const [providerFormSelectedServices, setProviderFormSelectedServices] = useState<string[]>([]);
+  const [savingProvider, setSavingProvider] = useState(false);
+
+  const [loadingPageSettings, setLoadingPageSettings] = useState(false);
+  const [savingPageSettings, setSavingPageSettings] = useState(false);
+  // ── Branches state ──
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [branchModal, setBranchModal] = useState<{ open: boolean; mode: "add" | "edit"; branch: Partial<Branch> }>({
+    open: false, mode: "add", branch: {}
+  });
+  const [savingBranch, setSavingBranch] = useState(false);
+  const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
+  const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
+    { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+    { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+    { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+    { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+    { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+    { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "10:00", closeTime: "20:00" },
+    { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+  ]);  const [pageSettingsLangTab, setPageSettingsLangTab] = useState<"en" | "ar">("en");
+  const [aboutImage1, setAboutImage1] = useState<string>("");
+  const [aboutImage2, setAboutImage2] = useState<string>("");
+  const [aboutImage3, setAboutImage3] = useState<string>("");
+  const [beforeAfterPairs, setBeforeAfterPairs] = useState<any[]>([]);
+  const [whatWeDoImage1, setWhatWeDoImage1] = useState<string>("");
+  const [whatWeDoImage2, setWhatWeDoImage2] = useState<string>("");
+  const [whatWeDoList, setWhatWeDoList] = useState<string[]>(["", "", "", ""]);
+  const [whatWeDoListAr, setWhatWeDoListAr] = useState<string[]>(["", "", "", ""]);
+  const [howItWorksHeading, setHowItWorksHeading] = useState<string>("");
+  const [howItWorksDescription, setHowItWorksDescription] = useState<string>("");
+  const [howItWorksHeadingAr, setHowItWorksHeadingAr] = useState<string>("");
+  const [howItWorksDescriptionAr, setHowItWorksDescriptionAr] = useState<string>("");
+  
+  // Why Choose Us Section
+  const [wcuYearsLabel, setWcuYearsLabel] = useState<string>("");
+  const [wcuHeading, setWcuHeading] = useState<string>("");
+  const [wcuDescription, setWcuDescription] = useState<string>("");
+  const [wcuQuote, setWcuQuote] = useState<string>("");
+  const [wcuContactLabel, setWcuContactLabel] = useState<string>("");
+  const [wcuPhone, setWcuPhone] = useState<string>("");
+  const [wcuYearsLabelAr, setWcuYearsLabelAr] = useState<string>("");
+  const [wcuHeadingAr, setWcuHeadingAr] = useState<string>("");
+  const [wcuDescriptionAr, setWcuDescriptionAr] = useState<string>("");
+  const [wcuQuoteAr, setWcuQuoteAr] = useState<string>("");
+  const [wcuContactLabelAr, setWcuContactLabelAr] = useState<string>("");
+  const [wcuPhoneAr, setWcuPhoneAr] = useState<string>("");
+  const [wcuImage1, setWcuImage1] = useState<string>("");
+  const [wcuImage2, setWcuImage2] = useState<string>("");
+
+  // FAQ Section
+  const [faqTag, setFaqTag] = useState<string>("");
+  const [faqTagAr, setFaqTagAr] = useState<string>("");
+  const [faqHeading, setFaqHeading] = useState<string>("");
+  const [faqHeadingAr, setFaqHeadingAr] = useState<string>("");
+  const [faqImage1, setFaqImage1] = useState<string>("");
+  const [faqImage2, setFaqImage2] = useState<string>("");
+  const [faqs, setFaqs] = useState<Array<{ question: string; answer: string }>>([]);
+  const [faqsAr, setFaqsAr] = useState<Array<{ question: string; answer: string }>>([]);
+
   const [reportsCustomerSearch, setReportsCustomerSearch] = useState("");
   const [smsTemplateSearch, setSmsTemplateSearch] = useState("");
   const [smsLogSearch, setSmsLogSearch] = useState("");
@@ -864,6 +902,19 @@ export default function AdminPage() {
     return Array.from(map.values());
   }, [allReservations]);
 
+  const todaysBookingsCount = useMemo(() => {
+    const getLocalDateString = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const todayStr = getLocalDateString(new Date());
+    return allReservations.filter(
+      r => String(r.date).slice(0, 10) === todayStr && r.status === 'approved'
+    ).length;
+  }, [allReservations]);
+
   const dynamicOverviewCards = useMemo(() => {
     const activeBookings = allReservations.filter((r) => r.status === "approved");
     const activeBookingsCount = activeBookings.length;
@@ -908,7 +959,19 @@ export default function AdminPage() {
   useEffect(() => {
     fetchRequests();
     fetchAllReservations();
+    fetchPageSettings();
     fetchProviders();
+    // Fetch branches and set default branch
+    setLoadingBranches(true);
+    fetch("/api/branches")
+      .then(r => r.json())
+      .then(data => {
+        const list: Branch[] = Array.isArray(data) ? data : [];
+        setBranches(list);
+        if (list.length > 0) setBranch(list[0].id);
+      })
+      .catch(() => setBranches([]))
+      .finally(() => setLoadingBranches(false));
   }, []);
 
   useEffect(() => {
@@ -917,9 +980,472 @@ export default function AdminPage() {
     });
   }, [activeNav]);
 
+  // Re-fetch bookings whenever branch selection changes
+  useEffect(() => {
+    if (!branch) return; // wait until branches are loaded
+    fetchRequests();
+    fetchAllReservations();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branch]);
+
+  // Fetch ALL reservations (no branch filter) for the schedule view whenever the date or view changes
+  useEffect(() => {
+    if (calendarView === "Schedule") {
+      fetchScheduleReservations();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarView, scheduleDate]);
+
+  // Set default manual booking branch to the currently active branch filter
+  useEffect(() => {
+    if (showAddBookingModal) {
+      setNewPatientBranch(branch);
+    }
+  }, [showAddBookingModal, branch]);
+
+  // Update unavailable time slots for manual booking based on selected date, service, and branch
+  useEffect(() => {
+    if (!showAddBookingModal || !newPatientService || !newPatientDate) {
+      setManualUnavailableSlots([]);
+      return;
+    }
+    const branchQuery = newPatientBranch ? `&branchId=${newPatientBranch}` : "";
+    fetch(`/api/reservations?serviceId=${newPatientService}&date=${newPatientDate}&status=approved${branchQuery}`, { cache: "no-store" })
+      .then(r => r.json())
+      .then(list => {
+        if (Array.isArray(list)) {
+          const unavailable = getUnavailableSlots(list, Number(newPatientService));
+          setManualUnavailableSlots(unavailable);
+          // Auto-select first available slot if current is unavailable or empty
+          if (!newPatientTimeSlot || unavailable.includes(newPatientTimeSlot)) {
+            const first = SLOTS.find((s) => !unavailable.includes(s)) || SLOTS[0];
+            setNewPatientTimeSlot(first);
+          }
+        }
+      })
+      .catch(() => setManualUnavailableSlots([]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAddBookingModal, newPatientService, newPatientDate, newPatientBranch]);
+
+  function fetchProviders() {
+    fetch("/api/providers", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setProviders(data);
+        }
+      })
+      .catch((err) => console.error("fetchProviders error:", err));
+  }
+
+  function openAddProviderModal() {
+    setProviderModalMode("add");
+    setProviderEditingId(null);
+    setProviderFormName("");
+    setProviderFormRating(5);
+    setProviderFormMore(0);
+    setProviderFormSelectedServices([]);
+    setShowProviderModal(true);
+  }
+
+  function openEditProviderModal(provider: any) {
+    setProviderModalMode("edit");
+    setProviderEditingId(provider.id);
+    setProviderFormName(provider.name);
+    setProviderFormRating(provider.rating || 5);
+    setProviderFormMore(provider.more || 0);
+    setProviderFormSelectedServices(provider.services || []);
+    setShowProviderModal(true);
+  }
+
+  function handleSaveProvider() {
+    if (!providerFormName.trim()) {
+      alert("Provider Name is required.");
+      return;
+    }
+
+    setSavingProvider(true);
+
+    const payload = {
+      name: providerFormName.trim(),
+      services: providerFormSelectedServices,
+      rating: Number(providerFormRating),
+      more: Math.max(0, providerFormSelectedServices.length - 2)
+    };
+
+    const isEdit = providerModalMode === "edit";
+    const url = isEdit ? `/api/providers?id=${providerEditingId}` : "/api/providers";
+    const method = isEdit ? "PATCH" : "POST";
+
+    fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.name) {
+          fetchProviders();
+          setShowProviderModal(false);
+          alert(isEdit ? "Provider updated successfully!" : "Provider added successfully!");
+        } else {
+          alert(data.error || "Failed to save provider.");
+        }
+      })
+      .catch((err) => {
+        console.error("handleSaveProvider error:", err);
+        alert("Error saving provider.");
+      })
+      .finally(() => {
+        setSavingProvider(false);
+      });
+  }
+
+  function handleDeleteProvider(id: string) {
+    if (!id) return;
+    if (confirm("Are you sure you want to delete this provider?")) {
+      fetch(`/api/providers?id=${id}`, {
+        method: "DELETE"
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.success) {
+            fetchProviders();
+            alert("Provider deleted successfully!");
+          } else {
+            alert("Failed to delete provider.");
+          }
+        })
+        .catch((err) => {
+          console.error("handleDeleteProvider error:", err);
+          alert("Error deleting provider.");
+        });
+    }
+  }
+
+  function fetchPageSettings() {
+    setLoadingPageSettings(true);
+    fetch("/api/page-settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data) {
+          setHomeHeroSlides(data.hero?.slides || []);
+          setHomeHeroSlidesAr(data.hero?.slides_ar || []);
+          setAboutImage1(data.about?.image1 || "");
+          setAboutImage2(data.about?.image2 || "");
+          setAboutImage3(data.about?.image3 || "");
+          setBeforeAfterPairs(data.results?.pairs || [
+            { id: 1, before: "/images/before-after/1-before.jpeg", after: "/images/before-after/1-after.jpeg" },
+            { id: 2, before: "/images/before-after/2-before.jpeg", after: "/images/before-after/2-after.jpeg" },
+            { id: 3, before: "/images/before-after/3-before.jpeg", after: "/images/before-after/3-after.jpeg" },
+            { id: 4, before: "/images/before-after/4-before.jpg",  after: "/images/before-after/4-after.jpg" },
+            { id: 5, before: "/images/before-after/5-before.jpg",  after: "/images/before-after/5-after.jpg" },
+            { id: 6, before: "/images/before-after/6-before.jpg",  after: "/images/before-after/6-after.jpg" },
+          ]);
+          setWhatWeDoImage1(data.aboutPage?.whatWeDoImage1 || "");
+          setWhatWeDoImage2(data.aboutPage?.whatWeDoImage2 || "");
+          setWhatWeDoList(data.aboutPage?.whatWeDoList || [
+            "Dermatology & Aesthetic Treatments",
+            "Gynecology & Women's Health",
+            "Physical Therapy & Rehabilitation",
+            "Osteopathy & Therapeutic Nutrition",
+          ]);
+          setWhatWeDoListAr(data.aboutPage?.whatWeDoListAr || [
+            "علاجات الجلدية والتجميل",
+            "النساء والتوليد وصحة المرأة",
+            "العلاج الطبيعي وإعادة التأهيل",
+            "تقويم العظام والتغذية العلاجية",
+          ]);
+
+          // Load FAQ Section Settings
+          setFaqTag(data.aboutPage?.faqTag || "frequently asked questions");
+          setFaqTagAr(data.aboutPage?.faqTagAr || "أسئلة شائعة");
+          setFaqHeading(data.aboutPage?.faqHeading || "Questions? We have answers.");
+          setFaqHeadingAr(data.aboutPage?.faqHeadingAr || "أسئلة؟ لدينا إجابات.");
+          setFaqImage1(data.aboutPage?.faqImage1 || "");
+          setFaqImage2(data.aboutPage?.faqImage2 || "");
+          setFaqs(data.aboutPage?.faqs || [
+            {
+              question: "1. What services does Revera offer?",
+              answer: "Revera is a premium polyclinic specializing in dermatology and aesthetic treatments, gynecology and women's health, physical therapy and rehabilitation, and osteopathy and therapeutic nutrition. Every service is delivered with medical precision and a luxury experience tailored to you."
+            },
+            {
+              question: "2. Who is Revera designed for?",
+              answer: "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best — not the cheapest — and expect a medical experience that matches their standards."
+            },
+            {
+              question: "3. How does my treatment plan work?",
+              answer: "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan — never a template — that evolves with your progress and needs."
+            },
+            {
+              question: "4. What makes Revera different from other clinics?",
+              answer: "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint — from your first appointment to your last follow-up."
+            }
+          ]);
+          setFaqsAr(data.aboutPage?.faqsAr || [
+            {
+              question: "١. ما الخدمات التي تقدمها ريفيرا؟",
+              answer: "ريفيرا عيادة متميزة متخصصة في علاجات الجلدية والتجميل، وصحة المرأة والنساء والتوليد، والعلاج الطبيعي وإعادة التأهيل، وتقويم العظام والتغذية العلاجية. كل خدمة تُقدَّم بدقة طبية وتجربة فاخرة مصممة لكِ."
+            },
+            {
+              question: "٢. لمن صُمِّمت ريفيرا؟",
+              answer: "ريفيرا مصممة للمرأة التي تقدّر الأناقة والخصوصية والنتائج الحقيقية. عميلاتنا يبحثن عن الأفضل — لا الأرخص — ويتوقعن تجربة طبية تليق بمعاييرهن."
+            },
+            {
+              question: "٣. كيف تعمل خطة علاجي؟",
+              answer: "تبدأ رحلتكِ باستشارة شاملة نُقيّم فيها صحتكِ وأهدافكِ الجمالية وأسلوب حياتكِ. بناءً على ذلك، يضع أطباؤنا خطة علاج شخصية متكاملة — لا نموذجاً جاهزاً — تتطور مع تقدمكِ واحتياجاتكِ."
+            },
+            {
+              question: "٤. ما الذي يجعل ريفيرا مختلفة؟",
+              answer: "ريفيرا وجهة، لا مجرد عيادة. الفرق في الإحساس: بيئة خاصة وهادئة، وأطباء يستمعون، ومستوى رعاية يمكنكِ رؤيته والشعور به في كل لحظة — من موعدكِ الأول إلى متابعتكِ الأخيرة."
+            }
+          ]);
+          setHowItWorksHeading(data.howItWorks?.heading || "Simple steps to beauty transformations");
+          setHowItWorksDescription(data.howItWorks?.description || "Discover a seamless process designed to enhance your beauty and health through personalized consultations, customized treatment plans, and dedicated medical support. We guide you every step toward achieving your beauty and wellness goals.");
+          setHowItWorksHeadingAr(data.howItWorks?.headingAr || "خطوات بسيطة لتحولات الجمال");
+          setHowItWorksDescriptionAr(data.howItWorks?.descriptionAr || "اكتشف عملية سلسة مصممة لتعزيز جمالك وصحتك من خلال استشارات شخصية وخطط علاجية مخصصة ودعم طبي متخصص. نرشدك في كل خطوة نحو تحقيق أهداف الجمال والعافية.");
+
+          // Load Why Choose Us Settings
+          setWcuYearsLabel(data.whyChooseUs?.yearsLabel || "15+ years excellence");
+          setWcuHeading(data.whyChooseUs?.heading || "Where medical expertise meets a luxury experience");
+          setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional — from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
+          setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions — we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
+          setWcuContactLabel(data.whyChooseUs?.contactLabel || "Reach us:");
+          setWcuPhone(data.whyChooseUs?.phone || "(+20) 01035595691");
+
+          setWcuYearsLabelAr(data.whyChooseUs?.yearsLabelAr || "١٥+ عاماً من التميز");
+          setWcuHeadingAr(data.whyChooseUs?.headingAr || "حيث تلتقي الخبرة الطبية بتجربة فاخرة");
+          setWcuDescriptionAr(data.whyChooseUs?.descriptionAr || "في ريفيرا، كل تفصيل مقصود — بدءاً من استشارتك الأولى وحتى لحظة خروجك متحوّلة. نقدم رعاية مدعومة بالعلم مع الثقة الهادئة لوجهة طبية خاصة.");
+          setWcuQuoteAr(data.whyChooseUs?.quoteAr || '"نحن لا نعالج فقط — بل نُحوّل الثقة. كل جلسة في ريفيرا مصممة حولكِ: أهدافكِ، بشرتكِ، رحلتكِ."');
+          setWcuContactLabelAr(data.whyChooseUs?.contactLabelAr || "تواصلي معنا:");
+          setWcuPhoneAr(data.whyChooseUs?.phoneAr || "(+20) 01035595691");
+
+          setWcuImage1(data.whyChooseUs?.image1 || "");
+          setWcuImage2(data.whyChooseUs?.image2 || "");
+
+          if (data.footer && data.footer.serviceHours) {
+            setServiceHours(data.footer.serviceHours);
+          }
+        }
+      })
+      .catch((err) => console.error("fetchPageSettings error:", err))
+      .finally(() => setLoadingPageSettings(false));
+  }
+
+  async function savePageSettings(overrideData?: any) {
+    setSavingPageSettings(true);
+    
+    // Construct the full payload merging current states and any overrides
+    const heroSlides = overrideData?.hero?.slides || homeHeroSlides;
+    const heroSlidesAr = overrideData?.hero?.slides_ar || homeHeroSlidesAr;
+    const img1 = overrideData?.about?.image1 !== undefined ? overrideData.about.image1 : aboutImage1;
+    const img2 = overrideData?.about?.image2 !== undefined ? overrideData.about.image2 : aboutImage2;
+    const img3 = overrideData?.about?.image3 !== undefined ? overrideData.about.image3 : aboutImage3;
+    const pairs = overrideData?.results?.pairs || beforeAfterPairs;
+    
+    const wwdImage1 = overrideData?.aboutPage?.whatWeDoImage1 !== undefined ? overrideData.aboutPage.whatWeDoImage1 : whatWeDoImage1;
+    const wwdImage2 = overrideData?.aboutPage?.whatWeDoImage2 !== undefined ? overrideData.aboutPage.whatWeDoImage2 : whatWeDoImage2;
+    const wwdList = overrideData?.aboutPage?.whatWeDoList !== undefined ? overrideData.aboutPage.whatWeDoList : whatWeDoList;
+    const wwdListAr = overrideData?.aboutPage?.whatWeDoListAr !== undefined ? overrideData.aboutPage.whatWeDoListAr : whatWeDoListAr;
+
+    const fTag = overrideData?.aboutPage?.faqTag !== undefined ? overrideData.aboutPage.faqTag : faqTag;
+    const fTagAr = overrideData?.aboutPage?.faqTagAr !== undefined ? overrideData.aboutPage.faqTagAr : faqTagAr;
+    const fHeading = overrideData?.aboutPage?.faqHeading !== undefined ? overrideData.aboutPage.faqHeading : faqHeading;
+    const fHeadingAr = overrideData?.aboutPage?.faqHeadingAr !== undefined ? overrideData.aboutPage.faqHeadingAr : faqHeadingAr;
+    const fImage1 = overrideData?.aboutPage?.faqImage1 !== undefined ? overrideData.aboutPage.faqImage1 : faqImage1;
+    const fImage2 = overrideData?.aboutPage?.faqImage2 !== undefined ? overrideData.aboutPage.faqImage2 : faqImage2;
+    const fList = overrideData?.aboutPage?.faqs !== undefined ? overrideData.aboutPage.faqs : faqs;
+    const fListAr = overrideData?.aboutPage?.faqsAr !== undefined ? overrideData.aboutPage.faqsAr : faqsAr;
+
+    const hiwHeading = overrideData?.howItWorks?.heading !== undefined ? overrideData.howItWorks.heading : howItWorksHeading;
+    const hiwDescription = overrideData?.howItWorks?.description !== undefined ? overrideData.howItWorks.description : howItWorksDescription;
+    const hiwHeadingAr = overrideData?.howItWorks?.headingAr !== undefined ? overrideData.howItWorks.headingAr : howItWorksHeadingAr;
+    const hiwDescriptionAr = overrideData?.howItWorks?.descriptionAr !== undefined ? overrideData.howItWorks.descriptionAr : howItWorksDescriptionAr;
+
+    const wcuYearsLabelVal = overrideData?.whyChooseUs?.yearsLabel !== undefined ? overrideData.whyChooseUs.yearsLabel : wcuYearsLabel;
+    const wcuHeadingVal = overrideData?.whyChooseUs?.heading !== undefined ? overrideData.whyChooseUs.heading : wcuHeading;
+    const wcuDescriptionVal = overrideData?.whyChooseUs?.description !== undefined ? overrideData.whyChooseUs.description : wcuDescription;
+    const wcuQuoteVal = overrideData?.whyChooseUs?.quote !== undefined ? overrideData.whyChooseUs.quote : wcuQuote;
+    const wcuContactLabelVal = overrideData?.whyChooseUs?.contactLabel !== undefined ? overrideData.whyChooseUs.contactLabel : wcuContactLabel;
+    const wcuPhoneVal = overrideData?.whyChooseUs?.phone !== undefined ? overrideData.whyChooseUs.phone : wcuPhone;
+
+    const wcuYearsLabelArVal = overrideData?.whyChooseUs?.yearsLabelAr !== undefined ? overrideData.whyChooseUs.yearsLabelAr : wcuYearsLabelAr;
+    const wcuHeadingArVal = overrideData?.whyChooseUs?.headingAr !== undefined ? overrideData.whyChooseUs.headingAr : wcuHeadingAr;
+    const wcuDescriptionArVal = overrideData?.whyChooseUs?.descriptionAr !== undefined ? overrideData.whyChooseUs.descriptionAr : wcuDescriptionAr;
+    const wcuQuoteArVal = overrideData?.whyChooseUs?.quoteAr !== undefined ? overrideData.whyChooseUs.quoteAr : wcuQuoteAr;
+    const wcuContactLabelArVal = overrideData?.whyChooseUs?.contactLabelAr !== undefined ? overrideData.whyChooseUs.contactLabelAr : wcuContactLabelAr;
+    const wcuPhoneArVal = overrideData?.whyChooseUs?.phoneAr !== undefined ? overrideData.whyChooseUs.phoneAr : wcuPhoneAr;
+
+    const wcuImage1Val = overrideData?.whyChooseUs?.image1 !== undefined ? overrideData.whyChooseUs.image1 : wcuImage1;
+    const wcuImage2Val = overrideData?.whyChooseUs?.image2 !== undefined ? overrideData.whyChooseUs.image2 : wcuImage2;
+
+    const sHours = overrideData?.footer?.serviceHours !== undefined ? overrideData.footer.serviceHours : serviceHours;
+
+    const fullPayload = {
+      hero: {
+        slides: heroSlides,
+        slides_ar: heroSlidesAr
+      },
+      about: {
+        image1: img1,
+        image2: img2,
+        image3: img3
+      },
+      results: {
+        pairs: pairs
+      },
+      aboutPage: {
+        whatWeDoImage1: wwdImage1,
+        whatWeDoImage2: wwdImage2,
+        whatWeDoList: wwdList,
+        whatWeDoListAr: wwdListAr,
+        faqTag: fTag,
+        faqTagAr: fTagAr,
+        faqHeading: fHeading,
+        faqHeadingAr: fHeadingAr,
+        faqImage1: fImage1,
+        faqImage2: fImage2,
+        faqs: fList,
+        faqsAr: fListAr
+      },
+      howItWorks: {
+        heading: hiwHeading,
+        description: hiwDescription,
+        headingAr: hiwHeadingAr,
+        descriptionAr: hiwDescriptionAr
+      },
+      whyChooseUs: {
+        yearsLabel: wcuYearsLabelVal,
+        heading: wcuHeadingVal,
+        description: wcuDescriptionVal,
+        quote: wcuQuoteVal,
+        contactLabel: wcuContactLabelVal,
+        phone: wcuPhoneVal,
+        yearsLabelAr: wcuYearsLabelArVal,
+        headingAr: wcuHeadingArVal,
+        descriptionAr: wcuDescriptionArVal,
+        quoteAr: wcuQuoteArVal,
+        contactLabelAr: wcuContactLabelArVal,
+        phoneAr: wcuPhoneArVal,
+        image1: wcuImage1Val,
+        image2: wcuImage2Val
+      },
+      footer: {
+        serviceHours: sHours
+      }
+    };
+
+    try {
+      const res = await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fullPayload),
+      });
+      if (res.ok) {
+        alert("Homepage settings saved successfully! Check the public website homepage to see changes.");
+        fetchPageSettings();
+      } else {
+        alert("Failed to save settings. Please try again.");
+      }
+    } catch (err) {
+      console.error("savePageSettings error:", err);
+      alert("Error saving settings.");
+    } finally {
+      setSavingPageSettings(false);
+    }
+  }
+
+  const handleMoveSlide = (index: number, dir: "up" | "down") => {
+    const newIndex = dir === "up" ? index - 1 : index + 1;
+    const slidesList = pageSettingsLangTab === "en" ? homeHeroSlides : homeHeroSlidesAr;
+    if (newIndex < 0 || newIndex >= slidesList.length) return;
+    
+    // Swap in English
+    const enList = [...homeHeroSlides];
+    const tempEn = enList[index];
+    enList[index] = enList[newIndex];
+    enList[newIndex] = tempEn;
+    setHomeHeroSlides(enList);
+
+    // Swap in Arabic
+    const arList = [...homeHeroSlidesAr];
+    const tempAr = arList[index];
+    arList[index] = arList[newIndex];
+    arList[newIndex] = tempAr;
+    setHomeHeroSlidesAr(arList);
+  };
+
+  const handleAddSlide = () => {
+    const newEnSlide = {
+      welcome: "Welcome to Revera Clinics",
+      heading: "New Slide Title",
+      description: "Expert dermatology and cosmetic surgery services designed for you.",
+      bookBtn: "Book Appointment",
+      rating: "4.5",
+      reviewCount: "(1000+ review)",
+      image: "/images/hero/slide-1.jpg"
+    };
+    const newArSlide = {
+      welcome: "مرحباً بكم في عيادات ريفيرا",
+      heading: "عنوان الشريحة الجديدة",
+      description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية.",
+      bookBtn: "احجز موعدًا",
+      rating: "4.5",
+      reviewCount: "(1000+ تقييم)",
+      image: "/images/hero/slide-1.jpg"
+    };
+    setHomeHeroSlides([...homeHeroSlides, newEnSlide]);
+    setHomeHeroSlidesAr([...homeHeroSlidesAr, newArSlide]);
+  };
+
+  const handleDeleteSlide = (index: number) => {
+    console.log("handleDeleteSlide called for index:", index);
+    console.log("Current English slides count:", homeHeroSlides.length);
+    console.log("Current Arabic slides count:", homeHeroSlidesAr.length);
+    
+    if (confirm("Are you sure you want to delete this slide?")) {
+      const newEn = homeHeroSlides.filter((_, i) => i !== index);
+      const newAr = homeHeroSlidesAr.filter((_, i) => i !== index);
+      
+      console.log("New English slides count after delete:", newEn.length);
+      console.log("New Arabic slides count after delete:", newAr.length);
+      
+      setHomeHeroSlides(newEn);
+      setHomeHeroSlidesAr(newAr);
+      
+      // Auto-save changes immediately to keep DB and UI in sync
+      savePageSettings({ hero: { slides: newEn, slides_ar: newAr } });
+    }
+  };
+
+  const handleUpdateField = (index: number, field: string, val: string) => {
+    if (pageSettingsLangTab === "en") {
+      const enList = [...homeHeroSlides];
+      enList[index] = { ...enList[index], [field]: val };
+      setHomeHeroSlides(enList);
+      // Sync image to Arabic list
+      if (field === "image" && homeHeroSlidesAr[index]) {
+        const arList = [...homeHeroSlidesAr];
+        arList[index] = { ...arList[index], image: val };
+        setHomeHeroSlidesAr(arList);
+      }
+    } else {
+      const arList = [...homeHeroSlidesAr];
+      arList[index] = { ...arList[index], [field]: val };
+      setHomeHeroSlidesAr(arList);
+      // Sync image to English list
+      if (field === "image" && homeHeroSlides[index]) {
+        const enList = [...homeHeroSlides];
+        enList[index] = { ...enList[index], image: val };
+        setHomeHeroSlides(enList);
+      }
+    }
+  };
+
   function fetchRequests() {
     setLoading(true);
-    fetch("/api/reservations?status=pending")
+    const branchParam = branch ? `&branchId=${branch}` : "";
+    fetch(`/api/reservations?status=pending${branchParam}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -937,8 +1463,24 @@ export default function AdminPage() {
       });
   }
 
+  function fetchScheduleReservations() {
+    const dateStr = [
+      scheduleDate.getFullYear(),
+      String(scheduleDate.getMonth() + 1).padStart(2, '0'),
+      String(scheduleDate.getDate()).padStart(2, '0'),
+    ].join('-');
+    fetch(`/api/reservations?date=${dateStr}`, { cache: "no-store" })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setScheduleReservations(data);
+        else setScheduleReservations([]);
+      })
+      .catch(() => setScheduleReservations([]));
+  }
+
   function fetchAllReservations() {
-    fetch("/api/reservations")
+    const branchParam = branch ? `?branchId=${branch}` : "";
+    fetch(`/api/reservations${branchParam}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -952,14 +1494,59 @@ export default function AdminPage() {
         console.error("fetchAllReservations error:", err);
         setAllReservations([]);
       });
+
+    // Automatically keep schedule view reservations in sync if it's active
+    if (calendarView === "Schedule") {
+      fetchScheduleReservations();
+    }
+  }
+
+  function getUnavailableSlots(approvedBookings: Req[], targetServiceId: number): string[] {
+    const svc = localServices.find(s => s.id === targetServiceId);
+    const targetDuration = getDurationInMinutes(svc?.duration);
+    const targetSlotsNeeded = Math.ceil(targetDuration / 15);
+    
+    const occupied = new Array(ALL_15MIN_SLOTS.length).fill(false);
+    
+    for (const b of approvedBookings) {
+      if (b.timeSlot) {
+        const norm = normaliseTo24hSlot(b.timeSlot);
+        if (norm) {
+          const idx = ALL_15MIN_SLOTS.indexOf(norm);
+          if (idx >= 0) {
+            for (let k = 0; k < targetSlotsNeeded; k++) {
+              if (idx + k < occupied.length) {
+                occupied[idx + k] = true;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    const unavailable: string[] = [];
+    for (let i = 0; i < ALL_15MIN_SLOTS.length; i++) {
+      let fit = true;
+      for (let k = 0; k < targetSlotsNeeded; k++) {
+        if (i + k >= occupied.length || occupied[i + k]) {
+          fit = false;
+          break;
+        }
+      }
+      if (!fit) {
+        unavailable.push(ALL_15MIN_SLOTS[i]);
+      }
+    }
+    return unavailable;
   }
 
   async function openApprove(r: Req) {
     setSelected(r);
     const qs = `serviceId=${r.serviceId}&date=${r.date}&status=approved`;
     const taken = await fetch("/api/reservations?" + qs).then((res) => res.json());
-    const takenSlots = taken.map((t: Req) => t.timeSlot).filter(Boolean);
-    const first = SLOTS.find((s) => !takenSlots.includes(s)) || SLOTS[0];
+    const unavailable = getUnavailableSlots(Array.isArray(taken) ? taken : [], r.serviceId);
+    setApproveUnavailableSlots(unavailable);
+    const first = SLOTS.find((s) => !unavailable.includes(s)) || SLOTS[0];
     setSlot(first);
     setDoctorName("Dr. Sara El Gamel");
   }
@@ -999,6 +1586,7 @@ export default function AdminPage() {
       status: newPatientStatus,
       timeSlot: newPatientStatus === 'approved' ? newPatientTimeSlot : null,
       doctorName: newPatientStatus === 'approved' ? newPatientDoctor : null,
+      branchId: newPatientBranch || null,
     };
 
     const res = await fetch("/api/reservations", {
@@ -1074,7 +1662,6 @@ export default function AdminPage() {
   );
 
   return (
-    <>
     <div className="min-h-screen bg-[#F2EFE9] text-[#1F251A]">
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[280px_1fr]">
         {/* Backdrop for mobile sidebar */}
@@ -1116,444 +1703,6 @@ export default function AdminPage() {
 
           <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
             {SIDEBAR_ITEMS.map((item) => {
-              if (item.label === "Prescriptions") {
-                const Icon = item.icon;
-                const active = activeNav === "All Prescriptions" || activeNav === "Medicine Library";
-                return (
-                  <div key={item.label} className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPrescriptionsExpanded(!prescriptionsExpanded);
-                      }}
-                      className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
-                        active
-                          ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
-                          : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
-                            active ? "bg-[#C4AE7C]/20 text-[#414E36]" : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
-                          }`}
-                        >
-                          <Icon size={18} />
-                        </span>
-                        <span>{item.label}</span>
-                      </div>
-                      <ChevronDown
-                        size={16}
-                        className={`text-current transition-transform duration-200 ${
-                          prescriptionsExpanded ? "" : "-rotate-90"
-                        }`}
-                      />
-                    </button>
-                    {prescriptionsExpanded && (
-                      <div className="mt-1 space-y-1 overflow-hidden rounded-2xl bg-black/15 py-1.5 pl-3 pr-1">
-                        <button
-                          type="button"
-                          onClick={() => setActiveNav("All Prescriptions")}
-                          className={`group relative flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-xs font-semibold transition-all duration-200 ${
-                            activeNav === "All Prescriptions"
-                              ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-3 rounded-l-none"
-                              : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
-                          }`}
-                        >
-                          <FileText size={14} className={activeNav === "All Prescriptions" ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
-                          <span>All Prescriptions</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveNav("Medicine Library")}
-                          className={`group relative flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-xs font-semibold transition-all duration-200 ${
-                            activeNav === "Medicine Library"
-                              ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-3 rounded-l-none"
-                              : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
-                          }`}
-                        >
-                          <Box size={14} className={activeNav === "Medicine Library" ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
-                          <span>Medicine Library</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              if (item.label === "E-Commerce") {
-                const Icon = item.icon;
-                const active = [
-                  "Products",
-                  "Product Categories",
-                  "Suppliers",
-                  "Purchases",
-                  "Batch Management",
-                  "POS System",
-                  "POS Orders",
-                  "Sales Dashboard",
-                  "Refunds",
-                  "Shipping Methods",
-                ].includes(activeNav);
-                return (
-                  <div key={item.label} className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setECommerceExpanded(!eCommerceExpanded);
-                      }}
-                      className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
-                        active
-                          ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
-                          : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
-                            active ? "bg-[#C4AE7C]/20 text-[#414E36]" : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
-                          }`}
-                        >
-                          <Icon size={18} />
-                        </span>
-                        <span>{item.label}</span>
-                      </div>
-                      <ChevronDown
-                        size={16}
-                        className={`text-current transition-transform duration-200 ${
-                          eCommerceExpanded ? "" : "-rotate-90"
-                        }`}
-                      />
-                    </button>
-                    {eCommerceExpanded && (
-                      <div className="mt-1 space-y-1 overflow-hidden rounded-2xl bg-black/15 py-1.5 pl-3 pr-1">
-                        {[
-                          { label: "Products", icon: ShoppingBag },
-                          { label: "Product Categories", icon: Layers },
-                          { label: "Suppliers", icon: Store },
-                          { label: "Purchases", icon: CreditCard },
-                          { label: "Batch Management", icon: Box },
-                          { label: "POS System", icon: Monitor },
-                          { label: "POS Orders", icon: Receipt },
-                          { label: "Sales Dashboard", icon: BarChart3 },
-                          { label: "Refunds", icon: Undo },
-                          { label: "Shipping Methods", icon: Truck },
-                        ].map((sub) => {
-                          const SubIcon = sub.icon;
-                          const subActive = activeNav === sub.label;
-                          return (
-                            <button
-                              key={sub.label}
-                              type="button"
-                              onClick={() => setActiveNav(sub.label)}
-                              className={`group relative flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-xs font-semibold transition-all duration-200 ${
-                                subActive
-                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-3 rounded-l-none"
-                                  : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
-                              }`}
-                            >
-                              <SubIcon size={14} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
-                              <span>{sub.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              if (item.label === "Finances") {
-                const Icon = item.icon;
-                const active = [
-                  "Expense Categories",
-                  "Transactions",
-                  "Expenses",
-                  "Payroll",
-                  "Finances Dashboard",
-                ].includes(activeNav);
-                return (
-                  <div key={item.label} className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFinancesExpanded(!financesExpanded);
-                      }}
-                      className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
-                        active
-                          ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
-                          : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
-                            active ? "bg-[#C4AE7C]/20 text-[#414E36]" : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
-                          }`}
-                        >
-                          <Icon size={18} />
-                        </span>
-                        <span>{item.label}</span>
-                      </div>
-                      <ChevronDown
-                        size={16}
-                        className={`text-current transition-transform duration-200 ${
-                          financesExpanded ? "" : "-rotate-90"
-                        }`}
-                      />
-                    </button>
-                    {financesExpanded && (
-                      <div className="mt-1 space-y-1 overflow-hidden rounded-2xl bg-black/15 py-1.5 pl-3 pr-1">
-                        {[
-                          { label: "Expense Categories", icon: Layers },
-                          { label: "Transactions", icon: CircleDollarSign },
-                          { label: "Expenses", icon: CircleDollarSign },
-                          { label: "Payroll", icon: CircleDollarSign },
-                          { label: "Dashboard", icon: Presentation, targetNav: "Finances Dashboard" },
-                        ].map((sub) => {
-                          const SubIcon = sub.icon;
-                          const targetVal = sub.targetNav || sub.label;
-                          const subActive = activeNav === targetVal;
-                          return (
-                            <button
-                              key={sub.label}
-                              type="button"
-                              onClick={() => setActiveNav(targetVal)}
-                              className={`group relative flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-xs font-semibold transition-all duration-200 ${
-                                subActive
-                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-3 rounded-l-none"
-                                  : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
-                              }`}
-                            >
-                              <SubIcon size={14} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
-                              <span>{sub.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              if (item.label === "Reports") {
-                const Icon = item.icon;
-                const active = [
-                  "Transaction Reports",
-                  "Customer Transaction History",
-                  "Provider Performance Reports",
-                  "Provider Performance Date Range Reports",
-                  "Service Performance Reports",
-                ].includes(activeNav);
-                return (
-                  <div key={item.label} className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReportsExpanded(!reportsExpanded);
-                      }}
-                      className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
-                        active
-                          ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
-                          : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
-                            active ? "bg-[#C4AE7C]/20 text-[#414E36]" : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
-                          }`}
-                        >
-                          <Icon size={18} />
-                        </span>
-                        <span>{item.label}</span>
-                      </div>
-                      <ChevronDown
-                        size={16}
-                        className={`text-current transition-transform duration-200 ${
-                          reportsExpanded ? "" : "-rotate-90"
-                        }`}
-                      />
-                    </button>
-                    {reportsExpanded && (
-                      <div className="mt-1 space-y-1 overflow-hidden rounded-2xl bg-black/15 py-1.5 pl-3 pr-1">
-                        {[
-                          { label: "Transaction Reports", icon: CircleDollarSign },
-                          { label: "Customer Transaction History", icon: CircleUser },
-                          { label: "Provider Performance Reports", icon: Presentation },
-                          { label: "Provider Performance Date Range Reports", icon: Presentation },
-                          { label: "Service Performance Reports", icon: BarChart3 },
-                        ].map((sub) => {
-                          const SubIcon = sub.icon;
-                          const subActive = activeNav === sub.label;
-                          return (
-                            <button
-                              key={sub.label}
-                              type="button"
-                              onClick={() => setActiveNav(sub.label)}
-                              className={`group relative flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-xs font-semibold transition-all duration-200 ${
-                                subActive
-                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-3 rounded-l-none"
-                                  : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
-                              }`}
-                            >
-                              <SubIcon size={14} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
-                              <span>{sub.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              if (item.label === "Inventory") {
-                const Icon = item.icon;
-                const active = [
-                  "Product Categories",
-                  "Products",
-                  "Procurement",
-                  "Adjustments",
-                ].includes(activeNav);
-                return (
-                  <div key={item.label} className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInventoryExpanded(!inventoryExpanded);
-                      }}
-                      className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
-                        active
-                          ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
-                          : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
-                            active ? "bg-[#C4AE7C]/20 text-[#414E36]" : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
-                          }`}
-                        >
-                          <Icon size={18} />
-                        </span>
-                        <span>{item.label}</span>
-                      </div>
-                      <ChevronDown
-                        size={16}
-                        className={`text-current transition-transform duration-200 ${
-                          inventoryExpanded ? "" : "-rotate-90"
-                        }`}
-                      />
-                    </button>
-                    {inventoryExpanded && (
-                      <div className="mt-1 space-y-1 overflow-hidden rounded-2xl bg-black/15 py-1.5 pl-3 pr-1">
-                        {[
-                          { label: "Product Categories", icon: Layers },
-                          { label: "Products", icon: Tag },
-                          { label: "Procurement", icon: PlusCircle },
-                          { label: "Adjustments", icon: Pencil },
-                        ].map((sub) => {
-                          const SubIcon = sub.icon;
-                          const subActive = activeNav === sub.label;
-                          return (
-                            <button
-                              key={sub.label}
-                              type="button"
-                              onClick={() => setActiveNav(sub.label)}
-                              className={`group relative flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-xs font-semibold transition-all duration-200 ${
-                                subActive
-                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-3 rounded-l-none"
-                                  : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
-                              }`}
-                            >
-                              <SubIcon size={14} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
-                              <span>{sub.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
-              if (item.label === "SMS Management") {
-                const Icon = item.icon;
-                const active = [
-                  "SMS Templates",
-                  "End User Groups",
-                  "SMS Automation",
-                  "Marketing Campaigns",
-                  "Instant SMS",
-                  "SMS Logs",
-                  "Follow-up",
-                ].includes(activeNav);
-                return (
-                  <div key={item.label} className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSMSExpanded(!smsExpanded);
-                      }}
-                      className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
-                        active
-                          ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
-                          : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
-                            active ? "bg-[#C4AE7C]/20 text-[#414E36]" : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
-                          }`}
-                        >
-                          <Icon size={18} />
-                        </span>
-                        <span>{item.label}</span>
-                      </div>
-                      <ChevronDown
-                        size={16}
-                        className={`text-current transition-transform duration-200 ${
-                          smsExpanded ? "" : "-rotate-90"
-                        }`}
-                      />
-                    </button>
-                    {smsExpanded && (
-                      <div className="mt-1 space-y-1 overflow-hidden rounded-2xl bg-black/15 py-1.5 pl-3 pr-1">
-                        {[
-                          { label: "SMS Templates", icon: MessageSquare },
-                          { label: "End User Groups", icon: Users },
-                          { label: "SMS Automation", icon: Settings },
-                          { label: "Marketing Campaigns", icon: Megaphone },
-                          { label: "Instant SMS", icon: Quote },
-                          { label: "SMS Logs", icon: MessageSquare },
-                          { label: "Follow-up", icon: Megaphone },
-                        ].map((sub) => {
-                          const SubIcon = sub.icon;
-                          const subActive = activeNav === sub.label;
-                          return (
-                            <button
-                              key={sub.label}
-                              type="button"
-                              onClick={() => setActiveNav(sub.label)}
-                              className={`group relative flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-xs font-semibold transition-all duration-200 ${
-                                subActive
-                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-3 rounded-l-none"
-                                  : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
-                              }`}
-                            >
-                              <SubIcon size={14} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
-                              <span>{sub.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
               if (item.label === "Settings") {
                 const Icon = item.icon;
                 const active = [
@@ -1561,10 +1710,10 @@ export default function AdminPage() {
                   "Service Hours",
                   "Branches",
                   "Users",
-                  "Manage Areas",
-                  "Roles and permissions",
-                  "SMS Configuration",
-                  "Medical Forms",
+                  "Booking Settings",
+                  "Notification Settings",
+                  "Queue Settings",
+                  "Pages Settings",
                 ].includes(activeNav);
                 return (
                   <div key={item.label} className="space-y-1">
@@ -1603,10 +1752,10 @@ export default function AdminPage() {
                           { label: "Service Hours", icon: Clock },
                           { label: "Branches", icon: MapIcon },
                           { label: "Users", icon: Users },
-                          { label: "Manage Areas", icon: MapIcon },
-                          { label: "Roles and permissions", icon: Shield },
-                          { label: "SMS Configuration", icon: MessageSquare },
-                          { label: "Medical Forms", icon: ClipboardList },
+                          { label: "Booking Settings", icon: CalendarDays },
+                          { label: "Notification Settings", icon: Bell },
+                          { label: "Queue Settings", icon: ListOrdered },
+                          { label: "Pages Settings", icon: FileText },
                         ].map((sub) => {
                           const SubIcon = sub.icon;
                           const subActive = activeNav === sub.label;
@@ -1683,8 +1832,8 @@ export default function AdminPage() {
                   onChange={(e) => setBranch(e.target.value)}
                   className="appearance-none rounded-xl border border-[#414E36]/15 bg-white py-2 pl-3 pr-8 text-sm font-medium text-[#1F251A] shadow-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 cursor-pointer"
                 >
-                  {BRANCHES.map((b) => (
-                    <option key={b} value={b}>{b}</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name_en}</option>
                   ))}
                 </select>
                 <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
@@ -1749,118 +1898,75 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {providerTab === "Providers" ? (
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
-                        <Filter size={16} /> Filter
-                      </button>
-                      <button 
-                        onClick={handleAddProvider}
-                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                      >
-                        <Plus size={16} /> Add
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-5 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
-                        Show Filters
-                      </button>
-                      <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-5 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
-                        Monthly Report
-                      </button>
-                      <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-5 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
-                        Provider Report
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
+                      <Filter size={16} /> Filter
+                    </button>
+                    <button
+                      onClick={openAddProviderModal}
+                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                    >
+                      <Plus size={16} /> Add
+                    </button>
+                  </div>
                 </div>
 
-                {providerTab === "Providers" ? (
-                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                    <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                      <span>Name</span>
-                      <span>Bookings</span>
-                      <span>Services</span>
-                      <span>Rating</span>
-                    </div>
-                    <div className="divide-y divide-[#E6E9EB]">
-                      {providers.map((provider) => (
-                        <div key={provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
-                          <span className="font-semibold text-[#1F251A]">{provider.name}</span>
-                          <span>{provider.bookings}</span>
-                          <div className="flex flex-wrap items-center gap-2">
-                            {provider.services.map((service: string) => (
-                              <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
-                                {service}
-                              </span>
-                            ))}
-                            {provider.more > 0 && (
-                              <span className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36]">
-                                +{provider.more}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="inline-flex items-center gap-2 text-[#5A6A51]">
-                              <Star size={16} className="text-[#C4AE7C]" />
-                              {provider.rating}
+                <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                  <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                    <span>Name</span>
+                    <span>Bookings</span>
+                    <span>Services</span>
+                    <span>Rating</span>
+                  </div>
+                  <div className="divide-y divide-[#E6E9EB]">
+                    {providers.map((provider) => (
+                      <div key={provider.id || provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
+                        <span className="font-semibold text-[#1F251A]">{provider.name}</span>
+                        <span>{provider.bookings}</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {provider.services.slice(0, 2).map((service: string) => (
+                            <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
+                              {service}
                             </span>
-                            <div className="flex items-center gap-2">
-                              <button className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]">
-                                <Info size={16} />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteProvider(provider.id, provider.name)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-[#FFF5F5] text-red-600 transition hover:bg-red-100"
-                                title="Delete provider"
+                          ))}
+                          {provider.services.length > 2 && (
+                            <span
+                              className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36] cursor-help"
+                              title={provider.services.slice(2).join(", ")}
+                            >
+                              +{provider.services.length - 2} More
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="inline-flex items-center gap-2 text-[#5A6A51]">
+                            <Star size={16} className="text-[#C4AE7C]" />
+                            {provider.rating}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {provider.id && (
+                              <button
+                                onClick={() => handleDeleteProvider(provider.id)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
+                                title="Delete Provider"
                               >
-                                <Trash2 size={16} />
+                                <Trash2 size={15} />
                               </button>
-                            </div>
+                            )}
+                            <button
+                              onClick={() => openEditProviderModal(provider)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
+                              title="Edit Provider"
+                            >
+                              <Pencil size={14} />
+                            </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[1200px] text-sm text-left">
-                        <thead>
-                          <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[10px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                            <th className="px-6 py-4">ID</th>
-                            <th className="px-6 py-4">Provider Name</th>
-                            <th className="px-6 py-4">Provider Phone</th>
-                            <th className="px-6 py-4">Branch</th>
-                            <th className="px-6 py-4">Check In Date</th>
-                            <th className="px-6 py-4">Check In Time</th>
-                            <th className="px-6 py-4">Check Out Time</th>
-                            <th className="px-6 py-4">Delay</th>
-                            <th className="px-6 py-4">Early Departure</th>
-                            <th className="px-6 py-4">Working Duration</th>
-                            <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4 text-center">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td colSpan={12} className="px-6 py-24 text-center text-[#5A6A51] font-medium bg-white">
-                              <div className="flex flex-col items-center justify-center gap-3">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EDF1EC] text-[#5A6A51]">
-                                  <CalendarDays size={20} />
-                                </div>
-                                <p className="text-sm font-semibold text-[#1F251A]">No data available!</p>
-                              </div>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
-
             </section>
           )}
 
@@ -1919,7 +2025,7 @@ export default function AdminPage() {
               {/* Category Accordions */}
               <div className="flex flex-col gap-4">
                 {localCategories.map((cat) => {
-                  const catServices = groupedServices[cat.key] ?? [];
+                  const catServices = (groupedServices[cat.key] ?? []).filter((svc) => (serviceToggles[svc.id]?.visible ?? true));
                   const isExpanded = expandedCategories[cat.key] ?? true;
                   const hasMatch = catServices.length > 0;
                   if (serviceSearch.trim() && !hasMatch) return null;
@@ -2050,8 +2156,7 @@ export default function AdminPage() {
                                   {catServices.map((svc) => {
                                     const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
                                     const isInactive = !toggles.active;
-                                    const isInvisible = !toggles.visible;
-                                    const rowFaded = isInactive || isInvisible;
+                                    const rowFaded = isInactive;
                                     return (
                                       <tr
                                         key={svc.id}
@@ -2101,9 +2206,6 @@ export default function AdminPage() {
                                             <p className={`font-semibold ${ rowFaded ? "line-through text-[#5A6A51]" : "text-[#1F251A]" }`}>{svc.en}</p>
                                             {isInactive && (
                                               <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-500">Inactive</span>
-                                            )}
-                                            {isInvisible && (
-                                              <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-600">Hidden</span>
                                             )}
                                           </div>
                                         </td>
@@ -2273,7 +2375,7 @@ export default function AdminPage() {
                       </button>
                       <button
                         onClick={() => {
-                          const updated = sortServices(localServices.filter(s => s.id !== deleteServiceTarget.id));
+                          const updated = localServices.filter(s => s.id !== deleteServiceTarget.id);
                           setLocalServices(updated);
                           saveDynamicServices(updated);
                           setDeleteServiceTarget(null);
@@ -2286,7 +2388,6 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
-
 
               {/* ── ADD CATEGORY MODAL ── */}
               {showAddCategoryModal && (
@@ -2326,8 +2427,7 @@ export default function AdminPage() {
                         onClick={() => {
                           if (!newCategoryNameEn.trim()) return;
                           const key = newCategoryNameEn.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-                          const nextSortOrder = Math.max(0, ...localCategories.map(c => c.sortOrder ?? 0)) + 1;
-                          const updated = [...localCategories, { key, en: newCategoryNameEn.trim(), ar: "", sortOrder: nextSortOrder }];
+                          const updated = [...localCategories, { key, en: newCategoryNameEn.trim(), ar: "" }];
                           setLocalCategories(updated);
                           saveDynamicCategories(updated);
                           setExpandedCategories(prev => ({ ...prev, [key]: true }));
@@ -2402,14 +2502,20 @@ export default function AdminPage() {
                             type="file"
                             accept="image/*"
                             className="hidden"
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setServiceImageUrl(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
+                                try {
+                                  const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                  setServiceImageUrl(compressed);
+                                } catch (err) {
+                                  console.error("Failed to compress service image, using original:", err);
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setServiceImageUrl(reader.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
                               }
                             }}
                           />
@@ -2447,7 +2553,9 @@ export default function AdminPage() {
                             onChange={(e) => setServiceDuration(e.target.value)}
                             className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                           >
+                            <option value="0:15 Hours">0:15 Hours</option>
                             <option value="0:30 Hours">0:30 Hours</option>
+                            <option value="0:45 Hours">0:45 Hours</option>
                             <option value="1:00 Hours">1:00 Hours</option>
                             <option value="1:30 Hours">1:30 Hours</option>
                             <option value="2:00 Hours">2:00 Hours</option>
@@ -2763,18 +2871,17 @@ export default function AdminPage() {
                               return s;
                             });
                             
-                            const sortedServices = sortServices(updatedServices);
-                            setLocalServices(sortedServices);
-                            saveDynamicServices(sortedServices);
+                            setLocalServices(updatedServices);
+                            saveDynamicServices(updatedServices);
 
                             const defaultBranch = serviceBranchPricing.find(b => b.isDefault);
                             if (defaultBranch) {
-                                setServiceToggle(editingService.id, "active", defaultBranch.status);
-                                setServiceToggle(editingService.id, "visible", defaultBranch.visible);
-                                setServiceToggles(prev => ({
-                                  ...prev,
-                                  [editingService.id]: { visible: defaultBranch.visible, active: defaultBranch.status }
-                                }));
+                              setServiceToggle(editingService.id, "active", defaultBranch.status);
+                              setServiceToggle(editingService.id, "visible", defaultBranch.visible);
+                              setServiceToggles(prev => ({
+                                ...prev,
+                                [editingService.id]: { visible: defaultBranch.visible, active: defaultBranch.status }
+                              }));
                             }
                           } else {
                             // Add mode
@@ -2798,9 +2905,8 @@ export default function AdminPage() {
                             };
 
                             const updatedServices = [...localServices, newService];
-                            const sortedServices = sortServices(updatedServices);
-                            setLocalServices(sortedServices);
-                            saveDynamicServices(sortedServices);
+                            setLocalServices(updatedServices);
+                            saveDynamicServices(updatedServices);
 
                             const defaultBranch = serviceBranchPricing.find(b => b.isDefault);
                             const isDefaultActive = defaultBranch ? defaultBranch.status : true;
@@ -4949,6 +5055,1523 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* ── PAGES SETTINGS VIEW ── */}
+          {activeNav === "Pages Settings" && (
+            <div className="space-y-6">
+              <div className="mb-2">
+                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80">Settings</p>
+                <h2 className="mt-2 text-4xl font-semibold text-[#1F251A]">Pages Settings</h2>
+                <p className="mt-2 text-sm text-[#5A6A51]">Edit the content displayed on each public-facing page of the website.</p>
+              </div>
+
+              {/* Page tabs */}
+              <div className="flex items-center gap-1 p-1 w-fit rounded-full border border-[#414E36]/12 bg-white shadow-sm">
+                {(["Home", "About Us", "Services"] as const).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setPagesSettingsTab(page)}
+                    className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+                      pagesSettingsTab === page
+                        ? "bg-[#414E36] text-[#FBFBF9] shadow-sm"
+                        : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+
+              {/* Home Page */}
+              {pagesSettingsTab === "Home" && (() => {
+                const slidesList = pageSettingsLangTab === "en" ? homeHeroSlides : homeHeroSlidesAr;
+                return (
+                  <div className="space-y-6">
+                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+                      <div>
+                        <h3 className="text-2xl font-bold text-[#1F251A]">Hero Slider Editor</h3>
+                        <p className="text-sm text-[#5A6A51] mt-1">Manage slides, headings, descriptions, and background images.</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={handleAddSlide}
+                          className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/30 bg-transparent px-5 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
+                        >
+                          <Plus size={16} /> Add New Slide
+                        </button>
+                        <button
+                          disabled={savingPageSettings}
+                          onClick={() => savePageSettings({ hero: { slides: homeHeroSlides, slides_ar: homeHeroSlidesAr } })}
+                          className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                        >
+                          {savingPageSettings ? "Saving..." : "Save All Changes"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Language Tab Switcher */}
+                    <div className="flex border-b border-[#F2EFE9] bg-white px-8 pt-4 rounded-t-[40px] shadow-[0_10px_30px_rgba(47,61,41,0.02)]">
+                      <button
+                        onClick={() => setPageSettingsLangTab("en")}
+                        className={`pb-4 px-6 text-sm font-bold transition-all duration-200 border-b-2 ${
+                          pageSettingsLangTab === "en" ? "border-[#414E36] text-[#414E36]" : "border-transparent text-[#5A6A51]/70 hover:text-[#414E36]"
+                        }`}
+                      >
+                        English Version
+                      </button>
+                      <button
+                        onClick={() => setPageSettingsLangTab("ar")}
+                        className={`pb-4 px-6 text-sm font-bold transition-all duration-200 border-b-2 ${
+                          pageSettingsLangTab === "ar" ? "border-[#414E36] text-[#414E36]" : "border-transparent text-[#5A6A51]/70 hover:text-[#414E36]"
+                        }`}
+                      >
+                        Arabic Version (العربية)
+                      </button>
+                    </div>
+
+                    {loadingPageSettings ? (
+                      <div className="rounded-b-[40px] bg-white p-12 shadow-[0_30px_80px_rgba(47,61,41,0.07)] flex justify-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#414E36] border-t-transparent" />
+                      </div>
+                    ) : (
+                      <div className="rounded-b-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-8">
+                        {slidesList.length === 0 ? (
+                          <div className="text-center py-12">
+                            <p className="text-sm text-[#5A6A51]">No slides found. Click "Add New Slide" to start.</p>
+                          </div>
+                        ) : (
+                          slidesList.map((slide: any, index: number) => (
+                            <div key={index} className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] p-6 space-y-6 relative group">
+                              
+                              {/* Slide header & order controls */}
+                              <div className="flex items-center justify-between border-b border-[#414E36]/8 pb-4">
+                                <h4 className="font-bold text-[#414E36] text-lg">Slide #{index + 1}</h4>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    disabled={index === 0}
+                                    onClick={() => handleMoveSlide(index, "up")}
+                                    className="p-2 rounded-full border border-[#414E36]/15 hover:bg-[#F2EFE9] text-[#414E36] disabled:opacity-30 disabled:hover:bg-transparent transition"
+                                    title="Move Up"
+                                  >
+                                    <ArrowUp size={14} />
+                                  </button>
+                                  <button
+                                    disabled={index === slidesList.length - 1}
+                                    onClick={() => handleMoveSlide(index, "down")}
+                                    className="p-2 rounded-full border border-[#414E36]/15 hover:bg-[#F2EFE9] text-[#414E36] disabled:opacity-30 disabled:hover:bg-transparent transition"
+                                    title="Move Down"
+                                  >
+                                    <ArrowDown size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteSlide(index)}
+                                    className="ml-2 inline-flex items-center gap-1 rounded-2xl bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 transition"
+                                  >
+                                    <Trash2 size={12} /> Delete
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Two column: Image and Texts */}
+                              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                
+                                {/* Left column: Image picker */}
+                                <div className="lg:col-span-1 space-y-4">
+                                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Slide Background Image</label>
+                                  <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden bg-gray-100 border border-dashed border-[#414E36]/20 flex flex-col items-center justify-center group/img">
+                                    {slide.image ? (
+                                      <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={slide.image} alt="Preview" className="h-full w-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                          <span className="text-xs text-white font-medium">Click to change</span>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <div className="text-center p-4">
+                                        <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
+                                        <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
+                                      </div>
+                                    )}
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="absolute inset-0 opacity-0 cursor-pointer"
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          try {
+                                            const compressed = await compressImage(file, 1920, 1080, 0.75);
+                                            handleUpdateField(index, "image", compressed);
+                                          } catch (err) {
+                                            console.error("Failed to compress hero image, using original:", err);
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                              handleUpdateField(index, "image", reader.result as string);
+                                            };
+                                            reader.readAsDataURL(file);
+                                          }
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[11px] font-semibold text-[#5A6A51]/80 mb-1.5">Or enter Image URL/Path</label>
+                                    <input
+                                      type="text"
+                                      value={slide.image || ""}
+                                      onChange={(e) => handleUpdateField(index, "image", e.target.value)}
+                                      placeholder="/images/hero/slide-1.jpg"
+                                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Right column: Slide texts fields */}
+                                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1.5">Welcome Badge Text</label>
+                                    <input
+                                      type="text"
+                                      value={slide.welcome || ""}
+                                      onChange={(e) => handleUpdateField(index, "welcome", e.target.value)}
+                                      placeholder="e.g. Welcome to Revera Clinics"
+                                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                                    />
+                                  </div>
+
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1.5">Heading Title</label>
+                                    <input
+                                      type="text"
+                                      value={slide.heading || ""}
+                                      onChange={(e) => handleUpdateField(index, "heading", e.target.value)}
+                                      placeholder="e.g. Transform Your Beauty Naturally!"
+                                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                                    />
+                                  </div>
+
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1.5">Slide Description</label>
+                                    <textarea
+                                      value={slide.description || ""}
+                                      onChange={(e) => handleUpdateField(index, "description", e.target.value)}
+                                      placeholder="Enter slide paragraph content..."
+                                      rows={3}
+                                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] resize-none"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1.5">CTA Button Text</label>
+                                    <input
+                                      type="text"
+                                      value={slide.bookBtn || ""}
+                                      onChange={(e) => handleUpdateField(index, "bookBtn", e.target.value)}
+                                      placeholder="e.g. Book Appointment"
+                                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                                    />
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1.5">Rating</label>
+                                      <input
+                                        type="text"
+                                        value={slide.rating || ""}
+                                        onChange={(e) => handleUpdateField(index, "rating", e.target.value)}
+                                        placeholder="4.5"
+                                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1.5">Review Count</label>
+                                      <input
+                                        type="text"
+                                        value={slide.reviewCount || ""}
+                                        onChange={(e) => handleUpdateField(index, "reviewCount", e.target.value)}
+                                        placeholder="(1000+ review)"
+                                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                                      />
+                                    </div>
+                                  </div>
+
+                                </div>
+
+                              </div>
+
+                            </div>
+                          ))
+                        )}
+
+                        {/* Bottom action buttons */}
+                        {slidesList.length > 0 && (
+                          <div className="flex justify-end pt-4 border-t border-[#F2EFE9] gap-3">
+                            <button
+                              onClick={handleAddSlide}
+                              className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/30 bg-transparent px-5 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
+                            >
+                              <Plus size={16} /> Add New Slide
+                            </button>
+                            <button
+                              disabled={savingPageSettings}
+                              onClick={() => savePageSettings({ hero: { slides: homeHeroSlides, slides_ar: homeHeroSlidesAr } })}
+                              className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                            >
+                              {savingPageSettings ? "Saving..." : "Save All Changes"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Before / After Results Editor */}
+                    <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#F2EFE9]">
+                        <div>
+                          <h3 className="text-2xl font-bold text-[#1F251A]">Before / After Results</h3>
+                          <p className="text-sm text-[#5A6A51] mt-1">Manage the before-and-after photo catalog shown on the homepage.</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newPair = {
+                              id: Date.now(),
+                              before: "/images/before-after/1-before.jpeg",
+                              after: "/images/before-after/1-after.jpeg"
+                            };
+                            setBeforeAfterPairs([...beforeAfterPairs, newPair]);
+                          }}
+                          className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/30 bg-transparent px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
+                        >
+                          <Plus size={16} /> Add Result Pair
+                        </button>
+                      </div>
+
+                      {beforeAfterPairs.length === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="text-sm text-[#5A6A51]">No before/after pairs found. Click "Add Result Pair" to start.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          {beforeAfterPairs.map((pair, index) => (
+                            <div key={pair.id || index} className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] p-6 space-y-4 relative group">
+                              <div className="flex items-center justify-between border-b border-[#414E36]/8 pb-2">
+                                <h4 className="font-bold text-[#414E36] text-sm">Result Case #{index + 1}</h4>
+                                <button
+                                  onClick={() => {
+                                    if (confirm("Are you sure you want to delete this result case?")) {
+                                      const updated = beforeAfterPairs.filter((_, i) => i !== index);
+                                      setBeforeAfterPairs(updated);
+                                      savePageSettings({ results: { pairs: updated } });
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-xl bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-100 transition"
+                                >
+                                  <Trash2 size={11} /> Delete
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                {/* Before Photo Column */}
+                                <div className="space-y-2">
+                                  <span className="block text-[11px] font-bold text-[#5A6A51] uppercase tracking-wide">Before</span>
+                                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group/img">
+                                    {pair.before ? (
+                                      <>
+                                        <Image
+                                          src={pair.before}
+                                          alt="Before Case"
+                                          fill
+                                          className="object-cover"
+                                          unoptimized
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                                          <span className="text-white text-[10px] font-semibold px-2 py-1 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <div className="text-center p-2">
+                                        <Upload className="mx-auto h-6 w-6 text-[#5A6A51]/60 mb-1" />
+                                        <span className="text-[10px] text-[#5A6A51]/60 font-medium">Upload File</span>
+                                      </div>
+                                    )}
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="absolute inset-0 opacity-0 cursor-pointer"
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          try {
+                                            const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                            const updated = [...beforeAfterPairs];
+                                            updated[index] = { ...updated[index], before: compressed };
+                                            setBeforeAfterPairs(updated);
+                                          } catch (err) {
+                                            console.error("Failed to compress before image, using original:", err);
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                              const updated = [...beforeAfterPairs];
+                                              updated[index] = { ...updated[index], before: reader.result as string };
+                                              setBeforeAfterPairs(updated);
+                                            };
+                                            reader.readAsDataURL(file);
+                                          }
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={pair.before || ""}
+                                    onChange={(e) => {
+                                      const updated = [...beforeAfterPairs];
+                                      updated[index] = { ...updated[index], before: e.target.value };
+                                      setBeforeAfterPairs(updated);
+                                    }}
+                                    placeholder="Image URL"
+                                    className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-[11px] text-[#1F251A] outline-none"
+                                  />
+                                </div>
+
+                                {/* After Photo Column */}
+                                <div className="space-y-2">
+                                  <span className="block text-[11px] font-bold text-[#5A6A51] uppercase tracking-wide">After</span>
+                                  <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group/img">
+                                    {pair.after ? (
+                                      <>
+                                        <Image
+                                          src={pair.after}
+                                          alt="After Case"
+                                          fill
+                                          className="object-cover"
+                                          unoptimized
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                                          <span className="text-white text-[10px] font-semibold px-2 py-1 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <div className="text-center p-2">
+                                        <Upload className="mx-auto h-6 w-6 text-[#5A6A51]/60 mb-1" />
+                                        <span className="text-[10px] text-[#5A6A51]/60 font-medium">Upload File</span>
+                                      </div>
+                                    )}
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="absolute inset-0 opacity-0 cursor-pointer"
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          try {
+                                            const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                            const updated = [...beforeAfterPairs];
+                                            updated[index] = { ...updated[index], after: compressed };
+                                            setBeforeAfterPairs(updated);
+                                          } catch (err) {
+                                            console.error("Failed to compress after image, using original:", err);
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                              const updated = [...beforeAfterPairs];
+                                              updated[index] = { ...updated[index], after: reader.result as string };
+                                              setBeforeAfterPairs(updated);
+                                            };
+                                            reader.readAsDataURL(file);
+                                          }
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={pair.after || ""}
+                                    onChange={(e) => {
+                                      const updated = [...beforeAfterPairs];
+                                      updated[index] = { ...updated[index], after: e.target.value };
+                                      setBeforeAfterPairs(updated);
+                                    }}
+                                    placeholder="Image URL"
+                                    className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-[11px] text-[#1F251A] outline-none"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex justify-end pt-4 border-t border-[#F2EFE9] gap-3">
+                        <button
+                          disabled={savingPageSettings}
+                          onClick={() => savePageSettings()}
+                          className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                        >
+                          {savingPageSettings ? "Saving..." : "Save All Changes"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+
+              {/* About Us Page */}
+              {pagesSettingsTab === "About Us" && (
+                <div className="space-y-8">
+                  <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                  <div>
+                    <h3 className="text-2xl font-bold text-[#1F251A]">About Section Photos</h3>
+                    <p className="text-sm text-[#5A6A51] mt-1">Upload or edit the three main images displayed in the homepage About section.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
+                    {/* Image 1: Left Doctor Portrait */}
+                    <div className="space-y-4">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 1: Doctor Portrait (Foreground)</label>
+                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
+                        {aboutImage1 || "/images/doctor/portrait-about.jpg" ? (
+                          <>
+                            <Image
+                              src={aboutImage1 || "/images/doctor/portrait-about.jpg"}
+                              alt="Foreground Portrait"
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center p-4">
+                            <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
+                            <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                setAboutImage1(compressed);
+                              } catch (err) {
+                                console.error("Failed to compress portrait 1, using original:", err);
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setAboutImage1(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
+                        <input
+                          type="text"
+                          value={aboutImage1}
+                          onChange={(e) => setAboutImage1(e.target.value)}
+                          placeholder="/images/doctor/portrait-about.jpg"
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Image 2: Right Doctor Portrait */}
+                    <div className="space-y-4">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 2: Doctor Portrait (Background)</label>
+                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
+                        {aboutImage2 || "/images/doctor/portrait-main.jpg" ? (
+                          <>
+                            <Image
+                              src={aboutImage2 || "/images/doctor/portrait-main.jpg"}
+                              alt="Background Portrait"
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center p-4">
+                            <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
+                            <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                setAboutImage2(compressed);
+                              } catch (err) {
+                                console.error("Failed to compress portrait 2, using original:", err);
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setAboutImage2(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
+                        <input
+                          type="text"
+                          value={aboutImage2}
+                          onChange={(e) => setAboutImage2(e.target.value)}
+                          placeholder="/images/doctor/portrait-main.jpg"
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Image 3: Clinic Interior */}
+                    <div className="space-y-4">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 3: Clinic Interior</label>
+                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
+                        {aboutImage3 || "/images/clinic/interior.jpg" ? (
+                          <>
+                            <Image
+                              src={aboutImage3 || "/images/clinic/interior.jpg"}
+                              alt="Clinic Interior"
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center p-4">
+                            <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
+                            <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                setAboutImage3(compressed);
+                              } catch (err) {
+                                console.error("Failed to compress clinic interior, using original:", err);
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setAboutImage3(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
+                        <input
+                          type="text"
+                          value={aboutImage3}
+                          onChange={(e) => setAboutImage3(e.target.value)}
+                          placeholder="/images/clinic/interior.jpg"
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-4 border-t border-[#F2EFE9] gap-3">
+                      <button
+                        disabled={savingPageSettings}
+                        onClick={() => savePageSettings()}
+                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] duration-150 cursor-pointer"
+                      >
+                        {savingPageSettings ? "Saving..." : "Save All Changes"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                    <div>
+                      <h3 className="text-2xl font-bold text-[#1F251A]">What We Do</h3>
+                      <p className="text-sm text-[#5A6A51] mt-1">Upload or edit the photos and modify checklist items shown in the "What We Do" section on the About Us page.</p>
+                    </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                    {/* What We Do Photo 1: Left Before/After Collage */}
+                    <div className="space-y-4">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">What We Do: Photo 1 (Left Collage)</label>
+                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
+                        {whatWeDoImage1 || "/images/clinic/interior.jpg" ? (
+                          <>
+                            <Image
+                              src={whatWeDoImage1 || "/images/clinic/interior.jpg"}
+                              alt="What We Do Left Image"
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center p-4">
+                            <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
+                            <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                setWhatWeDoImage1(compressed);
+                              } catch (err) {
+                                console.error("Failed to compress what we do 1, using original:", err);
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setWhatWeDoImage1(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
+                        <input
+                          type="text"
+                          value={whatWeDoImage1}
+                          onChange={(e) => setWhatWeDoImage1(e.target.value)}
+                          placeholder="/images/clinic/interior.jpg"
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* What We Do Photo 2: Right Circular Image */}
+                    <div className="space-y-4">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">What We Do: Photo 2 (Right Treatment)</label>
+                      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
+                        {whatWeDoImage2 || "/images/clinic/video-thumbnail.jpg" ? (
+                          <>
+                            <Image
+                              src={whatWeDoImage2 || "/images/clinic/video-thumbnail.jpg"}
+                              alt="What We Do Right Image"
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center p-4">
+                            <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
+                            <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              try {
+                                const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                setWhatWeDoImage2(compressed);
+                              } catch (err) {
+                                console.error("Failed to compress what we do 2, using original:", err);
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setWhatWeDoImage2(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
+                        <input
+                          type="text"
+                          value={whatWeDoImage2}
+                          onChange={(e) => setWhatWeDoImage2(e.target.value)}
+                          placeholder="/images/clinic/video-thumbnail.jpg"
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <hr className="border-[#F2EFE9] my-6" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                    {/* English Checklist */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-[#1F251A]">English Checklist Items</h4>
+                        <button
+                          type="button"
+                          onClick={() => setWhatWeDoList([...whatWeDoList, ""])}
+                          className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          + Add Item
+                        </button>
+                      </div>
+                      {whatWeDoList.map((item, index) => (
+                        <div key={index} className="flex items-end gap-2">
+                          <div className="flex-1 space-y-1">
+                            <label className="block text-xs font-semibold text-[#5A6A51]">Item {index + 1}</label>
+                            <input
+                              type="text"
+                              value={item}
+                              onChange={(e) => {
+                                const newList = [...whatWeDoList];
+                                newList[index] = e.target.value;
+                                setWhatWeDoList(newList);
+                              }}
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                              placeholder={`Checklist Item ${index + 1}`}
+                            />
+                          </div>
+                          {whatWeDoList.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newList = whatWeDoList.filter((_, i) => i !== index);
+                                setWhatWeDoList(newList);
+                              }}
+                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition duration-155 cursor-pointer"
+                              title="Delete Item"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Arabic Checklist */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => setWhatWeDoListAr([...whatWeDoListAr, ""])}
+                          className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          + إضافة عنصر
+                        </button>
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">عناصر القائمة باللغة العربية</h4>
+                      </div>
+                      {whatWeDoListAr.map((item, index) => (
+                        <div key={index} className="flex items-end gap-2" dir="rtl">
+                          <div className="flex-1 space-y-1">
+                            <label className="block text-xs font-semibold text-[#5A6A51] text-right">العنصر {index + 1}</label>
+                            <input
+                              type="text"
+                              value={item}
+                              onChange={(e) => {
+                                const newList = [...whatWeDoListAr];
+                                newList[index] = e.target.value;
+                                setWhatWeDoListAr(newList);
+                              }}
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
+                              placeholder={`عنصر القائمة ${index + 1}`}
+                            />
+                          </div>
+                          {whatWeDoListAr.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newList = whatWeDoListAr.filter((_, i) => i !== index);
+                                setWhatWeDoListAr(newList);
+                              }}
+                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition duration-155 cursor-pointer"
+                              title="حذف العنصر"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-4 border-t border-[#F2EFE9] gap-3">
+                    <button
+                      disabled={savingPageSettings}
+                      onClick={() => savePageSettings()}
+                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                    >
+                      {savingPageSettings ? "Saving..." : "Save All Changes"}
+                    </button>
+                  </div>
+
+                  {/* Frequently Asked Questions Section */}
+                  <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                    <div>
+                      <h3 className="text-2xl font-bold text-[#1F251A]">Frequently Asked Questions</h3>
+                      <p className="text-sm text-[#5A6A51] mt-1">Configure the images, tag, heading, and list of questions & answers for the FAQ accordion on the About Us page.</p>
+                    </div>
+
+                    {/* FAQ Photos Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-[#F2EFE9]">
+                      {/* Photo 1: Left Consultation (Main) */}
+                      <div className="space-y-4">
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 1: Consultation (Main Left)</label>
+                        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
+                          {faqImage1 || "/images/doctor/portrait-main.jpg" ? (
+                            <>
+                              <Image
+                                src={faqImage1 || "/images/doctor/portrait-main.jpg"}
+                                alt="Main FAQ Image"
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center p-4">
+                              <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
+                              <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
+                            </div>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                try {
+                                  const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                  setFaqImage1(compressed);
+                                } catch (err) {
+                                  console.error("Failed to compress FAQ Image 1, using original:", err);
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setFaqImage1(reader.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
+                          <input
+                            type="text"
+                            value={faqImage1}
+                            onChange={(e) => setFaqImage1(e.target.value)}
+                            placeholder="/images/doctor/portrait-main.jpg"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Photo 2: Right Portrait (Secondary Overlay) */}
+                      <div className="space-y-4">
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 2: Portrait (Secondary Right)</label>
+                        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
+                          {faqImage2 || "/images/doctor/portrait-faq.jpg" ? (
+                            <>
+                              <Image
+                                src={faqImage2 || "/images/doctor/portrait-faq.jpg"}
+                                alt="Secondary FAQ Image"
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center p-4">
+                              <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
+                              <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
+                            </div>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                try {
+                                  const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                  setFaqImage2(compressed);
+                                } catch (err) {
+                                  console.error("Failed to compress FAQ Image 2, using original:", err);
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setFaqImage2(reader.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
+                          <input
+                            type="text"
+                            value={faqImage2}
+                            onChange={(e) => setFaqImage2(e.target.value)}
+                            placeholder="/images/doctor/portrait-faq.jpg"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* FAQ Text Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-[#F2EFE9]">
+                      {/* English General */}
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-semibold text-[#1F251A]">English Content Info</h4>
+                        
+                        <div className="space-y-2">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">FAQ Tagline</label>
+                          <input
+                            type="text"
+                            value={faqTag}
+                            onChange={(e) => setFaqTag(e.target.value)}
+                            placeholder="Frequently Asked Questions"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">FAQ Heading</label>
+                          <input
+                            type="text"
+                            value={faqHeading}
+                            onChange={(e) => setFaqHeading(e.target.value)}
+                            placeholder="Questions? We have answers."
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Arabic General */}
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">المعلومات باللغة العربية</h4>
+                        
+                        <div className="space-y-2" dir="rtl">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الجانبي</label>
+                          <input
+                            type="text"
+                            value={faqTagAr}
+                            onChange={(e) => setFaqTagAr(e.target.value)}
+                            placeholder="أسئلة شائعة"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
+                          />
+                        </div>
+
+                        <div className="space-y-2" dir="rtl">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الرئيسي</label>
+                          <input
+                            type="text"
+                            value={faqHeadingAr}
+                            onChange={(e) => setFaqHeadingAr(e.target.value)}
+                            placeholder="أسئلة؟ لدينا إجابات."
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* FAQ Items Accordion list editors */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-[#F2EFE9]">
+                      {/* English FAQ Items */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-[#1F251A]">English FAQ Items</h4>
+                          <button
+                            type="button"
+                            onClick={() => setFaqs([...faqs, { question: "", answer: "" }])}
+                            className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            + Add FAQ Item
+                          </button>
+                        </div>
+
+                        <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2">
+                          {faqs.map((faq, index) => (
+                            <div key={index} className="p-4 rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] space-y-3 relative group">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-[#5A6A51]">FAQ Item #{index + 1}</span>
+                                {faqs.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setFaqs(faqs.filter((_, i) => i !== index))}
+                                    className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase">Question</label>
+                                <input
+                                  type="text"
+                                  value={faq.question}
+                                  onChange={(e) => {
+                                    const newFaqs = [...faqs];
+                                    newFaqs[index].question = e.target.value;
+                                    setFaqs(newFaqs);
+                                  }}
+                                  placeholder="Enter Question..."
+                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase">Answer</label>
+                                <textarea
+                                  rows={3}
+                                  value={faq.answer}
+                                  onChange={(e) => {
+                                    const newFaqs = [...faqs];
+                                    newFaqs[index].answer = e.target.value;
+                                    setFaqs(newFaqs);
+                                  }}
+                                  placeholder="Enter Answer..."
+                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Arabic FAQ Items */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => setFaqsAr([...faqsAr, { question: "", answer: "" }])}
+                            className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            + إضافة سؤال
+                          </button>
+                          <h4 className="text-sm font-semibold text-[#1F251A] text-right">أسئلة وأجوبة باللغة العربية</h4>
+                        </div>
+
+                        <div className="space-y-6 max-h-[500px] overflow-y-auto pl-2" dir="rtl">
+                          {faqsAr.map((faq, index) => (
+                            <div key={index} className="p-4 rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] space-y-3 relative group text-right">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-[#5A6A51]">سؤال وجواب #{index + 1}</span>
+                                {faqsAr.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setFaqsAr(faqsAr.filter((_, i) => i !== index))}
+                                    className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">السؤال</label>
+                                <input
+                                  type="text"
+                                  value={faq.question}
+                                  onChange={(e) => {
+                                    const newFaqs = [...faqsAr];
+                                    newFaqs[index].question = e.target.value;
+                                    setFaqsAr(newFaqs);
+                                  }}
+                                  placeholder="اكتب السؤال هنا..."
+                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">الإجابة</label>
+                                <textarea
+                                  rows={3}
+                                  value={faq.answer}
+                                  onChange={(e) => {
+                                    const newFaqs = [...faqsAr];
+                                    newFaqs[index].answer = e.target.value;
+                                    setFaqsAr(newFaqs);
+                                  }}
+                                  placeholder="اكتب الإجابة هنا..."
+                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none text-right"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t border-[#F2EFE9] gap-3">
+                      <button
+                        disabled={savingPageSettings}
+                        onClick={() => savePageSettings()}
+                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                      >
+                        {savingPageSettings ? "Saving..." : "Save All Changes"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+              {/* Services Page */}
+              {pagesSettingsTab === "Services" && (
+                <div className="space-y-8">
+                  {/* How It Works Section */}
+                  <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                    <div>
+                      <h3 className="text-2xl font-bold text-[#1F251A]">How It Works Section</h3>
+                      <p className="text-sm text-[#5A6A51] mt-1">Configure the main heading and description for the step-by-step process section.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                      {/* English Settings */}
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-semibold text-[#1F251A]">English Content</h4>
+                        
+                        <div className="space-y-2">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Heading</label>
+                          <input
+                            type="text"
+                            value={howItWorksHeading}
+                            onChange={(e) => setHowItWorksHeading(e.target.value)}
+                            placeholder="Simple steps to beauty transformations"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Description</label>
+                          <textarea
+                            rows={5}
+                            value={howItWorksDescription}
+                            onChange={(e) => setHowItWorksDescription(e.target.value)}
+                            placeholder="Discover a seamless process designed to enhance your beauty and health through personalized consultations..."
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none leading-relaxed"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Arabic Settings */}
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">المحتوى باللغة العربية</h4>
+                        
+                        <div className="space-y-2" dir="rtl">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان</label>
+                          <input
+                            type="text"
+                            value={howItWorksHeadingAr}
+                            onChange={(e) => setHowItWorksHeadingAr(e.target.value)}
+                            placeholder="خطوات بسيطة لتحولات الجمال"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
+                          />
+                        </div>
+
+                        <div className="space-y-2" dir="rtl">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">الوصف</label>
+                          <textarea
+                            rows={5}
+                            value={howItWorksDescriptionAr}
+                            onChange={(e) => setHowItWorksDescriptionAr(e.target.value)}
+                            placeholder="اكتشف عملية سلسة مصممة لتعزيز جمالك وصحتك..."
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none leading-relaxed text-right"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t border-[#F2EFE9]">
+                      <button
+                        disabled={savingPageSettings}
+                        onClick={() => savePageSettings()}
+                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                      >
+                        {savingPageSettings ? "Saving..." : "Save All Changes"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Why Choose Us Section */}
+                  <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                    <div>
+                      <h3 className="text-2xl font-bold text-[#1F251A]">Why Choose Us Section</h3>
+                      <p className="text-sm text-[#5A6A51] mt-1">Configure the images and content for the clinic differentiation section.</p>
+                    </div>
+
+                    {/* Photos grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                      {/* Photo 1: Left Treatment (Background) */}
+                      <div className="space-y-4">
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 1: Left Treatment (Background)</label>
+                        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
+                          {wcuImage1 || "/images/clinic/treatment.jpg" ? (
+                            <>
+                              <Image
+                                src={wcuImage1 || "/images/clinic/treatment.jpg"}
+                                alt="Treatment Image"
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center p-4">
+                              <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
+                              <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
+                            </div>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                try {
+                                  const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                  setWcuImage1(compressed);
+                                } catch (err) {
+                                  console.error("Failed to compress WCU Image 1, using original:", err);
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setWcuImage1(reader.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
+                          <input
+                            type="text"
+                            value={wcuImage1}
+                            onChange={(e) => setWcuImage1(e.target.value)}
+                            placeholder="/images/clinic/treatment.jpg"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Photo 2: Right Doctor (Foreground Overlay) */}
+                      <div className="space-y-4">
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Photo 2: Right Doctor (Foreground Overlay)</label>
+                        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl border border-[#414E36]/10 bg-[#F2EFE9] flex items-center justify-center group">
+                          {wcuImage2 || "/images/clinic/room.jpg" ? (
+                            <>
+                              <Image
+                                src={wcuImage2 || "/images/clinic/room.jpg"}
+                                alt="Room Image"
+                                fill
+                                className="object-cover"
+                                unoptimized
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <span className="text-white text-xs font-semibold px-3 py-1.5 rounded-full border border-white/50 bg-black/20 backdrop-blur-sm cursor-pointer">Change Image</span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center p-4">
+                              <Upload className="mx-auto h-8 w-8 text-[#5A6A51]/60 mb-2" />
+                              <span className="text-xs text-[#5A6A51]/60 font-medium">Select Image file</span>
+                            </div>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                try {
+                                  const compressed = await compressImage(file, 1000, 1000, 0.75);
+                                  setWcuImage2(compressed);
+                                } catch (err) {
+                                  console.error("Failed to compress WCU Image 2, using original:", err);
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setWcuImage2(reader.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-[#5A6A51]/80 mb-1">Image URL/Path</label>
+                          <input
+                            type="text"
+                            value={wcuImage2}
+                            onChange={(e) => setWcuImage2(e.target.value)}
+                            placeholder="/images/clinic/room.jpg"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                      {/* English Settings */}
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-semibold text-[#1F251A]">English Content</h4>
+                        
+                        <div className="space-y-2">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Heading</label>
+                          <input
+                            type="text"
+                            value={wcuHeading}
+                            onChange={(e) => setWcuHeading(e.target.value)}
+                            placeholder="Where medical expertise meets a luxury experience"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Experience Vertical Label</label>
+                          <input
+                            type="text"
+                            value={wcuYearsLabel}
+                            onChange={(e) => setWcuYearsLabel(e.target.value)}
+                            placeholder="15+ years excellence"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Quote</label>
+                          <input
+                            type="text"
+                            value={wcuQuote}
+                            onChange={(e) => setWcuQuote(e.target.value)}
+                            placeholder="We don't treat conditions — we transform confidence..."
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+
+
+                        <div className="space-y-2">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Description</label>
+                          <textarea
+                            rows={5}
+                            value={wcuDescription}
+                            onChange={(e) => setWcuDescription(e.target.value)}
+                            placeholder="At Revera, every detail is intentional..."
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none leading-relaxed"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Arabic Settings */}
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">المحتوى باللغة العربية</h4>
+                        
+                        <div className="space-y-2" dir="rtl">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان</label>
+                          <input
+                            type="text"
+                            value={wcuHeadingAr}
+                            onChange={(e) => setWcuHeadingAr(e.target.value)}
+                            placeholder="حيث تلتقي الخبرة الطبية بتجربة فاخرة"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
+                          />
+                        </div>
+
+                        <div className="space-y-2" dir="rtl">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">عبارة التميز (رأسية)</label>
+                          <input
+                            type="text"
+                            value={wcuYearsLabelAr}
+                            onChange={(e) => setWcuYearsLabelAr(e.target.value)}
+                            placeholder="١٥+ عاماً من التميز"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
+                          />
+                        </div>
+
+                        <div className="space-y-2" dir="rtl">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">اقتباس الثقة</label>
+                          <input
+                            type="text"
+                            value={wcuQuoteAr}
+                            onChange={(e) => setWcuQuoteAr(e.target.value)}
+                            placeholder="نحن لا نعالج فقط — بل نُحوّل الثقة..."
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
+                          />
+                        </div>
+
+
+                        <div className="space-y-2" dir="rtl">
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">الوصف</label>
+                          <textarea
+                            rows={5}
+                            value={wcuDescriptionAr}
+                            onChange={(e) => setWcuDescriptionAr(e.target.value)}
+                            placeholder="في ريفيرا، كل تفصيل مقصود..."
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none leading-relaxed text-right"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t border-[#F2EFE9]">
+                      <button
+                        disabled={savingPageSettings}
+                        onClick={() => savePageSettings()}
+                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                      >
+                        {savingPageSettings ? "Saving..." : "Save All Changes"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── SETTINGS VIEWS ── */}
           {activeNav === "Profile" && (
             <div className="space-y-6">
@@ -4986,19 +6609,63 @@ export default function AdminPage() {
 
           {activeNav === "Service Hours" && (
             <div className="space-y-6">
-              <div className="mb-6">
-                <h2 className="text-4xl font-semibold text-[#1F251A]">Weekly Service Hours</h2>
-                <p className="mt-2 text-sm text-[#5A6A51]">Configure operating schedules for Zayed and other active branches.</p>
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Weekly Service Hours</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Configure operating schedules for Zayed and other active branches.</p>
+                </div>
+                <button
+                  onClick={() => savePageSettings()}
+                  disabled={savingPageSettings}
+                  className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                >
+                  {savingPageSettings ? "Saving..." : "Save Changes"}
+                </button>
               </div>
               <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-4">
-                {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, idx) => (
+                {serviceHours.map((sh, idx) => (
                   <div key={idx} className="flex items-center justify-between border-b border-[#F2EFE9] pb-3 last:border-b-0 last:pb-0">
-                    <span className="font-semibold text-[#1F251A] w-28">{day}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-md">Open</span>
-                      <span className="text-xs text-[#5A6A51]">10:00 am - 8:00 pm</span>
+                    <span className="font-semibold text-[#1F251A] w-28">{sh.day}</span>
+                    <div className="flex items-center gap-4 flex-1 justify-end">
+                      <label className="flex items-center gap-2 cursor-pointer mr-2">
+                        <input
+                          type="checkbox"
+                          checked={sh.isOpen}
+                          onChange={(e) => {
+                            const newHours = [...serviceHours];
+                            newHours[idx].isOpen = e.target.checked;
+                            setServiceHours(newHours);
+                          }}
+                          className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                        />
+                        <span className="text-sm text-[#5A6A51]">{sh.isOpen ? "Open" : "Closed"}</span>
+                      </label>
+                      {sh.isOpen && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="time"
+                            value={sh.openTime}
+                            onChange={(e) => {
+                              const newHours = [...serviceHours];
+                              newHours[idx].openTime = e.target.value;
+                              setServiceHours(newHours);
+                            }}
+                            className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-sm outline-none w-28"
+                          />
+                          <span className="text-sm text-[#5A6A51]">to</span>
+                          <input
+                            type="time"
+                            value={sh.closeTime}
+                            onChange={(e) => {
+                              const newHours = [...serviceHours];
+                              newHours[idx].closeTime = e.target.value;
+                              setServiceHours(newHours);
+                            }}
+                            className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-sm outline-none w-28"
+                          />
+                        </div>
+                      )}
                     </div>
-                    <button className="text-xs font-bold text-[#C4AE7C] hover:underline">Edit Hours</button>
                   </div>
                 ))}
               </div>
@@ -5012,29 +6679,153 @@ export default function AdminPage() {
                   <h2 className="text-4xl font-semibold text-[#1F251A]">Branches</h2>
                   <p className="mt-2 text-sm text-[#5A6A51]">Add, edit, or toggle availability of clinic physical locations.</p>
                 </div>
-                <button className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]">
+                <button
+                  onClick={() => setBranchModal({ open: true, mode: "add", branch: { status: "active", sort_order: branches.length } })}
+                  className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                >
                   <Plus size={16} /> Add Branch
                 </button>
               </div>
-              <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] grid gap-6 md:grid-cols-2">
-                {[
-                  { name: "Sheikh Zayed Branch", address: "Capital Business Park, Sheikh Zayed, Giza", status: "Active" },
-                  { name: "Maadi Branch", address: "Degla Square, Street 9, Maadi, Cairo", status: "Active" },
-                  { name: "Heliopolis Branch", address: "El Merghany Street, Heliopolis, Cairo", status: "Active" },
-                  { name: "New Cairo Branch", address: "Fifth Settlement, Road 90, New Cairo", status: "Active" },
-                ].map((br, idx) => (
-                  <div key={idx} className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm flex flex-col justify-between min-h-[160px]">
-                    <div>
-                      <h3 className="font-bold text-[#1F251A]">{br.name}</h3>
-                      <p className="text-xs text-[#5A6A51] mt-2 leading-relaxed">{br.address}</p>
+
+              {loadingBranches ? (
+                <div className="text-center py-16 text-[#5A6A51]">Loading branches…</div>
+              ) : branches.length === 0 ? (
+                <div className="text-center py-16 text-[#5A6A51]">
+                  <MapIcon size={40} className="mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">No branches yet. Add your first branch.</p>
+                </div>
+              ) : (
+                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] grid gap-6 md:grid-cols-2">
+                  {branches.map((br) => (
+                    <div key={br.id} className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm flex flex-col justify-between min-h-[180px]">
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-bold text-[#1F251A] text-base">{br.name_en}</h3>
+                          <span className={`shrink-0 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            br.status === "active" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"
+                          }`}>{br.status === "active" ? "Active" : "Inactive"}</span>
+                        </div>
+                        <p className="text-xs text-[#5A6A51] mt-1">{br.name_ar}</p>
+                        <p className="text-xs text-[#5A6A51] mt-2 leading-relaxed">{br.address_en}</p>
+                        {br.phone && <p className="text-xs text-[#5A6A51] mt-1">{br.phone}</p>}
+                      </div>
+                      <div className="mt-4 flex items-center justify-between border-t border-[#F2EFE9] pt-4 gap-2">
+                        <button
+                          onClick={async () => {
+                            const newStatus = br.status === "active" ? "inactive" : "active";
+                            await fetch("/api/branches", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ ...br, status: newStatus }),
+                            });
+                            setBranches(prev => prev.map(b => b.id === br.id ? { ...b, status: newStatus } : b));
+                          }}
+                          className="text-xs font-semibold text-[#5A6A51] hover:text-[#414E36] border border-[#E6E9EB] rounded-full px-3 py-1 transition"
+                        >
+                          {br.status === "active" ? "Set Inactive" : "Set Active"}
+                        </button>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => setBranchModal({ open: true, mode: "edit", branch: { ...br } })}
+                            className="text-xs font-bold text-[#414E36] hover:underline"
+                          >Edit</button>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Delete "${br.name_en}"?`)) return;
+                              setDeletingBranchId(br.id);
+                              await fetch(`/api/branches?id=${br.id}`, { method: "DELETE" });
+                              setBranches(prev => prev.filter(b => b.id !== br.id));
+                              setDeletingBranchId(null);
+                            }}
+                            className="text-xs font-bold text-red-500 hover:underline disabled:opacity-50"
+                            disabled={deletingBranchId === br.id}
+                          >{deletingBranchId === br.id ? "Deleting…" : "Delete"}</button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="mt-4 flex items-center justify-between border-t border-[#F2EFE9] pt-4">
-                      <span className="inline-block rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">{br.status}</span>
-                      <button className="text-xs font-bold text-[#414E36] hover:underline">Edit Details</button>
+                  ))}
+                </div>
+              )}
+
+              {/* Branch Add/Edit Modal */}
+              {branchModal.open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                  <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-8">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-2xl font-semibold text-[#1F251A]">
+                        {branchModal.mode === "add" ? "Add Branch" : "Edit Branch"}
+                      </h3>
+                      <button onClick={() => setBranchModal({ open: false, mode: "add", branch: {} })} className="p-2 rounded-full hover:bg-[#F2EFE9]">
+                        <X size={18} />
+                      </button>
                     </div>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        setSavingBranch(true);
+                        try {
+                          const res = await fetch("/api/branches", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(branchModal.branch),
+                          });
+                          const saved = await res.json();
+                          if (branchModal.mode === "edit") {
+                            setBranches(prev => prev.map(b => b.id === saved.id ? saved : b));
+                          } else {
+                            setBranches(prev => [...prev, saved]);
+                          }
+                          setBranchModal({ open: false, mode: "add", branch: {} });
+                        } finally {
+                          setSavingBranch(false);
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      {([
+                        { field: "name_en", label: "Branch Name (English)", placeholder: "e.g. New Cairo Branch", required: true },
+                        { field: "name_ar", label: "Branch Name (Arabic)", placeholder: "مثال: فرع القاهرة الجديدة", required: true, dir: "rtl" },
+                        { field: "address_en", label: "Address (English)", placeholder: "e.g. 5th Settlement, New Cairo", required: true },
+                        { field: "address_ar", label: "Address (Arabic)", placeholder: "مثال: التجمع الخامس، القاهرة الجديدة", required: true, dir: "rtl" },
+                        { field: "phone", label: "Phone Number", placeholder: "e.g. +201035595691" },
+                        { field: "maps_embed", label: "Google Maps Embed URL", placeholder: "https://www.google.com/maps/embed?pb=…" },
+                        { field: "maps_link", label: "Google Maps Link", placeholder: "https://maps.app.goo.gl/…" },
+                      ] as Array<{ field: keyof Branch; label: string; placeholder: string; required?: boolean; dir?: string }>).map(({ field, label, placeholder, required, dir }) => (
+                        <div key={field}>
+                          <label className="block text-xs font-semibold uppercase tracking-[0.15em] text-[#5A6A51] mb-1.5">{label}</label>
+                          <input
+                            type="text"
+                            required={required}
+                            dir={dir}
+                            placeholder={placeholder}
+                            value={(branchModal.branch[field] as string) ?? ""}
+                            onChange={(e) => setBranchModal(prev => ({ ...prev, branch: { ...prev.branch, [field]: e.target.value } }))}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                          />
+                        </div>
+                      ))}
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-[0.15em] text-[#5A6A51] mb-1.5">Status</label>
+                        <select
+                          value={branchModal.branch.status ?? "active"}
+                          onChange={(e) => setBranchModal(prev => ({ ...prev, branch: { ...prev.branch, status: e.target.value as "active" | "inactive" } }))}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none"
+                        >
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={savingBranch}
+                        className="w-full rounded-3xl bg-[#414E36] py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-2"
+                      >
+                        {savingBranch ? "Saving…" : branchModal.mode === "add" ? "Add Branch" : "Save Changes"}
+                      </button>
+                    </form>
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -5912,7 +7703,7 @@ export default function AdminPage() {
           {/* ── BOOKINGS VIEW ── */}
           {activeNav === "Bookings" && (
           <>
-          <header className="mb-8 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <header className="mb-8">
             <div>
               <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80">
                 Admin Dashboard
@@ -5924,36 +7715,95 @@ export default function AdminPage() {
                 Manage reservations, monitor requests, and keep the clinic schedule aligned in one place.
               </p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#414E36]/30">
-                <Bell size={18} /> Notifications
-              </button>
-              <button className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-4 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]">
-                <Plus size={18} /> New entry
-              </button>
-            </div>
           </header>
 
-          {/* ── CALENDAR VIEW SWITCHER ── */}
-          <div className="mb-4 flex items-center gap-1 p-1 w-fit rounded-full border border-[#414E36]/12 bg-white shadow-sm">
-            {(["Calendar", "List", "Schedule"] as const).map((view) => (
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            {/* ── CALENDAR VIEW SWITCHER ── */}
+            <div className="flex items-center gap-1 p-1 w-fit rounded-full border border-[#414E36]/12 bg-white shadow-sm">
+              {(["Calendar", "List", "Schedule"] as const).map((view) => (
+                <button
+                  key={view}
+                  onClick={() => setCalendarView(view)}
+                  className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+                    calendarView === view
+                      ? "bg-[#414E36] text-[#FBFBF9] shadow-sm"
+                      : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]"
+                  }`}
+                >
+                  {view}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
               <button
-                key={view}
-                onClick={() => setCalendarView(view)}
-                className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
-                  calendarView === view
-                    ? "bg-[#414E36] text-[#FBFBF9] shadow-sm"
-                    : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]"
-                }`}
+                onClick={() => setShowAddBookingModal(true)}
+                className="inline-flex items-center gap-2 rounded-full bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] w-fit"
               >
-                {view}
+                <Plus size={18} /> New booking
               </button>
-            ))}
+            </div>
           </div>
 
           {calendarView === "Calendar" && (
-          <section className="mb-8 grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
+          <section className="mb-8 flex flex-col gap-6">
+            {/* ── Dashboard summary row ── */}
+            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+              {/* Today's bookings stat */}
+              <div
+                onClick={() => { setCalendarMonth(new Date()); setShowTodayBookingsModal(true); }}
+                className="rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] cursor-pointer hover:shadow-[0_30px_80px_rgba(47,61,41,0.12)] transition"
+              >
+                <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]/80">Today's bookings</p>
+                <p className="mt-3 text-4xl font-bold text-[#1F251A]">{todaysBookingsCount}</p>
+                <p className="mt-1 text-sm text-[#5A6A51]">Click to view today's schedule</p>
+              </div>
+              {/* Pending requests stat */}
+              <div
+                onClick={() => document.getElementById("pending-approvals-section")?.scrollIntoView({ behavior: 'smooth' })}
+                className="rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] cursor-pointer hover:shadow-[0_30px_80px_rgba(47,61,41,0.12)] transition"
+              >
+                <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]/80">Pending requests</p>
+                <p className="mt-3 text-4xl font-bold text-[#C4AE7C]">{requests.length}</p>
+                <p className="mt-1 text-sm text-[#5A6A51]">{requests.length === 0 ? "No pending requests" : "Awaiting approval"}</p>
+              </div>
+              {/* Latest confirmed booking */}
+              {(() => {
+                const latestApproved = allReservations.find(r => r.status === 'approved');
+                return (
+                  <div
+                    onClick={() => latestApproved && setViewingBooking(latestApproved)}
+                    className={`rounded-[32px] bg-[#E8EDDF]/80 p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] transition ${latestApproved ? 'cursor-pointer hover:shadow-[0_30px_80px_rgba(47,61,41,0.12)]' : ''}`}
+                  >
+                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]/80">Latest confirmed</p>
+                    <p className="mt-3 text-base font-semibold text-[#1F251A] line-clamp-2">
+                      {latestApproved ? latestApproved.name : "No bookings yet"}
+                    </p>
+                    <p className="mt-1 text-sm text-[#5A6A51]">
+                      {latestApproved ? (latestApproved.doctorName || 'Dr. Sara El Gamel') : "—"}
+                    </p>
+                  </div>
+                );
+              })()}
+              {/* Quick actions */}
+              <div className="rounded-[32px] bg-[#414E36] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] flex flex-col gap-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#FBFBF9]/60">Quick actions</p>
+                <button
+                  onClick={() => setShowFilterModal(true)}
+                  className="rounded-2xl bg-[#FBFBF9]/10 px-4 py-3 text-left text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#FBFBF9]/20"
+                >
+                  Filter bookings
+                </button>
+                <button
+                  onClick={() => setShowActionsMenuModal(true)}
+                  className="rounded-2xl bg-[#C4AE7C] px-4 py-3 text-left text-sm font-semibold text-[#414E36] transition hover:bg-[#b59e6c]"
+                >
+                  Actions menu
+                </button>
+              </div>
+            </div>
+
+            {/* ── Calendar grid ── */}
             <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
               <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
@@ -5988,171 +7838,50 @@ export default function AdminPage() {
                   ))}
                 </div>
                 <div className="grid grid-cols-7 gap-3 text-sm text-[#414E36]">
-                  {Array.from({ length: 42 }).map((_, index) => {
-                    const day = index - startWeekday + 1;
-                    const isCurrentMonthDay = day > 0 && day <= daysInMonth;
-                    const dateKey = isCurrentMonthDay
-                      ? `${currentYear}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-                      : "";
-                    const bookingCount = isCurrentMonthDay ? bookingCountsByDay.get(dateKey) ?? 0 : 0;
-                    const today = new Date();
-                    const isToday =
-                      isCurrentMonthDay &&
-                      today.getFullYear() === currentYear &&
-                      today.getMonth() === calendarMonth.getMonth() &&
-                      today.getDate() === day;
-
-                    return (
-                      <div
-                        key={index}
-                        onClick={() => {
-                          if (bookingCount > 0) {
-                            const bookingsForDay = filteredReservations.filter(
-                              (r) => String(r.date).slice(0, 10) === dateKey && r.status === 'approved'
-                            );
-                            if (bookingsForDay.length > 0) {
-                              setViewingBooking(bookingsForDay[0]);
-                            }
-                          }
-                        }}
-                        className={`min-h-[84px] rounded-3xl border border-transparent px-3 py-3 text-left transition ${
-                          bookingCount > 0
-                            ? "bg-[#C4AE7C] text-[#414E36] shadow-[0_15px_45px_rgba(196,174,124,0.18)] cursor-pointer"
-                            : "hover:border-[#C4AE7C]/15 hover:bg-[#fff]"
-                        }`}
-                      >
-                        <span className="block text-sm font-semibold">
-                          {isCurrentMonthDay ? day : ""}
-                        </span>
-                        {bookingCount > 0 && (
-                          <span className="mt-4 inline-flex rounded-full bg-[#414E36] px-2.5 py-1 text-[11px] font-semibold text-[#FBFBF9]">
-                            {bookingCount} booking{bookingCount > 1 ? "s" : ""}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                {dynamicOverviewCards.map((card) => {
-                  const Icon = card.icon;
-                  return (
-                    <div key={card.label} className="min-w-[170px] rounded-3xl bg-[#F9F9F7] p-5 shadow-[0_18px_40px_rgba(47,61,41,0.05)]">
-                      <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-2xl text-[#414E36]" style={{ backgroundColor: 'rgba(196, 174, 124, 0.12)' }}>
-                        <Icon size={20} />
-                      </div>
-                      <p className="text-sm text-[#5A6A51]">{card.label}</p>
-                      <p className="mt-3 text-3xl font-semibold text-[#1F251A]">{card.value}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-                <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">
-                      Activity feed
-                    </p>
-                    <h4 className="mt-2 text-2xl font-semibold text-[#1F251A]">
-                      Today’s snapshot
-                    </h4>
-                  </div>
-                  <button
-                    onClick={() => setShowSearchModal(true)}
-                    className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-4 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                  >
-                    <Search size={18} /> Search
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {/* 1. Latest Confirmed Booking Activity */}
                   {(() => {
-                    const latestApproved = allReservations.find(r => r.status === 'approved');
-                    if (!latestApproved) {
+                    const totalCells = daysInMonth + startWeekday <= 35 ? 35 : 42;
+                    return Array.from({ length: totalCells }).map((_, index) => {
+                      const day = index - startWeekday + 1;
+                      const isCurrentMonthDay = day > 0 && day <= daysInMonth;
+
+                      if (!isCurrentMonthDay) {
+                        return <div key={index} className="min-h-[84px]" />;
+                      }
+
+                      const dateKey = `${currentYear}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                      const bookingCount = bookingCountsByDay.get(dateKey) ?? 0;
+
                       return (
-                        <div className="rounded-3xl border border-[#414E36]/10 bg-[#E8EDDF]/80 p-4">
-                          <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Completed booking</p>
-                          <p className="mt-2 text-base font-semibold text-[#1F251A]">
-                            No completed bookings today.
-                          </p>
+                        <div
+                          key={index}
+                          onClick={() => {
+                            if (bookingCount > 0) {
+                              const bookingsForDay = filteredReservations.filter(
+                                (r) => String(r.date).slice(0, 10) === dateKey && r.status === 'approved'
+                              );
+                              if (bookingsForDay.length > 0) {
+                                setViewingBooking(bookingsForDay[0]);
+                              }
+                            }
+                          }}
+                          className={`min-h-[84px] rounded-3xl border border-transparent px-3 py-3 text-left transition ${
+                            bookingCount > 0
+                              ? "bg-[#C4AE7C] text-[#414E36] shadow-[0_15px_45px_rgba(196,174,124,0.18)] cursor-pointer"
+                              : "hover:border-[#C4AE7C]/15 hover:bg-[#fff]"
+                          }`}
+                        >
+                          <span className="block text-sm font-semibold">
+                            {day}
+                          </span>
+                          {bookingCount > 0 && (
+                            <span className="mt-4 inline-flex rounded-full bg-[#414E36] px-2.5 py-1 text-[11px] font-semibold text-[#FBFBF9]">
+                              {bookingCount} booking{bookingCount > 1 ? "s" : ""}
+                            </span>
+                          )}
                         </div>
                       );
-                    }
-                    return (
-                      <div
-                        onClick={() => setViewingBooking(latestApproved)}
-                        className="rounded-3xl border border-[#414E36]/10 bg-[#E8EDDF]/80 p-4 cursor-pointer hover:border-[#C4AE7C]/30 transition"
-                      >
-                        <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Completed booking</p>
-                        <p className="mt-2 text-base font-semibold text-[#1F251A]">
-                          Confirmed appointment for {latestApproved.name} with {latestApproved.doctorName || 'Dr. Sara El Gamel'}.
-                        </p>
-                      </div>
-                    );
+                    });
                   })()}
-
-                  {/* 2. Pending Requests Summary */}
-                  <div
-                    onClick={() => {
-                      document.getElementById("pending-approvals-section")?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="rounded-3xl border border-[#414E36]/10 bg-[#F7F7F5]/80 p-4 cursor-pointer hover:border-[#414E36]/30 transition"
-                  >
-                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">New request</p>
-                    <p className="mt-2 text-base font-semibold text-[#1F251A]">
-                      {requests.length === 0
-                        ? "No pending reservation requests waiting."
-                        : `${requests.length} new reservation request${requests.length > 1 ? "s are" : " is"} waiting.`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-                <div className="mb-6 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80">
-                      Quick actions
-                    </p>
-                    <h4 className="mt-2 text-2xl font-semibold text-[#1F251A]">
-                      Actions & filters
-                    </h4>
-                  </div>
-                  <button
-                    onClick={() => setShowCancellationsModal(true)}
-                    className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#f7f6f2]"
-                  >
-                    View Cancellations
-                  </button>
-                </div>
-                <div className="grid gap-4">
-                  <button
-                    onClick={() => {
-                      setCalendarMonth(new Date());
-                      setShowTodayBookingsModal(true);
-                    }}
-                    className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] px-5 py-4 text-left text-sm font-semibold text-[#414E36] transition hover:bg-[#f7f6f2]"
-                  >
-                    Today • {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                  </button>
-                  <button
-                    onClick={() => setShowFilterModal(true)}
-                    className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] px-5 py-4 text-left text-sm font-semibold text-[#414E36] transition hover:bg-[#f7f6f2]"
-                  >
-                    Filter bookings
-                  </button>
-                  <button
-                    onClick={() => setShowActionsMenuModal(true)}
-                    className="rounded-3xl bg-[#414E36] px-5 py-4 text-left text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                  >
-                    Actions menu
-                  </button>
                 </div>
               </div>
             </div>
@@ -6225,7 +7954,9 @@ export default function AdminPage() {
                             <td className="px-4 py-4 whitespace-nowrap">
                               <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${statusClass}`}>{r.status}</span>
                             </td>
-                            <td className="px-4 py-4 text-[#5A6A51]">N/A</td>
+                            <td className="px-4 py-4 text-[#5A6A51] whitespace-nowrap">
+                              {branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}
+                            </td>
                             <td className="px-4 py-4 whitespace-nowrap">
                               <div className="flex items-center gap-1.5 text-[#5A6A51]">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
@@ -6260,8 +7991,6 @@ export default function AdminPage() {
 
           {/* ── SCHEDULE VIEW ── */}
           {calendarView === "Schedule" && (() => {
-            const DOCTORS = ["Dr. Sara El Gamel", "Dr. Radwa Seif", "Dr. Ahmed Medhat"];
-
             // Build 15-min slots 09:00 → 20:00 in 24h ("HH:MM") format for matching
             const RAW_SLOTS: string[] = [];
             for (let h = 9; h <= 20; h++) {
@@ -6306,23 +8035,47 @@ export default function AdminPage() {
             ].join('-');
             const scheduleDateLabel = scheduleDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
+            // Collect doctor names from actual bookings for this day (status: approved or pending with a time)
+            const bookingDoctorNames = Array.from(
+              new Set(
+                scheduleReservations
+                  .filter(r => r.timeSlot || r.requestedTime)
+                  .map(r => r.doctorName)
+                  .filter(Boolean) as string[]
+              )
+            );
+
+            // Merge: DB providers + any doctor names found in actual bookings (deduped)
+            const providerNames = providers.length > 0
+              ? providers.map((p: any) => p.name as string)
+              : ["Dr. Sara El Gamel", "Dr. Radwa Seif", "Dr. Ahmed Medhat"];
+
+            const DOCTORS = Array.from(new Set([...providerNames, ...bookingDoctorNames]));
+
+            // Default doctor for bookings with no doctorName
+            const defaultDoctor = providerNames[0] ?? '';
+
             const visibleDoctors = scheduleProviderFilter === 'All'
               ? DOCTORS
               : DOCTORS.filter(d => d === scheduleProviderFilter);
 
-            // Use ALL reservations for the day (not just filteredReservations which respects status filter)
-            const dayBookings = allReservations.filter(r => {
-              const rDate = r.date ? String(r.date).slice(0, 10) : null;
-              if (rDate !== scheduleDateStr) return false;
-              if (scheduleProviderFilter !== 'All' && (r.doctorName || 'Dr. Sara El Gamel') !== scheduleProviderFilter) return false;
-              if (scheduleServiceFilter !== 'All' && (r.sessionType || '') !== scheduleServiceFilter) return false;
+            // All bookings for the day that have a usable time (approved with timeSlot, or pending with requestedTime)
+            const dayBookings = scheduleReservations.filter(r => {
+              const hasTime = r.timeSlot || r.requestedTime;
+              if (!hasTime) return false;
+              if (scheduleProviderFilter !== 'All' && (r.doctorName || defaultDoctor) !== scheduleProviderFilter) return false;
+              if (scheduleServiceFilter !== 'All') {
+                const svc = localServices.find(s => s.id === r.serviceId);
+                if (!svc || svc.en !== scheduleServiceFilter) return false;
+              }
               return true;
             });
 
             // bookingMap[slotKey][doctorName] = Req[]
             const bookingMap: Record<string, Record<string, Req[]>> = {};
             dayBookings.forEach(r => {
-              const doc = r.doctorName || 'Dr. Sara El Gamel';
+              const doc = r.doctorName || defaultDoctor;
+              // Use confirmed timeSlot for approved, requestedTime for pending
               const slotKey = normaliseSlot(r.timeSlot || r.requestedTime) ?? '09:00';
               if (!bookingMap[slotKey]) bookingMap[slotKey] = {};
               if (!bookingMap[slotKey][doc]) bookingMap[slotKey][doc] = [];
@@ -6440,20 +8193,24 @@ export default function AdminPage() {
                                     className={`border-l border-[#414E36]/08 p-1.5 align-top ${si > 0 ? 'border-t border-[#414E36]/06' : ''}`}
                                     style={{ height: 36 * 4 }}
                                   >
-                                    {cells.map(b => (
-                                      <div
-                                        key={b.id}
-                                        title={`${b.name} — ${b.sessionType || 'Consultation'} (${b.status})`}
-                                        className="flex h-full flex-col justify-center gap-1 rounded-2xl bg-[#414E36]/10 px-3 py-2 ring-1 ring-[#414E36]/20"
-                                      >
-                                        <div className="flex items-center gap-1.5">
-                                          <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot[b.status?.toLowerCase()] ?? 'bg-[#5A6A51]'}`} />
-                                          <p className="truncate text-xs font-semibold text-[#1F251A]">{b.name}</p>
+                                    {cells.map(b => {
+                                      const svc = localServices.find(s => s.id === b.serviceId);
+                                      const svcName = svc ? svc.en : b.sessionType || 'Consultation';
+                                      return (
+                                        <div
+                                          key={b.id}
+                                          title={`${b.name} — ${svcName} (${b.status})`}
+                                          className="flex h-full flex-col justify-center gap-1 rounded-2xl bg-[#414E36]/10 px-3 py-2 ring-1 ring-[#414E36]/20"
+                                        >
+                                          <div className="flex items-center gap-1.5">
+                                            <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot[b.status?.toLowerCase()] ?? 'bg-[#5A6A51]'}`} />
+                                            <p className="truncate text-xs font-semibold text-[#1F251A]">{b.name}</p>
+                                          </div>
+                                          <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]">{svcName}</p>
+                                          <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]/60 capitalize">{b.status}</p>
                                         </div>
-                                        <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]">{b.sessionType || 'Consultation'}</p>
-                                        <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]/60">{b.status}</p>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </td>
                                 );
                               }
@@ -6516,7 +8273,7 @@ export default function AdminPage() {
                         {req.name}
                       </p>
                       <p className="mt-1 text-sm text-[#5A6A51]">
-                        {req.email} • {req.phone}
+                        {req.email} • {req.phone} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === req.branchId)?.name_en || "Default/All"}</span>
                       </p>
                     </div>
                     <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#414E36]">
@@ -6600,7 +8357,7 @@ export default function AdminPage() {
                 onClick={() => setSelected(null)}
                 className="rounded-full bg-[#F2EFE9] p-3 text-[#414E36] transition hover:bg-[#e4e0d6]"
               >
-                <ChevronDown size={20} className="rotate-45" />
+                <X size={20} />
               </button>
             </div>
             <p className="mb-4 text-sm text-[#5A6A51]">
@@ -6614,11 +8371,14 @@ export default function AdminPage() {
               onChange={(e) => setSlot(e.target.value)}
               className="mb-4 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
             >
-              {SLOTS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
+              {SLOTS.map((s) => {
+                const isUnavailable = approveUnavailableSlots.includes(s);
+                return (
+                  <option key={s} value={s} disabled={isUnavailable}>
+                    {s} {isUnavailable ? "(Unavailable)" : ""}
+                  </option>
+                );
+              })}
             </select>
 
             <label className="mb-2 block text-sm font-semibold text-[#414E36]">
@@ -6629,24 +8389,11 @@ export default function AdminPage() {
               onChange={(e) => setDoctorName(e.target.value)}
               className="mb-6 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
             >
-              {(() => {
-                const bookedServiceName = localServices.find(s => Number(s.id) === Number(selected.serviceId))?.en ?? "";
-                const eligibleProviders = bookedServiceName
-                  ? providers.filter(p => p.services.includes(bookedServiceName))
-                  : [];
-                if (eligibleProviders.length === 0) {
-                  return (
-                    <option value="" disabled>
-                      — No doctors available for this service —
-                    </option>
-                  );
-                }
-                return eligibleProviders.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    {p.name}
-                  </option>
-                ));
-              })()}
+              {providers.map((p) => (
+                <option key={p.id || p.name} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
             </select>
 
             <div className="flex flex-wrap gap-3">
@@ -6711,7 +8458,7 @@ export default function AdminPage() {
                   onClick={() => setViewingBooking(null)}
                   className="rounded-full bg-[#F2EFE9] p-2 text-[#414E36] transition hover:bg-[#e4e0d6]"
                 >
-                  <ChevronDown size={20} className="rotate-45" />
+                  <X size={20} />
                 </button>
               </div>
 
@@ -6954,10 +8701,9 @@ export default function AdminPage() {
                       </div>
                     </div>
                     <select
-                      value={viewingBooking.doctorName || ""}
+                      value={viewingBooking.doctorName || "Dr. Sara El Gamel"}
                       onChange={async (e) => {
                         const newDoc = e.target.value;
-                        if (!newDoc) return;
                         await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json" },
@@ -6968,24 +8714,11 @@ export default function AdminPage() {
                       }}
                       className="w-full rounded-xl border border-[#414E36]/10 bg-[#FBFBF9] px-3 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer"
                     >
-                      {(() => {
-                        const bookedServiceName = localServices.find(s => Number(s.id) === Number(viewingBooking.serviceId))?.en ?? "";
-                        const eligibleProviders = bookedServiceName
-                          ? providers.filter(p => p.services.includes(bookedServiceName))
-                          : [];
-                        if (eligibleProviders.length === 0) {
-                          return (
-                            <option value="" disabled>
-                              — No doctors available for this service —
-                            </option>
-                          );
-                        }
-                        return eligibleProviders.map((p) => (
-                          <option key={p.name} value={p.name}>
-                            {p.name}
-                          </option>
-                        ));
-                      })()}
+                      {providers.map((p) => (
+                        <option key={p.id || p.name} value={p.name}>
+                          {p.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -7065,7 +8798,7 @@ export default function AdminPage() {
                 onClick={() => setShowCancellationsModal(false)}
                 className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
               >
-                <ChevronDown size={20} className="rotate-45" />
+                <X size={20} />
               </button>
             </div>
 
@@ -7135,7 +8868,7 @@ export default function AdminPage() {
                 onClick={() => setShowTodayBookingsModal(false)}
                 className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
               >
-                <ChevronDown size={20} className="rotate-45" />
+                <X size={20} />
               </button>
             </div>
 
@@ -7202,7 +8935,7 @@ export default function AdminPage() {
                 onClick={() => setShowFilterModal(false)}
                 className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
               >
-                <ChevronDown size={20} className="rotate-45" />
+                <X size={20} />
               </button>
             </div>
 
@@ -7254,7 +8987,7 @@ export default function AdminPage() {
                 >
                   <option value="All">All Doctors</option>
                   {providers.map(p => (
-                    <option key={p.name} value={p.name}>{p.name}</option>
+                    <option key={p.id || p.name} value={p.name}>{p.name}</option>
                   ))}
                 </select>
               </div>
@@ -7296,7 +9029,7 @@ export default function AdminPage() {
                 onClick={() => setShowActionsMenuModal(false)}
                 className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
               >
-                <ChevronDown size={20} className="rotate-45" />
+                <X size={20} />
               </button>
             </div>
 
@@ -7372,7 +9105,7 @@ export default function AdminPage() {
 
       {/* 5. Add Booking Modal */}
       {showAddBookingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4">
           <div className="w-full max-w-xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[90vh] overflow-y-auto">
             <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
               <div>
@@ -7381,9 +9114,9 @@ export default function AdminPage() {
               </div>
               <button
                 onClick={() => setShowAddBookingModal(false)}
-                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] hover:bg-[#e4e0d6]"
               >
-                <ChevronDown size={20} className="rotate-45" />
+                <X size={20} />
               </button>
             </div>
 
@@ -7397,7 +9130,7 @@ export default function AdminPage() {
                     placeholder="Enter name"
                     value={newPatientName}
                     onChange={(e) => setNewPatientName(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                   />
                 </div>
                 <div>
@@ -7408,7 +9141,7 @@ export default function AdminPage() {
                     placeholder="Enter email"
                     value={newPatientEmail}
                     onChange={(e) => setNewPatientEmail(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                   />
                 </div>
               </div>
@@ -7422,7 +9155,7 @@ export default function AdminPage() {
                     placeholder="Enter phone"
                     value={newPatientPhone}
                     onChange={(e) => setNewPatientPhone(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                   />
                 </div>
                 <div>
@@ -7432,7 +9165,7 @@ export default function AdminPage() {
                     required
                     value={newPatientDate}
                     onChange={(e) => setNewPatientDate(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer"
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   />
                 </div>
               </div>
@@ -7443,7 +9176,7 @@ export default function AdminPage() {
                   <select
                     value={newPatientService}
                     onChange={(e) => setNewPatientService(Number(e.target.value))}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer font-semibold"
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   >
                     {localServices.map(s => (
                       <option key={s.id} value={s.id}>{s.en} ({s.cat})</option>
@@ -7455,7 +9188,7 @@ export default function AdminPage() {
                   <select
                     value={newPatientSessionType}
                     onChange={(e) => setNewPatientSessionType(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer font-semibold"
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   >
                     <option value="in_person">In Person / في العيادة</option>
                     <option value="online">Online / أونلاين</option>
@@ -7465,56 +9198,61 @@ export default function AdminPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branch</label>
+                  <select
+                    value={newPatientBranch}
+                    onChange={(e) => setNewPatientBranch(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                  >
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name_en} / {b.name_ar}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Status</label>
                   <select
                     value={newPatientStatus}
                     onChange={(e) => setNewPatientStatus(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer font-semibold"
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   >
                     <option value="approved">Approved (Active Booking)</option>
                     <option value="pending">Pending (Awaiting Approval)</option>
                     <option value="rejected">Rejected (Canceled Booking)</option>
                   </select>
                 </div>
-                {newPatientStatus === 'approved' && (
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Assign Doctor</label>
-                    <select
-                      value={newPatientDoctor}
-                      onChange={(e) => setNewPatientDoctor(e.target.value)}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer font-semibold"
-                    >
-                      {(() => {
-                        const bookedServiceName = localServices.find(s => Number(s.id) === Number(newPatientService))?.en ?? "";
-                        const eligibleProviders = bookedServiceName
-                          ? providers.filter(p => p.services.includes(bookedServiceName))
-                          : [];
-                        if (eligibleProviders.length === 0) {
-                          return (
-                            <option value="" disabled>
-                              — No doctors available for this service —
-                            </option>
-                          );
-                        }
-                        return eligibleProviders.map(p => (
-                          <option key={p.name} value={p.name}>{p.name}</option>
-                        ));
-                      })()}
-                    </select>
-                  </div>
-                )}
               </div>
+
+              {newPatientStatus === 'approved' && (
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Assign Doctor</label>
+                  <select
+                    value={newPatientDoctor}
+                    onChange={(e) => setNewPatientDoctor(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                  >
+                    {providers.map(p => (
+                      <option key={p.id || p.name} value={p.name}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Time Slot / Requested Time</label>
                 <select
                   value={newPatientTimeSlot}
                   onChange={(e) => setNewPatientTimeSlot(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer font-semibold"
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                 >
-                  {SLOTS.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
+                  {SLOTS.map(s => {
+                    const isUnavailable = manualUnavailableSlots.includes(s);
+                    return (
+                      <option key={s} value={s} disabled={isUnavailable}>
+                        {s} {isUnavailable ? "(Unavailable)" : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -7524,20 +9262,20 @@ export default function AdminPage() {
                   placeholder="Add details/notes about this appointment"
                   value={newPatientNotes}
                   onChange={(e) => setNewPatientNotes(e.target.value)}
-                  className="w-full min-h-[80px] rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                  className="w-full min-h-[80px] rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                 />
               </div>
 
               <div className="border-t border-[#414E36]/10 pt-4 flex gap-3">
                 <button
                   onClick={handleCreateManualBooking}
-                  className="flex-1 rounded-3xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition text-center"
+                  className="flex-1 rounded-3xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] text-center"
                 >
                   Create Booking
                 </button>
                 <button
                   onClick={() => setShowAddBookingModal(false)}
-                  className="flex-1 rounded-3xl border border-[#414E36]/20 bg-white py-3 text-sm font-bold text-[#414E36] hover:bg-[#f7f6f2] transition text-center"
+                  className="flex-1 rounded-3xl border border-[#414E36]/20 bg-[#fff] py-3 text-sm font-bold text-[#414E36] hover:bg-[#f7f6f2] text-center"
                 >
                   Cancel
                 </button>
@@ -7562,7 +9300,7 @@ export default function AdminPage() {
                 }}
                 className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
               >
-                <ChevronDown size={20} className="rotate-45" />
+                <X size={20} />
               </button>
             </div>
 
@@ -7619,7 +9357,7 @@ export default function AdminPage() {
                         <div>
                           <p className="font-bold text-[#1F251A]">{r.name}</p>
                           <p className="text-xs text-[#5A6A51] mt-1">
-                            {service ? service.en : `Service #${r.serviceId}`} • {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""}
+                            {service ? service.en : `Service #${r.serviceId}`} • {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}</span>
                           </p>
                           {r.doctorName && (
                             <p className="text-xs text-[#C4AE7C] mt-0.5 font-semibold">
@@ -7648,113 +9386,107 @@ export default function AdminPage() {
         </div>
       )}
 
-    </div>
-
-    {/* ── ADD NEW PROVIDER (DOCTOR) MODAL (Portal → renders into document.body to escape parent containers) ── */}
-    {showAddProviderModal && typeof document !== "undefined" && ReactDOM.createPortal(
-      <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/40 py-10 px-4 backdrop-blur-sm overflow-y-auto">
-        <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 animate-fadeIn flex flex-col max-h-[85vh]">
-          {/* Modal Header */}
-          <div className="flex items-center justify-between border-b border-[#414E36]/10 px-6 py-4">
-            <div>
-              <h3 className="text-lg font-semibold text-[#1F251A]">Add New Doctor / Provider</h3>
-              <p className="text-sm text-[#5A6A51]">Register a new healthcare provider and assign their services.</p>
-            </div>
-            <button
-              onClick={() => setShowAddProviderModal(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] hover:bg-[#F9F9F7]"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Modal Body */}
-          <div ref={providerModalBodyRef} className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* Name input */}
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Doctor's Full Name</label>
-              <input
-                type="text"
-                value={providerName}
-                onChange={(e) => setProviderName(e.target.value)}
-                placeholder="e.g. Dr. Radwa Seif"
-                className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
-              />
+      {/* Add/Edit Provider Modal */}
+      {showProviderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
+          <div className="w-full max-w-xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[90vh] flex flex-col">
+            
+            {/* Header */}
+            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4 shrink-0">
+              <div>
+                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">
+                  {providerModalMode === "edit" ? "Edit Doctor / Provider" : "Add Doctor / Provider"}
+                </p>
+                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">
+                  {providerModalMode === "edit" ? "Modify Provider Details" : "Create New Provider"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowProviderModal(false)}
+                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
+              >
+                <X size={20} />
+              </button>
             </div>
 
-            {/* Rating input */}
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Rating (0.0 - 5.0)</label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                max="5"
-                value={providerRating}
-                onChange={(e) => setProviderRating(e.target.value)}
-                placeholder="e.g. 5.0"
-                className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
-              />
-            </div>
+            {/* Scrollable Form Content */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dr. Jane Doe"
+                  value={providerFormName}
+                  onChange={(e) => setProviderFormName(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                />
+              </div>
 
-            {/* Services checklist grouped by category */}
-            <div>
-              <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Select Provided Services</label>
-              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2">
-                {localCategories.map((cat) => {
-                  const catSvcs = localServices.filter(s => s.cat === cat.key);
-                  if (catSvcs.length === 0) return null;
-                  return (
-                    <div key={cat.key} className="space-y-2 border border-[#414E36]/10 rounded-xl p-4 bg-[#F9F9F7]">
-                      <h4 className="text-xs font-bold text-[#414E36] border-b border-[#414E36]/10 pb-1.5">{cat.en}</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
-                        {catSvcs.map((svc) => {
-                          const isChecked = providerSelectedServices.includes(svc.en);
-                          return (
-                            <label key={svc.id} className="flex items-start gap-2.5 text-xs text-[#1F251A] cursor-pointer hover:text-[#414E36] transition select-none">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => {
-                                  if (isChecked) {
-                                    setProviderSelectedServices(prev => prev.filter(s => s !== svc.en));
-                                  } else {
-                                    setProviderSelectedServices(prev => [...prev, svc.en]);
-                                  }
-                                }}
-                                className="mt-0.5 h-3.5 w-3.5 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C]"
-                              />
-                              <span>{svc.en}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Rating (1-5)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  step="0.1"
+                  placeholder="e.g. 5"
+                  value={providerFormRating}
+                  onChange={(e) => setProviderFormRating(Number(e.target.value))}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Select Services Offered</label>
+                <div className="max-h-[30vh] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2">
+                  {allServicesList.map((svc) => {
+                    const isChecked = providerFormSelectedServices.includes(svc.en);
+                    return (
+                      <label key={svc.id} className="flex items-center gap-3 cursor-pointer select-none py-1 hover:bg-gray-50 rounded px-1">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setProviderFormSelectedServices([...providerFormSelectedServices, svc.en]);
+                            } else {
+                              setProviderFormSelectedServices(providerFormSelectedServices.filter(s => s !== svc.en));
+                            }
+                          }}
+                          className="h-4.5 w-4.5 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                        />
+                        <div className="text-sm text-[#1F251A]">
+                          <span className="font-medium">{svc.en}</span>
+                          {svc.ar && <span className="text-gray-400 text-xs ml-1.5">({svc.ar})</span>}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Modal Footer */}
-          <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 px-6 py-4 bg-[#F9F9F7] rounded-b-2xl">
-            <button
-              onClick={() => setShowAddProviderModal(false)}
-              className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveNewProvider}
-              className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#2e3a26]"
-            >
-              Save Provider
-            </button>
+            {/* Footer Actions */}
+            <div className="border-t border-[#414E36]/10 pt-4 mt-4 flex gap-3 shrink-0">
+              <button
+                onClick={handleSaveProvider}
+                disabled={savingProvider}
+                className="flex-1 rounded-3xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] disabled:opacity-50 text-center"
+              >
+                {savingProvider ? "Saving..." : providerModalMode === "edit" ? "Save Changes" : "Add Provider"}
+              </button>
+              <button
+                onClick={() => setShowProviderModal(false)}
+                className="flex-1 rounded-3xl border border-[#414E36]/20 bg-[#fff] py-3 text-sm font-bold text-[#414E36] hover:bg-[#f7f6f2] text-center"
+              >
+                Cancel
+              </button>
+            </div>
+
           </div>
         </div>
-      </div>,
-      document.body
-    )}
-    </>
+      )}
+
+    </div>
   );
 }

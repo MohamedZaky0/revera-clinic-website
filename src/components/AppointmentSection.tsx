@@ -226,19 +226,42 @@ export function AppointmentSection() {
               }}
             >
               {/* Gold tagline icon */}
-              <span
-                className="section-tag"
+              <div
+                className="ap-tag-row"
                 style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
                   marginBottom: "16px",
+                  direction: isRTL ? "rtl" : "ltr",
                 }}
               >
-                <img
-                  src="/images/main_logo.png"
-                  alt=""
-                  style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }}
-                />
-                {t.appointment.tag}
-              </span>
+                <svg
+                  width="40"
+                  height="40"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--color-brand-secondary)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ flexShrink: 0 }}
+                >
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+                <span
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: 700,
+                    letterSpacing: isRTL ? "normal" : "0.2em",
+                    color: "var(--color-brand-secondary)",
+                    textTransform: "uppercase",
+                    lineHeight: "normal",
+                  }}
+                >
+                  {t.appointment.tag}
+                </span>
+              </div>
 
               {/* Title */}
               <h2

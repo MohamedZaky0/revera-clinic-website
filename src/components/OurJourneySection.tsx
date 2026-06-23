@@ -56,25 +56,33 @@ export function OurJourneySection() {
           <div style={{ position: "relative", zIndex: 1, direction: isRTL ? "rtl" : "ltr" }}>
 
             {/* Tag */}
-            <span
-              className="section-tag"
+            <div
               style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "10px",
                 marginBottom: "14px",
-                color: "rgba(255, 255, 255, 0.6)",
+                direction: isRTL ? "rtl" : "ltr",
               }}
             >
-              <img
-                src="/images/main_logo.png"
-                alt=""
-                style={{
-                  width: 40,
-                  height: 40,
-                  objectFit: "contain",
-                  filter: "brightness(0) saturate(0) invert(1) opacity(0.6)",
-                }}
+              <img 
+                src="/images/main_logo.png" 
+                alt="" 
+                style={{ width: 44, height: 44, objectFit: "contain", filter: "brightness(0) saturate(0) invert(1) opacity(0.6)", flexShrink: 0 }} 
               />
-              {t.aboutPage.storiesTag}
-            </span>
+              <span
+                style={{
+                  fontSize: "20px",
+                  fontWeight: 700,
+                  letterSpacing: isRTL ? "normal" : "0.2em",
+                  color: "rgba(255,255,255,0.6)",
+                  textTransform: "uppercase",
+                  lineHeight: "normal",
+                }}
+              >
+                {t.aboutPage.storiesTag}
+              </span>
+            </div>
 
             {/* Heading */}
             <h2
@@ -108,7 +116,6 @@ export function OurJourneySection() {
                     display: "flex",
                     alignItems: "center",
                     gap: "10px",
-                    flexDirection: "row",
                   }}
                 >
                   <span
@@ -153,7 +160,6 @@ export function OurJourneySection() {
                     display: "flex",
                     alignItems: "center",
                     gap: "14px",
-                    flexDirection: "row",
                   }}
                 >
                   {/* Circular icon */}
@@ -194,7 +200,6 @@ export function OurJourneySection() {
                 display: "flex",
                 alignItems: "center",
                 gap: "12px",
-                flexDirection: "row",
               }}
             >
               <Link
@@ -219,7 +224,7 @@ export function OurJourneySection() {
                   e.currentTarget.style.background = "rgba(255,255,255,0.12)";
                 }}
               >
-                {isRTL ? "تواصل معنا" : "Contact Us"}
+                {t.nav.contact}
               </Link>
               <Link
                 href="/contact"
@@ -238,10 +243,10 @@ export function OurJourneySection() {
                   transition: "all 0.25s ease",
                 }}
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 18 18"
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 18 18" 
                   fill="none"
                   style={{ transform: isRTL ? "scaleX(-1)" : "none" }}
                 >

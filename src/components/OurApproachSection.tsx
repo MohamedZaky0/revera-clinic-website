@@ -107,7 +107,6 @@ export function OurApproachSection() {
               gap: 16px;
             }
             .rtl-oas2 .oas2-item {
-              flex-direction: row;
               text-align: right;
             }
             .oas2-icon {
@@ -193,13 +192,33 @@ export function OurApproachSection() {
             {/* LEFT: text + white card */}
             <div className={`oas2-text-col ${reveal}`}>
               {/* Tag */}
-              <span
-                className="section-tag"
-                style={{ marginBottom: "14px" }}
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "14px",
+                  direction: isRTL ? "rtl" : "ltr",
+                }}
               >
-                <img src="/images/main_logo.png" alt="" style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }} />
-                {t.aboutPage.servicesTag}
-              </span>
+                <img 
+                  src="/images/main_logo.png" 
+                  alt="" 
+                  style={{ width: 44, height: 44, objectFit: "contain", flexShrink: 0 }} 
+                />
+                <span
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: 700,
+                    letterSpacing: isRTL ? "normal" : "0.2em",
+                    color: "var(--color-brand-secondary)",
+                    textTransform: "uppercase",
+                    lineHeight: "normal",
+                  }}
+                >
+                  {t.aboutPage.servicesTag}
+                </span>
+              </div>
 
               {/* Heading */}
               <h2
@@ -333,9 +352,7 @@ export function OurApproachSection() {
                       fontWeight: 600,
                       color: "rgba(255,255,255,0.85)",
                       textDecoration: "none",
-                      display: "inline-block",
                     }}
-                    dir="ltr"
                   >
                     {t.aboutPage.phone}
                   </a>

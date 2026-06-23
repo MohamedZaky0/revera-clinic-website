@@ -92,9 +92,6 @@ export function HowItWorks() {
           }
 
           /* RTL adjustments */
-          .rtl .hiw-step-item {
-            flex-direction: row;
-          }
 
           /* Desktop specific alignment: make left part sit higher */
           @media (min-width: 1025px) {
@@ -153,19 +150,42 @@ export function HowItWorks() {
             }}
           >
             {/* Tag with Golden Icon */}
-            <span
-              className="section-tag"
+            <div
+              className="hiw-tag-row"
               style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
                 marginBottom: "16px",
+                direction: isRTL ? "rtl" : "ltr",
               }}
             >
-              <img
-                src="/images/main_logo.png"
-                alt=""
-                style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }}
-              />
-              {t.howItWorks.tag}
-            </span>
+              <svg
+                width="40"
+                height="40"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--color-brand-secondary)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ flexShrink: 0 }}
+              >
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+              </svg>
+              <span
+                style={{
+                  fontSize: "20px",
+                  fontWeight: 700,
+                  letterSpacing: isRTL ? "normal" : "0.2em",
+                  color: "var(--color-brand-secondary)",
+                  textTransform: "uppercase",
+                  lineHeight: "normal",
+                }}
+              >
+                {t.howItWorks.tag}
+              </span>
+            </div>
 
             {/* Title */}
             <h2
@@ -201,7 +221,6 @@ export function HowItWorks() {
                 display: "flex",
                 alignItems: "center",
                 gap: "10px",
-                flexDirection: "row",
                 width: "100%",
                 justifyContent: "flex-start",
               }}
@@ -254,10 +273,10 @@ export function HowItWorks() {
                   e.currentTarget.style.transform = "scale(1)";
                 }}
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 18 18"
+                <svg 
+                  width="18" 
+                  height="18" 
+                  viewBox="0 0 18 18" 
                   fill="none"
                   style={{ transform: isRTL ? "scaleX(-1)" : "none" }}
                 >

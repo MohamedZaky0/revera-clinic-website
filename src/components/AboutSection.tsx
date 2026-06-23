@@ -44,9 +44,7 @@ export function AboutSection() {
     <section ref={sectionRef} className="section-padding bg-white overflow-hidden">
       <div className="cr-container">
         <div
-          className={`flex flex-col lg:flex-row gap-12 lg:gap-16 items-center ${
-            isRTL ? "lg:flex-row-reverse" : ""
-          }`}
+          className="flex flex-col lg:flex-row gap-12 lg:gap-16 items-center"
         >
           {/* ── Left Column: Overlapping Portraits ── */}
           <div className={`flex-1 w-full max-w-[500px] lg:max-w-none ${imageReveal}`}>
@@ -76,12 +74,13 @@ export function AboutSection() {
                 }`}
               >
                 <Image
-                  src="/images/doctor/portrait-main.jpg"
-                  alt="Dr. X"
+                  src={t.about.image1 || "/images/doctor/portrait-about.jpg"}
+                  alt="Dr. Mahmoud Nasr Abu Obeid"
                   fill
                   sizes="(max-width: 1024px) 50vw, 25vw"
                   className="object-cover object-top"
                   priority
+                  unoptimized
                 />
               </div>
 
@@ -92,16 +91,16 @@ export function AboutSection() {
                 }`}
               >
                 <Image
-                  src="/images/doctor/portrait-about.jpg"
-                  alt="Dr. Arwa"
+                  src={t.about.image2 || "/images/doctor/portrait-main.jpg"}
+                  alt="Dr. Mahmoud Nasr Abu Obeid"
                   fill
                   sizes="(max-width: 1024px) 50vw, 25vw"
                   className="object-cover object-top"
                   priority
+                  unoptimized
                 />
               </div>
 
-              {/* Central Rose Badge Shield - Sitting Over Bottom Overlap */}
               <div 
                 className={`absolute z-30 w-20 h-20 rounded-full bg-white shadow-xl flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-110 bottom-[74px] ${
                   isRTL 
@@ -109,12 +108,14 @@ export function AboutSection() {
                     : "left-[56%] -translate-x-1/2"
                 }`}
               >
-                <img
-                  src="/images/main_logo.png"
-                  alt="Revera logo"
-                  className="w-full h-full object-contain"
-                  style={{ transform: "scale(1.7)" }}
-                />
+                <div className="w-full h-full animate-[spin_10s_linear_infinite] flex items-center justify-center">
+                  <img
+                    src="/images/main_logo.png"
+                    alt="Revera logo"
+                    className="w-full h-full object-contain"
+                    style={{ transform: "scale(1.7)" }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -123,9 +124,19 @@ export function AboutSection() {
           <div className={`flex-1 ${textReveal}`}>
             
             {/* Tagline Row */}
-            <div className={`flex items-center gap-2 mb-3 ${isRTL ? "flex-row-reverse justify-start" : ""}`}>
-              <img src="/images/main_logo.png" alt="" className="w-5 h-5 object-contain" />
-              <span className="section-tag mb-0 font-sans tracking-[0.15em] font-semibold text-xs text-[#5A6A51] uppercase">
+            <div 
+              className="flex items-center gap-2.5 mb-4"
+              style={{ direction: isRTL ? "rtl" : "ltr" }}
+            >
+              <img 
+                src="/images/main_logo.png" 
+                alt="" 
+                className="w-12 h-12 object-contain shrink-0" 
+              />
+              <span 
+                className="section-tag mb-0 font-sans font-bold text-xl text-[#5A6A51] uppercase"
+                style={{ letterSpacing: isRTL ? "normal" : "0.15em" }}
+              >
                 {t.about.tag}
               </span>
             </div>
@@ -157,9 +168,7 @@ export function AboutSection() {
                   {t.about.services.map((service) => (
                     <li 
                       key={service} 
-                      className={`flex items-center gap-3.5 ${
-                        isRTL ? "flex-row-reverse" : ""
-                      }`}
+                      className="flex items-center gap-3.5"
                     >
                       <span
                         className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white shadow-sm"
@@ -179,11 +188,12 @@ export function AboutSection() {
               <div className={`md:col-span-5 ${isRTL ? "md:order-1" : "md:order-2"}`}>
                 <div className="relative aspect-[16/10] w-full rounded-[20px] overflow-hidden shadow-md transition-transform duration-500 hover:scale-[1.03]">
                   <Image
-                    src="/images/clinic/interior.jpg"
+                    src={t.about.image3 || "/images/clinic/interior.jpg"}
                     alt="Revera Clinics Interior"
                     fill
                     sizes="(max-width: 768px) 100vw, 250px"
                     className="object-cover"
+                    unoptimized
                   />
                 </div>
               </div>
@@ -191,15 +201,11 @@ export function AboutSection() {
 
             {/* ── Bottom Premium Help & Action Banner ── */}
             <div
-              className={`bg-[#EDF1EC] p-6 md:p-8 rounded-[24px] flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm border border-[#F2EFE9]/30 ${
-                isRTL ? "sm:flex-row-reverse" : ""
-              }`}
+              className="bg-[#EDF1EC] p-6 md:p-8 rounded-[24px] flex flex-col sm:flex-row items-center justify-between gap-6 shadow-sm border border-[#F2EFE9]/30"
             >
               {/* Left Side: Phone call details */}
               <div
-                className={`flex items-center gap-4 ${
-                  isRTL ? "flex-row-reverse text-right" : "text-left"
-                }`}
+                className="flex items-center gap-4"
               >
                 <div
                   className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white shadow-md transition-transform duration-300 hover:scale-105"
@@ -246,9 +252,15 @@ export function AboutSection() {
                 >
                   <span className="tracking-wide capitalize">{t.about.readMore}</span>
                   <span 
-                    className="flex h-7 w-7 items-center justify-center rounded-full bg-[#5A6A51] text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300"
+                    className={`flex h-7 w-7 items-center justify-center rounded-full bg-[#5A6A51] text-white ${
+                      isRTL ? "group-hover:-translate-x-0.5" : "group-hover:translate-x-0.5"
+                    } group-hover:-translate-y-0.5 transition-transform duration-300`}
                   >
-                    <ArrowUpRight size={14} strokeWidth={2.5} />
+                    <ArrowUpRight 
+                      size={14} 
+                      strokeWidth={2.5} 
+                      style={{ transform: isRTL ? "scaleX(-1)" : "none" }} 
+                    />
                   </span>
                 </button>
               </div>
