@@ -1,62 +1,207 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabaseServer';
+import { supabaseServer } from '@/lib/supabaseServer';
+import fs from 'fs';
+import path from 'path';
 
-function mapProviderRow(r: any) {
+export const dynamic = 'force-dynamic';
+
+const JSON_FILE_PATH = path.join(process.cwd(), 'data', 'providers.json');
+
+const DEFAULT_PROVIDERS = [
+  {
+    name: "Dr. Ahmed Medhat",
+    bookings_count: 0,
+    services: ["Tattoo Removal (Small)", "Tattoo Removal (Medium)"],
+    more_count: 4,
+    rating: 0,
+  },
+  {
+    name: "Dr. Radwa Seif",
+    bookings_count: 0,
+    services: ["Physio: Basic Relief (3)", "Physio: Standard Recovery (6)"],
+    more_count: 4,
+    rating: 0,
+  },
+  {
+    name: "Dr. Sara El Gamel",
+    bookings_count: 1,
+    services: ["Half Arm", "Full Arms"],
+    more_count: 14,
+    rating: 0,
+  },
+];
+
+function mapProvider(p: Record<string, any>) {
   return {
-    id: r.id,
-    name: r.name,
-    bookings: r.bookings_count,
-    services: r.services || [],
-    more: r.more_count,
-    rating: Number(r.rating || 0),
-  };
-}
-
-function mapProviderToDb(p: any) {
-  const row: any = {
+    id: p.id,
     name: p.name,
-    bookings_count: p.bookings || 0,
-    services: p.services || [],
-    more_count: p.more || 0,
-    rating: p.rating || 0,
+    bookings: p.bookings_count ?? 0,
+    services: p.services ?? [],
+    more: p.more_count ?? 0,
+    rating: Number(p.rating || 0),
   };
-  if (p.id) {
-    row.id = p.id;
-  }
-  return row;
 }
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    const { data, error } = await getSupabaseServer()
+    const { data, error } = await supabaseServer
       .from('providers')
       .select('*')
-      .order('created_at', { ascending: true });
+      .order('name', { ascending: true });
 
-    if (error) throw error;
-    return NextResponse.json((data || []).map(mapProviderRow));
+    if (!error && data) {
+      if (data.length === 0) {
+        // Seed default providers
+        const { data: seeded, error: seedError } = await supabaseServer
+          .from('providers')
+          .insert(DEFAULT_PROVIDERS)
+          .select();
+        
+        if (!seedError && seeded) {
+          return NextResponse.json(seeded.map(mapProvider));
+        } else {
+          console.warn("Failed to seed default providers to Supabase:", seedError);
+        }
+      } else {
+        return NextResponse.json(data.map(mapProvider));
+      }
+    } else {
+      console.warn("Supabase providers query error, falling back to JSON:", error);
+    }
+  } catch (dbErr) {
+    console.error("Database providers load error, falling back to JSON:", dbErr);
+  }
+
+  // Fallback to local JSON file
+  try {
+    if (!fs.existsSync(JSON_FILE_PATH)) {
+      fs.mkdirSync(path.dirname(JSON_FILE_PATH), { recursive: true });
+      fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(DEFAULT_PROVIDERS.map((p, i) => ({ ...mapProvider(p), id: `local-${i}` })), null, 2));
+      return NextResponse.json(DEFAULT_PROVIDERS.map((p, i) => ({ ...mapProvider(p), id: `local-${i}` })));
+    }
+    const fileContent = fs.readFileSync(JSON_FILE_PATH, 'utf-8');
+    return NextResponse.json(JSON.parse(fileContent));
   } catch (err) {
-    console.error('GET /api/providers error:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    console.error("JSON fallback load error:", err);
+    return NextResponse.json([]);
   }
 }
 
 export async function POST(req: Request) {
+  let body: any;
   try {
-    const body = await req.json();
-    const isArray = Array.isArray(body);
-    const providersToUpsert = isArray ? body.map(mapProviderToDb) : [mapProviderToDb(body)];
-
-    const { data, error } = await getSupabaseServer()
-      .from('providers')
-      .upsert(providersToUpsert)
-      .select();
-
-    if (error) throw error;
-    return NextResponse.json(isArray ? data.map(mapProviderRow) : mapProviderRow(data[0]), { status: 201 });
+    body = await req.json();
   } catch (err) {
-    console.error('POST /api/providers error:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+  }
+
+  const { name, services, rating, more } = body;
+  const newProvider = {
+    name,
+    services: services || [],
+    rating: Number(rating || 0),
+    more_count: Number(more || 0),
+    bookings_count: 0
+  };
+
+  try {
+    const { data, error } = await supabaseServer
+      .from('providers')
+      .insert(newProvider)
+      .select()
+      .single();
+
+    if (!error && data) {
+      return NextResponse.json(mapProvider(data), { status: 201 });
+    } else {
+      console.warn("Supabase providers insert error, falling back to JSON:", error);
+    }
+  } catch (dbErr) {
+    console.error("Database providers insert error, falling back to JSON:", dbErr);
+  }
+
+  // Fallback to JSON file
+  try {
+    let list = [];
+    if (fs.existsSync(JSON_FILE_PATH)) {
+      list = JSON.parse(fs.readFileSync(JSON_FILE_PATH, 'utf-8'));
+    }
+    const localNew = {
+      id: `local-${Date.now()}`,
+      name,
+      bookings: 0,
+      services: services || [],
+      more: Number(more || 0),
+      rating: Number(rating || 0)
+    };
+    list.push(localNew);
+    fs.mkdirSync(path.dirname(JSON_FILE_PATH), { recursive: true });
+    fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(list, null, 2));
+    return NextResponse.json(localNew, { status: 201 });
+  } catch (err) {
+    console.error("JSON fallback insert error:", err);
+    return NextResponse.json({ error: 'Server error saving provider' }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request) {
+  const url = new URL(req.url);
+  const id = url.searchParams.get('id');
+  if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+  let body: any;
+  try {
+    body = await req.json();
+  } catch (err) {
+    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+  }
+
+  const { name, services, rating, more } = body;
+  const updates: Record<string, any> = {};
+  if (name !== undefined) updates.name = name;
+  if (services !== undefined) updates.services = services;
+  if (rating !== undefined) updates.rating = Number(rating || 0);
+  if (more !== undefined) updates.more_count = Number(more || 0);
+
+  try {
+    const { data, error } = await supabaseServer
+      .from('providers')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (!error && data) {
+      return NextResponse.json(mapProvider(data));
+    } else {
+      console.warn("Supabase providers update error, falling back to JSON:", error);
+    }
+  } catch (dbErr) {
+    console.error("Database providers update error, falling back to JSON:", dbErr);
+  }
+
+  // Fallback to JSON file
+  try {
+    if (fs.existsSync(JSON_FILE_PATH)) {
+      const list = JSON.parse(fs.readFileSync(JSON_FILE_PATH, 'utf-8'));
+      const index = list.findIndex((p: any) => p.id === id);
+      if (index !== -1) {
+        list[index] = {
+          ...list[index],
+          ...updates,
+          services: updates.services !== undefined ? updates.services : list[index].services,
+          name: updates.name !== undefined ? updates.name : list[index].name,
+          rating: updates.rating !== undefined ? updates.rating : list[index].rating,
+          more: updates.more_count !== undefined ? updates.more_count : list[index].more
+        };
+        fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(list, null, 2));
+        return NextResponse.json(list[index]);
+      }
+    }
+    return NextResponse.json({ error: 'Provider not found' }, { status: 404 });
+  } catch (err) {
+    console.error("JSON fallback update error:", err);
+    return NextResponse.json({ error: 'Server error updating provider' }, { status: 500 });
   }
 }
 
@@ -66,19 +211,30 @@ export async function DELETE(req: Request) {
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
   try {
-    const { data, error } = await getSupabaseServer()
+    const { error } = await supabaseServer
       .from('providers')
       .delete()
-      .eq('id', id)
-      .select();
+      .eq('id', id);
 
-    if (error) throw error;
-    if (!data || data.length === 0) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!error) {
+      return NextResponse.json({ success: true });
+    } else {
+      console.warn("Supabase providers delete error, falling back to JSON:", error);
     }
-    return NextResponse.json({ success: true, message: 'Provider deleted' });
-  } catch (err) {
-    console.error('DELETE /api/providers error:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+  } catch (dbErr) {
+    console.error("Database providers delete error, falling back to JSON:", dbErr);
   }
+
+  // Fallback delete from JSON
+  try {
+    if (fs.existsSync(JSON_FILE_PATH)) {
+      const list = JSON.parse(fs.readFileSync(JSON_FILE_PATH, 'utf-8'));
+      const filtered = list.filter((p: any) => p.id !== id);
+      fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(filtered, null, 2));
+      return NextResponse.json({ success: true });
+    }
+  } catch (err) {
+    console.error("JSON fallback delete error:", err);
+  }
+  return NextResponse.json({ error: 'Failed to delete provider' }, { status: 500 });
 }

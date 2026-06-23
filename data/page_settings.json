@@ -1,0 +1,171 @@
+{
+  "hero": {
+    "slides": [
+      {
+        "image": "/images/hero/slide-1.jpg",
+        "rating": "4.5",
+        "bookBtn": "Book Appointment",
+        "heading": "Transform Your Beauty Naturally!",
+        "welcome": "Welcome to Revera Clinics",
+        "description": "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
+        "reviewCount": "(1000+ review)"
+      },
+      {
+        "image": "/images/hero/slide-2.jpg",
+        "rating": "4.5",
+        "bookBtn": "Book Appointment",
+        "heading": "Advanced Medical Care You Can Trust!",
+        "welcome": "Welcome to Revera Clinics",
+        "description": "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and dental services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
+        "reviewCount": "(1000+ review)"
+      },
+      {
+        "image": "/images/hero/slide-3.jpg",
+        "rating": "4.5",
+        "bookBtn": "Book Appointment",
+        "heading": "Your Beauty & Health Journey Starts Here!",
+        "welcome": "Welcome to Revera Clinics",
+        "description": "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and dental care for all ages.",
+        "reviewCount": "(1000+ review)"
+      }
+    ],
+    "slides_ar": [
+      {
+        "image": "/images/hero/slide-1.jpg",
+        "rating": "4.5",
+        "bookBtn": "احجز موعدًا",
+        "heading": "حوّل جمالك بشكل طبيعي!",
+        "welcome": "مرحباً بكم في عيادات كريستال روز",
+        "description": "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية مصممة لمساعدتك على تحقيق أهدافك في الجمال والصحة من خلال تقنيات طبية متقدمة.",
+        "reviewCount": "(1000+ تقييم)"
+      },
+      {
+        "image": "/images/hero/slide-2.jpg",
+        "rating": "4.5",
+        "bookBtn": "احجز موعدًا",
+        "heading": "رعاية طبية متقدمة يمكنك الوثوق بها!",
+        "welcome": "مرحباً بكم في عيادات كريستال روز",
+        "description": "اكتشف خدمات شاملة في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان المصممة لااحتياجاتك الفريدة. مع أكثر من 15 عامًا من الخبرة المهنية، نحن هنا لإرشادك نحو الجمال الدائم والعافية.",
+        "reviewCount": "(1000+ تقييم)"
+      },
+      {
+        "image": "/images/hero/slide-3.jpg",
+        "rating": "4.5",
+        "bookBtn": "احجز موعدًا",
+        "heading": "رحلتك نحو الجمال والصحة تبدأ هنا!",
+        "welcome": "مرحباً بكم في عيادات كريستال روز",
+        "description": "عيادات متخصصة تحت إشراف طبي كامل تقدم خدمات في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان لجميع الأعمار.",
+        "reviewCount": "(1000+ تقييم)"
+      }
+    ]
+  },
+  "about": {
+    "image1": "",
+    "image2": "",
+    "image3": ""
+  },
+  "results": {
+    "pairs": [
+      {
+        "id": 1,
+        "after": "/images/before-after/1-after.jpeg",
+        "before": "/images/before-after/1-before.jpeg"
+      },
+      {
+        "id": 2,
+        "after": "/images/before-after/2-after.jpeg",
+        "before": "/images/before-after/2-before.jpeg"
+      },
+      {
+        "id": 3,
+        "after": "/uploads/img_1782222425649_183.png",
+        "before": "/images/before-after/3-before.jpeg"
+      },
+      {
+        "id": 4,
+        "after": "/images/before-after/4-after.jpg",
+        "before": "/images/before-after/4-before.jpg"
+      }
+    ]
+  },
+  "aboutPage": {
+    "whatWeDoImage1": "/uploads/img_1782222425653_363.png",
+    "whatWeDoImage2": "/uploads/img_1782222425656_424.png",
+    "whatWeDoList": [
+      "Dermatology & Aesthetic Treatments",
+      "Gynecology & Women's Health",
+      "Physical Therapy & Rehabilitation",
+      "Osteopathy & Therapeutic Nutrition"
+    ],
+    "whatWeDoListAr": [
+      "علاجات الجلدية والتجميل",
+      "النساء والتوليد وصحة المرأة",
+      "العلاج الطبيعي وإعادة التأهيل",
+      "تقويم العظام والتغذية العلاجية"
+    ],
+    "faqTag": "frequently asked questions",
+    "faqTagAr": "أسئلة شائعة",
+    "faqHeading": "Questions? We have answers.",
+    "faqHeadingAr": "أسئلة؟ لدينا إجابات.",
+    "faqImage1": "/uploads/img_1782222425664_511.png",
+    "faqImage2": "",
+    "faqs": [
+      {
+        "question": "1. What services does Revera offer?",
+        "answer": "Revera is a premium polyclinic specializing in dermatology and aesthetic treatments, gynecology and women's health, physical therapy and rehabilitation, and osteopathy and therapeutic nutrition. Every service is delivered with medical precision and a luxury experience tailored to you."
+      },
+      {
+        "question": "2. Who is Revera designed for?",
+        "answer": "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best — not the cheapest — and expect a medical experience that matches their standards."
+      },
+      {
+        "question": "3. How does my treatment plan work?",
+        "answer": "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan — never a template — that evolves with your progress and needs."
+      },
+      {
+        "question": "4. What makes Revera different from other clinics?",
+        "answer": "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint — from your first appointment to your last follow-up."
+      }
+    ],
+    "faqsAr": [
+      {
+        "question": "١. ما الخدمات التي تقدمها ريفيرا؟",
+        "answer": "ريفيرا عيادة متميزة متخصصة في علاجات الجلدية والتجميل، وصحة المرأة والنساء والتوليد، والعلاج الطبيعي وإعادة التأهيل، وتقويم العظام والتغذية العلاجية. كل خدمة تُقدَّم بدقة طبية وتجربة فاخرة مصممة لكِ."
+      },
+      {
+        "question": "٢. لمن صُمِّمت ريفيرا؟",
+        "answer": "ريفيرا مصممة للمرأة التي تقدّر الأناقة والخصوصية والنتائج الحقيقية. عميلاتنا يبحثن عن الأفضل — لا الأرخص — ويتوقعن تجربة طبية تليق بمعاييرهن."
+      },
+      {
+        "question": "٣. كيف تعمل خطة علاجي؟",
+        "answer": "تبدأ رحلتكِ باستشارة شاملة نُقيّم فيها صحتكِ وأهدافكِ الجمالية وأسلوب حياتكِ. بناءً على ذلك، يضع أطباؤنا خطة علاج شخصية متكاملة — لا نموذجاً جاهزاً — تتطور مع تقدمكِ واحتياجاتكِ."
+      },
+      {
+        "question": "٤. ما الذي يجعل ريفيرا مختلفة؟",
+        "answer": "ريفيرا وجهة، لا مجرد عيادة. الفرق في الإحساس: بيئة خاصة وهادئة، وأطباء يستمعون، ومستوى رعاية يمكنكِ رؤيته والشعور به في كل لحظة — من موعدكِ الأول إلى متابعتكِ الأخيرة."
+      }
+    ]
+  },
+  "howItWorks": {
+    "heading": "Simple steps to beauty transformations",
+    "description": "Discover a seamless process designed to enhance your beauty and health through personalized consultations, customized treatment plans, and dedicated medical support. We guide you every step toward achieving your beauty and wellness goals.",
+    "headingAr": "خطوات بسيطة لتحولات الجمال",
+    "descriptionAr": "اكتشف عملية سلسة مصممة لتعزيز جمالك وصحتك من خلال استشارات شخصية وخطط علاجية مخصصة ودعم طبي متخصص. نرشدك في كل خطوة نحو تحقيق أهداف الجمال والعافية."
+  },
+  "whyChooseUs": {
+    "yearsLabel": "15+ years excellence",
+    "heading": "Where medical expertise meets a luxury experience",
+    "description": "At Revera, every detail is intentional — from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.",
+    "quote": "\"We don't treat conditions — we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey.\"",
+    "contactLabel": "Reach us:",
+    "phone": "(+20) 01035595691",
+    "yearsLabelAr": "١٥+ عاماً من التميز",
+    "headingAr": "حيث تلتقي الخبرة الطبية بتجربة فاخرة",
+    "descriptionAr": "في ريفيرا، كل تفصيل مقصود — بدءاً من استشارتك الأولى وحتى لحظة خروجك متحوّلة. نقدم رعاية مدعومة بالعلم مع الثقة الهادئة لوجهة طبية خاصة.",
+    "quoteAr": "\"نحن لا نعالج فقط — بل نُحوّل الثقة. كل جلسة في ريفيرا مصممة حولكِ: أهدافكِ، بشرتكِ، رحلتكِ.\"",
+    "contactLabelAr": "تواصلي معنا:",
+    "phoneAr": "(+20) 01035595691",
+    "image1": "",
+    "image2": "/uploads/img_1782222425667_853.png"
+  }
+}
