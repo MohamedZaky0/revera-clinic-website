@@ -8,7 +8,7 @@ import { Autoplay, EffectFade } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/effect-fade";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { ArrowRight, ArrowLeft, Star } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 
 const SLIDE_IMAGES = [
   "/images/hero/slide-1.jpg",
@@ -65,7 +65,6 @@ export function HeroSlider() {
 
   return (
     <section
-      dir="ltr"
       className="relative mx-2 my-3 sm:mx-4 sm:my-5 md:mx-6 md:my-8 overflow-hidden rounded-[20px] sm:rounded-[28px] md:rounded-[32px]"
       style={{
         height: "calc(100svh - 176px)",
@@ -83,22 +82,26 @@ export function HeroSlider() {
         onSlideChange={handleSlideChange}
         className="absolute inset-0 h-full w-full"
         aria-hidden="true"
+        dir={isRTL ? "rtl" : "ltr"}
+        key={isRTL ? "rtl" : "ltr"}
       >
-        {SLIDE_IMAGES.map((src, i) => (
-          <SwiperSlide key={i}>
-            <div className="hero-kb absolute inset-0">
-              <Image
-                src={src}
-                alt=""
-                fill
-                priority={i === 0}
-                loading={src === "/images/hero/slide-2.jpg" ? "eager" : undefined}
-                style={{ objectFit: "cover", objectPosition: "center top" }}
-                sizes="100vw"
-              />
-            </div>
-          </SwiperSlide>
-        ))}
+        {slides.map((slide: any, i: number) => {
+          const src = slide.image || `/images/hero/slide-${(i % 3) + 1}.jpg`;
+          return (
+            <SwiperSlide key={i}>
+              <div className="hero-kb absolute inset-0">
+                <Image
+                  src={src}
+                  alt=""
+                  fill
+                  priority={i === 0}
+                  style={{ objectFit: "cover", objectPosition: "center top" }}
+                  sizes="100vw"
+                />
+              </div>
+            </SwiperSlide>
+          );
+        })}
       </Swiper>
 
       <div
@@ -160,10 +163,7 @@ export function HeroSlider() {
             style={{ fontSize: "15px" }}
           >
             {slide.bookBtn}
-            {isRTL
-              ? <ArrowLeft size={15} strokeWidth={2.5} />
-              : <ArrowRight size={15} strokeWidth={2.5} />
-            }
+            <ArrowRight size={15} strokeWidth={2.5} />
           </button>
 
           <div
@@ -222,9 +222,7 @@ export function HeroSlider() {
         className="absolute z-20"
         style={{
           bottom: "clamp(40px, 6svh, 72px)",
-          ...(isRTL
-            ? { left: "clamp(28px, 5vw, 60px)" }
-            : { right: "clamp(28px, 5vw, 60px)" }),
+          insetInlineEnd: "clamp(28px, 5vw, 60px)",
           color: "rgba(251,251,249,0.48)",
           fontSize: "11px",
           fontFamily: "var(--font-sora), sans-serif",

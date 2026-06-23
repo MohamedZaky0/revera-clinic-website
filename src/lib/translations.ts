@@ -205,6 +205,15 @@ export const translations: Record<"en" | "ar", Translation> = {
       address: "Address:",
       copyright: "Copyright © 2026 All Rights Reserved.",
       poweredBy: "Powered by Octpoii",
+      serviceHours: [
+        { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+        { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+        { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+        { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+        { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+        { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "10:00", closeTime: "20:00" },
+        { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+      ],
     },
     booking: {
       title: "Book Your Service",
@@ -374,7 +383,7 @@ export const translations: Record<"en" | "ar", Translation> = {
     hero: {
       slides: [
         {
-          welcome: "مرحباً بكم في عيادات كريستال روز",
+          welcome: "مرحباً بكم في عيادات ريفيرا",
           heading: "حوّل جمالك بشكل طبيعي!",
           description:
             "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية مصممة لمساعدتك على تحقيق أهدافك في الجمال والصحة من خلال تقنيات طبية متقدمة.",
@@ -383,7 +392,7 @@ export const translations: Record<"en" | "ar", Translation> = {
           reviewCount: "(1000+ تقييم)",
         },
         {
-          welcome: "مرحباً بكم في عيادات كريستال روز",
+          welcome: "مرحباً بكم في عيادات ريفيرا",
           heading: "رعاية طبية متقدمة يمكنك الوثوق بها!",
           description:
             "اكتشف خدمات شاملة في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان المصممة لاحتياجاتك الفريدة. مع أكثر من 15 عامًا من الخبرة المهنية، نحن هنا لإرشادك نحو الجمال الدائم والعافية.",
@@ -392,7 +401,7 @@ export const translations: Record<"en" | "ar", Translation> = {
           reviewCount: "(1000+ تقييم)",
         },
         {
-          welcome: "مرحباً بكم في عيادات كريستال روز",
+          welcome: "مرحباً بكم في عيادات ريفيرا",
           heading: "رحلتك نحو الجمال والصحة تبدأ هنا!",
           description:
             "عيادات متخصصة تحت إشراف طبي كامل تقدم خدمات في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان لجميع الأعمار.",
@@ -562,6 +571,15 @@ export const translations: Record<"en" | "ar", Translation> = {
       address: "العنوان:",
       copyright: "حقوق النشر © 2026 جميع الحقوق محفوظة.",
       poweredBy: "تشغيل بواسطة Octpoii",
+      serviceHours: [
+        { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+        { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+        { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+        { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+        { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+        { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "10:00", closeTime: "20:00" },
+        { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+      ],
     },
     booking: {
       title: "احجز خدمتك",
@@ -697,7 +715,7 @@ export const translations: Record<"en" | "ar", Translation> = {
       submitBtn: "إرسال الآن",
     },
     auth: {
-      title: "مرحباً بك في كريستال روز",
+      title: "مرحباً بك في ريفيرا",
       subtitle: "أدخل رقم هاتفك للبدء",
       phonePlaceholder: "رقم الهاتف",
       phoneHint: "رقم هاتف مصري (11 رقمًا، يبدأ بـ 01)",

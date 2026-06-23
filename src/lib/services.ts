@@ -1,3 +1,67 @@
+export function getDurationInMinutes(duration: string | null | undefined): number {
+  if (!duration) return 30; // default to 30 mins
+  const cleaned = duration.toLowerCase().trim();
+  
+  // Format: "1:30 Hours" or "0:30 Hours" or "1:00 Hours"
+  const matchHours = cleaned.match(/(\d+):(\d+)\s*hour/);
+  if (matchHours) {
+    const hrs = parseInt(matchHours[1], 10);
+    const mins = parseInt(matchHours[2], 10);
+    return hrs * 60 + mins;
+  }
+  
+  // Format: "30 mins" or "15 mins"
+  const matchMins = cleaned.match(/(\d+)\s*min/);
+  if (matchMins) {
+    return parseInt(matchMins[1], 10);
+  }
+
+  // Format: "1 hour"
+  const matchOneHour = cleaned.match(/(\d+)\s*hour/);
+  if (matchOneHour) {
+    return parseInt(matchOneHour[1], 10) * 60;
+  }
+  
+  // Format: "1:30"
+  const matchHHMM = cleaned.match(/^(\d+):(\d+)$/);
+  if (matchHHMM) {
+    const hrs = parseInt(matchHHMM[1], 10);
+    const mins = parseInt(matchHHMM[2], 10);
+    return hrs * 60 + mins;
+  }
+
+  return 30; // default fallback
+}
+
+export const ALL_15MIN_SLOTS: string[] = (() => {
+  const slots: string[] = [];
+  for (let h = 9; h <= 20; h++) {
+    for (const m of [0, 15, 30, 45]) {
+      if (h === 20 && m > 0) break;
+      slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }
+  return slots;
+})();
+
+export function normaliseTo24hSlot(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const cleaned = raw.trim();
+  const match = cleaned.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?/i);
+  if (!match) return null;
+  let hh = parseInt(match[1], 10);
+  const mm = parseInt(match[2], 10);
+  const ampm = match[3]?.toUpperCase();
+  if (ampm === 'PM' && hh !== 12) hh += 12;
+  if (ampm === 'AM' && hh === 12) hh = 0;
+  
+  const totalMins = hh * 60 + mm;
+  const rounded = Math.round(totalMins / 15) * 15;
+  const rh = Math.floor(rounded / 60);
+  const rm = rounded % 60;
+  return `${String(rh).padStart(2, '0')}:${String(rm).padStart(2, '0')}`;
+}
+
 export type Category = string;
 
 export interface ServiceItem {
@@ -15,8 +79,6 @@ export interface ServiceItem {
   descriptionAr?: string;
   isShared?: boolean;
   enableReminder?: boolean;
-  visible?: boolean;
-  active?: boolean;
   branchPricing?: Array<{
     name: string;
     price: number;

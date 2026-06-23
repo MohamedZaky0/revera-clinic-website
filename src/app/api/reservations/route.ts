@@ -1,25 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabaseServer';
+import { supabaseServer } from '@/lib/supabaseServer';
 
 /**
- * Parses dynamic or standard ISO date formats to a raw YYYY-MM-DD string.
+ * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
+ * toISOString().slice(0,10) on a UTC-midnight Date is always correct (no tz shift).
+ * String() on a Date gives "Mon Jun 22 ..." which breaks everything — never use that.
  */
 function fmtDate(d: unknown): string {
   if (d instanceof Date) return d.toISOString().slice(0, 10);
   return String(d).slice(0, 10); // already a YYYY-MM-DD string
 }
 
-function fmtCreatedAt(val: unknown): string {
-  if (!val) return "";
-  const d = new Date(String(val));
-  if (isNaN(d.getTime())) return String(val);
-  const datePart = d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-  let timePart = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true });
-  timePart = timePart.toLowerCase();
-  return `${datePart} ${timePart}`;
-}
-
-function mapRow(r: any) {
+function mapRow(r: Record<string, any>) {
   return {
     id: r.id,
     serviceId: r.service_id,
@@ -33,7 +25,8 @@ function mapRow(r: any) {
     timeSlot: r.time_slot,
     sessionType: r.session_type,
     doctorName: r.doctor_name,
-    createdAt: fmtCreatedAt(r.created_at),
+    createdAt: r.created_at,
+    branchId: r.branch_id ?? null,
   };
 }
 
@@ -43,30 +36,23 @@ export async function GET(req: Request) {
   const status = params.get('status');
   const serviceId = params.get('serviceId');
   const date = params.get('date');
+  const branchId = params.get('branchId');
 
   try {
-    let query = getSupabaseServer()
+    let q = supabaseServer
       .from('reservations')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (status) {
-      query = query.eq('status', status);
-    }
-    if (serviceId) {
-      query = query.eq('service_id', Number(serviceId));
-    }
-    if (date) {
-      query = query.eq('date', date);
-    }
+    if (status) q = q.eq('status', status);
+    if (serviceId) q = q.eq('service_id', Number(serviceId));
+    if (date) q = q.eq('date', date);
+    if (branchId) q = q.eq('branch_id', branchId);
 
-    const { data, error } = await query;
+    const { data: rows, error } = await q;
 
-    if (error) {
-      throw error;
-    }
-
-    return NextResponse.json((data || []).map(mapRow));
+    if (error) throw error;
+    return NextResponse.json(rows ? rows.map(mapRow) : []);
   } catch (err) {
     console.error('GET /api/reservations error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
@@ -74,15 +60,15 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const { serviceId, date, requestedTime, name, email, phone, notes, sessionType } = body;
-
-  if (!serviceId || !date || !name || !email || !phone) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-  }
-
   try {
-    const { data, error } = await getSupabaseServer()
+    const body = await req.json();
+    const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId } = body;
+
+    if (!serviceId || !date || !name || !email || !phone) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const { data, error } = await supabaseServer
       .from('reservations')
       .insert({
         service_id: Number(serviceId),
@@ -94,15 +80,13 @@ export async function POST(req: Request) {
         notes: notes || '',
         status: 'pending',
         time_slot: null,
-        session_type: sessionType || 'in_person'
+        session_type: sessionType || 'in_person',
+        branch_id: branchId || null,
       })
       .select()
       .single();
 
-    if (error) {
-      throw error;
-    }
-
+    if (error) throw error;
     return NextResponse.json(mapRow(data), { status: 201 });
   } catch (err) {
     console.error('POST /api/reservations error:', err);
@@ -115,37 +99,44 @@ export async function PATCH(req: Request) {
   const id = url.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
-  const body = await req.json();
-  const { action, timeSlot, status, doctorName, notes, sessionType } = body;
-
   try {
-    const { data: target, error: getErr } = await getSupabaseServer()
+    const body = await req.json();
+    const { action, timeSlot, status, doctorName, notes, sessionType } = body;
+
+    const { data: target, error: findError } = await supabaseServer
       .from('reservations')
       .select('*')
       .eq('id', id)
-      .maybeSingle();
+      .single();
 
-    if (getErr) throw getErr;
-    if (!target) {
+    if (findError || !target) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
     if (action === 'approve') {
       if (!timeSlot) return NextResponse.json({ error: 'Missing timeSlot' }, { status: 400 });
 
-      const { count: approvedCount, error: countErr } = await getSupabaseServer()
+      let bookedQuery = supabaseServer
         .from('reservations')
         .select('*', { count: 'exact', head: true })
         .eq('service_id', target.service_id)
         .eq('date', target.date)
         .eq('status', 'approved');
 
-      if (countErr) throw countErr;
-      if ((approvedCount || 0) >= 8) {
+      if (target.branch_id) {
+        bookedQuery = bookedQuery.eq('branch_id', target.branch_id);
+      } else {
+        bookedQuery = bookedQuery.is('branch_id', null);
+      }
+
+      const { count: bookedCount, error: countError1 } = await bookedQuery;
+
+      if (countError1) throw countError1;
+      if (Number(bookedCount || 0) >= 8) {
         return NextResponse.json({ error: 'Day is fully booked' }, { status: 400 });
       }
 
-      const { count: slotCount, error: slotErr } = await getSupabaseServer()
+      let slotQuery = supabaseServer
         .from('reservations')
         .select('*', { count: 'exact', head: true })
         .eq('service_id', target.service_id)
@@ -153,12 +144,20 @@ export async function PATCH(req: Request) {
         .eq('status', 'approved')
         .eq('time_slot', timeSlot);
 
-      if (slotErr) throw slotErr;
-      if ((slotCount || 0) > 0) {
+      if (target.branch_id) {
+        slotQuery = slotQuery.eq('branch_id', target.branch_id);
+      } else {
+        slotQuery = slotQuery.is('branch_id', null);
+      }
+
+      const { count: slotCount, error: countError2 } = await slotQuery;
+
+      if (countError2) throw countError2;
+      if (Number(slotCount || 0) > 0) {
         return NextResponse.json({ error: 'Time slot already taken' }, { status: 400 });
       }
 
-      const { data: updated, error: updateErr } = await getSupabaseServer()
+      const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
         .update({
           status: 'approved',
@@ -169,18 +168,18 @@ export async function PATCH(req: Request) {
         .select()
         .single();
 
-      if (updateErr) throw updateErr;
+      if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
     } else if (action === 'reject') {
-      const { data: updated, error: updateErr } = await getSupabaseServer()
+      const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
         .update({ status: 'rejected' })
         .eq('id', id)
         .select()
         .single();
 
-      if (updateErr) throw updateErr;
+      if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
     } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined) {
@@ -190,14 +189,14 @@ export async function PATCH(req: Request) {
       if (doctorName !== undefined) updates.doctor_name = doctorName;
       if (sessionType !== undefined) updates.session_type = sessionType;
 
-      const { data: updated, error: updateErr } = await getSupabaseServer()
+      const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
         .update(updates)
         .eq('id', id)
         .select()
         .single();
 
-      if (updateErr) throw updateErr;
+      if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
     } else {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
@@ -215,23 +214,23 @@ export async function DELETE(req: Request) {
 
   try {
     if (id === 'all') {
-      const { error } = await getSupabaseServer()
+      const { error } = await supabaseServer
         .from('reservations')
         .delete()
-        .not('id', 'is', null);
-
+        .neq('status', 'nonexistent_status_to_delete_all_rows');
+      
       if (error) throw error;
       return NextResponse.json({ success: true, message: 'All reservations cleared' });
     }
 
-    const { data, error } = await getSupabaseServer()
+    const { data: deleted, error: deleteError } = await supabaseServer
       .from('reservations')
       .delete()
       .eq('id', id)
-      .select();
+      .select()
+      .single();
 
-    if (error) throw error;
-    if (!data || data.length === 0) {
+    if (deleteError || !deleted) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
     return NextResponse.json({ success: true, message: 'Reservation deleted' });

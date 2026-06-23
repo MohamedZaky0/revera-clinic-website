@@ -106,12 +106,7 @@ export function WhatWeDo() {
                 textAlign: isRTL ? "right" : "left",
               }}
             >
-              <span
-                className="section-tag"
-              >
-                <img src="/images/main_logo.png" alt="" style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }} />
-                {t.whatWeDo.tag}
-              </span>
+              <span className="section-tag">{t.whatWeDo.tag}</span>
 
               <h2 style={{ margin: 0, lineHeight: 1.15 }}>
                 {t.whatWeDo.heading}
@@ -146,7 +141,6 @@ export function WhatWeDo() {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      flexDirection: "row",
                       gap: "12px",
                     }}
                   >
@@ -193,7 +187,6 @@ export function WhatWeDo() {
                   alignItems: "center",
                   gap: "10px",
                   marginTop: "8px",
-                  flexDirection: "row",
                 }}
               >
                 <a
@@ -246,10 +239,10 @@ export function WhatWeDo() {
                     e.currentTarget.style.backgroundColor = "var(--color-brand-secondary)";
                   }}
                 >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 18 18"
+                  <svg 
+                    width="18" 
+                    height="18" 
+                    viewBox="0 0 18 18" 
                     fill="none"
                     style={{ transform: isRTL ? "scaleX(-1)" : "none" }}
                   >

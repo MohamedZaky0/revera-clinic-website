@@ -1,58 +1,65 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-
-const MAP_SRC_NEWCAIRO =
-  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3455.240762823598!2d31.451330111694702!3d30.001242420510955!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x145823da15b7dca9%3A0xb388d9b9c32ebce5!2sRevera%20Clinic%20-%20Tagamoa%20Branch!5e0!3m2!1sen!2sit!4v1781634264961!5m2!1sen!2sit";
-
-const MAP_SRC_ZAYED =
-  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3452.9529642711104!2d30.9335256!3d30.066882699999997!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x145859626e72e263%3A0x148f1e87e5c115c0!2sEl%20nada%20CLINICS%20complex!5e0!3m2!1sen!2sit!4v1781634456678!5m2!1sen!2sit";
+import { Branch } from "@/types";
 
 export function ContactPageContent() {
   const { t, isRTL, language } = useLanguage();
-  const [activeLocation, setActiveLocation] = useState<"newcairo" | "zayed">("newcairo");
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [activeBranchId, setActiveBranchId] = useState<string | null>(null);
   const [form, setForm] = useState({ fname: "", lname: "", phone: "", email: "", message: "" });
 
-  const infoItems = [
-    {
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-          <circle cx="12" cy="10" r="3"/>
-        </svg>
-      ),
-      title: t.contactPage.locationTitle,
-      value: activeLocation === "newcairo"
-        ? t.contactPage.locationText
-        : t.contactPage.locationTextZayed,
-      href: activeLocation === "newcairo"
-        ? "https://maps.app.goo.gl/sXQXDW3A7DdZSRJZ9"
-        : "https://maps.app.goo.gl/7ig2Q9iCY9uszyHq9",
-    },
-    {
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-          <path d="M15 2h7v7M22 2l-8 8" />
-        </svg>
-      ),
-      title: t.contactPage.contactTitle,
-      value: activeLocation === "newcairo" ? t.contactPage.phone : t.contactPage.phoneZayed,
-      href: `tel:${(activeLocation === "newcairo" ? t.contactPage.phone : t.contactPage.phoneZayed).replace(/\s/g, "")}`,
-    },
-    {
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-          <polyline points="22,6 12,13 2,6"/>
-        </svg>
-      ),
-      title: t.contactPage.emailTitle,
-      value: t.contactPage.email,
-      href: `mailto:${t.contactPage.email}`,
-    },
-  ];
+  useEffect(() => {
+    fetch("/api/branches")
+      .then(r => r.json())
+      .then((data: Branch[]) => {
+        const active = Array.isArray(data) ? data.filter(b => b.status === "active") : [];
+        setBranches(active);
+        if (active.length > 0) setActiveBranchId(active[0].id);
+      })
+      .catch(() => setBranches([]));
+  }, []);
+
+  const activeBranch = branches.find(b => b.id === activeBranchId) ?? null;
+
+  const infoItems = activeBranch
+    ? [
+        {
+          icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+          ),
+          title: t.contactPage.locationTitle,
+          value: language === "ar" ? activeBranch.address_ar : activeBranch.address_en,
+          href: activeBranch.maps_link ?? "#",
+        },
+        {
+          icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              <path d="M15 2h7v7M22 2l-8 8" />
+            </svg>
+          ),
+          title: t.contactPage.contactTitle,
+          value: activeBranch.phone ?? t.contactPage.phone,
+          href: `tel:${(activeBranch.phone ?? "").replace(/\s/g, "")}`,
+        },
+        {
+          icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+          ),
+          title: t.contactPage.emailTitle,
+          value: t.contactPage.email,
+          href: `mailto:${t.contactPage.email}`,
+        },
+      ]
+    : [];
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -158,7 +165,7 @@ export function ContactPageContent() {
         </div>
       </section>
 
-      {/* Form + map (Biege rounded container on a white background) */}
+      {/* Form + map */}
       <section className="section-padding bg-white" style={{ paddingTop: 0 }}>
         <div className="cr-container">
           <div
@@ -266,75 +273,78 @@ export function ContactPageContent() {
 
             {/* Map column with branch switcher */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Branch switcher pills */}
-              <div 
-                className="contact-branch-switcher"
-                style={{ 
-                  display: "flex", 
-                  gap: 8, 
-                  backgroundColor: "rgba(90, 61, 52, 0.05)", 
-                  padding: 6, 
-                  borderRadius: 50,
-                  alignSelf: "center",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setActiveLocation("newcairo")}
+              {/* Dynamic branch switcher pills */}
+              {branches.length > 1 && (
+                <div
+                  className="contact-branch-switcher"
                   style={{
-                    padding: "8px 24px",
+                    display: "flex",
+                    gap: 8,
+                    backgroundColor: "rgba(90, 61, 52, 0.05)",
+                    padding: 6,
                     borderRadius: 50,
-                    border: "none",
-                    fontFamily: "var(--font-sora), sans-serif",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.3s ease",
-                    backgroundColor: activeLocation === "newcairo" ? "var(--cr-primary)" : "transparent",
-                    color: activeLocation === "newcairo" ? "#ffffff" : "var(--cr-primary)",
+                    alignSelf: "center",
+                    flexWrap: "wrap",
                   }}
                 >
-                  {language === "ar" ? "فرع القاهرة الجديدة" : "New Cairo Branch"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveLocation("zayed")}
-                  style={{
-                    padding: "8px 24px",
-                    borderRadius: 50,
-                    border: "none",
-                    fontFamily: "var(--font-sora), sans-serif",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    transition: "all 0.3s ease",
-                    backgroundColor: activeLocation === "zayed" ? "var(--cr-primary)" : "transparent",
-                    color: activeLocation === "zayed" ? "#ffffff" : "var(--cr-primary)",
-                  }}
-                >
-                  {language === "ar" ? "فرع الشيخ زايد" : "Sheikh Zayed Branch"}
-                </button>
-              </div>
+                  {branches.map((br) => (
+                    <button
+                      key={br.id}
+                      type="button"
+                      onClick={() => setActiveBranchId(br.id)}
+                      style={{
+                        padding: "8px 24px",
+                        borderRadius: 50,
+                        border: "none",
+                        fontFamily: "var(--font-sora), sans-serif",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        transition: "all 0.3s ease",
+                        backgroundColor: activeBranchId === br.id ? "var(--cr-primary)" : "transparent",
+                        color: activeBranchId === br.id ? "#ffffff" : "var(--cr-primary)",
+                      }}
+                    >
+                      {language === "ar" ? br.name_ar : br.name_en}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Map embed */}
-              <div 
-                style={{ 
-                  borderRadius: 24, 
-                  overflow: "hidden", 
-                  position: "relative", 
+              <div
+                style={{
+                  borderRadius: 24,
+                  overflow: "hidden",
+                  position: "relative",
                   flex: 1,
                   minHeight: 440,
                   border: "1px solid rgba(90, 106, 81, 0.2)",
                 }}
               >
-                <iframe
-                  src={activeLocation === "newcairo" ? MAP_SRC_NEWCAIRO : MAP_SRC_ZAYED}
-                  title="Revera Clinics location"
-                  style={{ border: 0, width: "100%", height: "100%", minHeight: 440 }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
+                {activeBranch?.maps_embed ? (
+                  <iframe
+                    key={activeBranch.id}
+                    src={activeBranch.maps_embed}
+                    title={`${activeBranch.name_en} location`}
+                    style={{ border: 0, width: "100%", height: "100%", minHeight: 440 }}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                ) : (
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    height: "100%",
+                    minHeight: 440,
+                    color: "var(--cr-muted-foreground)",
+                    fontSize: 14,
+                  }}>
+                    {language === "ar" ? "لا تتوفر خريطة لهذا الفرع." : "No map available for this branch."}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -211,13 +211,9 @@ export function SiteFooter() {
             }
 
             /* RTL adjustments */
-            .rtl .ft-top-row {
-              flex-direction: row;
-            }
             .rtl .ft-newsletter-wrapper {
               padding-left: 5px;
               padding-right: 20px;
-              flex-direction: row;
             }
             .rtl .ft-newsletter-input {
               text-align: right;
@@ -228,14 +224,7 @@ export function SiteFooter() {
             .rtl .ft-contact-section {
               direction: rtl;
             }
-            .rtl .ft-contact-subrow {
-              flex-direction: row;
-            }
-            .rtl .ft-contact-row-content {
-              flex-direction: row;
-            }
             .rtl .ft-bottom-bar {
-              flex-direction: row;
               direction: rtl;
             }
 
@@ -340,10 +329,10 @@ export function SiteFooter() {
                   onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.08)"}
                   onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                 >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 18 18"
+                  <svg 
+                    width="15" 
+                    height="15" 
+                    viewBox="0 0 18 18" 
                     fill="none"
                     style={{ transform: isRTL ? "scaleX(-1)" : "none" }}
                   >
@@ -454,7 +443,7 @@ export function SiteFooter() {
               </div>
 
               {/* Column 3: Open Hours (arranged horizontally) */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: "220px" }}>
                 <h4
                   style={{
                     fontSize: "16px",
@@ -469,17 +458,41 @@ export function SiteFooter() {
                   className="ft-hours-row"
                   style={{
                     display: "flex",
-                    flexDirection: "row",
-                    gap: "24px",
-                    flexWrap: "wrap",
+                    flexDirection: "column",
+                    gap: "8px",
                   }}
                 >
-                  <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.72)" }}>
-                    {t.footer.hoursLine1}
-                  </p>
-                  <p style={{ margin: 0, fontSize: "14px", color: "var(--color-brand-sand)", fontWeight: 500 }}>
-                    {t.footer.hoursLine2}
-                  </p>
+                  {t.footer.serviceHours?.map((sh, idx) => {
+                    const formatTime = (time24: string) => {
+                      if (!time24) return "";
+                      const [hStr, mStr] = time24.split(":");
+                      let h = parseInt(hStr, 10);
+                      const m = parseInt(mStr, 10);
+                      const ampm = h >= 12 ? (isRTL ? "م" : "PM") : (isRTL ? "ص" : "AM");
+                      h = h % 12;
+                      h = h ? h : 12;
+                      const mm = m < 10 ? `0${m}` : m;
+                      return `${h}:${mm} ${ampm}`;
+                    };
+                    return (
+                      <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", fontSize: "14px" }}>
+                        <span style={{ color: "rgba(255,255,255,0.72)" }}>{isRTL ? sh.dayAr : sh.day}</span>
+                        <span style={{ color: "var(--color-brand-sand)", fontWeight: 500, whiteSpace: "nowrap" }}>
+                          {sh.isOpen ? `${formatTime(sh.openTime)} – ${formatTime(sh.closeTime)}` : (isRTL ? "مغلق" : "Closed")}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {!t.footer.serviceHours && (
+                    <>
+                      <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.72)" }}>
+                        {t.footer.hoursLine1}
+                      </p>
+                      <p style={{ margin: 0, fontSize: "14px", color: "var(--color-brand-sand)", fontWeight: 500 }}>
+                        {t.footer.hoursLine2}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

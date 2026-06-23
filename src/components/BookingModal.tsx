@@ -2,14 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Category, ServiceItem } from "@/lib/services";
+import { Category, ServiceItem, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
 import { 
   getServiceToggles, 
   isServiceActive, 
   ServiceToggleState, 
   getDynamicServices, 
   getDynamicCategories, 
-  sortServices,
   LocalCategory 
 } from "@/lib/serviceStore";
 
@@ -27,10 +26,17 @@ function getNext30Days(): Date[] {
   return days;
 }
 
-// 8 sessions every 30 minutes starting at 12:00 PM: 12:00, 12:30, 13:00 ... 15:30
-const TIME_SLOTS = [
-  '12:00 PM','12:30 PM','01:00 PM','01:30 PM','02:00 PM','02:30 PM','03:00 PM','03:30 PM'
-];
+function to12h(slot24h: string): string {
+  const [hhStr, mmStr] = slot24h.split(':');
+  let hh = parseInt(hhStr, 10);
+  const mm = parseInt(mmStr, 10);
+  const ampm = hh >= 12 ? 'PM' : 'AM';
+  hh = hh % 12;
+  if (hh === 0) hh = 12;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} ${ampm}`;
+}
+
+const TIME_SLOTS = ALL_15MIN_SLOTS.map(to12h);
 
 function to24(slot: string) {
   // input like "12:30 PM" -> return "12:30" or "15:30"
@@ -75,12 +81,16 @@ export function BookingModal() {
   const [disabledDates, setDisabledDates] = useState<Record<string, number>>({});
   const [takenSlots, setTakenSlots] = useState<string[]>([]);
 
+  const [branches, setBranches] = useState<{ id: string; name_en: string; name_ar: string; status: string }[]>([]);
+  const [branchId, setBranchId] = useState<string | null>(null);
+
   const days = getNext30Days();
 
   const resetState = useCallback(() => {
     setStep(1);
     setSelectedCategory("dermatology");
     setServiceId(null);
+    setBranchId(branches[0]?.id ?? null);
     setSelectedDate(null);
     setSelectedTime(null);
     setName('');
@@ -89,7 +99,7 @@ export function BookingModal() {
     setNotes("");
     setSessionType("in_person");
     setConfirmed(false);
-  }, []);
+  }, [branches]);
 
   const handleClose = useCallback(() => {
     setOpen(false);
@@ -121,46 +131,13 @@ export function BookingModal() {
   const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>([]);
   const [dynamicCategories, setDynamicCategories] = useState<LocalCategory[]>([]);
 
+  // Derived from dynamicServices — must be declared before useEffects that depend on it
+  const selectedService = serviceId ? dynamicServices.find((service) => service.id === serviceId) : undefined;
+
   useEffect(() => {
     setServiceToggles(getServiceToggles());
     setDynamicServices(getDynamicServices());
     setDynamicCategories(getDynamicCategories());
-
-    fetch("/api/services")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const sorted = sortServices(data);
-          setDynamicServices(sorted);
-          localStorage.setItem("revera_dynamic_services", JSON.stringify(sorted));
-
-          // Merge backend status and visibility toggles into serviceToggles state and persist
-          setServiceToggles((prev) => {
-            const merged = { ...prev };
-            sorted.forEach((svc) => {
-              merged[svc.id] = {
-                visible: svc.visible !== undefined ? svc.visible : (prev[svc.id]?.visible ?? true),
-                active: svc.active !== undefined ? svc.active : (prev[svc.id]?.active ?? true),
-              };
-            });
-            localStorage.setItem("revera_service_toggles", JSON.stringify(merged));
-            return merged;
-          });
-        }
-      })
-      .catch((err) => console.error("BookingModal: fetch services failed", err));
-
-    fetch("/api/categories")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const sortedCats = data.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-          setDynamicCategories(sortedCats);
-          localStorage.setItem("revera_dynamic_categories", JSON.stringify(sortedCats));
-          setDynamicServices(prev => sortServices(prev));
-        }
-      })
-      .catch((err) => console.error("BookingModal: fetch categories failed", err));
 
     const handleStorage = () => {
       setServiceToggles(getServiceToggles());
@@ -171,21 +148,38 @@ export function BookingModal() {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  // Fetch availability for next 30 days when modal opens or service changes
+  // Load branches
+  useEffect(() => {
+    fetch("/api/branches")
+      .then((r) => r.json())
+      .then((data) => {
+        const activeBranches = (data || []).filter((b: any) => b.status === "active");
+        setBranches(activeBranches);
+        if (activeBranches.length > 0) {
+          setBranchId(activeBranches[0].id);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch availability for next 30 days when modal opens, service changes, or branch changes
   useEffect(() => {
     if (!open || !serviceId) return;
-    fetch(`/api/availability?serviceId=${serviceId}&days=30`).then(r => r.json()).then((data) => {
+    const branchQuery = branchId ? `&branchId=${branchId}` : "";
+    fetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}`).then(r => r.json()).then((data) => {
       const map: Record<string, number> = {};
       if (Array.isArray(data)) {
-        data.forEach((d: { date: string; approvedCount: number }) => { map[d.date] = d.approvedCount; });
+        data.forEach((d: { date: string; approvedCount: number; isAvailable?: boolean }) => { 
+          map[d.date] = d.isAvailable === false ? 99 : 0; 
+        });
       } else {
         console.error("Fetch availability expected array, got", data);
       }
       setDisabledDates(map);
     }).catch(()=>{});
-  }, [open, serviceId]);
+  }, [open, serviceId, branchId]);
 
-  // Fetch taken time slots for a single selected date
+  // Fetch taken time slots for a single selected date and calculate duration-based availability
   useEffect(() => {
     let active = true;
     if (!serviceId || !selectedDate) {
@@ -195,13 +189,46 @@ export function BookingModal() {
       return;
     }
     const date = toLocalDateStr(selectedDate);
-    fetch(`/api/reservations?serviceId=${serviceId}&date=${date}&status=approved`)
+    const branchQuery = branchId ? `&branchId=${branchId}` : "";
+    fetch(`/api/reservations?serviceId=${serviceId}&date=${date}&status=approved${branchQuery}`)
       .then(r=>r.json())
       .then((list)=>{
         if (active) {
           if (Array.isArray(list)) {
-            const slots = list.map((i: { timeSlot?: string | null }) => i.timeSlot).filter(Boolean) as string[];
-            setTakenSlots(slots);
+            const targetDuration = getDurationInMinutes(selectedService?.duration);
+            const targetSlotsNeeded = Math.ceil(targetDuration / 15);
+            
+            const occupied = new Array(ALL_15MIN_SLOTS.length).fill(false);
+            
+            const bookings = list.map((i: { timeSlot?: string | null }) => i.timeSlot).filter(Boolean) as string[];
+            for (const b of bookings) {
+              const norm = normaliseTo24hSlot(b);
+              if (norm) {
+                const idx = ALL_15MIN_SLOTS.indexOf(norm);
+                if (idx >= 0) {
+                  for (let k = 0; k < targetSlotsNeeded; k++) {
+                    if (idx + k < occupied.length) {
+                      occupied[idx + k] = true;
+                    }
+                  }
+                }
+              }
+            }
+            
+            const unavailable: string[] = [];
+            for (let i = 0; i < ALL_15MIN_SLOTS.length; i++) {
+              let fit = true;
+              for (let k = 0; k < targetSlotsNeeded; k++) {
+                if (i + k >= occupied.length || occupied[i + k]) {
+                  fit = false;
+                  break;
+                }
+              }
+              if (!fit) {
+                unavailable.push(ALL_15MIN_SLOTS[i]);
+              }
+            }
+            setTakenSlots(unavailable);
           } else {
             console.error("Fetch reservations expected array, got", list);
             setTakenSlots([]);
@@ -214,7 +241,7 @@ export function BookingModal() {
     return () => {
       active = false;
     };
-  }, [serviceId, selectedDate]);
+  }, [serviceId, selectedDate, branchId, selectedService]);
 
   // Close on Escape key
   useEffect(() => {
@@ -246,6 +273,7 @@ export function BookingModal() {
       requestedTime: selectedTime,
       name, email, phone, notes,
       sessionType,
+      branchId,
     };
     fetch('/api/reservations', { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } })
       .then(r => r.json())
@@ -253,13 +281,12 @@ export function BookingModal() {
       .catch(() => setConfirmed(true));
   }
 
-  const selectedService = serviceId ? dynamicServices.find((service) => service.id === serviceId) : undefined;
   // Filter out services that admin marked as inactive or hidden
   const activeServices = dynamicServices.filter(s => isServiceActive(s.id, serviceToggles));
   const servicesForCategory = activeServices.filter((service) => service.cat === selectedCategory);
 
   const canNext =
-    (step === 1 && serviceId !== null) ||
+    (step === 1 && serviceId !== null && (branches.length === 0 || branchId !== null)) ||
     (step === 2 && selectedDate !== null) ||
     (step === 3 && selectedTime !== null);
 
@@ -275,7 +302,7 @@ export function BookingModal() {
     >
       <div className="modal-box" dir={isRTL ? "rtl" : "ltr"}>
         {/* Header */}
-        <div className={`flex items-center justify-between mb-6 ${isRTL ? "flex-row-reverse" : ""}`}>
+        <div className="flex items-center justify-between mb-6">
           <div>
             <div
               className="flex h-10 w-10 items-center justify-center rounded-full mb-2"
@@ -324,6 +351,15 @@ export function BookingModal() {
                 style={{ backgroundColor: "var(--cr-secondary)" }}
                 dir={isRTL ? "rtl" : "ltr"}
               >
+                 {branchId && (
+                  <p className="mb-1">
+                    <span className="font-semibold">{isRTL ? "الفرع" : "Branch"}: </span>
+                    {(() => {
+                      const b = branches.find(x => x.id === branchId);
+                      return b ? (isRTL ? b.name_ar : b.name_en) : "";
+                    })()}
+                  </p>
+                )}
                 <p className="mb-1">
                   <span className="font-semibold">{t.booking.labels.date}: </span>
                   {formatDate(selectedDate)}
@@ -341,7 +377,7 @@ export function BookingModal() {
         ) : (
           <>
             {/* Step progress */}
-            <div className={`flex items-center justify-between mb-8 ${isRTL ? "flex-row-reverse" : ""}`}>
+            <div className="flex items-center justify-between mb-8">
               {t.booking.steps.map((label, i) => {
                 const stepNum = (i + 1) as Step;
                 const isActive = step === stepNum;
@@ -383,6 +419,35 @@ export function BookingModal() {
             {/* Step 1: Service selection */}
             {step === 1 && (
               <div>
+                {branches.length > 0 && (
+                  <div className="mb-6">
+                    <p className="mb-3 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
+                      {isRTL ? "اختر الفرع" : "Select Branch"}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {branches.map((branch) => {
+                        const label = isRTL ? branch.name_ar : branch.name_en;
+                        const isActive = branchId === branch.id;
+                        return (
+                          <button
+                            key={branch.id}
+                            type="button"
+                            onClick={() => setBranchId(branch.id)}
+                            className="rounded-full px-4 py-2 text-xs font-semibold transition-colors"
+                            style={{
+                              backgroundColor: isActive ? "var(--cr-primary)" : "var(--cr-secondary)",
+                              color: isActive ? "var(--cr-white)" : "var(--cr-primary)",
+                              border: isActive ? "none" : "1.5px solid rgba(65, 78, 54, 0.18)",
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <p className="mb-4 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
                   {t.booking.labels.service}
                 </p>
@@ -481,9 +546,9 @@ export function BookingModal() {
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {TIME_SLOTS.map((slot) => {
-                    const isSelected = selectedTime === slot;
-                    const slot24 = to24(slot);
-                    const taken = takenSlots.includes(slot24);
+                     const isSelected = selectedTime === slot;
+                     const slot24 = normaliseTo24hSlot(slot) ?? "";
+                     const taken = takenSlots.includes(slot24);
                     return (
                       <button
                         key={slot}
@@ -520,6 +585,15 @@ export function BookingModal() {
                     <p className="mb-0">
                       <span className="font-semibold">{t.booking.labels.service}: </span>
                       {isRTL ? selectedService.ar : selectedService.en}
+                    </p>
+                  )}
+                  {branchId && (
+                    <p className="mb-0">
+                      <span className="font-semibold">{isRTL ? "الفرع" : "Branch"}: </span>
+                      {(() => {
+                        const b = branches.find(x => x.id === branchId);
+                        return b ? (isRTL ? b.name_ar : b.name_en) : "";
+                      })()}
                     </p>
                   )}
                   {selectedDate && (
@@ -596,7 +670,7 @@ export function BookingModal() {
             {/* Navigation */}
             <div
               className={`flex mt-6 gap-3 ${
-                step === 1 ? "justify-end" : isRTL ? "flex-row-reverse justify-between" : "justify-between"
+                step === 1 ? "justify-end" : "justify-between"
               }`}
             >
               {step > 1 && (

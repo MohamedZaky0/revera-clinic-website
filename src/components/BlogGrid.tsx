@@ -37,7 +37,6 @@ export function BlogGrid() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  flexDirection: "row",
                   gap: 16,
                   padding: "0 4px",
                 }}
@@ -58,10 +57,10 @@ export function BlogGrid() {
                   aria-hidden
                   className="blog-arrow-btn"
                 >
-                  <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 18 18"
+                  <svg 
+                    width="18" 
+                    height="18" 
+                    viewBox="0 0 18 18" 
                     fill="none"
                     style={{ transform: isRTL ? "scaleX(-1)" : "none" }}
                   >

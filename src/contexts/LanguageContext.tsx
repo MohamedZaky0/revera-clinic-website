@@ -7,7 +7,6 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { usePathname } from "next/navigation";
 import type { Language, Direction, Translation } from "@/types";
 import { translations } from "@/lib/translations";
 
@@ -33,36 +32,195 @@ function getInitialLanguage(): Language {
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>(getInitialLanguage);
-  const pathname = usePathname();
-  const isAdmin = pathname?.startsWith("/admin");
-
-  const currentLang = isAdmin ? "en" : language;
+  const [dynamicTranslations, setDynamicTranslations] = useState(translations);
 
   useEffect(() => {
-    const dir: Direction = currentLang === "ar" ? "rtl" : "ltr";
-    document.documentElement.lang = currentLang;
+    const dir: Direction = language === "ar" ? "rtl" : "ltr";
+    document.documentElement.lang = language;
     document.documentElement.dir = dir;
     document.body.className = dir;
+    localStorage.setItem("cr-language", language);
 
-    if (!isAdmin) {
-      localStorage.setItem("cr-language", language);
-      const url = new URL(window.location.href);
-      url.searchParams.set("lang", language);
-      window.history.replaceState({}, "", url.toString());
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", language);
+    window.history.replaceState({}, "", url.toString());
+  }, [language]);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/page-settings", { cache: "no-store" });
+        if (res.ok) {
+          const homeSettings = await res.json();
+          if (homeSettings) {
+            setDynamicTranslations(prev => {
+              const updated = { ...prev };
+              if (homeSettings.hero?.slides) {
+                updated.en = {
+                  ...updated.en,
+                  hero: {
+                    ...updated.en.hero,
+                    slides: homeSettings.hero.slides,
+                  },
+                };
+              }
+              if (homeSettings.hero?.slides_ar) {
+                updated.ar = {
+                  ...updated.ar,
+                  hero: {
+                    ...updated.ar.hero,
+                    slides: homeSettings.hero.slides_ar,
+                  },
+                };
+              }
+              if (homeSettings.about) {
+                updated.en = {
+                  ...updated.en,
+                  about: {
+                    ...updated.en.about,
+                    ...homeSettings.about,
+                  },
+                };
+                updated.ar = {
+                  ...updated.ar,
+                  about: {
+                    ...updated.ar.about,
+                    ...homeSettings.about,
+                  },
+                };
+              }
+              if (homeSettings.results) {
+                updated.en = {
+                  ...updated.en,
+                  results: {
+                    ...updated.en.results,
+                    pairs: homeSettings.results.pairs,
+                  },
+                };
+                updated.ar = {
+                  ...updated.ar,
+                  results: {
+                    ...updated.ar.results,
+                    pairs: homeSettings.results.pairs,
+                  },
+                };
+              }
+              if (homeSettings.aboutPage) {
+                updated.en = {
+                  ...updated.en,
+                  aboutPage: {
+                    ...updated.en.aboutPage,
+                    whatWeDoImage1: homeSettings.aboutPage.whatWeDoImage1,
+                    whatWeDoImage2: homeSettings.aboutPage.whatWeDoImage2,
+                    whatWeDoList: homeSettings.aboutPage.whatWeDoList || updated.en.aboutPage.whatWeDoList,
+                    faqTag: homeSettings.aboutPage.faqTag || updated.en.aboutPage.faqTag,
+                    faqHeading: homeSettings.aboutPage.faqHeading || updated.en.aboutPage.faqHeading,
+                    faqs: homeSettings.aboutPage.faqs || updated.en.aboutPage.faqs,
+                    faqImage1: homeSettings.aboutPage.faqImage1 || updated.en.aboutPage.faqImage1,
+                    faqImage2: homeSettings.aboutPage.faqImage2 || updated.en.aboutPage.faqImage2,
+                  },
+                };
+                updated.ar = {
+                  ...updated.ar,
+                  aboutPage: {
+                    ...updated.ar.aboutPage,
+                    whatWeDoImage1: homeSettings.aboutPage.whatWeDoImage1,
+                    whatWeDoImage2: homeSettings.aboutPage.whatWeDoImage2,
+                    whatWeDoList: homeSettings.aboutPage.whatWeDoListAr || updated.ar.aboutPage.whatWeDoList,
+                    faqTag: homeSettings.aboutPage.faqTagAr || updated.ar.aboutPage.faqTag,
+                    faqHeading: homeSettings.aboutPage.faqHeadingAr || updated.ar.aboutPage.faqHeading,
+                    faqs: homeSettings.aboutPage.faqsAr || updated.ar.aboutPage.faqs,
+                    faqImage1: homeSettings.aboutPage.faqImage1 || updated.ar.aboutPage.faqImage1,
+                    faqImage2: homeSettings.aboutPage.faqImage2 || updated.ar.aboutPage.faqImage2,
+                  },
+                };
+              }
+              if (homeSettings.howItWorks) {
+                updated.en = {
+                  ...updated.en,
+                  howItWorks: {
+                    ...updated.en.howItWorks,
+                    heading: homeSettings.howItWorks.heading || updated.en.howItWorks.heading,
+                    description: homeSettings.howItWorks.description || updated.en.howItWorks.description,
+                  },
+                };
+                updated.ar = {
+                  ...updated.ar,
+                  howItWorks: {
+                    ...updated.ar.howItWorks,
+                    heading: homeSettings.howItWorks.headingAr || updated.ar.howItWorks.heading,
+                    description: homeSettings.howItWorks.descriptionAr || updated.ar.howItWorks.description,
+                  },
+                };
+              }
+              if (homeSettings.whyChooseUs) {
+                updated.en = {
+                  ...updated.en,
+                  whyChooseUs: {
+                    ...updated.en.whyChooseUs,
+                    yearsLabel: homeSettings.whyChooseUs.yearsLabel || updated.en.whyChooseUs.yearsLabel,
+                    heading: homeSettings.whyChooseUs.heading || updated.en.whyChooseUs.heading,
+                    description: homeSettings.whyChooseUs.description || updated.en.whyChooseUs.description,
+                    quote: homeSettings.whyChooseUs.quote || updated.en.whyChooseUs.quote,
+                    contactLabel: homeSettings.whyChooseUs.contactLabel || updated.en.whyChooseUs.contactLabel,
+                    phone: homeSettings.whyChooseUs.phone || updated.en.whyChooseUs.phone,
+                    image1: homeSettings.whyChooseUs.image1 || updated.en.whyChooseUs.image1,
+                    image2: homeSettings.whyChooseUs.image2 || updated.en.whyChooseUs.image2,
+                  },
+                };
+                updated.ar = {
+                  ...updated.ar,
+                  whyChooseUs: {
+                    ...updated.ar.whyChooseUs,
+                    yearsLabel: homeSettings.whyChooseUs.yearsLabelAr || updated.ar.whyChooseUs.yearsLabel,
+                    heading: homeSettings.whyChooseUs.headingAr || updated.ar.whyChooseUs.heading,
+                    description: homeSettings.whyChooseUs.descriptionAr || updated.ar.whyChooseUs.description,
+                    quote: homeSettings.whyChooseUs.quoteAr || updated.ar.whyChooseUs.quote,
+                    contactLabel: homeSettings.whyChooseUs.contactLabelAr || updated.ar.whyChooseUs.contactLabel,
+                    phone: homeSettings.whyChooseUs.phoneAr || updated.ar.whyChooseUs.phone,
+                    image1: homeSettings.whyChooseUs.image1 || updated.ar.whyChooseUs.image1,
+                    image2: homeSettings.whyChooseUs.image2 || updated.ar.whyChooseUs.image2,
+                  },
+                };
+              }
+              if (homeSettings.footer && homeSettings.footer.serviceHours) {
+                updated.en = {
+                  ...updated.en,
+                  footer: {
+                    ...updated.en.footer,
+                    serviceHours: homeSettings.footer.serviceHours,
+                  },
+                };
+                updated.ar = {
+                  ...updated.ar,
+                  footer: {
+                    ...updated.ar.footer,
+                    serviceHours: homeSettings.footer.serviceHours,
+                  },
+                };
+              }
+              return updated;
+            });
+          }
+        }
+      } catch (err) {
+        console.error("LanguageProvider: failed to load page settings", err);
+      }
     }
-  }, [language, currentLang, isAdmin]);
+    loadSettings();
+  }, []);
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
   }, []);
 
-  const direction: Direction = currentLang === "ar" ? "rtl" : "ltr";
+  const direction: Direction = language === "ar" ? "rtl" : "ltr";
   const value: LanguageContextValue = {
-    language: currentLang,
+    language,
     direction,
-    t: translations[currentLang],
+    t: dynamicTranslations[language],
     setLanguage,
-    isRTL: currentLang === "ar",
+    isRTL: language === "ar",
   };
 
   return (

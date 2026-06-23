@@ -119,11 +119,11 @@ function StatCounter({ stat, active, isRTL }: StatCounterProps) {
           color: "var(--cr-primary)",
           transform: stat.value === "10K+" ? (isRTL ? "translateX(-6px)" : "translateX(6px)") : "none",
           display: "inline-block",
+          direction: "ltr",
         }}
-        dir="ltr"
         aria-label={`${stat.value} ${stat.label}`}
       >
-        {`${count}${suffix}`}
+        {count}{suffix}
       </div>
       <p
         className="mb-0 text-sm font-medium"
@@ -149,7 +149,8 @@ export function OurResults() {
     setFailedIds((prev) => new Set([...prev, id]));
   }, []);
 
-  const validPairs = BEFORE_AFTER_PAIRS.filter((p) => !failedIds.has(p.id));
+  const pairsSource = t.results.pairs || BEFORE_AFTER_PAIRS;
+  const validPairs = pairsSource.filter((p) => !failedIds.has(p.id));
 
   // Stats data merged with icons
   const statsWithIcons: StatItem[] = t.results.stats.map((s, i) => ({
@@ -199,16 +200,7 @@ export function OurResults() {
             headerVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           }`}
         >
-          <span
-            className="section-tag"
-            style={{
-              justifyContent: "center",
-              display: "inline-flex",
-            }}
-          >
-            <img src="/images/main_logo.png" alt="" style={{ width: 40, height: 40, objectFit: "contain", opacity: 0.8 }} />
-            {t.results.tag}
-          </span>
+          <span className="section-tag">{t.results.tag}</span>
           <h2 className="mt-3 max-w-2xl mx-auto">{t.results.heading}</h2>
         </div>
 
@@ -282,6 +274,7 @@ function BeforeAfterSlide({ pair, isRTL, priority = false, onError }: BeforeAfte
           className="object-cover"
           priority={priority}
           onError={() => onError?.(pair.id)}
+          unoptimized
         />
         <span
           className="absolute bottom-3 left-3 rounded-full px-3 py-1 text-xs font-semibold text-white"
@@ -301,6 +294,7 @@ function BeforeAfterSlide({ pair, isRTL, priority = false, onError }: BeforeAfte
           className="object-cover"
           priority={priority}
           onError={() => onError?.(pair.id)}
+          unoptimized
         />
         <span
           className="absolute bottom-3 left-3 rounded-full px-3 py-1 text-xs font-semibold text-white"

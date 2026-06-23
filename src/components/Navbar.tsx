@@ -60,11 +60,10 @@ export function Navbar() {
         background: scrolled ? "rgba(255,255,255,0.98)" : "transparent",
         boxShadow: scrolled ? "0 2px 20px rgba(90,61,52,0.08)" : "none",
       }}
-      dir={isRTL ? "rtl" : "ltr"}
     >
       <div className="cr-container">
         <nav
-          className="h-16 lg:h-28 flex items-center justify-between gap-4 lg:gap-7"
+          className="h-16 lg:h-28 flex items-center justify-between gap-4 lg:gap-7 flex-row"
         >
           {/* Logo */}
           <Link href="/" className="shrink-0">
@@ -153,7 +152,6 @@ export function Navbar() {
             {/* Phone */}
             <a
               href="tel:+201035595691"
-              dir="ltr"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -172,7 +170,7 @@ export function Navbar() {
               }}
             >
               <Phone size={18} strokeWidth={1.5} />
-              <span>(+20) 01125787019</span>
+              <span>(+20) 01035595691</span>
             </a>
 
             {/* Language dropdown */}
@@ -203,13 +201,13 @@ export function Navbar() {
                 }}
               >
                 <Image
-                  src={language === "ar" ? "/images/flag/ar.png" : "/images/flag/en.png"}
-                  alt={language === "ar" ? "Arabic" : "English"}
+                  src={language === "en" ? "/images/flag/en.png" : "/images/flag/ar.png"}
+                  alt={language === "en" ? "English" : "العربية"}
                   width={20}
                   height={14}
                   style={{ width: "auto", height: "auto", borderRadius: "2px" }}
                 />
-                <span>{language === "ar" ? "العربية" : "English"}</span>
+                <span>{language === "en" ? "English" : "العربية"}</span>
                 <ChevronDown size={16} />
               </button>
 

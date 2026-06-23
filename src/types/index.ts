@@ -1,6 +1,21 @@
 export type Language = "en" | "ar";
 export type Direction = "ltr" | "rtl";
 
+export interface Branch {
+  id: string;
+  name_en: string;
+  name_ar: string;
+  address_en: string;
+  address_ar: string;
+  phone?: string;
+  maps_embed?: string;
+  maps_link?: string;
+  status: "active" | "inactive";
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Translation {
   nav: {
     home: string;
@@ -22,6 +37,7 @@ export interface Translation {
       bookBtn: string;
       rating: string;
       reviewCount: string;
+      image?: string;
     }>;
   };
   about: {
@@ -33,11 +49,15 @@ export interface Translation {
     needHelp: string;
     phone: string;
     readMore: string;
+    image1?: string;
+    image2?: string;
+    image3?: string;
   };
   results: {
     tag: string;
     heading: string;
     stats: Array<{ value: string; label: string }>;
+    pairs?: Array<{ id: number; before: string; after: string }>;
   };
   services: {
     tag: string;
@@ -70,6 +90,8 @@ export interface Translation {
     quote: string;
     contactLabel: string;
     phone: string;
+    image1?: string;
+    image2?: string;
   };
   howItWorks: {
     tag: string;
@@ -112,6 +134,13 @@ export interface Translation {
     address: string;
     copyright: string;
     poweredBy: string;
+    serviceHours?: Array<{
+      day: string;
+      dayAr: string;
+      isOpen: boolean;
+      openTime: string;
+      closeTime: string;
+    }>;
   };
   booking: {
     title: string;
@@ -165,6 +194,8 @@ export interface Translation {
     whatWeDoHeading: string;
     whatWeDoDescription: string;
     whatWeDoList: string[];
+    whatWeDoImage1?: string;
+    whatWeDoImage2?: string;
     storiesTag: string;
     storiesHeading: string;
     storiesList: string[];
@@ -172,6 +203,8 @@ export interface Translation {
     faqTag: string;
     faqHeading: string;
     faqs: Array<{ question: string; answer: string }>;
+    faqImage1?: string;
+    faqImage2?: string;
   };
   servicesPage: {
     pageTitle: string;

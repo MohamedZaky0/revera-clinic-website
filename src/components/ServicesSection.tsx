@@ -9,7 +9,6 @@ import {
   ServiceToggleState, 
   getDynamicServices, 
   getDynamicCategories, 
-  sortServices,
   LocalCategory 
 } from "@/lib/serviceStore";
 
@@ -136,12 +135,17 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
   const [showCursor, setShowCursor] = useState(false);
   const title = lang === "ar" ? service.ar : service.en;
+  const isRTL = lang === "ar";
   // const price = `${service.cost.toLocaleString()} EGP`;
 
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={() => {
+        const msg = encodeURIComponent(`Hello Revera, I'm interested in booking "${service.en}". Please let me know your availability at your New Cairo branch. Thank you.`);
+        window.open(`https://wa.me/201035595691?text=${msg}`, '_blank');
+      }}
       style={{
         backgroundColor: "var(--cr-secondary)",
         borderRadius: 24,
@@ -151,8 +155,11 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
         display: "flex",
         flexDirection: "column",
         height: "100%",
+        padding: 24,
+        cursor: "pointer",
+        position: "relative",
       }}>
-      <div style={{ padding: 24, flex: 1, display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 24 }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14 }}>
           <h3 style={{
             margin: 0,
@@ -174,7 +181,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
             placeItems: "center",
             flexShrink: 0,
             transition: "transform 0.28s ease, background-color 0.28s ease",
-            transform: hovered ? "rotate(45deg)" : "rotate(0deg)",
+            transform: `${isRTL ? "scaleX(-1)" : ""} ${hovered ? "rotate(45deg)" : "rotate(0deg)"}`,
           }}>
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M4 14L14 4M14 4H6M14 4V12" stroke="#414E36" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -309,42 +316,6 @@ export function ServicesSection() {
     setDynamicServices(getDynamicServices());
     setDynamicCategories(getDynamicCategories());
 
-    fetch("/api/services")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const sorted = sortServices(data);
-          setDynamicServices(sorted);
-          localStorage.setItem("revera_dynamic_services", JSON.stringify(sorted));
-
-          // Merge backend status and visibility toggles into serviceToggles state and persist
-          setServiceToggles((prev) => {
-            const merged = { ...prev };
-            sorted.forEach((svc) => {
-              merged[svc.id] = {
-                visible: svc.visible !== undefined ? svc.visible : (prev[svc.id]?.visible ?? true),
-                active: svc.active !== undefined ? svc.active : (prev[svc.id]?.active ?? true),
-              };
-            });
-            localStorage.setItem("revera_service_toggles", JSON.stringify(merged));
-            return merged;
-          });
-        }
-      })
-      .catch((err) => console.error("ServicesSection: fetch services failed", err));
-
-    fetch("/api/categories")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const sortedCats = data.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-          setDynamicCategories(sortedCats);
-          localStorage.setItem("revera_dynamic_categories", JSON.stringify(sortedCats));
-          setDynamicServices(prev => sortServices(prev));
-        }
-      })
-      .catch((err) => console.error("ServicesSection: fetch categories failed", err));
-
     const handleStorage = () => {
       setServiceToggles(getServiceToggles());
       setDynamicServices(getDynamicServices());
@@ -417,7 +388,6 @@ export function ServicesSection() {
                       alignItems: "center",
                       gap: 8,
                       marginBottom: 8,
-                      flexDirection: isRTL ? "row-reverse" : "row"
                     }}
                   >
                   </div>

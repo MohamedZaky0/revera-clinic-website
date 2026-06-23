@@ -111,7 +111,7 @@ export function AuthModal() {
     >
       <div className="modal-box" dir={isRTL ? "rtl" : "ltr"}>
         {/* Header */}
-        <div className={`flex items-start justify-between mb-6 ${isRTL ? "flex-row-reverse" : ""}`}>
+        <div className="flex items-start justify-between mb-6">
           <div>
             <div
               className="flex h-10 w-10 items-center justify-center rounded-full mb-3"
@@ -268,11 +268,11 @@ export function AuthModal() {
               >
                 {t.auth.gender}
               </p>
-              <div className={`flex gap-4 ${isRTL ? "flex-row-reverse" : ""}`}>
+              <div className="flex gap-4">
                 {(["female", "male"] as const).map((g) => (
                   <label
                     key={g}
-                    className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium transition-colors ${isRTL ? "flex-row-reverse" : ""}`}
+                    className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium transition-colors"
                     style={{
                       backgroundColor: gender === g ? "var(--cr-primary)" : "var(--cr-secondary)",
                       color: gender === g ? "var(--cr-white)" : "var(--cr-primary)",

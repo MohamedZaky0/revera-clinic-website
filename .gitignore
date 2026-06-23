@@ -48,25 +48,6 @@ next-env.d.ts
 # Local temp files
 temp/
 
-# Electron/Chromium installer artifacts
-*.dll
-*.pak
-*.bin
-*.dat
-*.exe
-*.json
-locales/
-policies/
-resources/
-resources.pak
-snapshot_blob.bin
-tools/
-unins000*
-updating_version
-v8_context_snapshot.bin
-vk_swiftshader*
-vulkan-1.dll
-
 # Database & local DB setup scripts
 db/
 *.db
@@ -75,7 +56,3 @@ init_revera.mjs
 setup_revera_db.mjs
 check_bookings.mjs
 supabase-booking-schema.sql
-
-DESIGN.md
-
-PRODUCT.md

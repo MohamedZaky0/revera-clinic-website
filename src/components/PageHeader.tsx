@@ -145,7 +145,6 @@ export function PageHeader({ pageKey }: { pageKey: PageKey }) {
                   padding: 0,
                   margin: 0,
                   fontSize: "0.9rem",
-                  flexDirection: "row",
                 }}
               >
                 <li>
