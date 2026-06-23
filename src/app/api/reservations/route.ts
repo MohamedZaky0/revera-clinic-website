@@ -27,6 +27,7 @@ function mapRow(r: Record<string, any>) {
     doctorName: r.doctor_name,
     createdAt: r.created_at,
     branchId: r.branch_id ?? null,
+    customerId: r.customer_id ?? null,
   };
 }
 
@@ -68,6 +69,53 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // 1. Lookup or create customer profile
+    let customerId: string | null = null;
+    try {
+      const { data: customer, error: customerError } = await supabaseServer
+        .from('customers')
+        .select('id, number_of_bookings')
+        .eq('mobile', phone)
+        .maybeSingle();
+
+      if (customerError) {
+        console.error('Customer lookup error:', customerError);
+      }
+
+      if (customer) {
+        customerId = customer.id;
+        const newBookings = (customer.number_of_bookings || 0) + 1;
+        await supabaseServer
+          .from('customers')
+          .update({ number_of_bookings: newBookings })
+          .eq('id', customerId);
+      } else {
+        const { data: newCustomer, error: createError } = await supabaseServer
+          .from('customers')
+          .insert({
+            name,
+            mobile: phone,
+            email: email || null,
+            registration_date: new Date().toISOString(),
+            active: true,
+            spent_amount: 0,
+            outstanding: 0,
+            number_of_bookings: 1,
+          })
+          .select('id')
+          .single();
+
+        if (createError) {
+          console.error('Customer creation error:', createError);
+        } else if (newCustomer) {
+          customerId = newCustomer.id;
+        }
+      }
+    } catch (custErr) {
+      console.error('Customer integration error:', custErr);
+    }
+
+    // 2. Insert reservation linked to customer
     const { data, error } = await supabaseServer
       .from('reservations')
       .insert({
@@ -82,6 +130,7 @@ export async function POST(req: Request) {
         time_slot: null,
         session_type: sessionType || 'in_person',
         branch_id: branchId || null,
+        customer_id: customerId,
       })
       .select()
       .single();

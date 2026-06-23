@@ -134,6 +134,7 @@ const PROVIDERS = [
 const TARGET_BONUSES = [] as const;
 
 type Customer = {
+  id?: string;
   email: string;
   name: string;
   phone: string;
@@ -142,6 +143,20 @@ type Customer = {
   spent: number;
   outstanding: number;
   wallet: number;
+  mobile?: string;
+  gender?: string | null;
+  number_of_bookings?: number;
+  registration_date?: string;
+  active?: boolean;
+  spent_amount?: number;
+  area?: string | null;
+  location_name?: string | null;
+  street_name?: string | null;
+  building_no?: string | null;
+  floor_no?: string | null;
+  note?: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 const MOCK_PRESCRIPTIONS = [
@@ -342,6 +357,9 @@ export default function AdminPage() {
   const [lang, setLang] = useState<"EN" | "AR">("EN");
   const [notifCount] = useState(1);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [showExportCustomersModal, setShowExportCustomersModal] = useState(false);
+  const [dbCustomers, setDbCustomers] = useState<Customer[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [couponSearch, setCouponSearch] = useState("");
   const [couponDate, setCouponDate] = useState("");
   const [couponStatus, setCouponStatus] = useState("All");
@@ -881,13 +899,28 @@ export default function AdminPage() {
     }));
   }
 
-  // Derive unique customers from all reservations
+  // Derive unique customers from database or all reservations as fallback
   const customers = useMemo<Customer[]>(() => {
+    if (dbCustomers && dbCustomers.length > 0) {
+      return dbCustomers.map((c) => ({
+        ...c,
+        id: c.id,
+        email: c.email || "",
+        name: c.name,
+        phone: c.mobile || "",
+        createdAt: c.registration_date || c.created_at || new Date().toISOString(),
+        bookings: c.number_of_bookings || 0,
+        spent: Number(c.spent_amount || 0),
+        outstanding: Number(c.outstanding || 0),
+        wallet: 0,
+      }));
+    }
     const map = new globalThis.Map<string, Customer>();
     allReservations.forEach((r) => {
-      if (!map.has(r.email)) {
-        map.set(r.email, {
-          email: r.email,
+      const emailKey = r.email || r.phone;
+      if (!map.has(emailKey)) {
+        map.set(emailKey, {
+          email: r.email || "",
           name: r.name,
           phone: r.phone,
           createdAt: r.createdAt ?? r.date,
@@ -897,10 +930,10 @@ export default function AdminPage() {
           wallet: 0,
         });
       }
-      map.get(r.email)!.bookings += 1;
+      map.get(emailKey)!.bookings += 1;
     });
     return Array.from(map.values());
-  }, [allReservations]);
+  }, [dbCustomers, allReservations]);
 
   const todaysBookingsCount = useMemo(() => {
     const getLocalDateString = (d: Date) => {
@@ -959,6 +992,7 @@ export default function AdminPage() {
   useEffect(() => {
     fetchRequests();
     fetchAllReservations();
+    fetchCustomers();
     fetchPageSettings();
     fetchProviders();
     // Fetch branches and set default branch
@@ -1478,6 +1512,94 @@ export default function AdminPage() {
       .catch(() => setScheduleReservations([]));
   }
 
+  function fetchCustomers() {
+    setLoadingCustomers(true);
+    fetch("/api/customers", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setDbCustomers(data);
+        } else {
+          console.error("fetchCustomers: expected array, got", data);
+          setDbCustomers([]);
+        }
+      })
+      .catch((err) => {
+        console.error("fetchCustomers error:", err);
+        setDbCustomers([]);
+      })
+      .finally(() => {
+        setLoadingCustomers(false);
+      });
+  }
+
+  function handleExportCustomersCSV() {
+    if (customers.length === 0) {
+      alert("No customers available to export.");
+      return;
+    }
+
+    const headers = [
+      "id",
+      "Customer Name",
+      "Mobile",
+      "Gender",
+      "Email",
+      "Number of Bookings",
+      "Registration Date",
+      "Active",
+      "Spent Amount",
+      "Outstanding",
+      "Area",
+      "Location Name",
+      "Street Name",
+      "Building No.",
+      "Floor No.",
+      "Note"
+    ];
+
+    const escapeCSV = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      let str = String(val);
+      str = str.replace(/"/g, '""');
+      if (str.includes(',') || str.includes('\n') || str.includes('\r') || str.includes('"')) {
+        return `"${str}"`;
+      }
+      return `"${str}"`;
+    };
+
+    const rows = customers.map(c => [
+      escapeCSV(c.id || ""),
+      escapeCSV(c.name || ""),
+      escapeCSV(c.mobile || c.phone || ""),
+      escapeCSV(c.gender || ""),
+      escapeCSV(c.email || ""),
+      escapeCSV(c.number_of_bookings !== undefined ? c.number_of_bookings : c.bookings),
+      escapeCSV(c.registration_date ? new Date(c.registration_date).toLocaleDateString("en-GB") : (c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-GB") : "")),
+      escapeCSV(c.active !== undefined ? (c.active ? "Yes" : "No") : "Yes"),
+      escapeCSV(c.spent_amount !== undefined ? c.spent_amount : c.spent),
+      escapeCSV(c.outstanding || 0),
+      escapeCSV(c.area || ""),
+      escapeCSV(c.location_name || ""),
+      escapeCSV(c.street_name || ""),
+      escapeCSV(c.building_no || ""),
+      escapeCSV(c.floor_no || ""),
+      escapeCSV(c.note || "")
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `customers_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setShowExportCustomersModal(false);
+  }
+
   function fetchAllReservations() {
     const branchParam = branch ? `?branchId=${branch}` : "";
     fetch(`/api/reservations${branchParam}`, { cache: "no-store" })
@@ -1485,6 +1607,8 @@ export default function AdminPage() {
       .then((data) => {
         if (Array.isArray(data)) {
           setAllReservations(data);
+          // Keep customer profiles in sync
+          fetchCustomers();
         } else {
           console.error("fetchAllReservations: expected array, got", data);
           setAllReservations([]);
@@ -2383,6 +2507,94 @@ export default function AdminPage() {
                         className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
                       >
                         Yes, Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── EXPORT CUSTOMERS MODAL ── */}
+              {showExportCustomersModal && (
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+                  onClick={(e) => { if (e.target === e.currentTarget) setShowExportCustomersModal(false); }}
+                >
+                  <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 overflow-hidden">
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36]">
+                          <Download size={18} />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-[#1F251A]">Export Customers</h3>
+                          <p className="text-xs text-[#5A6A51]">{customers.length} customer{customers.length !== 1 ? "s" : ""} will be exported</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowExportCustomersModal(false)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    {/* Modal Body */}
+                    <div className="px-6 py-5 space-y-4">
+                      <p className="text-sm text-[#5A6A51]">
+                        The exported CSV file will contain the following data columns for each customer:
+                      </p>
+
+                      {/* Column Chips */}
+                      <div className="flex flex-wrap gap-2">
+                        {["ID", "Customer Name", "Mobile", "Gender", "Email", "Number of Bookings", "Registration Date", "Active", "Spent Amount", "Outstanding", "Area", "Location Name", "Street Name", "Building No.", "Floor No.", "Note"].map((col) => (
+                          <span
+                            key={col}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-[#414E36]/15 bg-[#EDF1EC] px-3 py-1 text-xs font-medium text-[#414E36]"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#C4AE7C] flex-shrink-0" />
+                            {col}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Stats row */}
+                      <div className="grid grid-cols-3 gap-3 rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-4">
+                        <div className="text-center">
+                          <p className="text-xl font-bold text-[#1F251A]">{customers.length}</p>
+                          <p className="text-xs text-[#5A6A51] mt-0.5">Total Customers</p>
+                        </div>
+                        <div className="text-center border-x border-[#414E36]/10">
+                          <p className="text-xl font-bold text-[#1F251A]">16</p>
+                          <p className="text-xs text-[#5A6A51] mt-0.5">Columns</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-bold text-[#414E36]">CSV</p>
+                          <p className="text-xs text-[#5A6A51] mt-0.5">Format</p>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-[#5A6A51] flex items-center gap-1.5">
+                        <FileText size={12} className="text-[#C4AE7C]" />
+                        The file will be UTF-8 encoded (BOM) for full compatibility with Microsoft Excel and Google Sheets.
+                      </p>
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+                      <button
+                        onClick={() => setShowExportCustomersModal(false)}
+                        className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleExportCustomersCSV}
+                        disabled={loadingCustomers}
+                        className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <Download size={15} />
+                        {loadingCustomers ? "Loading..." : "Export CSV"}
                       </button>
                     </div>
                   </div>
@@ -4343,7 +4555,10 @@ export default function AdminPage() {
                   <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#f5f4f0]">
                     <Filter size={14} /> Filter
                   </button>
-                  <button className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-4 py-2 text-sm font-medium text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26]">
+                  <button
+                    onClick={() => setShowExportCustomersModal(true)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-4 py-2 text-sm font-medium text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26]"
+                  >
                     <Download size={14} /> Export
                   </button>
                   <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/30 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#414E36]/5">
