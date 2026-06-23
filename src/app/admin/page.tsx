@@ -366,6 +366,8 @@ export default function AdminPage() {
   const [selectedCustomerForEdit, setSelectedCustomerForEdit] = useState<Customer | null>(null);
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [customerFormError, setCustomerFormError] = useState("");
+  const [deleteCustomerTarget, setDeleteCustomerTarget] = useState<Customer | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState(false);
 
   const [custName, setCustName] = useState("");
   const [custMobile, setCustMobile] = useState("");
@@ -1713,6 +1715,32 @@ export default function AdminPage() {
       });
   }
 
+  function handleDeleteCustomer(id: string) {
+    setDeletingCustomer(true);
+    fetch(`/api/customers?id=${id}`, {
+      method: "DELETE",
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to delete customer");
+        }
+        return data;
+      })
+      .then(() => {
+        fetchCustomers();
+        setDeleteCustomerTarget(null);
+        setShowCustomerFormModal(false);
+      })
+      .catch((err) => {
+        console.error("handleDeleteCustomer error:", err);
+        alert(err.message || "An error occurred while deleting the customer.");
+      })
+      .finally(() => {
+        setDeletingCustomer(false);
+      });
+  }
+
   function fetchAllReservations() {
     const branchParam = branch ? `?branchId=${branch}` : "";
     fetch(`/api/reservations${branchParam}`, { cache: "no-store" })
@@ -1913,19 +1941,19 @@ export default function AdminPage() {
         }`}>
           <div className="mb-10 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative h-14 w-14 overflow-hidden rounded-2xl bg-[#C4AE7C]/15 p-3">
+              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-white shadow-md p-2">
                 <Image
                   src="/images/main_logo.png"
                   alt="Revera Clinics"
                   fill
-                  style={{ objectFit: "contain" }}
+                  style={{ objectFit: "contain", padding: "4px" }}
                 />
               </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-[#FBFBF9]/70">
+              <div className="flex flex-col justify-center">
+                <p className="text-[10px] uppercase tracking-[0.3em] text-[#FBFBF9]/60 leading-none mb-1">
                   Revera Clinics
                 </p>
-                <h1 className="text-xl font-semibold">Admin</h1>
+                <h1 className="text-xl font-semibold leading-tight">Admin</h1>
               </div>
             </div>
             <button
@@ -4663,12 +4691,22 @@ export default function AdminPage() {
                           <td className="px-5 py-4 text-center text-[#1F251A]">{c.outstanding}</td>
                           <td className="px-5 py-4 text-center text-[#1F251A]">{c.wallet}</td>
                           <td className="px-4 py-4 text-center">
-                            <button
-                              onClick={() => handleOpenEditCustomer(c)}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                            >
-                              <Info size={14} />
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleOpenEditCustomer(c)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                title="Edit Customer"
+                              >
+                                <Info size={14} />
+                              </button>
+                              <button
+                                onClick={() => setDeleteCustomerTarget(c)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50"
+                                title="Delete Customer"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -10031,21 +10069,74 @@ export default function AdminPage() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+              <div>
+                {selectedCustomerForEdit && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteCustomerTarget(selectedCustomerForEdit)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm transition hover:bg-red-50 hover:border-red-300"
+                  >
+                    <Trash2 size={14} />
+                    Delete Customer
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerFormModal(false)}
+                  className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCustomer}
+                  disabled={savingCustomer}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {savingCustomer ? "Saving..." : "Save Customer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DELETE CUSTOMER CONFIRMATION MODAL ── */}
+      {deleteCustomerTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+            <div className="mb-5 flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 border border-red-100">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#1F251A]">Delete Customer?</h3>
+                <p className="mt-2 text-sm text-[#5A6A51] leading-relaxed">
+                  Are you sure you want to delete the customer profile for{" "}
+                  <span className="font-semibold text-[#1F251A]">{deleteCustomerTarget.name}</span>?
+                  This action will permanently remove their records from Supabase. Any linked reservations will be unlinked (set to guest status).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
               <button
                 type="button"
-                onClick={() => setShowCustomerFormModal(false)}
-                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+                onClick={() => setDeleteCustomerTarget(null)}
+                className="rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleSaveCustomer}
-                disabled={savingCustomer}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+                onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!)}
+                disabled={deletingCustomer}
+                className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {savingCustomer ? "Saving..." : "Save Customer"}
+                {deletingCustomer ? "Deleting..." : "Yes, Delete Customer"}
               </button>
             </div>
           </div>

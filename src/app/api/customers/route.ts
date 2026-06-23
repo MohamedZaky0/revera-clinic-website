@@ -102,3 +102,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
+    }
+
+    const { error } = await supabaseServer
+      .from('customers')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    return NextResponse.json({ message: 'Customer deleted successfully' });
+  } catch (err: any) {
+    console.error('DELETE /api/customers error:', err);
+    return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
+  }
+}
