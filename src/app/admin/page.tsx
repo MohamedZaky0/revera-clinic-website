@@ -2513,93 +2513,6 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* ── EXPORT CUSTOMERS MODAL ── */}
-              {showExportCustomersModal && (
-                <div
-                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-                  onClick={(e) => { if (e.target === e.currentTarget) setShowExportCustomersModal(false); }}
-                >
-                  <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 overflow-hidden">
-                    {/* Modal Header */}
-                    <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36]">
-                          <Download size={18} />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-[#1F251A]">Export Customers</h3>
-                          <p className="text-xs text-[#5A6A51]">{customers.length} customer{customers.length !== 1 ? "s" : ""} will be exported</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setShowExportCustomersModal(false)}
-                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-
-                    {/* Modal Body */}
-                    <div className="px-6 py-5 space-y-4">
-                      <p className="text-sm text-[#5A6A51]">
-                        The exported CSV file will contain the following data columns for each customer:
-                      </p>
-
-                      {/* Column Chips */}
-                      <div className="flex flex-wrap gap-2">
-                        {["ID", "Customer Name", "Mobile", "Gender", "Email", "Number of Bookings", "Registration Date", "Active", "Spent Amount", "Outstanding", "Area", "Location Name", "Street Name", "Building No.", "Floor No.", "Note"].map((col) => (
-                          <span
-                            key={col}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-[#414E36]/15 bg-[#EDF1EC] px-3 py-1 text-xs font-medium text-[#414E36]"
-                          >
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#C4AE7C] flex-shrink-0" />
-                            {col}
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* Stats row */}
-                      <div className="grid grid-cols-3 gap-3 rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-4">
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-[#1F251A]">{customers.length}</p>
-                          <p className="text-xs text-[#5A6A51] mt-0.5">Total Customers</p>
-                        </div>
-                        <div className="text-center border-x border-[#414E36]/10">
-                          <p className="text-xl font-bold text-[#1F251A]">16</p>
-                          <p className="text-xs text-[#5A6A51] mt-0.5">Columns</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-[#414E36]">CSV</p>
-                          <p className="text-xs text-[#5A6A51] mt-0.5">Format</p>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-[#5A6A51] flex items-center gap-1.5">
-                        <FileText size={12} className="text-[#C4AE7C]" />
-                        The file will be UTF-8 encoded (BOM) for full compatibility with Microsoft Excel and Google Sheets.
-                      </p>
-                    </div>
-
-                    {/* Modal Footer */}
-                    <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
-                      <button
-                        onClick={() => setShowExportCustomersModal(false)}
-                        className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleExportCustomersCSV}
-                        disabled={loadingCustomers}
-                        className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        <Download size={15} />
-                        {loadingCustomers ? "Loading..." : "Export CSV"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* ── ADD CATEGORY MODAL ── */}
               {showAddCategoryModal && (
@@ -9698,6 +9611,94 @@ export default function AdminPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ── EXPORT CUSTOMERS MODAL ── */}
+      {showExportCustomersModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowExportCustomersModal(false); }}
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36]">
+                  <Download size={18} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-[#1F251A]">Export Customers</h3>
+                  <p className="text-xs text-[#5A6A51]">{customers.length} customer{customers.length !== 1 ? "s" : ""} will be exported</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowExportCustomersModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-[#5A6A51]">
+                The exported CSV file will contain the following data columns for each customer:
+              </p>
+
+              {/* Column Chips */}
+              <div className="flex flex-wrap gap-2">
+                {["ID", "Customer Name", "Mobile", "Gender", "Email", "Number of Bookings", "Registration Date", "Active", "Spent Amount", "Outstanding", "Area", "Location Name", "Street Name", "Building No.", "Floor No.", "Note"].map((col) => (
+                  <span
+                    key={col}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#414E36]/15 bg-[#EDF1EC] px-3 py-1 text-xs font-medium text-[#414E36]"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#C4AE7C] flex-shrink-0" />
+                    {col}
+                  </span>
+                ))}
+              </div>
+
+              {/* Stats row */}
+              <div className="grid grid-cols-3 gap-3 rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-4">
+                <div className="text-center">
+                  <p className="text-xl font-bold text-[#1F251A]">{customers.length}</p>
+                  <p className="text-xs text-[#5A6A51] mt-0.5">Total Customers</p>
+                </div>
+                <div className="text-center border-x border-[#414E36]/10">
+                  <p className="text-xl font-bold text-[#1F251A]">16</p>
+                  <p className="text-xs text-[#5A6A51] mt-0.5">Columns</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-[#414E36]">CSV</p>
+                  <p className="text-xs text-[#5A6A51] mt-0.5">Format</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-[#5A6A51] flex items-center gap-1.5">
+                <FileText size={12} className="text-[#C4AE7C]" />
+                The file will be UTF-8 encoded (BOM) for full compatibility with Microsoft Excel and Google Sheets.
+              </p>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+              <button
+                onClick={() => setShowExportCustomersModal(false)}
+                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExportCustomersCSV}
+                disabled={loadingCustomers}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Download size={15} />
+                {loadingCustomers ? "Loading..." : "Export CSV"}
+              </button>
+            </div>
           </div>
         </div>
       )}
