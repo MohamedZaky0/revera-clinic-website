@@ -360,6 +360,26 @@ export default function AdminPage() {
   const [showExportCustomersModal, setShowExportCustomersModal] = useState(false);
   const [dbCustomers, setDbCustomers] = useState<Customer[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
+
+  // Customer Add/Edit Form states
+  const [showCustomerFormModal, setShowCustomerFormModal] = useState(false);
+  const [selectedCustomerForEdit, setSelectedCustomerForEdit] = useState<Customer | null>(null);
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [customerFormError, setCustomerFormError] = useState("");
+
+  const [custName, setCustName] = useState("");
+  const [custMobile, setCustMobile] = useState("");
+  const [custEmail, setCustEmail] = useState("");
+  const [custGender, setCustGender] = useState<"Male" | "Female" | "">("");
+  const [custActive, setCustActive] = useState(true);
+  const [custSpent, setCustSpent] = useState("0");
+  const [custOutstanding, setCustOutstanding] = useState("0");
+  const [custArea, setCustArea] = useState("");
+  const [custLocationName, setCustLocationName] = useState("");
+  const [custStreet, setCustStreet] = useState("");
+  const [custBuilding, setCustBuilding] = useState("");
+  const [custFloor, setCustFloor] = useState("");
+  const [custNote, setCustNote] = useState("");
   const [couponSearch, setCouponSearch] = useState("");
   const [couponDate, setCouponDate] = useState("");
   const [couponStatus, setCouponStatus] = useState("All");
@@ -1598,6 +1618,99 @@ export default function AdminPage() {
     document.body.removeChild(link);
 
     setShowExportCustomersModal(false);
+  }
+
+  function handleOpenAddCustomer() {
+    setCustName("");
+    setCustMobile("");
+    setCustEmail("");
+    setCustGender("");
+    setCustActive(true);
+    setCustSpent("0");
+    setCustOutstanding("0");
+    setCustArea("");
+    setCustLocationName("");
+    setCustStreet("");
+    setCustBuilding("");
+    setCustFloor("");
+    setCustNote("");
+    setCustomerFormError("");
+    setSelectedCustomerForEdit(null);
+    setShowCustomerFormModal(true);
+  }
+
+  function handleOpenEditCustomer(c: Customer) {
+    setCustName(c.name || "");
+    setCustMobile(c.mobile || c.phone || "");
+    setCustEmail(c.email || "");
+    setCustGender((c.gender as any) || "");
+    setCustActive(c.active !== undefined ? c.active : true);
+    setCustSpent(String(c.spent_amount !== undefined ? c.spent_amount : c.spent || 0));
+    setCustOutstanding(String(c.outstanding || 0));
+    setCustArea(c.area || "");
+    setCustLocationName(c.location_name || "");
+    setCustStreet(c.street_name || "");
+    setCustBuilding(c.building_no || "");
+    setCustFloor(c.floor_no || "");
+    setCustNote(c.note || "");
+    setCustomerFormError("");
+    setSelectedCustomerForEdit(c);
+    setShowCustomerFormModal(true);
+  }
+
+  function handleSaveCustomer() {
+    if (!custName.trim()) {
+      setCustomerFormError("Customer name is required.");
+      return;
+    }
+    if (!custMobile.trim()) {
+      setCustomerFormError("Mobile number is required.");
+      return;
+    }
+
+    setSavingCustomer(true);
+    setCustomerFormError("");
+
+    const payload = {
+      id: selectedCustomerForEdit?.id || undefined,
+      name: custName.trim(),
+      mobile: custMobile.trim(),
+      email: custEmail.trim() || null,
+      gender: custGender || null,
+      active: custActive,
+      spent_amount: parseFloat(custSpent) || 0,
+      outstanding: parseFloat(custOutstanding) || 0,
+      area: custArea.trim() || null,
+      location_name: custLocationName.trim() || null,
+      street_name: custStreet.trim() || null,
+      building_no: custBuilding.trim() || null,
+      floor_no: custFloor.trim() || null,
+      note: custNote.trim() || null,
+    };
+
+    fetch("/api/customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to save customer");
+        }
+        return data;
+      })
+      .then(() => {
+        fetchCustomers();
+        setShowCustomerFormModal(false);
+      })
+      .catch((err) => {
+        console.error("handleSaveCustomer error:", err);
+        setCustomerFormError(err.message || "An error occurred while saving the customer.");
+      })
+      .finally(() => {
+        setSavingCustomer(false);
+      });
   }
 
   function fetchAllReservations() {
@@ -4477,7 +4590,10 @@ export default function AdminPage() {
                   <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/30 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#414E36]/5">
                     <Upload size={14} /> Import
                   </button>
-                  <button className="inline-flex items-center gap-2 rounded-lg bg-[#C4AE7C] px-4 py-2 text-sm font-semibold text-[#414E36] shadow-sm transition hover:bg-[#b59e6c]">
+                  <button
+                    onClick={handleOpenAddCustomer}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#C4AE7C] px-4 py-2 text-sm font-semibold text-[#414E36] shadow-sm transition hover:bg-[#b59e6c]"
+                  >
                     <Plus size={14} /> Add
                   </button>
                 </div>
@@ -4534,8 +4650,9 @@ export default function AdminPage() {
                       const dt = new Date(c.createdAt);
                       const dateStr = dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
                       const timeStr = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+                      const uniqueKey = c.id || c.email || c.phone;
                       return (
-                        <tr key={c.email} className="transition hover:bg-[#F9F9F7]">
+                        <tr key={uniqueKey} className="transition hover:bg-[#F9F9F7]">
                           <td className="px-5 py-4 font-semibold text-[#1F251A]">{c.name}</td>
                           <td className="px-5 py-4 text-[#5A6A51]">
                             <span className="block font-medium text-[#1F251A]">{dateStr}</span>
@@ -4546,7 +4663,10 @@ export default function AdminPage() {
                           <td className="px-5 py-4 text-center text-[#1F251A]">{c.outstanding}</td>
                           <td className="px-5 py-4 text-center text-[#1F251A]">{c.wallet}</td>
                           <td className="px-4 py-4 text-center">
-                            <button className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]">
+                            <button
+                              onClick={() => handleOpenEditCustomer(c)}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                            >
                               <Info size={14} />
                             </button>
                           </td>
@@ -9697,6 +9817,235 @@ export default function AdminPage() {
               >
                 <Download size={15} />
                 {loadingCustomers ? "Loading..." : "Export CSV"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADD/EDIT CUSTOMER MODAL ── */}
+      {showCustomerFormModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCustomerFormModal(false); }}
+        >
+          <div className="w-full max-w-2xl rounded-2xl bg-[#FBFBF9] shadow-2xl border border-[#414E36]/10 overflow-hidden my-8">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36]">
+                  <Plus size={18} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-[#1F251A]">
+                    {selectedCustomerForEdit ? "Edit Customer Details" : "Add New Customer"}
+                  </h3>
+                  <p className="text-xs text-[#5A6A51]">
+                    {selectedCustomerForEdit ? `Editing profile of ${custName}` : "Create a new customer profile in Supabase"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCustomerFormModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 max-h-[70vh] overflow-y-auto space-y-5 custom-scrollbar">
+              {customerFormError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                  {customerFormError}
+                </div>
+              )}
+
+              {/* Personal Information section */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Personal Information</h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">
+                      Customer Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={custName}
+                      onChange={(e) => setCustName(e.target.value)}
+                      placeholder="e.g. Mohamed Aly"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">
+                      Mobile Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={custMobile}
+                      onChange={(e) => setCustMobile(e.target.value)}
+                      placeholder="e.g. +201012345678"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      value={custEmail}
+                      onChange={(e) => setCustEmail(e.target.value)}
+                      placeholder="e.g. mohamed@example.com"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Gender</label>
+                    <select
+                      value={custGender}
+                      onChange={(e) => setCustGender(e.target.value as any)}
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-[#414E36]/10" />
+
+              {/* Financials & Status section */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Financials & Status</h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Spent Amount (EGP)</label>
+                    <input
+                      type="number"
+                      value={custSpent}
+                      onChange={(e) => setCustSpent(e.target.value)}
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Outstanding (EGP)</label>
+                    <input
+                      type="number"
+                      value={custOutstanding}
+                      onChange={(e) => setCustOutstanding(e.target.value)}
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div className="flex items-center pt-5">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={custActive}
+                        onChange={(e) => setCustActive(e.target.checked)}
+                        className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                      />
+                      <span className="text-sm font-semibold text-[#1F251A]">Active Profile</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-[#414E36]/10" />
+
+              {/* Address / Location Details section */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Address & Location Details</h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Area</label>
+                    <input
+                      type="text"
+                      value={custArea}
+                      onChange={(e) => setCustArea(e.target.value)}
+                      placeholder="e.g. New Cairo"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Location Name</label>
+                    <input
+                      type="text"
+                      value={custLocationName}
+                      onChange={(e) => setCustLocationName(e.target.value)}
+                      placeholder="e.g. Tagamoa Branch"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Street Name</label>
+                    <input
+                      type="text"
+                      value={custStreet}
+                      onChange={(e) => setCustStreet(e.target.value)}
+                      placeholder="e.g. El-Teseen St."
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Building No.</label>
+                    <input
+                      type="text"
+                      value={custBuilding}
+                      onChange={(e) => setCustBuilding(e.target.value)}
+                      placeholder="e.g. 14B"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Floor No.</label>
+                    <input
+                      type="text"
+                      value={custFloor}
+                      onChange={(e) => setCustFloor(e.target.value)}
+                      placeholder="e.g. 3rd Floor"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-[#414E36]/10" />
+
+              {/* Notes section */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Notes & Observations</h4>
+                <div>
+                  <textarea
+                    value={custNote}
+                    onChange={(e) => setCustNote(e.target.value)}
+                    placeholder="Add patient history, clinic preferences, or other notes..."
+                    rows={3}
+                    className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+              <button
+                type="button"
+                onClick={() => setShowCustomerFormModal(false)}
+                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCustomer}
+                disabled={savingCustomer}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {savingCustomer ? "Saving..." : "Save Customer"}
               </button>
             </div>
           </div>
