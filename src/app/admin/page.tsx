@@ -675,16 +675,6 @@ export default function AdminPage() {
           setAdminPermissions(authData.permissions || []);
           setAdminEmail(authData.email || "");
           setAdminEmployeeId(authData.employeeId || "");
-          
-          // Redirect if their role doesn't permit the currently active tab
-          const permittedItems = authData.permissions || [];
-          if (permittedItems.length > 0 && !permittedItems.includes(activeNav)) {
-            if (permittedItems.includes('Bookings')) {
-              setActiveNav('Bookings');
-            } else {
-              setActiveNav(permittedItems[0]);
-            }
-          }
         } else {
           console.warn("Unregistered employee session. Logging out.");
           await supabase.auth.signOut();
@@ -703,7 +693,36 @@ export default function AdminPage() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [activeNav]);
+  }, []);
+
+  useEffect(() => {
+    if (adminPermissions.length > 0 && !adminPermissions.includes(activeNav)) {
+      if (activeNav === 'Role Management' && adminRole === 'superadmin') {
+        return;
+      }
+      
+      const settingsSubsections = [
+        "Profile",
+        "Service Hours",
+        "Branches",
+        "Users",
+        "Booking Settings",
+        "Notification Settings",
+        "Queue Settings",
+        "Pages Settings"
+      ];
+      
+      if (settingsSubsections.includes(activeNav) && adminPermissions.includes("Settings")) {
+        return;
+      }
+      
+      if (adminPermissions.includes('Bookings')) {
+        setActiveNav('Bookings');
+      } else {
+        setActiveNav(adminPermissions[0]);
+      }
+    }
+  }, [adminPermissions, adminRole, activeNav]);
 
   useEffect(() => {
     if (activeNav === "Role Management" && adminRole === "superadmin") {
@@ -712,6 +731,7 @@ export default function AdminPage() {
   }, [activeNav, adminRole]);
 
   async function fetchRolesAndEmployees() {
+    console.log("RBAC - fetchRolesAndEmployees called!");
     setLoadingRolesAndEmployees(true);
     try {
       const [rolesRes, empsRes] = await Promise.all([
@@ -929,6 +949,7 @@ export default function AdminPage() {
   }, [adminRole, adminPermissions]);
 
   const hasAccessToActiveNav = useMemo(() => {
+    console.log("RBAC Access Check - activeNav:", activeNav, "| adminRole:", adminRole, "| permissions:", adminPermissions);
     if (!adminRole) return false;
     if (adminRole === 'superadmin') return true;
     if (activeNav === 'Logout') return true;
