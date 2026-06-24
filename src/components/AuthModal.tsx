@@ -6,8 +6,47 @@ import { supabase } from "@/lib/supabaseClient";
 
 type AuthStep = 1 | 2 | 3;
 
-const EGYPTIAN_PHONE_REGEX = /^01[0-9]{9}$/;
 const OTP_REGEX = /^[0-9]{6}$/;
+
+function convertArabicToEnglishDigits(str: string): string {
+  const arabicDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
+  return str.replace(/[٠-٩]/g, (w) => String(arabicDigits.indexOf(w)));
+}
+
+function cleanAndFormatPhone(rawPhone: string) {
+  let cleaned = convertArabicToEnglishDigits(rawPhone);
+  // Remove all non-digit characters except '+' (if present)
+  cleaned = cleaned.replace(/[^\d+]/g, "");
+  
+  // If it starts with +2001, correct it to +201
+  if (cleaned.startsWith("+2001")) {
+    cleaned = "+201" + cleaned.slice(5);
+  }
+  // If it starts with 2001, correct it to 201
+  else if (cleaned.startsWith("2001")) {
+    cleaned = "201" + cleaned.slice(4);
+  }
+
+  // Convert to local 11-digit Egyptian format (starts with '01')
+  let localPhone = "";
+  if (cleaned.startsWith("+201") && cleaned.length === 13) {
+    localPhone = "0" + cleaned.slice(3);
+  } else if (cleaned.startsWith("201") && cleaned.length === 12) {
+    localPhone = "0" + cleaned.slice(2);
+  } else if (cleaned.startsWith("01") && cleaned.length === 11) {
+    localPhone = cleaned;
+  } else if (cleaned.startsWith("1") && cleaned.length === 10) {
+    localPhone = "0" + cleaned;
+  }
+
+  // Format to E.164 format (+201XXXXXXXXX)
+  let e164Phone = "";
+  if (localPhone && localPhone.length === 11) {
+    e164Phone = "+20" + localPhone.slice(1);
+  }
+
+  return { localPhone, e164Phone, isValid: localPhone !== "" };
+}
 
 export function AuthModal() {
   const { t, isRTL } = useLanguage();
@@ -232,38 +271,35 @@ export function AuthModal() {
   }, [open, handleClose]);
 
   async function handleSendOtp() {
-    const cleaned = phone.replace(/\s+/g, "");
-    if (!EGYPTIAN_PHONE_REGEX.test(cleaned)) {
+    const { localPhone, e164Phone, isValid } = cleanAndFormatPhone(phone);
+    if (!isValid) {
       setPhoneError(t.auth.phoneHint);
       return;
     }
     setPhoneError("");
     setSending(true);
 
-    const formattedPhone = `+20${cleaned.slice(1)}`;
-    let useFallback = false;
+    // Normalize phone number in the UI/state to the 11-digit format
+    setPhone(localPhone);
 
     if (supabase) {
       try {
-        const { data, error } = await supabase.auth.signInWithOtp({
-          phone: formattedPhone,
+        const { error } = await supabase.auth.signInWithOtp({
+          phone: e164Phone,
         });
         if (error) {
-          console.warn("Real Supabase OTP send failed. Falling back to Demo Mode:", error.message);
-          useFallback = true;
-        } else {
-          console.log("Real Supabase OTP sent successfully!");
-          setDemoMode(false);
+          setPhoneError(error.message || "Failed to send code. Please try again.");
+          setSending(false);
+          return;
         }
+        console.log("Real Supabase OTP sent successfully!");
+        setDemoMode(false);
       } catch (err: any) {
-        console.warn("Exception during real Supabase OTP send. Falling back to Demo Mode:", err);
-        useFallback = true;
+        setPhoneError(err.message || "An error occurred while sending the code.");
+        setSending(false);
+        return;
       }
     } else {
-      useFallback = true;
-    }
-
-    if (useFallback) {
       setDemoMode(true);
     }
 
@@ -279,14 +315,18 @@ export function AuthModal() {
     setOtpError("");
     setVerifying(true);
 
-    const cleaned = phone.replace(/\s+/g, "");
-    const formattedPhone = `+20${cleaned.slice(1)}`;
+    const { localPhone, e164Phone, isValid } = cleanAndFormatPhone(phone);
+    if (!isValid) {
+      setOtpError("Invalid phone number state.");
+      setVerifying(false);
+      return;
+    }
     let verifiedSuccess = false;
 
     if (!demoMode && supabase) {
       try {
-        const { data, error } = await supabase.auth.verifyOtp({
-          phone: formattedPhone,
+        const { error } = await supabase.auth.verifyOtp({
+          phone: e164Phone,
           token: otp,
           type: "sms",
         });
@@ -297,22 +337,23 @@ export function AuthModal() {
         }
         verifiedSuccess = true;
       } catch (err: any) {
-        console.warn("Real OTP verification exception. Falling back to demo check:", err);
-        if (otp === "123456") {
-          verifiedSuccess = true;
-        } else {
-          setOtpError("Verification error. Try using '123456' as a demo code.");
-          setVerifying(false);
-          return;
-        }
+        setOtpError(err.message || "Verification failed. Please try again.");
+        setVerifying(false);
+        return;
       }
     } else {
-      verifiedSuccess = true;
+      if (otp === "123456") {
+        verifiedSuccess = true;
+      } else {
+        setOtpError("Verification error. Try using '123456' as a demo code.");
+        setVerifying(false);
+        return;
+      }
     }
 
     if (verifiedSuccess) {
       try {
-        const res = await fetch(`/api/customers?mobile=${cleaned}`);
+        const res = await fetch(`/api/customers?mobile=${localPhone}`);
         if (res.ok) {
           const customer = await res.json();
           if (customer) {
@@ -327,6 +368,7 @@ export function AuthModal() {
         console.error("Error looking up customer profile:", err);
       }
 
+      setHasPhoneInDb(true);
       setStep(3);
     }
     setVerifying(false);
@@ -336,16 +378,18 @@ export function AuthModal() {
     setOtp("");
     setOtpError("");
     setSending(true);
-    const cleaned = phone.replace(/\s+/g, "");
-    const formattedPhone = `+20${cleaned.slice(1)}`;
+    const { e164Phone, isValid } = cleanAndFormatPhone(phone);
 
-    if (!demoMode && supabase) {
+    if (!demoMode && supabase && isValid) {
       try {
-        await supabase.auth.signInWithOtp({
-          phone: formattedPhone,
+        const { error } = await supabase.auth.signInWithOtp({
+          phone: e164Phone,
         });
-      } catch (err) {
-        console.warn("Error resending real OTP:", err);
+        if (error) {
+          setOtpError(error.message);
+        }
+      } catch (err: any) {
+        setOtpError(err.message || "Failed to resend code.");
       }
     }
 
@@ -456,9 +500,9 @@ export function AuthModal() {
     if (!firstName || !lastName || !gender) {
       return;
     }
-    const cleanedPhone = phone.replace(/\s+/g, "");
-    if (!cleanedPhone) {
-      alert(isRTL ? "رقم الهاتف مطلوب لإتمام التسجيل" : "Phone number is required to complete registration");
+    const { localPhone, isValid } = cleanAndFormatPhone(phone);
+    if (!isValid) {
+      alert(isRTL ? "يرجى إدخال رقم هاتف مصري صحيح" : "Please enter a valid Egyptian phone number");
       return;
     }
     setVerifying(true);
@@ -466,7 +510,7 @@ export function AuthModal() {
     const payload = {
       ...(customerId ? { id: customerId } : {}),
       name: `${firstName.trim()} ${lastName.trim()}`,
-      mobile: cleanedPhone,
+      mobile: localPhone,
       email: email.trim() || null,
       gender: gender === "male" ? "Male" : "Female",
     };
@@ -691,7 +735,8 @@ export function AuthModal() {
                 placeholder={t.auth.otpPlaceholder}
                 value={otp}
                 onChange={(e) => {
-                  setOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
+                  const conv = convertArabicToEnglishDigits(e.target.value);
+                  setOtp(conv.replace(/\D/g, "").slice(0, 6));
                   if (otpError) setOtpError("");
                 }}
                 onKeyDown={(e) => {
