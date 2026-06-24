@@ -40,6 +40,7 @@ export function AuthModal() {
   const [email, setEmail] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "">("");
   const [customerId, setCustomerId] = useState<string | null>(null);
+  const [loadingProfileOnboarding, setLoadingProfileOnboarding] = useState(false);
 
   const resetState = useCallback(() => {
     setStep(1);
@@ -53,6 +54,7 @@ export function AuthModal() {
     setEmail("");
     setGender("");
     setCustomerId(null);
+    setLoadingProfileOnboarding(false);
     setDemoMode(false);
     setVerifying(false);
     setAuthType("phone");
@@ -95,6 +97,120 @@ export function AuthModal() {
     window.addEventListener("open-auth", handler as EventListener);
     return () => window.removeEventListener("open-auth", handler as EventListener);
   }, [resetState]);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
+      handleSessionCheck(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any, session: any) => {
+      if (event === "SIGNED_IN") {
+        sessionStorage.removeItem("revera_profile_prompted");
+      }
+      handleSessionCheck(session);
+    });
+
+    async function handleSessionCheck(session: any) {
+      if (!session?.user) return;
+
+      const stored = localStorage.getItem("revera_user");
+      let parsedStored = null;
+      if (stored) {
+        try {
+          parsedStored = JSON.parse(stored);
+        } catch {}
+      }
+
+      const isIncompleteStored = !parsedStored || !parsedStored.gender || !parsedStored.mobile || parsedStored.mobile.startsWith("guest_");
+
+      if (isIncompleteStored) {
+        const promptedThisSession = sessionStorage.getItem("revera_profile_prompted");
+        if (!promptedThisSession) {
+          sessionStorage.setItem("revera_profile_prompted", "true");
+
+          const meta = session.user.user_metadata || {};
+          const fullName = meta.full_name || meta.name || session.user.email?.split('@')[0] || "";
+          const nameParts = fullName.trim().split(/\s+/);
+          const firstName = nameParts[0] || "";
+          const lastName = nameParts.slice(1).join(" ") || "";
+          const phoneVal = session.user.phone || "";
+          const cleanedPhone = phoneVal ? (phoneVal.startsWith("+20") ? "0" + phoneVal.slice(3) : phoneVal) : "";
+
+          setStep(3);
+          setEmail(session.user.email || "");
+          setEmailInput(session.user.email || "");
+          setFirstName(firstName);
+          setLastName(lastName);
+          setPhone(cleanedPhone);
+          setCustomerId(null);
+          setGender("");
+          setLoadingProfileOnboarding(true);
+          setOpen(true);
+
+          const phone = session.user.phone;
+          const emailVal = session.user.email;
+          let customer = null;
+
+          try {
+            if (phone) {
+              let localMobile = phone;
+              if (phone.startsWith("+20")) {
+                localMobile = "0" + phone.slice(3);
+              }
+              const res = await fetch(`/api/customers?mobile=${localMobile}`);
+              if (res.ok) customer = await res.json();
+            }
+
+            if (!customer && emailVal) {
+              const res = await fetch(`/api/customers?email=${emailVal}`);
+              if (res.ok) customer = await res.json();
+            }
+
+            const isDbProfileComplete = 
+              customer && 
+              customer.name && 
+              customer.mobile && 
+              !customer.mobile.startsWith("guest_") && 
+              customer.gender;
+
+            if (isDbProfileComplete) {
+              localStorage.setItem("revera_user", JSON.stringify(customer));
+              window.dispatchEvent(new CustomEvent("revera-auth-change"));
+              setOpen(false);
+              resetState();
+            } else {
+              if (customer) {
+                const dbName = customer.name || "";
+                if (dbName) {
+                  const dbNameParts = dbName.trim().split(/\s+/);
+                  setFirstName(dbNameParts[0] || "");
+                  setLastName(dbNameParts.slice(1).join(" ") || "");
+                }
+                if (customer.mobile && !customer.mobile.startsWith("guest_")) {
+                  setPhone(customer.mobile);
+                }
+                if (customer.gender) {
+                  const g = customer.gender.toLowerCase();
+                  if (g === "male" || g === "female") setGender(g);
+                }
+                setCustomerId(customer.id || null);
+              }
+              setLoadingProfileOnboarding(false);
+            }
+          } catch (err) {
+            console.error("Background onboarding lookup failed:", err);
+            setLoadingProfileOnboarding(false);
+          }
+        }
+      }
+    }
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -619,7 +735,15 @@ export function AuthModal() {
 
         {/* Step 3: Registration Profile Details */}
         {step === 3 && (
-          <form onSubmit={handleRegister} className="flex flex-col gap-4" noValidate>
+          loadingProfileOnboarding ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--cr-accent)]" style={{ borderColor: "var(--cr-accent) transparent transparent transparent" }}></div>
+              <p className="text-xs font-semibold uppercase tracking-wider animate-pulse" style={{ color: "var(--cr-primary)" }}>
+                {isRTL ? "جارٍ التحقق من حسابك..." : "Checking account status..."}
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleRegister} className="flex flex-col gap-4" noValidate>
             {/* Name row */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <input
@@ -714,6 +838,7 @@ export function AuthModal() {
               {verifying ? (isRTL ? "جارٍ حفظ البيانات..." : "Saving profile...") : (isRTL ? "إتمام التسجيل" : "Complete Registration")}
             </button>
           </form>
+          )
         )}
 
         {/* Divider and OAuth Buttons */}
