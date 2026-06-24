@@ -126,6 +126,22 @@ export function BookingModal() {
     return () => window.removeEventListener("open-booking", handler);
   }, []);
 
+  useEffect(() => {
+    if (open) {
+      const stored = localStorage.getItem("revera_user");
+      if (stored) {
+        try {
+          const cust = JSON.parse(stored);
+          if (cust.name) setName(cust.name);
+          if (cust.mobile) setPhone(cust.mobile);
+          if (cust.email) setEmail(cust.email);
+        } catch (err) {
+          console.error("Error reading revera_user in BookingModal:", err);
+        }
+      }
+    }
+  }, [open]);
+
   // Sync service toggle state from admin localStorage
   const [serviceToggles, setServiceToggles] = useState<ServiceToggleState>({});
   const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>([]);

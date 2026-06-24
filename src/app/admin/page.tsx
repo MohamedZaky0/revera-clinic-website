@@ -1833,6 +1833,33 @@ export default function AdminPage() {
     fetchAllReservations();
   }
 
+  async function handleManualPhoneChange(val: string) {
+    setNewPatientPhone(val);
+    
+    // Clean and validate Egyptian mobile number
+    let cleaned = val.replace(/[^\d]/g, "");
+    if (cleaned.startsWith("201") && cleaned.length === 12) {
+      cleaned = "0" + cleaned.slice(2);
+    } else if (cleaned.startsWith("1") && cleaned.length === 10) {
+      cleaned = "0" + cleaned;
+    }
+    
+    if (/^01[0-9]{9}$/.test(cleaned)) {
+      try {
+        const res = await fetch(`/api/customers?mobile=${cleaned}`);
+        if (res.ok) {
+          const customer = await res.json();
+          if (customer) {
+            if (customer.name) setNewPatientName(customer.name);
+            if (customer.email) setNewPatientEmail(customer.email);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching customer by phone:", err);
+      }
+    }
+  }
+
   async function handleCreateManualBooking() {
     if (!newPatientName || !newPatientEmail || !newPatientPhone || !newPatientDate) {
       alert("Please fill in all required fields (Name, Email, Phone, Date).");
@@ -9440,7 +9467,7 @@ export default function AdminPage() {
                     required
                     placeholder="Enter phone"
                     value={newPatientPhone}
-                    onChange={(e) => setNewPatientPhone(e.target.value)}
+                    onChange={(e) => handleManualPhoneChange(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                   />
                 </div>
