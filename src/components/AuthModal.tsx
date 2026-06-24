@@ -66,9 +66,12 @@ export function AuthModal() {
   }, []);
 
   const handleClose = useCallback(() => {
+    if (loadingProfileOnboarding || step === 3) {
+      sessionStorage.setItem("revera_profile_prompted", "true");
+    }
     setOpen(false);
     resetState();
-  }, [resetState]);
+  }, [resetState, loadingProfileOnboarding, step]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -128,8 +131,6 @@ export function AuthModal() {
       if (isIncompleteStored) {
         const promptedThisSession = sessionStorage.getItem("revera_profile_prompted");
         if (!promptedThisSession) {
-          sessionStorage.setItem("revera_profile_prompted", "true");
-
           const meta = session.user.user_metadata || {};
           const fullName = meta.full_name || meta.name || session.user.email?.split('@')[0] || "";
           const nameParts = fullName.trim().split(/\s+/);
