@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Phone, ChevronDown } from "lucide-react";
+import { Phone, ChevronDown, User, LogOut } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 const NAV_LINKS = [
   { key: "home" as const, href: "/" },
@@ -21,8 +22,102 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [user, setUser] = useState<{ name?: string; mobile?: string; email?: string } | null>(null);
+
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  useEffect(() => {
+    const checkUser = () => {
+      const stored = localStorage.getItem("revera_user");
+      if (stored) {
+        try {
+          setUser(JSON.parse(stored));
+        } catch {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    };
+    checkUser();
+
+    window.addEventListener("revera-auth-change", checkUser);
+
+    if (supabase) {
+      supabase.auth.onAuthStateChange(async (event: any, session: any) => {
+        if (session?.user) {
+          const stored = localStorage.getItem("revera_user");
+          if (!stored) {
+            const phone = session.user.phone;
+            const email = session.user.email;
+            let customer = null;
+
+            if (phone) {
+              let localMobile = phone;
+              if (phone.startsWith("+20")) {
+                localMobile = "0" + phone.slice(3);
+              }
+              const res = await fetch(`/api/customers?mobile=${localMobile}`);
+              if (res.ok) {
+                customer = await res.json();
+              }
+            }
+
+            if (!customer && email) {
+              const res = await fetch(`/api/customers?email=${email}`);
+              if (res.ok) {
+                customer = await res.json();
+              }
+            }
+
+            if (customer) {
+              localStorage.setItem("revera_user", JSON.stringify(customer));
+              setUser(customer);
+              window.dispatchEvent(new CustomEvent("revera-auth-change"));
+            } else {
+              const meta = session.user.user_metadata || {};
+              const fullName = meta.full_name || meta.name || session.user.email?.split('@')[0] || "New Patient";
+              const cleanedPhone = phone ? (phone.startsWith("+20") ? "0" + phone.slice(3) : phone) : "";
+              
+              const payload = {
+                name: fullName,
+                mobile: cleanedPhone || `guest_${session.user.id.slice(0, 8)}`,
+                email: session.user.email || null,
+                gender: null,
+              };
+
+              try {
+                const createRes = await fetch("/api/customers", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload)
+                });
+                if (createRes.ok) {
+                  const newCust = await createRes.json();
+                  localStorage.setItem("revera_user", JSON.stringify(newCust));
+                  setUser(newCust);
+                  window.dispatchEvent(new CustomEvent("revera-auth-change"));
+                }
+              } catch (err) {
+                console.error("Auto customer profile creation error:", err);
+              }
+            }
+          }
+        } else {
+          if (event === "SIGNED_OUT") {
+            localStorage.removeItem("revera_user");
+            setUser(null);
+            window.dispatchEvent(new CustomEvent("revera-auth-change"));
+          }
+        }
+      });
+    }
+
+    return () => {
+      window.removeEventListener("revera-auth-change", checkUser);
+    };
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -48,6 +143,15 @@ export function Navbar() {
   const handleAuth = () => {
     window.dispatchEvent(new CustomEvent("open-auth"));
     setMenuOpen(false);
+  };
+
+  const handleLogout = async () => {
+    localStorage.removeItem("revera_user");
+    setUser(null);
+    window.dispatchEvent(new CustomEvent("revera-auth-change"));
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
   };
 
   return (
@@ -299,29 +403,85 @@ export function Navbar() {
               )}
             </div>
 
-            {/* Login button */}
-            <button
-              disabled
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                background: "transparent",
-                color: "rgba(65, 78, 54, 0.45)",
-                border: "1.5px solid rgba(65, 78, 54, 0.25)",
-                padding: "10px 20px",
-                borderRadius: "6px",
-                cursor: "not-allowed",
-                fontSize: "14px",
-                fontWeight: 600,
-                transition: "all 0.2s ease",
-                whiteSpace: "nowrap",
-                opacity: 0.65,
-              }}
-            >
-              {/* TODO: Add login icon */}
-              {t.nav.login}
-            </button>
+            {/* Login / User info button */}
+            {user ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "rgba(90,61,52,0.05)",
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    color: "var(--cr-primary)",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                  }}
+                >
+                  <User size={16} />
+                  <span>{user.name || user.mobile}</span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    background: "transparent",
+                    color: "var(--cr-primary)",
+                    border: "1.5px solid var(--cr-primary)",
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-primary)";
+                    (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-white)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                    (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
+                  }}
+                >
+                  <LogOut size={14} />
+                  <span>{isRTL ? "خروج" : "Logout"}</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleAuth}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: "transparent",
+                  color: "var(--cr-primary)",
+                  border: "1.5px solid var(--cr-primary)",
+                  padding: "10px 20px",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  transition: "all 0.2s ease",
+                  whiteSpace: "nowrap",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-primary)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-white)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
+                }}
+              >
+                <User size={16} />
+                <span>{t.nav.login}</span>
+              </button>
+            )}
           </div>
 
           {/* Mobile hamburger */}
@@ -525,29 +685,75 @@ export function Navbar() {
                 </button>
               </div>
 
-              {/* Mobile login button */}
-              <button
-                disabled
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                  background: "rgba(65, 78, 54, 0.12)",
-                  color: "rgba(255, 255, 255, 0.7)",
-                  border: "none",
-                  padding: "12px 20px",
-                  borderRadius: "6px",
-                  cursor: "not-allowed",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  transition: "all 0.2s ease",
-                  width: "100%",
-                  opacity: 0.65,
-                }}
-              >
-                {t.nav.login}
-              </button>
+              {/* Mobile login / user info button */}
+              {user ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      background: "rgba(90,61,52,0.05)",
+                      padding: "12px 16px",
+                      borderRadius: "6px",
+                      color: "var(--cr-primary)",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <User size={16} />
+                    <span>{user.name || user.mobile}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setMenuOpen(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      background: "transparent",
+                      color: "var(--cr-primary)",
+                      border: "1.5px solid var(--cr-primary)",
+                      padding: "12px 20px",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      transition: "all 0.2s ease",
+                      width: "100%",
+                    }}
+                  >
+                    <LogOut size={16} />
+                    <span>{isRTL ? "تسجيل الخروج" : "Logout"}</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleAuth}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    background: "var(--cr-primary)",
+                    color: "var(--cr-white)",
+                    border: "none",
+                    padding: "12px 20px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    transition: "all 0.2s ease",
+                    width: "100%",
+                  }}
+                >
+                  <User size={16} />
+                  <span>{t.nav.login}</span>
+                </button>
+              )}
             </div>
           </div>
         )}

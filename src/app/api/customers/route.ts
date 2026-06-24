@@ -1,8 +1,34 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const mobile = searchParams.get('mobile');
+    const email = searchParams.get('email');
+
+    if (mobile) {
+      const { data, error } = await supabaseServer
+        .from('customers')
+        .select('*')
+        .eq('mobile', mobile)
+        .maybeSingle();
+
+      if (error) throw error;
+      return NextResponse.json(data || null);
+    }
+
+    if (email) {
+      const { data, error } = await supabaseServer
+        .from('customers')
+        .select('*')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (error) throw error;
+      return NextResponse.json(data || null);
+    }
+
     const { data: rows, error } = await supabaseServer
       .from('customers')
       .select('*')
