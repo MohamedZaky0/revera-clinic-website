@@ -19,14 +19,27 @@ ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
 -- Drop policies if they exist to avoid duplicate errors
 DROP POLICY IF EXISTS "Allow public read access to roles" ON public.roles;
 DROP POLICY IF EXISTS "Allow service_role full access to roles" ON public.roles;
+DROP POLICY IF EXISTS "Allow public insert to roles" ON public.roles;
+DROP POLICY IF EXISTS "Allow public update to roles" ON public.roles;
+DROP POLICY IF EXISTS "Allow public delete to roles" ON public.roles;
 
--- Allow public read access to roles (authenticated service role or client)
+-- Allow read access to roles
 CREATE POLICY "Allow public read access to roles" ON public.roles
   FOR SELECT USING (true);
 
 -- Allow all operations to service_role key
 CREATE POLICY "Allow service_role full access to roles" ON public.roles
   FOR ALL TO service_role USING (true);
+
+-- Allow insert, update, delete for server API routes using anon/auth credentials
+CREATE POLICY "Allow public insert to roles" ON public.roles
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Allow public update to roles" ON public.roles
+  FOR UPDATE USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow public delete to roles" ON public.roles
+  FOR DELETE USING (true);
 
 
 -- 2. Create Employee Accounts table
@@ -45,14 +58,27 @@ ALTER TABLE public.employee_accounts ENABLE ROW LEVEL SECURITY;
 -- Drop policies if they exist to avoid duplicate errors
 DROP POLICY IF EXISTS "Allow public read access to employee_accounts" ON public.employee_accounts;
 DROP POLICY IF EXISTS "Allow service_role full access to employee_accounts" ON public.employee_accounts;
+DROP POLICY IF EXISTS "Allow public insert to employee_accounts" ON public.employee_accounts;
+DROP POLICY IF EXISTS "Allow public update to employee_accounts" ON public.employee_accounts;
+DROP POLICY IF EXISTS "Allow public delete to employee_accounts" ON public.employee_accounts;
 
--- Allow public read access (client/service role lookup)
+-- Allow read access
 CREATE POLICY "Allow public read access to employee_accounts" ON public.employee_accounts
   FOR SELECT USING (true);
 
 -- Allow all operations to service_role key
 CREATE POLICY "Allow service_role full access to employee_accounts" ON public.employee_accounts
   FOR ALL TO service_role USING (true);
+
+-- Allow insert, update, delete for server API routes using anon/auth credentials
+CREATE POLICY "Allow public insert to employee_accounts" ON public.employee_accounts
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Allow public update to employee_accounts" ON public.employee_accounts
+  FOR UPDATE USING (true) WITH CHECK (true);
+
+CREATE POLICY "Allow public delete to employee_accounts" ON public.employee_accounts
+  FOR DELETE USING (true);
 
 
 -- 3. Seed default roles
