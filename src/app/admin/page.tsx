@@ -8559,12 +8559,7 @@ export default function AdminPage() {
                   Pending approvals
                 </h4>
               </div>
-              <button
-                onClick={() => setShowAddBookingModal(true)}
-                className="inline-flex items-center gap-2 rounded-3xl bg-[#C4AE7C] px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#b59e6c]"
-              >
-                <Plus size={16} /> Add request
-              </button>
+
             </div>
 
             {loading && <p>Loading requests…</p>}
