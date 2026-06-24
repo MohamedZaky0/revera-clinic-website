@@ -217,32 +217,34 @@ export function Navbar() {
           <div
             className="hidden lg:flex items-center shrink-0 flex-row"
             style={{
-              gap: "24px",
+              gap: user ? "12px" : "24px",
             }}
           >
             {/* Phone */}
-            <a
-              href="tel:+201035595691"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                color: "var(--cr-primary)",
-                textDecoration: "none",
-                fontSize: "15px",
-                fontWeight: 500,
-                transition: "opacity 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.opacity = "0.7";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.opacity = "1";
-              }}
-            >
-              <Phone size={18} strokeWidth={1.5} />
-              <span>(+20) 01035595691</span>
-            </a>
+            {!user && (
+              <a
+                href="tel:+201035595691"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  color: "var(--cr-primary)",
+                  textDecoration: "none",
+                  fontSize: "15px",
+                  fontWeight: 500,
+                  transition: "opacity 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.opacity = "0.7";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.opacity = "1";
+                }}
+              >
+                <Phone size={18} strokeWidth={1.5} />
+                <span>(+20) 01035595691</span>
+              </a>
+            )}
 
             {/* Language dropdown */}
             <div style={{ position: "relative" }}>
