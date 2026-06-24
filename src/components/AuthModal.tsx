@@ -41,6 +41,7 @@ export function AuthModal() {
   const [gender, setGender] = useState<"male" | "female" | "">("");
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [loadingProfileOnboarding, setLoadingProfileOnboarding] = useState(false);
+  const [hasPhoneInDb, setHasPhoneInDb] = useState(false);
 
   const resetState = useCallback(() => {
     setStep(1);
@@ -55,6 +56,7 @@ export function AuthModal() {
     setGender("");
     setCustomerId(null);
     setLoadingProfileOnboarding(false);
+    setHasPhoneInDb(false);
     setDemoMode(false);
     setVerifying(false);
     setAuthType("phone");
@@ -86,7 +88,12 @@ export function AuthModal() {
         }
         if (firstName) setFirstName(firstName);
         if (lastName) setLastName(lastName);
-        if (phone) setPhone(phone);
+        if (phone) {
+          setPhone(phone);
+          if (!phone.startsWith("guest_")) {
+            setHasPhoneInDb(true);
+          }
+        }
         if (customerId) setCustomerId(customerId);
         if (gender) {
           const g = gender.toLowerCase();
@@ -147,6 +154,7 @@ export function AuthModal() {
           setPhone(cleanedPhone);
           setCustomerId(null);
           setGender("");
+          setHasPhoneInDb(cleanedPhone !== "" && !cleanedPhone.startsWith("guest_"));
           setLoadingProfileOnboarding(true);
           setOpen(true);
 
@@ -191,6 +199,7 @@ export function AuthModal() {
                 }
                 if (customer.mobile && !customer.mobile.startsWith("guest_")) {
                   setPhone(customer.mobile);
+                  setHasPhoneInDb(true);
                 }
                 if (customer.gender) {
                   const g = customer.gender.toLowerCase();
@@ -768,7 +777,7 @@ export function AuthModal() {
             </div>
 
             {/* Mobile (Only shown if they signed in via Email/OAuth and we don't have it) */}
-            {(!phone || phone === "") && (
+            {!hasPhoneInDb && (
               <div>
                 <input
                   type="tel"
