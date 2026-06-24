@@ -22,7 +22,8 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
-  const [user, setUser] = useState<{ name?: string; mobile?: string; email?: string } | null>(null);
+  const [user, setUser] = useState<{ id?: string; name?: string; mobile?: string; email?: string; gender?: string | null } | null>(null);
+  const isProfileIncomplete = !!(user && (!user.gender || !user.mobile || user.mobile.startsWith("guest_")));
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -48,7 +49,16 @@ export function Navbar() {
       supabase.auth.onAuthStateChange(async (event: any, session: any) => {
         if (session?.user) {
           const stored = localStorage.getItem("revera_user");
-          if (!stored) {
+          let parsedStored = null;
+          if (stored) {
+            try {
+              parsedStored = JSON.parse(stored);
+            } catch {}
+          }
+
+          const isIncompleteStored = !parsedStored || !parsedStored.gender || !parsedStored.mobile || parsedStored.mobile.startsWith("guest_");
+
+          if (isIncompleteStored) {
             const phone = session.user.phone;
             const email = session.user.email;
             let customer = null;
@@ -71,42 +81,51 @@ export function Navbar() {
               }
             }
 
-            if (customer) {
+            const isDbProfileComplete = 
+              customer && 
+              customer.name && 
+              customer.mobile && 
+              !customer.mobile.startsWith("guest_") && 
+              customer.gender;
+
+            if (isDbProfileComplete) {
               localStorage.setItem("revera_user", JSON.stringify(customer));
               setUser(customer);
               window.dispatchEvent(new CustomEvent("revera-auth-change"));
             } else {
-              const meta = session.user.user_metadata || {};
-              const fullName = meta.full_name || meta.name || session.user.email?.split('@')[0] || "New Patient";
-              const cleanedPhone = phone ? (phone.startsWith("+20") ? "0" + phone.slice(3) : phone) : "";
-              
-              const payload = {
-                name: fullName,
-                mobile: cleanedPhone || `guest_${session.user.id.slice(0, 8)}`,
-                email: session.user.email || null,
-                gender: null,
-              };
+              const promptedThisSession = sessionStorage.getItem("revera_profile_prompted");
+              if (!promptedThisSession) {
+                sessionStorage.setItem("revera_profile_prompted", "true");
+                
+                const meta = session.user.user_metadata || {};
+                const fullName = customer?.name || meta.full_name || meta.name || session.user.email?.split('@')[0] || "";
+                const nameParts = fullName.trim().split(/\s+/);
+                const firstName = nameParts[0] || "";
+                const lastName = nameParts.slice(1).join(" ") || "";
+                
+                const phoneVal = phone || customer?.mobile || "";
+                const cleanedPhone = phoneVal ? (phoneVal.startsWith("+20") ? "0" + phoneVal.slice(3) : phoneVal) : "";
 
-              try {
-                const createRes = await fetch("/api/customers", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(payload)
-                });
-                if (createRes.ok) {
-                  const newCust = await createRes.json();
-                  localStorage.setItem("revera_user", JSON.stringify(newCust));
-                  setUser(newCust);
-                  window.dispatchEvent(new CustomEvent("revera-auth-change"));
-                }
-              } catch (err) {
-                console.error("Auto customer profile creation error:", err);
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent("open-auth", {
+                    detail: {
+                      step: 3,
+                      email: session.user.email || customer?.email || "",
+                      firstName: firstName,
+                      lastName: lastName,
+                      phone: cleanedPhone.startsWith("guest_") ? "" : cleanedPhone,
+                      customerId: customer?.id || null,
+                      gender: customer?.gender || null
+                    }
+                  }));
+                }, 200);
               }
             }
           }
         } else {
           if (event === "SIGNED_OUT") {
             localStorage.removeItem("revera_user");
+            sessionStorage.removeItem("revera_profile_prompted");
             setUser(null);
             window.dispatchEvent(new CustomEvent("revera-auth-change"));
           }
@@ -151,6 +170,29 @@ export function Navbar() {
     window.dispatchEvent(new CustomEvent("revera-auth-change"));
     if (supabase) {
       await supabase.auth.signOut();
+    }
+  };
+
+  const handleCompleteProfile = () => {
+    if (user) {
+      const nameParts = (user.name || "").trim().split(/\s+/);
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+      
+      const phoneVal = user.mobile || "";
+      const cleanedPhone = phoneVal.startsWith("guest_") ? "" : phoneVal;
+      
+      window.dispatchEvent(new CustomEvent("open-auth", {
+        detail: {
+          step: 3,
+          email: user.email || "",
+          firstName: firstName,
+          lastName: lastName,
+          phone: cleanedPhone,
+          customerId: user.id || null,
+          gender: user.gender || null
+        }
+      }));
     }
   };
 
@@ -422,6 +464,35 @@ export function Navbar() {
                   <User size={16} />
                   <span>{user.name || user.mobile}</span>
                 </div>
+                {isProfileIncomplete && (
+                  <button
+                    onClick={handleCompleteProfile}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      background: "rgba(196,174,124,0.15)",
+                      color: "var(--cr-primary)",
+                      border: "1.5px solid var(--cr-accent)",
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-accent)";
+                      (e.currentTarget as HTMLButtonElement).style.color = "white";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(196,174,124,0.15)";
+                      (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
+                    }}
+                  >
+                    <span>{isRTL ? "إكمال الملف" : "Complete Profile"}</span>
+                  </button>
+                )}
                 <button
                   onClick={handleLogout}
                   style={{
@@ -704,6 +775,31 @@ export function Navbar() {
                     <User size={16} />
                     <span>{user.name || user.mobile}</span>
                   </div>
+                  {isProfileIncomplete && (
+                    <button
+                      onClick={() => {
+                        handleCompleteProfile();
+                        setMenuOpen(false);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: "rgba(196,174,124,0.15)",
+                        color: "var(--cr-primary)",
+                        border: "1.5px solid var(--cr-accent)",
+                        padding: "12px 16px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        width: "100%",
+                      }}
+                    >
+                      <span>{isRTL ? "إكمال الملف الشخصي" : "Complete Profile"}</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       handleLogout();

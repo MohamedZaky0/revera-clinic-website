@@ -39,6 +39,7 @@ export function AuthModal() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "">("");
+  const [customerId, setCustomerId] = useState<string | null>(null);
 
   const resetState = useCallback(() => {
     setStep(1);
@@ -51,6 +52,7 @@ export function AuthModal() {
     setLastName("");
     setEmail("");
     setGender("");
+    setCustomerId(null);
     setDemoMode(false);
     setVerifying(false);
     setAuthType("phone");
@@ -67,10 +69,32 @@ export function AuthModal() {
   }, [resetState]);
 
   useEffect(() => {
-    const handler = () => setOpen(true);
-    window.addEventListener("open-auth", handler);
-    return () => window.removeEventListener("open-auth", handler);
-  }, []);
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      resetState();
+      if (customEvent.detail) {
+        const { step, email, firstName, lastName, phone, customerId, gender } = customEvent.detail;
+        if (step) setStep(step);
+        if (email) {
+          setEmail(email);
+          setEmailInput(email);
+        }
+        if (firstName) setFirstName(firstName);
+        if (lastName) setLastName(lastName);
+        if (phone) setPhone(phone);
+        if (customerId) setCustomerId(customerId);
+        if (gender) {
+          const g = gender.toLowerCase();
+          if (g === "male" || g === "female") {
+            setGender(g);
+          }
+        }
+      }
+      setOpen(true);
+    };
+    window.addEventListener("open-auth", handler as EventListener);
+    return () => window.removeEventListener("open-auth", handler as EventListener);
+  }, [resetState]);
 
   useEffect(() => {
     if (!open) return;
@@ -314,6 +338,7 @@ export function AuthModal() {
     setVerifying(true);
 
     const payload = {
+      ...(customerId ? { id: customerId } : {}),
       name: `${firstName.trim()} ${lastName.trim()}`,
       mobile: cleanedPhone,
       email: email.trim() || null,
