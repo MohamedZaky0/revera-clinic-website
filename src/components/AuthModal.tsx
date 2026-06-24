@@ -660,15 +660,17 @@ export function AuthModal() {
               </div>
             )}
 
-            {/* Email (Pre-filled or optional) */}
-            <input
-              type="email"
-              className="cr-input"
-              placeholder={t.auth.email}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              aria-label={t.auth.email}
-            />
+            {/* Email (Only shown if we don't have it) */}
+            {(!email || email === "") && (
+              <input
+                type="email"
+                className="cr-input"
+                placeholder={t.auth.email}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                aria-label={t.auth.email}
+              />
+            )}
 
             {/* Gender */}
             <div>
