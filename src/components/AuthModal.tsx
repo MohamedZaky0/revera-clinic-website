@@ -284,6 +284,7 @@ export function AuthModal() {
 
     if (supabase) {
       try {
+        console.log("Sending SMS OTP via Supabase to:", e164Phone);
         const { error } = await supabase.auth.signInWithOtp({
           phone: e164Phone,
         });
