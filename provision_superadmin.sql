@@ -19,6 +19,5 @@ SET auth_user_id = EXCLUDED.auth_user_id,
 
 -- 3. Bypassing email confirmation (fixes "Email not confirmed" error)
 UPDATE auth.users
-SET email_confirmed_at = NOW(),
-    confirmed_at = NOW()
+SET email_confirmed_at = NOW()
 WHERE id = '08191193-45c0-4c65-ae37-6dd84677055a';
