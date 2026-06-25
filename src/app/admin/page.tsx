@@ -1296,6 +1296,19 @@ export default function AdminPage() {
     ).length;
   }, [allReservations]);
 
+  const comingAppointmentsCount = useMemo(() => {
+    const getLocalDateString = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const todayStr = getLocalDateString(new Date());
+    return allReservations.filter(
+      r => r.status === 'approved' && String(r.date).slice(0, 10) >= todayStr
+    ).length;
+  }, [allReservations]);
+
   const dynamicOverviewCards = useMemo(() => {
     const activeBookings = allReservations.filter((r) => r.status === "approved");
     const activeBookingsCount = activeBookings.length;
@@ -1881,6 +1894,36 @@ export default function AdminPage() {
       });
   }
 
+  function handleExportBookingsCSV() {
+    if (allReservations.length === 0) {
+      alert("No reservations to export.");
+      return;
+    }
+    const headers = ["ID", "Patient Name", "Email", "Phone", "Date", "Time Slot", "Session Type", "Doctor", "Status", "Notes"];
+    const rows = allReservations.map(r => [
+      r.id,
+      r.name,
+      r.email,
+      r.phone,
+      r.date,
+      r.timeSlot || r.requestedTime || "",
+      r.sessionType || "in_person",
+      r.doctorName || "",
+      r.status,
+      (r.notes || "").replace(/"/g, '""')
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.map(val => `"${val}"`).join(","))].join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `reservations_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   function handleExportCustomersCSV() {
     if (customers.length === 0) {
       alert("No customers available to export.");
@@ -2189,6 +2232,13 @@ export default function AdminPage() {
   async function handleCreateManualBooking() {
     if (!newPatientName || !newPatientEmail || !newPatientPhone || !newPatientDate) {
       alert("Please fill in all required fields (Name, Email, Phone, Date).");
+      return;
+    }
+
+    // Validate Egyptian mobile number format
+    const cleanedMobile = newPatientPhone.trim();
+    if (!/^01[0125]\d{8}$/.test(cleanedMobile)) {
+      alert("Please enter a valid Egyptian mobile number (must be 11 digits and start with 010, 011, 012, or 015).");
       return;
     }
 
@@ -8665,8 +8715,21 @@ export default function AdminPage() {
 
             <div className="flex flex-wrap items-center gap-3">
               <button
+                onClick={() => setShowFilterModal(true)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#414E36]/15 bg-white text-[#414E36] transition hover:bg-[#f7f6f2] shadow-sm"
+                title="Filter Bookings"
+              >
+                <Filter size={18} />
+              </button>
+              <button
+                onClick={handleExportBookingsCSV}
+                className="inline-flex items-center gap-2 rounded-full bg-[#C4AE7C] px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#b59e6c] w-fit shadow-sm"
+              >
+                <Download size={16} /> Export
+              </button>
+              <button
                 onClick={() => setShowAddBookingModal(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] w-fit"
+                className="inline-flex items-center gap-2 rounded-full bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] w-fit shadow-sm"
               >
                 <Plus size={18} /> New booking
               </button>
@@ -8676,7 +8739,7 @@ export default function AdminPage() {
           {calendarView === "Calendar" && (
           <section className="mb-8 flex flex-col gap-6">
             {/* ── Dashboard summary row ── */}
-            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
               {/* Today's bookings stat */}
               <div
                 onClick={() => { setCalendarMonth(new Date()); setShowTodayBookingsModal(true); }}
@@ -8695,39 +8758,13 @@ export default function AdminPage() {
                 <p className="mt-3 text-4xl font-bold text-[#C4AE7C]">{requests.length}</p>
                 <p className="mt-1 text-sm text-[#5A6A51]">{requests.length === 0 ? "No pending requests" : "Awaiting approval"}</p>
               </div>
-              {/* Latest confirmed booking */}
-              {(() => {
-                const latestApproved = allReservations.find(r => r.status === 'approved');
-                return (
-                  <div
-                    onClick={() => latestApproved && setViewingBooking(latestApproved)}
-                    className={`rounded-[32px] bg-[#E8EDDF]/80 p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] transition ${latestApproved ? 'cursor-pointer hover:shadow-[0_30px_80px_rgba(47,61,41,0.12)]' : ''}`}
-                  >
-                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]/80">Latest confirmed</p>
-                    <p className="mt-3 text-base font-semibold text-[#1F251A] line-clamp-2">
-                      {latestApproved ? latestApproved.name : "No bookings yet"}
-                    </p>
-                    <p className="mt-1 text-sm text-[#5A6A51]">
-                      {latestApproved ? (latestApproved.doctorName || 'Dr. Sara El Gamel') : "—"}
-                    </p>
-                  </div>
-                );
-              })()}
-              {/* Quick actions */}
-              <div className="rounded-[32px] bg-[#414E36] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] flex flex-col gap-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-[#FBFBF9]/60">Quick actions</p>
-                <button
-                  onClick={() => setShowFilterModal(true)}
-                  className="rounded-2xl bg-[#FBFBF9]/10 px-4 py-3 text-left text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#FBFBF9]/20"
-                >
-                  Filter bookings
-                </button>
-                <button
-                  onClick={() => setShowActionsMenuModal(true)}
-                  className="rounded-2xl bg-[#C4AE7C] px-4 py-3 text-left text-sm font-semibold text-[#414E36] transition hover:bg-[#b59e6c]"
-                >
-                  Actions menu
-                </button>
+              {/* Coming appointments stat */}
+              <div
+                className="rounded-[32px] bg-[#E8EDDF]/80 p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]"
+              >
+                <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]/80">Coming appointments</p>
+                <p className="mt-3 text-4xl font-bold text-[#1F251A]">{comingAppointmentsCount}</p>
+                <p className="mt-1 text-sm text-[#5A6A51]">Upcoming approved bookings</p>
               </div>
             </div>
 
@@ -9677,27 +9714,30 @@ export default function AdminPage() {
                     </button>
                   </div>
 
-                  {/* Danger Zone / Remove Booking */}
+                  {/* Cancel Booking Section */}
                   <div className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-red-800 mb-3">Danger Zone</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-red-800 mb-3">Cancel Booking</p>
                     <button
                       onClick={async () => {
-                        if (confirm("Are you sure you want to permanently delete/remove this booking?")) {
+                        if (confirm("Are you sure you want to cancel this booking?")) {
                           const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                            method: "DELETE",
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "reject" }),
                           });
                           if (res.ok) {
                             setViewingBooking(null);
                             fetchRequests();
                             fetchAllReservations();
+                            alert("Booking canceled successfully!");
                           } else {
-                            alert("Failed to delete booking.");
+                            alert("Failed to cancel booking.");
                           }
                         }
                       }}
                       className="w-full rounded-2xl bg-red-600 py-2.5 text-xs font-bold text-white hover:bg-red-700 transition"
                     >
-                      Remove Booking
+                      Cancel Booking
                     </button>
                   </div>
 
@@ -10003,26 +10043,7 @@ export default function AdminPage() {
               >
                 Export Bookings to CSV
               </button>
-              <button
-                onClick={async () => {
-                  if (confirm("WARNING: This will permanently delete ALL bookings and requests. Are you sure you want to proceed?")) {
-                    const poolRes = await fetch('/api/reservations?id=all', {
-                      method: 'DELETE'
-                    });
-                    if (poolRes.ok) {
-                      alert("Successfully cleared all bookings!");
-                      fetchRequests();
-                      fetchAllReservations();
-                    } else {
-                      alert("Failed to clear database.");
-                    }
-                    setShowActionsMenuModal(false);
-                  }
-                }}
-                className="w-full rounded-2xl border border-red-200 bg-red-50 py-3.5 text-sm font-bold text-red-700 hover:bg-red-100 transition"
-              >
-                Clear Database Bookings
-              </button>
+
             </div>
           </div>
         </div>
@@ -10046,6 +10067,20 @@ export default function AdminPage() {
             </div>
 
             <div className="space-y-4">
+              {/* 1. Phone Number at top */}
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number *</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="Enter phone (e.g. 01012345678)"
+                  value={newPatientPhone}
+                  onChange={(e) => handleManualPhoneChange(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                />
+              </div>
+
+              {/* 2. Patient Name and Email side-by-side */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Patient Name *</label>
@@ -10071,18 +10106,8 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number *</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="Enter phone"
-                    value={newPatientPhone}
-                    onChange={(e) => handleManualPhoneChange(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  />
-                </div>
+              {/* 3. Booking Date and Time Slot stacked vertically */}
+              <div className="space-y-4">
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Booking Date *</label>
                   <input
@@ -10093,8 +10118,26 @@ export default function AdminPage() {
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Time Slot / Requested Time</label>
+                  <select
+                    value={newPatientTimeSlot}
+                    onChange={(e) => setNewPatientTimeSlot(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                  >
+                    {SLOTS.map(s => {
+                      const isUnavailable = manualUnavailableSlots.includes(s);
+                      return (
+                        <option key={s} value={s} disabled={isUnavailable}>
+                          {s} {isUnavailable ? "(Unavailable)" : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
 
+              {/* 4. Service Type and Session Type */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Service Type</label>
@@ -10121,6 +10164,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              {/* 5. Branch and Status */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branch</label>
@@ -10148,6 +10192,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              {/* 6. Doctor Name if Approved */}
               {newPatientStatus === 'approved' && (
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Assign Doctor</label>
@@ -10163,24 +10208,7 @@ export default function AdminPage() {
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Time Slot / Requested Time</label>
-                <select
-                  value={newPatientTimeSlot}
-                  onChange={(e) => setNewPatientTimeSlot(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
-                >
-                  {SLOTS.map(s => {
-                    const isUnavailable = manualUnavailableSlots.includes(s);
-                    return (
-                      <option key={s} value={s} disabled={isUnavailable}>
-                        {s} {isUnavailable ? "(Unavailable)" : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
+              {/* 7. Notes */}
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Notes (Optional)</label>
                 <textarea
