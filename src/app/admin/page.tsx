@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { supabase } from "@/lib/supabaseClient";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -343,6 +344,32 @@ const MOCK_PAYROLL = [
 ];
 
 export default function AdminPage() {
+  // Auth state
+  const [session, setSession] = useState<any>(null);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [adminRole, setAdminRole] = useState<string | null>(null);
+  const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminEmployeeId, setAdminEmployeeId] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // Role Management state
+  const [rolesList, setRolesList] = useState<any[]>([]);
+  const [employeesList, setEmployeesList] = useState<any[]>([]);
+  const [loadingRolesAndEmployees, setLoadingRolesAndEmployees] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRolePermissions, setNewRolePermissions] = useState<string[]>([]);
+  const [newEmployeeId, setNewEmployeeId] = useState("");
+  const [newEmployeeRole, setNewEmployeeRole] = useState("");
+  const [newEmployeePassword, setNewEmployeePassword] = useState("");
+  const [roleCreateError, setRoleCreateError] = useState("");
+  const [roleCreateSuccess, setRoleCreateSuccess] = useState("");
+  const [employeeCreateError, setEmployeeCreateError] = useState("");
+  const [employeeCreateSuccess, setEmployeeCreateSuccess] = useState("");
+
   const [requests, setRequests] = useState<Req[]>([]);
   const [allReservations, setAllReservations] = useState<Req[]>([]);
   const [loading, setLoading] = useState(false);
@@ -606,6 +633,270 @@ export default function AdminPage() {
   // per-service toggle state: visible & status
   const [serviceToggles, setServiceToggles] = useState<Record<number, { visible: boolean; active: boolean }>>({});
 
+  // Auth and Role Management effects & handlers
+  useEffect(() => {
+    if (!supabase) {
+      setAuthChecking(false);
+      return;
+    }
+
+    // 1. Get current session
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
+      handleAuthSession(session);
+    });
+
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, newSession: any) => {
+      handleAuthSession(newSession);
+    });
+
+    async function handleAuthSession(currSession: any) {
+      setSession(currSession);
+      if (!currSession?.user) {
+        setAdminRole(null);
+        setAdminPermissions([]);
+        setAdminEmail("");
+        setAdminEmployeeId("");
+        setAuthChecking(false);
+        return;
+      }
+
+      try {
+        const token = currSession.access_token;
+        const res = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (res.ok) {
+          const authData = await res.json();
+          setAdminRole(authData.role);
+          setAdminPermissions(authData.permissions || []);
+          setAdminEmail(authData.email || "");
+          setAdminEmployeeId(authData.employeeId || "");
+        } else {
+          console.warn("Unregistered employee session. Logging out.");
+          await supabase.auth.signOut();
+          setAdminRole(null);
+          setAdminPermissions([]);
+          setAdminEmail("");
+          setAdminEmployeeId("");
+        }
+      } catch (err) {
+        console.error("Error retrieving admin permissions:", err);
+      } finally {
+        setAuthChecking(false);
+      }
+    }
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (adminPermissions.length > 0 && !adminPermissions.includes(activeNav)) {
+      if (activeNav === 'Role Management' && adminRole === 'superadmin') {
+        return;
+      }
+      
+      const settingsSubsections = [
+        "Profile",
+        "Service Hours",
+        "Branches",
+        "Users",
+        "Booking Settings",
+        "Notification Settings",
+        "Queue Settings",
+        "Pages Settings"
+      ];
+      
+      if (settingsSubsections.includes(activeNav) && adminPermissions.includes("Settings")) {
+        return;
+      }
+      
+      if (adminPermissions.includes('Bookings')) {
+        setActiveNav('Bookings');
+      } else {
+        setActiveNav(adminPermissions[0]);
+      }
+    }
+  }, [adminPermissions, adminRole, activeNav]);
+
+  useEffect(() => {
+    if (activeNav === "Role Management" && adminRole === "superadmin") {
+      fetchRolesAndEmployees();
+    }
+  }, [activeNav, adminRole]);
+
+  async function fetchRolesAndEmployees() {
+    console.log("RBAC - fetchRolesAndEmployees called!");
+    setLoadingRolesAndEmployees(true);
+    try {
+      const [rolesRes, empsRes] = await Promise.all([
+        fetch('/api/roles'),
+        fetch('/api/employees')
+      ]);
+
+      if (rolesRes.ok) {
+        const roles = await rolesRes.json();
+        setRolesList(roles);
+      }
+      if (empsRes.ok) {
+        const emps = await empsRes.json();
+        setEmployeesList(emps);
+      }
+    } catch (err) {
+      console.error("Error loading roles and employees:", err);
+    } finally {
+      setLoadingRolesAndEmployees(false);
+    }
+  }
+
+  async function handleAdminLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!loginEmail || !loginPassword) {
+      setLoginError("Please enter both email/ID and password.");
+      return;
+    }
+    setLoginLoading(true);
+    setLoginError("");
+
+    let emailToSign = loginEmail.trim();
+    if (!emailToSign.includes("@")) {
+      try {
+        const res = await fetch(`/api/auth/employee-email?id=${encodeURIComponent(emailToSign)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.email) {
+            emailToSign = data.email;
+          }
+        } else {
+          setLoginError("Invalid Employee ID or account not found.");
+          setLoginLoading(false);
+          return;
+        }
+      } catch (err) {
+        setLoginError("Failed to lookup Employee ID. Please try entering your full email.");
+        setLoginLoading(false);
+        return;
+      }
+    }
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: emailToSign,
+        password: loginPassword,
+      });
+
+      if (error) {
+        setLoginError(error.message);
+        setLoginLoading(false);
+        return;
+      }
+    } catch (err: any) {
+      setLoginError(err.message || "An authentication error occurred.");
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  async function handleCreateRole(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newRoleName.trim()) return;
+    setRoleCreateError("");
+    setRoleCreateSuccess("");
+
+    try {
+      const res = await fetch('/api/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newRoleName, permissions: newRolePermissions })
+      });
+
+      if (res.ok) {
+        setNewRoleName("");
+        setNewRolePermissions([]);
+        setRoleCreateSuccess("Role saved successfully!");
+        fetchRolesAndEmployees();
+        setTimeout(() => setRoleCreateSuccess(""), 3000);
+      } else {
+        const data = await res.json();
+        setRoleCreateError(data.error || "Failed to create role.");
+      }
+    } catch (err: any) {
+      setRoleCreateError(err.message || "Network error.");
+    }
+  }
+
+  async function handleDeleteRole(name: string) {
+    if (!confirm(`Are you sure you want to delete the role '${name}'? This will disconnect employee accounts assigned to this role.`)) return;
+    try {
+      const res = await fetch(`/api/roles?name=${encodeURIComponent(name)}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchRolesAndEmployees();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to delete role.");
+      }
+    } catch (err: any) {
+      alert("Error deleting role: " + err.message);
+    }
+  }
+
+  async function handleCreateEmployee(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newEmployeeId.trim() || !newEmployeeRole || !newEmployeePassword) return;
+    setEmployeeCreateError("");
+    setEmployeeCreateSuccess("");
+
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: newEmployeeId,
+          roleName: newEmployeeRole,
+          password: newEmployeePassword
+        })
+      });
+
+      if (res.ok) {
+        setNewEmployeeId("");
+        setNewEmployeeRole("");
+        setNewEmployeePassword("");
+        setEmployeeCreateSuccess("Employee account provisioned successfully!");
+        fetchRolesAndEmployees();
+        setTimeout(() => setEmployeeCreateSuccess(""), 3000);
+      } else {
+        const data = await res.json();
+        setEmployeeCreateError(data.error || "Failed to create account.");
+      }
+    } catch (err: any) {
+      setEmployeeCreateError(err.message || "Network error.");
+    }
+  }
+
+  async function handleDeleteEmployee(id: string) {
+    if (!confirm("Are you sure you want to delete this employee account? They will lose access to the admin panel immediately.")) return;
+    try {
+      const res = await fetch(`/api/employees?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchRolesAndEmployees();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to revoke credentials.");
+      }
+    } catch (err: any) {
+      alert("Error deleting account: " + err.message);
+    }
+  }
+
   // Force English/LTR context on Admin page
   useEffect(() => {
     const prevDir = document.documentElement.dir;
@@ -647,6 +938,41 @@ export default function AdminPage() {
     setServiceToggles({ ...defaults, ...storedToggles });
   }, []);
   // BRANCHES is now derived from the real branches state loaded from Supabase
+
+  const permittedSidebarItems = useMemo(() => {
+    if (!adminRole) return [];
+    if (adminRole === 'superadmin') return SIDEBAR_ITEMS;
+    return SIDEBAR_ITEMS.filter(item => {
+      if (item.label === 'Logout') return true;
+      return adminPermissions.includes(item.label);
+    });
+  }, [adminRole, adminPermissions]);
+
+  const hasAccessToActiveNav = useMemo(() => {
+    console.log("RBAC Access Check - activeNav:", activeNav, "| adminRole:", adminRole, "| permissions:", adminPermissions);
+    if (!adminRole) return false;
+    if (adminRole === 'superadmin') return true;
+    if (activeNav === 'Logout') return true;
+    
+    const settingsSubsections = [
+      "Profile",
+      "Service Hours",
+      "Branches",
+      "Users",
+      "Booking Settings",
+      "Notification Settings",
+      "Queue Settings",
+      "Pages Settings",
+      "Role Management"
+    ];
+    
+    if (settingsSubsections.includes(activeNav)) {
+      if (activeNav === 'Role Management') return false; // strictly superadmin
+      return adminPermissions.includes("Settings");
+    }
+    
+    return adminPermissions.includes(activeNav);
+  }, [adminRole, adminPermissions, activeNav]);
 
   const [prescriptionsExpanded, setPrescriptionsExpanded] = useState(false);
   const [prescriptionsSearch, setPrescriptionsSearch] = useState("");
@@ -1953,6 +2279,84 @@ export default function AdminPage() {
     []
   );
 
+  if (authChecking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F2EFE9] text-[#414E36]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#C4AE7C] border-t-transparent"></div>
+          <p className="text-sm font-semibold tracking-wider">Verifying administrator session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session || !adminRole) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F2EFE9] px-4">
+        <div className="w-full max-w-md rounded-[32px] bg-[#FBFBF9] p-8 shadow-[0_20px_60px_rgba(31,37,26,0.15)] animate-fadeIn">
+          <div className="mb-8 flex flex-col items-center">
+            <div className="mb-4 relative h-16 w-16 overflow-hidden rounded-2xl bg-[#414E36] p-2.5 shadow-md">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/main_logo.png"
+                alt="Revera Clinics"
+                style={{ objectFit: "contain", width: "100%", height: "100%" }}
+              />
+            </div>
+            <p className="text-xs uppercase tracking-[0.3em] text-[#5A6A51]/80 font-bold mb-1">Revera Clinics</p>
+            <h2 className="text-2xl font-bold text-[#1F251A]">Admin Access Control</h2>
+          </div>
+
+          <form onSubmit={handleAdminLogin} className="space-y-5" noValidate>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Email Address or Employee ID</label>
+              <input
+                type="text"
+                required
+                placeholder="Enter email or employee ID"
+                value={loginEmail}
+                onChange={(e) => {
+                  setLoginEmail(e.target.value);
+                  if (loginError) setLoginError("");
+                }}
+                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Password</label>
+              <input
+                type="password"
+                required
+                placeholder="Enter password"
+                value={loginPassword}
+                onChange={(e) => {
+                  setLoginPassword(e.target.value);
+                  if (loginError) setLoginError("");
+                }}
+                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              />
+            </div>
+
+            {loginError && (
+              <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-xl p-3">
+                ⚠️ {loginError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full rounded-2xl bg-[#414E36] py-3.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loginLoading ? "Authenticating..." : "Access Dashboard"}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F2EFE9] text-[#1F251A]">
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[280px_1fr]">
@@ -1994,7 +2398,7 @@ export default function AdminPage() {
           </div>
 
           <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
-            {SIDEBAR_ITEMS.map((item) => {
+            {permittedSidebarItems.map((item) => {
               if (item.label === "Settings") {
                 const Icon = item.icon;
                 const active = [
@@ -2006,6 +2410,7 @@ export default function AdminPage() {
                   "Notification Settings",
                   "Queue Settings",
                   "Pages Settings",
+                  "Role Management"
                 ].includes(activeNav);
                 return (
                   <div key={item.label} className="space-y-1">
@@ -2048,6 +2453,7 @@ export default function AdminPage() {
                           { label: "Notification Settings", icon: Bell },
                           { label: "Queue Settings", icon: ListOrdered },
                           { label: "Pages Settings", icon: FileText },
+                          ...(adminRole === 'superadmin' ? [{ label: "Role Management", icon: Shield }] : [])
                         ].map((sub) => {
                           const SubIcon = sub.icon;
                           const subActive = activeNav === sub.label;
@@ -2079,7 +2485,15 @@ export default function AdminPage() {
                 <button
                   key={item.label}
                   type="button"
-                  onClick={() => setActiveNav(item.label)}
+                  onClick={async () => {
+                    if (item.label === "Logout") {
+                      if (supabase) {
+                        await supabase.auth.signOut();
+                      }
+                    } else {
+                      setActiveNav(item.label);
+                    }
+                  }}
                   className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
                     active
                       ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
@@ -2156,6 +2570,18 @@ export default function AdminPage() {
           </div>
 
           <div className="py-8">
+            {!hasAccessToActiveNav ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center gap-4 bg-white rounded-[40px] shadow-[0_30px_80px_rgba(47,61,41,0.07)] p-8">
+                <div className="h-16 w-16 flex items-center justify-center rounded-full bg-red-50 text-red-600 border border-red-100">
+                  <Shield size={32} />
+                </div>
+                <h3 className="text-2xl font-bold text-[#1F251A]">Access Restrained</h3>
+                <p className="text-sm text-[#5A6A51] max-w-md leading-relaxed">
+                  Your administrator account role does not have authorization to view the <strong>"{activeNav}"</strong> module. Please contact the super admin to request access privileges.
+                </p>
+              </div>
+            ) : (
+              <>
 
           {/* ── PROVIDERS VIEW ── */}
           {activeNav === "Providers" && (
@@ -7244,43 +7670,232 @@ export default function AdminPage() {
             </div>
           )}
 
-          {activeNav === "Roles and permissions" && (
-            <div className="space-y-6">
+          {activeNav === "Role Management" && adminRole === "superadmin" && (
+            <div className="space-y-8 animate-fadeIn">
               <div className="mb-6">
-                <h2 className="text-4xl font-semibold text-[#1F251A]">Roles & Access Permissions</h2>
-                <p className="mt-2 text-sm text-[#5A6A51]">Modify administrative authorization settings across system modules.</p>
+                <h2 className="text-4xl font-semibold text-[#1F251A]">Role & Credentials Management</h2>
+                <p className="mt-2 text-sm text-[#5A6A51]">Define system roles, set view permissions, and provision employee credentials.</p>
               </div>
-              <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-                <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                  <table className="w-full min-w-[900px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                        <th className="px-6 py-4 text-left">Module / Feature</th>
-                        <th className="px-6 py-4 text-center">Super Admin</th>
-                        <th className="px-6 py-4 text-center">Doctor</th>
-                        <th className="px-6 py-4 text-center">Nurse</th>
-                        <th className="px-6 py-4 text-center">Receptionist</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
-                      {[
-                        { mod: "Bookings Management", values: [true, true, true, true] },
-                        { mod: "Finances & Payroll", values: [true, false, false, false] },
-                        { mod: "Inventory & POS", values: [true, true, true, true] },
-                        { mod: "SMS Campaigns & Setup", values: [true, false, false, false] },
-                        { mod: "System Core Settings", values: [true, false, false, false] },
-                      ].map((perm, idx) => (
-                        <tr key={idx} className="transition hover:bg-[#F9F9F7]">
-                          <td className="px-6 py-5 font-semibold text-[#1F251A]">{perm.mod}</td>
-                          {perm.values.map((v, vIdx) => (
-                            <td key={vIdx} className="px-6 py-5 text-center">
-                              <input type="checkbox" defaultChecked={v} disabled={vIdx === 0} className="h-4.5 w-4.5 accent-[#414E36] rounded" />
-                            </td>
+
+              {/* Grid for Roles and Employee Accounts */}
+              <div className="grid gap-8 lg:grid-cols-1">
+                {/* 1. Manage Roles Card */}
+                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+                  <h3 className="text-xl font-bold text-[#1F251A] mb-4">Define System Roles</h3>
+                  
+                  {/* Create Role Form */}
+                  <form onSubmit={handleCreateRole} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Role Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. receptionist"
+                          value={newRoleName}
+                          onChange={(e) => {
+                            setNewRoleName(e.target.value);
+                            if (roleCreateError) setRoleCreateError("");
+                          }}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Permissions (Select Screens)</label>
+                        <div className="flex flex-wrap gap-3 mt-2">
+                          {["Bookings", "Customers", "Providers", "Services", "Settings"].map((perm) => (
+                            <label key={perm} className="flex items-center gap-2 text-xs font-semibold text-[#414E36] cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={newRolePermissions.includes(perm)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setNewRolePermissions(prev => [...prev, perm]);
+                                  } else {
+                                    setNewRolePermissions(prev => prev.filter(p => p !== perm));
+                                  }
+                                }}
+                                className="h-4 w-4 accent-[#414E36] rounded"
+                              />
+                              {perm}
+                            </label>
                           ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {roleCreateError && <p className="text-xs text-red-600 font-medium">⚠️ {roleCreateError}</p>}
+                    {roleCreateSuccess && <p className="text-xs text-green-700 font-medium">✅ {roleCreateSuccess}</p>}
+
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                    >
+                      Save Role
+                    </button>
+                  </form>
+
+                  {/* Roles Table */}
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                          <th className="px-6 py-4 text-left">Role Name</th>
+                          <th className="px-6 py-4 text-left">Allowed Modules</th>
+                          <th className="px-6 py-4 text-center">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
+                        {loadingRolesAndEmployees ? (
+                          <tr>
+                            <td colSpan={3} className="px-6 py-5 text-center text-xs text-gray-400">Loading roles...</td>
+                          </tr>
+                        ) : rolesList.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="px-6 py-5 text-center text-xs text-gray-400">No roles configured.</td>
+                          </tr>
+                        ) : rolesList.map((r) => (
+                          <tr key={r.id} className="transition hover:bg-[#F9F9F7]">
+                            <td className="px-6 py-4 font-bold text-[#1F251A] capitalize">{r.name}</td>
+                            <td className="px-6 py-4 text-xs font-semibold text-[#5A6A51]">
+                              <div className="flex flex-wrap gap-1.5">
+                                {r.permissions.map((p: string) => (
+                                  <span key={p} className="rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-[#414E36] border border-[#414E36]/10">{p}</span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              {r.name !== 'superadmin' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRole(r.name)}
+                                  className="text-red-600 hover:text-red-800 transition"
+                                  title="Delete Role"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              ) : <span className="text-xs text-gray-400 font-semibold italic">System Locked</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 2. Manage Employees / Credentials Provisioning */}
+                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+                  <h3 className="text-xl font-bold text-[#1F251A] mb-4">Provision Employee Credentials</h3>
+                  
+                  {/* Create Employee Form */}
+                  <form onSubmit={handleCreateEmployee} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Employee ID</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. 12345678"
+                          value={newEmployeeId}
+                          onChange={(e) => {
+                            setNewEmployeeId(e.target.value.replace(/\D/g, ""));
+                            if (employeeCreateError) setEmployeeCreateError("");
+                          }}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Assign Role</label>
+                        <select
+                          required
+                          value={newEmployeeRole}
+                          onChange={(e) => {
+                            setNewEmployeeRole(e.target.value);
+                            if (employeeCreateError) setEmployeeCreateError("");
+                          }}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                        >
+                          <option value="">Select Role...</option>
+                          {rolesList.map(r => (
+                            <option key={r.id} value={r.name} className="capitalize">{r.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Password</label>
+                        <input
+                          type="password"
+                          required
+                          placeholder="Enter account password"
+                          value={newEmployeePassword}
+                          onChange={(e) => {
+                            setNewEmployeePassword(e.target.value);
+                            if (employeeCreateError) setEmployeeCreateError("");
+                          }}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
+
+                    {newEmployeeId && newEmployeeRole && (
+                      <p className="text-xs text-[#5A6A51] font-semibold italic">
+                        Generated Email Address: <span className="text-[#414E36] font-bold underline">{newEmployeeId}@{newEmployeeRole}.com</span>
+                      </p>
+                    )}
+
+                    {employeeCreateError && <p className="text-xs text-red-600 font-medium">⚠️ {employeeCreateError}</p>}
+                    {employeeCreateSuccess && <p className="text-xs text-green-700 font-medium">✅ {employeeCreateSuccess}</p>}
+
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                    >
+                      Create Account
+                    </button>
+                  </form>
+
+                  {/* Employees Table */}
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                          <th className="px-6 py-4 text-left">Employee ID</th>
+                          <th className="px-6 py-4 text-left">Assigned Role</th>
+                          <th className="px-6 py-4 text-left">Login Email / Username</th>
+                          <th className="px-6 py-4 text-center">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
+                        {loadingRolesAndEmployees ? (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-5 text-center text-xs text-gray-400">Loading accounts...</td>
+                          </tr>
+                        ) : employeesList.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-5 text-center text-xs text-gray-400">No employee accounts provisioned.</td>
+                          </tr>
+                        ) : employeesList.map((emp) => (
+                          <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
+                            <td className="px-6 py-4 font-mono font-bold text-[#1F251A]">{emp.employee_id}</td>
+                            <td className="px-6 py-4 text-xs font-semibold capitalize text-[#414E36]">{emp.role_name}</td>
+                            <td className="px-6 py-4 font-mono text-[#5A6A51]">{emp.email}</td>
+                            <td className="px-6 py-4 text-center">
+                              {emp.employee_id !== 'superadmin' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteEmployee(emp.id)}
+                                  className="text-red-600 hover:text-red-800 transition"
+                                  title="Revoke Credentials"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              ) : <span className="text-xs text-gray-400 font-semibold italic">System Owner</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -8642,6 +9257,8 @@ export default function AdminPage() {
               ))}
             </div>
           </section>
+          </>
+          )}
           </>
           )}
           </div>
