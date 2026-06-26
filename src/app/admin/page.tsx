@@ -1415,19 +1415,45 @@ export default function AdminPage() {
 
   // Derive unique customers from database or all reservations as fallback
   const customers = useMemo<Customer[]>(() => {
+    const now = new Date();
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
     if (dbCustomers && dbCustomers.length > 0) {
-      return dbCustomers.map((c) => ({
-        ...c,
-        id: c.id,
-        email: c.email || "",
-        name: c.name,
-        phone: c.mobile || "",
-        createdAt: c.registration_date || c.created_at || new Date().toISOString(),
-        bookings: c.number_of_bookings || 0,
-        spent: Number(c.spent_amount || 0),
-        outstanding: Number(c.outstanding || 0),
-        wallet: 0,
-      }));
+      return dbCustomers.map((c) => {
+        // Find if this customer has a booking in the last 2 weeks
+        const customerReservations = allReservations.filter((r) => 
+          (r.phone && (r.phone === c.mobile || r.phone === c.phone)) ||
+          (r.customerId && r.customerId === c.id)
+        );
+
+        const hasRecentBooking = customerReservations.some((r) => {
+          if (!r.date) return false;
+          const bookingDate = new Date(String(r.date).slice(0, 10) + 'T00:00:00');
+          return bookingDate >= twoWeeksAgo;
+        });
+
+        // Determine active status:
+        // If explicitly set to inactive in DB, then it's inactive.
+        // Otherwise, active only if they have a booking in the last 2 weeks OR if they registered in the last 2 weeks.
+        const regDateStr = c.registration_date || c.created_at || now.toISOString();
+        const regDate = new Date(regDateStr);
+        const registeredRecently = regDate >= twoWeeksAgo;
+        const isActive = c.active !== false && (hasRecentBooking || registeredRecently);
+
+        return {
+          ...c,
+          id: c.id,
+          email: c.email || "",
+          name: c.name,
+          phone: c.mobile || "",
+          createdAt: regDateStr,
+          bookings: c.number_of_bookings || 0,
+          spent: Number(c.spent_amount || 0),
+          outstanding: Number(c.outstanding || 0),
+          wallet: 0,
+          active: isActive,
+        };
+      });
     }
     const map = new globalThis.Map<string, Customer>();
     allReservations.forEach((r) => {
@@ -1446,7 +1472,29 @@ export default function AdminPage() {
       }
       map.get(emailKey)!.bookings += 1;
     });
-    return Array.from(map.values());
+
+    const fallbackList = Array.from(map.values());
+    return fallbackList.map((c) => {
+      const customerReservations = allReservations.filter((r) => 
+        (r.phone && r.phone === c.phone) ||
+        (r.email && r.email === c.email)
+      );
+
+      const hasRecentBooking = customerReservations.some((r) => {
+        if (!r.date) return false;
+        const bookingDate = new Date(String(r.date).slice(0, 10) + 'T00:00:00');
+        return bookingDate >= twoWeeksAgo;
+      });
+
+      const regDate = new Date(c.createdAt);
+      const registeredRecently = regDate >= twoWeeksAgo;
+      const isActive = hasRecentBooking || registeredRecently;
+
+      return {
+        ...c,
+        active: isActive,
+      };
+    });
   }, [dbCustomers, allReservations]);
 
   const todaysBookingsCount = useMemo(() => {
