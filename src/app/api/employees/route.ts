@@ -19,18 +19,26 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { employeeId, roleName, password } = body;
+    const { email, name, roleName } = body;
 
-    if (!employeeId || !roleName || !password) {
-      return NextResponse.json({ error: 'Employee ID, Role, and Password are required' }, { status: 400 });
+    // ── Validate inputs ──────────────────────────────────────────────────────
+    if (!email || !name || !roleName) {
+      return NextResponse.json(
+        { error: 'Full name, email address, and role are all required.' },
+        { status: 400 }
+      );
     }
 
-    const cleanedId = employeeId.trim();
-    if (!cleanedId) {
-      return NextResponse.json({ error: 'Invalid Employee ID' }, { status: 400 });
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName  = name.trim();
+
+    // Basic email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
     }
 
-    // 1. Verify role exists in the database
+    // ── Verify role exists ───────────────────────────────────────────────────
     const { data: roleData, error: roleError } = await supabaseServer
       .from('roles')
       .select('name')
@@ -39,54 +47,60 @@ export async function POST(req: Request) {
 
     if (roleError) throw roleError;
     if (!roleData) {
-      return NextResponse.json({ error: `Role '${roleName}' does not exist. Please create it first.` }, { status: 400 });
+      return NextResponse.json(
+        { error: `Role '${roleName}' does not exist. Please create it first.` },
+        { status: 400 }
+      );
     }
 
-    // 2. Generate email and check uniqueness locally
-    const email = `${cleanedId}@${roleName}.com`.toLowerCase();
-
-    // Check if employee ID already exists
+    // ── Prevent duplicate email ──────────────────────────────────────────────
     const { data: existingEmp, error: existError } = await supabaseServer
       .from('employee_accounts')
       .select('id')
-      .eq('employee_id', cleanedId)
+      .eq('email', cleanEmail)
       .maybeSingle();
 
     if (existError) throw existError;
     if (existingEmp) {
-      return NextResponse.json({ error: `An account for Employee ID '${cleanedId}' already exists.` }, { status: 400 });
+      return NextResponse.json(
+        { error: `An account with the email '${cleanEmail}' already exists.` },
+        { status: 400 }
+      );
     }
 
-    // 3. Create auth user in Supabase using the admin API
-    const { data: authData, error: authError } = await supabaseServer.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
+    // ── Send Supabase invitation email ───────────────────────────────────────
+    // The invited user receives an official link to set their own password.
+    const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(
+      cleanEmail,
+      {
+        data: {
+          full_name: cleanName,
+          role: roleName,
+        },
+      }
+    );
 
-    if (authError) {
-      throw authError;
-    }
+    if (inviteError) throw inviteError;
 
-    const authUserId = authData.user?.id;
+    const authUserId = inviteData.user?.id;
     if (!authUserId) {
-      throw new Error('Failed to retrieve user ID from auth creation');
+      throw new Error('Failed to retrieve user ID from invitation.');
     }
 
-    // 4. Create record in employee_accounts
+    // ── Insert record into employee_accounts ─────────────────────────────────
     const { data: newEmployee, error: insertError } = await supabaseServer
       .from('employee_accounts')
       .insert({
         auth_user_id: authUserId,
-        employee_id: cleanedId,
+        email: cleanEmail,
+        name: cleanName,
         role_name: roleName,
-        email,
       })
       .select()
       .single();
 
     if (insertError) {
-      // Rollback auth user creation if db insert fails
+      // Rollback: delete the auth user so they aren't orphaned
       await supabaseServer.auth.admin.deleteUser(authUserId);
       throw insertError;
     }

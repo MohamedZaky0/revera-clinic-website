@@ -369,9 +369,9 @@ export default function AdminPage() {
   const [loadingRolesAndEmployees, setLoadingRolesAndEmployees] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>([]);
-  const [newEmployeeId, setNewEmployeeId] = useState("");
+  const [newEmployeeEmail, setNewEmployeeEmail] = useState("");
+  const [newEmployeeName, setNewEmployeeName] = useState("");
   const [newEmployeeRole, setNewEmployeeRole] = useState("");
-  const [newEmployeePassword, setNewEmployeePassword] = useState("");
   const [roleCreateError, setRoleCreateError] = useState("");
   const [roleCreateSuccess, setRoleCreateSuccess] = useState("");
   const [employeeCreateError, setEmployeeCreateError] = useState("");
@@ -920,7 +920,12 @@ export default function AdminPage() {
 
   async function handleCreateEmployee(e: React.FormEvent) {
     e.preventDefault();
-    if (!newEmployeeId.trim() || !newEmployeeRole || !newEmployeePassword) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!newEmployeeName.trim() || !newEmployeeEmail.trim() || !newEmployeeRole) return;
+    if (!emailRegex.test(newEmployeeEmail.trim())) {
+      setEmployeeCreateError("Please enter a valid email address.");
+      return;
+    }
     setEmployeeCreateError("");
     setEmployeeCreateSuccess("");
 
@@ -929,22 +934,22 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employeeId: newEmployeeId,
+          email: newEmployeeEmail.trim().toLowerCase(),
+          name: newEmployeeName.trim(),
           roleName: newEmployeeRole,
-          password: newEmployeePassword
         })
       });
 
       if (res.ok) {
-        setNewEmployeeId("");
+        setNewEmployeeEmail("");
+        setNewEmployeeName("");
         setNewEmployeeRole("");
-        setNewEmployeePassword("");
-        setEmployeeCreateSuccess("Employee account provisioned successfully!");
+        setEmployeeCreateSuccess(`Invitation sent to ${newEmployeeEmail.trim()}! They will receive an email to set their password.`);
         fetchRolesAndEmployees();
-        setTimeout(() => setEmployeeCreateSuccess(""), 3000);
+        setTimeout(() => setEmployeeCreateSuccess(""), 6000);
       } else {
         const data = await res.json();
-        setEmployeeCreateError(data.error || "Failed to create account.");
+        setEmployeeCreateError(data.error || "Failed to send invitation.");
       }
     } catch (err: any) {
       setEmployeeCreateError(err.message || "Network error.");
@@ -9117,18 +9122,32 @@ export default function AdminPage() {
                 <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
                   <h3 className="text-xl font-bold text-[#1F251A] mb-4">Provision Employee Credentials</h3>
                   
-                  {/* Create Employee Form */}
+                  {/* Create Employee Form — OAuth Invite Flow */}
                   <form onSubmit={handleCreateEmployee} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
                     <div className="grid gap-4 sm:grid-cols-3">
                       <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Employee ID</label>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Full Name</label>
                         <input
                           type="text"
                           required
-                          placeholder="e.g. 12345678"
-                          value={newEmployeeId}
+                          placeholder="e.g. Sara El Gamel"
+                          value={newEmployeeName}
                           onChange={(e) => {
-                            setNewEmployeeId(e.target.value.replace(/\D/g, ""));
+                            setNewEmployeeName(e.target.value);
+                            if (employeeCreateError) setEmployeeCreateError("");
+                          }}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Work Email Address</label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="e.g. sara@gmail.com"
+                          value={newEmployeeEmail}
+                          onChange={(e) => {
+                            setNewEmployeeEmail(e.target.value);
                             if (employeeCreateError) setEmployeeCreateError("");
                           }}
                           className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
@@ -9151,36 +9170,25 @@ export default function AdminPage() {
                           ))}
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Password</label>
-                        <input
-                          type="password"
-                          required
-                          placeholder="Enter account password"
-                          value={newEmployeePassword}
-                          onChange={(e) => {
-                            setNewEmployeePassword(e.target.value);
-                            if (employeeCreateError) setEmployeeCreateError("");
-                          }}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
                     </div>
 
-                    {newEmployeeId && newEmployeeRole && (
-                      <p className="text-xs text-[#5A6A51] font-semibold italic">
-                        Generated Email Address: <span className="text-[#414E36] font-bold underline">{newEmployeeId}@{newEmployeeRole}.com</span>
+                    {/* Invite info banner */}
+                    <div className="flex items-start gap-2.5 rounded-2xl bg-[#EDF5E8] border border-[#414E36]/15 px-4 py-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mt-0.5 shrink-0 text-[#414E36]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      <p className="text-xs text-[#414E36] font-medium leading-relaxed">
+                        An official <strong>invitation email</strong> will be sent to the employee&apos;s address. They will set their own password via the link — no password is stored by the admin.
                       </p>
-                    )}
+                    </div>
 
                     {employeeCreateError && <p className="text-xs text-red-600 font-medium">⚠️ {employeeCreateError}</p>}
                     {employeeCreateSuccess && <p className="text-xs text-green-700 font-medium">✅ {employeeCreateSuccess}</p>}
 
                     <button
                       type="submit"
-                      className="rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                      className="inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
                     >
-                      Create Account
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                      Send Invitation
                     </button>
                   </form>
 
@@ -9189,33 +9197,42 @@ export default function AdminPage() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                          <th className="px-6 py-4 text-left">Employee ID</th>
+                          <th className="px-6 py-4 text-left">Full Name</th>
                           <th className="px-6 py-4 text-left">Assigned Role</th>
-                          <th className="px-6 py-4 text-left">Login Email / Username</th>
+                          <th className="px-6 py-4 text-left">Login Email</th>
+                          <th className="px-6 py-4 text-center">Status</th>
                           <th className="px-6 py-4 text-center">Actions</th>
                         </tr>
+
                       </thead>
                       <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
                         {loadingRolesAndEmployees ? (
                           <tr>
-                            <td colSpan={4} className="px-6 py-5 text-center text-xs text-gray-400">Loading accounts...</td>
+                            <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">Loading accounts...</td>
                           </tr>
                         ) : employeesList.length === 0 ? (
                           <tr>
-                            <td colSpan={4} className="px-6 py-5 text-center text-xs text-gray-400">No employee accounts provisioned.</td>
+                            <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">No employee accounts provisioned yet. Use the form above to send an invitation.</td>
                           </tr>
                         ) : employeesList.map((emp) => (
                           <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
-                            <td className="px-6 py-4 font-mono font-bold text-[#1F251A]">{emp.employee_id}</td>
+                            <td className="px-6 py-4 font-semibold text-[#1F251A]">{emp.name || emp.employee_id || '—'}</td>
                             <td className="px-6 py-4 text-xs font-semibold capitalize text-[#414E36]">{emp.role_name}</td>
-                            <td className="px-6 py-4 font-mono text-[#5A6A51]">{emp.email}</td>
+                            <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">{emp.email}</td>
+                            <td className="px-6 py-4 text-center">
+                              {emp.email_confirmed_at ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">✓ Active</span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">⏳ Invite Pending</span>
+                              )}
+                            </td>
                             <td className="px-6 py-4 text-center">
                               {emp.employee_id !== 'superadmin' ? (
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteEmployee(emp.id)}
                                   className="text-red-600 hover:text-red-800 transition"
-                                  title="Revoke Credentials"
+                                  title="Revoke Access"
                                 >
                                   <Trash2 size={16} />
                                 </button>
