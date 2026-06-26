@@ -1166,6 +1166,23 @@ export default function AdminPage() {
   const [providerFormRating, setProviderFormRating] = useState(5);
   const [providerFormMore, setProviderFormMore] = useState(0);
   const [providerFormSelectedServices, setProviderFormSelectedServices] = useState<string[]>([]);
+  const [providerFormImage, setProviderFormImage] = useState("");
+  const [providerFormPhone, setProviderFormPhone] = useState("");
+  const [providerFormGender, setProviderFormGender] = useState<"Male" | "Female" | "">("");
+  const [providerFormAge, setProviderFormAge] = useState<string>("");
+  const [providerFormSpecialty, setProviderFormSpecialty] = useState("");
+  const [providerFormNationalId, setProviderFormNationalId] = useState("");
+  const [providerFormBranchId, setProviderFormBranchId] = useState("");
+  const [providerFormStartDate, setProviderFormStartDate] = useState("");
+  const [providerFormWorkingDaysHours, setProviderFormWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string }>>({
+    Sunday: { isOpen: false, start: "10:00", end: "20:00" },
+    Monday: { isOpen: false, start: "10:00", end: "20:00" },
+    Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
+    Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
+    Thursday: { isOpen: false, start: "10:00", end: "20:00" },
+    Friday: { isOpen: false, start: "10:00", end: "20:00" },
+    Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+  });
   const [savingProvider, setSavingProvider] = useState(false);
 
   const [loadingPageSettings, setLoadingPageSettings] = useState(false);
@@ -1457,6 +1474,23 @@ export default function AdminPage() {
     setProviderFormRating(5);
     setProviderFormMore(0);
     setProviderFormSelectedServices([]);
+    setProviderFormImage("");
+    setProviderFormPhone("");
+    setProviderFormGender("");
+    setProviderFormAge("");
+    setProviderFormSpecialty("");
+    setProviderFormNationalId("");
+    setProviderFormBranchId(branches.length > 0 ? branches[0].id : "");
+    setProviderFormStartDate("");
+    setProviderFormWorkingDaysHours({
+      Sunday: { isOpen: false, start: "10:00", end: "20:00" },
+      Monday: { isOpen: false, start: "10:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "10:00", end: "20:00" },
+      Friday: { isOpen: false, start: "10:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+    });
     setShowProviderModal(true);
   }
 
@@ -1467,6 +1501,23 @@ export default function AdminPage() {
     setProviderFormRating(provider.rating || 5);
     setProviderFormMore(provider.more || 0);
     setProviderFormSelectedServices(provider.services || []);
+    setProviderFormImage(provider.image || "");
+    setProviderFormPhone(provider.phone || "");
+    setProviderFormGender(provider.gender || "");
+    setProviderFormAge(provider.age ? String(provider.age) : "");
+    setProviderFormSpecialty(provider.specialty || "");
+    setProviderFormNationalId(provider.nationalId || "");
+    setProviderFormBranchId(provider.branchId || "");
+    setProviderFormStartDate(provider.startDate || "");
+    setProviderFormWorkingDaysHours(provider.workingDaysHours || {
+      Sunday: { isOpen: false, start: "10:00", end: "20:00" },
+      Monday: { isOpen: false, start: "10:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "10:00", end: "20:00" },
+      Friday: { isOpen: false, start: "10:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+    });
     setShowProviderModal(true);
   }
 
@@ -1482,7 +1533,16 @@ export default function AdminPage() {
       name: providerFormName.trim(),
       services: providerFormSelectedServices,
       rating: Number(providerFormRating),
-      more: Math.max(0, providerFormSelectedServices.length - 2)
+      more: Math.max(0, providerFormSelectedServices.length - 2),
+      image: providerFormImage || null,
+      phone: providerFormPhone || null,
+      gender: providerFormGender || null,
+      age: providerFormAge ? Number(providerFormAge) : null,
+      specialty: providerFormSpecialty || null,
+      nationalId: providerFormNationalId || null,
+      workingDaysHours: providerFormWorkingDaysHours,
+      branchId: providerFormBranchId || null,
+      startDate: providerFormStartDate || null
     };
 
     const isEdit = providerModalMode === "edit";
@@ -10403,35 +10463,141 @@ export default function AdminPage() {
             </div>
 
             {/* Scrollable Form Content */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Dr. Jane Doe"
-                  value={providerFormName}
-                  onChange={(e) => setProviderFormName(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                />
+            <div className="flex-1 overflow-y-auto space-y-5 pr-1">
+              
+              {/* Row 1: Name & Specialty */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dr. Jane Doe"
+                    value={providerFormName}
+                    onChange={(e) => setProviderFormName(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Specialty</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dermatologist"
+                    value={providerFormSpecialty}
+                    onChange={(e) => setProviderFormSpecialty(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Rating (1-5)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="5"
-                  step="0.1"
-                  placeholder="e.g. 5"
-                  value={providerFormRating}
-                  onChange={(e) => setProviderFormRating(Number(e.target.value))}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                />
+              {/* Row 2: Phone & National ID */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 01012345678"
+                    value={providerFormPhone}
+                    onChange={(e) => setProviderFormPhone(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">National ID</label>
+                  <input
+                    type="text"
+                    placeholder="14-digit National ID"
+                    value={providerFormNationalId}
+                    onChange={(e) => setProviderFormNationalId(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
               </div>
 
+              {/* Row 3: Gender & Age */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Gender</label>
+                  <select
+                    value={providerFormGender}
+                    onChange={(e) => setProviderFormGender(e.target.value as "Male" | "Female" | "")}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Age</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 35"
+                    value={providerFormAge}
+                    onChange={(e) => setProviderFormAge(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: Branch & Start Date */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branch</label>
+                  <select
+                    value={providerFormBranchId}
+                    onChange={(e) => setProviderFormBranchId(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  >
+                    <option value="">Default/All Branches</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name_en} ({b.name_ar})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
+                  <input
+                    type="date"
+                    value={providerFormStartDate}
+                    onChange={(e) => setProviderFormStartDate(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              {/* Row 5: Rating & Provider Image URL/Base64 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-1">
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Rating (1-5)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    step="0.1"
+                    placeholder="e.g. 5"
+                    value={providerFormRating}
+                    onChange={(e) => setProviderFormRating(Number(e.target.value))}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Image URL or Base64</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. /images/doctors/dr-doe.jpg"
+                    value={providerFormImage}
+                    onChange={(e) => setProviderFormImage(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              {/* Services Offered */}
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Select Services Offered</label>
-                <div className="max-h-[30vh] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2">
+                <div className="max-h-[22vh] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2">
                   {allServicesList.map((svc) => {
                     const isChecked = providerFormSelectedServices.includes(svc.en);
                     return (
@@ -10457,6 +10623,65 @@ export default function AdminPage() {
                   })}
                 </div>
               </div>
+
+              {/* Weekly Working Schedule */}
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2.5">Weekly Working Days & Hours</label>
+                <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                  {Object.keys(providerFormWorkingDaysHours).map((day) => {
+                    const sched = providerFormWorkingDaysHours[day];
+                    return (
+                      <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
+                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={sched.isOpen}
+                            onChange={(e) => {
+                              setProviderFormWorkingDaysHours({
+                                ...providerFormWorkingDaysHours,
+                                [day]: { ...sched, isOpen: e.target.checked }
+                              });
+                            }}
+                            className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                          />
+                          <span className="text-xs font-bold text-[#414E36] w-24">{day}</span>
+                        </label>
+
+                        {sched.isOpen ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="time"
+                              value={sched.start}
+                              onChange={(e) => {
+                                setProviderFormWorkingDaysHours({
+                                  ...providerFormWorkingDaysHours,
+                                  [day]: { ...sched, start: e.target.value }
+                                });
+                              }}
+                              className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                            />
+                            <span className="text-xs text-[#5A6A51]">to</span>
+                            <input
+                              type="time"
+                              value={sched.end}
+                              onChange={(e) => {
+                                setProviderFormWorkingDaysHours({
+                                  ...providerFormWorkingDaysHours,
+                                  [day]: { ...sched, end: e.target.value }
+                                });
+                              }}
+                              className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">Off / Closed</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
             </div>
 
             {/* Footer Actions */}
