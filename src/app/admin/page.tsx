@@ -1192,6 +1192,12 @@ export default function AdminPage() {
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [savingAttendanceId, setSavingAttendanceId] = useState<string | null>(null);
 
+  const [showProviderFilterPanel, setShowProviderFilterPanel] = useState(false);
+  const [providerFilterBranchId, setProviderFilterBranchId] = useState("All");
+  const [providerFilterSpecialty, setProviderFilterSpecialty] = useState("All");
+  const [providerFilterGender, setProviderFilterGender] = useState("All");
+  const [providerSearchQuery, setProviderSearchQuery] = useState("");
+
   const [loadingPageSettings, setLoadingPageSettings] = useState(false);
   const [savingPageSettings, setSavingPageSettings] = useState(false);
   // ── Branches state ──
@@ -2573,6 +2579,20 @@ export default function AdminPage() {
       </div>
     );
   }
+  const uniqueSpecialties = Array.from(new Set(providers.map((p) => p.specialty).filter(Boolean)));
+  const filteredProviders = providers.filter((p) => {
+    if (providerFilterBranchId !== "All" && p.branchId !== providerFilterBranchId) return false;
+    if (providerFilterSpecialty !== "All" && p.specialty !== providerFilterSpecialty) return false;
+    if (providerFilterGender !== "All" && p.gender !== providerFilterGender) return false;
+    if (providerSearchQuery.trim()) {
+      const q = providerSearchQuery.toLowerCase();
+      const nameMatch = p.name?.toLowerCase().includes(q);
+      const specMatch = p.specialty?.toLowerCase().includes(q);
+      const phoneMatch = p.phone?.toLowerCase().includes(q);
+      if (!nameMatch && !specMatch && !phoneMatch) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-[#F2EFE9] text-[#1F251A]">
@@ -2834,7 +2854,7 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    {providerTab === "Attendance" ? (
+                    {providerTab === "Attendance" && (
                       <div className="flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-2.5 shadow-sm">
                         <label className="text-xs uppercase font-bold text-[#5A6A51] select-none">Date:</label>
                         <input
@@ -2844,21 +2864,109 @@ export default function AdminPage() {
                           className="bg-transparent text-sm text-[#1F251A] outline-none font-semibold cursor-pointer"
                         />
                       </div>
-                    ) : (
-                      <>
-                        <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
-                          <Filter size={16} /> Filter
-                        </button>
-                        <button
-                          onClick={openAddProviderModal}
-                          className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                        >
-                          <Plus size={16} /> Add
-                        </button>
-                      </>
+                    )}
+                    
+                    <button
+                      onClick={() => setShowProviderFilterPanel(prev => !prev)}
+                      className={`inline-flex items-center gap-2 rounded-3xl border px-4 py-3 text-sm font-semibold transition ${
+                        showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()
+                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                          : "border-[#E6E9EB] bg-white text-[#414E36] hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]"
+                      }`}
+                    >
+                      <Filter size={16} /> Filter
+                      {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()) && (
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#414E36] text-[10px] font-bold text-white">!</span>
+                      )}
+                    </button>
+
+                    {providerTab === "Providers" && (
+                      <button
+                        onClick={openAddProviderModal}
+                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                      >
+                        <Plus size={16} /> Add
+                      </button>
                     )}
                   </div>
                 </div>
+
+                {/* Dynamic Filters Drawer */}
+                {showProviderFilterPanel && (
+                  <div className="mb-6 grid grid-cols-1 gap-4 rounded-[24px] border border-[#E6E9EB] bg-[#F7F7F9] p-5 md:grid-cols-4 items-end shadow-sm">
+                    {/* Search Input */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Search Doctor</label>
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                        <input
+                          type="text"
+                          value={providerSearchQuery}
+                          onChange={(e) => setProviderSearchQuery(e.target.value)}
+                          placeholder="Search name, specialty..."
+                          className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-1 focus:ring-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Branch Dropdown */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Branch</label>
+                      <select
+                        value={providerFilterBranchId}
+                        onChange={(e) => setProviderFilterBranchId(e.target.value)}
+                        className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                      >
+                        <option value="All">All Branches</option>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>{b.name_en}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Specialty Dropdown */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Specialty</label>
+                      <select
+                        value={providerFilterSpecialty}
+                        onChange={(e) => setProviderFilterSpecialty(e.target.value)}
+                        className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                      >
+                        <option value="All">All Specialties</option>
+                        {uniqueSpecialties.map((spec) => (
+                          <option key={spec} value={spec}>{spec}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Gender and Clear Options */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Gender</label>
+                        <select
+                          value={providerFilterGender}
+                          onChange={(e) => setProviderFilterGender(e.target.value)}
+                          className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                        >
+                          <option value="All">All</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setProviderFilterBranchId("All");
+                          setProviderFilterSpecialty("All");
+                          setProviderFilterGender("All");
+                          setProviderSearchQuery("");
+                        }}
+                        className="h-[42px] w-full rounded-2xl border border-red-200 bg-red-50/50 text-xs font-bold text-red-600 hover:bg-red-100/70 transition"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {providerTab === "Providers" ? (
                   <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
@@ -2869,51 +2977,55 @@ export default function AdminPage() {
                       <span>Rating</span>
                     </div>
                     <div className="divide-y divide-[#E6E9EB]">
-                      {providers.map((provider) => (
-                        <div key={provider.id || provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
-                          <span className="font-semibold text-[#1F251A]">{provider.name}</span>
-                          <span>{provider.bookings}</span>
-                          <div className="flex flex-wrap items-center gap-2">
-                            {provider.services.slice(0, 2).map((service: string) => (
-                              <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
-                                {service}
-                              </span>
-                            ))}
-                            {provider.services.length > 2 && (
-                              <span
-                                className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36] cursor-help"
-                                title={provider.services.slice(2).join(", ")}
-                              >
-                                +{provider.services.length - 2} More
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="inline-flex items-center gap-2 text-[#5A6A51]">
-                              <Star size={16} className="text-[#C4AE7C]" />
-                              {provider.rating}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              {provider.id && (
-                                <button
-                                  onClick={() => handleDeleteProvider(provider.id)}
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
-                                  title="Delete Provider"
+                      {filteredProviders.length === 0 ? (
+                        <div className="text-center py-16 text-gray-400 italic">No doctors/providers matching filters.</div>
+                      ) : (
+                        filteredProviders.map((provider) => (
+                          <div key={provider.id || provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
+                            <span className="font-semibold text-[#1F251A]">{provider.name}</span>
+                            <span>{provider.bookings}</span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {provider.services.slice(0, 2).map((service: string) => (
+                                <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
+                                  {service}
+                                </span>
+                              ))}
+                              {provider.services.length > 2 && (
+                                <span
+                                  className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36] cursor-help"
+                                  title={provider.services.slice(2).join(", ")}
                                 >
-                                  <Trash2 size={15} />
-                                </button>
+                                  +{provider.services.length - 2} More
+                                </span>
                               )}
-                              <button
-                                onClick={() => openEditProviderModal(provider)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
-                                title="Edit Provider"
-                              >
-                                <Pencil size={14} />
-                              </button>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="inline-flex items-center gap-2 text-[#5A6A51]">
+                                <Star size={16} className="text-[#C4AE7C]" />
+                                {provider.rating}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                {provider.id && (
+                                  <button
+                                    onClick={() => handleDeleteProvider(provider.id)}
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
+                                    title="Delete Provider"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => openEditProviderModal(provider)}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
+                                  title="Edit Provider"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -2930,10 +3042,10 @@ export default function AdminPage() {
                           <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#C4AE7C] border-t-transparent mr-2.5"></div>
                           <span className="font-medium">Loading attendance data...</span>
                         </div>
-                      ) : providers.length === 0 ? (
-                        <div className="text-center py-16 text-gray-400 italic">No doctors/providers registered in system.</div>
+                      ) : filteredProviders.length === 0 ? (
+                        <div className="text-center py-16 text-gray-400 italic">No doctors/providers matching filters.</div>
                       ) : (
-                        providers.map((provider) => {
+                        filteredProviders.map((provider) => {
                           const record = attendanceRecords.find((r) => r.provider_id === provider.id);
                           const currentStatus = record?.status || "Unmarked";
                           const branchName = branches.find((b) => b.id === provider.branchId)?.name_en || "Default/All";
