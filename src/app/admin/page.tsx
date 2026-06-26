@@ -93,6 +93,28 @@ type Req = {
   amountLeft?: number | null;
 };
 
+function getStatusBadgeClass(status: string): string {
+  const s = status?.toLowerCase() || 'pending';
+  switch (s) {
+    case 'approved':
+      return 'bg-green-50 text-green-700 border border-green-200/50';
+    case 'confirmed':
+      return 'bg-sky-50 text-sky-700 border border-sky-200/50';
+    case 'started':
+      return 'bg-indigo-50 text-indigo-700 border border-indigo-200/50';
+    case 'completed':
+      return 'bg-emerald-50 text-emerald-700 border border-emerald-200/50';
+    case 'cancelled':
+    case 'canceled':
+      return 'bg-gray-50 text-gray-500 border border-gray-200/50';
+    case 'rejected':
+      return 'bg-red-50 text-red-700 border border-red-200/50';
+    case 'pending':
+    default:
+      return 'bg-amber-50 text-amber-700 border border-amber-200/50';
+  }
+}
+
 const SLOTS = ALL_15MIN_SLOTS;
 
 const SIDEBAR_ITEMS = [
@@ -647,7 +669,7 @@ export default function AdminPage() {
     const monthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}`;
 
     filteredReservations.forEach((reservation) => {
-      if (!reservation.date || reservation.status !== 'approved') return;
+      if (!reservation.date || !['approved', 'confirmed', 'started', 'completed'].includes(reservation.status)) return;
       // Slice directly — avoids UTC conversion that shifts dates for non-UTC timezones
       const normalizedDate = String(reservation.date).slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) return;
@@ -1436,7 +1458,7 @@ export default function AdminPage() {
     };
     const todayStr = getLocalDateString(new Date());
     return allReservations.filter(
-      r => String(r.date).slice(0, 10) === todayStr && r.status === 'approved'
+      r => String(r.date).slice(0, 10) === todayStr && ['approved', 'confirmed', 'started', 'completed'].includes(r.status)
     ).length;
   }, [allReservations]);
 
@@ -1449,12 +1471,12 @@ export default function AdminPage() {
     };
     const todayStr = getLocalDateString(new Date());
     return allReservations.filter(
-      r => r.status === 'approved' && String(r.date).slice(0, 10) >= todayStr
+      r => ['approved', 'confirmed', 'started', 'completed'].includes(r.status) && String(r.date).slice(0, 10) >= todayStr
     ).length;
   }, [allReservations]);
 
   const dynamicOverviewCards = useMemo(() => {
-    const activeBookings = allReservations.filter((r) => r.status === "approved");
+    const activeBookings = allReservations.filter((r) => ['approved', 'confirmed', 'started', 'completed'].includes(r.status));
     const activeBookingsCount = activeBookings.length;
     const newCustomersCount = customers.length;
     const openRequestsCount = requests.length;
@@ -10121,7 +10143,7 @@ export default function AdminPage() {
                           onClick={() => {
                             if (bookingCount > 0) {
                               const bookingsForDay = filteredReservations.filter(
-                                (r) => String(r.date).slice(0, 10) === dateKey && r.status === 'approved'
+                                (r) => String(r.date).slice(0, 10) === dateKey && ['approved', 'confirmed', 'started', 'completed'].includes(r.status)
                               );
                               if (bookingsForDay.length > 0) {
                                 setViewingBooking(bookingsForDay[0]);
@@ -10161,7 +10183,7 @@ export default function AdminPage() {
                 <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">All bookings — list</h3>
               </div>
               <span className="rounded-full bg-[#EDF1EC] px-4 py-2 text-sm font-semibold text-[#5A6A51]">
-                {filteredReservations.filter(r => r.status === 'approved').length} approved
+                {filteredReservations.filter(r => ['approved', 'confirmed', 'started', 'completed'].includes(r.status)).length} active
               </span>
             </div>
             {filteredReservations.length === 0 ? (
@@ -10191,14 +10213,7 @@ export default function AdminPage() {
                           : '—';
                         const timeLabel = r.timeSlot || r.requestedTime || null;
                         const refId = `#${r.id.replace(/-/g,'').slice(0,8).toUpperCase()}`;
-                        const statusColors: Record<string, string> = {
-                          approved:  'bg-[#414E36]/10 text-[#414E36]',
-                          pending:   'bg-[#C4AE7C]/25 text-[#7a6a3a]',
-                          rejected:  'bg-red-100 text-red-600',
-                          cancelled: 'bg-red-100 text-red-500',
-                          canceled:  'bg-red-100 text-red-500',
-                        };
-                        const statusClass = statusColors[r.status?.toLowerCase()] ?? 'bg-[#EDF1EC] text-[#5A6A51]';
+                        const statusClass = getStatusBadgeClass(r.status);
                         return (
                           <tr key={r.id} className="group transition-colors hover:bg-[#EDF1EC]/40">
                             <td className="px-4 py-4 font-mono font-bold text-[#1F251A] whitespace-nowrap">{refId}</td>
@@ -11196,7 +11211,7 @@ export default function AdminPage() {
               };
               const todayStr = getLocalDateString(new Date());
               const todaysBookings = allReservations.filter(
-                r => String(r.date).slice(0, 10) === todayStr && r.status === 'approved'
+                r => String(r.date).slice(0, 10) === todayStr && ['approved', 'confirmed', 'started', 'completed'].includes(r.status)
               );
 
               if (todaysBookings.length === 0) {
@@ -11648,7 +11663,7 @@ export default function AdminPage() {
                         onClick={() => {
                           setShowSearchModal(false);
                           setSearchQuery("");
-                          if (r.status === 'approved') {
+                          if (['approved', 'confirmed', 'started', 'completed'].includes(r.status)) {
                             setViewingBooking(r);
                           } else {
                             alert(`This booking request is ${r.status}. You can review it in the Pending approvals section.`);
@@ -11670,11 +11685,7 @@ export default function AdminPage() {
                         </div>
                         <div className="text-right">
                           <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider ${
-                            r.status === 'approved' 
-                              ? 'bg-green-100 text-green-800' 
-                              : r.status === 'rejected' 
-                                ? 'bg-red-100 text-red-800' 
-                                : 'bg-amber-100 text-amber-800'
+                            getStatusBadgeClass(r.status)
                           }`}>
                             {r.status}
                           </span>
@@ -12654,9 +12665,7 @@ export default function AdminPage() {
                           const resDt = new Date(res.date);
                           const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
                           const serv = localServices.find(s => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
-                          const isApproved = res.status === "approved";
-                          const isRejected = res.status === "rejected";
-                          const isPending = res.status === "pending";
+                          const statusClass = getStatusBadgeClass(res.status);
 
                           const pricesMap: Record<number, number> = {
                             1: 400, 2: 500, 3: 450, 4: 600, 5: 800, 6: 700, 7: 1500,
@@ -12679,10 +12688,7 @@ export default function AdminPage() {
                               <td className="px-4 py-3 text-right font-medium text-green-700">{spent} EGP</td>
                               <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
                               <td className="px-4 py-3 text-center">
-                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                                  isApproved ? "bg-green-50 text-green-700" :
-                                  isRejected ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"
-                                }`}>
+                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusClass}`}>
                                   {res.status}
                                 </span>
                               </td>
