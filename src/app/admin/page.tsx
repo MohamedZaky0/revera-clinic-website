@@ -89,6 +89,8 @@ type Req = {
   createdAt?: string;
   branchId?: string | null;
   customerId?: string | null;
+  amountPaid?: number;
+  amountLeft?: number | null;
 };
 
 const SLOTS = ALL_15MIN_SLOTS;
@@ -10801,10 +10803,61 @@ export default function AdminPage() {
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">AMOUNT TO PAY</p>
-                      <p className="text-sm text-[#d93838] mt-1 font-bold">Remaining: {cost} EGP</p>
+                  {/* Payment Details */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-4 shadow-sm">
+                    <p className="text-sm font-bold text-[#1F251A]">Payment Details / تفاصيل الدفع</p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">
+                          Amount Paid / المدفوع
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            value={viewingBooking.amountPaid ?? 0}
+                            onChange={async (e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              // Autocalculate remaining left
+                              const remaining = Math.max(0, cost - val);
+                              await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ amountPaid: val, amountLeft: remaining })
+                              });
+                              setViewingBooking(prev => prev ? { ...prev, amountPaid: val, amountLeft: remaining } : null);
+                              fetchAllReservations();
+                            }}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-12 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">
+                          Amount Left (Remaining) / المتبقي
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            value={viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null ? viewingBooking.amountLeft : Math.max(0, cost - (viewingBooking.amountPaid ?? 0))}
+                            onChange={async (e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ amountLeft: val })
+                              });
+                              setViewingBooking(prev => prev ? { ...prev, amountLeft: val } : null);
+                              fetchAllReservations();
+                            }}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-12 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -12576,6 +12629,8 @@ export default function AdminPage() {
                         <th className="px-4 py-3 text-left">Date / Slot</th>
                         <th className="px-4 py-3 text-left">Service</th>
                         <th className="px-4 py-3 text-left">Provider</th>
+                        <th className="px-4 py-3 text-right">Paid</th>
+                        <th className="px-4 py-3 text-right">Left</th>
                         <th className="px-4 py-3 text-center">Status</th>
                       </tr>
                     </thead>
@@ -12589,7 +12644,7 @@ export default function AdminPage() {
                         if (history.length === 0) {
                           return (
                             <tr>
-                              <td colSpan={4} className="px-4 py-6 text-center text-gray-400 italic">
+                              <td colSpan={6} className="px-4 py-6 text-center text-gray-400 italic">
                                 No booking history records found for this patient.
                               </td>
                             </tr>
@@ -12602,6 +12657,17 @@ export default function AdminPage() {
                           const isApproved = res.status === "approved";
                           const isRejected = res.status === "rejected";
                           const isPending = res.status === "pending";
+
+                          const pricesMap: Record<number, number> = {
+                            1: 400, 2: 500, 3: 450, 4: 600, 5: 800, 6: 700, 7: 1500,
+                            11: 600, 12: 500, 13: 800, 14: 1200, 15: 1500, 16: 1000, 17: 400,
+                            21: 300, 22: 350, 23: 300,
+                            31: 400, 32: 350, 33: 400, 34: 500
+                          };
+                          const serviceCost = localServices.find(s => s.id === res.serviceId)?.price ?? pricesMap[res.serviceId] ?? 500;
+                          const spent = res.amountPaid ?? 0;
+                          const left = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : Math.max(0, serviceCost - spent);
+
                           return (
                             <tr key={res.id} className="hover:bg-[#F9F9F7]">
                               <td className="px-4 py-3">
@@ -12610,6 +12676,8 @@ export default function AdminPage() {
                               </td>
                               <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
                               <td className="px-4 py-3">{res.doctorName || "—"}</td>
+                              <td className="px-4 py-3 text-right font-medium text-green-700">{spent} EGP</td>
+                              <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
                               <td className="px-4 py-3 text-center">
                                 <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
                                   isApproved ? "bg-green-50 text-green-700" :

@@ -28,6 +28,8 @@ function mapRow(r: Record<string, any>) {
     createdAt: r.created_at,
     branchId: r.branch_id ?? null,
     customerId: r.customer_id ?? null,
+    amountPaid: r.amount_paid ?? 0,
+    amountLeft: r.amount_left ?? null,
   };
 }
 
@@ -131,6 +133,8 @@ export async function POST(req: Request) {
         session_type: sessionType || 'in_person',
         branch_id: branchId || null,
         customer_id: customerId,
+        amount_paid: body.amountPaid !== undefined ? Number(body.amountPaid) : 0,
+        amount_left: body.amountLeft !== undefined ? Number(body.amountLeft) : null,
       })
       .select()
       .single();
@@ -150,7 +154,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType } = body;
+    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft } = body;
 
     const { data: target, error: findError } = await supabaseServer
       .from('reservations')
@@ -231,12 +235,14 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined) {
+    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (notes !== undefined) updates.notes = notes;
       if (doctorName !== undefined) updates.doctor_name = doctorName;
       if (sessionType !== undefined) updates.session_type = sessionType;
+      if (amountPaid !== undefined) updates.amount_paid = amountPaid;
+      if (amountLeft !== undefined) updates.amount_left = amountLeft;
 
       const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
