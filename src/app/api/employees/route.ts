@@ -72,6 +72,7 @@ export async function POST(req: Request) {
     // The invited user receives an official link to set their own password.
     // redirectTo sends them to our /auth/callback which then redirects to /admin.
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://revera-clinic.vercel.app';
+    console.log('Sending invitation to:', cleanEmail, 'with redirectTo:', `${siteUrl}/auth/callback?next=/admin`);
     const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(
       cleanEmail,
       {
