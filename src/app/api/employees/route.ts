@@ -92,6 +92,7 @@ export async function POST(req: Request) {
       .from('employee_accounts')
       .insert({
         auth_user_id: authUserId,
+        employee_id: cleanEmail,   // use real email as the unique identifier
         email: cleanEmail,
         name: cleanName,
         role_name: roleName,
