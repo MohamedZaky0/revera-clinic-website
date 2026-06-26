@@ -1,0 +1,131 @@
+# ai_docs — Revera Clinics Agent Knowledge Base
+
+> **Last Updated:** 2026-06-26
+> **Branch:** dev (these docs do not belong on main/production)
+> **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
+
+This folder is the single source of truth for any AI agent, LLM coding tool (Cursor, Windsurf, GitHub Copilot, Claude Code, etc.), or human developer who needs to understand this codebase before touching it.
+
+**Rule: Read before you write.** Do not make assumptions about what is built, what decisions were made, or what patterns to follow without reading the relevant files below first.
+
+---
+
+## Reading Order (start here)
+
+Follow this order on first contact with this codebase:
+
+```
+1. PROJECT.md        → What is this system, who uses it, deployment model
+2. ARCHITECTURE.md   → Tech stack, folder structure, data flow, patterns
+3. DB_SCHEMA.md      → Database tables, columns, relationships
+4. PRODUCT_RULES.md  → Business logic enforced in code (not aspirational)
+5. DECISIONS.md      → Why things are built the way they are
+6. RISKS.md          → Known problems and the files/lines they live in
+```
+
+After that, check task-specific files:
+
+```
+7. API_CONTRACT.md   → When touching API routes or writing new endpoints
+8. PROPOSALS.md      → Before starting any refactor (must read before executing)
+```
+
+---
+
+## File Index
+
+### Core Context (always read)
+
+| File | Purpose | Update When |
+|---|---|---|
+| `PROJECT.md` | System overview — what it is, who uses it, stack, known gaps | Deployment model changes, new users/roles added, major gaps resolved |
+| `ARCHITECTURE.md` | Full stack, folder structure, data flow, brand token system, i18n | New folders/patterns introduced, Supabase tables added, auth added |
+| `DB_SCHEMA.md` | All Supabase tables with columns, types, and relationships | Any schema change (add table, add column, change type) |
+| `PRODUCT_RULES.md` | Business logic **actually enforced in code** — nothing aspirational | Any time a rule is added, removed, or changed in an API route or component |
+| `DECISIONS.md` | Decision log — what was decided, why, what was rejected | Any architectural or strategic decision is made or reversed |
+| `RISKS.md` | Risk register — known problems with file/line references | New risks found; existing risks mitigated; hardcoded values changed |
+
+### Task-Specific (read when relevant)
+
+| File | Purpose | Update When |
+|---|---|---|
+| `API_CONTRACT.md` | All API routes — methods, params, responses | Any API route added, changed, or deleted |
+| `PROPOSALS.md` | Proposed refactors awaiting approval — do not execute without review | A new refactor is proposed; an approved proposal is completed (mark it done) |
+| `AGENTS.md` | Quick-start rules for AI agents specifically | Agent workflow changes; new rules for what agents must/must not do |
+
+### Externally Managed (do not populate here)
+
+| File | Why it is empty |
+|---|---|
+| `ROADMAP.md` | Managed in an external tracker — editing here creates two sources of truth |
+| `TODO.md` | Same as above |
+| `FUTURE_FEATURES.md` | Same as above |
+| `AI_PIPELINE.md` | No AI pipeline exists in the codebase as of last audit |
+
+---
+
+## Project Status Snapshot (as of 2026-06-26)
+
+### What Is Actually Built and Working
+- Public website (homepage, about, services, contact, blog stub)
+- Booking modal → `reservations` table (real Supabase writes)
+- Admin booking management (calendar, list, approve/reject, status changes)
+- Service catalog CRUD (with drag-sort, bilingual names, branch pricing)
+- Branch management CRUD
+- Website CMS — hero slides (EN/AR) editable via admin
+- Provider records (doctors) — basic CRUD
+
+### What Is Mock UI Only (hardcoded data, not Supabase)
+- All clinical: consultation notes, prescriptions, treatment plans, before/after photos
+- All billing: POS, invoicing, payments, refunds, package tracking
+- All reporting: every chart and metric shows static hardcoded values
+- All marketing: WhatsApp is external `wa.me` links only; no campaigns or templates
+- Notification templates
+- RBAC / roles and permissions
+
+### Critical Gaps (do not assume these work)
+- **Admin has no authentication** — `/admin` is publicly accessible (RISK-002)
+- **Patient OTP auth is simulated** — no SMS sent, no user created (RISK-003)
+- Doctor shifts and availability — not built; derived only from existing bookings
+- Waitlist — not built
+
+---
+
+## Architecture in One Paragraph
+
+Next.js 15 (App Router) + TypeScript on Vercel. Single app serving both the public Revera website and the `/admin` panel. Supabase (PostgreSQL) as the database, accessed via a service role key from all API routes. No RLS enforcement. Brand colors centralized in `globals.css` as CSS custom properties — but many components bypass these with raw hex Tailwind JIT classes (see RISK-001 in `RISKS.md`). All UI copy (EN/AR) lives in `src/lib/translations.ts`. The admin panel is a single ~550KB client component at `src/app/admin/page.tsx`.
+
+---
+
+## Key Rules for Agents and LLM Tools
+
+1. **Do not add raw hex colors** (`#414E36`, `#C4AE7C`) to components. Use `var(--cr-primary)` and `var(--cr-accent)` from `globals.css`.
+2. **Do not hardcode "Revera"** in component strings, metadata, or alt text. It goes in `src/lib/translations.ts` or will move to `src/config/client.ts` after PROPOSAL-001 is approved.
+3. **Do not hardcode phone numbers or WhatsApp links** inline. See PROPOSAL-001 in `PROPOSALS.md`.
+4. **Do not treat mock UI sections as real features.** Finance, Payroll, Prescriptions, Inventory, POS are backed by hardcoded arrays. Adding real backend to them is a separate task.
+5. **`branch` is the topmost scoping unit.** There is no `org_id` or `tenant_id`. Do not introduce one without a decision logged in `DECISIONS.md`.
+6. **Do not add localStorage writes** for admin data. The existing `serviceStore.ts` pattern (localStorage as primary, Supabase as secondary) is a known risk (RISK-004) — do not extend it.
+7. **Before any refactor touching hardcoded values**, read `PROPOSALS.md` first — a centralization plan already exists.
+8. **The admin panel has no auth.** Do not assume any middleware protects `/admin`.
+
+---
+
+## When to Update These Docs
+
+| Trigger | Files to Update |
+|---|---|
+| New Supabase table or column added | `DB_SCHEMA.md`, `ARCHITECTURE.md` |
+| New API route added or changed | `API_CONTRACT.md` |
+| New business rule enforced in code | `PRODUCT_RULES.md` |
+| Architectural decision made | `DECISIONS.md` |
+| New risk identified (hardcoding, security, data integrity) | `RISKS.md` |
+| Mock section becomes real (Supabase-backed) | `PROJECT.md` status snapshot + `PRODUCT_RULES.md` |
+| Admin auth added | `PROJECT.md`, `ARCHITECTURE.md`, `RISKS.md` (close RISK-002), `DECISIONS.md` |
+| PROPOSAL-001 executed | `PROPOSALS.md` (mark done), `RISKS.md` (close RISK-001), `ARCHITECTURE.md` |
+| Fork for new client created | `DECISIONS.md` (log the new client), `PROPOSALS.md` (confirm PROPOSAL-001 was applied) |
+
+---
+
+## Folder Location Note
+
+This folder (`ai_docs/`) lives on the **`dev` branch only**. It is not part of the production build on `main`. Do not merge it to `main`.
