@@ -405,6 +405,11 @@ export default function AdminPage() {
   const [showExportCustomersModal, setShowExportCustomersModal] = useState(false);
   const [dbCustomers, setDbCustomers] = useState<Customer[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [showCustomerFilterPanel, setShowCustomerFilterPanel] = useState(false);
+  const [customerFilterGender, setCustomerFilterGender] = useState("All");
+  const [customerFilterStatus, setCustomerFilterStatus] = useState("All");
+  const [customerFilterReferral, setCustomerFilterReferral] = useState("All");
+  const [showImportCustomersModal, setShowImportCustomersModal] = useState(false);
 
   // Customer Add/Edit Form states
   const [showCustomerFormModal, setShowCustomerFormModal] = useState(false);
@@ -1440,12 +1445,34 @@ export default function AdminPage() {
   }, [allReservations, customers.length, requests.length]);
 
   const filteredCustomers = useMemo(() => {
-    if (!customerSearch.trim()) return customers;
-    const q = customerSearch.toLowerCase();
-    return customers.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
-    );
-  }, [customers, customerSearch]);
+    let list = customers;
+
+    if (customerFilterGender !== "All") {
+      list = list.filter((c) => c.gender === customerFilterGender);
+    }
+
+    if (customerFilterStatus !== "All") {
+      const wantActive = customerFilterStatus === "Active";
+      list = list.filter((c) => (c.active !== undefined ? c.active : true) === wantActive);
+    }
+
+    if (customerFilterReferral !== "All") {
+      list = list.filter((c) => c.referral === customerFilterReferral);
+    }
+
+    if (customerSearch.trim()) {
+      const q = customerSearch.toLowerCase();
+      list = list.filter((c) => {
+        const nameMatch = (c.name || "").toLowerCase().includes(q);
+        const emailMatch = (c.email || "").toLowerCase().includes(q);
+        const phoneMatch = (c.mobile || c.phone || "").toLowerCase().includes(q);
+        const nationalIdMatch = (c.national_id || "").toLowerCase().includes(q);
+        return nameMatch || emailMatch || phoneMatch || nationalIdMatch;
+      });
+    }
+
+    return list;
+  }, [customers, customerSearch, customerFilterGender, customerFilterStatus, customerFilterReferral]);
 
   useEffect(() => {
     fetchRequests();
@@ -2233,6 +2260,203 @@ export default function AdminPage() {
     setSelectedCustomerForEdit(c);
     setShowCustomerFormModal(true);
   }
+
+  // CSV Import state and functions
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importHeaders, setImportHeaders] = useState<string[]>([]);
+  const [importRows, setImportRows] = useState<Record<string, string>[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importProgress, setImportProgress] = useState(0);
+  const [importLog, setImportLog] = useState<{ name: string; status: "success" | "error"; error?: string }[]>([]);
+
+  const parseCSV = (text: string) => {
+    const lines: string[] = [];
+    let currentLine = "";
+    let inQuotes = false;
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if ((char === '\n' || char === '\r') && !inQuotes) {
+        if (currentLine.trim()) {
+          lines.push(currentLine);
+        }
+        currentLine = "";
+        if (char === '\r' && text[i+1] === '\n') {
+          i++;
+        }
+      } else {
+        currentLine += char;
+      }
+    }
+    if (currentLine.trim()) {
+      lines.push(currentLine);
+    }
+    
+    if (lines.length === 0) return { headers: [], rows: [] };
+    
+    const splitCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let currentVal = "";
+      let quoteActive = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          quoteActive = !quoteActive;
+        } else if (char === ',' && !quoteActive) {
+          result.push(currentVal.trim());
+          currentVal = "";
+        } else {
+          currentVal += char;
+        }
+      }
+      result.push(currentVal.trim());
+      return result;
+    };
+    
+    const headers = splitCSVLine(lines[0]);
+    const headersClean = headers.map(h => h.toLowerCase().replace(/[\s_]+/g, ''));
+    const rows: Record<string, string>[] = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = splitCSVLine(lines[i]);
+      const row: Record<string, string> = {};
+      headersClean.forEach((header, idx) => {
+        row[header] = values[idx] || "";
+      });
+      rows.push(row);
+    }
+    
+    return { headers, rows };
+  };
+
+  const mapRowToCustomer = (row: Record<string, string>) => {
+    const keys = Object.keys(row);
+    const getVal = (possibleHeaders: string[]) => {
+      const match = keys.find(k => possibleHeaders.includes(k.toLowerCase().replace(/[\s_]+/g, '')));
+      return match ? row[match] : "";
+    };
+
+    return {
+      name: getVal(["name", "fullname", "patientname", "patient"]),
+      mobile: getVal(["mobile", "phone", "phonenumber", "mobilephone", "tel"]),
+      email: getVal(["email", "emailaddress"]),
+      gender: getVal(["gender", "sex"]),
+      age: getVal(["age"]),
+      national_id: getVal(["nationalid", "national_id", "idcard"]),
+      address: getVal(["address", "location"]),
+      referral: getVal(["referral", "referralsource"]),
+      occupation: getVal(["occupation", "job"]),
+      note: getVal(["note", "notes", "comments", "description"])
+    };
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const { headers, rows } = parseCSV(text);
+      if (headers.length === 0 || rows.length === 0) {
+        setImportError("The selected CSV file appears to be empty or invalid.");
+        return;
+      }
+      setImportHeaders(headers);
+      setImportRows(rows);
+      setImportError("");
+    };
+    reader.onerror = () => {
+      setImportError("Error reading the CSV file.");
+    };
+    reader.readAsText(file);
+  };
+
+  const handleStartImport = async () => {
+    if (importRows.length === 0) return;
+    setImportLoading(true);
+    setImportProgress(0);
+    setImportLog([]);
+    
+    const logs: { name: string; status: "success" | "error"; error?: string }[] = [];
+    
+    for (let i = 0; i < importRows.length; i++) {
+      const rawRow = importRows[i];
+      const mapped = mapRowToCustomer(rawRow);
+      
+      if (!mapped.name || !mapped.mobile) {
+        logs.push({
+          name: mapped.name || `Row ${i + 1}`,
+          status: "error",
+          error: "Missing required fields (Name and Mobile are required)."
+        });
+        setImportLog([...logs]);
+        setImportProgress(Math.round(((i + 1) / importRows.length) * 100));
+        continue;
+      }
+      
+      try {
+        const response = await fetch("/api/customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: mapped.name,
+            mobile: mapped.mobile,
+            email: mapped.email || null,
+            gender: mapped.gender || null,
+            age: mapped.age ? Number(mapped.age) : null,
+            national_id: mapped.national_id || null,
+            address: mapped.address || null,
+            referral: mapped.referral || null,
+            occupation: mapped.occupation || null,
+            note: mapped.note || null,
+            active: true
+          })
+        });
+        
+        const data = await response.json();
+        if (!response.ok) {
+          logs.push({
+            name: mapped.name,
+            status: "error",
+            error: data.error || "Failed to save to database."
+          });
+        } else {
+          logs.push({
+            name: mapped.name,
+            status: "success"
+          });
+        }
+      } catch (err: any) {
+        logs.push({
+          name: mapped.name,
+          status: "error",
+          error: err.message || "Network error."
+        });
+      }
+      
+      setImportLog([...logs]);
+      setImportProgress(Math.round(((i + 1) / importRows.length) * 100));
+    }
+    
+    setImportLoading(false);
+    fetchCustomers();
+  };
+
+  const handleCloseImportModal = () => {
+    setShowImportCustomersModal(false);
+    setImportFile(null);
+    setImportHeaders([]);
+    setImportRows([]);
+    setImportLoading(false);
+    setImportError("");
+    setImportProgress(0);
+    setImportLog([]);
+  };
 
   function handleSaveCustomer() {
     if (!custName.trim()) {
@@ -5684,43 +5908,136 @@ export default function AdminPage() {
           {/* ── CUSTOMERS VIEW ── */}
           {activeNav === "Customers" && (
             <div>
-              {/* Page header */}
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <h2 className="text-2xl font-semibold text-[#1F251A]">Customers</h2>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#f5f4f0]">
-                    <Filter size={14} /> Filter
-                  </button>
-                  <button
-                    onClick={() => setShowExportCustomersModal(true)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-4 py-2 text-sm font-medium text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26]"
-                  >
-                    <Download size={14} /> Export
-                  </button>
-                  <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/30 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#414E36]/5">
-                    <Upload size={14} /> Import
-                  </button>
-                  <button
-                    onClick={handleOpenAddCustomer}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[#C4AE7C] px-4 py-2 text-sm font-semibold text-[#414E36] shadow-sm transition hover:bg-[#b59e6c]"
-                  >
-                    <Plus size={14} /> Add
-                  </button>
+              {/* Page header and premium controls panel */}
+              <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-[#1F251A]">Patients Directory</h2>
+                    <p className="text-xs text-[#5A6A51]">Manage demographic profiles and clinical histories</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => setShowCustomerFilterPanel(prev => !prev)}
+                      className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                        showCustomerFilterPanel || customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All"
+                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                          : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
+                      }`}
+                    >
+                      <Filter size={14} /> Filter
+                      {(customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All") && (
+                        <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={() => setShowExportCustomersModal(true)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
+                    >
+                      <Download size={14} /> Export
+                    </button>
+                    
+                    <button
+                      onClick={() => setShowImportCustomersModal(true)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
+                    >
+                      <Upload size={14} /> Import
+                    </button>
+                    
+                    <button
+                      onClick={handleOpenAddCustomer}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                    >
+                      <Plus size={14} /> Add Patient
+                    </button>
+                  </div>
+                </div>
+
+                {/* Unified Search and Quick Info Bar */}
+                <div className="flex flex-wrap items-center gap-3 border-t border-[#414E36]/5 pt-4">
+                  <div className="relative flex-1 max-w-md">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] z-10 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      placeholder="Search by name, phone, national ID..."
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:bg-white focus:ring-2 focus:ring-[#C4AE7C]/15"
+                    />
+                  </div>
+                  <div className="text-xs text-[#5A6A51] ml-auto">
+                    Total Patients: <span className="font-bold text-[#1F251A]">{filteredCustomers.length}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Search */}
-              <div className="mb-4 flex items-center gap-3">
-                <div className="relative flex-1 max-w-xs">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
-                  <input
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                    placeholder="Search customers…"
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
-                  />
+              {/* Toggleable Customer Filters Drawer */}
+              {showCustomerFilterPanel && (
+                <div className="mb-6 grid grid-cols-1 gap-4 rounded-3xl border border-[#414E36]/10 bg-[#F9F9F7] p-5 md:grid-cols-4 items-end shadow-sm animate-fadeIn">
+                  {/* Gender Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Gender</label>
+                    <select
+                      value={customerFilterGender}
+                      onChange={(e) => setCustomerFilterGender(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/10 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                    >
+                      <option value="All">All Genders</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Status</label>
+                    <select
+                      value={customerFilterStatus}
+                      onChange={(e) => setCustomerFilterStatus(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/10 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                    >
+                      <option value="All">All Statuses</option>
+                      <option value="Active">Active Only</option>
+                      <option value="Inactive">Inactive Only</option>
+                    </select>
+                  </div>
+
+                  {/* Referral Source Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Referral Source</label>
+                    <select
+                      value={customerFilterReferral}
+                      onChange={(e) => setCustomerFilterReferral(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/10 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                    >
+                      <option value="All">All Referrals</option>
+                      <option value="Google">Google Search</option>
+                      <option value="Facebook">Facebook</option>
+                      <option value="Instagram">Instagram</option>
+                      <option value="Friend">Friend / Family</option>
+                      <option value="Doctor Referral">Doctor Referral</option>
+                      <option value="Walk-in">Walk-in</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  {/* Clear Button */}
+                  <div>
+                    <button
+                      onClick={() => {
+                        setCustomerFilterGender("All");
+                        setCustomerFilterStatus("All");
+                        setCustomerFilterReferral("All");
+                        setCustomerSearch("");
+                      }}
+                      className="h-[42px] w-full rounded-2xl border border-red-200 bg-red-50 text-xs font-bold text-red-600 hover:bg-red-100 transition"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Table */}
               <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white shadow-sm">
@@ -11262,6 +11579,207 @@ export default function AdminPage() {
                 <Download size={15} />
                 {loadingCustomers ? "Loading..." : "Export CSV"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── IMPORT CUSTOMERS MODAL ── */}
+      {showImportCustomersModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget && !importLoading) handleCloseImportModal(); }}
+        >
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 overflow-hidden my-8 animate-fadeIn">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36]">
+                  <Upload size={18} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-[#1F251A]">Import Customers / Patients</h3>
+                  <p className="text-xs text-[#5A6A51]">Upload a CSV file containing patient demographic details</p>
+                </div>
+              </div>
+              <button
+                disabled={importLoading}
+                onClick={handleCloseImportModal}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36] disabled:opacity-50"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              {!importFile ? (
+                // Step 1: Upload File Instructions and Box
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-[#414E36]/25 rounded-2xl p-8 bg-[#FBFBF9] hover:bg-[#F5F4F0] transition group relative">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <Upload className="h-10 w-10 text-[#C4AE7C] mb-3 transition-transform group-hover:-translate-y-1" />
+                  <span className="text-sm font-semibold text-[#1F251A]">Click to select CSV File</span>
+                  <span className="text-xs text-[#5A6A51] mt-1">Accepts standard .csv comma-separated values</span>
+                  <div className="mt-4 text-[10px] text-gray-400 text-center max-w-sm">
+                    For best matching, make sure your CSV contains columns like: <strong>Name, Phone/Mobile, Email, Gender, National ID, Age</strong>.
+                  </div>
+                </div>
+              ) : (
+                // Step 2: File Selected and Parsed
+                <div className="space-y-4">
+                  {/* File Info Card */}
+                  <div className="flex items-center justify-between rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-3">
+                    <div className="flex items-center gap-3">
+                      <FileText size={24} className="text-[#C4AE7C]" />
+                      <div>
+                        <p className="text-sm font-semibold text-[#1F251A]">{importFile.name}</p>
+                        <p className="text-xs text-[#5A6A51]">
+                          {(importFile.size / 1024).toFixed(1)} KB • {importRows.length} rows found
+                        </p>
+                      </div>
+                    </div>
+                    {!importLoading && (
+                      <button
+                        onClick={() => {
+                          setImportFile(null);
+                          setImportRows([]);
+                          setImportHeaders([]);
+                          setImportError("");
+                          setImportLog([]);
+                        }}
+                        className="text-xs font-semibold text-red-500 hover:underline"
+                      >
+                        Change File
+                      </button>
+                    )}
+                  </div>
+
+                  {importError && (
+                    <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600">
+                      {importError}
+                    </div>
+                  )}
+
+                  {/* CSV Columns Detected */}
+                  {!importLoading && importHeaders.length > 0 && (
+                    <div className="space-y-1.5">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Headers Detected</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {importHeaders.map(h => (
+                          <span key={h} className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600 border border-gray-200">
+                            {h}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rows Preview */}
+                  {!importLoading && importRows.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Preview (First 3 Rows Mapping)</h4>
+                      <div className="overflow-x-auto rounded-xl border border-[#414E36]/10 bg-white">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100">
+                            <tr>
+                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Name</th>
+                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Phone</th>
+                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Email</th>
+                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">National ID</th>
+                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Gender</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {importRows.slice(0, 3).map((row, idx) => {
+                              const m = mapRowToCustomer(row);
+                              return (
+                                <tr key={idx} className="hover:bg-gray-50/50">
+                                  <td className="px-3 py-2 font-medium text-[#1F251A]">{m.name || <span className="text-red-400 italic">Missing</span>}</td>
+                                  <td className="px-3 py-2 text-gray-600">{m.mobile || <span className="text-red-400 italic">Missing</span>}</td>
+                                  <td className="px-3 py-2 text-gray-600">{m.email || "-"}</td>
+                                  <td className="px-3 py-2 text-gray-600">{m.national_id || "-"}</td>
+                                  <td className="px-3 py-2 text-gray-600">{m.gender || "-"}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Progress & Live Log */}
+                  {(importLoading || importLog.length > 0) && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-[#1F251A]">
+                          {importLoading ? `Importing patients...` : "Import Complete"}
+                        </span>
+                        <span className="font-bold text-[#C4AE7C]">{importProgress}%</span>
+                      </div>
+                      
+                      {/* Progress Bar container */}
+                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#414E36] transition-all duration-200"
+                          style={{ width: `${importProgress}%` }}
+                        />
+                      </div>
+
+                      {/* Log Container */}
+                      <div className="h-40 overflow-y-auto rounded-xl border border-[#414E36]/10 bg-gray-50 p-3 space-y-1 text-[11px] font-mono">
+                        {importLog.map((log, idx) => (
+                          <div key={idx} className="flex justify-between items-center py-0.5 border-b border-gray-100/50 last:border-0">
+                            <span className="font-medium text-gray-700 truncate max-w-sm">{log.name}</span>
+                            {log.status === "success" ? (
+                              <span className="text-green-600 font-semibold bg-green-50 px-1.5 rounded">Success</span>
+                            ) : (
+                              <span className="text-red-600 font-semibold bg-red-50 px-1.5 rounded" title={log.error}>
+                                Error: {log.error || "failed"}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+              <button
+                disabled={importLoading}
+                onClick={handleCloseImportModal}
+                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC] disabled:opacity-50"
+              >
+                {importProgress === 100 ? "Close" : "Cancel"}
+              </button>
+              {importFile && importRows.length > 0 && importProgress < 100 && (
+                <button
+                  onClick={handleStartImport}
+                  disabled={importLoading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60"
+                >
+                  {importLoading ? (
+                    <>
+                      <svg className="mr-2 h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Importing...
+                    </>
+                  ) : (
+                    `Import ${importRows.length} Patients`
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
