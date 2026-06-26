@@ -14,11 +14,21 @@ function AuthCallbackContent() {
       return;
     }
 
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const isInvite = hash.includes("type=invite");
+    const isRecovery = hash.includes("type=recovery");
+
+    const getRedirectUrl = (defaultNext: string) => {
+      if (isInvite) return "/admin?setup=true";
+      if (isRecovery) return "/admin?recovery=true";
+      return defaultNext;
+    };
+
     // 1. Listen for auth state changes. When signed in, redirect to next (or /admin).
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: any) => {
       if (session) {
         const next = searchParams.get("next") ?? "/admin";
-        router.push(next);
+        router.push(getRedirectUrl(next));
       }
     });
 
@@ -26,7 +36,7 @@ function AuthCallbackContent() {
     supabase.auth.getSession().then(({ data: { session } }: any) => {
       if (session) {
         const next = searchParams.get("next") ?? "/admin";
-        router.push(next);
+        router.push(getRedirectUrl(next));
       } else {
         // If there's no code and no session, we can't authenticate, redirect to admin.
         const code = searchParams.get("code");

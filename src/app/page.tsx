@@ -14,10 +14,12 @@ import { AppointmentSection } from "@/components/AppointmentSection";
 import { SiteFooter } from "@/components/SiteFooter";
 import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
+import { AuthRedirectHandler } from "@/components/AuthRedirectHandler";
 
 export default function Home() {
   return (
     <>
+      <AuthRedirectHandler />
       <Preloader />
       <CustomCursor />
       <Navbar />

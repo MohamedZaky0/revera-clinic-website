@@ -387,6 +387,14 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
+  // Setup password states (for invited users / password resets)
+  const [showSetupPasswordModal, setShowSetupPasswordModal] = useState(false);
+  const [setupPassword, setSetupPassword] = useState("");
+  const [setupConfirmPassword, setSetupConfirmPassword] = useState("");
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupError, setSetupError] = useState("");
+  const [setupSuccess, setSetupSuccess] = useState("");
+
   // Role Management state
   const [rolesList, setRolesList] = useState<any[]>([]);
   const [employeesList, setEmployeesList] = useState<any[]>([]);
@@ -818,6 +826,61 @@ export default function AdminPage() {
       }
     }
   }, [adminPermissions, adminRole, activeNav]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get("setup") === "true" || searchParams.get("recovery") === "true") {
+        setShowSetupPasswordModal(true);
+      }
+    }
+  }, []);
+
+  async function handleSetupPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!setupPassword || !setupConfirmPassword) {
+      setSetupError("Please fill in both fields.");
+      return;
+    }
+    if (setupPassword !== setupConfirmPassword) {
+      setSetupError("Passwords do not match.");
+      return;
+    }
+    if (setupPassword.length < 6) {
+      setSetupError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setSetupLoading(true);
+    setSetupError("");
+    setSetupSuccess("");
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: setupPassword,
+      });
+
+      if (error) {
+        setSetupError(error.message);
+      } else {
+        setSetupSuccess("Your password has been successfully configured! Redirecting to dashboard...");
+        setTimeout(() => {
+          setShowSetupPasswordModal(false);
+          // Remove query params from URL so it doesn't reopen
+          if (typeof window !== "undefined") {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("setup");
+            url.searchParams.delete("recovery");
+            window.history.replaceState({}, document.title, url.pathname + url.search);
+          }
+        }, 3000);
+      }
+    } catch (err: any) {
+      setSetupError(err.message || "Failed to update password.");
+    } finally {
+      setSetupLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (activeNav === "Role Management" && adminRole === "superadmin") {
@@ -12759,6 +12822,94 @@ export default function AdminPage() {
               >
                 Close Profile
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Setup Password Modal (shown after accepting invite or password reset) ── */}
+      {showSetupPasswordModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="relative w-full max-w-md mx-4 rounded-3xl bg-white shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-br from-[#1F251A] to-[#414E36] px-8 py-8 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#C4AE7C]/20 ring-2 ring-[#C4AE7C]/40">
+                <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#C4AE7C" strokeWidth={2}>
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-1">Set Your Password</h2>
+              <p className="text-sm text-[#C4AE7C]/80">
+                Welcome! Please create a secure password to complete your account setup.
+              </p>
+            </div>
+
+            {/* Body */}
+            <div className="px-8 py-7">
+              {setupSuccess ? (
+                <div className="flex flex-col items-center gap-4 text-center py-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+                  <p className="text-green-700 font-semibold text-base">{setupSuccess}</p>
+                  <p className="text-sm text-[#5A6A51]">You will be redirected automatically…</p>
+                </div>
+              ) : (
+                <form onSubmit={handleSetupPassword} className="space-y-5">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={setupPassword}
+                      onChange={(e) => setSetupPassword(e.target.value)}
+                      placeholder="At least 6 characters"
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                      disabled={setupLoading}
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                      Confirm Password
+                    </label>
+                    <input
+                      type="password"
+                      value={setupConfirmPassword}
+                      onChange={(e) => setSetupConfirmPassword(e.target.value)}
+                      placeholder="Re-enter your password"
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                      disabled={setupLoading}
+                    />
+                  </div>
+
+                  {setupError && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium">
+                      {setupError}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={setupLoading}
+                    className="w-full rounded-xl bg-[#414E36] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {setupLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                        </svg>
+                        Setting password…
+                      </span>
+                    ) : "Confirm & Access Dashboard"}
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         </div>
