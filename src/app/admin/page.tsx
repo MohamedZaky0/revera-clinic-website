@@ -88,6 +88,7 @@ type Req = {
   doctorName?: string | null;
   createdAt?: string;
   branchId?: string | null;
+  customerId?: string | null;
 };
 
 const SLOTS = ALL_15MIN_SLOTS;
@@ -158,6 +159,12 @@ type Customer = {
   note?: string | null;
   created_at?: string;
   updated_at?: string;
+  // new demographic fields
+  age?: number | null;
+  national_id?: string | null;
+  address?: string | null;
+  referral?: string | null;
+  occupation?: string | null;
 };
 
 const MOCK_PRESCRIPTIONS = [
@@ -382,7 +389,18 @@ export default function AdminPage() {
   const [providerTab, setProviderTab] = useState<"Providers" | "Attendance">("Providers");
   const [branch, setBranch] = useState<string>(""); // branch id; empty = all branches
   const [lang, setLang] = useState<"EN" | "AR">("EN");
-  const [notifCount] = useState(1);
+  const [showQuickActionMenu, setShowQuickActionMenu] = useState(false);
+  const [showNotificationMenu, setShowNotificationMenu] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([
+    {
+      id: "system-1",
+      title: "Clinic System Active",
+      message: "Twilio SMS integration and Supabase auth are fully operational.",
+      time: "10m ago",
+      read: false,
+      type: "system"
+    }
+  ]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showExportCustomersModal, setShowExportCustomersModal] = useState(false);
   const [dbCustomers, setDbCustomers] = useState<Customer[]>([]);
@@ -409,6 +427,16 @@ export default function AdminPage() {
   const [custBuilding, setCustBuilding] = useState("");
   const [custFloor, setCustFloor] = useState("");
   const [custNote, setCustNote] = useState("");
+
+  // New Customer Profile fields
+  const [custAge, setCustAge] = useState("");
+  const [custNationalId, setCustNationalId] = useState("");
+  const [custAddress, setCustAddress] = useState("");
+  const [custReferral, setCustReferral] = useState("");
+  const [custOccupation, setCustOccupation] = useState("");
+
+  // Customer Profile details drawer state
+  const [viewingCustomerProfile, setViewingCustomerProfile] = useState<Customer | null>(null);
   const [couponSearch, setCouponSearch] = useState("");
   const [couponDate, setCouponDate] = useState("");
   const [couponStatus, setCouponStatus] = useState("All");
@@ -632,6 +660,45 @@ export default function AdminPage() {
 
   // per-service toggle state: visible & status
   const [serviceToggles, setServiceToggles] = useState<Record<number, { visible: boolean; active: boolean }>>({});
+
+  // Synchronize dynamic bookings into notifications list
+  useEffect(() => {
+    if (!allReservations || allReservations.length === 0) return;
+
+    const latestReservations = [...allReservations]
+      .sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      })
+      .slice(0, 5);
+
+    const generatedNotifications = latestReservations.map((res) => {
+      const isCancelled = res.status === "cancelled";
+      const serviceName = localServices.find((s) => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
+      const timeString = res.timeSlot || res.requestedTime || "unspecified time";
+      return {
+        id: res.id || String(Math.random()),
+        title: isCancelled ? "Appointment Cancelled" : "New Booking Received",
+        message: `${res.name || "A patient"} reserved ${serviceName} on ${res.date} at ${timeString}.`,
+        time: res.createdAt ? new Date(res.createdAt).toLocaleDateString() : "Just now",
+        read: false,
+        type: isCancelled ? "cancelled" : "booking"
+      };
+    });
+
+    setNotifications([
+      {
+        id: "system-1",
+        title: "Clinic System Active",
+        message: "Twilio SMS integration and Supabase auth are fully operational.",
+        time: "Active",
+        read: false,
+        type: "system"
+      },
+      ...generatedNotifications
+    ]);
+  }, [allReservations, localServices]);
 
   // Auth and Role Management effects & handlers
   useEffect(() => {
@@ -1149,7 +1216,37 @@ export default function AdminPage() {
   const [providerFormRating, setProviderFormRating] = useState(5);
   const [providerFormMore, setProviderFormMore] = useState(0);
   const [providerFormSelectedServices, setProviderFormSelectedServices] = useState<string[]>([]);
+  const [providerFormImage, setProviderFormImage] = useState("");
+  const [providerFormPhone, setProviderFormPhone] = useState("");
+  const [providerFormGender, setProviderFormGender] = useState<"Male" | "Female" | "">("");
+  const [providerFormAge, setProviderFormAge] = useState<string>("");
+  const [providerFormSpecialty, setProviderFormSpecialty] = useState("");
+  const [providerFormNationalId, setProviderFormNationalId] = useState("");
+  const [providerFormBranchId, setProviderFormBranchId] = useState("");
+  const [providerFormStartDate, setProviderFormStartDate] = useState("");
+  const [providerFormWorkingDaysHours, setProviderFormWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string }>>({
+    Sunday: { isOpen: false, start: "10:00", end: "20:00" },
+    Monday: { isOpen: false, start: "10:00", end: "20:00" },
+    Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
+    Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
+    Thursday: { isOpen: false, start: "10:00", end: "20:00" },
+    Friday: { isOpen: false, start: "10:00", end: "20:00" },
+    Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+  });
   const [savingProvider, setSavingProvider] = useState(false);
+  const [attendanceDate, setAttendanceDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [savingAttendanceId, setSavingAttendanceId] = useState<string | null>(null);
+
+  const [showProviderFilterPanel, setShowProviderFilterPanel] = useState(false);
+  const [providerFilterBranchId, setProviderFilterBranchId] = useState("All");
+  const [providerFilterSpecialty, setProviderFilterSpecialty] = useState("All");
+  const [providerFilterGender, setProviderFilterGender] = useState("All");
+  const [providerSearchQuery, setProviderSearchQuery] = useState("");
 
   const [loadingPageSettings, setLoadingPageSettings] = useState(false);
   const [savingPageSettings, setSavingPageSettings] = useState(false);
@@ -1433,6 +1530,61 @@ export default function AdminPage() {
       .catch((err) => console.error("fetchProviders error:", err));
   }
 
+  async function fetchAttendance(dateStr: string) {
+    setLoadingAttendance(true);
+    try {
+      const res = await fetch(`/api/provider-attendance?date=${dateStr}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setAttendanceRecords(data);
+      } else {
+        console.error("Failed to fetch attendance");
+      }
+    } catch (err) {
+      console.error("fetchAttendance error:", err);
+    } finally {
+      setLoadingAttendance(false);
+    }
+  }
+
+  async function handleToggleAttendance(providerId: string, status: "Present" | "Absent" | "On Leave") {
+    setSavingAttendanceId(providerId);
+    try {
+      const existing = attendanceRecords.find(r => r.provider_id === providerId);
+      const payload = {
+        providerId,
+        date: attendanceDate,
+        status,
+        checkIn: status === "Present" ? "09:00" : null,
+        checkOut: status === "Present" ? "17:00" : null,
+        notes: existing?.notes || ""
+      };
+
+      const res = await fetch("/api/provider-attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        fetchAttendance(attendanceDate);
+      } else {
+        alert("Failed to save attendance record.");
+      }
+    } catch (err) {
+      console.error("handleToggleAttendance error:", err);
+      alert("Error saving attendance.");
+    } finally {
+      setSavingAttendanceId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (providerTab === "Attendance") {
+      fetchAttendance(attendanceDate);
+    }
+  }, [providerTab, attendanceDate, fetchAttendance]);
+
   function openAddProviderModal() {
     setProviderModalMode("add");
     setProviderEditingId(null);
@@ -1440,6 +1592,23 @@ export default function AdminPage() {
     setProviderFormRating(5);
     setProviderFormMore(0);
     setProviderFormSelectedServices([]);
+    setProviderFormImage("");
+    setProviderFormPhone("");
+    setProviderFormGender("");
+    setProviderFormAge("");
+    setProviderFormSpecialty("");
+    setProviderFormNationalId("");
+    setProviderFormBranchId(branches.length > 0 ? branches[0].id : "");
+    setProviderFormStartDate("");
+    setProviderFormWorkingDaysHours({
+      Sunday: { isOpen: false, start: "10:00", end: "20:00" },
+      Monday: { isOpen: false, start: "10:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "10:00", end: "20:00" },
+      Friday: { isOpen: false, start: "10:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+    });
     setShowProviderModal(true);
   }
 
@@ -1450,6 +1619,23 @@ export default function AdminPage() {
     setProviderFormRating(provider.rating || 5);
     setProviderFormMore(provider.more || 0);
     setProviderFormSelectedServices(provider.services || []);
+    setProviderFormImage(provider.image || "");
+    setProviderFormPhone(provider.phone || "");
+    setProviderFormGender(provider.gender || "");
+    setProviderFormAge(provider.age ? String(provider.age) : "");
+    setProviderFormSpecialty(provider.specialty || "");
+    setProviderFormNationalId(provider.nationalId || "");
+    setProviderFormBranchId(provider.branchId || "");
+    setProviderFormStartDate(provider.startDate || "");
+    setProviderFormWorkingDaysHours(provider.workingDaysHours || {
+      Sunday: { isOpen: false, start: "10:00", end: "20:00" },
+      Monday: { isOpen: false, start: "10:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "10:00", end: "20:00" },
+      Friday: { isOpen: false, start: "10:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+    });
     setShowProviderModal(true);
   }
 
@@ -1465,7 +1651,16 @@ export default function AdminPage() {
       name: providerFormName.trim(),
       services: providerFormSelectedServices,
       rating: Number(providerFormRating),
-      more: Math.max(0, providerFormSelectedServices.length - 2)
+      more: Math.max(0, providerFormSelectedServices.length - 2),
+      image: providerFormImage || null,
+      phone: providerFormPhone || null,
+      gender: providerFormGender || null,
+      age: providerFormAge ? Number(providerFormAge) : null,
+      specialty: providerFormSpecialty || null,
+      nationalId: providerFormNationalId || null,
+      workingDaysHours: providerFormWorkingDaysHours,
+      branchId: providerFormBranchId || null,
+      startDate: providerFormStartDate || null
     };
 
     const isEdit = providerModalMode === "edit";
@@ -2005,6 +2200,11 @@ export default function AdminPage() {
     setCustBuilding("");
     setCustFloor("");
     setCustNote("");
+    setCustAge("");
+    setCustNationalId("");
+    setCustAddress("");
+    setCustReferral("");
+    setCustOccupation("");
     setCustomerFormError("");
     setSelectedCustomerForEdit(null);
     setShowCustomerFormModal(true);
@@ -2024,6 +2224,11 @@ export default function AdminPage() {
     setCustBuilding(c.building_no || "");
     setCustFloor(c.floor_no || "");
     setCustNote(c.note || "");
+    setCustAge(c.age !== undefined && c.age !== null ? String(c.age) : "");
+    setCustNationalId(c.national_id || "");
+    setCustAddress(c.address || "");
+    setCustReferral(c.referral || "");
+    setCustOccupation(c.occupation || "");
     setCustomerFormError("");
     setSelectedCustomerForEdit(c);
     setShowCustomerFormModal(true);
@@ -2039,13 +2244,25 @@ export default function AdminPage() {
       return;
     }
 
+    // Validate Egyptian mobile number format
+    let cleanedMobile = custMobile.trim();
+    if (cleanedMobile.startsWith("+20")) {
+      cleanedMobile = "0" + cleanedMobile.slice(3);
+    } else if (cleanedMobile.startsWith("0020")) {
+      cleanedMobile = "0" + cleanedMobile.slice(4);
+    }
+    if (!/^01[0125]\d{8}$/.test(cleanedMobile)) {
+      setCustomerFormError("Please enter a valid Egyptian mobile number (11 digits, starting with 010, 011, 012, or 015).");
+      return;
+    }
+
     setSavingCustomer(true);
     setCustomerFormError("");
 
     const payload = {
       id: selectedCustomerForEdit?.id || undefined,
       name: custName.trim(),
-      mobile: custMobile.trim(),
+      mobile: cleanedMobile,
       email: custEmail.trim() || null,
       gender: custGender || null,
       active: custActive,
@@ -2057,6 +2274,12 @@ export default function AdminPage() {
       building_no: custBuilding.trim() || null,
       floor_no: custFloor.trim() || null,
       note: custNote.trim() || null,
+      // new demographic fields
+      age: custAge ? parseInt(custAge) : null,
+      national_id: custNationalId.trim() || null,
+      address: custAddress.trim() || null,
+      referral: custReferral.trim() || null,
+      occupation: custOccupation.trim() || null,
     };
 
     fetch("/api/customers", {
@@ -2406,6 +2629,28 @@ export default function AdminPage() {
       </div>
     );
   }
+  const uniqueSpecialties = Array.from(new Set(providers.map((p) => p.specialty).filter(Boolean)));
+  const filteredProviders = providers.filter((p) => {
+    if (providerFilterBranchId !== "All" && p.branchId !== providerFilterBranchId) return false;
+    if (providerFilterSpecialty !== "All" && p.specialty !== providerFilterSpecialty) return false;
+    if (providerFilterGender !== "All" && p.gender !== providerFilterGender) return false;
+    if (providerSearchQuery.trim()) {
+      const q = providerSearchQuery.toLowerCase();
+      const nameMatch = p.name?.toLowerCase().includes(q);
+      const specMatch = p.specialty?.toLowerCase().includes(q);
+      const phoneMatch = p.phone?.toLowerCase().includes(q);
+      if (!nameMatch && !specMatch && !phoneMatch) return false;
+    }
+    return true;
+  });
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  function handleMarkAllAsRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }
+  function handleMarkAsRead(id: string) {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  }
 
   return (
     <div className="min-h-screen bg-[#F2EFE9] text-[#1F251A]">
@@ -2598,19 +2843,146 @@ export default function AdminPage() {
 
             {/* Right: new entry, notifications, user profile */}
             <div className="flex items-center gap-3">
-              <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36] text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26]">
-                <Plus size={18} />
-              </button>
+              {/* Quick Actions Dropdown */}
               <div className="relative">
-                <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/8 text-[#414E36] transition hover:bg-[#414E36]/15">
-                  <Bell size={18} />
+                <button
+                  onClick={() => {
+                    setShowQuickActionMenu(prev => !prev);
+                    setShowNotificationMenu(false);
+                  }}
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-[#FBFBF9] shadow-sm transition ${
+                    showQuickActionMenu ? "bg-[#2e3a26]" : "bg-[#414E36] hover:bg-[#2e3a26]"
+                  }`}
+                  title="Quick Actions"
+                >
+                  <Plus size={18} className={`transition-transform duration-200 ${showQuickActionMenu ? "rotate-45" : ""}`} />
                 </button>
-                {notifCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                    {notifCount}
-                  </span>
+                {showQuickActionMenu && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-[#E6E9EB] bg-white p-2 shadow-[0_15px_40px_rgba(47,61,41,0.12)] z-50 animate-fadeIn">
+                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#E6E9EB] mb-1">
+                      Quick Creation
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowQuickActionMenu(false);
+                        setShowAddBookingModal(true);
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                    >
+                      <Plus size={14} className="text-[#C4AE7C]" /> New Appointment
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowQuickActionMenu(false);
+                        handleOpenAddCustomer();
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                    >
+                      <Plus size={14} className="text-[#C4AE7C]" /> New Patient
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowQuickActionMenu(false);
+                        openAddProviderModal();
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                    >
+                      <Plus size={14} className="text-[#C4AE7C]" /> New Doctor / Provider
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowQuickActionMenu(false);
+                        setShowAddCategoryModal(true);
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                    >
+                      <Plus size={14} className="text-[#C4AE7C]" /> New Service Category
+                    </button>
+                  </div>
                 )}
               </div>
+
+              {/* Notifications Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowNotificationMenu(prev => !prev);
+                    setShowQuickActionMenu(false);
+                  }}
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${
+                    showNotificationMenu || unreadCount > 0
+                      ? "bg-[#C4AE7C]/20 text-[#414E36]"
+                      : "bg-[#414E36]/8 text-[#414E36] hover:bg-[#414E36]/15"
+                  }`}
+                  title="Notifications"
+                >
+                  <Bell size={18} />
+                </button>
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white pointer-events-none animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
+                {showNotificationMenu && (
+                  <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-[#E6E9EB] bg-white shadow-[0_15px_40px_rgba(47,61,41,0.12)] z-50 animate-fadeIn overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-[#E6E9EB] bg-[#FBFBF9] px-4 py-3">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#1F251A]">Notifications</span>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllAsRead}
+                          className="text-[11px] font-semibold text-[#C4AE7C] hover:underline"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto divide-y divide-[#E6E9EB]">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-gray-400 italic">No notifications yet.</div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => handleMarkAsRead(n.id)}
+                            className={`p-3 text-left transition hover:bg-[#EDF1EC]/40 cursor-pointer ${
+                              !n.read ? "bg-[#EDE4C8]/10" : ""
+                            }`}
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${
+                                n.type === "cancelled"
+                                  ? "bg-red-500"
+                                  : n.type === "system"
+                                    ? "bg-amber-500"
+                                    : "bg-green-500"
+                              }`} />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-semibold text-xs text-[#1F251A]">{n.title}</span>
+                                  <span className="text-[10px] text-[#5A6A51] whitespace-nowrap">{n.time}</span>
+                                </div>
+                                <p className="text-[11px] text-[#414E36] leading-relaxed mt-0.5">{n.message}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="border-t border-[#E6E9EB] bg-[#FBFBF9] px-4 py-2.5 text-center">
+                      <button
+                        onClick={() => {
+                          setShowNotificationMenu(false);
+                          setActiveNav("Bookings");
+                        }}
+                        className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26]"
+                      >
+                        View all bookings
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button className="flex items-center gap-2 rounded-xl border border-[#414E36]/10 bg-white px-3 py-1.5 text-sm font-medium text-[#1F251A] shadow-sm transition hover:bg-[#f5f4f0]">
                 <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#414E36] text-white text-xs font-bold">RC</span>
                 <span>Revera Clinics</span>
@@ -2667,73 +3039,280 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
-                      <Filter size={16} /> Filter
-                    </button>
+                    {providerTab === "Attendance" && (
+                      <div className="flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-2.5 shadow-sm">
+                        <label className="text-xs uppercase font-bold text-[#5A6A51] select-none">Date:</label>
+                        <input
+                          type="date"
+                          value={attendanceDate}
+                          onChange={(e) => setAttendanceDate(e.target.value)}
+                          className="bg-transparent text-sm text-[#1F251A] outline-none font-semibold cursor-pointer"
+                        />
+                      </div>
+                    )}
+                    
                     <button
-                      onClick={openAddProviderModal}
-                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                      onClick={() => setShowProviderFilterPanel(prev => !prev)}
+                      className={`inline-flex items-center gap-2 rounded-3xl border px-4 py-3 text-sm font-semibold transition ${
+                        showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()
+                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                          : "border-[#E6E9EB] bg-white text-[#414E36] hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]"
+                      }`}
                     >
-                      <Plus size={16} /> Add
+                      <Filter size={16} /> Filter
+                      {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()) && (
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#414E36] text-[10px] font-bold text-white">!</span>
+                      )}
                     </button>
+
+                    {providerTab === "Providers" && (
+                      <button
+                        onClick={openAddProviderModal}
+                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                      >
+                        <Plus size={16} /> Add
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                  <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                    <span>Name</span>
-                    <span>Bookings</span>
-                    <span>Services</span>
-                    <span>Rating</span>
-                  </div>
-                  <div className="divide-y divide-[#E6E9EB]">
-                    {providers.map((provider) => (
-                      <div key={provider.id || provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
-                        <span className="font-semibold text-[#1F251A]">{provider.name}</span>
-                        <span>{provider.bookings}</span>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {provider.services.slice(0, 2).map((service: string) => (
-                            <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
-                              {service}
-                            </span>
-                          ))}
-                          {provider.services.length > 2 && (
-                            <span
-                              className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36] cursor-help"
-                              title={provider.services.slice(2).join(", ")}
-                            >
-                              +{provider.services.length - 2} More
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="inline-flex items-center gap-2 text-[#5A6A51]">
-                            <Star size={16} className="text-[#C4AE7C]" />
-                            {provider.rating}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            {provider.id && (
-                              <button
-                                onClick={() => handleDeleteProvider(provider.id)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
-                                title="Delete Provider"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => openEditProviderModal(provider)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
-                              title="Edit Provider"
-                            >
-                              <Pencil size={14} />
-                            </button>
-                          </div>
-                        </div>
+                {/* Dynamic Filters Drawer */}
+                {showProviderFilterPanel && (
+                  <div className="mb-6 grid grid-cols-1 gap-4 rounded-[24px] border border-[#E6E9EB] bg-[#F7F7F9] p-5 md:grid-cols-4 items-end shadow-sm">
+                    {/* Search Input */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Search Doctor</label>
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                        <input
+                          type="text"
+                          value={providerSearchQuery}
+                          onChange={(e) => setProviderSearchQuery(e.target.value)}
+                          placeholder="Search name, specialty..."
+                          className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-1 focus:ring-[#C4AE7C]"
+                        />
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Branch Dropdown */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Branch</label>
+                      <select
+                        value={providerFilterBranchId}
+                        onChange={(e) => setProviderFilterBranchId(e.target.value)}
+                        className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                      >
+                        <option value="All">All Branches</option>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>{b.name_en}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Specialty Dropdown */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Specialty</label>
+                      <select
+                        value={providerFilterSpecialty}
+                        onChange={(e) => setProviderFilterSpecialty(e.target.value)}
+                        className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                      >
+                        <option value="All">All Specialties</option>
+                        {uniqueSpecialties.map((spec) => (
+                          <option key={spec} value={spec}>{spec}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Gender and Clear Options */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Gender</label>
+                        <select
+                          value={providerFilterGender}
+                          onChange={(e) => setProviderFilterGender(e.target.value)}
+                          className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                        >
+                          <option value="All">All</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setProviderFilterBranchId("All");
+                          setProviderFilterSpecialty("All");
+                          setProviderFilterGender("All");
+                          setProviderSearchQuery("");
+                        }}
+                        className="h-[42px] w-full rounded-2xl border border-red-200 bg-red-50/50 text-xs font-bold text-red-600 hover:bg-red-100/70 transition"
+                      >
+                        Clear
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {providerTab === "Providers" ? (
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                      <span>Name</span>
+                      <span>Bookings</span>
+                      <span>Services</span>
+                      <span>Rating</span>
+                    </div>
+                    <div className="divide-y divide-[#E6E9EB]">
+                      {filteredProviders.length === 0 ? (
+                        <div className="text-center py-16 text-gray-400 italic">No doctors/providers matching filters.</div>
+                      ) : (
+                        filteredProviders.map((provider) => (
+                          <div key={provider.id || provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
+                            <span className="font-semibold text-[#1F251A]">{provider.name}</span>
+                            <span>{provider.bookings}</span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {provider.services.slice(0, 2).map((service: string) => (
+                                <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
+                                  {service}
+                                </span>
+                              ))}
+                              {provider.services.length > 2 && (
+                                <span
+                                  className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36] cursor-help"
+                                  title={provider.services.slice(2).join(", ")}
+                                >
+                                  +{provider.services.length - 2} More
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="inline-flex items-center gap-2 text-[#5A6A51]">
+                                <Star size={16} className="text-[#C4AE7C]" />
+                                {provider.rating}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                {provider.id && (
+                                  <button
+                                    onClick={() => handleDeleteProvider(provider.id)}
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
+                                    title="Delete Provider"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => openEditProviderModal(provider)}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
+                                  title="Edit Provider"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <div className="grid grid-cols-[2fr_1fr_1.5fr_2fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.12em] text-[#5A6A51]">
+                      <span>Doctor / Provider</span>
+                      <span>Branch</span>
+                      <span>Status</span>
+                      <span className="text-center">Set Attendance</span>
+                    </div>
+                    <div className="divide-y divide-[#E6E9EB]">
+                      {loadingAttendance ? (
+                        <div className="flex items-center justify-center py-16 text-[#5A6A51]">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#C4AE7C] border-t-transparent mr-2.5"></div>
+                          <span className="font-medium">Loading attendance data...</span>
+                        </div>
+                      ) : filteredProviders.length === 0 ? (
+                        <div className="text-center py-16 text-gray-400 italic">No doctors/providers matching filters.</div>
+                      ) : (
+                        filteredProviders.map((provider) => {
+                          const record = attendanceRecords.find((r) => r.provider_id === provider.id);
+                          const currentStatus = record?.status || "Unmarked";
+                          const branchName = branches.find((b) => b.id === provider.branchId)?.name_en || "Default/All";
+                          const isSaving = savingAttendanceId === provider.id;
+
+                          return (
+                            <div key={provider.id} className="grid grid-cols-[2fr_1fr_1.5fr_2fr] items-center gap-0 px-6 py-4.5 text-sm text-[#414E36]">
+                              <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-full bg-[#EDF1EC] flex items-center justify-center font-bold text-[#414E36]">
+                                  {provider.name.charAt(0)}
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="font-semibold text-[#1F251A]">{provider.name}</span>
+                                  {provider.specialty && <span className="text-xs text-[#5A6A51]">{provider.specialty}</span>}
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <span className="text-xs font-semibold text-[#5A6A51] bg-[#EDF1EC] px-2.5 py-1 rounded-md">
+                                  {branchName}
+                                </span>
+                              </div>
+
+                              <div>
+                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${
+                                  currentStatus === "Present"
+                                    ? "bg-green-100 text-green-800"
+                                    : currentStatus === "Absent"
+                                      ? "bg-red-100 text-red-800"
+                                      : currentStatus === "On Leave"
+                                        ? "bg-blue-100 text-blue-800"
+                                        : "bg-gray-100 text-gray-600"
+                                }`}>
+                                  {currentStatus}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-center gap-2">
+                                {isSaving ? (
+                                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#414E36] border-t-transparent"></div>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleToggleAttendance(provider.id, "Present")}
+                                      className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                                        currentStatus === "Present"
+                                          ? "bg-green-700 text-[#FBFBF9] shadow-sm"
+                                          : "border border-green-200 text-green-800 hover:bg-green-50"
+                                      }`}
+                                    >
+                                      Present
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleAttendance(provider.id, "Absent")}
+                                      className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                                        currentStatus === "Absent"
+                                          ? "bg-red-700 text-[#FBFBF9] shadow-sm"
+                                          : "border border-red-200 text-red-800 hover:bg-red-50"
+                                      }`}
+                                    >
+                                      Absent
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleAttendance(provider.id, "On Leave")}
+                                      className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                                        currentStatus === "On Leave"
+                                          ? "bg-blue-700 text-[#FBFBF9] shadow-sm"
+                                          : "border border-blue-200 text-blue-800 hover:bg-blue-50"
+                                      }`}
+                                    >
+                                      Leave
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
           )}
@@ -5130,18 +5709,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Stat cards */}
-              <div className="mb-6 flex flex-wrap gap-4">
-                <div className="min-w-[180px] rounded-2xl border border-[#414E36]/10 bg-white px-6 py-4 shadow-sm">
-                  <p className="text-2xl font-bold text-[#1F251A]">0</p>
-                  <p className="mt-1 text-sm text-[#5A6A51]">Remaining Amount</p>
-                </div>
-                <div className="min-w-[180px] rounded-2xl border border-[#414E36]/10 bg-white px-6 py-4 shadow-sm">
-                  <p className="text-2xl font-bold text-[#1F251A]">0</p>
-                  <p className="mt-1 text-sm text-[#5A6A51]">Total Wallet Balance</p>
-                </div>
-              </div>
-
               {/* Search */}
               <div className="mb-4 flex items-center gap-3">
                 <div className="relative flex-1 max-w-xs">
@@ -5161,18 +5728,17 @@ export default function AdminPage() {
                   <thead>
                     <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Customer</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Phone</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Email</th>
                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Created At</th>
                       <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Bookings</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Spent</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Outstanding</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Wallet</th>
                       <th className="px-4 py-3"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#414E36]/8">
                     {filteredCustomers.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-5 py-8 text-center text-[#5A6A51]">
+                        <td colSpan={6} className="px-5 py-8 text-center text-[#5A6A51]">
                           No customers found.
                         </td>
                       </tr>
@@ -5182,25 +5748,33 @@ export default function AdminPage() {
                       const dateStr = dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
                       const timeStr = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
                       const uniqueKey = c.id || c.email || c.phone;
+                      const displayPhone = c.mobile || c.phone || "—";
+                      const displayEmail = c.email || "—";
                       return (
                         <tr key={uniqueKey} className="transition hover:bg-[#F9F9F7]">
                           <td className="px-5 py-4 font-semibold text-[#1F251A]">{c.name}</td>
+                          <td className="px-5 py-4 text-[#1F251A]">{displayPhone}</td>
+                          <td className="px-5 py-4 text-[#5A6A51]">{displayEmail}</td>
                           <td className="px-5 py-4 text-[#5A6A51]">
                             <span className="block font-medium text-[#1F251A]">{dateStr}</span>
                             <span className="text-xs">{timeStr}</span>
                           </td>
                           <td className="px-5 py-4 text-center text-[#1F251A]">{c.bookings}</td>
-                          <td className="px-5 py-4 text-center text-[#1F251A]">{c.spent}</td>
-                          <td className="px-5 py-4 text-center text-[#1F251A]">{c.outstanding}</td>
-                          <td className="px-5 py-4 text-center text-[#1F251A]">{c.wallet}</td>
                           <td className="px-4 py-4 text-center">
                             <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => setViewingCustomerProfile(c)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                title="View Customer Profile & Booking History"
+                              >
+                                <Info size={14} />
+                              </button>
                               <button
                                 onClick={() => handleOpenEditCustomer(c)}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
                                 title="Edit Customer"
                               >
-                                <Info size={14} />
+                                <Pencil size={12} />
                               </button>
                               <button
                                 onClick={() => setDeleteCustomerTarget(c)}
@@ -10363,35 +10937,141 @@ export default function AdminPage() {
             </div>
 
             {/* Scrollable Form Content */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Dr. Jane Doe"
-                  value={providerFormName}
-                  onChange={(e) => setProviderFormName(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                />
+            <div className="flex-1 overflow-y-auto space-y-5 pr-1">
+              
+              {/* Row 1: Name & Specialty */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dr. Jane Doe"
+                    value={providerFormName}
+                    onChange={(e) => setProviderFormName(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Specialty</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dermatologist"
+                    value={providerFormSpecialty}
+                    onChange={(e) => setProviderFormSpecialty(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Rating (1-5)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="5"
-                  step="0.1"
-                  placeholder="e.g. 5"
-                  value={providerFormRating}
-                  onChange={(e) => setProviderFormRating(Number(e.target.value))}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                />
+              {/* Row 2: Phone & National ID */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 01012345678"
+                    value={providerFormPhone}
+                    onChange={(e) => setProviderFormPhone(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">National ID</label>
+                  <input
+                    type="text"
+                    placeholder="14-digit National ID"
+                    value={providerFormNationalId}
+                    onChange={(e) => setProviderFormNationalId(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
               </div>
 
+              {/* Row 3: Gender & Age */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Gender</label>
+                  <select
+                    value={providerFormGender}
+                    onChange={(e) => setProviderFormGender(e.target.value as "Male" | "Female" | "")}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Age</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 35"
+                    value={providerFormAge}
+                    onChange={(e) => setProviderFormAge(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: Branch & Start Date */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branch</label>
+                  <select
+                    value={providerFormBranchId}
+                    onChange={(e) => setProviderFormBranchId(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  >
+                    <option value="">Default/All Branches</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name_en} ({b.name_ar})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
+                  <input
+                    type="date"
+                    value={providerFormStartDate}
+                    onChange={(e) => setProviderFormStartDate(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              {/* Row 5: Rating & Provider Image URL/Base64 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-1">
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Rating (1-5)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    step="0.1"
+                    placeholder="e.g. 5"
+                    value={providerFormRating}
+                    onChange={(e) => setProviderFormRating(Number(e.target.value))}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Image URL or Base64</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. /images/doctors/dr-doe.jpg"
+                    value={providerFormImage}
+                    onChange={(e) => setProviderFormImage(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              {/* Services Offered */}
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Select Services Offered</label>
-                <div className="max-h-[30vh] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2">
+                <div className="max-h-[22vh] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2">
                   {allServicesList.map((svc) => {
                     const isChecked = providerFormSelectedServices.includes(svc.en);
                     return (
@@ -10417,6 +11097,65 @@ export default function AdminPage() {
                   })}
                 </div>
               </div>
+
+              {/* Weekly Working Schedule */}
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2.5">Weekly Working Days & Hours</label>
+                <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                  {Object.keys(providerFormWorkingDaysHours).map((day) => {
+                    const sched = providerFormWorkingDaysHours[day];
+                    return (
+                      <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
+                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={sched.isOpen}
+                            onChange={(e) => {
+                              setProviderFormWorkingDaysHours({
+                                ...providerFormWorkingDaysHours,
+                                [day]: { ...sched, isOpen: e.target.checked }
+                              });
+                            }}
+                            className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                          />
+                          <span className="text-xs font-bold text-[#414E36] w-24">{day}</span>
+                        </label>
+
+                        {sched.isOpen ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="time"
+                              value={sched.start}
+                              onChange={(e) => {
+                                setProviderFormWorkingDaysHours({
+                                  ...providerFormWorkingDaysHours,
+                                  [day]: { ...sched, start: e.target.value }
+                                });
+                              }}
+                              className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                            />
+                            <span className="text-xs text-[#5A6A51]">to</span>
+                            <input
+                              type="time"
+                              value={sched.end}
+                              onChange={(e) => {
+                                setProviderFormWorkingDaysHours({
+                                  ...providerFormWorkingDaysHours,
+                                  [day]: { ...sched, end: e.target.value }
+                                });
+                              }}
+                              className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">Off / Closed</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
             </div>
 
             {/* Footer Actions */}
@@ -10568,7 +11307,7 @@ export default function AdminPage() {
 
               {/* Personal Information section */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Personal Information</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Patient Profile Details</h4>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-semibold text-[#5A6A51] mb-1">
@@ -10591,7 +11330,7 @@ export default function AdminPage() {
                       type="text"
                       value={custMobile}
                       onChange={(e) => setCustMobile(e.target.value)}
-                      placeholder="e.g. +201012345678"
+                      placeholder="e.g. 01012345678"
                       className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
                       required
                     />
@@ -10607,6 +11346,16 @@ export default function AdminPage() {
                     />
                   </div>
                   <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Age</label>
+                    <input
+                      type="number"
+                      value={custAge}
+                      onChange={(e) => setCustAge(e.target.value)}
+                      placeholder="e.g. 28"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
                     <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Gender</label>
                     <select
                       value={custGender}
@@ -10614,38 +11363,67 @@ export default function AdminPage() {
                       className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
                     >
                       <option value="">Select Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
+                      <option value="Male">Male / ذكر</option>
+                      <option value="Female">Female / أنثى</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">National ID</label>
+                    <input
+                      type="text"
+                      value={custNationalId}
+                      onChange={(e) => setCustNationalId(e.target.value)}
+                      placeholder="Enter 14-digit National ID"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Referral Source</label>
+                    <input
+                      type="text"
+                      value={custReferral}
+                      onChange={(e) => setCustReferral(e.target.value)}
+                      placeholder="e.g. Facebook page, Friend"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Occupation</label>
+                    <input
+                      type="text"
+                      value={custOccupation}
+                      onChange={(e) => setCustOccupation(e.target.value)}
+                      placeholder="e.g. Engineer, Doctor"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
                   </div>
                 </div>
               </div>
 
               <hr className="border-[#414E36]/10" />
 
-              {/* Financials & Status section */}
+              {/* Address details */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Financials & Status</h4>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Spent Amount (EGP)</label>
-                    <input
-                      type="number"
-                      value={custSpent}
-                      onChange={(e) => setCustSpent(e.target.value)}
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Outstanding (EGP)</label>
-                    <input
-                      type="number"
-                      value={custOutstanding}
-                      onChange={(e) => setCustOutstanding(e.target.value)}
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div className="flex items-center pt-5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Address & Location Details</h4>
+                <div>
+                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Address</label>
+                  <input
+                    type="text"
+                    value={custAddress}
+                    onChange={(e) => setCustAddress(e.target.value)}
+                    placeholder="e.g. Tagamoa, Street 90, Building 14"
+                    className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              <hr className="border-[#414E36]/10" />
+
+              {/* Status and Notes section */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Profile Status & Notes</h4>
+                <div className="space-y-4">
+                  <div className="flex items-center">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -10656,81 +11434,16 @@ export default function AdminPage() {
                       <span className="text-sm font-semibold text-[#1F251A]">Active Profile</span>
                     </label>
                   </div>
-                </div>
-              </div>
-
-              <hr className="border-[#414E36]/10" />
-
-              {/* Address / Location Details section */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Address & Location Details</h4>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Area</label>
-                    <input
-                      type="text"
-                      value={custArea}
-                      onChange={(e) => setCustArea(e.target.value)}
-                      placeholder="e.g. New Cairo"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Internal Notes (Optional)</label>
+                    <textarea
+                      value={custNote}
+                      onChange={(e) => setCustNote(e.target.value)}
+                      placeholder="Add patient history, clinic preferences, or other notes..."
+                      rows={3}
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] resize-none"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Location Name</label>
-                    <input
-                      type="text"
-                      value={custLocationName}
-                      onChange={(e) => setCustLocationName(e.target.value)}
-                      placeholder="e.g. Tagamoa Branch"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Street Name</label>
-                    <input
-                      type="text"
-                      value={custStreet}
-                      onChange={(e) => setCustStreet(e.target.value)}
-                      placeholder="e.g. El-Teseen St."
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Building No.</label>
-                    <input
-                      type="text"
-                      value={custBuilding}
-                      onChange={(e) => setCustBuilding(e.target.value)}
-                      placeholder="e.g. 14B"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Floor No.</label>
-                    <input
-                      type="text"
-                      value={custFloor}
-                      onChange={(e) => setCustFloor(e.target.value)}
-                      placeholder="e.g. 3rd Floor"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <hr className="border-[#414E36]/10" />
-
-              {/* Notes section */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Notes & Observations</h4>
-                <div>
-                  <textarea
-                    value={custNote}
-                    onChange={(e) => setCustNote(e.target.value)}
-                    placeholder="Add patient history, clinic preferences, or other notes..."
-                    rows={3}
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] resize-none"
-                  />
                 </div>
               </div>
             </div>
@@ -10804,6 +11517,201 @@ export default function AdminPage() {
                 className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {deletingCustomer ? "Deleting..." : "Yes, Delete Customer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CUSTOMER PROFILE & BOOKING HISTORY DRAWER ── */}
+      {viewingCustomerProfile && (
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-xs transition-opacity duration-300"
+          onClick={() => setViewingCustomerProfile(null)}
+        >
+          <div
+            className="w-full max-w-2xl bg-[#FBFBF9] h-full shadow-2xl flex flex-col animate-slideOver overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10">
+                  <User size={20} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[#1F251A]">{viewingCustomerProfile.name}</h3>
+                  <p className="text-xs text-[#5A6A51]">Patient Profile & Clinic Engagement History</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingCustomerProfile(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Drawer Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+              {/* Profile Details Cards */}
+              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Personal Profile</h4>
+                  <button
+                    onClick={() => {
+                      handleOpenEditCustomer(viewingCustomerProfile);
+                      setViewingCustomerProfile(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+                  >
+                    <Pencil size={12} /> Edit Profile
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
+                    <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Age</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Gender</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
+                    <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Referral Source</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Profile Status</span>
+                    <span className={`inline-flex items-center gap-1 text-xs font-bold ${
+                      viewingCustomerProfile.active !== false ? "text-green-700" : "text-gray-400"
+                    }`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-green-600" : "bg-gray-400"}`} />
+                      {viewingCustomerProfile.active !== false ? "Active Patient" : "Inactive"}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Address</span>
+                    <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
+                      {viewingCustomerProfile.address || [
+                        viewingCustomerProfile.building_no,
+                        viewingCustomerProfile.street_name,
+                        viewingCustomerProfile.floor_no,
+                        viewingCustomerProfile.area,
+                        viewingCustomerProfile.location_name
+                      ].filter(Boolean).join(", ") || "—"}
+                    </span>
+                  </div>
+                  {viewingCustomerProfile.note && (
+                    <div className="col-span-2">
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Notes & Observations</span>
+                      <p className="text-xs text-[#5A6A51] bg-amber-50/40 border border-amber-200/50 rounded-xl p-3 leading-relaxed">
+                        {viewingCustomerProfile.note}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Booking History Card */}
+              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                <div className="border-b border-[#414E36]/10 pb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Booking History</h4>
+                  <span className="text-xs font-semibold bg-[#EDF1EC] text-[#414E36] px-2.5 py-1 rounded-md">
+                    Total: {
+                      allReservations.filter(
+                        (r) =>
+                          r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
+                          r.customerId === viewingCustomerProfile.id
+                      ).length
+                    }
+                  </span>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-[#E6E9EB]">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] font-bold text-[#5A6A51] uppercase tracking-wider text-[10px]">
+                        <th className="px-4 py-3 text-left">Date / Slot</th>
+                        <th className="px-4 py-3 text-left">Service</th>
+                        <th className="px-4 py-3 text-left">Provider</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                      {(() => {
+                        const history = allReservations.filter(
+                          (r) =>
+                            r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
+                            r.customerId === viewingCustomerProfile.id
+                        );
+                        if (history.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={4} className="px-4 py-6 text-center text-gray-400 italic">
+                                No booking history records found for this patient.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return history.map((res) => {
+                          const resDt = new Date(res.date);
+                          const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                          const serv = localServices.find(s => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
+                          const isApproved = res.status === "approved";
+                          const isRejected = res.status === "rejected";
+                          const isPending = res.status === "pending";
+                          return (
+                            <tr key={res.id} className="hover:bg-[#F9F9F7]">
+                              <td className="px-4 py-3">
+                                <span className="block font-semibold text-[#1F251A]">{formattedDate}</span>
+                                <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "—"}</span>
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
+                              <td className="px-4 py-3">{res.doctorName || "—"}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                  isApproved ? "bg-green-50 text-green-700" :
+                                  isRejected ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"
+                                }`}>
+                                  {res.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="flex items-center justify-end px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+              <button
+                type="button"
+                onClick={() => setViewingCustomerProfile(null)}
+                className="rounded-lg border border-[#414E36]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+              >
+                Close Profile
               </button>
             </div>
           </div>
