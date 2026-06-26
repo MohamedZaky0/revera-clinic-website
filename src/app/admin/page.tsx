@@ -88,6 +88,7 @@ type Req = {
   doctorName?: string | null;
   createdAt?: string;
   branchId?: string | null;
+  customerId?: string | null;
 };
 
 const SLOTS = ALL_15MIN_SLOTS;
@@ -158,6 +159,12 @@ type Customer = {
   note?: string | null;
   created_at?: string;
   updated_at?: string;
+  // new demographic fields
+  age?: number | null;
+  national_id?: string | null;
+  address?: string | null;
+  referral?: string | null;
+  occupation?: string | null;
 };
 
 const MOCK_PRESCRIPTIONS = [
@@ -409,6 +416,16 @@ export default function AdminPage() {
   const [custBuilding, setCustBuilding] = useState("");
   const [custFloor, setCustFloor] = useState("");
   const [custNote, setCustNote] = useState("");
+
+  // New Customer Profile fields
+  const [custAge, setCustAge] = useState("");
+  const [custNationalId, setCustNationalId] = useState("");
+  const [custAddress, setCustAddress] = useState("");
+  const [custReferral, setCustReferral] = useState("");
+  const [custOccupation, setCustOccupation] = useState("");
+
+  // Customer Profile details drawer state
+  const [viewingCustomerProfile, setViewingCustomerProfile] = useState<Customer | null>(null);
   const [couponSearch, setCouponSearch] = useState("");
   const [couponDate, setCouponDate] = useState("");
   const [couponStatus, setCouponStatus] = useState("All");
@@ -2005,6 +2022,11 @@ export default function AdminPage() {
     setCustBuilding("");
     setCustFloor("");
     setCustNote("");
+    setCustAge("");
+    setCustNationalId("");
+    setCustAddress("");
+    setCustReferral("");
+    setCustOccupation("");
     setCustomerFormError("");
     setSelectedCustomerForEdit(null);
     setShowCustomerFormModal(true);
@@ -2024,6 +2046,11 @@ export default function AdminPage() {
     setCustBuilding(c.building_no || "");
     setCustFloor(c.floor_no || "");
     setCustNote(c.note || "");
+    setCustAge(c.age !== undefined && c.age !== null ? String(c.age) : "");
+    setCustNationalId(c.national_id || "");
+    setCustAddress(c.address || "");
+    setCustReferral(c.referral || "");
+    setCustOccupation(c.occupation || "");
     setCustomerFormError("");
     setSelectedCustomerForEdit(c);
     setShowCustomerFormModal(true);
@@ -2039,13 +2066,25 @@ export default function AdminPage() {
       return;
     }
 
+    // Validate Egyptian mobile number format
+    let cleanedMobile = custMobile.trim();
+    if (cleanedMobile.startsWith("+20")) {
+      cleanedMobile = "0" + cleanedMobile.slice(3);
+    } else if (cleanedMobile.startsWith("0020")) {
+      cleanedMobile = "0" + cleanedMobile.slice(4);
+    }
+    if (!/^01[0125]\d{8}$/.test(cleanedMobile)) {
+      setCustomerFormError("Please enter a valid Egyptian mobile number (11 digits, starting with 010, 011, 012, or 015).");
+      return;
+    }
+
     setSavingCustomer(true);
     setCustomerFormError("");
 
     const payload = {
       id: selectedCustomerForEdit?.id || undefined,
       name: custName.trim(),
-      mobile: custMobile.trim(),
+      mobile: cleanedMobile,
       email: custEmail.trim() || null,
       gender: custGender || null,
       active: custActive,
@@ -2057,6 +2096,12 @@ export default function AdminPage() {
       building_no: custBuilding.trim() || null,
       floor_no: custFloor.trim() || null,
       note: custNote.trim() || null,
+      // new demographic fields
+      age: custAge ? parseInt(custAge) : null,
+      national_id: custNationalId.trim() || null,
+      address: custAddress.trim() || null,
+      referral: custReferral.trim() || null,
+      occupation: custOccupation.trim() || null,
     };
 
     fetch("/api/customers", {
@@ -5130,18 +5175,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Stat cards */}
-              <div className="mb-6 flex flex-wrap gap-4">
-                <div className="min-w-[180px] rounded-2xl border border-[#414E36]/10 bg-white px-6 py-4 shadow-sm">
-                  <p className="text-2xl font-bold text-[#1F251A]">0</p>
-                  <p className="mt-1 text-sm text-[#5A6A51]">Remaining Amount</p>
-                </div>
-                <div className="min-w-[180px] rounded-2xl border border-[#414E36]/10 bg-white px-6 py-4 shadow-sm">
-                  <p className="text-2xl font-bold text-[#1F251A]">0</p>
-                  <p className="mt-1 text-sm text-[#5A6A51]">Total Wallet Balance</p>
-                </div>
-              </div>
-
               {/* Search */}
               <div className="mb-4 flex items-center gap-3">
                 <div className="relative flex-1 max-w-xs">
@@ -5161,18 +5194,17 @@ export default function AdminPage() {
                   <thead>
                     <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Customer</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Phone</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Email</th>
                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Created At</th>
                       <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Bookings</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Spent</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Outstanding</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Wallet</th>
                       <th className="px-4 py-3"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#414E36]/8">
                     {filteredCustomers.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-5 py-8 text-center text-[#5A6A51]">
+                        <td colSpan={6} className="px-5 py-8 text-center text-[#5A6A51]">
                           No customers found.
                         </td>
                       </tr>
@@ -5182,25 +5214,33 @@ export default function AdminPage() {
                       const dateStr = dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
                       const timeStr = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
                       const uniqueKey = c.id || c.email || c.phone;
+                      const displayPhone = c.mobile || c.phone || "—";
+                      const displayEmail = c.email || "—";
                       return (
                         <tr key={uniqueKey} className="transition hover:bg-[#F9F9F7]">
                           <td className="px-5 py-4 font-semibold text-[#1F251A]">{c.name}</td>
+                          <td className="px-5 py-4 text-[#1F251A]">{displayPhone}</td>
+                          <td className="px-5 py-4 text-[#5A6A51]">{displayEmail}</td>
                           <td className="px-5 py-4 text-[#5A6A51]">
                             <span className="block font-medium text-[#1F251A]">{dateStr}</span>
                             <span className="text-xs">{timeStr}</span>
                           </td>
                           <td className="px-5 py-4 text-center text-[#1F251A]">{c.bookings}</td>
-                          <td className="px-5 py-4 text-center text-[#1F251A]">{c.spent}</td>
-                          <td className="px-5 py-4 text-center text-[#1F251A]">{c.outstanding}</td>
-                          <td className="px-5 py-4 text-center text-[#1F251A]">{c.wallet}</td>
                           <td className="px-4 py-4 text-center">
                             <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => setViewingCustomerProfile(c)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                title="View Customer Profile & Booking History"
+                              >
+                                <Info size={14} />
+                              </button>
                               <button
                                 onClick={() => handleOpenEditCustomer(c)}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
                                 title="Edit Customer"
                               >
-                                <Info size={14} />
+                                <Pencil size={12} />
                               </button>
                               <button
                                 onClick={() => setDeleteCustomerTarget(c)}
@@ -10568,7 +10608,7 @@ export default function AdminPage() {
 
               {/* Personal Information section */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Personal Information</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Patient Profile Details</h4>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-semibold text-[#5A6A51] mb-1">
@@ -10591,7 +10631,7 @@ export default function AdminPage() {
                       type="text"
                       value={custMobile}
                       onChange={(e) => setCustMobile(e.target.value)}
-                      placeholder="e.g. +201012345678"
+                      placeholder="e.g. 01012345678"
                       className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
                       required
                     />
@@ -10607,6 +10647,16 @@ export default function AdminPage() {
                     />
                   </div>
                   <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Age</label>
+                    <input
+                      type="number"
+                      value={custAge}
+                      onChange={(e) => setCustAge(e.target.value)}
+                      placeholder="e.g. 28"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
                     <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Gender</label>
                     <select
                       value={custGender}
@@ -10614,38 +10664,67 @@ export default function AdminPage() {
                       className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
                     >
                       <option value="">Select Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
+                      <option value="Male">Male / ذكر</option>
+                      <option value="Female">Female / أنثى</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">National ID</label>
+                    <input
+                      type="text"
+                      value={custNationalId}
+                      onChange={(e) => setCustNationalId(e.target.value)}
+                      placeholder="Enter 14-digit National ID"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Referral Source</label>
+                    <input
+                      type="text"
+                      value={custReferral}
+                      onChange={(e) => setCustReferral(e.target.value)}
+                      placeholder="e.g. Facebook page, Friend"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Occupation</label>
+                    <input
+                      type="text"
+                      value={custOccupation}
+                      onChange={(e) => setCustOccupation(e.target.value)}
+                      placeholder="e.g. Engineer, Doctor"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
                   </div>
                 </div>
               </div>
 
               <hr className="border-[#414E36]/10" />
 
-              {/* Financials & Status section */}
+              {/* Address details */}
               <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Financials & Status</h4>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Spent Amount (EGP)</label>
-                    <input
-                      type="number"
-                      value={custSpent}
-                      onChange={(e) => setCustSpent(e.target.value)}
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Outstanding (EGP)</label>
-                    <input
-                      type="number"
-                      value={custOutstanding}
-                      onChange={(e) => setCustOutstanding(e.target.value)}
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div className="flex items-center pt-5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Address & Location Details</h4>
+                <div>
+                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Address</label>
+                  <input
+                    type="text"
+                    value={custAddress}
+                    onChange={(e) => setCustAddress(e.target.value)}
+                    placeholder="e.g. Tagamoa, Street 90, Building 14"
+                    className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              <hr className="border-[#414E36]/10" />
+
+              {/* Status and Notes section */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Profile Status & Notes</h4>
+                <div className="space-y-4">
+                  <div className="flex items-center">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -10656,81 +10735,16 @@ export default function AdminPage() {
                       <span className="text-sm font-semibold text-[#1F251A]">Active Profile</span>
                     </label>
                   </div>
-                </div>
-              </div>
-
-              <hr className="border-[#414E36]/10" />
-
-              {/* Address / Location Details section */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Address & Location Details</h4>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Area</label>
-                    <input
-                      type="text"
-                      value={custArea}
-                      onChange={(e) => setCustArea(e.target.value)}
-                      placeholder="e.g. New Cairo"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Internal Notes (Optional)</label>
+                    <textarea
+                      value={custNote}
+                      onChange={(e) => setCustNote(e.target.value)}
+                      placeholder="Add patient history, clinic preferences, or other notes..."
+                      rows={3}
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] resize-none"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Location Name</label>
-                    <input
-                      type="text"
-                      value={custLocationName}
-                      onChange={(e) => setCustLocationName(e.target.value)}
-                      placeholder="e.g. Tagamoa Branch"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Street Name</label>
-                    <input
-                      type="text"
-                      value={custStreet}
-                      onChange={(e) => setCustStreet(e.target.value)}
-                      placeholder="e.g. El-Teseen St."
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Building No.</label>
-                    <input
-                      type="text"
-                      value={custBuilding}
-                      onChange={(e) => setCustBuilding(e.target.value)}
-                      placeholder="e.g. 14B"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Floor No.</label>
-                    <input
-                      type="text"
-                      value={custFloor}
-                      onChange={(e) => setCustFloor(e.target.value)}
-                      placeholder="e.g. 3rd Floor"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <hr className="border-[#414E36]/10" />
-
-              {/* Notes section */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Notes & Observations</h4>
-                <div>
-                  <textarea
-                    value={custNote}
-                    onChange={(e) => setCustNote(e.target.value)}
-                    placeholder="Add patient history, clinic preferences, or other notes..."
-                    rows={3}
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] resize-none"
-                  />
                 </div>
               </div>
             </div>
@@ -10804,6 +10818,201 @@ export default function AdminPage() {
                 className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {deletingCustomer ? "Deleting..." : "Yes, Delete Customer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CUSTOMER PROFILE & BOOKING HISTORY DRAWER ── */}
+      {viewingCustomerProfile && (
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-xs transition-opacity duration-300"
+          onClick={() => setViewingCustomerProfile(null)}
+        >
+          <div
+            className="w-full max-w-2xl bg-[#FBFBF9] h-full shadow-2xl flex flex-col animate-slideOver overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10">
+                  <User size={20} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[#1F251A]">{viewingCustomerProfile.name}</h3>
+                  <p className="text-xs text-[#5A6A51]">Patient Profile & Clinic Engagement History</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingCustomerProfile(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Drawer Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+              {/* Profile Details Cards */}
+              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Personal Profile</h4>
+                  <button
+                    onClick={() => {
+                      handleOpenEditCustomer(viewingCustomerProfile);
+                      setViewingCustomerProfile(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+                  >
+                    <Pencil size={12} /> Edit Profile
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
+                    <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Age</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Gender</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
+                    <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Referral Source</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Profile Status</span>
+                    <span className={`inline-flex items-center gap-1 text-xs font-bold ${
+                      viewingCustomerProfile.active !== false ? "text-green-700" : "text-gray-400"
+                    }`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-green-600" : "bg-gray-400"}`} />
+                      {viewingCustomerProfile.active !== false ? "Active Patient" : "Inactive"}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Address</span>
+                    <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
+                      {viewingCustomerProfile.address || [
+                        viewingCustomerProfile.building_no,
+                        viewingCustomerProfile.street_name,
+                        viewingCustomerProfile.floor_no,
+                        viewingCustomerProfile.area,
+                        viewingCustomerProfile.location_name
+                      ].filter(Boolean).join(", ") || "—"}
+                    </span>
+                  </div>
+                  {viewingCustomerProfile.note && (
+                    <div className="col-span-2">
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Notes & Observations</span>
+                      <p className="text-xs text-[#5A6A51] bg-amber-50/40 border border-amber-200/50 rounded-xl p-3 leading-relaxed">
+                        {viewingCustomerProfile.note}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Booking History Card */}
+              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                <div className="border-b border-[#414E36]/10 pb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Booking History</h4>
+                  <span className="text-xs font-semibold bg-[#EDF1EC] text-[#414E36] px-2.5 py-1 rounded-md">
+                    Total: {
+                      allReservations.filter(
+                        (r) =>
+                          r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
+                          r.customerId === viewingCustomerProfile.id
+                      ).length
+                    }
+                  </span>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-[#E6E9EB]">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] font-bold text-[#5A6A51] uppercase tracking-wider text-[10px]">
+                        <th className="px-4 py-3 text-left">Date / Slot</th>
+                        <th className="px-4 py-3 text-left">Service</th>
+                        <th className="px-4 py-3 text-left">Provider</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                      {(() => {
+                        const history = allReservations.filter(
+                          (r) =>
+                            r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
+                            r.customerId === viewingCustomerProfile.id
+                        );
+                        if (history.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={4} className="px-4 py-6 text-center text-gray-400 italic">
+                                No booking history records found for this patient.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return history.map((res) => {
+                          const resDt = new Date(res.date);
+                          const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                          const serv = localServices.find(s => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
+                          const isApproved = res.status === "approved";
+                          const isRejected = res.status === "rejected";
+                          const isPending = res.status === "pending";
+                          return (
+                            <tr key={res.id} className="hover:bg-[#F9F9F7]">
+                              <td className="px-4 py-3">
+                                <span className="block font-semibold text-[#1F251A]">{formattedDate}</span>
+                                <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "—"}</span>
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
+                              <td className="px-4 py-3">{res.doctorName || "—"}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                  isApproved ? "bg-green-50 text-green-700" :
+                                  isRejected ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"
+                                }`}>
+                                  {res.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="flex items-center justify-end px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+              <button
+                type="button"
+                onClick={() => setViewingCustomerProfile(null)}
+                className="rounded-lg border border-[#414E36]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+              >
+                Close Profile
               </button>
             </div>
           </div>
