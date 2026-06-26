@@ -777,7 +777,6 @@ export default function AdminPage() {
         "Profile",
         "Service Hours",
         "Branches",
-        "Users",
         "Booking Settings",
         "Notification Settings",
         "Queue Settings",
@@ -1030,7 +1029,6 @@ export default function AdminPage() {
       "Profile",
       "Service Hours",
       "Branches",
-      "Users",
       "Booking Settings",
       "Notification Settings",
       "Queue Settings",
@@ -1315,6 +1313,43 @@ export default function AdminPage() {
   const [smsTemplateSearch, setSmsTemplateSearch] = useState("");
   const [smsLogSearch, setSmsLogSearch] = useState("");
   const [settingsUserSearch, setSettingsUserSearch] = useState("");
+
+  // ── Clinic Profile Settings State ──
+  const [clinicName, setClinicName] = useState("Revera Clinics");
+  const [clinicNameAr, setClinicNameAr] = useState("ريفيرا كلينيك");
+  const [clinicLocation, setClinicLocation] = useState("Sheikh Zayed City, Giza");
+  const [clinicLocationAr, setClinicLocationAr] = useState("مدينة الشيخ زايد، الجيزة");
+  const [clinicEmail, setClinicEmail] = useState("info@reveraclinics.com");
+  const [clinicPhone, setClinicPhone] = useState("+20 2 3796 2200");
+  const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
+  const [savingClinicProfile, setSavingClinicProfile] = useState(false);
+
+  // ── Booking Settings State ──
+  const [bookingMinAdvance, setBookingMinAdvance] = useState(2);
+  const [bookingMaxAdvance, setBookingMaxAdvance] = useState(30);
+  const [bookingCancelWindow, setBookingCancelWindow] = useState(4);
+  const [bookingMaxPerSlot, setBookingMaxPerSlot] = useState(3);
+  const [bookingInstantApproval, setBookingInstantApproval] = useState(false);
+  const [bookingShowDoctorNotes, setBookingShowDoctorNotes] = useState(true);
+  const [savingBookingSettings, setSavingBookingSettings] = useState(false);
+
+  // ── Notification Settings State ──
+  const [notifSmsOtp, setNotifSmsOtp] = useState(true);
+  const [notifWhatsApp, setNotifWhatsApp] = useState(true);
+  const [notifEmailConfirm, setNotifEmailConfirm] = useState(false);
+  const [notifSmsTemplate, setNotifSmsTemplate] = useState("Hello {name}, your appointment for {service} is confirmed on {date} at {time}. See you at Revera Clinics!");
+  const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("مرحباً {name}، تم تأكيد موعدك لخدمة {service} بتاريخ {date} الساعة {time}. نراك في ريفيرا كلينيك!");
+  const [notifReminderHours, setNotifReminderHours] = useState(24);
+  const [notifStaffEmail, setNotifStaffEmail] = useState("admin@reveraclinics.com");
+  const [savingNotificationSettings, setSavingNotificationSettings] = useState(false);
+
+  // ── Queue Settings State ──
+  const [queueVirtualRoom, setQueueVirtualRoom] = useState(false);
+  const [queueShowOnScreens, setQueueShowOnScreens] = useState(true);
+  const [queueAutoCheckIn, setQueueAutoCheckIn] = useState(false);
+  const [queueAlertThreshold, setQueueAlertThreshold] = useState(2);
+  const [queueAvgSessionDuration, setQueueAvgSessionDuration] = useState(20);
+  const [savingQueueSettings, setSavingQueueSettings] = useState(false);
   const [eCommerceSearch, setECommerceSearch] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
   const [purchaseSearch, setPurchaseSearch] = useState("");
@@ -1847,6 +1882,76 @@ export default function AdminPage() {
       })
       .catch((err) => console.error("fetchPageSettings error:", err))
       .finally(() => setLoadingPageSettings(false));
+  }
+
+  // ── Settings Panel Handlers ──
+  async function handleSaveClinicProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingClinicProfile(true);
+    try {
+      await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clinic: { name: clinicName, name_ar: clinicNameAr, location: clinicLocation, location_ar: clinicLocationAr, email: clinicEmail, phone: clinicPhone, whatsapp: clinicWhatsapp }
+        }),
+      });
+    } catch (err) {
+      console.error("handleSaveClinicProfile error:", err);
+    } finally {
+      setSavingClinicProfile(false);
+    }
+  }
+
+  async function handleSaveBookingSettings() {
+    setSavingBookingSettings(true);
+    try {
+      await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          booking: { minAdvance: bookingMinAdvance, maxAdvance: bookingMaxAdvance, cancelWindow: bookingCancelWindow, maxPerSlot: bookingMaxPerSlot, instantApproval: bookingInstantApproval, showDoctorNotes: bookingShowDoctorNotes }
+        }),
+      });
+    } catch (err) {
+      console.error("handleSaveBookingSettings error:", err);
+    } finally {
+      setSavingBookingSettings(false);
+    }
+  }
+
+  async function handleSaveNotificationSettings() {
+    setSavingNotificationSettings(true);
+    try {
+      await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notifications: { smsOtp: notifSmsOtp, whatsapp: notifWhatsApp, email: notifEmailConfirm, smsTemplate: notifSmsTemplate, smsTemplateAr: notifSmsTemplateAr, reminderHours: notifReminderHours, staffEmail: notifStaffEmail }
+        }),
+      });
+    } catch (err) {
+      console.error("handleSaveNotificationSettings error:", err);
+    } finally {
+      setSavingNotificationSettings(false);
+    }
+  }
+
+  async function handleSaveQueueSettings() {
+    setSavingQueueSettings(true);
+    try {
+      await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          queue: { virtualRoom: queueVirtualRoom, showOnScreens: queueShowOnScreens, autoCheckIn: queueAutoCheckIn, alertThreshold: queueAlertThreshold, avgSessionDuration: queueAvgSessionDuration }
+        }),
+      });
+    } catch (err) {
+      console.error("handleSaveQueueSettings error:", err);
+    } finally {
+      setSavingQueueSettings(false);
+    }
   }
 
   async function savePageSettings(overrideData?: any) {
@@ -2967,7 +3072,6 @@ export default function AdminPage() {
                           { label: "Profile", icon: User },
                           { label: "Service Hours", icon: Clock },
                           { label: "Branches", icon: MapIcon },
-                          { label: "Users", icon: Users },
                           { label: "Booking Settings", icon: CalendarDays },
                           { label: "Notification Settings", icon: Bell },
                           { label: "Queue Settings", icon: ListOrdered },
@@ -8255,33 +8359,90 @@ export default function AdminPage() {
           {/* ── SETTINGS VIEWS ── */}
           {activeNav === "Profile" && (
             <div className="space-y-6">
-              <div className="mb-6">
-                <h2 className="text-4xl font-semibold text-[#1F251A]">Clinic Profile Settings</h2>
-                <p className="mt-2 text-sm text-[#5A6A51]">Configure the core identity, branches, and contact settings of your clinic.</p>
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Clinic Profile Settings</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Configure the core identity, contact details, and localization of your clinic.</p>
+                </div>
+                <button
+                  form="clinic-profile-form"
+                  type="submit"
+                  disabled={savingClinicProfile}
+                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+                >
+                  {savingClinicProfile ? "Saving..." : "Save Profile"}
+                </button>
               </div>
               <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl">
-                <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+                <form id="clinic-profile-form" className="space-y-6" onSubmit={handleSaveClinicProfile}>
                   <div className="grid gap-6 md:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Clinic Brand Name</label>
-                      <input type="text" defaultValue="Revera Clinics" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Clinic Brand Name (EN)</label>
+                      <input
+                        type="text"
+                        value={clinicName}
+                        onChange={(e) => setClinicName(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Primary Branch Location</label>
-                      <input type="text" defaultValue="Sheikh Zayed City, Giza" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">اسم العلامة التجارية (AR)</label>
+                      <input
+                        type="text"
+                        dir="rtl"
+                        value={clinicNameAr}
+                        onChange={(e) => setClinicNameAr(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition text-right"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Primary Location (EN)</label>
+                      <input
+                        type="text"
+                        value={clinicLocation}
+                        onChange={(e) => setClinicLocation(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">الموقع الرئيسي (AR)</label>
+                      <input
+                        type="text"
+                        dir="rtl"
+                        value={clinicLocationAr}
+                        onChange={(e) => setClinicLocationAr(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition text-right"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Inquiries Email</label>
-                      <input type="email" defaultValue="info@reveraclinics.com" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
+                      <input
+                        type="email"
+                        value={clinicEmail}
+                        onChange={(e) => setClinicEmail(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Inquiries Phone</label>
-                      <input type="text" defaultValue="+20 2 3796 2200" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
+                      <input
+                        type="text"
+                        value={clinicPhone}
+                        onChange={(e) => setClinicPhone(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">WhatsApp Number</label>
+                      <input
+                        type="text"
+                        value={clinicWhatsapp}
+                        onChange={(e) => setClinicWhatsapp(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
+                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Used for the WhatsApp floating chat button visible on all public pages.</span>
                     </div>
                   </div>
-                  <button type="submit" className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]">
-                    Save Profile Changes
-                  </button>
                 </form>
               </div>
             </div>
@@ -8508,65 +8669,293 @@ export default function AdminPage() {
               )}
             </div>
           )}
-
-          {activeNav === "Users" && (
+          {activeNav === "Booking Settings" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Users</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Manage administrative accounts, role levels, and statuses.</p>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Booking Settings</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Configure appointment rules, advance booking limits, and slot management.</p>
                 </div>
-                <button className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]">
-                  <Plus size={16} /> Invite User
+                <button
+                  onClick={handleSaveBookingSettings}
+                  disabled={savingBookingSettings}
+                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+                >
+                  {savingBookingSettings ? "Saving..." : "Save Booking Settings"}
                 </button>
               </div>
-              <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="relative flex-1">
-                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5A6A51]/50" />
+
+              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-6">
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Min Advance Booking (Hours)</label>
+                    <select
+                      value={bookingMinAdvance}
+                      onChange={(e) => setBookingMinAdvance(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    >
+                      {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"}</option>)}
+                    </select>
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Minimum time before appointment that bookings are allowed.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Max Advance Booking (Days)</label>
+                    <select
+                      value={bookingMaxAdvance}
+                      onChange={(e) => setBookingMaxAdvance(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    >
+                      {[7, 14, 30, 60, 90].map(d => <option key={d} value={d}>{d} Days</option>)}
+                    </select>
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">How far in advance patients can schedule.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Cancellation Window (Hours)</label>
+                    <select
+                      value={bookingCancelWindow}
+                      onChange={(e) => setBookingCancelWindow(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    >
+                      {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"} Before</option>)}
+                    </select>
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">How early a patient must cancel to avoid a penalty.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Max Bookings Per Slot</label>
                     <input
-                      type="text"
-                      placeholder="Search users by name or email..."
-                      value={settingsUserSearch}
-                      onChange={(e) => setSettingsUserSearch(e.target.value)}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-white py-3 pl-12 pr-4 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={bookingMaxPerSlot}
+                      onChange={(e) => setBookingMaxPerSlot(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
                     />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Maximum concurrent appointments per time slot.</span>
                   </div>
                 </div>
-                <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                  <table className="w-full min-w-[900px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                        <th className="px-6 py-4 text-left">Username</th>
-                        <th className="px-6 py-4 text-left">Email Address</th>
-                        <th className="px-6 py-4 text-left">Access Role</th>
-                        <th className="px-6 py-4 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
-                      {[
-                        { name: "Ahmed Medhat", email: "dr.ahmed@reveraclinics.com", role: "Super Admin / Doctor", status: "Active" },
-                        { name: "Mariam Salem", email: "mariam.nurse@reveraclinics.com", role: "Nurse Practitioner", status: "Active" },
-                        { name: "Youssef Fadel", email: "youssef.reception@reveraclinics.com", role: "Clinic Front Desk Manager", status: "Active" },
-                      ].filter(u => 
-                        u.name.toLowerCase().includes(settingsUserSearch.toLowerCase()) ||
-                        u.email.toLowerCase().includes(settingsUserSearch.toLowerCase())
-                      ).map((user, idx) => (
-                        <tr key={idx} className="transition hover:bg-[#F9F9F7]">
-                          <td className="px-6 py-5 font-semibold text-[#1F251A]">{user.name}</td>
-                          <td className="px-6 py-5 font-mono text-xs text-[#5A6A51]">{user.email}</td>
-                          <td className="px-6 py-5 text-[#5A6A51] font-semibold">{user.role}</td>
-                          <td className="px-6 py-5 text-center">
-                            <span className="inline-block rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">{user.status}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
+                <div className="border-t border-[#F2EFE9] pt-6 space-y-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bookingInstantApproval}
+                      onChange={(e) => setBookingInstantApproval(e.target.checked)}
+                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Instant Approval</span>
+                      <span className="text-xs text-[#5A6A51]">Automatically approve bookings without manual admin review.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bookingShowDoctorNotes}
+                      onChange={(e) => setBookingShowDoctorNotes(e.target.checked)}
+                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Show Doctor Notes to Patient</span>
+                      <span className="text-xs text-[#5A6A51]">Display post-visit notes from the provider in the patient portal.</span>
+                    </div>
+                  </label>
                 </div>
               </div>
             </div>
           )}
+
+          {activeNav === "Notification Settings" && (
+            <div className="space-y-6">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Notification Settings</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Manage SMS, WhatsApp, email confirmations, and reminder scheduling.</p>
+                </div>
+                <button
+                  onClick={handleSaveNotificationSettings}
+                  disabled={savingNotificationSettings}
+                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+                >
+                  {savingNotificationSettings ? "Saving..." : "Save Notification Settings"}
+                </button>
+              </div>
+
+              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-6">
+                <div className="space-y-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={notifSmsOtp} onChange={(e) => setNotifSmsOtp(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">SMS OTP Verification</span>
+                      <span className="text-xs text-[#5A6A51]">Send one-time passwords to patients during login and booking.</span>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={notifWhatsApp} onChange={(e) => setNotifWhatsApp(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">WhatsApp Confirmations</span>
+                      <span className="text-xs text-[#5A6A51]">Send appointment confirmations and reminders via WhatsApp.</span>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={notifEmailConfirm} onChange={(e) => setNotifEmailConfirm(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Email Confirmations</span>
+                      <span className="text-xs text-[#5A6A51]">Send email confirmations in addition to SMS (requires SMTP config).</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="border-t border-[#F2EFE9] pt-6 space-y-5">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">SMS Confirmation Template (EN)</label>
+                    <textarea
+                      value={notifSmsTemplate}
+                      onChange={(e) => setNotifSmsTemplate(e.target.value)}
+                      rows={3}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition font-mono"
+                    />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Supports variables: <code>{`{name}`}</code>, <code>{`{service}`}</code>, <code>{`{date}`}</code>, <code>{`{time}`}</code>.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">قالب رسالة التأكيد النصية (AR)</label>
+                    <textarea
+                      value={notifSmsTemplateAr}
+                      onChange={(e) => setNotifSmsTemplateAr(e.target.value)}
+                      rows={3}
+                      dir="rtl"
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition font-mono text-right"
+                    />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block text-right">يدعم الحقول المتغيرة: <code>{`{name}`}</code>، <code>{`{service}`}</code>، <code>{`{date}`}</code>، <code>{`{time}`}</code>.</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-[#F2EFE9] pt-6 grid gap-6 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Reminder Timing (Hours Before)</label>
+                    <select
+                      value={notifReminderHours}
+                      onChange={(e) => setNotifReminderHours(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition font-semibold"
+                    >
+                      <option value={2}>2 Hours Before</option>
+                      <option value={6}>6 Hours Before</option>
+                      <option value={12}>12 Hours Before</option>
+                      <option value={24}>24 Hours Before (1 Day)</option>
+                      <option value={48}>48 Hours Before (2 Days)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Staff Summary Daily Email</label>
+                    <input
+                      type="email"
+                      value={notifStaffEmail}
+                      onChange={(e) => setNotifStaffEmail(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Sends a daily summary of appointments to this address.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeNav === "Queue Settings" && (
+            <div className="space-y-6">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Queue &amp; Waiting Room Settings</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Configure lobby display screens, check-in thresholds and session calculations.</p>
+                </div>
+                <button
+                  onClick={handleSaveQueueSettings}
+                  disabled={savingQueueSettings}
+                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+                >
+                  {savingQueueSettings ? "Saving..." : "Save Queue Settings"}
+                </button>
+              </div>
+
+              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-6">
+                <div className="space-y-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={queueVirtualRoom}
+                      onChange={(e) => setQueueVirtualRoom(e.target.checked)}
+                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Enable Virtual Waiting Room Tracker</span>
+                      <span className="text-xs text-[#5A6A51]">Allows checked-in patients to track live queue position via mobile.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={queueShowOnScreens}
+                      onChange={(e) => setQueueShowOnScreens(e.target.checked)}
+                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Display Queue on Lobby TV Screens</span>
+                      <span className="text-xs text-[#5A6A51]">Show queue statuses on public dashboard screens inside clinic lobbies.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={queueAutoCheckIn}
+                      onChange={(e) => setQueueAutoCheckIn(e.target.checked)}
+                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Auto Check-In on Arrival</span>
+                      <span className="text-xs text-[#5A6A51]">Use geofencing or terminal scan to auto register presence on patient arrival.</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="border-t border-[#F2EFE9] pt-6 grid gap-6 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Queue Alert SMS Threshold</label>
+                    <select
+                      value={queueAlertThreshold}
+                      onChange={(e) => setQueueAlertThreshold(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    >
+                      <option value={1}>1 Patient Ahead</option>
+                      <option value={2}>2 Patients Ahead</option>
+                      <option value={3}>3 Patients Ahead</option>
+                      <option value={4}>4 Patients Ahead</option>
+                      <option value={5}>5 Patients Ahead</option>
+                    </select>
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Trigger SMS warning alert to patient before their turn.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Average Session Duration (Minutes)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={queueAvgSessionDuration}
+                      onChange={(e) => setQueueAvgSessionDuration(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Used for calculating estimated waiting room delays.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
 
           {activeNav === "Manage Areas" && (
             <div className="space-y-6">
