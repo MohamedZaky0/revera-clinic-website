@@ -389,7 +389,18 @@ export default function AdminPage() {
   const [providerTab, setProviderTab] = useState<"Providers" | "Attendance">("Providers");
   const [branch, setBranch] = useState<string>(""); // branch id; empty = all branches
   const [lang, setLang] = useState<"EN" | "AR">("EN");
-  const [notifCount] = useState(1);
+  const [showQuickActionMenu, setShowQuickActionMenu] = useState(false);
+  const [showNotificationMenu, setShowNotificationMenu] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([
+    {
+      id: "system-1",
+      title: "Clinic System Active",
+      message: "Twilio SMS integration and Supabase auth are fully operational.",
+      time: "10m ago",
+      read: false,
+      type: "system"
+    }
+  ]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [showExportCustomersModal, setShowExportCustomersModal] = useState(false);
   const [dbCustomers, setDbCustomers] = useState<Customer[]>([]);
@@ -649,6 +660,45 @@ export default function AdminPage() {
 
   // per-service toggle state: visible & status
   const [serviceToggles, setServiceToggles] = useState<Record<number, { visible: boolean; active: boolean }>>({});
+
+  // Synchronize dynamic bookings into notifications list
+  useEffect(() => {
+    if (!allReservations || allReservations.length === 0) return;
+
+    const latestReservations = [...allReservations]
+      .sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      })
+      .slice(0, 5);
+
+    const generatedNotifications = latestReservations.map((res) => {
+      const isCancelled = res.status === "cancelled";
+      const serviceName = localServices.find((s) => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
+      const timeString = res.timeSlot || res.requestedTime || "unspecified time";
+      return {
+        id: res.id || String(Math.random()),
+        title: isCancelled ? "Appointment Cancelled" : "New Booking Received",
+        message: `${res.name || "A patient"} reserved ${serviceName} on ${res.date} at ${timeString}.`,
+        time: res.createdAt ? new Date(res.createdAt).toLocaleDateString() : "Just now",
+        read: false,
+        type: isCancelled ? "cancelled" : "booking"
+      };
+    });
+
+    setNotifications([
+      {
+        id: "system-1",
+        title: "Clinic System Active",
+        message: "Twilio SMS integration and Supabase auth are fully operational.",
+        time: "Active",
+        read: false,
+        type: "system"
+      },
+      ...generatedNotifications
+    ]);
+  }, [allReservations, localServices]);
 
   // Auth and Role Management effects & handlers
   useEffect(() => {
@@ -2594,6 +2644,14 @@ export default function AdminPage() {
     return true;
   });
 
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  function handleMarkAllAsRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }
+  function handleMarkAsRead(id: string) {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  }
+
   return (
     <div className="min-h-screen bg-[#F2EFE9] text-[#1F251A]">
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[280px_1fr]">
@@ -2785,19 +2843,146 @@ export default function AdminPage() {
 
             {/* Right: new entry, notifications, user profile */}
             <div className="flex items-center gap-3">
-              <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36] text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26]">
-                <Plus size={18} />
-              </button>
+              {/* Quick Actions Dropdown */}
               <div className="relative">
-                <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/8 text-[#414E36] transition hover:bg-[#414E36]/15">
-                  <Bell size={18} />
+                <button
+                  onClick={() => {
+                    setShowQuickActionMenu(prev => !prev);
+                    setShowNotificationMenu(false);
+                  }}
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-[#FBFBF9] shadow-sm transition ${
+                    showQuickActionMenu ? "bg-[#2e3a26]" : "bg-[#414E36] hover:bg-[#2e3a26]"
+                  }`}
+                  title="Quick Actions"
+                >
+                  <Plus size={18} className={`transition-transform duration-200 ${showQuickActionMenu ? "rotate-45" : ""}`} />
                 </button>
-                {notifCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                    {notifCount}
-                  </span>
+                {showQuickActionMenu && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-[#E6E9EB] bg-white p-2 shadow-[0_15px_40px_rgba(47,61,41,0.12)] z-50 animate-fadeIn">
+                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#E6E9EB] mb-1">
+                      Quick Creation
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowQuickActionMenu(false);
+                        setShowAddBookingModal(true);
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                    >
+                      <Plus size={14} className="text-[#C4AE7C]" /> New Appointment
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowQuickActionMenu(false);
+                        handleOpenAddCustomer();
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                    >
+                      <Plus size={14} className="text-[#C4AE7C]" /> New Patient
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowQuickActionMenu(false);
+                        openAddProviderModal();
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                    >
+                      <Plus size={14} className="text-[#C4AE7C]" /> New Doctor / Provider
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowQuickActionMenu(false);
+                        setShowAddCategoryModal(true);
+                      }}
+                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                    >
+                      <Plus size={14} className="text-[#C4AE7C]" /> New Service Category
+                    </button>
+                  </div>
                 )}
               </div>
+
+              {/* Notifications Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowNotificationMenu(prev => !prev);
+                    setShowQuickActionMenu(false);
+                  }}
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${
+                    showNotificationMenu || unreadCount > 0
+                      ? "bg-[#C4AE7C]/20 text-[#414E36]"
+                      : "bg-[#414E36]/8 text-[#414E36] hover:bg-[#414E36]/15"
+                  }`}
+                  title="Notifications"
+                >
+                  <Bell size={18} />
+                </button>
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white pointer-events-none animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
+                {showNotificationMenu && (
+                  <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-[#E6E9EB] bg-white shadow-[0_15px_40px_rgba(47,61,41,0.12)] z-50 animate-fadeIn overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-[#E6E9EB] bg-[#FBFBF9] px-4 py-3">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#1F251A]">Notifications</span>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllAsRead}
+                          className="text-[11px] font-semibold text-[#C4AE7C] hover:underline"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto divide-y divide-[#E6E9EB]">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-gray-400 italic">No notifications yet.</div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => handleMarkAsRead(n.id)}
+                            className={`p-3 text-left transition hover:bg-[#EDF1EC]/40 cursor-pointer ${
+                              !n.read ? "bg-[#EDE4C8]/10" : ""
+                            }`}
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${
+                                n.type === "cancelled"
+                                  ? "bg-red-500"
+                                  : n.type === "system"
+                                    ? "bg-amber-500"
+                                    : "bg-green-500"
+                              }`} />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-semibold text-xs text-[#1F251A]">{n.title}</span>
+                                  <span className="text-[10px] text-[#5A6A51] whitespace-nowrap">{n.time}</span>
+                                </div>
+                                <p className="text-[11px] text-[#414E36] leading-relaxed mt-0.5">{n.message}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="border-t border-[#E6E9EB] bg-[#FBFBF9] px-4 py-2.5 text-center">
+                      <button
+                        onClick={() => {
+                          setShowNotificationMenu(false);
+                          setActiveNav("Bookings");
+                        }}
+                        className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26]"
+                      >
+                        View all bookings
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <button className="flex items-center gap-2 rounded-xl border border-[#414E36]/10 bg-white px-3 py-1.5 text-sm font-medium text-[#1F251A] shadow-sm transition hover:bg-[#f5f4f0]">
                 <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#414E36] text-white text-xs font-bold">RC</span>
                 <span>Revera Clinics</span>
