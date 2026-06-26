@@ -64,7 +64,13 @@ export async function POST(req: Request) {
     street_name,
     building_no,
     floor_no,
-    note
+    note,
+    // new demographic fields
+    age,
+    national_id,
+    address,
+    referral,
+    occupation
   } = body;
 
   if (!name || !mobile) {
@@ -85,6 +91,12 @@ export async function POST(req: Request) {
     building_no: building_no || null,
     floor_no: floor_no || null,
     note: note || null,
+    // new demographic fields
+    age: age ? Number(age) : null,
+    national_id: national_id || null,
+    address: address || null,
+    referral: referral || null,
+    occupation: occupation || null,
     updated_at: new Date().toISOString()
   };
 
