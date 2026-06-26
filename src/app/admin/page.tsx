@@ -1184,6 +1184,13 @@ export default function AdminPage() {
     Saturday: { isOpen: false, start: "10:00", end: "20:00" }
   });
   const [savingProvider, setSavingProvider] = useState(false);
+  const [attendanceDate, setAttendanceDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [savingAttendanceId, setSavingAttendanceId] = useState<string | null>(null);
 
   const [loadingPageSettings, setLoadingPageSettings] = useState(false);
   const [savingPageSettings, setSavingPageSettings] = useState(false);
@@ -1466,6 +1473,61 @@ export default function AdminPage() {
       })
       .catch((err) => console.error("fetchProviders error:", err));
   }
+
+  async function fetchAttendance(dateStr: string) {
+    setLoadingAttendance(true);
+    try {
+      const res = await fetch(`/api/provider-attendance?date=${dateStr}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setAttendanceRecords(data);
+      } else {
+        console.error("Failed to fetch attendance");
+      }
+    } catch (err) {
+      console.error("fetchAttendance error:", err);
+    } finally {
+      setLoadingAttendance(false);
+    }
+  }
+
+  async function handleToggleAttendance(providerId: string, status: "Present" | "Absent" | "On Leave") {
+    setSavingAttendanceId(providerId);
+    try {
+      const existing = attendanceRecords.find(r => r.provider_id === providerId);
+      const payload = {
+        providerId,
+        date: attendanceDate,
+        status,
+        checkIn: status === "Present" ? "09:00" : null,
+        checkOut: status === "Present" ? "17:00" : null,
+        notes: existing?.notes || ""
+      };
+
+      const res = await fetch("/api/provider-attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        fetchAttendance(attendanceDate);
+      } else {
+        alert("Failed to save attendance record.");
+      }
+    } catch (err) {
+      console.error("handleToggleAttendance error:", err);
+      alert("Error saving attendance.");
+    } finally {
+      setSavingAttendanceId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (providerTab === "Attendance") {
+      fetchAttendance(attendanceDate);
+    }
+  }, [providerTab, attendanceDate, fetchAttendance]);
 
   function openAddProviderModal() {
     setProviderModalMode("add");
@@ -2772,73 +2834,188 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
-                      <Filter size={16} /> Filter
-                    </button>
-                    <button
-                      onClick={openAddProviderModal}
-                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                    >
-                      <Plus size={16} /> Add
-                    </button>
+                    {providerTab === "Attendance" ? (
+                      <div className="flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-2.5 shadow-sm">
+                        <label className="text-xs uppercase font-bold text-[#5A6A51] select-none">Date:</label>
+                        <input
+                          type="date"
+                          value={attendanceDate}
+                          onChange={(e) => setAttendanceDate(e.target.value)}
+                          className="bg-transparent text-sm text-[#1F251A] outline-none font-semibold cursor-pointer"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
+                          <Filter size={16} /> Filter
+                        </button>
+                        <button
+                          onClick={openAddProviderModal}
+                          className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                        >
+                          <Plus size={16} /> Add
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                  <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                    <span>Name</span>
-                    <span>Bookings</span>
-                    <span>Services</span>
-                    <span>Rating</span>
-                  </div>
-                  <div className="divide-y divide-[#E6E9EB]">
-                    {providers.map((provider) => (
-                      <div key={provider.id || provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
-                        <span className="font-semibold text-[#1F251A]">{provider.name}</span>
-                        <span>{provider.bookings}</span>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {provider.services.slice(0, 2).map((service: string) => (
-                            <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
-                              {service}
-                            </span>
-                          ))}
-                          {provider.services.length > 2 && (
-                            <span
-                              className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36] cursor-help"
-                              title={provider.services.slice(2).join(", ")}
-                            >
-                              +{provider.services.length - 2} More
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="inline-flex items-center gap-2 text-[#5A6A51]">
-                            <Star size={16} className="text-[#C4AE7C]" />
-                            {provider.rating}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            {provider.id && (
-                              <button
-                                onClick={() => handleDeleteProvider(provider.id)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
-                                title="Delete Provider"
+                {providerTab === "Providers" ? (
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                      <span>Name</span>
+                      <span>Bookings</span>
+                      <span>Services</span>
+                      <span>Rating</span>
+                    </div>
+                    <div className="divide-y divide-[#E6E9EB]">
+                      {providers.map((provider) => (
+                        <div key={provider.id || provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
+                          <span className="font-semibold text-[#1F251A]">{provider.name}</span>
+                          <span>{provider.bookings}</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {provider.services.slice(0, 2).map((service: string) => (
+                              <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
+                                {service}
+                              </span>
+                            ))}
+                            {provider.services.length > 2 && (
+                              <span
+                                className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36] cursor-help"
+                                title={provider.services.slice(2).join(", ")}
                               >
-                                <Trash2 size={15} />
-                              </button>
+                                +{provider.services.length - 2} More
+                              </span>
                             )}
-                            <button
-                              onClick={() => openEditProviderModal(provider)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
-                              title="Edit Provider"
-                            >
-                              <Pencil size={14} />
-                            </button>
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="inline-flex items-center gap-2 text-[#5A6A51]">
+                              <Star size={16} className="text-[#C4AE7C]" />
+                              {provider.rating}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {provider.id && (
+                                <button
+                                  onClick={() => handleDeleteProvider(provider.id)}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
+                                  title="Delete Provider"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => openEditProviderModal(provider)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
+                                title="Edit Provider"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <div className="grid grid-cols-[2fr_1fr_1.5fr_2fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.12em] text-[#5A6A51]">
+                      <span>Doctor / Provider</span>
+                      <span>Branch</span>
+                      <span>Status</span>
+                      <span className="text-center">Set Attendance</span>
+                    </div>
+                    <div className="divide-y divide-[#E6E9EB]">
+                      {loadingAttendance ? (
+                        <div className="flex items-center justify-center py-16 text-[#5A6A51]">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#C4AE7C] border-t-transparent mr-2.5"></div>
+                          <span className="font-medium">Loading attendance data...</span>
+                        </div>
+                      ) : providers.length === 0 ? (
+                        <div className="text-center py-16 text-gray-400 italic">No doctors/providers registered in system.</div>
+                      ) : (
+                        providers.map((provider) => {
+                          const record = attendanceRecords.find((r) => r.provider_id === provider.id);
+                          const currentStatus = record?.status || "Unmarked";
+                          const branchName = branches.find((b) => b.id === provider.branchId)?.name_en || "Default/All";
+                          const isSaving = savingAttendanceId === provider.id;
+
+                          return (
+                            <div key={provider.id} className="grid grid-cols-[2fr_1fr_1.5fr_2fr] items-center gap-0 px-6 py-4.5 text-sm text-[#414E36]">
+                              <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-full bg-[#EDF1EC] flex items-center justify-center font-bold text-[#414E36]">
+                                  {provider.name.charAt(0)}
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="font-semibold text-[#1F251A]">{provider.name}</span>
+                                  {provider.specialty && <span className="text-xs text-[#5A6A51]">{provider.specialty}</span>}
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <span className="text-xs font-semibold text-[#5A6A51] bg-[#EDF1EC] px-2.5 py-1 rounded-md">
+                                  {branchName}
+                                </span>
+                              </div>
+
+                              <div>
+                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${
+                                  currentStatus === "Present"
+                                    ? "bg-green-100 text-green-800"
+                                    : currentStatus === "Absent"
+                                      ? "bg-red-100 text-red-800"
+                                      : currentStatus === "On Leave"
+                                        ? "bg-blue-100 text-blue-800"
+                                        : "bg-gray-100 text-gray-600"
+                                }`}>
+                                  {currentStatus}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-center gap-2">
+                                {isSaving ? (
+                                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#414E36] border-t-transparent"></div>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleToggleAttendance(provider.id, "Present")}
+                                      className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                                        currentStatus === "Present"
+                                          ? "bg-green-700 text-[#FBFBF9] shadow-sm"
+                                          : "border border-green-200 text-green-800 hover:bg-green-50"
+                                      }`}
+                                    >
+                                      Present
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleAttendance(provider.id, "Absent")}
+                                      className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                                        currentStatus === "Absent"
+                                          ? "bg-red-700 text-[#FBFBF9] shadow-sm"
+                                          : "border border-red-200 text-red-800 hover:bg-red-50"
+                                      }`}
+                                    >
+                                      Absent
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleAttendance(provider.id, "On Leave")}
+                                      className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                                        currentStatus === "On Leave"
+                                          ? "bg-blue-700 text-[#FBFBF9] shadow-sm"
+                                          : "border border-blue-200 text-blue-800 hover:bg-blue-50"
+                                      }`}
+                                    >
+                                      Leave
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
           )}
