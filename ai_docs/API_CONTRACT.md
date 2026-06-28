@@ -1,8 +1,8 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-06-27
 > **Base:** Next.js App Router API routes under `/app/api/`
-> **Auth:** None — all routes use the Supabase service role key server-side; no user auth on API layer
+> **Auth:** All routes use the Supabase **service role key** server-side (no per-request user auth on API layer). The admin page enforces Supabase session client-side before calling these routes. `/api/auth/me` is the exception — it accepts a Bearer token and validates it.
 > **Previous content was for a different project — discarded entirely**
 
 ---
@@ -216,3 +216,167 @@ For each date: counts approved bookings, calculates whether at least one contigu
 of free 15-minute slots exists to fit the service's duration.
 
 **Response:** Array of `{ date, approvedCount, approvedSlots, isAvailable }`
+
+---
+
+## GET /api/customers
+
+Returns all customers ordered by `created_at` desc. Optionally filter by `?mobile={phone}` or `?email={email}` (returns single match or null).
+
+**Response:** `CustomerRow[]` or single `CustomerRow | null`
+
+---
+
+## POST /api/customers
+
+Create or update a customer. If body contains `id`, updates that customer. Otherwise creates new.
+
+**Body:** `{ id?, name, mobile, gender?, email?, active?, spent_amount?, outstanding?, area?, location_name?, street_name?, building_no?, floor_no?, note?, age?, national_id?, address?, referral?, occupation? }`
+
+Required: `name`, `mobile`.
+
+**Response:** Created/updated customer (201 on create, 200 on update)
+
+**Errors:** 400 if mobile or email already exists for another customer (unique constraint).
+
+---
+
+## DELETE /api/customers?id={id}
+
+Deletes a customer by ID.
+
+**Response:** `{ message: "Customer deleted successfully" }`
+
+---
+
+## GET /api/employees
+
+Returns all employee accounts ordered by `created_at` desc.
+
+**Response:** `EmployeeAccount[]`
+
+---
+
+## POST /api/employees
+
+Invites a new employee via Supabase Auth and creates an `employee_accounts` record.
+
+**Body:** `{ email, name, roleName }`
+
+All fields required. `roleName` must match an existing role in the `roles` table.
+
+**Flow:**
+1. Validates inputs + checks role exists + checks email not already registered
+2. Calls `supabaseServer.auth.admin.inviteUserByEmail()` → sends invite email
+3. Inserts row into `employee_accounts` with `auth_user_id` from invite
+4. On insert failure: rolls back by deleting the auth user
+
+**Response:** New employee account, status 201
+
+---
+
+## DELETE /api/employees?id={id}
+
+Deletes an employee account (from `employee_accounts` table + Supabase Auth).
+
+**Errors:** 400 if trying to delete `employee_id = 'superadmin'`.
+
+**Response:** `{ message: "Employee account deleted successfully" }`
+
+---
+
+## GET /api/roles
+
+Returns all roles ordered by name.
+
+**Response:** `Role[]` — `{ name, permissions, updated_at }`
+
+---
+
+## POST /api/roles
+
+Upserts a role. Cleans name to lowercase alphanumeric (no spaces).
+
+**Body:** `{ name, permissions: string[] }`
+
+**Response:** Upserted role
+
+---
+
+## DELETE /api/roles?name={name}
+
+Deletes a role by name.
+
+**Errors:** 400 if `name = 'superadmin'`.
+
+**Response:** `{ message: "Role '{name}' deleted successfully" }`
+
+---
+
+## GET /api/provider-attendance?date={YYYY-MM-DD}
+
+Returns all attendance records for the given date.
+
+**Response:** `AttendanceRecord[]`
+
+---
+
+## POST /api/provider-attendance
+
+Upserts an attendance record for a provider on a given date.
+
+**Body:** `{ providerId, date, status, checkIn?, checkOut?, notes? }`
+
+Required: `providerId`, `date`, `status`.
+
+Unique constraint: `(provider_id, date)` — existing record is updated.
+
+**Response:** Upserted record
+
+---
+
+## GET /api/clinic-settings?key={key}
+
+Reads a single row from `page_settings` by key. Returns the `value` JSONB or `null`.
+
+**Response:** `value` object | `null`
+
+---
+
+## POST /api/clinic-settings
+
+Upserts a row in `page_settings`.
+
+**Body:** `{ key, value }`
+
+**Response:** Upserted row
+
+---
+
+## GET /api/auth/me
+
+Validates a Supabase JWT and returns the authenticated employee's role and permissions.
+
+**Auth:** `Authorization: Bearer {supabase_access_token}`
+
+**Logic:**
+1. `supabaseServer.auth.getUser(token)` — verifies token
+2. If email is `superadmin@revera.com` → returns hardcoded full permissions (no DB lookup)
+3. Otherwise: lookup `employee_accounts` by `auth_user_id` → lookup `roles` by `role_name`
+
+**Response:** `{ role, permissions: string[], email, employeeId }`
+
+**Errors:** 401 if no/invalid token; 403 if no employee_accounts record for the user
+
+---
+
+## GET /api/auth/employee-email?id={employee_id}
+
+Looks up an employee's email address by their `employee_id` string.
+
+Used during login when an employee enters their employee ID instead of email — the admin
+page fetches the real email, then signs in with Supabase using that email.
+
+**Response:** `{ email: string }`
+
+**Errors:** 400 if no id; 404 if employee not found

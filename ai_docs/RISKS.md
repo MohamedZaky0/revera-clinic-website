@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-06-27
 > **Previous content was for a different project — discarded entirely**
 
 ---
@@ -92,20 +92,22 @@ Correctly stored in env vars (`.env.local`):
 
 ---
 
-## RISK-002: Admin Panel Has No Authentication
+## RISK-002: Admin Auth Is Client-Side Only (Partially Resolved)
 
-**Severity:** Critical
+**Severity:** Medium (was Critical)
 **Type:** Security
+**Status:** Partially mitigated as of 2026-06-27
 
-**Description:**
-The `/admin` route is publicly accessible. Anyone who knows the URL can view all bookings,
-customer data (name, email, phone), edit services, and change CMS content.
+**What changed:**
+The admin page now has a full Supabase email/password login gate. Employees are managed via `employee_accounts` + `roles` tables. Invites are sent via Supabase Auth. A superadmin bypass exists for `superadmin@revera.com`.
 
-**Affected data:** All reservations (patient names, emails, phones), all admin actions.
+**Remaining gap:**
+All `/api/` routes are still unprotected on the server side. A direct HTTP call to e.g. `GET /api/reservations` from outside the browser returns all data without any token check. The session gate exists only in the browser React component, not in middleware or route handlers.
 
-**Mitigation (not yet implemented):**
-- Add Supabase Auth or a simple password gate in Next.js middleware before `/admin`
-- Until fixed, ensure the admin URL is not publicly discoverable (security through obscurity is insufficient)
+**What would fully resolve this:**
+- Add Next.js middleware that validates a Supabase session cookie for `/api/` routes
+- Or add `Authorization: Bearer` token validation in individual route handlers
+- Or use Supabase RLS policies on all tables (currently bypassed by service role key)
 
 ---
 
