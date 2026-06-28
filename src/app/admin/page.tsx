@@ -1060,6 +1060,26 @@ export default function AdminPage() {
     }
   }
 
+  async function handleResendInvitation(id: string) {
+    if (!confirm("Resend the invitation email to this employee? Their old invite link will be invalidated.")) return;
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        alert('Invitation re-sent successfully! The employee will receive a new email.');
+        fetchRolesAndEmployees();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to resend invitation.');
+      }
+    } catch (err: any) {
+      alert('Error resending invitation: ' + err.message);
+    }
+  }
+
   // Force English/LTR context on Admin page
   useEffect(() => {
     const prevDir = document.documentElement.dir;
@@ -9363,14 +9383,27 @@ export default function AdminPage() {
                             </td>
                             <td className="px-6 py-4 text-center">
                               {emp.employee_id !== 'superadmin' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteEmployee(emp.id)}
-                                  className="text-red-600 hover:text-red-800 transition"
-                                  title="Revoke Access"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
+                                <div className="flex items-center justify-center gap-2">
+                                  {!emp.email_confirmed_at && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleResendInvitation(emp.id)}
+                                      className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100"
+                                      title="Resend Invitation Email"
+                                    >
+                                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9z"/></svg>
+                                      Resend
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteEmployee(emp.id)}
+                                    className="text-red-600 hover:text-red-800 transition"
+                                    title="Revoke Access"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
                               ) : <span className="text-xs text-gray-400 font-semibold italic">System Owner</span>}
                             </td>
                           </tr>
