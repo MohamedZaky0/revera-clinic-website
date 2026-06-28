@@ -9,7 +9,27 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json(employees || []);
+
+    // Fetch auth users using the service_role client to check email_confirmed_at
+    const { data: authData, error: authError } = await supabaseServer.auth.admin.listUsers();
+    
+    let confirmedMap = new Map<string, string | null>();
+    if (!authError && authData?.users) {
+      authData.users.forEach((u: any) => {
+        if (u.id) {
+          confirmedMap.set(u.id, u.email_confirmed_at || u.confirmed_at || null);
+        }
+      });
+    } else if (authError) {
+      console.warn("Failed to fetch auth users list for confirmation check:", authError.message);
+    }
+
+    const enrichedEmployees = (employees || []).map((emp: any) => ({
+      ...emp,
+      email_confirmed_at: emp.auth_user_id ? confirmedMap.get(emp.auth_user_id) : null
+    }));
+
+    return NextResponse.json(enrichedEmployees);
   } catch (err: any) {
     console.error('GET /api/employees error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
@@ -21,7 +41,6 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { email, name, roleName } = body;
 
-    // ── Validate inputs ──────────────────────────────────────────────────────
     if (!email || !name || !roleName) {
       return NextResponse.json(
         { error: 'Full name, email address, and role are all required.' },
@@ -32,13 +51,11 @@ export async function POST(req: Request) {
     const cleanEmail = email.trim().toLowerCase();
     const cleanName  = name.trim();
 
-    // Basic email format check
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(cleanEmail)) {
       return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
     }
 
-    // ── Verify role exists ───────────────────────────────────────────────────
     const { data: roleData, error: roleError } = await supabaseServer
       .from('roles')
       .select('name')
@@ -53,7 +70,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // ── Prevent duplicate email ──────────────────────────────────────────────
     const { data: existingEmp, error: existError } = await supabaseServer
       .from('employee_accounts')
       .select('id')
@@ -68,15 +84,12 @@ export async function POST(req: Request) {
       );
     }
 
-    // ── Send Supabase invitation email ───────────────────────────────────────
-    // The invited user receives an official link to set their own password.
-    // redirectTo sends them to our /auth/callback which then redirects to /admin.
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://revera-clinic.vercel.app';
-    console.log('Sending invitation to:', cleanEmail, 'with redirectTo:', `${siteUrl}/auth/callback?next=/admin`);
+    console.log('Sending invitation to:', cleanEmail, 'with redirectTo:', `${siteUrl}/auth/setup`);
     const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(
       cleanEmail,
       {
-        redirectTo: `${siteUrl}/auth/callback?next=/admin`,
+        redirectTo: `${siteUrl}/auth/setup`,
         data: {
           full_name: cleanName,
           role: roleName,
@@ -91,12 +104,11 @@ export async function POST(req: Request) {
       throw new Error('Failed to retrieve user ID from invitation.');
     }
 
-    // ── Insert record into employee_accounts ─────────────────────────────────
     const { data: newEmployee, error: insertError } = await supabaseServer
       .from('employee_accounts')
       .insert({
         auth_user_id: authUserId,
-        employee_id: cleanEmail,   // use real email as the unique identifier
+        employee_id: cleanEmail,
         email: cleanEmail,
         name: cleanName,
         role_name: roleName,
@@ -105,7 +117,6 @@ export async function POST(req: Request) {
       .single();
 
     if (insertError) {
-      // Rollback: delete the auth user so they aren't orphaned
       await supabaseServer.auth.admin.deleteUser(authUserId);
       throw insertError;
     }
@@ -113,6 +124,62 @@ export async function POST(req: Request) {
     return NextResponse.json(newEmployee, { status: 201 });
   } catch (err: any) {
     console.error('POST /api/employees error:', err);
+    return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request) {
+  // Resend invitation to an employee whose invite expired
+  try {
+    const body = await req.json();
+    const { id } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Employee ID is required.' }, { status: 400 });
+    }
+
+    const { data: employee, error: fetchError } = await supabaseServer
+      .from('employee_accounts')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (!employee) {
+      return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
+    }
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://revera-clinic.vercel.app';
+
+    // Delete old auth user so we can re-invite cleanly with a fresh token
+    if (employee.auth_user_id) {
+      await supabaseServer.auth.admin.deleteUser(employee.auth_user_id).catch(() => {});
+    }
+
+    const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(
+      employee.email,
+      {
+        redirectTo: `${siteUrl}/auth/setup`,
+        data: {
+          full_name: employee.name,
+          role: employee.role_name,
+        },
+      }
+    );
+
+    if (inviteError) throw inviteError;
+
+    const newAuthUserId = inviteData.user?.id;
+    if (newAuthUserId) {
+      await supabaseServer
+        .from('employee_accounts')
+        .update({ auth_user_id: newAuthUserId })
+        .eq('id', id);
+    }
+
+    return NextResponse.json({ message: 'Invitation re-sent successfully.' });
+  } catch (err: any) {
+    console.error('PATCH /api/employees error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
   }
 }
@@ -126,7 +193,6 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Employee account ID is required' }, { status: 400 });
     }
 
-    // 1. Fetch employee to get auth_user_id
     const { data: employee, error: fetchError } = await supabaseServer
       .from('employee_accounts')
       .select('*')
@@ -142,7 +208,6 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Cannot delete superadmin account' }, { status: 400 });
     }
 
-    // 2. Delete from Supabase Auth
     if (employee.auth_user_id) {
       const { error: deleteAuthError } = await supabaseServer.auth.admin.deleteUser(employee.auth_user_id);
       if (deleteAuthError) {
@@ -150,7 +215,6 @@ export async function DELETE(req: Request) {
       }
     }
 
-    // 3. Delete from database table
     const { error: deleteDbError } = await supabaseServer
       .from('employee_accounts')
       .delete()

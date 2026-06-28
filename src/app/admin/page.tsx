@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
@@ -374,12 +374,134 @@ const MOCK_PAYROLL = [
   { id: "PRL-006", name: "Hoda Aly", role: "Clinic Admin Assistant", base: "EGP 16,000.00", bonus: "EGP 1,500.00", deductions: "EGP 250.00", net: "EGP 17,250.00", period: "1 May - 31 May 2026", status: "Processing" },
 ];
 
+const PERMISSION_STRUCTURE = [
+  {
+    category: "Bookings Management",
+    prefix: "bookings",
+    items: [
+      { key: "bookings.view_calendar", label: "View Calendar" },
+      { key: "bookings.view_list", label: "View Bookings List" },
+      { key: "bookings.create", label: "Create Bookings" },
+      { key: "bookings.edit", label: "Edit/Reschedule Bookings" },
+      { key: "bookings.approve_reject", label: "Approve/Reject Requests" },
+      { key: "bookings.delete", label: "Delete/Cancel Bookings" }
+    ]
+  },
+  {
+    category: "Customer Management",
+    prefix: "customers",
+    items: [
+      { key: "customers.view", label: "View Customer Profiles" },
+      { key: "customers.create", label: "Create Patients" },
+      { key: "customers.edit", label: "Edit Patients" },
+      { key: "customers.delete", label: "Delete Patients" },
+      { key: "customers.import", label: "Import Patients (CSV)" }
+    ]
+  },
+  {
+    category: "Provider (Doctor) Management",
+    prefix: "providers",
+    items: [
+      { key: "providers.view", label: "View Provider Profiles" },
+      { key: "providers.create", label: "Add New Providers" },
+      { key: "providers.edit", label: "Edit Provider Details" },
+      { key: "providers.delete", label: "Delete Providers" },
+      { key: "providers.attendance", label: "Manage Provider Attendance" }
+    ]
+  },
+  {
+    category: "Services Management",
+    prefix: "services",
+    items: [
+      { key: "services.view", label: "View Services List" },
+      { key: "services.create", label: "Create Services & Categories" },
+      { key: "services.edit", label: "Edit Services & Toggle Status" },
+      { key: "services.delete", label: "Delete Services" }
+    ]
+  },
+  {
+    category: "Settings & System Control",
+    prefix: "settings",
+    items: [
+      { key: "settings.sms", label: "Configure SMS Gateway" },
+      { key: "settings.medical_forms", label: "Manage Medical Forms" },
+      { key: "settings.roles", label: "Manage Employee Roles & Accounts" },
+      { key: "settings.profile", label: "Manage Company Profile" },
+      { key: "settings.service_hours", label: "Manage Service Hours" },
+      { key: "settings.branches", label: "Manage Branches" },
+      { key: "settings.booking_settings", label: "Manage Booking Settings" },
+      { key: "settings.notification", label: "Manage Notification Settings" },
+      { key: "settings.queue", label: "Manage Queue Settings" },
+      { key: "settings.pages", label: "Manage Pages Settings (CMS)" }
+    ]
+  }
+];
+
 export default function AdminPage() {
   // Auth state
   const [session, setSession] = useState<any>(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [adminRole, setAdminRole] = useState<string | null>(null);
   const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
+  const hasPermission = useCallback((permKey: string): boolean => {
+    if (adminRole === 'superadmin') return true;
+    if (!adminPermissions) return false;
+    if (adminPermissions.includes(permKey)) return true;
+    
+    // Backward compatibility mappings
+    if (["customers.create", "customers.edit", "customers.import"].includes(permKey)) {
+      if (adminPermissions.includes("customers.create_edit") || adminPermissions.includes("Customers")) return true;
+    }
+    if (permKey === "customers.delete") {
+      if (adminPermissions.includes("customers.delete") || adminPermissions.includes("Customers")) return true;
+    }
+    if (["providers.create", "providers.edit"].includes(permKey)) {
+      if (adminPermissions.includes("providers.create_edit") || adminPermissions.includes("Providers")) return true;
+    }
+    if (permKey === "providers.delete") {
+      if (adminPermissions.includes("providers.delete") || adminPermissions.includes("Providers")) return true;
+    }
+    if (["services.create", "services.edit", "services.delete"].includes(permKey)) {
+      if (adminPermissions.includes("services.create_edit_delete") || adminPermissions.includes("Services")) return true;
+    }
+
+    const parentScreenMap: Record<string, string> = {
+      "bookings": "Bookings",
+      "customers": "Customers",
+      "providers": "Providers",
+      "services": "Services",
+      "settings": "Settings"
+    };
+    const category = permKey.split('.')[0];
+    const legacyScreen = parentScreenMap[category];
+    if (legacyScreen && adminPermissions.includes(legacyScreen)) {
+      return true;
+    }
+
+    return false;
+  }, [adminRole, adminPermissions]);
+
+  const permittedSidebarItems = useMemo(() => {
+    if (!adminRole) return [];
+    if (adminRole === 'superadmin') return SIDEBAR_ITEMS;
+    return SIDEBAR_ITEMS.filter(item => {
+      if (item.label === 'Logout') return true;
+      if (adminPermissions.includes(item.label)) return true;
+      
+      const parentScreenMap: Record<string, string> = {
+        "Bookings": "bookings",
+        "Customers": "customers",
+        "Providers": "providers",
+        "Services": "services",
+        "Settings": "settings"
+      };
+      const prefix = parentScreenMap[item.label];
+      if (prefix && adminPermissions.some(p => p.startsWith(prefix + "."))) return true;
+      
+      return false;
+    });
+  }, [adminRole, adminPermissions]);
+
   const [adminEmail, setAdminEmail] = useState("");
   const [adminEmployeeId, setAdminEmployeeId] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
@@ -629,6 +751,14 @@ export default function AdminPage() {
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
   const [calendarView, setCalendarView] = useState<"Calendar" | "List" | "Schedule">("Calendar");
+  useEffect(() => {
+    if (adminRole === 'superadmin') return;
+    if (adminPermissions.length > 0) {
+      if (!hasPermission("bookings.view_calendar") && hasPermission("bookings.view_list")) {
+        setCalendarView("List");
+      }
+    }
+  }, [adminPermissions, adminRole, hasPermission]);
   const [scheduleDate, setScheduleDate] = useState<Date>(() => new Date());
   const [scheduleProviderFilter, setScheduleProviderFilter] = useState<string>("All");
   const [scheduleServiceFilter, setScheduleServiceFilter] = useState<string>("All");
@@ -800,32 +930,49 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (adminPermissions.length > 0 && !adminPermissions.includes(activeNav)) {
-      if (activeNav === 'Role Management' && adminRole === 'superadmin') {
-        return;
-      }
-      
-      const settingsSubsections = [
-        "Profile",
-        "Service Hours",
-        "Branches",
-        "Booking Settings",
-        "Notification Settings",
-        "Queue Settings",
-        "Pages Settings"
-      ];
-      
-      if (settingsSubsections.includes(activeNav) && adminPermissions.includes("Settings")) {
-        return;
-      }
-      
-      if (adminPermissions.includes('Bookings')) {
-        setActiveNav('Bookings');
+    if (adminRole === 'superadmin') return;
+    if (adminPermissions.length > 0) {
+      let isPermitted = false;
+      if (activeNav === 'Logout') {
+        isPermitted = true;
       } else {
-        setActiveNav(adminPermissions[0]);
+        const settingsSubsections: Record<string, string> = {
+          "Profile": "settings.profile",
+          "Service Hours": "settings.service_hours",
+          "Branches": "settings.branches",
+          "Booking Settings": "settings.booking_settings",
+          "Notification Settings": "settings.notification",
+          "Queue Settings": "settings.queue",
+          "Pages Settings": "settings.pages",
+          "Role Management": "settings.roles"
+        };
+        if (settingsSubsections[activeNav]) {
+          isPermitted = hasPermission(settingsSubsections[activeNav]);
+        } else {
+          const parentScreenMap: Record<string, string> = {
+            "Bookings": "bookings",
+            "Customers": "customers",
+            "Providers": "providers",
+            "Services": "services",
+            "Settings": "settings"
+          };
+          const prefix = parentScreenMap[activeNav];
+          if (prefix) {
+            isPermitted = adminPermissions.includes(activeNav) || adminPermissions.some(p => p.startsWith(prefix + "."));
+          } else {
+            isPermitted = adminPermissions.includes(activeNav);
+          }
+        }
+      }
+
+      if (!isPermitted && permittedSidebarItems.length > 0) {
+        const firstPermitted = permittedSidebarItems.find(item => item.label !== 'Logout');
+        if (firstPermitted) {
+          setActiveNav(firstPermitted.label);
+        }
       }
     }
-  }, [adminPermissions, adminRole, activeNav]);
+  }, [adminPermissions, adminRole, activeNav, permittedSidebarItems, hasPermission]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -835,6 +982,31 @@ export default function AdminPage() {
       }
     }
   }, []);
+
+  // Automatically select the first permitted sub-tab in Bookings and Providers view
+  useEffect(() => {
+    if (adminRole === 'superadmin') return;
+
+    if (activeNav === "Bookings") {
+      const hasCalendar = hasPermission("bookings.view_calendar");
+      const hasList = hasPermission("bookings.view_list");
+      if (hasList && !hasCalendar && (calendarView === "Calendar" || calendarView === "Schedule")) {
+        setCalendarView("List");
+      } else if (hasCalendar && !hasList && calendarView === "List") {
+        setCalendarView("Calendar");
+      }
+    }
+
+    if (activeNav === "Providers") {
+      const hasView = hasPermission("providers.view");
+      const hasAttendance = hasPermission("providers.attendance");
+      if (hasAttendance && !hasView && providerTab === "Providers") {
+        setProviderTab("Attendance");
+      } else if (hasView && !hasAttendance && providerTab === "Attendance") {
+        setProviderTab("Providers");
+      }
+    }
+  }, [activeNav, adminRole, adminPermissions, hasPermission, calendarView, providerTab]);
 
   async function handleSetupPassword(e: React.FormEvent) {
     e.preventDefault();
@@ -1060,6 +1232,26 @@ export default function AdminPage() {
     }
   }
 
+  async function handleResendInvitation(id: string) {
+    if (!confirm("Resend the invitation email to this employee? Their old invite link will be invalidated.")) return;
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        alert('Invitation re-sent successfully! The employee will receive a new email.');
+        fetchRolesAndEmployees();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to resend invitation.');
+      }
+    } catch (err: any) {
+      alert('Error resending invitation: ' + err.message);
+    }
+  }
+
   // Force English/LTR context on Admin page
   useEffect(() => {
     const prevDir = document.documentElement.dir;
@@ -1102,39 +1294,43 @@ export default function AdminPage() {
   }, []);
   // BRANCHES is now derived from the real branches state loaded from Supabase
 
-  const permittedSidebarItems = useMemo(() => {
-    if (!adminRole) return [];
-    if (adminRole === 'superadmin') return SIDEBAR_ITEMS;
-    return SIDEBAR_ITEMS.filter(item => {
-      if (item.label === 'Logout') return true;
-      return adminPermissions.includes(item.label);
-    });
-  }, [adminRole, adminPermissions]);
-
   const hasAccessToActiveNav = useMemo(() => {
     console.log("RBAC Access Check - activeNav:", activeNav, "| adminRole:", adminRole, "| permissions:", adminPermissions);
     if (!adminRole) return false;
     if (adminRole === 'superadmin') return true;
     if (activeNav === 'Logout') return true;
     
-    const settingsSubsections = [
-      "Profile",
-      "Service Hours",
-      "Branches",
-      "Booking Settings",
-      "Notification Settings",
-      "Queue Settings",
-      "Pages Settings",
-      "Role Management"
-    ];
+    const settingsSubsections: Record<string, string> = {
+      "Profile": "settings.profile",
+      "Service Hours": "settings.service_hours",
+      "Branches": "settings.branches",
+      "Booking Settings": "settings.booking_settings",
+      "Notification Settings": "settings.notification",
+      "Queue Settings": "settings.queue",
+      "Pages Settings": "settings.pages",
+      "Role Management": "settings.roles"
+    };
     
-    if (settingsSubsections.includes(activeNav)) {
-      if (activeNav === 'Role Management') return false; // strictly superadmin
-      return adminPermissions.includes("Settings");
+    if (settingsSubsections[activeNav]) {
+      const perm = settingsSubsections[activeNav];
+      return hasPermission(perm);
     }
     
-    return adminPermissions.includes(activeNav);
-  }, [adminRole, adminPermissions, activeNav]);
+    const parentScreenMap: Record<string, string> = {
+      "Bookings": "bookings",
+      "Customers": "customers",
+      "Providers": "providers",
+      "Services": "services",
+      "Settings": "settings"
+    };
+    
+    const prefix = parentScreenMap[activeNav];
+    if (prefix) {
+      return adminPermissions.includes(activeNav) || adminPermissions.some(p => p.startsWith(prefix + "."));
+    }
+    
+    return false;
+  }, [adminRole, adminPermissions, activeNav, hasPermission]);
 
   const [prescriptionsExpanded, setPrescriptionsExpanded] = useState(false);
   const [prescriptionsSearch, setPrescriptionsSearch] = useState("");
@@ -3209,15 +3405,18 @@ export default function AdminPage() {
                     {settingsExpanded && (
                       <div className="mt-1 space-y-1 overflow-hidden rounded-2xl bg-black/15 py-1.5 pl-3 pr-1">
                         {[
-                          { label: "Profile", icon: User },
-                          { label: "Service Hours", icon: Clock },
-                          { label: "Branches", icon: MapIcon },
-                          { label: "Booking Settings", icon: CalendarDays },
-                          { label: "Notification Settings", icon: Bell },
-                          { label: "Queue Settings", icon: ListOrdered },
-                          { label: "Pages Settings", icon: FileText },
-                          ...(adminRole === 'superadmin' ? [{ label: "Role Management", icon: Shield }] : [])
-                        ].map((sub) => {
+                          { label: "Profile", icon: User, perm: "settings.profile" },
+                          { label: "Service Hours", icon: Clock, perm: "settings.service_hours" },
+                          { label: "Branches", icon: MapIcon, perm: "settings.branches" },
+                          { label: "Booking Settings", icon: CalendarDays, perm: "settings.booking_settings" },
+                          { label: "Notification Settings", icon: Bell, perm: "settings.notification" },
+                          { label: "Queue Settings", icon: ListOrdered, perm: "settings.queue" },
+                          { label: "Pages Settings", icon: FileText, perm: "settings.pages" },
+                          { label: "Role Management", icon: Shield, perm: "settings.roles" }
+                        ].filter(sub => {
+                          if (adminRole === 'superadmin') return true;
+                          return hasPermission(sub.perm);
+                        }).map((sub) => {
                           const SubIcon = sub.icon;
                           const subActive = activeNav === sub.label;
                           return (
@@ -3330,42 +3529,50 @@ export default function AdminPage() {
                     <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#E6E9EB] mb-1">
                       Quick Creation
                     </div>
-                    <button
-                      onClick={() => {
-                        setShowQuickActionMenu(false);
-                        setShowAddBookingModal(true);
-                      }}
-                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
-                    >
-                      <Plus size={14} className="text-[#C4AE7C]" /> New Appointment
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowQuickActionMenu(false);
-                        handleOpenAddCustomer();
-                      }}
-                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
-                    >
-                      <Plus size={14} className="text-[#C4AE7C]" /> New Patient
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowQuickActionMenu(false);
-                        openAddProviderModal();
-                      }}
-                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
-                    >
-                      <Plus size={14} className="text-[#C4AE7C]" /> New Doctor / Provider
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowQuickActionMenu(false);
-                        setShowAddCategoryModal(true);
-                      }}
-                      className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
-                    >
-                      <Plus size={14} className="text-[#C4AE7C]" /> New Service Category
-                    </button>
+                    {hasPermission("bookings.create") && (
+                      <button
+                        onClick={() => {
+                          setShowQuickActionMenu(false);
+                          setShowAddBookingModal(true);
+                        }}
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                      >
+                        <Plus size={14} className="text-[#C4AE7C]" /> New Appointment
+                      </button>
+                    )}
+                    {hasPermission("customers.create") && (
+                      <button
+                        onClick={() => {
+                          setShowQuickActionMenu(false);
+                          handleOpenAddCustomer();
+                        }}
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                      >
+                        <Plus size={14} className="text-[#C4AE7C]" /> New Patient
+                      </button>
+                    )}
+                    {hasPermission("providers.create") && (
+                      <button
+                        onClick={() => {
+                          setShowQuickActionMenu(false);
+                          openAddProviderModal();
+                        }}
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                      >
+                        <Plus size={14} className="text-[#C4AE7C]" /> New Doctor / Provider
+                      </button>
+                    )}
+                    {hasPermission("services.create") && (
+                      <button
+                        onClick={() => {
+                          setShowQuickActionMenu(false);
+                          setShowAddCategoryModal(true);
+                        }}
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                      >
+                        <Plus size={14} className="text-[#C4AE7C]" /> New Service Category
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -3481,28 +3688,32 @@ export default function AdminPage() {
                   <div>
                     <h1 className="text-4xl font-semibold text-[#1F251A]">Providers</h1>
                     <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#5A6A51]">
-                      <button
-                        type="button"
-                        onClick={() => setProviderTab("Providers")}
-                        className={`rounded-full px-5 py-3 transition ${
-                          providerTab === "Providers"
-                            ? "bg-[#414E36] text-[#FBFBF9]"
-                            : "bg-[#F2EFE9] text-[#5A6A51] hover:bg-[#EDF1EC]"
-                        }`}
-                      >
-                        Providers
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setProviderTab("Attendance")}
-                        className={`rounded-full px-5 py-3 transition ${
-                          providerTab === "Attendance"
-                            ? "bg-[#414E36] text-[#FBFBF9]"
-                            : "bg-[#F2EFE9] text-[#5A6A51] hover:bg-[#EDF1EC]"
-                        }`}
-                      >
-                        Attendance
-                      </button>
+                      {hasPermission("providers.view") && (
+                        <button
+                          type="button"
+                          onClick={() => setProviderTab("Providers")}
+                          className={`rounded-full px-5 py-3 transition ${
+                            providerTab === "Providers"
+                              ? "bg-[#414E36] text-[#FBFBF9]"
+                              : "bg-[#F2EFE9] text-[#5A6A51] hover:bg-[#EDF1EC]"
+                          }`}
+                        >
+                          Providers
+                        </button>
+                      )}
+                      {hasPermission("providers.attendance") && (
+                        <button
+                          type="button"
+                          onClick={() => setProviderTab("Attendance")}
+                          className={`rounded-full px-5 py-3 transition ${
+                            providerTab === "Attendance"
+                              ? "bg-[#414E36] text-[#FBFBF9]"
+                              : "bg-[#F2EFE9] text-[#5A6A51] hover:bg-[#EDF1EC]"
+                          }`}
+                        >
+                          Attendance
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -3533,7 +3744,7 @@ export default function AdminPage() {
                       )}
                     </button>
 
-                    {providerTab === "Providers" && (
+                    {providerTab === "Providers" && hasPermission("providers.create") && (
                       <button
                         onClick={openAddProviderModal}
                         className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
@@ -3658,7 +3869,7 @@ export default function AdminPage() {
                                 {provider.rating}
                               </span>
                               <div className="flex items-center gap-2">
-                                {provider.id && (
+                                {provider.id && hasPermission("providers.delete") && (
                                   <button
                                     onClick={() => handleDeleteProvider(provider.id)}
                                     className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
@@ -3667,13 +3878,15 @@ export default function AdminPage() {
                                     <Trash2 size={15} />
                                   </button>
                                 )}
-                                <button
-                                  onClick={() => openEditProviderModal(provider)}
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
-                                  title="Edit Provider"
-                                >
-                                  <Pencil size={14} />
-                                </button>
+                                {hasPermission("providers.edit") && (
+                                  <button
+                                    onClick={() => openEditProviderModal(provider)}
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
+                                    title="Edit Provider"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -3930,7 +4143,7 @@ export default function AdminPage() {
                               setEditingService(null);
                               setShowAddServiceModal(true);
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+                            className={`${hasPermission("services.create") ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-lg border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-medium text-[#414E36] transition hover:bg-[#EDF1EC]`}
                           >
                             <Plus size={12} /> Add Service
                           </button>
@@ -4069,11 +4282,16 @@ export default function AdminPage() {
                                           <div className="flex flex-col items-center gap-1">
                                             <button
                                               type="button"
-                                              onClick={() => toggleService(svc.id, "active")}
-                                              className="relative h-6 w-11 rounded-full focus:outline-none transition-colors duration-300"
+                                              onClick={() => {
+                                                if (hasPermission("services.edit")) {
+                                                  toggleService(svc.id, "active");
+                                                }
+                                              }}
+                                              className={`relative h-6 w-11 rounded-full focus:outline-none transition-colors duration-300 ${!hasPermission("services.edit") ? "opacity-60 cursor-not-allowed" : ""}`}
                                               style={{ 
                                                 backgroundColor: toggles.active ? "#C4AE7C" : "#d1d5db"
                                               }}
+                                              disabled={!hasPermission("services.edit")}
                                             >
                                               <span
                                                 className="absolute top-[4px] h-4 w-4 rounded-full bg-white shadow-md"
@@ -4089,14 +4307,16 @@ export default function AdminPage() {
                                           </div>
                                         </td>
                                         <td className="px-3 py-3 text-center">
-                                          <button
-                                            type="button"
-                                            onClick={() => handleEditService(svc)}
-                                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                            title="Edit Service"
-                                          >
-                                            <Pencil size={12} />
-                                          </button>
+                                          {hasPermission("services.edit") && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleEditService(svc)}
+                                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                              title="Edit Service"
+                                            >
+                                              <Pencil size={12} />
+                                            </button>
+                                          )}
                                         </td>
                                       </tr>
                                     );
@@ -4270,7 +4490,7 @@ export default function AdminPage() {
                         {editingService ? "Edit Service" : "Add Service"}
                       </h3>
                       <div className="flex items-center gap-3">
-                        {editingService && (
+                        {editingService && hasPermission("services.delete") && (
                           <button
                             type="button"
                             onClick={() => {
@@ -6182,19 +6402,23 @@ export default function AdminPage() {
                       <Download size={14} /> Export
                     </button>
                     
-                    <button
-                      onClick={() => setShowImportCustomersModal(true)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
-                    >
-                      <Upload size={14} /> Import
-                    </button>
+                    {hasPermission("customers.import") && (
+                      <button
+                        onClick={() => setShowImportCustomersModal(true)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
+                      >
+                        <Upload size={14} /> Import
+                      </button>
+                    )}
                     
-                    <button
-                      onClick={handleOpenAddCustomer}
-                      className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                    >
-                      <Plus size={14} /> Add Patient
-                    </button>
+                    {hasPermission("customers.create") && (
+                      <button
+                        onClick={handleOpenAddCustomer}
+                        className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                      >
+                        <Plus size={14} /> Add Patient
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -6330,20 +6554,24 @@ export default function AdminPage() {
                               >
                                 <Info size={14} />
                               </button>
-                              <button
-                                onClick={() => handleOpenEditCustomer(c)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                title="Edit Customer"
-                              >
-                                <Pencil size={12} />
-                              </button>
-                              <button
-                                onClick={() => setDeleteCustomerTarget(c)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50"
-                                title="Delete Customer"
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                              {hasPermission("customers.edit") && (
+                                <button
+                                  onClick={() => handleOpenEditCustomer(c)}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                  title="Edit Customer"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              )}
+                              {hasPermission("customers.delete") && (
+                                <button
+                                  onClick={() => setDeleteCustomerTarget(c)}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50"
+                                  title="Delete Customer"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -9155,7 +9383,7 @@ export default function AdminPage() {
                   
                   {/* Create Role Form */}
                   <form onSubmit={handleCreateRole} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-4">
                       <div>
                         <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Role Name</label>
                         <input
@@ -9167,29 +9395,66 @@ export default function AdminPage() {
                             setNewRoleName(e.target.value);
                             if (roleCreateError) setRoleCreateError("");
                           }}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          className="w-full max-w-md rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Permissions (Select Screens)</label>
-                        <div className="flex flex-wrap gap-3 mt-2">
-                          {["Bookings", "Customers", "Providers", "Services", "Settings"].map((perm) => (
-                            <label key={perm} className="flex items-center gap-2 text-xs font-semibold text-[#414E36] cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={newRolePermissions.includes(perm)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setNewRolePermissions(prev => [...prev, perm]);
-                                  } else {
-                                    setNewRolePermissions(prev => prev.filter(p => p !== perm));
-                                  }
-                                }}
-                                className="h-4 w-4 accent-[#414E36] rounded"
-                              />
-                              {perm}
-                            </label>
-                          ))}
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-3">Permissions & Access Control</label>
+                        <div className="grid gap-4 md:grid-cols-2 max-h-[400px] overflow-y-auto rounded-3xl border border-[#414E36]/10 p-5 bg-[#FBFBF9]">
+                          {PERMISSION_STRUCTURE.map((group) => {
+                            const allChecked = group.items.every(item => newRolePermissions.includes(item.key));
+                            const someChecked = group.items.some(item => newRolePermissions.includes(item.key)) && !allChecked;
+
+                            return (
+                              <div key={group.category} className="rounded-2xl border border-[#414E36]/10 bg-white p-4 shadow-sm flex flex-col justify-between">
+                                <div>
+                                  <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-2 mb-3">
+                                    <label className="flex items-center gap-2 text-xs font-bold text-[#1F251A] cursor-pointer select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={allChecked}
+                                        ref={(el) => {
+                                          if (el) el.indeterminate = someChecked;
+                                        }}
+                                        onChange={(e) => {
+                                          const keys = group.items.map(item => item.key);
+                                          if (e.target.checked) {
+                                            setNewRolePermissions(prev => [...new Set([...prev, ...keys])]);
+                                          } else {
+                                            setNewRolePermissions(prev => prev.filter(p => !keys.includes(p)));
+                                          }
+                                        }}
+                                        className="h-4 w-4 accent-[#414E36] rounded"
+                                      />
+                                      {group.category}
+                                    </label>
+                                    <span className="text-[10px] font-bold text-[#414E36] bg-[#414E36]/5 px-2 py-0.5 rounded-full">
+                                      {group.items.filter(item => newRolePermissions.includes(item.key)).length} / {group.items.length}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {group.items.map((item) => (
+                                      <label key={item.key} className="flex items-center gap-2.5 text-xs font-semibold text-[#414E36] cursor-pointer select-none hover:text-[#1F251A] transition">
+                                        <input
+                                          type="checkbox"
+                                          checked={newRolePermissions.includes(item.key)}
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              setNewRolePermissions(prev => [...prev, item.key]);
+                                            } else {
+                                              setNewRolePermissions(prev => prev.filter(p => p !== item.key));
+                                            }
+                                          }}
+                                          className="h-4 w-4 accent-[#414E36] rounded"
+                                        />
+                                        {item.label}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -9363,14 +9628,27 @@ export default function AdminPage() {
                             </td>
                             <td className="px-6 py-4 text-center">
                               {emp.employee_id !== 'superadmin' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteEmployee(emp.id)}
-                                  className="text-red-600 hover:text-red-800 transition"
-                                  title="Revoke Access"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
+                                <div className="flex items-center justify-center gap-2">
+                                  {!emp.email_confirmed_at && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleResendInvitation(emp.id)}
+                                      className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100"
+                                      title="Resend Invitation Email"
+                                    >
+                                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9z"/></svg>
+                                      Resend
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteEmployee(emp.id)}
+                                    className="text-red-600 hover:text-red-800 transition"
+                                    title="Revoke Access"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
                               ) : <span className="text-xs text-gray-400 font-semibold italic">System Owner</span>}
                             </td>
                           </tr>
@@ -10130,7 +10408,11 @@ export default function AdminPage() {
           <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             {/* ── CALENDAR VIEW SWITCHER ── */}
             <div className="flex items-center gap-1 p-1 w-fit rounded-full border border-[#414E36]/12 bg-white shadow-sm">
-              {(["Calendar", "List", "Schedule"] as const).map((view) => (
+              {(["Calendar", "List", "Schedule"] as const).filter(view => {
+                if (view === "Calendar" || view === "Schedule") return hasPermission("bookings.view_calendar");
+                if (view === "List") return hasPermission("bookings.view_list");
+                return true;
+              }).map((view) => (
                 <button
                   key={view}
                   onClick={() => setCalendarView(view)}
@@ -10159,12 +10441,14 @@ export default function AdminPage() {
               >
                 <Download size={16} /> Export
               </button>
-              <button
-                onClick={() => setShowAddBookingModal(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] w-fit shadow-sm"
-              >
-                <Plus size={18} /> New booking
-              </button>
+              {hasPermission("bookings.create") && (
+                <button
+                  onClick={() => setShowAddBookingModal(true)}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] w-fit shadow-sm"
+                >
+                  <Plus size={18} /> New booking
+                </button>
+              )}
             </div>
           </div>
 
@@ -10684,37 +10968,39 @@ export default function AdminPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openApprove(req);
-                      }}
-                      className="rounded-3xl bg-[#414E36] px-4 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        await fetch(
-                          "/api/reservations?id=" + encodeURIComponent(req.id),
-                          {
-                            method: "PATCH",
-                            body: JSON.stringify({ action: "reject" }),
-                            headers: { "Content-Type": "application/json" },
-                          }
-                        );
-                        fetchRequests();
-                        fetchAllReservations();
-                      }}
-                      className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#f7f6f2]"
-                    >
-                      Reject
-                    </button>
-                  </div>
+                  {hasPermission("bookings.approve_reject") && (
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openApprove(req);
+                        }}
+                        className="rounded-3xl bg-[#414E36] px-4 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await fetch(
+                            "/api/reservations?id=" + encodeURIComponent(req.id),
+                            {
+                              method: "PATCH",
+                              body: JSON.stringify({ action: "reject" }),
+                              headers: { "Content-Type": "application/json" },
+                            }
+                          );
+                          fetchRequests();
+                          fetchAllReservations();
+                        }}
+                        className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#f7f6f2]"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -10871,6 +11157,7 @@ export default function AdminPage() {
                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-1">SESSION TYPE</p>
                        <select
                          value={viewingBooking.sessionType || "in_person"}
+                         disabled={!hasPermission("bookings.edit")}
                          onChange={async (e) => {
                            const newType = e.target.value;
                            await fetch(`/api/reservations?id=${viewingBooking.id}`, {
@@ -10881,7 +11168,7 @@ export default function AdminPage() {
                            setViewingBooking(prev => prev ? { ...prev, sessionType: newType } : null);
                            fetchAllReservations();
                          }}
-                         className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer"
+                         className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                        >
                          <option value="in_person">In Person / في العيادة</option>
                          <option value="online">Online / أونلاين</option>
@@ -10914,7 +11201,10 @@ export default function AdminPage() {
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICES</p>
                       <p className="text-sm text-[#1F251A] mt-1 font-semibold">{serviceName}</p>
                     </div>
-                    <button className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition">
+                    <button
+                      disabled={!hasPermission("bookings.edit")}
+                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       Add Service
                     </button>
                   </div>
@@ -10924,7 +11214,10 @@ export default function AdminPage() {
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">EXTRA ADJUSTMENT</p>
                       <p className="text-sm text-[#1F251A] mt-1 font-semibold">0.00 EGP</p>
                     </div>
-                    <button className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition">
+                    <button
+                      disabled={!hasPermission("bookings.edit")}
+                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       Adjustment
                     </button>
                   </div>
@@ -10941,6 +11234,7 @@ export default function AdminPage() {
                           <input
                             type="number"
                             min="0"
+                            disabled={!hasPermission("bookings.edit")}
                             value={viewingBooking.amountPaid ?? 0}
                             onChange={async (e) => {
                               const val = parseFloat(e.target.value) || 0;
@@ -10954,7 +11248,7 @@ export default function AdminPage() {
                               setViewingBooking(prev => prev ? { ...prev, amountPaid: val, amountLeft: remaining } : null);
                               fetchAllReservations();
                             }}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-12 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-12 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] disabled:opacity-60 disabled:cursor-not-allowed"
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
                         </div>
@@ -10968,6 +11262,7 @@ export default function AdminPage() {
                           <input
                             type="number"
                             min="0"
+                            disabled={!hasPermission("bookings.edit")}
                             value={viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null ? viewingBooking.amountLeft : Math.max(0, cost - (viewingBooking.amountPaid ?? 0))}
                             onChange={async (e) => {
                               const val = parseFloat(e.target.value) || 0;
@@ -10979,7 +11274,7 @@ export default function AdminPage() {
                               setViewingBooking(prev => prev ? { ...prev, amountLeft: val } : null);
                               fetchAllReservations();
                             }}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-12 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-12 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] disabled:opacity-60 disabled:cursor-not-allowed"
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
                         </div>
@@ -10993,7 +11288,10 @@ export default function AdminPage() {
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS</p>
                       <p className="text-sm text-[#5A6A51] mt-1">No products added</p>
                     </div>
-                    <button className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition">
+                    <button
+                      disabled={!hasPermission("bookings.edit")}
+                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       See Products
                     </button>
                   </div>
@@ -11002,7 +11300,10 @@ export default function AdminPage() {
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-sm font-bold text-[#1F251A]">Prescriptions</p>
-                      <button className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition">
+                      <button
+                        disabled={!hasPermission("bookings.edit")}
+                        className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
                         + Add Prescription
                       </button>
                     </div>
@@ -11015,7 +11316,10 @@ export default function AdminPage() {
                         <polyline points="10 9 9 9 8 9" />
                       </svg>
                       <p className="text-xs font-semibold">no prescriptions yet</p>
-                      <button className="mt-2 text-xs font-bold text-[#414E36] hover:underline">
+                      <button
+                        disabled={!hasPermission("bookings.edit")}
+                        className="mt-2 text-xs font-bold text-[#414E36] hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
                         + Create First Prescription
                       </button>
                     </div>
@@ -11025,18 +11329,20 @@ export default function AdminPage() {
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-sm font-bold text-[#1F251A]">Notes</p>
-                      <button
-                        onClick={async () => {
-                          const note = prompt("Enter note:", viewingBooking.notes || "");
-                          if (note !== null) {
-                            await saveNotes(note);
-                            setViewingBooking(prev => prev ? { ...prev, notes: note } : null);
-                          }
-                        }}
-                        className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
-                      >
-                        {viewingBooking.notes ? "Edit Note" : "+ Add Note"}
-                      </button>
+                      {hasPermission("bookings.edit") && (
+                        <button
+                          onClick={async () => {
+                            const note = prompt("Enter note:", viewingBooking.notes || "");
+                            if (note !== null) {
+                              await saveNotes(note);
+                              setViewingBooking(prev => prev ? { ...prev, notes: note } : null);
+                            }
+                          }}
+                          className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                        >
+                          {viewingBooking.notes ? "Edit Note" : "+ Add Note"}
+                        </button>
+                      )}
                     </div>
                     {viewingBooking.notes ? (
                       <div className="rounded-xl bg-[#F7F7F3] p-4 text-sm text-[#414E36]">
@@ -11048,23 +11354,25 @@ export default function AdminPage() {
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                         </svg>
                         <p className="text-xs font-semibold">no notes yet</p>
-                        <button
-                          onClick={async () => {
-                            const note = prompt("Enter note:");
-                            if (note) {
-                              await saveNotes(note);
-                              setViewingBooking(prev => prev ? { ...prev, notes: note } : null);
-                            }
-                          }}
-                          className="mt-2 text-xs font-bold text-[#414E36] hover:underline"
-                        >
-                          Add your first note about this customer
-                        </button>
+                        {hasPermission("bookings.edit") && (
+                          <button
+                            onClick={async () => {
+                              const note = prompt("Enter note:");
+                              if (note) {
+                                await saveNotes(note);
+                                setViewingBooking(prev => prev ? { ...prev, notes: note } : null);
+                              }
+                            }}
+                            className="mt-2 text-xs font-bold text-[#414E36] hover:underline"
+                          >
+                            Add your first note about this customer
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
 
-                  {viewingBooking.status === 'pending' && (
+                  {viewingBooking.status === 'pending' && hasPermission("bookings.approve_reject") && (
                     <div className="rounded-2xl border-2 border-[#C4AE7C]/30 bg-[#EDF1EC] p-5 flex items-center justify-between gap-4">
                       <div>
                         <p className="text-sm font-bold text-[#1F251A]">Action Required</p>
@@ -11140,6 +11448,7 @@ export default function AdminPage() {
                     </div>
                     <select
                       value={viewingBooking.doctorName || "Dr. Sara El Gamel"}
+                      disabled={!hasPermission("bookings.edit")}
                       onChange={async (e) => {
                         const newDoc = e.target.value;
                         await fetch(`/api/reservations?id=${viewingBooking.id}`, {
@@ -11150,7 +11459,7 @@ export default function AdminPage() {
                         setViewingBooking(prev => prev ? { ...prev, doctorName: newDoc } : null);
                         fetchAllReservations();
                       }}
-                      className="w-full rounded-xl border border-[#414E36]/10 bg-[#FBFBF9] px-3 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer"
+                      className="w-full rounded-xl border border-[#414E36]/10 bg-[#FBFBF9] px-3 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {providers.map((p) => (
                         <option key={p.id || p.name} value={p.name}>
@@ -11191,31 +11500,33 @@ export default function AdminPage() {
                   </div>
 
                   {/* Cancel Booking Section */}
-                  <div className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-red-800 mb-3">Cancel Booking</p>
-                    <button
-                      onClick={async () => {
-                        if (confirm("Are you sure you want to cancel this booking?")) {
-                          const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ action: "reject" }),
-                          });
-                          if (res.ok) {
-                            setViewingBooking(null);
-                            fetchRequests();
-                            fetchAllReservations();
-                            alert("Booking canceled successfully!");
-                          } else {
-                            alert("Failed to cancel booking.");
+                  {hasPermission("bookings.delete") && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-red-800 mb-3">Cancel Booking</p>
+                      <button
+                        onClick={async () => {
+                          if (confirm("Are you sure you want to cancel this booking?")) {
+                            const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ action: "reject" }),
+                            });
+                            if (res.ok) {
+                              setViewingBooking(null);
+                              fetchRequests();
+                              fetchAllReservations();
+                              alert("Booking canceled successfully!");
+                            } else {
+                              alert("Failed to cancel booking.");
+                            }
                           }
-                        }
-                      }}
-                      className="w-full rounded-2xl bg-red-600 py-2.5 text-xs font-bold text-white hover:bg-red-700 transition"
-                    >
-                      Cancel Booking
-                    </button>
-                  </div>
+                        }}
+                        className="w-full rounded-2xl bg-red-600 py-2.5 text-xs font-bold text-white hover:bg-red-700 transition"
+                      >
+                        Cancel Booking
+                      </button>
+                    </div>
+                  )}
 
                 </div>
 
@@ -12657,15 +12968,17 @@ export default function AdminPage() {
               <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
                 <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
                   <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Personal Profile</h4>
-                  <button
-                    onClick={() => {
-                      handleOpenEditCustomer(viewingCustomerProfile);
-                      setViewingCustomerProfile(null);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
-                  >
-                    <Pencil size={12} /> Edit Profile
-                  </button>
+                  {hasPermission("customers.edit") && (
+                    <button
+                      onClick={() => {
+                        handleOpenEditCustomer(viewingCustomerProfile);
+                        setViewingCustomerProfile(null);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+                    >
+                      <Pencil size={12} /> Edit Profile
+                    </button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
