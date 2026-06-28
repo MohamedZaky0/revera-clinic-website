@@ -9,7 +9,27 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json(employees || []);
+
+    // Fetch auth users using the service_role client to check email_confirmed_at
+    const { data: authData, error: authError } = await supabaseServer.auth.admin.listUsers();
+    
+    let confirmedMap = new Map<string, string | null>();
+    if (!authError && authData?.users) {
+      authData.users.forEach((u: any) => {
+        if (u.id) {
+          confirmedMap.set(u.id, u.email_confirmed_at || u.confirmed_at || null);
+        }
+      });
+    } else if (authError) {
+      console.warn("Failed to fetch auth users list for confirmation check:", authError.message);
+    }
+
+    const enrichedEmployees = (employees || []).map((emp: any) => ({
+      ...emp,
+      email_confirmed_at: emp.auth_user_id ? confirmedMap.get(emp.auth_user_id) : null
+    }));
+
+    return NextResponse.json(enrichedEmployees);
   } catch (err: any) {
     console.error('GET /api/employees error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
