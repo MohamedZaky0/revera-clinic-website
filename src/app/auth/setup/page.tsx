@@ -21,7 +21,7 @@ function SetupContent() {
     // Supabase puts the access_token in the URL hash after the invite link is clicked.
     // The client SDK automatically picks it up and fires onAuthStateChange.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: string, session: any) => {
         if (session) {
           // Try to get the name from user metadata
           const name = session.user?.user_metadata?.full_name || session.user?.email || "";
@@ -35,7 +35,7 @@ function SetupContent() {
     );
 
     // Also try immediately
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
       if (session) {
         const name = session.user?.user_metadata?.full_name || session.user?.email || "";
         setEmployeeName(name);
