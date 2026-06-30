@@ -171,12 +171,21 @@ export function AuthModal() {
           if (checkEmpRes.ok) {
             const { exists } = await checkEmpRes.json();
             if (exists) {
-              alert("This email is registered as an administrator/employee account and cannot be used for customer access.");
-              await supabase.auth.signOut();
-              localStorage.removeItem("revera_user");
-              window.dispatchEvent(new CustomEvent("revera-auth-change"));
-              setOpen(false);
-              resetState();
+              const loginInProgress = typeof window !== "undefined" && sessionStorage.getItem("customer_login_in_progress");
+              if (loginInProgress) {
+                alert("This email is registered as an administrator/employee account and cannot be used for customer access.");
+                await supabase.auth.signOut();
+                localStorage.removeItem("revera_user");
+                window.dispatchEvent(new CustomEvent("revera-auth-change"));
+                setOpen(false);
+                resetState();
+              } else {
+                localStorage.removeItem("revera_user");
+                window.dispatchEvent(new CustomEvent("revera-auth-change"));
+              }
+              if (typeof window !== "undefined") {
+                sessionStorage.removeItem("customer_login_in_progress");
+              }
               return;
             }
           }
@@ -374,6 +383,9 @@ export function AuthModal() {
     }
 
     if (verifiedSuccess) {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("customer_login_in_progress", "true");
+      }
       try {
         const res = await fetch(`/api/customers?mobile=${localPhone}`);
         if (res.ok) {
@@ -428,6 +440,9 @@ export function AuthModal() {
     setEmailError("");
     setPasswordError("");
     setVerifying(true);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("customer_login_in_progress", "true");
+    }
 
     try {
       const checkEmpRes = await fetch(`/api/auth/employee-email?email=${encodeURIComponent(emailInput)}`);
@@ -519,6 +534,9 @@ export function AuthModal() {
       return;
     }
     try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("customer_login_in_progress", "true");
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
