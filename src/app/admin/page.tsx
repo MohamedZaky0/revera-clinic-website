@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
@@ -441,6 +441,7 @@ export default function AdminPage() {
   // Auth state
   const [session, setSession] = useState<any>(null);
   const [authChecking, setAuthChecking] = useState(true);
+  const lastActivityRef = useRef<number>(Date.now());
   const [adminRole, setAdminRole] = useState<string | null>(null);
   const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
   const hasPermission = useCallback((permKey: string): boolean => {
@@ -874,13 +875,32 @@ export default function AdminPage() {
       return;
     }
 
-    // 1. Get current session
-    supabase.auth.getSession().then(({ data: { session } }: any) => {
-      handleAuthSession(session);
-    });
+    // 1. Initial sessionStorage Session Guard: Log out if browser/tab was closed
+    const isSessionActive = typeof window !== "undefined" && sessionStorage.getItem("revera_admin_session_active");
+    if (!isSessionActive) {
+      supabase.auth.getSession().then(({ data: { session: cachedSession } }: any) => {
+        if (cachedSession) {
+          console.log("Stale login session detected (tab reopened). Logging out.");
+          supabase.auth.signOut().then(() => {
+            setAuthChecking(false);
+          });
+          return;
+        }
+        setAuthChecking(false);
+      });
+    } else {
+      supabase.auth.getSession().then(({ data: { session: cachedSession } }: any) => {
+        handleAuthSession(cachedSession);
+      });
+    }
 
     // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, newSession: any) => {
+      if (event === "SIGNED_OUT") {
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("revera_admin_session_active");
+        }
+      }
       handleAuthSession(newSession);
     });
 
@@ -891,9 +911,18 @@ export default function AdminPage() {
         setAdminPermissions([]);
         setAdminEmail("");
         setAdminEmployeeId("");
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("revera_admin_session_active");
+        }
         setAuthChecking(false);
         return;
       }
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("revera_admin_session_active", "true");
+      }
+      // Reset activity timer upon successful authentication
+      lastActivityRef.current = Date.now();
 
       try {
         const token = currSession.access_token;
@@ -928,6 +957,42 @@ export default function AdminPage() {
       subscription.unsubscribe();
     };
   }, []);
+
+  // 3. Inactivity idle timeout: auto logout after 1 hour of complete inactivity
+  useEffect(() => {
+    if (!session || !adminRole) return;
+
+    const resetTimer = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    events.forEach((event) => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    // Check every 10 seconds. Timeout is 1 hour (3600000 ms)
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - lastActivityRef.current;
+      if (elapsed >= 3600000) {
+        clearInterval(interval);
+        console.log("Inactivity timeout reached. Logging out.");
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("revera_admin_session_active");
+        }
+        supabase.auth.signOut().then(() => {
+          alert("Your session has expired due to 1 hour of inactivity. Please log in again.");
+        });
+      }
+    }, 10000);
+
+    return () => {
+      events.forEach((event) => {
+        window.removeEventListener(event, resetTimer);
+      });
+      clearInterval(interval);
+    };
+  }, [session, adminRole]);
 
   useEffect(() => {
     if (adminRole === 'superadmin') return;
