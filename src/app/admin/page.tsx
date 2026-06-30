@@ -876,23 +876,21 @@ export default function AdminPage() {
     }
 
     // 1. Initial sessionStorage Session Guard: Log out if browser/tab was closed
-    const isSessionActive = typeof window !== "undefined" && sessionStorage.getItem("revera_admin_session_active");
-    if (!isSessionActive) {
-      supabase.auth.getSession().then(({ data: { session: cachedSession } }: any) => {
+    supabase.auth.getSession().then(({ data: { session: cachedSession } }: any) => {
+      const isSessionActive = typeof window !== "undefined" && sessionStorage.getItem("revera_admin_session_active");
+      if (cachedSession && !isSessionActive) {
+        console.log("Stale login session detected (tab reopened). Logging out.");
+        supabase.auth.signOut().then(() => {
+          setAuthChecking(false);
+        });
+      } else {
         if (cachedSession) {
-          console.log("Stale login session detected (tab reopened). Logging out.");
-          supabase.auth.signOut().then(() => {
-            setAuthChecking(false);
-          });
-          return;
+          handleAuthSession(cachedSession);
+        } else {
+          setAuthChecking(false);
         }
-        setAuthChecking(false);
-      });
-    } else {
-      supabase.auth.getSession().then(({ data: { session: cachedSession } }: any) => {
-        handleAuthSession(cachedSession);
-      });
-    }
+      }
+    });
 
     // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, newSession: any) => {
