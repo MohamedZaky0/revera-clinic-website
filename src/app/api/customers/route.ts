@@ -150,12 +150,21 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
     }
 
-    const { error } = await supabaseServer
+    // 1. Set customer_id to null in all reservations referencing this customer to avoid foreign key violation
+    const { error: updateError } = await supabaseServer
+      .from('reservations')
+      .update({ customer_id: null })
+      .eq('customer_id', id);
+
+    if (updateError) throw updateError;
+
+    // 2. Delete the customer
+    const { error: deleteError } = await supabaseServer
       .from('customers')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (deleteError) throw deleteError;
 
     return NextResponse.json({ message: 'Customer deleted successfully' });
   } catch (err: any) {
