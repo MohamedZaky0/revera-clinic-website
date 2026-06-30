@@ -33,6 +33,15 @@ function getInitialLanguage(): Language {
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>(getInitialLanguage);
   const [dynamicTranslations, setDynamicTranslations] = useState(translations);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.alert = (message: string) => {
+        setAlertMessage(message);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     const dir: Direction = language === "ar" ? "rtl" : "ltr";
@@ -226,6 +235,36 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   return (
     <LanguageContext.Provider value={value}>
       {children}
+      {alertMessage && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/55 p-4 backdrop-blur-md animate-fadeInFast">
+          <div 
+            className="w-full max-w-md rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10 text-center animate-scaleUp"
+            dir={direction}
+          >
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#414E36]/5 text-[#414E36] border border-[#414E36]/10">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+            </div>
+            
+            <h3 className="text-lg font-bold text-[#1F251A] mb-3">
+              {language === "ar" ? "تنبيه" : "Notification"}
+            </h3>
+            
+            <p className="text-sm text-[#5A6A51] leading-relaxed mb-6 font-medium">
+              {alertMessage}
+            </p>
+            
+            <button
+              type="button"
+              onClick={() => setAlertMessage(null)}
+              className="w-full rounded-xl bg-[#414E36] py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[#2E3A26] hover:scale-[1.02] active:scale-[0.98]"
+            >
+              {language === "ar" ? "موافق" : "OK"}
+            </button>
+          </div>
+        </div>
+      )}
     </LanguageContext.Provider>
   );
 }
