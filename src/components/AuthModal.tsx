@@ -164,6 +164,27 @@ export function AuthModal() {
     async function handleSessionCheck(session: any) {
       if (!session?.user) return;
 
+      const emailVal = session.user.email;
+      if (emailVal) {
+        try {
+          const checkEmpRes = await fetch(`/api/auth/employee-email?email=${encodeURIComponent(emailVal)}`);
+          if (checkEmpRes.ok) {
+            const { exists } = await checkEmpRes.json();
+            if (exists) {
+              alert("This email is registered as an administrator/employee account and cannot be used for customer access.");
+              await supabase.auth.signOut();
+              localStorage.removeItem("revera_user");
+              window.dispatchEvent(new CustomEvent("revera-auth-change"));
+              setOpen(false);
+              resetState();
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("Employee verification check failed:", err);
+        }
+      }
+
       const stored = localStorage.getItem("revera_user");
       let parsedStored = null;
       if (stored) {
@@ -407,6 +428,20 @@ export function AuthModal() {
     setEmailError("");
     setPasswordError("");
     setVerifying(true);
+
+    try {
+      const checkEmpRes = await fetch(`/api/auth/employee-email?email=${encodeURIComponent(emailInput)}`);
+      if (checkEmpRes.ok) {
+        const { exists } = await checkEmpRes.json();
+        if (exists) {
+          setEmailError("This email is registered as an administrator/employee account and cannot be used for customer access.");
+          setVerifying(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Employee verification check failed:", err);
+    }
 
     if (!supabase) {
       console.warn("Supabase not initialized. Using demo email auth fallback.");

@@ -77,6 +77,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Name and Mobile number are required' }, { status: 400 });
   }
 
+  if (email) {
+    const cleanEmail = email.trim().toLowerCase();
+    const { data: employeeCheck, error: empCheckError } = await supabaseServer
+      .from('employee_accounts')
+      .select('id')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    if (empCheckError) throw empCheckError;
+    if (employeeCheck) {
+      return NextResponse.json(
+        { error: 'This email is registered as an administrator/employee account and cannot be used for a customer profile.' },
+        { status: 400 }
+      );
+    }
+  }
+
   const customerData = {
     name,
     mobile,

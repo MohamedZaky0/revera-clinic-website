@@ -84,6 +84,20 @@ export async function POST(req: Request) {
       );
     }
 
+    const { data: customerCheck, error: custCheckError } = await supabaseServer
+      .from('customers')
+      .select('id')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    if (custCheckError) throw custCheckError;
+    if (customerCheck) {
+      return NextResponse.json(
+        { error: `This email is already registered as a customer account and cannot be added as an employee.` },
+        { status: 400 }
+      );
+    }
+
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://revera-clinic.vercel.app';
     console.log('Sending invitation to:', cleanEmail, 'with redirectTo:', `${siteUrl}/auth/setup`);
     const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(

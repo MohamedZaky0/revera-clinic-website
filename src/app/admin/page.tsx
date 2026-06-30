@@ -1178,6 +1178,20 @@ export default function AdminPage() {
         return;
       }
     }
+    // Verify that the email is not registered as a customer
+    try {
+      const checkRes = await fetch(`/api/customers?email=${encodeURIComponent(emailToSign)}`);
+      if (checkRes.ok) {
+        const customer = await checkRes.json();
+        if (customer) {
+          setLoginError("This email is registered as a customer and cannot be used for administrator access.");
+          setLoginLoading(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Customer email verification failed:", err);
+    }
 
     try {
       const { error } = await supabase.auth.signInWithPassword({

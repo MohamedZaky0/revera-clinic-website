@@ -71,6 +71,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    if (email) {
+      const cleanEmail = email.trim().toLowerCase();
+      const { data: employeeCheck, error: empCheckError } = await supabaseServer
+        .from('employee_accounts')
+        .select('id')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+
+      if (empCheckError) throw empCheckError;
+      if (employeeCheck) {
+        return NextResponse.json(
+          { error: 'This email belongs to an administrator/employee account and cannot be used to book appointments.' },
+          { status: 400 }
+        );
+      }
+    }
+
     // 1. Lookup or create customer profile
     let customerId: string | null = null;
     try {
