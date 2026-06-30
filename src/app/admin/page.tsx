@@ -1749,71 +1749,17 @@ export default function AdminPage() {
     }));
   }
 
-  // Derive unique customers from database or all reservations as fallback
+  // Derive unique customers from database
   const customers = useMemo<Customer[]>(() => {
     const now = new Date();
     const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const list = Array.isArray(dbCustomers) ? dbCustomers : [];
 
-    if (dbCustomers && dbCustomers.length > 0) {
-      return dbCustomers.map((c) => {
-        // Find if this customer has a booking in the last 2 weeks
-        const customerReservations = allReservations.filter((r) => 
-          (r.phone && (r.phone === c.mobile || r.phone === c.phone)) ||
-          (r.customerId && r.customerId === c.id)
-        );
-
-        const hasRecentBooking = customerReservations.some((r) => {
-          if (!r.date) return false;
-          const bookingDate = new Date(String(r.date).slice(0, 10) + 'T00:00:00');
-          return bookingDate >= twoWeeksAgo;
-        });
-
-        // Determine active status:
-        // If explicitly set to inactive in DB, then it's inactive.
-        // Otherwise, active only if they have a booking in the last 2 weeks OR if they registered in the last 2 weeks.
-        const regDateStr = c.registration_date || c.created_at || now.toISOString();
-        const regDate = new Date(regDateStr);
-        const registeredRecently = regDate >= twoWeeksAgo;
-        const isActive = c.active !== false && (hasRecentBooking || registeredRecently);
-
-        return {
-          ...c,
-          id: c.id,
-          email: c.email || "",
-          name: c.name,
-          phone: c.mobile || "",
-          createdAt: regDateStr,
-          bookings: c.number_of_bookings || 0,
-          spent: Number(c.spent_amount || 0),
-          outstanding: Number(c.outstanding || 0),
-          wallet: 0,
-          active: isActive,
-        };
-      });
-    }
-    const map = new globalThis.Map<string, Customer>();
-    allReservations.forEach((r) => {
-      const emailKey = r.email || r.phone;
-      if (!map.has(emailKey)) {
-        map.set(emailKey, {
-          email: r.email || "",
-          name: r.name,
-          phone: r.phone,
-          createdAt: r.createdAt ?? r.date,
-          bookings: 0,
-          spent: 0,
-          outstanding: 0,
-          wallet: 0,
-        });
-      }
-      map.get(emailKey)!.bookings += 1;
-    });
-
-    const fallbackList = Array.from(map.values());
-    return fallbackList.map((c) => {
+    return list.map((c) => {
+      // Find if this customer has a booking in the last 2 weeks
       const customerReservations = allReservations.filter((r) => 
-        (r.phone && r.phone === c.phone) ||
-        (r.email && r.email === c.email)
+        (r.phone && (r.phone === c.mobile || r.phone === c.phone)) ||
+        (r.customerId && r.customerId === c.id)
       );
 
       const hasRecentBooking = customerReservations.some((r) => {
@@ -1822,12 +1768,25 @@ export default function AdminPage() {
         return bookingDate >= twoWeeksAgo;
       });
 
-      const regDate = new Date(c.createdAt);
+      // Determine active status:
+      // If explicitly set to inactive in DB, then it's inactive.
+      // Otherwise, active only if they have a booking in the last 2 weeks OR if they registered in the last 2 weeks.
+      const regDateStr = c.registration_date || c.created_at || now.toISOString();
+      const regDate = new Date(regDateStr);
       const registeredRecently = regDate >= twoWeeksAgo;
-      const isActive = hasRecentBooking || registeredRecently;
+      const isActive = c.active !== false && (hasRecentBooking || registeredRecently);
 
       return {
         ...c,
+        id: c.id,
+        email: c.email || "",
+        name: c.name,
+        phone: c.mobile || "",
+        createdAt: regDateStr,
+        bookings: c.number_of_bookings || 0,
+        spent: Number(c.spent_amount || 0),
+        outstanding: Number(c.outstanding || 0),
+        wallet: 0,
         active: isActive,
       };
     });
