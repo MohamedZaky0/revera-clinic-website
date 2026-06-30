@@ -150,7 +150,42 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
     }
 
-    // 1. Set customer_id to null in all reservations referencing this customer to avoid foreign key violation
+    // 1. Fetch customer email and mobile before deleting them
+    const { data: customer, error: fetchError } = await supabaseServer
+      .from('customers')
+      .select('email, mobile')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+
+    if (customer) {
+      // 2. Lookup and delete from Supabase Auth
+      try {
+        const { data: { users }, error: listError } = await supabaseServer.auth.admin.listUsers({
+          perPage: 1000
+        });
+        if (!listError && users) {
+          const authUser = users.find((u: any) => 
+            (customer.email && u.email?.toLowerCase() === customer.email.toLowerCase()) ||
+            (customer.mobile && u.phone === customer.mobile) ||
+            (customer.mobile && u.phone === `+20${customer.mobile.startsWith('0') ? customer.mobile.slice(1) : customer.mobile}`)
+          );
+
+          if (authUser) {
+            console.log(`Deleting auth user: ${authUser.id} for email ${authUser.email}`);
+            const { error: deleteAuthError } = await supabaseServer.auth.admin.deleteUser(authUser.id);
+            if (deleteAuthError) {
+              console.error(`Failed to delete auth user ${authUser.id}:`, deleteAuthError);
+            }
+          }
+        }
+      } catch (authErr) {
+        console.error("Error looking up/deleting auth user:", authErr);
+      }
+    }
+
+    // 3. Set customer_id to null in all reservations referencing this customer to avoid foreign key violation
     const { error: updateError } = await supabaseServer
       .from('reservations')
       .update({ customer_id: null })
@@ -158,7 +193,7 @@ export async function DELETE(req: Request) {
 
     if (updateError) throw updateError;
 
-    // 2. Delete the customer
+    // 4. Delete the customer
     const { error: deleteError } = await supabaseServer
       .from('customers')
       .delete()
