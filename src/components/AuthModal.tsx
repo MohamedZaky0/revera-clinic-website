@@ -55,7 +55,7 @@ export function AuthModal() {
   const [step, setStep] = useState<AuthStep>(1);
   const [demoMode, setDemoMode] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [authType, setAuthType] = useState<"phone" | "email">("phone");
+  const [authType, setAuthType] = useState<"phone" | "email">("email");
 
   // Step 1: Phone Auth
   const [phone, setPhone] = useState("");
@@ -152,6 +152,8 @@ export function AuthModal() {
 
     supabase.auth.getSession().then(({ data: { session } }: any) => {
       handleSessionCheck(session);
+    }).catch((err: any) => {
+      console.warn("AuthModal getSession error:", err);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any, session: any) => {
@@ -634,39 +636,7 @@ export function AuthModal() {
           </button>
         </div>
 
-        {/* Tab Buttons (Phone vs Email) */}
-        {step === 1 && (
-          <div className="flex border-b border-gray-100 mb-5">
-            <button
-              onClick={() => setAuthType("phone")}
-              className="flex-1 pb-2 text-sm font-semibold transition-colors border-b-2"
-              style={{
-                borderColor: authType === "phone" ? "var(--cr-primary)" : "transparent",
-                color: authType === "phone" ? "var(--cr-primary)" : "var(--cr-accent)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                borderBottom: authType === "phone" ? "2px solid var(--cr-primary)" : "none"
-              }}
-            >
-              {isRTL ? "الهاتف المحمول" : "Mobile Phone"}
-            </button>
-            <button
-              onClick={() => setAuthType("email")}
-              className="flex-1 pb-2 text-sm font-semibold transition-colors border-b-2"
-              style={{
-                borderColor: authType === "email" ? "var(--cr-primary)" : "transparent",
-                color: authType === "email" ? "var(--cr-primary)" : "var(--cr-accent)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                borderBottom: authType === "email" ? "2px solid var(--cr-primary)" : "none"
-              }}
-            >
-              {isRTL ? "البريد الإلكتروني" : "Email Address"}
-            </button>
-          </div>
-        )}
+        {/* Tab Buttons (Phone vs Email) - Hidden for now */}
 
         {/* Step 1: Phone Auth tab */}
         {step === 1 && authType === "phone" && (

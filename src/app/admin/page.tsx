@@ -882,6 +882,9 @@ export default function AdminPage() {
         console.log("Stale login session detected (tab reopened). Logging out.");
         supabase.auth.signOut().then(() => {
           setAuthChecking(false);
+        }).catch((err: any) => {
+          console.warn("signOut error:", err);
+          setAuthChecking(false);
         });
       } else {
         if (cachedSession) {
@@ -890,6 +893,9 @@ export default function AdminPage() {
           setAuthChecking(false);
         }
       }
+    }).catch((err: any) => {
+      console.warn("getSession error:", err);
+      setAuthChecking(false);
     });
 
     // 2. Listen for auth changes
