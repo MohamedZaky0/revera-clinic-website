@@ -692,74 +692,28 @@ export function AuthModal() {
         {step === 1 && authType === "email" && (
           <form onSubmit={handleEmailAuth} className="flex flex-col gap-4" noValidate>
             {isSignUp && (
-              <>
-                {/* Name row */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <input
-                    type="text"
-                    className="cr-input"
-                    placeholder={t.auth.firstName}
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                  />
-                  <input
-                    type="text"
-                    className="cr-input"
-                    placeholder={t.auth.lastName}
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* Mobile Phone */}
-                <div>
-                  <input
-                    type="tel"
-                    className="cr-input"
-                    placeholder={t.auth.phonePlaceholder}
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                  />
-                  <p className="mt-1.5 text-xs text-gray-400">
-                    {t.auth.phoneHint}
-                  </p>
-                </div>
-
-                {/* Gender */}
-                <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--cr-accent)" }}>
-                    {t.auth.gender}
-                  </p>
-                  <div className="flex gap-4">
-                    {(["female", "male"] as const).map((g) => (
-                      <label
-                        key={g}
-                        className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium transition-colors"
-                        style={{
-                          backgroundColor: gender === g ? "var(--cr-primary)" : "var(--cr-secondary)",
-                          color: gender === g ? "var(--cr-white)" : "var(--cr-primary)",
-                          border: gender === g ? "none" : "1.5px solid var(--cr-accent)",
-                        }}
-                      >
-                        <input
-                          type="radio"
-                          name="signup_gender"
-                          value={g}
-                          checked={gender === g}
-                          onChange={() => setGender(g)}
-                          className="sr-only"
-                        />
-                        {g === "female" ? t.auth.female : t.auth.male}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </>
+              /* Name row */
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <input
+                  type="text"
+                  className="cr-input"
+                  placeholder={t.auth.firstName}
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                />
+                <input
+                  type="text"
+                  className="cr-input"
+                  placeholder={t.auth.lastName}
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                />
+              </div>
             )}
 
+            {/* Email Address */}
             <div>
               <input
                 type="email"
@@ -779,6 +733,24 @@ export function AuthModal() {
               )}
             </div>
 
+            {isSignUp && (
+              /* Mobile Phone */
+              <div>
+                <input
+                  type="tel"
+                  className="cr-input"
+                  placeholder={t.auth.phonePlaceholder}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                />
+                <p className="mt-1.5 text-xs text-gray-400">
+                  {t.auth.phoneHint}
+                </p>
+              </div>
+            )}
+
+            {/* Password */}
             <div>
               <input
                 type="password"
@@ -797,6 +769,38 @@ export function AuthModal() {
                 </p>
               )}
             </div>
+
+            {isSignUp && (
+              /* Gender */
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--cr-accent)" }}>
+                  {t.auth.gender}
+                </p>
+                <div className="flex gap-4">
+                  {(["female", "male"] as const).map((g) => (
+                    <label
+                      key={g}
+                      className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium transition-colors"
+                      style={{
+                        backgroundColor: gender === g ? "var(--cr-primary)" : "var(--cr-secondary)",
+                        color: gender === g ? "var(--cr-white)" : "var(--cr-primary)",
+                        border: gender === g ? "none" : "1.5px solid var(--cr-accent)",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="signup_gender"
+                        value={g}
+                        checked={gender === g}
+                        onChange={() => setGender(g)}
+                        className="sr-only"
+                      />
+                      {g === "female" ? t.auth.female : t.auth.male}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
