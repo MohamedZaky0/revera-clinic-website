@@ -554,11 +554,21 @@ export function AuthModal() {
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (!firstName || !lastName || !gender) {
+      alert(isRTL ? "يرجى ملء جميع الحقول المطلوبة" : "Please fill in all required fields");
       return;
     }
     const { localPhone, isValid } = cleanAndFormatPhone(phone);
     if (!isValid) {
       alert(isRTL ? "يرجى إدخال رقم هاتف مصري صحيح" : "Please enter a valid Egyptian phone number");
+      return;
+    }
+    if (!email || !email.trim()) {
+      alert(isRTL ? "البريد الإلكتروني مطلوب" : "Email Address is required");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      alert(isRTL ? "يرجى إدخال بريد إلكتروني صحيح" : "Please enter a valid email address");
       return;
     }
     setVerifying(true);
@@ -872,6 +882,7 @@ export function AuthModal() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 aria-label={t.auth.email}
+                required
               />
             )}
 
