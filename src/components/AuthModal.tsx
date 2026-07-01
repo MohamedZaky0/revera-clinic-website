@@ -98,7 +98,7 @@ export function AuthModal() {
     setHasPhoneInDb(false);
     setDemoMode(false);
     setVerifying(false);
-    setAuthType("phone");
+    setAuthType("email");
     setEmailInput("");
     setPasswordInput("");
     setIsSignUp(false);
