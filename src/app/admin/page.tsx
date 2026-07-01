@@ -1335,6 +1335,24 @@ export default function AdminPage() {
     }
   }
 
+  async function handleUpdateEmployeeRole(id: string, newRole: string) {
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, roleName: newRole }),
+      });
+      if (res.ok) {
+        fetchRolesAndEmployees();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to update employee role.");
+      }
+    } catch (err: any) {
+      alert("Error updating employee role: " + err.message);
+    }
+  }
+
   // Force English/LTR context on Admin page
   useEffect(() => {
     const prevDir = document.documentElement.dir;
@@ -9659,7 +9677,23 @@ export default function AdminPage() {
                         ) : employeesList.map((emp) => (
                           <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
                             <td className="px-6 py-4 font-semibold text-[#1F251A]">{emp.name || emp.employee_id || '—'}</td>
-                            <td className="px-6 py-4 text-xs font-semibold capitalize text-[#414E36]">{emp.role_name}</td>
+                            <td className="px-6 py-4 text-xs font-semibold text-[#414E36]">
+                              {adminRole === "superadmin" && emp.employee_id !== "superadmin" ? (
+                                <select
+                                  value={emp.role_name}
+                                  onChange={(e) => handleUpdateEmployeeRole(emp.id, e.target.value)}
+                                  className="rounded-lg border border-[#E6E9EB] bg-[#FBFBF9] px-2 py-1 text-xs font-semibold text-[#414E36] focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36] outline-none"
+                                >
+                                  {rolesList.map((r) => (
+                                    <option key={r.id} value={r.name}>
+                                      {r.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span className="capitalize">{emp.role_name}</span>
+                              )}
+                            </td>
                             <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">{emp.email}</td>
                             <td className="px-6 py-4 text-center">
                               {emp.email_confirmed_at ? (

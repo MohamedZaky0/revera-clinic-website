@@ -143,10 +143,9 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  // Resend invitation to an employee whose invite expired
   try {
     const body = await req.json();
-    const { id } = body;
+    const { id, roleName } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Employee ID is required.' }, { status: 400 });
@@ -163,9 +162,47 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
     }
 
+    // 1. Update role if roleName is provided
+    if (roleName) {
+      if (employee.employee_id === 'superadmin') {
+        return NextResponse.json({ error: 'Cannot modify the role of the system owner account.' }, { status: 400 });
+      }
+
+      const { data: roleExists, error: roleCheckError } = await supabaseServer
+        .from('roles')
+        .select('name')
+        .eq('name', roleName)
+        .maybeSingle();
+
+      if (roleCheckError) throw roleCheckError;
+      if (!roleExists) {
+        return NextResponse.json({ error: `Role '${roleName}' does not exist.` }, { status: 400 });
+      }
+
+      const { data: updatedEmp, error: updateError } = await supabaseServer
+        .from('employee_accounts')
+        .update({ role_name: roleName })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      if (employee.auth_user_id) {
+        await supabaseServer.auth.admin.updateUserById(
+          employee.auth_user_id,
+          { user_metadata: { role: roleName } }
+        ).catch((err: any) => {
+          console.warn("Failed to update user auth metadata role:", err);
+        });
+      }
+
+      return NextResponse.json(updatedEmp);
+    }
+
+    // 2. Resend invitation to an employee whose invite expired (fallback if roleName not provided)
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://revera-clinic.vercel.app';
 
-    // Delete old auth user so we can re-invite cleanly with a fresh token
     if (employee.auth_user_id) {
       await supabaseServer.auth.admin.deleteUser(employee.auth_user_id).catch(() => {});
     }
