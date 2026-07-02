@@ -143,8 +143,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={() => {
-        const msg = encodeURIComponent(`Hello Revera, I'm interested in booking "${service.en}". Please let me know your availability at your New Cairo branch. Thank you.`);
-        window.open(`https://wa.me/201035595691?text=${msg}`, '_blank');
+        window.dispatchEvent(new CustomEvent("open-booking", { detail: { serviceId: service.id } }));
       }}
       style={{
         backgroundColor: "var(--cr-secondary)",
@@ -203,8 +202,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
         <div
           style={{ position: "relative", width: "100%", height: 220, borderRadius: 24, overflow: "hidden", cursor: showCursor ? "none" : "pointer" }}
           onClick={() => {
-            const msg = encodeURIComponent(`Hello Revera, I'm interested in booking "${service.en}". Please let me know your availability at your New Cairo branch. Thank you.`);
-            window.open(`https://wa.me/201035595691?text=${msg}`, '_blank');
+            window.dispatchEvent(new CustomEvent("open-booking", { detail: { serviceId: service.id } }));
           }}
           onMouseEnter={() => {
             setShowCursor(true);

@@ -183,10 +183,10 @@ export function Navbar() {
 
             {/* Make Appointment CTA next to Contact */}
             <li>
-              <a
-                href="https://wa.me/201035595691?text=Hello%20Revera%2C%20I%27d%20love%20to%20schedule%20a%20consultation%20at%20your%20New%20Cairo%20branch.%20Please%20let%20me%20know%20your%20earliest%20availability.%20Thank%20you."
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("open-booking"));
+                }}
                 style={{
                   padding: "10px 16px",
                   borderRadius: "8px",
@@ -198,19 +198,18 @@ export function Navbar() {
                   cursor: "pointer",
                   transition: "transform 0.12s ease, opacity 0.12s ease",
                   whiteSpace: "nowrap",
-                  textDecoration: "none",
                   display: "inline-block",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLAnchorElement).style.opacity = "0.9";
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.9";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLAnchorElement).style.opacity = "1";
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
                 }}
               >
                 {t.nav.makeAppointment}
-              </a>
-              </li>
+              </button>
+            </li>
           </ul>
 
           {/* Right controls */}
@@ -579,10 +578,11 @@ export function Navbar() {
               }}
             >
               {/* Mobile Make Appointment */}
-              <a
-                href="https://wa.me/201035595691?text=Hello%20Revera%2C%20I%27d%20love%20to%20schedule%20a%20consultation%20at%20your%20New%20Cairo%20branch.%20Please%20let%20me%20know%20your%20earliest%20availability.%20Thank%20you."
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("open-booking"));
+                  setMenuOpen(false);
+                }}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -598,11 +598,10 @@ export function Navbar() {
                   fontWeight: 600,
                   transition: "all 0.12s ease",
                   width: "100%",
-                  textDecoration: "none",
                 }}
               >
                 {t.nav.makeAppointment}
-              </a>
+              </button>
 
               {/* Mobile phone */}
               <a
