@@ -11007,24 +11007,29 @@ export default function AdminPage() {
             )}
 
             <div className="space-y-4">
-              {requests.map((req) => (
-                <div
-                  key={req.id}
-                  className="rounded-3xl border border-[#414E36]/10 bg-[#F7F7F3] p-5"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-lg font-semibold text-[#1F251A]">
-                        {req.name}
-                      </p>
-                      <p className="mt-1 text-sm text-[#5A6A51]">
-                        {req.email} • {req.phone} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === req.branchId)?.name_en || "Default/All"}</span>
-                      </p>
+              {requests.map((req) => {
+                const service = localServices.find(s => s.id === req.serviceId);
+                return (
+                  <div
+                    key={req.id}
+                    className="rounded-3xl border border-[#414E36]/10 bg-[#F7F7F3] p-5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-semibold text-[#1F251A]">
+                          {req.name}
+                        </p>
+                        <p className="text-sm font-semibold text-[#414E36] mt-0.5">
+                          Service: {service ? service.en : `Service #${req.serviceId}`}
+                        </p>
+                        <p className="mt-1 text-xs text-[#5A6A51]">
+                          {req.email} • {req.phone} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === req.branchId)?.name_en || "Default/All"}</span>
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#414E36]">
+                        {req.status}
+                      </span>
                     </div>
-                    <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#414E36]">
-                      {req.status}
-                    </span>
-                  </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-3xl bg-[#FBFBF9] p-4">
                       <p className="text-xs uppercase tracking-[0.25em] text-[#5A6A51]/80">
@@ -11078,7 +11083,8 @@ export default function AdminPage() {
                     </div>
                   )}
                 </div>
-              ))}
+              );
+            })}
             </div>
           </section>
           </>
