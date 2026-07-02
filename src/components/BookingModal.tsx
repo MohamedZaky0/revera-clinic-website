@@ -119,6 +119,10 @@ export function BookingModal() {
   }, [resetState]);
 
   useEffect(() => {
+    setSelectedTime(null);
+  }, [selectedDate]);
+
+  useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { serviceId?: number } | null;
       const id = detail?.serviceId ?? null;
@@ -315,6 +319,59 @@ export function BookingModal() {
     if (step === 3) setStep(2);
     if (step === 4) setStep(3);
   }
+
+  const getDayOperatingHours = useCallback((date: Date) => {
+    if (!date || !selectedService) return { start: "09:00", end: "20:00" };
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[date.getDay()];
+    
+    let minStart = 24 * 60; // in minutes
+    let maxEnd = 0; // in minutes
+    let found = false;
+
+    doctors.forEach((doc) => {
+      // Check branch
+      if (branchId && doc.branchId && doc.branchId !== branchId) return;
+      
+      // Check service
+      if (doc.services && doc.services.length > 0) {
+        if (!doc.services.includes(selectedService.en)) return;
+      }
+
+      // Check working days & hours
+      if (doc.workingDaysHours) {
+        const dayConfig = doc.workingDaysHours[weekdayName];
+        if (dayConfig && dayConfig.isOpen) {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          if (startMins < minStart) minStart = startMins;
+          if (endMins > maxEnd) maxEnd = endMins;
+          found = true;
+        }
+      } else {
+        if (9 * 60 < minStart) minStart = 9 * 60;
+        if (20 * 60 > maxEnd) maxEnd = 20 * 60;
+        found = true;
+      }
+    });
+
+    if (!found) {
+      return { start: "09:00", end: "20:00" };
+    }
+
+    const formatMins = (totalMins: number) => {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    return {
+      start: formatMins(minStart),
+      end: formatMins(maxEnd)
+    };
+  }, [doctors, branchId, selectedService]);
 
   const getAvailableDoctors = useCallback(() => {
     if (!selectedDate || !selectedTime || !selectedService) return [];
@@ -654,26 +711,35 @@ export function BookingModal() {
                   {t.booking.selectTime}
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {TIME_SLOTS.map((slot) => {
-                     const isSelected = selectedTime === slot;
-                     const slot24 = normaliseTo24hSlot(slot) ?? "";
-                     const taken = takenSlots.includes(slot24);
-                    return (
-                      <button
-                        key={slot}
-                        onClick={() => !taken && setSelectedTime(slot)}
-                        className="rounded-xl py-3 text-center text-sm font-medium transition-colors"
-                        style={{
-                          backgroundColor: isSelected ? "var(--cr-primary)" : "var(--cr-secondary)",
-                          color: isSelected ? "var(--cr-white)" : "var(--cr-primary)",
-                          border: isSelected ? "none" : "1.5px solid var(--cr-accent)",
-                          opacity: taken ? 0.45 : 1,
-                        }}
-                      >
-                        {slot}
-                      </button>
-                    );
-                  })}
+                  {(() => {
+                    if (!selectedDate) return null;
+                    const { start, end } = getDayOperatingHours(selectedDate);
+                    const filteredSlots = TIME_SLOTS.filter((slot) => {
+                      const slot24 = normaliseTo24hSlot(slot) ?? "";
+                      return slot24 >= start && slot24 < end;
+                    });
+                    
+                    return filteredSlots.map((slot) => {
+                      const isSelected = selectedTime === slot;
+                      const slot24 = normaliseTo24hSlot(slot) ?? "";
+                      const taken = takenSlots.includes(slot24);
+                      return (
+                        <button
+                          key={slot}
+                          onClick={() => !taken && setSelectedTime(slot)}
+                          className="rounded-xl py-3 text-center text-sm font-medium transition-colors"
+                          style={{
+                            backgroundColor: isSelected ? "var(--cr-primary)" : "var(--cr-secondary)",
+                            color: isSelected ? "var(--cr-white)" : "var(--cr-primary)",
+                            border: isSelected ? "none" : "1.5px solid var(--cr-accent)",
+                            opacity: taken ? 0.45 : 1,
+                          }}
+                        >
+                          {slot}
+                        </button>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             )}

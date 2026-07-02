@@ -1700,6 +1700,125 @@ export default function AdminPage() {
     }
   }, [availableDoctorsApprove, doctorName, selected]);
   
+  const getDayOperatingHoursAdmin = useCallback((dateStr: string | null) => {
+    if (!dateStr || !newPatientService) return { start: "09:00", end: "20:00" };
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
+
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[dateObj.getDay()];
+    
+    const targetService = localServices.find(s => s.id === newPatientService);
+    if (!targetService) return { start: "09:00", end: "20:00" };
+
+    let minStart = 24 * 60; // in minutes
+    let maxEnd = 0; // in minutes
+    let found = false;
+
+    providers.forEach((doc) => {
+      // Check branch
+      if (newPatientBranch && doc.branchId && doc.branchId !== newPatientBranch) return;
+      
+      // Check service
+      if (doc.services && doc.services.length > 0) {
+        if (!doc.services.includes(targetService.en)) return;
+      }
+
+      // Check working days & hours
+      if (doc.workingDaysHours) {
+        const dayConfig = doc.workingDaysHours[weekdayName];
+        if (dayConfig && dayConfig.isOpen) {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          if (startMins < minStart) minStart = startMins;
+          if (endMins > maxEnd) maxEnd = endMins;
+          found = true;
+        }
+      } else {
+        if (9 * 60 < minStart) minStart = 9 * 60;
+        if (20 * 60 > maxEnd) maxEnd = 20 * 60;
+        found = true;
+      }
+    });
+
+    if (!found) {
+      return { start: "09:00", end: "20:00" };
+    }
+
+    const formatMins = (totalMins: number) => {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    return {
+      start: formatMins(minStart),
+      end: formatMins(maxEnd)
+    };
+  }, [providers, newPatientBranch, newPatientService, localServices]);
+
+  const getDayOperatingHoursApprove = useCallback((selectedReq: Req | null) => {
+    if (!selectedReq) return { start: "09:00", end: "20:00" };
+    const dateStr = selectedReq.date;
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
+
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[dateObj.getDay()];
+    
+    const targetService = localServices.find(s => s.id === selectedReq.serviceId);
+    if (!targetService) return { start: "09:00", end: "20:00" };
+
+    let minStart = 24 * 60; // in minutes
+    let maxEnd = 0; // in minutes
+    let found = false;
+
+    providers.forEach((doc) => {
+      // Check branch
+      if (selectedReq.branchId && doc.branchId && doc.branchId !== selectedReq.branchId) return;
+      
+      // Check service
+      if (doc.services && doc.services.length > 0) {
+        if (!doc.services.includes(targetService.en)) return;
+      }
+
+      // Check working days & hours
+      if (doc.workingDaysHours) {
+        const dayConfig = doc.workingDaysHours[weekdayName];
+        if (dayConfig && dayConfig.isOpen) {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          if (startMins < minStart) minStart = startMins;
+          if (endMins > maxEnd) maxEnd = endMins;
+          found = true;
+        }
+      } else {
+        if (9 * 60 < minStart) minStart = 9 * 60;
+        if (20 * 60 > maxEnd) maxEnd = 20 * 60;
+        found = true;
+      }
+    });
+
+    if (!found) {
+      return { start: "09:00", end: "20:00" };
+    }
+
+    const formatMins = (totalMins: number) => {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    return {
+      start: formatMins(minStart),
+      end: formatMins(maxEnd)
+    };
+  }, [providers, localServices]);
+
   // Custom provider modal states
   const [showProviderModal, setShowProviderModal] = useState(false);
   const [providerModalMode, setProviderModalMode] = useState<"add" | "edit">("add");
@@ -2066,9 +2185,18 @@ export default function AdminPage() {
         if (Array.isArray(list)) {
           const unavailable = getUnavailableSlots(list, Number(newPatientService));
           setManualUnavailableSlots(unavailable);
-          // Auto-select first available slot if current is unavailable or empty
-          if (!newPatientTimeSlot || unavailable.includes(newPatientTimeSlot)) {
-            const first = SLOTS.find((s) => !unavailable.includes(s)) || SLOTS[0];
+          // Auto-select first available slot if current is unavailable, empty, or outside operating hours
+          const { start, end } = getDayOperatingHoursAdmin(newPatientDate);
+          const filteredSlots = SLOTS.filter((s) => {
+            const norm = normaliseTo24hSlot(s) ?? "";
+            return norm >= start && norm < end;
+          });
+          const isCurrentInvalid = !newPatientTimeSlot || 
+            unavailable.includes(newPatientTimeSlot) ||
+            !filteredSlots.includes(newPatientTimeSlot);
+
+          if (isCurrentInvalid) {
+            const first = filteredSlots.find((s) => !unavailable.includes(s)) || filteredSlots[0] || SLOTS[0];
             setNewPatientTimeSlot(first);
           }
         }
@@ -3228,7 +3356,12 @@ export default function AdminPage() {
     const taken = await fetch("/api/reservations?" + qs).then((res) => res.json());
     const unavailable = getUnavailableSlots(Array.isArray(taken) ? taken : [], r.serviceId);
     setApproveUnavailableSlots(unavailable);
-    const first = SLOTS.find((s) => !unavailable.includes(s)) || SLOTS[0];
+    const { start, end } = getDayOperatingHoursApprove(r);
+    const filteredSlots = SLOTS.filter((s) => {
+      const norm = normaliseTo24hSlot(s) ?? "";
+      return norm >= start && norm < end;
+    });
+    const first = filteredSlots.find((s) => !unavailable.includes(s)) || filteredSlots[0] || SLOTS[0];
     setSlot(first);
     setDoctorName("Dr. Sara El Gamel");
   }
@@ -11226,14 +11359,21 @@ export default function AdminPage() {
               onChange={(e) => setSlot(e.target.value)}
               className="mb-4 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
             >
-              {SLOTS.map((s) => {
-                const isUnavailable = approveUnavailableSlots.includes(s);
-                return (
-                  <option key={s} value={s} disabled={isUnavailable}>
-                    {s} {isUnavailable ? "(Unavailable)" : ""}
-                  </option>
-                );
-              })}
+              {(() => {
+                const { start, end } = getDayOperatingHoursApprove(selected);
+                const filteredSlots = SLOTS.filter((s) => {
+                  const norm = normaliseTo24hSlot(s) ?? "";
+                  return norm >= start && norm < end;
+                });
+                return filteredSlots.map((s) => {
+                  const isUnavailable = approveUnavailableSlots.includes(s);
+                  return (
+                    <option key={s} value={s} disabled={isUnavailable}>
+                      {s} {isUnavailable ? "(Unavailable)" : ""}
+                    </option>
+                  );
+                });
+              })()}
             </select>
 
             <label className="mb-2 block text-sm font-semibold text-[#414E36]">
@@ -12097,14 +12237,21 @@ export default function AdminPage() {
                     onChange={(e) => setNewPatientTimeSlot(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   >
-                    {SLOTS.map(s => {
-                      const isUnavailable = manualUnavailableSlots.includes(s);
-                      return (
-                        <option key={s} value={s} disabled={isUnavailable}>
-                          {s} {isUnavailable ? "(Unavailable)" : ""}
-                        </option>
-                      );
-                    })}
+                    {(() => {
+                      const { start, end } = getDayOperatingHoursAdmin(newPatientDate);
+                      const filteredSlots = SLOTS.filter((s) => {
+                        const norm = normaliseTo24hSlot(s) ?? "";
+                        return norm >= start && norm < end;
+                      });
+                      return filteredSlots.map(s => {
+                        const isUnavailable = manualUnavailableSlots.includes(s);
+                        return (
+                          <option key={s} value={s} disabled={isUnavailable}>
+                            {s} {isUnavailable ? "(Unavailable)" : ""}
+                          </option>
+                        );
+                      });
+                    })()}
                   </select>
                 </div>
               </div>
