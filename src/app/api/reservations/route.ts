@@ -65,7 +65,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId } = body;
+    const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId, doctorName } = body;
 
     if (!serviceId || !date || !name || !email || !phone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -152,6 +152,7 @@ export async function POST(req: Request) {
         customer_id: customerId,
         amount_paid: body.amountPaid !== undefined ? Number(body.amountPaid) : 0,
         amount_left: body.amountLeft !== undefined ? Number(body.amountLeft) : null,
+        doctor_name: doctorName || null,
       })
       .select()
       .single();

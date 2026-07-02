@@ -63,6 +63,13 @@ function formatDate(date: Date): string {
   });
 }
 
+function timeToMinutes(timeStr: string): number {
+  const norm = normaliseTo24hSlot(timeStr);
+  if (!norm) return 0;
+  const [hh, mm] = norm.split(":").map(Number);
+  return hh * 60 + mm;
+}
+
 export function BookingModal() {
   const { t, isRTL } = useLanguage();
 
@@ -80,6 +87,9 @@ export function BookingModal() {
   const [confirmed, setConfirmed] = useState(false);
   const [disabledDates, setDisabledDates] = useState<Record<string, number>>({});
   const [takenSlots, setTakenSlots] = useState<string[]>([]);
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [selectedDoctor, setSelectedDoctor] = useState<string>("");
+  const [reservationsForDate, setReservationsForDate] = useState<any[]>([]);
 
   const [branches, setBranches] = useState<{ id: string; name_en: string; name_ar: string; status: string }[]>([]);
   const [branchId, setBranchId] = useState<string | null>(null);
@@ -93,6 +103,8 @@ export function BookingModal() {
     setBranchId(branches[0]?.id ?? null);
     setSelectedDate(null);
     setSelectedTime(null);
+    setSelectedDoctor("");
+    setReservationsForDate([]);
     setName('');
     setEmail('');
     setPhone('');
@@ -178,6 +190,16 @@ export function BookingModal() {
       .catch(() => {});
   }, []);
 
+  // Load doctors
+  useEffect(() => {
+    fetch("/api/providers")
+      .then((r) => r.json())
+      .then((data) => {
+        setDoctors(data || []);
+      })
+      .catch(() => {});
+  }, []);
+
   // Fetch availability for next 30 days when modal opens, service changes, or branch changes
   useEffect(() => {
     if (!open || !serviceId) return;
@@ -200,23 +222,29 @@ export function BookingModal() {
     let active = true;
     if (!serviceId || !selectedDate) {
       Promise.resolve().then(() => {
-        if (active) setTakenSlots([]);
+        if (active) {
+          setTakenSlots([]);
+          setReservationsForDate([]);
+        }
       });
       return;
     }
     const date = toLocalDateStr(selectedDate);
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    fetch(`/api/reservations?serviceId=${serviceId}&date=${date}&status=approved${branchQuery}`)
+    fetch(`/api/reservations?date=${date}&status=approved${branchQuery}`)
       .then(r=>r.json())
       .then((list)=>{
         if (active) {
           if (Array.isArray(list)) {
+            setReservationsForDate(list);
+
+            const serviceReservations = list.filter((r: any) => r.serviceId === serviceId);
             const targetDuration = getDurationInMinutes(selectedService?.duration);
             const targetSlotsNeeded = Math.ceil(targetDuration / 15);
             
             const occupied = new Array(ALL_15MIN_SLOTS.length).fill(false);
             
-            for (const res of list) {
+            for (const res of serviceReservations) {
               if (!res.timeSlot) continue;
               const norm = normaliseTo24hSlot(res.timeSlot);
               if (norm) {
@@ -251,11 +279,15 @@ export function BookingModal() {
           } else {
             console.error("Fetch reservations expected array, got", list);
             setTakenSlots([]);
+            setReservationsForDate([]);
           }
         }
       })
       .catch(()=>{
-        if (active) setTakenSlots([]);
+        if (active) {
+          setTakenSlots([]);
+          setReservationsForDate([]);
+        }
       });
     return () => {
       active = false;
@@ -284,6 +316,63 @@ export function BookingModal() {
     if (step === 4) setStep(3);
   }
 
+  const getAvailableDoctors = useCallback(() => {
+    if (!selectedDate || !selectedTime || !selectedService) return [];
+
+    const startNew = timeToMinutes(selectedTime);
+    const durationNew = getDurationInMinutes(selectedService.duration);
+    const endNew = startNew + durationNew;
+
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[selectedDate.getDay()];
+
+    return doctors.filter((doctor) => {
+      if (branchId && doctor.branchId && doctor.branchId !== branchId) {
+        return false;
+      }
+
+      if (doctor.services && doctor.services.length > 0) {
+        if (!doctor.services.includes(selectedService.en)) {
+          return false;
+        }
+      }
+
+      if (doctor.workingDaysHours) {
+        const dayConfig = doctor.workingDaysHours[weekdayName];
+        if (!dayConfig || !dayConfig.isOpen) {
+          return false;
+        }
+        
+        const [sh, sm] = dayConfig.start.split(":").map(Number);
+        const [eh, em] = dayConfig.end.split(":").map(Number);
+        const shiftStart = sh * 60 + sm;
+        const shiftEnd = eh * 60 + em;
+
+        if (startNew < shiftStart || endNew > shiftEnd) {
+          return false;
+        }
+      }
+
+      const hasOverlap = reservationsForDate.some((res) => {
+        if (res.doctorName && res.doctorName === doctor.name && res.status !== "rejected") {
+          if (res.timeSlot) {
+            const startRes = timeToMinutes(res.timeSlot);
+            const resService = dynamicServices.find((s) => s.id === res.serviceId);
+            const durationRes = getDurationInMinutes(resService?.duration);
+            const endRes = startRes + durationRes;
+
+            if (startNew < endRes && startRes < endNew) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
+
+      return !hasOverlap;
+    });
+  }, [selectedDate, selectedTime, selectedService, doctors, branchId, reservationsForDate, dynamicServices]);
+
   function handleConfirm() {
     if (!serviceId || !selectedDate || !selectedTime || !name || !email || !phone) return;
     const payload = {
@@ -293,6 +382,7 @@ export function BookingModal() {
       name, email, phone, notes,
       sessionType,
       branchId,
+      doctorName: selectedDoctor || null,
     };
     fetch('/api/reservations', { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } })
       .then(r => r.json())
@@ -627,6 +717,12 @@ export function BookingModal() {
                       {selectedTime}
                     </p>
                   )}
+                  {selectedDoctor && (
+                    <p className="mb-0">
+                      <span className="font-semibold">{isRTL ? "الطبيب" : "Doctor"}: </span>
+                      {selectedDoctor}
+                    </p>
+                  )}
                 </div>
 
                 {/* Notes */}
@@ -640,6 +736,25 @@ export function BookingModal() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={t.booking.notes}
                 />
+
+                {/* Doctor Selection (Optional) */}
+                <label className="block mb-1 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
+                  {isRTL ? "الطبيب المعالج (اختياري)" : "Select Doctor (Optional)"}
+                </label>
+                <select
+                  className="cr-input mb-3 bg-white text-[#1F251A] font-medium"
+                  value={selectedDoctor}
+                  onChange={(e) => setSelectedDoctor(e.target.value)}
+                >
+                  <option value="">
+                    {isRTL ? "أي طبيب / لا يوجد تفضيل" : "Any Doctor / No Preference"}
+                  </option>
+                  {getAvailableDoctors().map((doc: any) => (
+                    <option key={doc.id} value={doc.name}>
+                      {doc.name}
+                    </option>
+                  ))}
+                </select>
 
 
 

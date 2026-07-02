@@ -1,0 +1,62 @@
+[
+  {
+    "id": "local-0",
+    "name": "Dr. Ahmed Medhat",
+    "bookings": 0,
+    "services": [
+      "Tattoo Removal (Small)",
+      "Tattoo Removal (Medium)"
+    ],
+    "more": 4,
+    "rating": 0,
+    "image": null,
+    "phone": null,
+    "gender": null,
+    "age": null,
+    "specialty": null,
+    "nationalId": null,
+    "workingDaysHours": null,
+    "branchId": null,
+    "startDate": null
+  },
+  {
+    "id": "local-1",
+    "name": "Dr. Radwa Seif",
+    "bookings": 0,
+    "services": [
+      "Physio: Basic Relief (3)",
+      "Physio: Standard Recovery (6)"
+    ],
+    "more": 4,
+    "rating": 0,
+    "image": null,
+    "phone": null,
+    "gender": null,
+    "age": null,
+    "specialty": null,
+    "nationalId": null,
+    "workingDaysHours": null,
+    "branchId": null,
+    "startDate": null
+  },
+  {
+    "id": "local-2",
+    "name": "Dr. Sara El Gamel",
+    "bookings": 1,
+    "services": [
+      "Half Arm",
+      "Full Arms"
+    ],
+    "more": 14,
+    "rating": 0,
+    "image": null,
+    "phone": null,
+    "gender": null,
+    "age": null,
+    "specialty": null,
+    "nationalId": null,
+    "workingDaysHours": null,
+    "branchId": null,
+    "startDate": null
+  }
+]

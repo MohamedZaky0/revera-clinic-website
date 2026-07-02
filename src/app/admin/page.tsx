@@ -793,7 +793,6 @@ export default function AdminPage() {
   const [newPatientBranch, setNewPatientBranch] = useState("");
   const [approveUnavailableSlots, setApproveUnavailableSlots] = useState<string[]>([]);
   const [manualUnavailableSlots, setManualUnavailableSlots] = useState<string[]>([]);
-
   const filteredReservations = useMemo(() => {
     return allReservations.filter((r) => {
       const matchStatus = statusFilter === "All" || r.status === statusFilter;
@@ -1599,6 +1598,107 @@ export default function AdminPage() {
     }
   ]);
   const [providers, setProviders] = useState<any[]>(PROVIDERS);
+
+  const isDoctorAvailableAdmin = useCallback((
+    doctor: any,
+    branchId: string | null,
+    dateStr: string | null,
+    timeSlotStr: string | null,
+    serviceId: number | null
+  ): boolean => {
+    if (!dateStr || !timeSlotStr || !serviceId) return true;
+
+    if (branchId && doctor.branchId && doctor.branchId !== branchId) {
+      return false;
+    }
+
+    const targetService = localServices.find(s => s.id === serviceId);
+    if (targetService) {
+      if (doctor.services && doctor.services.length > 0) {
+        if (!doctor.services.includes(targetService.en)) {
+          return false;
+        }
+      }
+    }
+
+    const timeToMinutes = (timeStr: string): number => {
+      const norm = normaliseTo24hSlot(timeStr);
+      if (!norm) return 0;
+      const [hh, mm] = norm.split(":").map(Number);
+      return hh * 60 + mm;
+    };
+
+    const startNew = timeToMinutes(timeSlotStr);
+    const durationNew = targetService ? getDurationInMinutes(targetService.duration) : 30;
+    const endNew = startNew + durationNew;
+
+    if (doctor.workingDaysHours) {
+      const dateObj = new Date(dateStr);
+      if (!isNaN(dateObj.getTime())) {
+        const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const weekdayName = weekdays[dateObj.getDay()];
+        const dayConfig = doctor.workingDaysHours[weekdayName];
+        if (!dayConfig || !dayConfig.isOpen) {
+          return false;
+        }
+        const [sh, sm] = dayConfig.start.split(":").map(Number);
+        const [eh, em] = dayConfig.end.split(":").map(Number);
+        const shiftStart = sh * 60 + sm;
+        const shiftEnd = eh * 60 + em;
+
+        if (startNew < shiftStart || endNew > shiftEnd) {
+          return false;
+        }
+      }
+    }
+
+    const hasOverlap = allReservations.some((res) => {
+      if (res.doctorName && res.doctorName === doctor.name && res.status !== "rejected") {
+        if (res.date === dateStr && res.timeSlot) {
+          const startRes = timeToMinutes(res.timeSlot);
+          const resService = localServices.find((s) => s.id === res.serviceId);
+          const durationRes = resService ? getDurationInMinutes(resService.duration) : 30;
+          const endRes = startRes + durationRes;
+
+          if (startNew < endRes && startRes < endNew) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+
+    return !hasOverlap;
+  }, [localServices, allReservations]);
+
+  const availableDoctorsNewPatient = useMemo(() => {
+    return providers.filter(p => isDoctorAvailableAdmin(p, newPatientBranch, newPatientDate, newPatientTimeSlot, newPatientService));
+  }, [providers, newPatientBranch, newPatientDate, newPatientTimeSlot, newPatientService, isDoctorAvailableAdmin]);
+
+  useEffect(() => {
+    if (availableDoctorsNewPatient.length > 0) {
+      if (!availableDoctorsNewPatient.some(d => d.name === newPatientDoctor)) {
+        setNewPatientDoctor(availableDoctorsNewPatient[0].name);
+      }
+    } else {
+      setNewPatientDoctor("");
+    }
+  }, [availableDoctorsNewPatient, newPatientDoctor]);
+
+  const availableDoctorsApprove = useMemo(() => {
+    if (!selected) return [];
+    return providers.filter(p => isDoctorAvailableAdmin(p, selected.branchId ?? null, selected.date, slot, selected.serviceId));
+  }, [providers, selected, slot, isDoctorAvailableAdmin]);
+
+  useEffect(() => {
+    if (selected && availableDoctorsApprove.length > 0) {
+      if (!availableDoctorsApprove.some(d => d.name === doctorName)) {
+        setDoctorName(availableDoctorsApprove[0].name);
+      }
+    } else if (selected) {
+      setDoctorName("");
+    }
+  }, [availableDoctorsApprove, doctorName, selected]);
   
   // Custom provider modal states
   const [showProviderModal, setShowProviderModal] = useState(false);
@@ -11144,11 +11244,14 @@ export default function AdminPage() {
               onChange={(e) => setDoctorName(e.target.value)}
               className="mb-6 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
             >
-              {providers.map((p) => (
+              {availableDoctorsApprove.map((p) => (
                 <option key={p.id || p.name} value={p.name}>
                   {p.name}
                 </option>
               ))}
+              {availableDoctorsApprove.length === 0 && (
+                <option value="">No Available Doctors</option>
+              )}
             </select>
 
             <div className="flex flex-wrap gap-3">
@@ -12070,9 +12173,12 @@ export default function AdminPage() {
                     onChange={(e) => setNewPatientDoctor(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   >
-                    {providers.map(p => (
+                    {availableDoctorsNewPatient.map(p => (
                       <option key={p.id || p.name} value={p.name}>{p.name}</option>
                     ))}
+                    {availableDoctorsNewPatient.length === 0 && (
+                      <option value="">No Available Doctors</option>
+                    )}
                   </select>
                 </div>
               )}
