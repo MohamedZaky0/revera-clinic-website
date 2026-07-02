@@ -39,9 +39,21 @@ export async function GET(req: Request) {
       }
     }
 
+    // Fetch all services to build a mapping of serviceId -> duration
+    const { data: dbServices } = await supabaseServer
+      .from('services')
+      .select('id, duration');
+
+    const servicesMap = new Map<number, number>();
+    if (dbServices) {
+      for (const s of dbServices) {
+        servicesMap.set(s.id, getDurationInMinutes(s.duration));
+      }
+    }
+
     let q = supabaseServer
       .from('reservations')
-      .select('date, time_slot')
+      .select('date, time_slot, service_id')
       .eq('status', 'approved')
       .in('date', dateKeys);
 
@@ -57,7 +69,7 @@ export async function GET(req: Request) {
     if (error) throw error;
 
     // Group by date
-    const groupedByDate = new Map<string, string[]>();
+    const groupedByDate = new Map<string, { timeSlot: string; serviceId: number }[]>();
     for (const key of dateKeys) {
       groupedByDate.set(key, []);
     }
@@ -65,7 +77,12 @@ export async function GET(req: Request) {
       for (const row of rows) {
         const key = String(row.date).slice(0, 10);
         if (groupedByDate.has(key)) {
-          if (row.time_slot) groupedByDate.get(key)!.push(row.time_slot);
+          if (row.time_slot && row.service_id) {
+            groupedByDate.get(key)!.push({
+              timeSlot: row.time_slot,
+              serviceId: row.service_id
+            });
+          }
         }
       }
     }
@@ -77,13 +94,15 @@ export async function GET(req: Request) {
       const isOccupied = new Array(ALL_15MIN_SLOTS.length).fill(false);
       const targetSlotsNeeded = Math.ceil(targetDuration / 15);
       
-      // Mark occupied slots for each approved booking
-      for (const s of slots) {
-        const norm = normaliseTo24hSlot(s);
+      // Mark occupied slots for each approved booking based on that booking's service duration
+      for (const r of slots) {
+        const norm = normaliseTo24hSlot(r.timeSlot);
         if (norm) {
           const idx = ALL_15MIN_SLOTS.indexOf(norm);
           if (idx >= 0) {
-            for (let k = 0; k < targetSlotsNeeded; k++) {
+            const resDuration = servicesMap.get(r.serviceId) ?? 30;
+            const resSlotsOccupied = Math.ceil(resDuration / 15);
+            for (let k = 0; k < resSlotsOccupied; k++) {
               if (idx + k < isOccupied.length) {
                 isOccupied[idx + k] = true;
               }
@@ -111,7 +130,7 @@ export async function GET(req: Request) {
       return {
         date: key,
         approvedCount: slots.length,
-        approvedSlots: slots,
+        approvedSlots: slots.map(s => s.timeSlot),
         isAvailable: hasAvailableSlot
       };
     });

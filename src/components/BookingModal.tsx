@@ -216,13 +216,16 @@ export function BookingModal() {
             
             const occupied = new Array(ALL_15MIN_SLOTS.length).fill(false);
             
-            const bookings = list.map((i: { timeSlot?: string | null }) => i.timeSlot).filter(Boolean) as string[];
-            for (const b of bookings) {
-              const norm = normaliseTo24hSlot(b);
+            for (const res of list) {
+              if (!res.timeSlot) continue;
+              const norm = normaliseTo24hSlot(res.timeSlot);
               if (norm) {
                 const idx = ALL_15MIN_SLOTS.indexOf(norm);
                 if (idx >= 0) {
-                  for (let k = 0; k < targetSlotsNeeded; k++) {
+                  const resService = dynamicServices.find(s => s.id === res.serviceId);
+                  const resDuration = getDurationInMinutes(resService?.duration);
+                  const resSlotsOccupied = Math.ceil(resDuration / 15);
+                  for (let k = 0; k < resSlotsOccupied; k++) {
                     if (idx + k < occupied.length) {
                       occupied[idx + k] = true;
                     }
