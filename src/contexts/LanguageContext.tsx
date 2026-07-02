@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import type { Language, Direction, Translation } from "@/types";
 import { translations } from "@/lib/translations";
+import { WhatsappButton } from "@/components/WhatsappButton";
 
 interface LanguageContextValue {
   language: Language;
@@ -39,6 +40,27 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") {
       window.alert = (message: string) => {
         setAlertMessage(message);
+      };
+
+      const handleRejection = (event: PromiseRejectionEvent) => {
+        if (event.reason && (event.reason.message === "Failed to fetch" || String(event.reason).includes("Failed to fetch"))) {
+          event.preventDefault();
+          console.warn("Handled promise rejection:", event.reason);
+        }
+      };
+
+      const handleError = (event: ErrorEvent) => {
+        if (event.error && (event.error.message === "Failed to fetch" || String(event.error).includes("Failed to fetch"))) {
+          event.preventDefault();
+          console.warn("Handled runtime error:", event.error);
+        }
+      };
+
+      window.addEventListener("unhandledrejection", handleRejection);
+      window.addEventListener("error", handleError);
+      return () => {
+        window.removeEventListener("unhandledrejection", handleRejection);
+        window.removeEventListener("error", handleError);
       };
     }
   }, []);
@@ -213,7 +235,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (err) {
-        console.error("LanguageProvider: failed to load page settings", err);
+        console.warn("LanguageProvider: failed to load page settings", err);
       }
     }
     loadSettings();
@@ -235,6 +257,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   return (
     <LanguageContext.Provider value={value}>
       {children}
+      <WhatsappButton />
       {alertMessage && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/55 p-4 backdrop-blur-md animate-fadeInFast">
           <div 
