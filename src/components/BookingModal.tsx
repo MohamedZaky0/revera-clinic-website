@@ -638,34 +638,7 @@ export function BookingModal() {
                   placeholder={t.booking.notes}
                 />
 
-                {/* Session Type Selectors */}
-                <label className="block mb-2 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
-                  {isRTL ? "مكان الجلسة" : "Session Type"}
-                </label>
-                <div className="flex gap-4 mb-4">
-                  <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer text-[#1F251A]">
-                    <input
-                      type="radio"
-                      name="sessionType"
-                      value="in_person"
-                      checked={sessionType === "in_person"}
-                      onChange={() => setSessionType("in_person")}
-                      className="accent-[#414E36]"
-                    />
-                    {isRTL ? "في العيادة (In Person)" : "In Person"}
-                  </label>
-                  <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer text-[#1F251A]">
-                    <input
-                      type="radio"
-                      name="sessionType"
-                      value="online"
-                      checked={sessionType === "online"}
-                      onChange={() => setSessionType("online")}
-                      className="accent-[#414E36]"
-                    />
-                    {isRTL ? "أونلاين (Online)" : "Online"}
-                  </label>
-                </div>
+
 
                 <label className="block mb-1 text-xs font-semibold">Name</label>
                 <input className="cr-input mb-2" value={name} onChange={(e)=>setName(e.target.value)} />
