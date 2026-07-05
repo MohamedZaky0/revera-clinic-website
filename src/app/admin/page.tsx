@@ -80,6 +80,7 @@ import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
 type Req = {
   id: string;
   serviceId: number;
+  serviceIds?: number[];
   date: string;
   requestedTime?: string | null;
   name: string;
@@ -95,6 +96,8 @@ type Req = {
   customerId?: string | null;
   amountPaid?: number;
   amountLeft?: number | null;
+  roomId?: string | null;
+  rooms?: string[];
 };
 
 function getStatusBadgeClass(status: string): string {
@@ -11521,7 +11524,7 @@ export default function AdminPage() {
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICE</p>
-                      <p className="mt-1 text-base font-semibold text-[#1F251A]">{serviceName}</p>
+                      <p className="mt-1 text-base font-semibold text-[#1F251A]">{serviceNames}</p>
                     </div>
                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">BOOKING DATE</p>

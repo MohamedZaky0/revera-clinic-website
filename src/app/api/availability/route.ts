@@ -79,7 +79,7 @@ async function fetchCachedServiceRooms(serviceId: number) {
     .from('service_rooms')
     .select('room_id')
     .eq('service_id', serviceId);
-  const roomIds = data ? data.map(sr => sr.room_id) : [];
+  const roomIds = data ? data.map((sr: any) => sr.room_id) : [];
   serviceRoomsCache[serviceId] = {
     roomIds,
     expiry: now + CACHE_TTL
@@ -115,7 +115,7 @@ export async function GET(req: Request) {
 
   try {
     const t0 = Date.now();
-    const dbServices = await fetchCachedServices();
+    const dbServices = (await fetchCachedServices()) || [];
     const servicesMap = new Map<number, number>();
     for (const s of dbServices) {
       servicesMap.set(s.id, getDurationInMinutes(s.duration));
