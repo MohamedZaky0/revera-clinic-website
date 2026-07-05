@@ -2231,7 +2231,11 @@ export default function AdminPage() {
           fetchAllReservations() || Promise.resolve()
         ]);
       } catch (err) {
-        console.error("Polling error:", err);
+        if (err instanceof TypeError || String(err).includes("Failed to fetch")) {
+          console.warn("Polling network connection lost (Failed to fetch)");
+        } else {
+          console.error("Polling error:", err);
+        }
       } finally {
         if (isMounted) {
           // Schedule next poll in 2 seconds after the current fetches complete
@@ -2893,7 +2897,11 @@ export default function AdminPage() {
         setLoading(false);
       })
       .catch((err) => {
-        console.error("fetchRequests error:", err);
+        if (err instanceof TypeError || String(err).includes("Failed to fetch")) {
+          console.warn("fetchRequests: Network connection lost (Failed to fetch)");
+        } else {
+          console.error("fetchRequests error:", err);
+        }
         setRequests([]);
         setLoading(false);
       });
@@ -3387,7 +3395,11 @@ export default function AdminPage() {
         }
       })
       .catch((err) => {
-        console.error("fetchAllReservations error:", err);
+        if (err instanceof TypeError || String(err).includes("Failed to fetch")) {
+          console.warn("fetchAllReservations: Network connection lost (Failed to fetch)");
+        } else {
+          console.error("fetchAllReservations error:", err);
+        }
         setAllReservations([]);
       });
 
