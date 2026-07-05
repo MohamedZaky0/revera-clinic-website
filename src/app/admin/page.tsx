@@ -423,6 +423,79 @@ const PERMISSION_STRUCTURE = [
   }
 ];
 
+function parseEgyptianNationalId(id: string) {
+  if (!id || id.length !== 14 || !/^\d{14}$/.test(id)) {
+    return { isValid: false, reason: "National ID must be exactly 14 digits." };
+  }
+
+  const centuryDigit = parseInt(id.charAt(0));
+  if (centuryDigit !== 2 && centuryDigit !== 3) {
+    return { isValid: false, reason: "Invalid first digit (must start with 2 or 3)." };
+  }
+
+  const yearPart = id.substring(1, 3);
+  const monthPart = id.substring(3, 5);
+  const dayPart = id.substring(5, 7);
+
+  const year = (centuryDigit === 2 ? 1900 : 2000) + parseInt(yearPart);
+  const month = parseInt(monthPart);
+  const day = parseInt(dayPart);
+
+  // Validate date
+  const birthDate = new Date(year, month - 1, day);
+  if (
+    birthDate.getFullYear() !== year ||
+    birthDate.getMonth() !== month - 1 ||
+    birthDate.getDate() !== day
+  ) {
+    return { isValid: false, reason: "Invalid birth date encoded in ID." };
+  }
+
+  const govCode = id.substring(7, 9);
+  const governorates: Record<string, string> = {
+    "01": "Cairo",
+    "02": "Alexandria",
+    "03": "Port Said",
+    "04": "Suez",
+    "11": "Damietta",
+    "12": "Dakahlia",
+    "13": "Sharkia",
+    "14": "Kalyobia",
+    "15": "Kafr El-Sheikh",
+    "16": "Gharbia",
+    "17": "Menoufia",
+    "18": "Beheira",
+    "19": "Ismailia",
+    "21": "Giza",
+    "22": "Beni Suef",
+    "23": "Fayoum",
+    "24": "Minya",
+    "25": "Asyut",
+    "26": "Sohag",
+    "27": "Qena",
+    "28": "Aswan",
+    "29": "Luxor",
+    "31": "Red Sea",
+    "32": "New Valley",
+    "33": "Matrouh",
+    "34": "North Sinai",
+    "35": "South Sinai",
+    "88": "Foreign birth"
+  };
+
+  const governorate = governorates[govCode] || "Unknown Governorate";
+
+  const genderDigit = parseInt(id.charAt(12));
+  const gender = genderDigit % 2 === 0 ? "Female" : "Male";
+
+  return {
+    isValid: true,
+    birthDate: birthDate.toLocaleDateString("en-US", { dateStyle: "long" }),
+    governorate,
+    gender
+  };
+}
+
 export default function AdminPage() {
   const { showConfirm } = useAlertConfirm();
   // Auth state
@@ -534,12 +607,17 @@ export default function AdminPage() {
   const [newEmployeeDepartment, setNewEmployeeDepartment] = useState("Reception");
   const [newEmployeeShift, setNewEmployeeShift] = useState("Day");
   const [newEmployeeSalary, setNewEmployeeSalary] = useState("0");
+  const [newEmployeeNationalId, setNewEmployeeNationalId] = useState("");
+  const [newEmployeeNationalIdFront, setNewEmployeeNationalIdFront] = useState("");
+  const [newEmployeeNationalIdBack, setNewEmployeeNationalIdBack] = useState("");
+  const [newEmployeeAddress, setNewEmployeeAddress] = useState("");
   const [employeeFilterDepartment, setEmployeeFilterDepartment] = useState("All");
   const [employeeFilterShift, setEmployeeFilterShift] = useState("All");
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [viewingEmployee, setViewingEmployee] = useState<any | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<any | null>(null);
   const [isEditingEmployeeModalOpen, setIsEditingEmployeeModalOpen] = useState(false);
+
 
   const [requests, setRequests] = useState<Req[]>([]);
   const [allReservations, setAllReservations] = useState<Req[]>([]);
@@ -9984,6 +10062,10 @@ export default function AdminPage() {
                     setNewEmployeeDepartment("Reception");
                     setNewEmployeeShift("Day");
                     setNewEmployeeSalary("0");
+                    setNewEmployeeNationalId("");
+                    setNewEmployeeNationalIdFront("");
+                    setNewEmployeeNationalIdBack("");
+                    setNewEmployeeAddress("");
                     setIsEditingEmployeeModalOpen(true);
                   }}
                   className="rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-md shrink-0"
@@ -10046,7 +10128,7 @@ export default function AdminPage() {
                         <th className="px-6 py-4">Department</th>
                         <th className="px-6 py-4">Shift</th>
                         <th className="px-6 py-4">Salary</th>
-                        <th className="px-6 py-4">Role</th>
+
                         <th className="px-6 py-4 text-center">Status</th>
                         <th className="px-6 py-4 text-right">Actions</th>
                       </tr>
@@ -10054,7 +10136,7 @@ export default function AdminPage() {
                     <tbody className="divide-y divide-[#414E36]/5">
                       {loadingRolesAndEmployees ? (
                         <tr>
-                          <td colSpan={9} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                          <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
                             Loading employees...
                           </td>
                         </tr>
@@ -10076,7 +10158,7 @@ export default function AdminPage() {
                         if (filtered.length === 0) {
                           return (
                             <tr>
-                              <td colSpan={9} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                              <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
                                 No employees match your filters.
                               </td>
                             </tr>
@@ -10108,11 +10190,7 @@ export default function AdminPage() {
                               <td className="px-6 py-4 text-xs font-bold text-[#1F251A]">
                                 {Number(emp.salary || 0).toLocaleString()} EGP
                               </td>
-                              <td className="px-6 py-4">
-                                <span className="inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">
-                                  {emp.role_name}
-                                </span>
-                              </td>
+
                               <td className="px-6 py-4 text-center">
                                 <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
                                   {emp.email_confirmed_at ? "Active" : "Invited"}
@@ -10123,9 +10201,10 @@ export default function AdminPage() {
                                   <button
                                     type="button"
                                     onClick={() => setViewingEmployee(emp)}
-                                    className="text-xs font-semibold text-[#5A6A51] hover:text-[#414E36] hover:underline transition"
+                                    className="text-[#5A6A51] hover:text-[#414E36] transition"
+                                    title="View Info"
                                   >
-                                    Info
+                                    <Info size={16} />
                                   </button>
                                   {!isSuperadmin && (
                                     <>
@@ -10140,6 +10219,10 @@ export default function AdminPage() {
                                           setNewEmployeeDepartment(emp.department || "Reception");
                                           setNewEmployeeShift(emp.shift || "Day");
                                           setNewEmployeeSalary(String(emp.salary || 0));
+                                          setNewEmployeeNationalId(emp.national_id || "");
+                                          setNewEmployeeNationalIdFront(emp.national_id_front || "");
+                                          setNewEmployeeNationalIdBack(emp.national_id_back || "");
+                                          setNewEmployeeAddress(emp.address || "");
                                           setIsEditingEmployeeModalOpen(true);
                                         }}
                                         className="text-xs font-semibold text-[#C4AE7C] hover:underline transition"
@@ -10216,6 +10299,10 @@ export default function AdminPage() {
                                 department: newEmployeeDepartment,
                                 shift: newEmployeeShift,
                                 salary: Number(newEmployeeSalary),
+                                nationalId: newEmployeeNationalId.trim() || null,
+                                nationalIdFront: newEmployeeNationalIdFront || null,
+                                nationalIdBack: newEmployeeNationalIdBack || null,
+                                address: newEmployeeAddress.trim() || null,
                               }),
                             });
                             if (res.ok) {
@@ -10242,6 +10329,10 @@ export default function AdminPage() {
                                 department: newEmployeeDepartment,
                                 shift: newEmployeeShift,
                                 salary: Number(newEmployeeSalary),
+                                nationalId: newEmployeeNationalId.trim() || null,
+                                nationalIdFront: newEmployeeNationalIdFront || null,
+                                nationalIdBack: newEmployeeNationalIdBack || null,
+                                address: newEmployeeAddress.trim() || null,
                               }),
                             });
                             if (res.ok) {
@@ -10351,6 +10442,175 @@ export default function AdminPage() {
                         </div>
                       </div>
 
+                      {/* --- NEW EMPLOYEE PROFILE FIELDS (National ID, Photo Uploads, Address) --- */}
+                      <div className="border-t border-[#414E36]/10 pt-4 space-y-4">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">National ID (14 Digits)</label>
+                            <input
+                              type="text"
+                              maxLength={14}
+                              placeholder="e.g. 29503152101234"
+                              value={newEmployeeNationalId}
+                              onChange={(e) => {
+                                // only numbers
+                                const val = e.target.value.replace(/\D/g, "");
+                                setNewEmployeeNationalId(val);
+                              }}
+                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] font-mono"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Home Address</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 15 El-Ghad St, Pyramids, Giza"
+                              value={newEmployeeAddress}
+                              onChange={(e) => setNewEmployeeAddress(e.target.value)}
+                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Interactive Egyptian National ID Check */}
+                        {newEmployeeNationalId.trim() && (() => {
+                          const check = parseEgyptianNationalId(newEmployeeNationalId.trim());
+                          if (check.isValid) {
+                            return (
+                              <div className="rounded-2xl bg-green-50/50 border border-green-200/50 p-3.5 space-y-1.5 text-xs">
+                                <div className="flex items-center gap-1.5 font-bold text-green-800">
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
+                                  Egyptian National ID Check Passed
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-green-700 font-medium">
+                                  <div>
+                                    <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Birth Date</span>
+                                    {check.birthDate}
+                                  </div>
+                                  <div>
+                                    <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Gender</span>
+                                    {check.gender}
+                                  </div>
+                                  <div>
+                                    <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Governorate</span>
+                                    {check.governorate}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div className="rounded-2xl bg-amber-50/50 border border-amber-200/50 p-3.5 text-xs text-amber-700 font-semibold flex items-center gap-1.5">
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] text-white">!</span>
+                                ID Check: {check.reason}
+                              </div>
+                            );
+                          }
+                        })()}
+
+                        {/* Front / Back ID Photo Uploads */}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {/* ID Front */}
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">National ID - Front Side</label>
+                            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-4 text-center">
+                              {newEmployeeNationalIdFront ? (
+                                <div className="relative w-full group">
+                                  <img
+                                    src={newEmployeeNationalIdFront}
+                                    alt="ID Front"
+                                    className="h-28 w-full object-cover rounded-xl border border-[#414E36]/10"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewEmployeeNationalIdFront("")}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white hover:bg-red-600 transition rounded-full h-6 w-6 flex items-center justify-center shadow font-bold text-xs"
+                                  >
+                                    &times;
+                                  </button>
+                                </div>
+                              ) : (
+                                <label className="flex flex-col items-center justify-center cursor-pointer py-4 w-full">
+                                  <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
+                                  <span className="text-[11px] font-semibold text-[#414E36]">Upload Front Side</span>
+                                  <span className="text-[9px] text-gray-400 mt-0.5">JPEG, PNG up to 5MB</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        try {
+                                          const compressed = await compressImage(file, 1200, 1200, 0.8);
+                                          setNewEmployeeNationalIdFront(compressed);
+                                        } catch (err) {
+                                          const reader = new FileReader();
+                                          reader.onloadend = () => {
+                                            setNewEmployeeNationalIdFront(reader.result as string);
+                                          };
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* ID Back */}
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">National ID - Back Side</label>
+                            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-4 text-center">
+                              {newEmployeeNationalIdBack ? (
+                                <div className="relative w-full group">
+                                  <img
+                                    src={newEmployeeNationalIdBack}
+                                    alt="ID Back"
+                                    className="h-28 w-full object-cover rounded-xl border border-[#414E36]/10"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewEmployeeNationalIdBack("")}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white hover:bg-red-600 transition rounded-full h-6 w-6 flex items-center justify-center shadow font-bold text-xs"
+                                  >
+                                    &times;
+                                  </button>
+                                </div>
+                              ) : (
+                                <label className="flex flex-col items-center justify-center cursor-pointer py-4 w-full">
+                                  <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
+                                  <span className="text-[11px] font-semibold text-[#414E36]">Upload Back Side</span>
+                                  <span className="text-[9px] text-gray-400 mt-0.5">JPEG, PNG up to 5MB</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        try {
+                                          const compressed = await compressImage(file, 1200, 1200, 0.8);
+                                          setNewEmployeeNationalIdBack(compressed);
+                                        } catch (err) {
+                                          const reader = new FileReader();
+                                          reader.onloadend = () => {
+                                            setNewEmployeeNationalIdBack(reader.result as string);
+                                          };
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="flex justify-end gap-3 pt-2">
                         <button
                           type="button"
@@ -10419,6 +10679,10 @@ export default function AdminPage() {
                               setNewEmployeeDepartment(viewingEmployee.department || "Reception");
                               setNewEmployeeShift(viewingEmployee.shift || "Day");
                               setNewEmployeeSalary(String(viewingEmployee.salary || 0));
+                              setNewEmployeeNationalId(viewingEmployee.national_id || "");
+                              setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
+                              setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
+                              setNewEmployeeAddress(viewingEmployee.address || "");
                               setViewingEmployee(null);
                               setIsEditingEmployeeModalOpen(true);
                             }}
@@ -10470,7 +10734,11 @@ export default function AdminPage() {
                               {viewingEmployee.email_confirmed_at ? "Active" : "Pending Invitation"}
                             </span>
                           </div>
-                          <div className="col-span-2">
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
+                            <span className="font-semibold text-[#1F251A] font-mono text-xs">{viewingEmployee.national_id || "—"}</span>
+                          </div>
+                          <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Added On</span>
                             <span className="font-semibold text-[#1F251A]">
                               {viewingEmployee.created_at
@@ -10478,6 +10746,93 @@ export default function AdminPage() {
                                 : "—"}
                             </span>
                           </div>
+                          <div className="col-span-2">
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Home Address</span>
+                            <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
+                              {viewingEmployee.address || "—"}
+                            </span>
+                          </div>
+
+                          {/* ID Check Info Card */}
+                          {viewingEmployee.national_id && (() => {
+                            const check = parseEgyptianNationalId(viewingEmployee.national_id);
+                            if (check.isValid) {
+                              return (
+                                <div className="col-span-2 rounded-xl bg-green-50/50 border border-green-200/50 p-4 space-y-2 text-xs">
+                                  <div className="flex items-center gap-1.5 font-bold text-green-800">
+                                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
+                                    Verified Egyptian National ID Check
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-4 text-green-700 font-medium">
+                                    <div>
+                                      <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Birth Date</span>
+                                      {check.birthDate}
+                                    </div>
+                                    <div>
+                                      <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Gender</span>
+                                      {check.gender}
+                                    </div>
+                                    <div>
+                                      <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Governorate</span>
+                                      {check.governorate}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+
+                          {/* Front / Back ID Photo Previews */}
+                          {(viewingEmployee.national_id_front || viewingEmployee.national_id_back) && (
+                            <div className="col-span-2 space-y-2 border-t border-[#414E36]/10 pt-3">
+                              <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider">ID Document Photos</span>
+                              <div className="grid grid-cols-2 gap-4">
+                                {viewingEmployee.national_id_front && (
+                                  <div className="space-y-1">
+                                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">Front Side</span>
+                                    <a
+                                      href={viewingEmployee.national_id_front}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
+                                      title="Click to view full size"
+                                    >
+                                      <img
+                                        src={viewingEmployee.national_id_front}
+                                        alt="ID Front"
+                                        className="h-28 w-full object-cover"
+                                      />
+                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
+                                        View Full Size
+                                      </div>
+                                    </a>
+                                  </div>
+                                )}
+                                {viewingEmployee.national_id_back && (
+                                  <div className="space-y-1">
+                                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">Back Side</span>
+                                    <a
+                                      href={viewingEmployee.national_id_back}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
+                                      title="Click to view full size"
+                                    >
+                                      <img
+                                        src={viewingEmployee.national_id_back}
+                                        alt="ID Back"
+                                        className="h-28 w-full object-cover"
+                                      />
+                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
+                                        View Full Size
+                                      </div>
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -10496,6 +10851,10 @@ export default function AdminPage() {
                               setNewEmployeeDepartment(viewingEmployee.department || "Reception");
                               setNewEmployeeShift(viewingEmployee.shift || "Day");
                               setNewEmployeeSalary(String(viewingEmployee.salary || 0));
+                              setNewEmployeeNationalId(viewingEmployee.national_id || "");
+                              setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
+                              setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
+                              setNewEmployeeAddress(viewingEmployee.address || "");
                               setViewingEmployee(null);
                               setIsEditingEmployeeModalOpen(true);
                             }}

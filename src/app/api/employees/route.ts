@@ -39,7 +39,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, name, roleName, phone, department, shift, salary } = body;
+    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address } = body;
 
     if (!email || !name || !roleName) {
       return NextResponse.json(
@@ -130,6 +130,10 @@ export async function POST(req: Request) {
         department: department || 'Reception',
         shift: shift || 'Day',
         salary: salary ? Number(salary) : 0,
+        national_id: nationalId || null,
+        national_id_front: nationalIdFront || null,
+        national_id_back: nationalIdBack || null,
+        address: address || null,
       })
       .select()
       .single();
@@ -149,7 +153,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, roleName, name, phone, department, shift, salary, resendInvite } = body;
+    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, resendInvite } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Employee ID is required.' }, { status: 400 });
@@ -166,7 +170,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
     }
 
-    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined)) {
+    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined)) {
       const updates: Record<string, any> = {};
       if (roleName) {
         if (employee.employee_id === 'superadmin') {
@@ -190,6 +194,10 @@ export async function PATCH(req: Request) {
       if (department !== undefined) updates.department = department;
       if (shift !== undefined) updates.shift = shift;
       if (salary !== undefined) updates.salary = Number(salary);
+      if (nationalId !== undefined) updates.national_id = nationalId;
+      if (nationalIdFront !== undefined) updates.national_id_front = nationalIdFront;
+      if (nationalIdBack !== undefined) updates.national_id_back = nationalIdBack;
+      if (address !== undefined) updates.address = address;
 
       const { data: updatedEmp, error: updateError } = await supabaseServer
         .from('employee_accounts')
