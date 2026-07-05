@@ -11678,6 +11678,27 @@ export default function AdminPage() {
                     )}
                   </div>
 
+                  {/*
+                   * Dev Notes:
+                   * - Implementation: Will require an 'adjustments' table or a JSON column in reservations to store reasons and positive/negative values.
+                   *   The frontend will show a form modal allowing reception/finance staff to add credits/debits.
+                   * - Technical Caveat / Gap: Requires strict role permission audit checks (e.g. only 'finance' or 'superadmin' roles can apply adjustments).
+                   *   All changes must write an audit trail log in a ledger table.
+                   * - Last Updated: July 5, 2026 2:45 PM
+                   * - Milestone: Postponed / Phase 2
+                   * - Module: Bookings / Billing
+                   * - Parent Feature: Billing System
+                   * - Place: Booking Details drawer / Extra Adjustment Section
+                   * - End Dev: Pending DB Schema
+                   * - Priority: Medium
+                   * - Started Dev: July 5, 2026 2:00 PM
+                   * - Status: Locked
+                   * - Sub-Features: Empty
+                   * - User Role: Finance Manager / Superadmin
+                   * - What: Allows adding positive or negative financial adjustments to the base price of a booking.
+                   * - Where: Located inside the booking details drawer under 'Extra Adjustment'.
+                   * - Why: Handles manual discounts, on-the-fly custom service adjustments, or refunds without altering core service pricing.
+                   */}
                   <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">EXTRA ADJUSTMENT</p>
@@ -11753,6 +11774,26 @@ export default function AdminPage() {
                   </div>
 
                   {/* Products */}
+                  {/*
+                   * Dev Notes:
+                   * - Implementation: Needs a 'products' table for catalog inventory and a 'reservation_products' junction table.
+                   *   The frontend should use an inventory picker modal showing live stock count.
+                   * - Technical Caveat / Gap: Inventory sync is critical. Real-time depletion check on checkout prevents overselling.
+                   * - Last Updated: July 5, 2026 2:45 PM
+                   * - Milestone: Postponed / Phase 2
+                   * - Module: Inventory / Products
+                   * - Parent Feature: Products System
+                   * - Place: Booking Details drawer / Products Section
+                   * - End Dev: Pending DB Schema
+                   * - Priority: Medium
+                   * - Started Dev: July 5, 2026 2:00 PM
+                   * - Status: Locked
+                   * - Sub-Features: Live Inventory Picker, Stock Reconciliation
+                   * - User Role: Pharmacist / Receptionist
+                   * - What: Allows prescribing/linking retail skincare or medical products to a patient's booking invoice.
+                   * - Where: Located inside the booking details drawer under 'Products'.
+                   * - Why: Consolidates clinical services and related products into a single final invoice for the patient.
+                   */}
                   <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS</p>
@@ -11768,6 +11809,26 @@ export default function AdminPage() {
                   </div>
 
                   {/* Prescriptions */}
+                  {/*
+                   * Dev Notes:
+                   * - Implementation: Requires a 'prescriptions' table with foreign keys to doctor, patient, and reservation, plus a 'prescription_items' table.
+                   *   The frontend should present a clean autocomplete selector for medicines, dosage rules, and duration.
+                   * - Technical Caveat / Gap: Needs integration with a drugs database API or static dictionary, and validation for active substance overlaps.
+                   * - Last Updated: July 5, 2026 2:45 PM
+                   * - Milestone: Postponed / Phase 2
+                   * - Module: Medical / Clinical
+                   * - Parent Feature: E-Prescriptions System
+                   * - Place: Booking Details drawer / Prescriptions Section
+                   * - End Dev: Pending DB Schema
+                   * - Priority: High
+                   * - Started Dev: July 5, 2026 2:00 PM
+                   * - Status: Locked
+                   * - Sub-Features: Autocomplete Drug Search, PDF Exporter
+                   * - User Role: Doctor / Clinician
+                   * - What: Digital prescription builder for writing treatment plans and medical prescriptions.
+                   * - Where: Located inside the booking details drawer under 'Prescriptions'.
+                   * - Why: Digitizes clinical workflows and allows patient records to keep a history of prescribed items.
+                   */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-sm font-bold text-[#1F251A]">Prescriptions</p>
