@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { getDurationInMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot } from '@/lib/services';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -30,6 +31,8 @@ function mapRow(r: Record<string, any>) {
     customerId: r.customer_id ?? null,
     amountPaid: r.amount_paid ?? 0,
     amountLeft: r.amount_left ?? null,
+    roomId: r.room_id ?? null,
+    rooms: r.rooms || [],
   };
 }
 
@@ -50,7 +53,8 @@ export async function GET(req: Request) {
     if (status) q = q.eq('status', status);
     if (serviceId) q = q.eq('service_id', Number(serviceId));
     if (date) q = q.eq('date', date);
-    if (branchId) q = q.eq('branch_id', branchId);
+    // Include bookings that match this branch OR have no branch set (website bookings without branch)
+    if (branchId) q = q.or(`branch_id.eq.${branchId},branch_id.is.null`);
 
     const { data: rows, error } = await q;
 
@@ -134,6 +138,20 @@ export async function POST(req: Request) {
       console.error('Customer integration error:', custErr);
     }
 
+    // Fetch compatible rooms for this service
+    let compRoomIds: string[] = [];
+    try {
+      const { data: sRooms } = await supabaseServer
+        .from('service_rooms')
+        .select('room_id')
+        .eq('service_id', Number(serviceId));
+      if (sRooms && sRooms.length > 0) {
+        compRoomIds = sRooms.map((sr: any) => sr.room_id);
+      }
+    } catch (e) {
+      console.warn("Could not load service compatible rooms:", e);
+    }
+
     // 2. Insert reservation linked to customer
     const { data, error } = await supabaseServer
       .from('reservations')
@@ -153,6 +171,7 @@ export async function POST(req: Request) {
         amount_paid: body.amountPaid !== undefined ? Number(body.amountPaid) : 0,
         amount_left: body.amountLeft !== undefined ? Number(body.amountLeft) : null,
         doctor_name: doctorName || null,
+        rooms: compRoomIds,
       })
       .select()
       .single();
@@ -187,45 +206,154 @@ export async function PATCH(req: Request) {
     if (action === 'approve') {
       if (!timeSlot) return NextResponse.json({ error: 'Missing timeSlot' }, { status: 400 });
 
-      let bookedQuery = supabaseServer
-        .from('reservations')
-        .select('*', { count: 'exact', head: true })
-        .eq('service_id', target.service_id)
-        .eq('date', target.date)
-        .eq('status', 'approved');
+      // Get all active, available clinical rooms in this branch
+      let roomsQuery = supabaseServer
+        .from('rooms')
+        .select('id, name')
+        .eq('type', 'clinical')
+        .eq('status', 'available');
 
       if (target.branch_id) {
-        bookedQuery = bookedQuery.eq('branch_id', target.branch_id);
-      } else {
-        bookedQuery = bookedQuery.is('branch_id', null);
+        roomsQuery = roomsQuery.eq('branch_id', target.branch_id);
       }
 
-      const { count: bookedCount, error: countError1 } = await bookedQuery;
+      const { data: branchRooms, error: roomsError } = await roomsQuery;
+      if (roomsError) throw roomsError;
 
-      if (countError1) throw countError1;
-      if (Number(bookedCount || 0) >= 8) {
-        return NextResponse.json({ error: 'Day is fully booked' }, { status: 400 });
+      if (!branchRooms || branchRooms.length === 0) {
+        return NextResponse.json({ error: 'No active clinical rooms found for this branch.' }, { status: 400 });
       }
 
-      let slotQuery = supabaseServer
+      // Find compatible rooms for the service
+      const { data: mappedRooms, error: mappingError } = await supabaseServer
+        .from('service_rooms')
+        .select('room_id')
+        .eq('service_id', target.service_id);
+
+      if (mappingError) throw mappingError;
+
+      const mappedRoomIds = mappedRooms ? mappedRooms.map((mr: any) => mr.room_id) : [];
+      const serviceCompRooms = branchRooms.filter((r: any) => mappedRoomIds.includes(r.id));
+
+      if (serviceCompRooms.length === 0) {
+        return NextResponse.json({ error: 'No clinical rooms are configured to perform this service in this branch.' }, { status: 400 });
+      }
+
+      // Fetch target service duration
+      const { data: targetSvc, error: svcError } = await supabaseServer
+        .from('services')
+        .select('duration')
+        .eq('id', target.service_id)
+        .single();
+
+      if (svcError) throw svcError;
+
+      const targetDuration = targetSvc?.duration ? getDurationInMinutes(targetSvc.duration) : 30;
+      const targetSlotsCount = Math.ceil(targetDuration / 15);
+
+      const normSlot = normaliseTo24hSlot(timeSlot);
+      if (!normSlot) return NextResponse.json({ error: 'Invalid time slot format' }, { status: 400 });
+
+      const startIdx = ALL_15MIN_SLOTS.indexOf(normSlot);
+      if (startIdx === -1) return NextResponse.json({ error: 'Invalid time slot value' }, { status: 400 });
+
+      // Fetch all approved bookings for this date
+      const { data: dayBookings, error: bookingsError } = await supabaseServer
         .from('reservations')
-        .select('*', { count: 'exact', head: true })
-        .eq('service_id', target.service_id)
+        .select('id, room_id, time_slot, service_id')
         .eq('date', target.date)
         .eq('status', 'approved')
-        .eq('time_slot', timeSlot);
+        .not('room_id', 'is', null);
 
-      if (target.branch_id) {
-        slotQuery = slotQuery.eq('branch_id', target.branch_id);
-      } else {
-        slotQuery = slotQuery.is('branch_id', null);
+      if (bookingsError) throw bookingsError;
+
+      // Fetch all service durations to calculate overlap
+      const { data: allSvcs, error: allSvcsError } = await supabaseServer
+        .from('services')
+        .select('id, duration');
+
+      if (allSvcsError) throw allSvcsError;
+
+      const durationMap = new Map<number, number>();
+      if (allSvcs) {
+        allSvcs.forEach((s: any) => {
+          durationMap.set(s.id, getDurationInMinutes(s.duration));
+        });
       }
 
-      const { count: slotCount, error: countError2 } = await slotQuery;
+      // Determine which rooms are available (not occupied)
+      const availableRooms: { id: string; name: string }[] = [];
 
-      if (countError2) throw countError2;
-      if (Number(slotCount || 0) > 0) {
-        return NextResponse.json({ error: 'Time slot already taken' }, { status: 400 });
+      for (const room of serviceCompRooms) {
+        let roomOccupied = false;
+        const roomBookings = dayBookings ? dayBookings.filter((b: any) => b.room_id === room.id) : [];
+
+        for (const rb of roomBookings) {
+          const rbNorm = normaliseTo24hSlot(rb.time_slot);
+          if (!rbNorm) continue;
+          const rbStartIdx = ALL_15MIN_SLOTS.indexOf(rbNorm);
+          if (rbStartIdx === -1) continue;
+
+          const rbDuration = durationMap.get(rb.service_id) ?? 30;
+          const rbSlotsCount = Math.ceil(rbDuration / 15);
+
+          // Overlap condition:
+          if (rbStartIdx < startIdx + targetSlotsCount && startIdx < rbStartIdx + rbSlotsCount) {
+            roomOccupied = true;
+            break;
+          }
+        }
+
+        if (!roomOccupied) {
+          availableRooms.push(room);
+        }
+      }
+
+      if (availableRooms.length === 0) {
+        return NextResponse.json({ error: 'No clinical rooms are available at this time slot.' }, { status: 400 });
+      }
+
+      let chosenRoom = availableRooms[0];
+
+      // Priority algorithm: if more than 1 room is available, select the room with the fewest exclusive services
+      if (availableRooms.length > 1) {
+        const { data: allSR, error: allSRError } = await supabaseServer
+          .from('service_rooms')
+          .select('service_id, room_id');
+
+        if (allSRError) throw allSRError;
+
+        const serviceRoomCounts = new Map<number, number>();
+        if (allSR) {
+          allSR.forEach((sr: any) => {
+            const count = serviceRoomCounts.get(sr.service_id) ?? 0;
+            serviceRoomCounts.set(sr.service_id, count + 1);
+          });
+        }
+
+        const roomScores = new Map<string, number>();
+        availableRooms.forEach((room: any) => {
+          let exclusiveServices = 0;
+          if (allSR) {
+            allSR.forEach((sr: any) => {
+              if (sr.room_id === room.id) {
+                const mappedRoomsCount = serviceRoomCounts.get(sr.service_id) ?? 0;
+                if (mappedRoomsCount === 1) {
+                  exclusiveServices++;
+                }
+              }
+            });
+          }
+          roomScores.set(room.id, exclusiveServices);
+        });
+
+        availableRooms.sort((a: any, b: any) => {
+          const scoreA = roomScores.get(a.id) ?? 0;
+          const scoreB = roomScores.get(b.id) ?? 0;
+          return scoreA - scoreB;
+        });
+
+        chosenRoom = availableRooms[0];
       }
 
       const { data: updated, error: updateError } = await supabaseServer
@@ -233,7 +361,9 @@ export async function PATCH(req: Request) {
         .update({
           status: 'approved',
           time_slot: timeSlot,
-          doctor_name: doctorName || null
+          doctor_name: doctorName || null,
+          room_id: chosenRoom.id,
+          rooms: serviceCompRooms.map((r: any) => r.id)
         })
         .eq('id', id)
         .select()
@@ -241,7 +371,6 @@ export async function PATCH(req: Request) {
 
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
-
     } else if (action === 'reject') {
       const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')

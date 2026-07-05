@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { cachedFetch, prefetchUrl } from "@/lib/fetchCache";
 import { Category, ServiceItem, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -204,11 +205,20 @@ export function BookingModal() {
       .catch(() => {});
   }, []);
 
-  // Fetch availability for next 30 days when modal opens, service changes, or branch changes
+  // Prefetch 30-day availability the moment serviceId + branchId are known
+  // — fires BEFORE the user even clicks "Next", so the calendar is warm
+  useEffect(() => {
+    if (!serviceId) return;
+    const branchQuery = branchId ? `&branchId=${branchId}` : "";
+    const url = `/api/availability?serviceId=${serviceId}&days=30${branchQuery}`;
+    prefetchUrl(url, 30000);
+  }, [serviceId, branchId]);
+
+  // Consume the cached 30-day data when the user actually reaches step 2 (date picker)
   useEffect(() => {
     if (!open || !serviceId) return;
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    fetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}`).then(r => r.json()).then((data) => {
+    cachedFetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}`, 30000).then((data) => {
       const map: Record<string, number> = {};
       if (Array.isArray(data)) {
         data.forEach((d: { date: string; approvedCount: number; isAvailable?: boolean }) => { 
@@ -220,6 +230,14 @@ export function BookingModal() {
       setDisabledDates(map);
     }).catch(()=>{});
   }, [open, serviceId, branchId]);
+
+  // Prefetch slots for the currently selected date so step 3 renders instantly
+  useEffect(() => {
+    if (!serviceId || !selectedDate) return;
+    const date = toLocalDateStr(selectedDate);
+    const branchQuery = branchId ? `&branchId=${branchId}` : "";
+    prefetchUrl(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}`, 5000);
+  }, [serviceId, selectedDate, branchId]);
 
   // Fetch taken time slots for a single selected date and calculate duration-based availability
   useEffect(() => {
@@ -235,59 +253,18 @@ export function BookingModal() {
     }
     const date = toLocalDateStr(selectedDate);
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    fetch(`/api/reservations?date=${date}&status=approved${branchQuery}`)
-      .then(r=>r.json())
-      .then((list)=>{
+    cachedFetch(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}`, 5000)
+      .then((data) => {
         if (active) {
-          if (Array.isArray(list)) {
-            setReservationsForDate(list);
-
-            const serviceReservations = list.filter((r: any) => r.serviceId === serviceId);
-            const targetDuration = getDurationInMinutes(selectedService?.duration);
-            const targetSlotsNeeded = Math.ceil(targetDuration / 15);
-            
-            const occupied = new Array(ALL_15MIN_SLOTS.length).fill(false);
-            
-            for (const res of serviceReservations) {
-              if (!res.timeSlot) continue;
-              const norm = normaliseTo24hSlot(res.timeSlot);
-              if (norm) {
-                const idx = ALL_15MIN_SLOTS.indexOf(norm);
-                if (idx >= 0) {
-                  const resService = dynamicServices.find(s => s.id === res.serviceId);
-                  const resDuration = getDurationInMinutes(resService?.duration);
-                  const resSlotsOccupied = Math.ceil(resDuration / 15);
-                  for (let k = 0; k < resSlotsOccupied; k++) {
-                    if (idx + k < occupied.length) {
-                      occupied[idx + k] = true;
-                    }
-                  }
-                }
-              }
-            }
-            
-            const unavailable: string[] = [];
-            for (let i = 0; i < ALL_15MIN_SLOTS.length; i++) {
-              let fit = true;
-              for (let k = 0; k < targetSlotsNeeded; k++) {
-                if (i + k >= occupied.length || occupied[i + k]) {
-                  fit = false;
-                  break;
-                }
-              }
-              if (!fit) {
-                unavailable.push(ALL_15MIN_SLOTS[i]);
-              }
-            }
-            setTakenSlots(unavailable);
+          if (data && Array.isArray(data.unavailableSlots)) {
+            setTakenSlots(data.unavailableSlots);
           } else {
-            console.error("Fetch reservations expected array, got", list);
             setTakenSlots([]);
-            setReservationsForDate([]);
           }
+          setReservationsForDate([]);
         }
       })
-      .catch(()=>{
+      .catch(() => {
         if (active) {
           setTakenSlots([]);
           setReservationsForDate([]);
@@ -325,6 +302,30 @@ export function BookingModal() {
     const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const weekdayName = weekdays[date.getDay()];
     
+    // Get clinic-wide service hours from page settings / translation context
+    const clinicDay = t.footer?.serviceHours?.find(
+      (sh: any) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
+    );
+
+    let clinicStartMins = 9 * 60; // 09:00 default
+    let clinicEndMins = 20 * 60;  // 20:00 default
+    let clinicClosed = false;
+
+    if (clinicDay) {
+      if (!clinicDay.isOpen) {
+        clinicClosed = true;
+      } else {
+        const [csh, csm] = clinicDay.openTime.split(":").map(Number);
+        const [ceh, cem] = clinicDay.closeTime.split(":").map(Number);
+        clinicStartMins = csh * 60 + csm;
+        clinicEndMins = ceh * 60 + cem;
+      }
+    }
+
+    if (clinicClosed) {
+      return { start: "23:59", end: "23:59" }; // clinic closed
+    }
+
     let minStart = 24 * 60; // in minutes
     let maxEnd = 0; // in minutes
     let found = false;
@@ -351,14 +352,18 @@ export function BookingModal() {
           found = true;
         }
       } else {
-        if (9 * 60 < minStart) minStart = 9 * 60;
-        if (20 * 60 > maxEnd) maxEnd = 20 * 60;
+        if (clinicStartMins < minStart) minStart = clinicStartMins;
+        if (clinicEndMins > maxEnd) maxEnd = clinicEndMins;
         found = true;
       }
     });
 
-    if (!found) {
-      return { start: "09:00", end: "20:00" };
+    if (found) {
+      if (minStart < clinicStartMins) minStart = clinicStartMins;
+      if (maxEnd > clinicEndMins) maxEnd = clinicEndMins;
+    } else {
+      minStart = clinicStartMins;
+      maxEnd = clinicEndMins;
     }
 
     const formatMins = (totalMins: number) => {
@@ -371,7 +376,7 @@ export function BookingModal() {
       start: formatMins(minStart),
       end: formatMins(maxEnd)
     };
-  }, [doctors, branchId, selectedService]);
+  }, [doctors, branchId, selectedService, t]);
 
   const getAvailableDoctors = useCallback(() => {
     if (!selectedDate || !selectedTime || !selectedService) return [];

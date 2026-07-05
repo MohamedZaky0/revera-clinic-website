@@ -11,6 +11,7 @@ import {
   getDynamicCategories, 
   LocalCategory 
 } from "@/lib/serviceStore";
+import { prefetchUrl } from "@/lib/fetchCache";
 
 // ── Service categories and items for Revera Clinics
 
@@ -210,7 +211,9 @@ function ServiceCard({ service, lang, descText, isRTL }: ServiceCardProps) {
           onClick={() => {
             window.dispatchEvent(new CustomEvent("open-booking", { detail: { serviceId: service.id } }));
           }}
-          onMouseEnter={() => {
+          onMouseEnter={(e) => {
+            // Prefetch availability on hover so it's cached before user clicks
+            prefetchUrl(`/api/availability?serviceId=${service.id}&days=30`, 30000);
             setShowCursor(true);
             if (typeof document !== 'undefined') {
               document.body.classList.add('hide-global-cursor');

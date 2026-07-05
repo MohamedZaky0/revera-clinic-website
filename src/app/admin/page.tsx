@@ -71,7 +71,11 @@ import {
   GripVertical,
   X,
   ListOrdered,
+  DoorOpen,
 } from "lucide-react";
+import RoomsManagerView from "@/components/RoomsManagerView";
+import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
+import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
 
 type Req = {
   id: string;
@@ -438,8 +442,19 @@ const PERMISSION_STRUCTURE = [
 ];
 
 export default function AdminPage() {
+  const { showConfirm } = useAlertConfirm();
   // Auth state
   const [session, setSession] = useState<any>(null);
+  // Rooms state
+  const [rooms, setRooms] = useState<any[]>([]);
+
+  function fetchRooms() {
+    cachedFetch("/api/rooms", 5000)
+      .then(data => {
+        setRooms(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setRooms([]));
+  }
   const [authChecking, setAuthChecking] = useState(true);
   const lastActivityRef = useRef<number>(Date.now());
   const [adminRole, setAdminRole] = useState<string | null>(null);
@@ -537,6 +552,16 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Req | null>(null);
   const [viewingBooking, setViewingBooking] = useState<Req | null>(null);
+  const [dayBookingsSelector, setDayBookingsSelector] = useState<{
+    open: boolean;
+    date: string;
+    bookings: any[];
+  }>({
+    open: false,
+    date: "",
+    bookings: [],
+  });
+  const [loadingApproveId, setLoadingApproveId] = useState<string | null>(null);
   const [doctorName, setDoctorName] = useState<string>("Dr. Sara El Gamel");
   const [slot, setSlot] = useState<string>("12:00");
   const [activeNav, setActiveNav] = useState("Bookings");
@@ -1132,19 +1157,12 @@ export default function AdminPage() {
     console.log("RBAC - fetchRolesAndEmployees called!");
     setLoadingRolesAndEmployees(true);
     try {
-      const [rolesRes, empsRes] = await Promise.all([
-        fetch('/api/roles'),
-        fetch('/api/employees')
+      const [roles, emps] = await Promise.all([
+        cachedFetch('/api/roles', 10000),
+        cachedFetch('/api/employees', 10000)
       ]);
-
-      if (rolesRes.ok) {
-        const roles = await rolesRes.json();
-        setRolesList(roles);
-      }
-      if (empsRes.ok) {
-        const emps = await empsRes.json();
-        setEmployeesList(emps);
-      }
+      setRolesList(roles);
+      setEmployeesList(emps);
     } catch (err) {
       console.error("Error loading roles and employees:", err);
     } finally {
@@ -1243,7 +1261,7 @@ export default function AdminPage() {
   }
 
   async function handleDeleteRole(name: string) {
-    if (!confirm(`Are you sure you want to delete the role '${name}'? This will disconnect employee accounts assigned to this role.`)) return;
+    if (!(await showConfirm(`Are you sure you want to delete the role '${name}'? This will disconnect employee accounts assigned to this role.`))) return;
     try {
       const res = await fetch(`/api/roles?name=${encodeURIComponent(name)}`, {
         method: 'DELETE'
@@ -1286,6 +1304,7 @@ export default function AdminPage() {
         setNewEmployeeName("");
         setNewEmployeeRole("");
         setEmployeeCreateSuccess(`Invitation sent to ${newEmployeeEmail.trim()}! They will receive an email to set their password.`);
+        clearFetchCache();
         fetchRolesAndEmployees();
         setTimeout(() => setEmployeeCreateSuccess(""), 6000);
       } else {
@@ -1298,12 +1317,13 @@ export default function AdminPage() {
   }
 
   async function handleDeleteEmployee(id: string) {
-    if (!confirm("Are you sure you want to delete this employee account? They will lose access to the admin panel immediately.")) return;
+    if (!(await showConfirm("Are you sure you want to delete this employee account? They will lose access to the admin panel immediately."))) return;
     try {
       const res = await fetch(`/api/employees?id=${encodeURIComponent(id)}`, {
         method: 'DELETE'
       });
       if (res.ok) {
+        clearFetchCache();
         fetchRolesAndEmployees();
       } else {
         const data = await res.json();
@@ -1315,7 +1335,7 @@ export default function AdminPage() {
   }
 
   async function handleResendInvitation(id: string) {
-    if (!confirm("Resend the invitation email to this employee? Their old invite link will be invalidated.")) return;
+    if (!(await showConfirm("Resend the invitation email to this employee? Their old invite link will be invalidated."))) return;
     try {
       const res = await fetch('/api/employees', {
         method: 'PATCH',
@@ -1699,125 +1719,7 @@ export default function AdminPage() {
       setDoctorName("");
     }
   }, [availableDoctorsApprove, doctorName, selected]);
-  
-  const getDayOperatingHoursAdmin = useCallback((dateStr: string | null) => {
-    if (!dateStr || !newPatientService) return { start: "09:00", end: "20:00" };
-    const dateObj = new Date(dateStr);
-    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
 
-    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const weekdayName = weekdays[dateObj.getDay()];
-    
-    const targetService = localServices.find(s => s.id === newPatientService);
-    if (!targetService) return { start: "09:00", end: "20:00" };
-
-    let minStart = 24 * 60; // in minutes
-    let maxEnd = 0; // in minutes
-    let found = false;
-
-    providers.forEach((doc) => {
-      // Check branch
-      if (newPatientBranch && doc.branchId && doc.branchId !== newPatientBranch) return;
-      
-      // Check service
-      if (doc.services && doc.services.length > 0) {
-        if (!doc.services.includes(targetService.en)) return;
-      }
-
-      // Check working days & hours
-      if (doc.workingDaysHours) {
-        const dayConfig = doc.workingDaysHours[weekdayName];
-        if (dayConfig && dayConfig.isOpen) {
-          const [sh, sm] = dayConfig.start.split(":").map(Number);
-          const [eh, em] = dayConfig.end.split(":").map(Number);
-          const startMins = sh * 60 + sm;
-          const endMins = eh * 60 + em;
-          if (startMins < minStart) minStart = startMins;
-          if (endMins > maxEnd) maxEnd = endMins;
-          found = true;
-        }
-      } else {
-        if (9 * 60 < minStart) minStart = 9 * 60;
-        if (20 * 60 > maxEnd) maxEnd = 20 * 60;
-        found = true;
-      }
-    });
-
-    if (!found) {
-      return { start: "09:00", end: "20:00" };
-    }
-
-    const formatMins = (totalMins: number) => {
-      const h = Math.floor(totalMins / 60);
-      const m = totalMins % 60;
-      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    };
-
-    return {
-      start: formatMins(minStart),
-      end: formatMins(maxEnd)
-    };
-  }, [providers, newPatientBranch, newPatientService, localServices]);
-
-  const getDayOperatingHoursApprove = useCallback((selectedReq: Req | null) => {
-    if (!selectedReq) return { start: "09:00", end: "20:00" };
-    const dateStr = selectedReq.date;
-    const dateObj = new Date(dateStr);
-    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
-
-    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const weekdayName = weekdays[dateObj.getDay()];
-    
-    const targetService = localServices.find(s => s.id === selectedReq.serviceId);
-    if (!targetService) return { start: "09:00", end: "20:00" };
-
-    let minStart = 24 * 60; // in minutes
-    let maxEnd = 0; // in minutes
-    let found = false;
-
-    providers.forEach((doc) => {
-      // Check branch
-      if (selectedReq.branchId && doc.branchId && doc.branchId !== selectedReq.branchId) return;
-      
-      // Check service
-      if (doc.services && doc.services.length > 0) {
-        if (!doc.services.includes(targetService.en)) return;
-      }
-
-      // Check working days & hours
-      if (doc.workingDaysHours) {
-        const dayConfig = doc.workingDaysHours[weekdayName];
-        if (dayConfig && dayConfig.isOpen) {
-          const [sh, sm] = dayConfig.start.split(":").map(Number);
-          const [eh, em] = dayConfig.end.split(":").map(Number);
-          const startMins = sh * 60 + sm;
-          const endMins = eh * 60 + em;
-          if (startMins < minStart) minStart = startMins;
-          if (endMins > maxEnd) maxEnd = endMins;
-          found = true;
-        }
-      } else {
-        if (9 * 60 < minStart) minStart = 9 * 60;
-        if (20 * 60 > maxEnd) maxEnd = 20 * 60;
-        found = true;
-      }
-    });
-
-    if (!found) {
-      return { start: "09:00", end: "20:00" };
-    }
-
-    const formatMins = (totalMins: number) => {
-      const h = Math.floor(totalMins / 60);
-      const m = totalMins % 60;
-      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    };
-
-    return {
-      start: formatMins(minStart),
-      end: formatMins(maxEnd)
-    };
-  }, [providers, localServices]);
 
   // Custom provider modal states
   const [showProviderModal, setShowProviderModal] = useState(false);
@@ -1870,13 +1772,13 @@ export default function AdminPage() {
   const [savingBranch, setSavingBranch] = useState(false);
   const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
   const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
-    { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "10:00", closeTime: "20:00" },
-    { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+    { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+    { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
   ]);  const [pageSettingsLangTab, setPageSettingsLangTab] = useState<"en" | "ar">("en");
   const [aboutImage1, setAboutImage1] = useState<string>("");
   const [aboutImage2, setAboutImage2] = useState<string>("");
@@ -1992,6 +1894,180 @@ export default function AdminPage() {
     }));
   }
 
+  const getDayOperatingHoursAdmin = useCallback((dateStr: string | null) => {
+    if (!dateStr || !newPatientService) return { start: "09:00", end: "20:00" };
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
+
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[dateObj.getDay()];
+
+    const clinicDay = serviceHours.find(
+      (sh) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
+    );
+
+    let clinicStartMins = 9 * 60; // 09:00 default
+    let clinicEndMins = 20 * 60;  // 20:00 default
+    let clinicClosed = false;
+
+    if (clinicDay) {
+      if (!clinicDay.isOpen) {
+        clinicClosed = true;
+      } else {
+        const [csh, csm] = clinicDay.openTime.split(":").map(Number);
+        const [ceh, cem] = clinicDay.closeTime.split(":").map(Number);
+        clinicStartMins = csh * 60 + csm;
+        clinicEndMins = ceh * 60 + cem;
+      }
+    }
+
+    if (clinicClosed) {
+      return { start: "23:59", end: "23:59" };
+    }
+    
+    const targetService = localServices.find(s => s.id === newPatientService);
+    if (!targetService) return { start: "09:00", end: "20:00" };
+
+    let minStart = 24 * 60; // in minutes
+    let maxEnd = 0; // in minutes
+    let found = false;
+
+    providers.forEach((doc) => {
+      // Check branch
+      if (newPatientBranch && doc.branchId && doc.branchId !== newPatientBranch) return;
+      
+      // Check service
+      if (doc.services && doc.services.length > 0) {
+        if (!doc.services.includes(targetService.en)) return;
+      }
+
+      // Check working days & hours
+      if (doc.workingDaysHours) {
+        const dayConfig = doc.workingDaysHours[weekdayName];
+        if (dayConfig && dayConfig.isOpen) {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          if (startMins < minStart) minStart = startMins;
+          if (endMins > maxEnd) maxEnd = endMins;
+          found = true;
+        }
+      } else {
+        if (clinicStartMins < minStart) minStart = clinicStartMins;
+        if (clinicEndMins > maxEnd) maxEnd = clinicEndMins;
+        found = true;
+      }
+    });
+
+    if (found) {
+      if (minStart < clinicStartMins) minStart = clinicStartMins;
+      if (maxEnd > clinicEndMins) maxEnd = clinicEndMins;
+    } else {
+      minStart = clinicStartMins;
+      maxEnd = clinicEndMins;
+    }
+
+    const formatMins = (totalMins: number) => {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    return {
+      start: formatMins(minStart),
+      end: formatMins(maxEnd)
+    };
+  }, [providers, newPatientBranch, newPatientService, localServices, serviceHours]);
+
+  const getDayOperatingHoursApprove = useCallback((selectedReq: Req | null) => {
+    if (!selectedReq) return { start: "09:00", end: "20:00" };
+    const dateStr = selectedReq.date;
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
+
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[dateObj.getDay()];
+
+    const clinicDay = serviceHours.find(
+      (sh) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
+    );
+
+    let clinicStartMins = 9 * 60; // 09:00 default
+    let clinicEndMins = 20 * 60;  // 20:00 default
+    let clinicClosed = false;
+
+    if (clinicDay) {
+      if (!clinicDay.isOpen) {
+        clinicClosed = true;
+      } else {
+        const [csh, csm] = clinicDay.openTime.split(":").map(Number);
+        const [ceh, cem] = clinicDay.closeTime.split(":").map(Number);
+        clinicStartMins = csh * 60 + csm;
+        clinicEndMins = ceh * 60 + cem;
+      }
+    }
+
+    if (clinicClosed) {
+      return { start: "23:59", end: "23:59" };
+    }
+    
+    const targetService = localServices.find(s => s.id === selectedReq.serviceId);
+    if (!targetService) return { start: "09:00", end: "20:00" };
+
+    let minStart = 24 * 60; // in minutes
+    let maxEnd = 0; // in minutes
+    let found = false;
+
+    providers.forEach((doc) => {
+      // Check branch
+      if (selectedReq.branchId && doc.branchId && doc.branchId !== selectedReq.branchId) return;
+      
+      // Check service
+      if (doc.services && doc.services.length > 0) {
+        if (!doc.services.includes(targetService.en)) return;
+      }
+
+      // Check working days & hours
+      if (doc.workingDaysHours) {
+        const dayConfig = doc.workingDaysHours[weekdayName];
+        if (dayConfig && dayConfig.isOpen) {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          if (startMins < minStart) minStart = startMins;
+          if (endMins > maxEnd) maxEnd = endMins;
+          found = true;
+        }
+      } else {
+        if (clinicStartMins < minStart) minStart = clinicStartMins;
+        if (clinicEndMins > maxEnd) maxEnd = clinicEndMins;
+        found = true;
+      }
+    });
+
+    if (found) {
+      if (minStart < clinicStartMins) minStart = clinicStartMins;
+      if (maxEnd > clinicEndMins) maxEnd = clinicEndMins;
+    } else {
+      minStart = clinicStartMins;
+      maxEnd = clinicEndMins;
+    }
+
+    const formatMins = (totalMins: number) => {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    return {
+      start: formatMins(minStart),
+      end: formatMins(maxEnd)
+    };
+  }, [providers, localServices, serviceHours]);
+
+
   // Derive unique customers from database
   const customers = useMemo<Customer[]>(() => {
     const now = new Date();
@@ -2043,9 +2119,12 @@ export default function AdminPage() {
       return `${year}-${month}-${day}`;
     };
     const todayStr = getLocalDateString(new Date());
-    return allReservations.filter(
-      r => String(r.date).slice(0, 10) === todayStr && ['approved', 'confirmed', 'started', 'completed'].includes(r.status)
-    ).length;
+    const ALL_ACTIVE = ['approved', 'confirmed', 'started', 'completed', 'pending'];
+    const todays = allReservations.filter(
+      r => String(r.date).slice(0, 10) === todayStr && ALL_ACTIVE.includes(r.status)
+    );
+    console.log('[Today Bookings] todayStr:', todayStr, '| all reservation dates:', allReservations.map(r => `${String(r.date).slice(0,10)}(${r.status})`));
+    return todays.length;
   }, [allReservations]);
 
   const comingAppointmentsCount = useMemo(() => {
@@ -2125,15 +2204,13 @@ export default function AdminPage() {
   }, [customers, customerSearch, customerFilterGender, customerFilterStatus, customerFilterReferral]);
 
   useEffect(() => {
-    fetchRequests();
-    fetchAllReservations();
     fetchCustomers();
     fetchPageSettings();
     fetchProviders();
+    fetchRooms();
     // Fetch branches and set default branch
     setLoadingBranches(true);
-    fetch("/api/branches")
-      .then(r => r.json())
+    cachedFetch("/api/branches", 30000)
       .then(data => {
         const list: Branch[] = Array.isArray(data) ? data : [];
         setBranches(list);
@@ -2149,11 +2226,39 @@ export default function AdminPage() {
     });
   }, [activeNav]);
 
-  // Re-fetch bookings whenever branch selection changes
+  // Re-fetch bookings whenever branch selection changes and poll every 2 seconds for new requests
   useEffect(() => {
     if (!branch) return; // wait until branches are loaded
-    fetchRequests();
-    fetchAllReservations();
+
+    let isMounted = true;
+    let timerId: NodeJS.Timeout;
+
+    const poll = async () => {
+      try {
+        // Clear specific endpoints cache entries to force fresh server response
+        clearFetchCache(`/api/reservations?status=pending&branchId=${branch}`);
+        clearFetchCache(`/api/reservations?branchId=${branch}`);
+        
+        await Promise.all([
+          fetchRequests() || Promise.resolve(),
+          fetchAllReservations() || Promise.resolve()
+        ]);
+      } catch (err) {
+        console.error("Polling error:", err);
+      } finally {
+        if (isMounted) {
+          // Schedule next poll in 2 seconds after the current fetches complete
+          timerId = setTimeout(poll, 2000);
+        }
+      }
+    };
+
+    poll();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timerId);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branch]);
 
@@ -2179,14 +2284,14 @@ export default function AdminPage() {
       return;
     }
     const branchQuery = newPatientBranch ? `&branchId=${newPatientBranch}` : "";
-    fetch(`/api/reservations?serviceId=${newPatientService}&date=${newPatientDate}&status=approved${branchQuery}`, { cache: "no-store" })
+    fetch(`/api/availability?date=${newPatientDate}&serviceId=${newPatientService}${branchQuery}`, { cache: "no-store" })
       .then(r => r.json())
-      .then(list => {
-        if (Array.isArray(list)) {
-          const unavailable = getUnavailableSlots(list, Number(newPatientService));
+      .then(data => {
+        if (data && Array.isArray(data.unavailableSlots)) {
+          const { start, end } = getDayOperatingHoursAdmin(newPatientDate);
+          const unavailable = data.unavailableSlots;
           setManualUnavailableSlots(unavailable);
           // Auto-select first available slot if current is unavailable, empty, or outside operating hours
-          const { start, end } = getDayOperatingHoursAdmin(newPatientDate);
           const filteredSlots = SLOTS.filter((s) => {
             const norm = normaliseTo24hSlot(s) ?? "";
             return norm >= start && norm < end;
@@ -2206,8 +2311,7 @@ export default function AdminPage() {
   }, [showAddBookingModal, newPatientService, newPatientDate, newPatientBranch]);
 
   function fetchProviders() {
-    fetch("/api/providers", { cache: "no-store" })
-      .then((res) => res.json())
+    cachedFetch("/api/providers", 10000)
       .then((data) => {
         if (Array.isArray(data)) {
           setProviders(data);
@@ -2287,13 +2391,13 @@ export default function AdminPage() {
     setProviderFormBranchId(branches.length > 0 ? branches[0].id : "");
     setProviderFormStartDate("");
     setProviderFormWorkingDaysHours({
-      Sunday: { isOpen: false, start: "10:00", end: "20:00" },
-      Monday: { isOpen: false, start: "10:00", end: "20:00" },
-      Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
-      Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
-      Thursday: { isOpen: false, start: "10:00", end: "20:00" },
-      Friday: { isOpen: false, start: "10:00", end: "20:00" },
-      Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
+      Monday: { isOpen: false, start: "09:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
+      Friday: { isOpen: false, start: "09:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
     });
     setShowProviderModal(true);
   }
@@ -2314,13 +2418,13 @@ export default function AdminPage() {
     setProviderFormBranchId(provider.branchId || "");
     setProviderFormStartDate(provider.startDate || "");
     setProviderFormWorkingDaysHours(provider.workingDaysHours || {
-      Sunday: { isOpen: false, start: "10:00", end: "20:00" },
-      Monday: { isOpen: false, start: "10:00", end: "20:00" },
-      Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
-      Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
-      Thursday: { isOpen: false, start: "10:00", end: "20:00" },
-      Friday: { isOpen: false, start: "10:00", end: "20:00" },
-      Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
+      Monday: { isOpen: false, start: "09:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
+      Friday: { isOpen: false, start: "09:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
     });
     setShowProviderModal(true);
   }
@@ -2377,9 +2481,9 @@ export default function AdminPage() {
       });
   }
 
-  function handleDeleteProvider(id: string) {
+  async function handleDeleteProvider(id: string) {
     if (!id) return;
-    if (confirm("Are you sure you want to delete this provider?")) {
+    if (await showConfirm("Are you sure you want to delete this provider?")) {
       fetch(`/api/providers?id=${id}`, {
         method: "DELETE"
       })
@@ -2401,8 +2505,7 @@ export default function AdminPage() {
 
   function fetchPageSettings() {
     setLoadingPageSettings(true);
-    fetch("/api/page-settings", { cache: "no-store" })
-      .then((r) => r.json())
+    cachedFetch("/api/page-settings", 15000)
       .then((data) => {
         if (data) {
           setHomeHeroSlides(data.hero?.slides || []);
@@ -2689,6 +2792,7 @@ export default function AdminPage() {
       });
       if (res.ok) {
         alert("Homepage settings saved successfully! Check the public website homepage to see changes.");
+        clearFetchCache();
         fetchPageSettings();
       } else {
         alert("Failed to save settings. Please try again.");
@@ -2744,12 +2848,12 @@ export default function AdminPage() {
     setHomeHeroSlidesAr([...homeHeroSlidesAr, newArSlide]);
   };
 
-  const handleDeleteSlide = (index: number) => {
+  const handleDeleteSlide = async (index: number) => {
     console.log("handleDeleteSlide called for index:", index);
     console.log("Current English slides count:", homeHeroSlides.length);
     console.log("Current Arabic slides count:", homeHeroSlidesAr.length);
     
-    if (confirm("Are you sure you want to delete this slide?")) {
+    if (await showConfirm("Are you sure you want to delete this slide?")) {
       const newEn = homeHeroSlides.filter((_, i) => i !== index);
       const newAr = homeHeroSlidesAr.filter((_, i) => i !== index);
       
@@ -2791,8 +2895,7 @@ export default function AdminPage() {
   function fetchRequests() {
     setLoading(true);
     const branchParam = branch ? `&branchId=${branch}` : "";
-    fetch(`/api/reservations?status=pending${branchParam}`, { cache: "no-store" })
-      .then((r) => r.json())
+    return cachedFetch(`/api/reservations?status=pending${branchParam}`, 2000)
       .then((data) => {
         if (Array.isArray(data)) {
           setRequests(data);
@@ -2826,8 +2929,7 @@ export default function AdminPage() {
 
   function fetchCustomers() {
     setLoadingCustomers(true);
-    fetch("/api/customers", { cache: "no-store" })
-      .then((r) => r.json())
+    cachedFetch("/api/customers", 4000)
       .then((data) => {
         if (Array.isArray(data)) {
           setDbCustomers(data);
@@ -3288,13 +3390,10 @@ export default function AdminPage() {
 
   function fetchAllReservations() {
     const branchParam = branch ? `?branchId=${branch}` : "";
-    fetch(`/api/reservations${branchParam}`, { cache: "no-store" })
-      .then((r) => r.json())
+    return cachedFetch(`/api/reservations${branchParam}`, 2000)
       .then((data) => {
         if (Array.isArray(data)) {
           setAllReservations(data);
-          // Keep customer profiles in sync
-          fetchCustomers();
         } else {
           console.error("fetchAllReservations: expected array, got", data);
           setAllReservations([]);
@@ -3311,7 +3410,7 @@ export default function AdminPage() {
     }
   }
 
-  function getUnavailableSlots(approvedBookings: Req[], targetServiceId: number): string[] {
+  function getUnavailableSlots(approvedBookings: Req[], targetServiceId: number, end?: string): string[] {
     const svc = localServices.find(s => s.id === targetServiceId);
     const targetDuration = getDurationInMinutes(svc?.duration);
     const targetSlotsNeeded = Math.ceil(targetDuration / 15);
@@ -3338,7 +3437,12 @@ export default function AdminPage() {
     for (let i = 0; i < ALL_15MIN_SLOTS.length; i++) {
       let fit = true;
       for (let k = 0; k < targetSlotsNeeded; k++) {
-        if (i + k >= occupied.length || occupied[i + k]) {
+        const slotIdx = i + k;
+        if (slotIdx >= occupied.length || occupied[slotIdx]) {
+          fit = false;
+          break;
+        }
+        if (end && ALL_15MIN_SLOTS[slotIdx] >= end) {
           fit = false;
           break;
         }
@@ -3351,19 +3455,26 @@ export default function AdminPage() {
   }
 
   async function openApprove(r: Req) {
-    setSelected(r);
-    const qs = `serviceId=${r.serviceId}&date=${r.date}&status=approved`;
-    const taken = await fetch("/api/reservations?" + qs).then((res) => res.json());
-    const unavailable = getUnavailableSlots(Array.isArray(taken) ? taken : [], r.serviceId);
-    setApproveUnavailableSlots(unavailable);
-    const { start, end } = getDayOperatingHoursApprove(r);
-    const filteredSlots = SLOTS.filter((s) => {
-      const norm = normaliseTo24hSlot(s) ?? "";
-      return norm >= start && norm < end;
-    });
-    const first = filteredSlots.find((s) => !unavailable.includes(s)) || filteredSlots[0] || SLOTS[0];
-    setSlot(first);
-    setDoctorName("Dr. Sara El Gamel");
+    setLoadingApproveId(r.id);
+    try {
+      const branchParam = r.branchId ? `&branchId=${r.branchId}` : "";
+      const data = await fetch(`/api/availability?date=${r.date}&serviceId=${r.serviceId}${branchParam}`).then((res) => res.json());
+      const { start, end } = getDayOperatingHoursApprove(r);
+      const unavailable = data && Array.isArray(data.unavailableSlots) ? data.unavailableSlots : [];
+      setApproveUnavailableSlots(unavailable);
+      const filteredSlots = SLOTS.filter((s) => {
+        const norm = normaliseTo24hSlot(s) ?? "";
+        return norm >= start && norm < end;
+      });
+      const first = filteredSlots.find((s) => !unavailable.includes(s)) || filteredSlots[0] || SLOTS[0];
+      setSlot(first);
+      setDoctorName("Dr. Sara El Gamel");
+      setSelected(r);
+    } catch (err) {
+      console.error("openApprove error:", err);
+    } finally {
+      setLoadingApproveId(null);
+    }
   }
 
   async function approve() {
@@ -3379,6 +3490,7 @@ export default function AdminPage() {
     const json = await res.json();
     if (!res.ok) alert(json.error || "Failed");
     setSelected(null);
+    clearFetchCache();
     fetchRequests();
     fetchAllReservations();
   }
@@ -3479,6 +3591,7 @@ export default function AdminPage() {
       setNewPatientStatus("approved");
 
       setShowAddBookingModal(false);
+      clearFetchCache();
       fetchRequests();
       fetchAllReservations();
       alert("Manual booking created successfully!");
@@ -3701,6 +3814,7 @@ export default function AdminPage() {
                           { label: "Profile", icon: User, perm: "settings.profile" },
                           { label: "Service Hours", icon: Clock, perm: "settings.service_hours" },
                           { label: "Branches", icon: MapIcon, perm: "settings.branches" },
+                          { label: "Rooms", icon: DoorOpen, perm: "settings.rooms" },
                           { label: "Booking Settings", icon: CalendarDays, perm: "settings.booking_settings" },
                           { label: "Notification Settings", icon: Bell, perm: "settings.notification" },
                           { label: "Queue Settings", icon: ListOrdered, perm: "settings.queue" },
@@ -4382,9 +4496,9 @@ export default function AdminPage() {
                       }`}
                     >
                       {/* Category header row */}
-                      <button
+                      <div
                         onClick={() => toggleCategoryExpand(cat.key)}
-                        className="flex w-full items-center justify-between gap-4 px-5 py-4 transition hover:bg-[#F9F9F7]"
+                        className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 transition hover:bg-[#F9F9F7]"
                       >
                         <div className="flex items-center gap-3">
                           {/* Category Drag Handle */}
@@ -4444,7 +4558,7 @@ export default function AdminPage() {
                             <ChevronDown size={18} />
                           </span>
                         </div>
-                      </button>
+                      </div>
 
                       {/* Services sub-table */}
                       {isExpanded && (
@@ -7802,8 +7916,8 @@ export default function AdminPage() {
                               <div className="flex items-center justify-between border-b border-[#414E36]/8 pb-2">
                                 <h4 className="font-bold text-[#414E36] text-sm">Result Case #{index + 1}</h4>
                                 <button
-                                  onClick={() => {
-                                    if (confirm("Are you sure you want to delete this result case?")) {
+                                  onClick={async () => {
+                                    if (await showConfirm("Are you sure you want to delete this result case?")) {
                                       const updated = beforeAfterPairs.filter((_, i) => i !== index);
                                       setBeforeAfterPairs(updated);
                                       savePageSettings({ results: { pairs: updated } });
@@ -9233,7 +9347,7 @@ export default function AdminPage() {
                           >Edit</button>
                           <button
                             onClick={async () => {
-                              if (!confirm(`Delete "${br.name_en}"?`)) return;
+                              if (!(await showConfirm(`Delete "${br.name_en}"?`))) return;
                               setDeletingBranchId(br.id);
                               await fetch(`/api/branches?id=${br.id}`, { method: "DELETE" });
                               setBranches(prev => prev.filter(b => b.id !== br.id));
@@ -9329,6 +9443,13 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
+          )}
+          {activeNav === "Rooms" && (
+            <RoomsManagerView
+              branches={branches}
+              services={localServices}
+              selectedBranchId={branch}
+            />
           )}
           {activeNav === "Booking Settings" && (
             <div className="space-y-6">
@@ -10849,8 +10970,14 @@ export default function AdminPage() {
                               const bookingsForDay = filteredReservations.filter(
                                 (r) => String(r.date).slice(0, 10) === dateKey && ['approved', 'confirmed', 'started', 'completed'].includes(r.status)
                               );
-                              if (bookingsForDay.length > 0) {
+                              if (bookingsForDay.length === 1) {
                                 setViewingBooking(bookingsForDay[0]);
+                              } else if (bookingsForDay.length > 1) {
+                                setDayBookingsSelector({
+                                  open: true,
+                                  date: dateKey,
+                                  bookings: bookingsForDay
+                                });
                               }
                             }
                           }}
@@ -11286,13 +11413,21 @@ export default function AdminPage() {
                     <div className="mt-4 flex flex-wrap gap-3">
                       <button
                         type="button"
+                        disabled={loadingApproveId === req.id}
                         onClick={(e) => {
                           e.stopPropagation();
                           openApprove(req);
                         }}
-                        className="rounded-3xl bg-[#414E36] px-4 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                        className="rounded-3xl bg-[#414E36] px-4 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-60 flex items-center gap-2"
                       >
-                        Approve
+                        {loadingApproveId === req.id ? (
+                          <>
+                            <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+                            Loading...
+                          </>
+                        ) : (
+                          "Approve"
+                        )}
                       </button>
                       <button
                         type="button"
@@ -11409,6 +11544,62 @@ export default function AdminPage() {
               >
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Date bookings selector modal */}
+      {dayBookingsSelector.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-lg rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] border border-[#414E36]/10">
+            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Select Appointment</p>
+                <h3 className="mt-2 text-xl font-semibold text-[#1F251A]">
+                  Bookings on {new Date(dayBookingsSelector.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                </h3>
+              </div>
+              <button
+                onClick={() => setDayBookingsSelector({ open: false, date: "", bookings: [] })}
+                className="rounded-full bg-white border border-[#414E36]/10 p-2 text-[#414E36] hover:bg-[#EDF1EC] transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-1">
+              {dayBookingsSelector.bookings.map((b: any) => {
+                const svc = localServices.find(s => s.id === b.serviceId);
+                const rm = rooms.find(room => room.id === b.roomId);
+                
+                return (
+                  <div
+                    key={b.id}
+                    onClick={() => {
+                      setViewingBooking(b);
+                      setDayBookingsSelector({ open: false, date: "", bookings: [] });
+                    }}
+                    className="flex items-center justify-between gap-4 rounded-2xl border border-[#414E36]/10 bg-white p-4 hover:bg-[#EDF1EC]/30 hover:border-[#414E36]/30 transition cursor-pointer group"
+                  >
+                    <div className="space-y-1">
+                      <p className="font-bold text-[#1F251A] group-hover:text-[#414E36] transition-colors">{b.name}</p>
+                      <p className="text-xs text-[#5A6A51] font-medium">{svc ? svc.en : `Service #${b.serviceId}`}</p>
+                      {rm && (
+                        <p className="text-[11px] text-[#5A6A51] flex items-center gap-1">
+                          <DoorOpen size={10} /> {rm.name}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-flex rounded-full bg-[#414E36]/10 text-[#414E36] px-2.5 py-1 text-xs font-semibold">
+                        {b.timeSlot || b.requestedTime || "N/A"}
+                      </span>
+                      <p className="text-[10px] text-[#5A6A51]/80 mt-1 capitalize font-medium">{b.status}</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -11705,17 +11896,25 @@ export default function AdminPage() {
                       </div>
                       <div className="flex gap-3">
                         <button
-                          onClick={() => {
+                          disabled={loadingApproveId === viewingBooking.id}
+                          onClick={async () => {
+                            await openApprove(viewingBooking);
                             setViewingBooking(null);
-                            openApprove(viewingBooking);
                           }}
-                          className="rounded-3xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                          className="rounded-3xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 flex items-center gap-1.5"
                         >
-                          Approve
+                          {loadingApproveId === viewingBooking.id ? (
+                            <>
+                              <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+                              Loading...
+                            </>
+                          ) : (
+                            "Approve"
+                          )}
                         </button>
                         <button
                           onClick={async () => {
-                            if (confirm("Are you sure you want to reject this request?")) {
+                            if (await showConfirm("Are you sure you want to reject this request?")) {
                               await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
@@ -11794,6 +11993,53 @@ export default function AdminPage() {
                     </select>
                   </div>
 
+                  {/* Assigned Room or Compatible Rooms */}
+                  {viewingBooking.roomId ? (
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Assigned Room</p>
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-[#414E36]/10 flex items-center justify-center text-[#414E36]">
+                          <DoorOpen size={18} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-[#1F251A]">
+                            {(() => {
+                              const r = rooms.find(rm => rm.id === viewingBooking.roomId);
+                              return r ? r.name : "Loading...";
+                            })()}
+                          </p>
+                          <p className="text-xs text-[#5A6A51] capitalize">
+                            {(() => {
+                              const r = rooms.find(rm => rm.id === viewingBooking.roomId);
+                              return r ? `${r.type} Room` : "";
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Compatible Rooms</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(() => {
+                          const compatibleList = rooms.filter(rm => viewingBooking.rooms?.includes(rm.id));
+                          if (compatibleList.length === 0) {
+                            return <p className="text-xs text-[#5A6A51] italic">No compatible clinical rooms configured for this service.</p>;
+                          }
+                          return compatibleList.map(rm => (
+                            <span 
+                              key={rm.id} 
+                              className="inline-flex items-center gap-1.5 rounded-full border border-[#414E36]/10 bg-[#EDF1EC] px-3 py-1 text-xs font-semibold text-[#414E36]"
+                            >
+                              <DoorOpen size={12} />
+                              {rm.name}
+                            </span>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Service Status */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 text-sm">
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Service status</p>
@@ -11830,7 +12076,7 @@ export default function AdminPage() {
                       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-red-800 mb-3">Cancel Booking</p>
                       <button
                         onClick={async () => {
-                          if (confirm("Are you sure you want to cancel this booking?")) {
+                          if (await showConfirm("Are you sure you want to cancel this booking?")) {
                             const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                               method: "PATCH",
                               headers: { "Content-Type": "application/json" },
@@ -11958,7 +12204,8 @@ export default function AdminPage() {
               };
               const todayStr = getLocalDateString(new Date());
               const todaysBookings = allReservations.filter(
-                r => String(r.date).slice(0, 10) === todayStr && ['approved', 'confirmed', 'started', 'completed'].includes(r.status)
+                r => String(r.date).slice(0, 10) === todayStr &&
+                  ['approved', 'confirmed', 'started', 'completed', 'pending'].includes(r.status)
               );
 
               if (todaysBookings.length === 0) {

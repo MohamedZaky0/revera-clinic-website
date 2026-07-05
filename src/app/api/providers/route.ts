@@ -58,24 +58,14 @@ export async function GET() {
       .select('*')
       .order('name', { ascending: true });
 
-    if (!error && data) {
-      if (data.length === 0) {
-        // Seed default providers
-        const { data: seeded, error: seedError } = await supabaseServer
-          .from('providers')
-          .insert(DEFAULT_PROVIDERS)
-          .select();
-        
-        if (!seedError && seeded) {
-          return NextResponse.json(seeded.map(mapProvider));
-        } else {
-          console.warn("Failed to seed default providers to Supabase:", seedError);
-        }
-      } else {
-        return NextResponse.json(data.map(mapProvider));
-      }
+    if (!error && data && data.length > 0 && ('working_days_hours' in data[0])) {
+      return NextResponse.json(data.map(mapProvider));
     } else {
-      console.warn("Supabase providers query error, falling back to JSON:", error);
+      if (error) {
+        console.warn("Supabase providers query error, falling back to JSON:", error);
+      } else {
+        console.warn("Supabase providers missing columns (schema not migrated), falling back to JSON");
+      }
     }
   } catch (dbErr) {
     console.error("Database providers load error, falling back to JSON:", dbErr);
