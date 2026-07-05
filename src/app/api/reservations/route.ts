@@ -13,9 +13,14 @@ function fmtDate(d: unknown): string {
 }
 
 function mapRow(r: Record<string, any>) {
+  const serviceIds = Array.isArray(r.service_ids) ? r.service_ids : [];
+  if (serviceIds.length === 0 && r.service_id) {
+    serviceIds.push(r.service_id);
+  }
   return {
     id: r.id,
     serviceId: r.service_id,
+    serviceIds: serviceIds,
     date: fmtDate(r.date),
     requestedTime: r.requested_time,
     name: r.name,
@@ -191,7 +196,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId } = body;
+    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds } = body;
 
     const { data: target, error: findError } = await supabaseServer
       .from('reservations')
@@ -382,7 +387,7 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined) {
+    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (notes !== undefined) updates.notes = notes;
@@ -391,6 +396,12 @@ export async function PATCH(req: Request) {
       if (amountPaid !== undefined) updates.amount_paid = amountPaid;
       if (amountLeft !== undefined) updates.amount_left = amountLeft;
       if (serviceId !== undefined) updates.service_id = Number(serviceId);
+      if (serviceIds !== undefined) {
+        updates.service_ids = serviceIds.map(Number);
+        if (serviceIds.length > 0) {
+          updates.service_id = Number(serviceIds[0]);
+        }
+      }
 
       const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')

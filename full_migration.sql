@@ -232,6 +232,7 @@ CREATE TABLE IF NOT EXISTS public.reservations (
   customer_id     uuid    REFERENCES public.customers(id) ON DELETE SET NULL,
   room_id         uuid,
   rooms           uuid[]  DEFAULT '{}',
+  service_ids     bigint[] DEFAULT '{}',
   created_at      timestamptz DEFAULT now(),
   updated_at      timestamptz DEFAULT now()
 );
@@ -247,6 +248,12 @@ ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS amount_paid  numeric DE
 ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS amount_left  numeric;
 ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS branch_id    uuid REFERENCES public.branches(id) ON DELETE SET NULL;
 ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS customer_id  uuid REFERENCES public.customers(id) ON DELETE SET NULL;
+ALTER TABLE public.reservations ADD COLUMN IF NOT EXISTS service_ids  bigint[] DEFAULT '{}';
+
+-- Backfill service_ids array with service_id if it's empty
+UPDATE public.reservations 
+SET service_ids = ARRAY[service_id] 
+WHERE (service_ids IS NULL OR service_ids = '{}'::bigint[]) AND service_id IS NOT NULL;
 
 
 -- 8. ROOMS

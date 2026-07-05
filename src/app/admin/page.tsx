@@ -11451,8 +11451,9 @@ export default function AdminPage() {
       )}
 
       {viewingBooking && (() => {
-        const service = localServices.find(s => s.id === viewingBooking.serviceId);
-        const serviceName = service ? service.en : "Half Arms";
+        const selectedServiceIds: number[] = Array.isArray(viewingBooking.serviceIds) 
+          ? viewingBooking.serviceIds 
+          : (viewingBooking.serviceId ? [Number(viewingBooking.serviceId)] : []);
         
         // Price Details map in EGP
         const prices: Record<number, number> = {
@@ -11461,7 +11462,18 @@ export default function AdminPage() {
           21: 300, 22: 350, 23: 300,
           31: 400, 32: 350, 33: 400, 34: 500
         };
-        const cost = service?.price ?? prices[viewingBooking.serviceId] ?? 500;
+
+        const bookingServices = selectedServiceIds.map(id => {
+          const s = localServices.find(item => item.id === id);
+          return {
+            id,
+            name: s ? s.en : `Service #${id}`,
+            price: s?.price ?? prices[id] ?? 500
+          };
+        });
+
+        const serviceNames = bookingServices.map(bs => bs.name).join(", ");
+        const cost = bookingServices.reduce((sum, bs) => sum + bs.price, 0);
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4">
@@ -11560,64 +11572,106 @@ export default function AdminPage() {
                   </div>
 
                   {/* Services & Adjustments */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
-                    <div className="flex-1 min-w-[200px]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICES</p>
-                      {isEditingService ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <select
-                            value={viewingBooking?.serviceId || ""}
-                            onChange={async (e) => {
-                              const newServiceId = Number(e.target.value);
-                              if (!newServiceId) return;
-                              try {
-                                const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                  method: "PATCH",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ serviceId: newServiceId }),
-                                });
-                                if (res.ok) {
-                                  const updated = await res.json();
-                                  setViewingBooking(updated);
-                                  fetchAllReservations();
-                                  setIsEditingService(false);
-                                } else {
-                                  const err = await res.json();
-                                  alert(err.error || "Failed to update service");
+                  <div className="flex flex-col gap-3 border-b border-[#414E36]/10 pb-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICES</p>
+                      </div>
+                      {!isEditingService && (
+                        <button
+                          onClick={() => setIsEditingService(true)}
+                          disabled={!hasPermission("bookings.edit")}
+                          className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Add Service
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {bookingServices.map((bs, index) => (
+                        <div key={`${bs.id}-${index}`} className="flex items-center gap-2 bg-[#EDF1EC] rounded-xl px-3 py-1.5 text-sm font-semibold text-[#1F251A] shadow-sm">
+                          <span>{bs.name}</span>
+                          <span className="text-xs font-medium text-[#5A6A51]">({bs.price} EGP)</span>
+                          {bookingServices.length > 1 && hasPermission("bookings.edit") && (
+                            <button
+                              onClick={async () => {
+                                const updatedIds = selectedServiceIds.filter((_, i) => i !== index);
+                                try {
+                                  const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ serviceIds: updatedIds }),
+                                  });
+                                  if (res.ok) {
+                                    const updated = await res.json();
+                                    setViewingBooking(updated);
+                                    fetchAllReservations();
+                                  } else {
+                                    const err = await res.json();
+                                    alert(err.error || "Failed to remove service");
+                                  }
+                                } catch (err) {
+                                  console.error(err);
+                                  alert("Error removing service");
                                 }
-                              } catch (err) {
-                                console.error(err);
-                                alert("Error updating service");
+                              }}
+                              className="text-red-600 hover:text-red-800 ml-1 font-bold text-lg leading-none"
+                              title="Remove service"
+                            >
+                              &times;
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {isEditingService && (
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <select
+                          value=""
+                          onChange={async (e) => {
+                            const newServiceId = Number(e.target.value);
+                            if (!newServiceId) return;
+                            const updatedServiceIds = [...selectedServiceIds, newServiceId];
+                            try {
+                              const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ serviceIds: updatedServiceIds }),
+                              });
+                              if (res.ok) {
+                                const updated = await res.json();
+                                setViewingBooking(updated);
+                                fetchAllReservations();
+                                setIsEditingService(false);
+                              } else {
+                                const err = await res.json();
+                                alert(err.error || "Failed to add service");
                               }
-                            }}
-                            className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-sm text-[#1F251A] outline-none font-semibold focus:border-[#C4AE7C]"
-                          >
-                            <option value="" disabled>Select a service</option>
-                            {localServices.map((svc) => (
+                            } catch (err) {
+                              console.error(err);
+                              alert("Error adding service");
+                            }
+                          }}
+                          className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-sm text-[#1F251A] outline-none font-semibold focus:border-[#C4AE7C]"
+                        >
+                          <option value="" disabled>Select a service to add</option>
+                          {localServices
+                            .filter(svc => !selectedServiceIds.includes(svc.id))
+                            .map((svc) => (
                               <option key={svc.id} value={svc.id}>
                                 {svc.en}
                               </option>
                             ))}
-                          </select>
-                          <button
-                            onClick={() => setIsEditingService(false)}
-                            className="text-xs font-semibold text-[#5A6A51] hover:underline"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-[#1F251A] mt-1 font-semibold">{serviceName}</p>
-                      )}
-                    </div>
-                    {!isEditingService && (
-                      <button
-                        onClick={() => setIsEditingService(true)}
-                        disabled={!hasPermission("bookings.edit")}
-                        className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Add Service
-                      </button>
+                        </select>
+                        <button
+                          onClick={() => setIsEditingService(false)}
+                          className="text-xs font-semibold text-[#5A6A51] hover:underline"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     )}
                   </div>
 
