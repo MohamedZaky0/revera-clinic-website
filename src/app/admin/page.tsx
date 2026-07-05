@@ -530,6 +530,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Req | null>(null);
   const [viewingBooking, setViewingBooking] = useState<Req | null>(null);
+  const [isEditingService, setIsEditingService] = useState(false);
   const [dayBookingsSelector, setDayBookingsSelector] = useState<{
     open: boolean;
     date: string;
@@ -763,6 +764,11 @@ export default function AdminPage() {
       }
     }
   }, [adminPermissions, adminRole, hasPermission]);
+
+  useEffect(() => {
+    setIsEditingService(false);
+  }, [viewingBooking]);
+
   const [scheduleDate, setScheduleDate] = useState<Date>(() => new Date());
   const [scheduleProviderFilter, setScheduleProviderFilter] = useState<string>("All");
   const [scheduleServiceFilter, setScheduleServiceFilter] = useState<string>("All");
@@ -11483,7 +11489,10 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setViewingBooking(null)}
+                  onClick={() => {
+                    setViewingBooking(null);
+                    setIsEditingService(false);
+                  }}
                   className="rounded-full bg-[#F2EFE9] p-2 text-[#414E36] transition hover:bg-[#e4e0d6]"
                 >
                   <X size={20} />
@@ -11552,16 +11561,64 @@ export default function AdminPage() {
 
                   {/* Services & Adjustments */}
                   <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
-                    <div>
+                    <div className="flex-1 min-w-[200px]">
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICES</p>
-                      <p className="text-sm text-[#1F251A] mt-1 font-semibold">{serviceName}</p>
+                      {isEditingService ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <select
+                            value={viewingBooking?.serviceId || ""}
+                            onChange={async (e) => {
+                              const newServiceId = Number(e.target.value);
+                              if (!newServiceId) return;
+                              try {
+                                const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ serviceId: newServiceId }),
+                                });
+                                if (res.ok) {
+                                  const updated = await res.json();
+                                  setViewingBooking(updated);
+                                  fetchAllReservations();
+                                  setIsEditingService(false);
+                                } else {
+                                  const err = await res.json();
+                                  alert(err.error || "Failed to update service");
+                                }
+                              } catch (err) {
+                                console.error(err);
+                                alert("Error updating service");
+                              }
+                            }}
+                            className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-sm text-[#1F251A] outline-none font-semibold focus:border-[#C4AE7C]"
+                          >
+                            <option value="" disabled>Select a service</option>
+                            {localServices.map((svc) => (
+                              <option key={svc.id} value={svc.id}>
+                                {svc.en}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => setIsEditingService(false)}
+                            className="text-xs font-semibold text-[#5A6A51] hover:underline"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-[#1F251A] mt-1 font-semibold">{serviceName}</p>
+                      )}
                     </div>
-                    <button
-                      disabled={!hasPermission("bookings.edit")}
-                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Add Service
-                    </button>
+                    {!isEditingService && (
+                      <button
+                        onClick={() => setIsEditingService(true)}
+                        disabled={!hasPermission("bookings.edit")}
+                        className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Add Service
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">

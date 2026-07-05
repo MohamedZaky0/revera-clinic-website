@@ -191,7 +191,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft } = body;
+    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId } = body;
 
     const { data: target, error: findError } = await supabaseServer
       .from('reservations')
@@ -382,7 +382,7 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined) {
+    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (notes !== undefined) updates.notes = notes;
@@ -390,6 +390,7 @@ export async function PATCH(req: Request) {
       if (sessionType !== undefined) updates.session_type = sessionType;
       if (amountPaid !== undefined) updates.amount_paid = amountPaid;
       if (amountLeft !== undefined) updates.amount_left = amountLeft;
+      if (serviceId !== undefined) updates.service_id = Number(serviceId);
 
       const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
