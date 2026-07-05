@@ -11570,9 +11570,10 @@ export default function AdminPage() {
                       <p className="text-sm text-[#1F251A] mt-1 font-semibold">0.00 EGP</p>
                     </div>
                     <button
-                      disabled={!hasPermission("bookings.edit")}
-                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={true}
+                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-gray-400 bg-gray-50 cursor-not-allowed opacity-50 flex items-center gap-1"
                     >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                       Adjustment
                     </button>
                   </div>
