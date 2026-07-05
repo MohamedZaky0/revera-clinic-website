@@ -11644,9 +11644,10 @@ export default function AdminPage() {
                       <p className="text-sm text-[#5A6A51] mt-1">No products added</p>
                     </div>
                     <button
-                      disabled={!hasPermission("bookings.edit")}
-                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={true}
+                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-gray-400 bg-gray-50 cursor-not-allowed opacity-50 flex items-center gap-1"
                     >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                       See Products
                     </button>
                   </div>
@@ -11656,9 +11657,10 @@ export default function AdminPage() {
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-sm font-bold text-[#1F251A]">Prescriptions</p>
                       <button
-                        disabled={!hasPermission("bookings.edit")}
-                        className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={true}
+                        className="rounded-2xl bg-[#414E36]/50 px-3 py-1 text-xs font-semibold text-[#FBFBF9]/80 cursor-not-allowed flex items-center gap-1"
                       >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                         + Add Prescription
                       </button>
                     </div>
@@ -11672,9 +11674,10 @@ export default function AdminPage() {
                       </svg>
                       <p className="text-xs font-semibold">no prescriptions yet</p>
                       <button
-                        disabled={!hasPermission("bookings.edit")}
-                        className="mt-2 text-xs font-bold text-[#414E36] hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={true}
+                        className="mt-2 text-xs font-bold text-gray-400 cursor-not-allowed flex items-center gap-1"
                       >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                         + Create First Prescription
                       </button>
                     </div>
