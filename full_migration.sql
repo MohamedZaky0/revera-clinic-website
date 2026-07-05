@@ -162,11 +162,7 @@ CREATE TABLE IF NOT EXISTS public.providers (
 );
 ALTER TABLE public.providers DISABLE ROW LEVEL SECURITY;
 
-INSERT INTO public.providers (name, bookings_count, services, more_count, rating) VALUES
-  ('Dr. Ahmed Medhat',  0, '["Tattoo Removal (Small)", "Tattoo Removal (Medium)"]'::jsonb,             4, 0),
-  ('Dr. Radwa Seif',    0, '["Physio: Basic Relief (3)", "Physio: Standard Recovery (6)"]'::jsonb,      4, 0),
-  ('Dr. Sara El Gamel', 1, '["Half Arm", "Full Arms"]'::jsonb,                                         14, 0)
-ON CONFLICT DO NOTHING;
+-- Providers will be added manually via the Admin Dashboard.
 
 
 -- 5. PROVIDER ATTENDANCE

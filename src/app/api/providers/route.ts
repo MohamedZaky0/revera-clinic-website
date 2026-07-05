@@ -7,29 +7,7 @@ export const dynamic = 'force-dynamic';
 
 const JSON_FILE_PATH = path.join(process.cwd(), 'data', 'providers.json');
 
-const DEFAULT_PROVIDERS = [
-  {
-    name: "Dr. Ahmed Medhat",
-    bookings_count: 0,
-    services: ["Tattoo Removal (Small)", "Tattoo Removal (Medium)"],
-    more_count: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Radwa Seif",
-    bookings_count: 0,
-    services: ["Physio: Basic Relief (3)", "Physio: Standard Recovery (6)"],
-    more_count: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Sara El Gamel",
-    bookings_count: 1,
-    services: ["Half Arm", "Full Arms"],
-    more_count: 14,
-    rating: 0,
-  },
-];
+const DEFAULT_PROVIDERS: any[] = [];
 
 function mapProvider(p: Record<string, any>) {
   return {

@@ -137,29 +137,7 @@ const overviewCards = [
   { label: "Open requests", value: "9", accent: "bg-[#C4AE7C]/10", icon: FileText },
 ];
 
-const PROVIDERS = [
-  {
-    name: "Dr. Ahmed Medhat",
-    bookings: 0,
-    services: ["Tattoo Removal (Small)", "Tattoo Removal (Medium)"],
-    more: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Radwa Seif",
-    bookings: 0,
-    services: ["Physio: Basic Relief (3)", "Physio: Standard Recovery (6)"],
-    more: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Sara El Gamel",
-    bookings: 1,
-    services: ["Half Arm", "Full Arms"],
-    more: 14,
-    rating: 0,
-  },
-];
+const PROVIDERS: any[] = [];
 
 const TARGET_BONUSES = [] as const;
 
@@ -4094,49 +4072,10 @@ export default function AdminPage() {
                 <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                   <div>
                     <h1 className="text-4xl font-semibold text-[#1F251A]">Providers</h1>
-                    <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#5A6A51]">
-                      {hasPermission("providers.view") && (
-                        <button
-                          type="button"
-                          onClick={() => setProviderTab("Providers")}
-                          className={`rounded-full px-5 py-3 transition ${
-                            providerTab === "Providers"
-                              ? "bg-[#414E36] text-[#FBFBF9]"
-                              : "bg-[#F2EFE9] text-[#5A6A51] hover:bg-[#EDF1EC]"
-                          }`}
-                        >
-                          Providers
-                        </button>
-                      )}
-                      {hasPermission("providers.attendance") && (
-                        <button
-                          type="button"
-                          onClick={() => setProviderTab("Attendance")}
-                          className={`rounded-full px-5 py-3 transition ${
-                            providerTab === "Attendance"
-                              ? "bg-[#414E36] text-[#FBFBF9]"
-                              : "bg-[#F2EFE9] text-[#5A6A51] hover:bg-[#EDF1EC]"
-                          }`}
-                        >
-                          Attendance
-                        </button>
-                      )}
-                    </div>
+
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    {providerTab === "Attendance" && (
-                      <div className="flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-2.5 shadow-sm">
-                        <label className="text-xs uppercase font-bold text-[#5A6A51] select-none">Date:</label>
-                        <input
-                          type="date"
-                          value={attendanceDate}
-                          onChange={(e) => setAttendanceDate(e.target.value)}
-                          className="bg-transparent text-sm text-[#1F251A] outline-none font-semibold cursor-pointer"
-                        />
-                      </div>
-                    )}
-                    
                     <button
                       onClick={() => setShowProviderFilterPanel(prev => !prev)}
                       className={`inline-flex items-center gap-2 rounded-3xl border px-4 py-3 text-sm font-semibold transition ${
@@ -4151,7 +4090,7 @@ export default function AdminPage() {
                       )}
                     </button>
 
-                    {providerTab === "Providers" && hasPermission("providers.create") && (
+                    {hasPermission("providers.create") && (
                       <button
                         onClick={openAddProviderModal}
                         className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
@@ -4239,7 +4178,6 @@ export default function AdminPage() {
                   </div>
                 )}
 
-                {providerTab === "Providers" ? (
                   <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
                     <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
                       <span>Name</span>
@@ -4301,106 +4239,7 @@ export default function AdminPage() {
                       )}
                     </div>
                   </div>
-                ) : (
-                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                    <div className="grid grid-cols-[2fr_1fr_1.5fr_2fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.12em] text-[#5A6A51]">
-                      <span>Doctor / Provider</span>
-                      <span>Branch</span>
-                      <span>Status</span>
-                      <span className="text-center">Set Attendance</span>
-                    </div>
-                    <div className="divide-y divide-[#E6E9EB]">
-                      {loadingAttendance ? (
-                        <div className="flex items-center justify-center py-16 text-[#5A6A51]">
-                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#C4AE7C] border-t-transparent mr-2.5"></div>
-                          <span className="font-medium">Loading attendance data...</span>
-                        </div>
-                      ) : filteredProviders.length === 0 ? (
-                        <div className="text-center py-16 text-gray-400 italic">No doctors/providers matching filters.</div>
-                      ) : (
-                        filteredProviders.map((provider) => {
-                          const record = attendanceRecords.find((r) => r.provider_id === provider.id);
-                          const currentStatus = record?.status || "Unmarked";
-                          const branchName = branches.find((b) => b.id === provider.branchId)?.name_en || "Default/All";
-                          const isSaving = savingAttendanceId === provider.id;
 
-                          return (
-                            <div key={provider.id} className="grid grid-cols-[2fr_1fr_1.5fr_2fr] items-center gap-0 px-6 py-4.5 text-sm text-[#414E36]">
-                              <div className="flex items-center gap-3">
-                                <div className="h-9 w-9 rounded-full bg-[#EDF1EC] flex items-center justify-center font-bold text-[#414E36]">
-                                  {provider.name.charAt(0)}
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="font-semibold text-[#1F251A]">{provider.name}</span>
-                                  {provider.specialty && <span className="text-xs text-[#5A6A51]">{provider.specialty}</span>}
-                                </div>
-                              </div>
-                              
-                              <div>
-                                <span className="text-xs font-semibold text-[#5A6A51] bg-[#EDF1EC] px-2.5 py-1 rounded-md">
-                                  {branchName}
-                                </span>
-                              </div>
-
-                              <div>
-                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${
-                                  currentStatus === "Present"
-                                    ? "bg-green-100 text-green-800"
-                                    : currentStatus === "Absent"
-                                      ? "bg-red-100 text-red-800"
-                                      : currentStatus === "On Leave"
-                                        ? "bg-blue-100 text-blue-800"
-                                        : "bg-gray-100 text-gray-600"
-                                }`}>
-                                  {currentStatus}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center justify-center gap-2">
-                                {isSaving ? (
-                                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#414E36] border-t-transparent"></div>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => handleToggleAttendance(provider.id, "Present")}
-                                      className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                                        currentStatus === "Present"
-                                          ? "bg-green-700 text-[#FBFBF9] shadow-sm"
-                                          : "border border-green-200 text-green-800 hover:bg-green-50"
-                                      }`}
-                                    >
-                                      Present
-                                    </button>
-                                    <button
-                                      onClick={() => handleToggleAttendance(provider.id, "Absent")}
-                                      className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                                        currentStatus === "Absent"
-                                          ? "bg-red-700 text-[#FBFBF9] shadow-sm"
-                                          : "border border-red-200 text-red-800 hover:bg-red-50"
-                                      }`}
-                                    >
-                                      Absent
-                                    </button>
-                                    <button
-                                      onClick={() => handleToggleAttendance(provider.id, "On Leave")}
-                                      className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                                        currentStatus === "On Leave"
-                                          ? "bg-blue-700 text-[#FBFBF9] shadow-sm"
-                                          : "border border-blue-200 text-blue-800 hover:bg-blue-50"
-                                      }`}
-                                    >
-                                      Leave
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </section>
           )}
