@@ -129,6 +129,7 @@ const SIDEBAR_ITEMS = [
   { label: "Customers", icon: Users },
   { label: "Providers", icon: ShieldCheck },
   { label: "Services", icon: Layers },
+  { label: "Employees", icon: CircleUser },
   { label: "Settings", icon: Settings, submenu: true },
   { label: "Logout", icon: LogOut },
 ];
@@ -490,6 +491,7 @@ export default function AdminPage() {
         "Customers": "customers",
         "Providers": "providers",
         "Services": "services",
+        "Employees": "employees",
         "Settings": "settings"
       };
       const prefix = parentScreenMap[item.label];
@@ -527,6 +529,17 @@ export default function AdminPage() {
   const [roleCreateSuccess, setRoleCreateSuccess] = useState("");
   const [employeeCreateError, setEmployeeCreateError] = useState("");
   const [employeeCreateSuccess, setEmployeeCreateSuccess] = useState("");
+
+  const [newEmployeePhone, setNewEmployeePhone] = useState("");
+  const [newEmployeeDepartment, setNewEmployeeDepartment] = useState("Reception");
+  const [newEmployeeShift, setNewEmployeeShift] = useState("Day");
+  const [newEmployeeSalary, setNewEmployeeSalary] = useState("0");
+  const [employeeFilterDepartment, setEmployeeFilterDepartment] = useState("All");
+  const [employeeFilterShift, setEmployeeFilterShift] = useState("All");
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+  const [viewingEmployee, setViewingEmployee] = useState<any | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<any | null>(null);
+  const [isEditingEmployeeModalOpen, setIsEditingEmployeeModalOpen] = useState(false);
 
   const [requests, setRequests] = useState<Req[]>([]);
   const [allReservations, setAllReservations] = useState<Req[]>([]);
@@ -1135,7 +1148,7 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    if (activeNav === "Role Management" && adminRole === "superadmin") {
+    if ((activeNav === "Role Management" || activeNav === "Employees") && adminRole === "superadmin") {
       fetchRolesAndEmployees();
     }
   }, [activeNav, adminRole]);
@@ -9950,6 +9963,479 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+
+          {/* ===================== EMPLOYEES SECTION ===================== */}
+          {activeNav === "Employees" && adminRole === "superadmin" && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Staff &amp; Employees</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Manage all staff accounts, departments, shifts, salaries, and system roles.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingEmployee(null);
+                    setNewEmployeeName("");
+                    setNewEmployeeEmail("");
+                    setNewEmployeeRole("");
+                    setNewEmployeePhone("");
+                    setNewEmployeeDepartment("Reception");
+                    setNewEmployeeShift("Day");
+                    setNewEmployeeSalary("0");
+                    setIsEditingEmployeeModalOpen(true);
+                  }}
+                  className="rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-md shrink-0"
+                >
+                  <Plus size={16} />
+                  Add Employee
+                </button>
+              </div>
+
+              {/* Filters & Search */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 bg-white p-5 rounded-3xl border border-[#414E36]/10 shadow-sm">
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                    <Search size={15} />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search name, phone, email..."
+                    value={employeeSearchQuery}
+                    onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] pl-10 pr-4 py-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+                <select
+                  value={employeeFilterDepartment}
+                  onChange={(e) => setEmployeeFilterDepartment(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                >
+                  <option value="All">All Departments</option>
+                  <option value="Medical">Medical</option>
+                  <option value="Reception">Reception</option>
+                  <option value="Nursing">Nursing</option>
+                  <option value="Administration">Administration</option>
+                  <option value="Finance">Finance</option>
+                  <option value="Other">Other</option>
+                </select>
+                <select
+                  value={employeeFilterShift}
+                  onChange={(e) => setEmployeeFilterShift(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                >
+                  <option value="All">All Shifts</option>
+                  <option value="Day">Day Shift</option>
+                  <option value="Night">Night Shift</option>
+                </select>
+                <div className="flex items-center justify-end text-xs font-semibold text-[#5A6A51] px-2">
+                  {loadingRolesAndEmployees ? "Loading..." : `${employeesList.length} Total Employees`}
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-sm">
+                    <thead>
+                      <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                        <th className="px-6 py-4">ID</th>
+                        <th className="px-6 py-4">Employee Info</th>
+                        <th className="px-6 py-4">Phone</th>
+                        <th className="px-6 py-4">Department</th>
+                        <th className="px-6 py-4">Shift</th>
+                        <th className="px-6 py-4">Salary</th>
+                        <th className="px-6 py-4">Role</th>
+                        <th className="px-6 py-4 text-center">Status</th>
+                        <th className="px-6 py-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#414E36]/5">
+                      {loadingRolesAndEmployees ? (
+                        <tr>
+                          <td colSpan={9} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                            Loading employees...
+                          </td>
+                        </tr>
+                      ) : (() => {
+                        const filtered = employeesList.filter((emp: any) => {
+                          if (employeeFilterDepartment !== "All" && emp.department !== employeeFilterDepartment) return false;
+                          if (employeeFilterShift !== "All" && emp.shift !== employeeFilterShift) return false;
+                          if (employeeSearchQuery.trim()) {
+                            const q = employeeSearchQuery.toLowerCase();
+                            if (
+                              !emp.name?.toLowerCase().includes(q) &&
+                              !emp.email?.toLowerCase().includes(q) &&
+                              !emp.phone?.toLowerCase().includes(q) &&
+                              !emp.employee_id?.toLowerCase().includes(q)
+                            ) return false;
+                          }
+                          return true;
+                        });
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={9} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                                No employees match your filters.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return filtered.map((emp: any) => {
+                          const isSuperadmin = emp.employee_id === "superadmin";
+                          const shortId = emp.employee_id?.includes("@")
+                            ? emp.employee_id.split("@")[0]
+                            : emp.id?.slice(0, 8);
+                          return (
+                            <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                              <td className="px-6 py-4 text-xs font-mono font-bold text-[#5A6A51]">{shortId}</td>
+                              <td className="px-6 py-4">
+                                <div className="font-semibold text-[#1F251A] text-sm">{emp.name || <span className="italic text-gray-400">No name</span>}</div>
+                                <div className="text-xs text-[#5A6A51]">{emp.email}</div>
+                              </td>
+                              <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.phone || "—"}</td>
+                              <td className="px-6 py-4">
+                                <span className="inline-block rounded-xl bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold text-[#8B7544]">
+                                  {emp.department || "Reception"}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`inline-block rounded-xl px-3 py-1 text-xs font-semibold ${emp.shift === "Night" ? "bg-indigo-50 text-indigo-700" : "bg-amber-50 text-amber-700"}`}>
+                                  {emp.shift || "Day"}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-xs font-bold text-[#1F251A]">
+                                {Number(emp.salary || 0).toLocaleString()} EGP
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">
+                                  {emp.role_name}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
+                                  {emp.email_confirmed_at ? "Active" : "Invited"}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center justify-end gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewingEmployee(emp)}
+                                    className="text-xs font-semibold text-[#5A6A51] hover:text-[#414E36] hover:underline transition"
+                                  >
+                                    Info
+                                  </button>
+                                  {!isSuperadmin && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingEmployee(emp);
+                                          setNewEmployeeName(emp.name || "");
+                                          setNewEmployeeEmail(emp.email || "");
+                                          setNewEmployeeRole(emp.role_name || "");
+                                          setNewEmployeePhone(emp.phone || "");
+                                          setNewEmployeeDepartment(emp.department || "Reception");
+                                          setNewEmployeeShift(emp.shift || "Day");
+                                          setNewEmployeeSalary(String(emp.salary || 0));
+                                          setIsEditingEmployeeModalOpen(true);
+                                        }}
+                                        className="text-xs font-semibold text-[#C4AE7C] hover:underline transition"
+                                      >
+                                        Edit
+                                      </button>
+                                      {!emp.email_confirmed_at && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleResendInvitation(emp.id)}
+                                          className="text-xs font-semibold text-amber-600 hover:underline transition"
+                                          title="Resend invitation email"
+                                        >
+                                          Resend
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteEmployee(emp.id)}
+                                        className="text-red-500 hover:text-red-700 transition"
+                                        title="Revoke access"
+                                      >
+                                        <Trash2 size={15} />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Add / Edit Employee Modal */}
+              {isEditingEmployeeModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                  <div className="w-full max-w-lg rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.15)] border border-[#414E36]/10 relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingEmployeeModalOpen(false)}
+                      className="absolute right-6 top-6 h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition font-bold text-lg"
+                    >
+                      &times;
+                    </button>
+                    <h3 className="text-2xl font-bold text-[#1F251A] mb-1">
+                      {editingEmployee ? "Edit Employee" : "Add New Employee"}
+                    </h3>
+                    <p className="text-xs text-[#5A6A51] mb-6">
+                      {editingEmployee
+                        ? "Update shift, department, salary, and role details."
+                        : "Fill in the details below to invite a new staff member."}
+                    </p>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!newEmployeeName.trim() || !newEmployeeRole) {
+                          alert("Name and System Role are required.");
+                          return;
+                        }
+                        try {
+                          if (editingEmployee) {
+                            const res = await fetch("/api/employees", {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                id: editingEmployee.id,
+                                name: newEmployeeName.trim(),
+                                roleName: newEmployeeRole,
+                                phone: newEmployeePhone.trim(),
+                                department: newEmployeeDepartment,
+                                shift: newEmployeeShift,
+                                salary: Number(newEmployeeSalary),
+                              }),
+                            });
+                            if (res.ok) {
+                              setIsEditingEmployeeModalOpen(false);
+                              clearFetchCache();
+                              fetchRolesAndEmployees();
+                            } else {
+                              const d = await res.json();
+                              alert(d.error || "Failed to update employee.");
+                            }
+                          } else {
+                            if (!newEmployeeEmail.trim()) {
+                              alert("Email is required.");
+                              return;
+                            }
+                            const res = await fetch("/api/employees", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                email: newEmployeeEmail.trim().toLowerCase(),
+                                name: newEmployeeName.trim(),
+                                roleName: newEmployeeRole,
+                                phone: newEmployeePhone.trim(),
+                                department: newEmployeeDepartment,
+                                shift: newEmployeeShift,
+                                salary: Number(newEmployeeSalary),
+                              }),
+                            });
+                            if (res.ok) {
+                              setIsEditingEmployeeModalOpen(false);
+                              clearFetchCache();
+                              fetchRolesAndEmployees();
+                            } else {
+                              const d = await res.json();
+                              alert(d.error || "Failed to invite employee.");
+                            }
+                          }
+                        } catch (err: any) {
+                          alert(err.message || "An error occurred.");
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Full Name *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Mohamed Ali"
+                            value={newEmployeeName}
+                            onChange={(e) => setNewEmployeeName(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Email Address {editingEmployee ? "" : "*"}</label>
+                          <input
+                            type="email"
+                            required={!editingEmployee}
+                            disabled={!!editingEmployee}
+                            placeholder="staff@revera.com"
+                            value={newEmployeeEmail}
+                            onChange={(e) => setNewEmployeeEmail(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] disabled:opacity-50 disabled:cursor-not-allowed"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Phone Number</label>
+                          <input
+                            type="text"
+                            placeholder="01012345678"
+                            value={newEmployeePhone}
+                            onChange={(e) => setNewEmployeePhone(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">System Role *</label>
+                          <select
+                            required
+                            value={newEmployeeRole}
+                            onChange={(e) => setNewEmployeeRole(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                          >
+                            <option value="" disabled>Select Role</option>
+                            {rolesList.map((role: any) => (
+                              <option key={role.name} value={role.name}>{role.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Department</label>
+                          <select
+                            value={newEmployeeDepartment}
+                            onChange={(e) => setNewEmployeeDepartment(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                          >
+                            <option value="Medical">Medical</option>
+                            <option value="Reception">Reception</option>
+                            <option value="Nursing">Nursing</option>
+                            <option value="Administration">Administration</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Shift</label>
+                          <select
+                            value={newEmployeeShift}
+                            onChange={(e) => setNewEmployeeShift(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                          >
+                            <option value="Day">Day</option>
+                            <option value="Night">Night</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Salary (EGP)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={newEmployeeSalary}
+                            onChange={(e) => setNewEmployeeSalary(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingEmployeeModalOpen(false)}
+                          className="rounded-2xl border border-[#414E36]/15 px-5 py-2.5 text-sm font-semibold text-[#414E36] hover:bg-gray-50 transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#2e3a26] transition shadow-md"
+                        >
+                          {editingEmployee ? "Save Changes" : "Send Invitation"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* View Employee Details Modal */}
+              {viewingEmployee && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                  <div className="w-full max-w-md rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.15)] border border-[#414E36]/10 relative">
+                    <button
+                      type="button"
+                      onClick={() => setViewingEmployee(null)}
+                      className="absolute right-6 top-6 h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition font-bold text-lg"
+                    >
+                      &times;
+                    </button>
+
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="h-16 w-16 rounded-full bg-[#414E36]/10 flex items-center justify-center text-2xl font-bold text-[#414E36] shrink-0">
+                        {viewingEmployee.name ? viewingEmployee.name.charAt(0).toUpperCase() : "E"}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-[#1F251A]">{viewingEmployee.name || "No name"}</h3>
+                        <p className="text-xs text-[#5A6A51] font-medium mt-0.5">{viewingEmployee.email}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-0 rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] overflow-hidden text-sm">
+                      {[
+                        { label: "Employee ID", value: viewingEmployee.employee_id },
+                        { label: "Phone Number", value: viewingEmployee.phone || "—" },
+                        { label: "Department", value: viewingEmployee.department || "Reception" },
+                        { label: "Shift", value: viewingEmployee.shift || "Day" },
+                        { label: "Monthly Salary", value: `${Number(viewingEmployee.salary || 0).toLocaleString()} EGP` },
+                        { label: "System Role", value: viewingEmployee.role_name },
+                        {
+                          label: "Account Status",
+                          value: viewingEmployee.email_confirmed_at ? "Active ✓" : "Pending Invitation",
+                          highlight: viewingEmployee.email_confirmed_at ? "text-green-700" : "text-amber-700",
+                        },
+                        {
+                          label: "Added On",
+                          value: viewingEmployee.created_at
+                            ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })
+                            : "—",
+                        },
+                      ].map((row, i, arr) => (
+                        <div
+                          key={row.label}
+                          className={`flex justify-between items-center px-5 py-3 ${i < arr.length - 1 ? "border-b border-[#414E36]/5" : ""}`}
+                        >
+                          <span className="font-semibold text-[#5A6A51] text-xs">{row.label}</span>
+                          <span className={`font-semibold text-xs text-right ${row.highlight || "text-[#1F251A]"}`}>{row.value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setViewingEmployee(null)}
+                      className="mt-6 w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-white hover:bg-[#2e3a26] transition shadow-md"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {/* ============================================================= */}
 
           {activeNav === "SMS Configuration" && (
             <div className="space-y-6">

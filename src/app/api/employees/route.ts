@@ -39,7 +39,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, name, roleName } = body;
+    const { email, name, roleName, phone, department, shift, salary } = body;
 
     if (!email || !name || !roleName) {
       return NextResponse.json(
@@ -126,6 +126,10 @@ export async function POST(req: Request) {
         email: cleanEmail,
         name: cleanName,
         role_name: roleName,
+        phone: phone || null,
+        department: department || 'Reception',
+        shift: shift || 'Day',
+        salary: salary ? Number(salary) : 0,
       })
       .select()
       .single();
@@ -145,7 +149,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, roleName } = body;
+    const { id, roleName, name, phone, department, shift, salary, resendInvite } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Employee ID is required.' }, { status: 400 });
@@ -162,33 +166,41 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
     }
 
-    // 1. Update role if roleName is provided
-    if (roleName) {
-      if (employee.employee_id === 'superadmin') {
-        return NextResponse.json({ error: 'Cannot modify the role of the system owner account.' }, { status: 400 });
+    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined)) {
+      const updates: Record<string, any> = {};
+      if (roleName) {
+        if (employee.employee_id === 'superadmin') {
+          return NextResponse.json({ error: 'Cannot modify the role of the system owner account.' }, { status: 400 });
+        }
+        const { data: roleExists, error: roleCheckError } = await supabaseServer
+          .from('roles')
+          .select('name')
+          .eq('name', roleName)
+          .maybeSingle();
+
+        if (roleCheckError) throw roleCheckError;
+        if (!roleExists) {
+          return NextResponse.json({ error: `Role '${roleName}' does not exist.` }, { status: 400 });
+        }
+        updates.role_name = roleName;
       }
 
-      const { data: roleExists, error: roleCheckError } = await supabaseServer
-        .from('roles')
-        .select('name')
-        .eq('name', roleName)
-        .maybeSingle();
-
-      if (roleCheckError) throw roleCheckError;
-      if (!roleExists) {
-        return NextResponse.json({ error: `Role '${roleName}' does not exist.` }, { status: 400 });
-      }
+      if (name !== undefined) updates.name = name;
+      if (phone !== undefined) updates.phone = phone;
+      if (department !== undefined) updates.department = department;
+      if (shift !== undefined) updates.shift = shift;
+      if (salary !== undefined) updates.salary = Number(salary);
 
       const { data: updatedEmp, error: updateError } = await supabaseServer
         .from('employee_accounts')
-        .update({ role_name: roleName })
+        .update(updates)
         .eq('id', id)
         .select()
         .single();
 
       if (updateError) throw updateError;
 
-      if (employee.auth_user_id) {
+      if (roleName && employee.auth_user_id) {
         await supabaseServer.auth.admin.updateUserById(
           employee.auth_user_id,
           { user_metadata: { role: roleName } }

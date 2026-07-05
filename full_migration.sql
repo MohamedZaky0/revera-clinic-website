@@ -402,9 +402,21 @@ CREATE TABLE IF NOT EXISTS public.employee_accounts (
   employee_id    text UNIQUE NOT NULL,
   role_name      text REFERENCES public.roles(name) ON UPDATE CASCADE ON DELETE SET NULL,
   email          text UNIQUE NOT NULL,
+  name           text,
+  phone          text,
+  department     text DEFAULT 'Reception',
+  shift          text DEFAULT 'Day',
+  salary         numeric DEFAULT 0,
   created_at     timestamptz DEFAULT now()
 );
 ALTER TABLE public.employee_accounts ENABLE ROW LEVEL SECURITY;
+
+-- Ensure columns exist for pre-existing tables
+ALTER TABLE public.employee_accounts ADD COLUMN IF NOT EXISTS name text;
+ALTER TABLE public.employee_accounts ADD COLUMN IF NOT EXISTS phone text;
+ALTER TABLE public.employee_accounts ADD COLUMN IF NOT EXISTS department text DEFAULT 'Reception';
+ALTER TABLE public.employee_accounts ADD COLUMN IF NOT EXISTS shift text DEFAULT 'Day';
+ALTER TABLE public.employee_accounts ADD COLUMN IF NOT EXISTS salary numeric DEFAULT 0;
 
 DROP POLICY IF EXISTS "Allow public read access to employee_accounts"       ON public.employee_accounts;
 DROP POLICY IF EXISTS "Allow service_role full access to employee_accounts" ON public.employee_accounts;
