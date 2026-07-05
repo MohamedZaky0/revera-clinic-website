@@ -10371,65 +10371,166 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* View Employee Details Modal */}
+              {/* View Employee Details — Slide-Over Drawer */}
               {viewingEmployee && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                  <div className="w-full max-w-md rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.15)] border border-[#414E36]/10 relative">
-                    <button
-                      type="button"
-                      onClick={() => setViewingEmployee(null)}
-                      className="absolute right-6 top-6 h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition font-bold text-lg"
-                    >
-                      &times;
-                    </button>
-
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="h-16 w-16 rounded-full bg-[#414E36]/10 flex items-center justify-center text-2xl font-bold text-[#414E36] shrink-0">
-                        {viewingEmployee.name ? viewingEmployee.name.charAt(0).toUpperCase() : "E"}
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-[#1F251A]">{viewingEmployee.name || "No name"}</h3>
-                        <p className="text-xs text-[#5A6A51] font-medium mt-0.5">{viewingEmployee.email}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-0 rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] overflow-hidden text-sm">
-                      {[
-                        { label: "Employee ID", value: viewingEmployee.employee_id },
-                        { label: "Phone Number", value: viewingEmployee.phone || "—" },
-                        { label: "Department", value: viewingEmployee.department || "Reception" },
-                        { label: "Shift", value: viewingEmployee.shift || "Day" },
-                        { label: "Monthly Salary", value: `${Number(viewingEmployee.salary || 0).toLocaleString()} EGP` },
-                        { label: "System Role", value: viewingEmployee.role_name },
-                        {
-                          label: "Account Status",
-                          value: viewingEmployee.email_confirmed_at ? "Active ✓" : "Pending Invitation",
-                          highlight: viewingEmployee.email_confirmed_at ? "text-green-700" : "text-amber-700",
-                        },
-                        {
-                          label: "Added On",
-                          value: viewingEmployee.created_at
-                            ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })
-                            : "—",
-                        },
-                      ].map((row, i, arr) => (
-                        <div
-                          key={row.label}
-                          className={`flex justify-between items-center px-5 py-3 ${i < arr.length - 1 ? "border-b border-[#414E36]/5" : ""}`}
-                        >
-                          <span className="font-semibold text-[#5A6A51] text-xs">{row.label}</span>
-                          <span className={`font-semibold text-xs text-right ${row.highlight || "text-[#1F251A]"}`}>{row.value}</span>
+                <div
+                  className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-xs transition-opacity duration-300"
+                  onClick={() => setViewingEmployee(null)}
+                >
+                  <div
+                    className="w-full max-w-2xl bg-[#FBFBF9] h-full shadow-2xl flex flex-col animate-slideOver overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Drawer Header */}
+                    <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 text-lg font-bold">
+                          {viewingEmployee.name ? viewingEmployee.name.charAt(0).toUpperCase() : "E"}
                         </div>
-                      ))}
+                        <div>
+                          <h3 className="text-xl font-bold text-[#1F251A]">{viewingEmployee.name || "No name"}</h3>
+                          <p className="text-xs text-[#5A6A51]">Employee Profile &amp; Staff Details</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setViewingEmployee(null)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+                      >
+                        <X size={16} />
+                      </button>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setViewingEmployee(null)}
-                      className="mt-6 w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-white hover:bg-[#2e3a26] transition shadow-md"
-                    >
-                      Close
-                    </button>
+                    {/* Drawer Content */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+
+                      {/* Profile Details Card */}
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                          <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Staff Profile</h4>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingEmployee(viewingEmployee);
+                              setNewEmployeeName(viewingEmployee.name || "");
+                              setNewEmployeeEmail(viewingEmployee.email || "");
+                              setNewEmployeeRole(viewingEmployee.role_name || "");
+                              setNewEmployeePhone(viewingEmployee.phone || "");
+                              setNewEmployeeDepartment(viewingEmployee.department || "Reception");
+                              setNewEmployeeShift(viewingEmployee.shift || "Day");
+                              setNewEmployeeSalary(String(viewingEmployee.salary || 0));
+                              setViewingEmployee(null);
+                              setIsEditingEmployeeModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+                          >
+                            <Pencil size={12} /> Edit Profile
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employee ID</span>
+                            <span className="font-semibold text-[#1F251A] font-mono text-xs">{viewingEmployee.employee_id || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
+                            <span className="font-semibold text-[#1F251A] break-all">{viewingEmployee.email || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.phone || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">System Role</span>
+                            <span className="inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">
+                              {viewingEmployee.role_name || "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Department</span>
+                            <span className="inline-block rounded-xl bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold text-[#8B7544]">
+                              {viewingEmployee.department || "Reception"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Shift</span>
+                            <span className={`inline-block rounded-xl px-3 py-1 text-xs font-semibold ${viewingEmployee.shift === "Night" ? "bg-indigo-50 text-indigo-700" : "bg-amber-50 text-amber-700"}`}>
+                              {viewingEmployee.shift || "Day"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Monthly Salary</span>
+                            <span className="font-bold text-[#1F251A]">{Number(viewingEmployee.salary || 0).toLocaleString()} EGP</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Account Status</span>
+                            <span className={`inline-flex items-center gap-1 text-xs font-bold ${viewingEmployee.email_confirmed_at ? "text-green-700" : "text-amber-700"}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-green-600" : "bg-amber-500"}`} />
+                              {viewingEmployee.email_confirmed_at ? "Active" : "Pending Invitation"}
+                            </span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Added On</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {viewingEmployee.created_at
+                                ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { dateStyle: "long" })
+                                : "—"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Actions Card */}
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-3">
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C] border-b border-[#414E36]/10 pb-3">Quick Actions</h4>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingEmployee(viewingEmployee);
+                              setNewEmployeeName(viewingEmployee.name || "");
+                              setNewEmployeeEmail(viewingEmployee.email || "");
+                              setNewEmployeeRole(viewingEmployee.role_name || "");
+                              setNewEmployeePhone(viewingEmployee.phone || "");
+                              setNewEmployeeDepartment(viewingEmployee.department || "Reception");
+                              setNewEmployeeShift(viewingEmployee.shift || "Day");
+                              setNewEmployeeSalary(String(viewingEmployee.salary || 0));
+                              setViewingEmployee(null);
+                              setIsEditingEmployeeModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition"
+                          >
+                            <Pencil size={13} /> Edit Employee
+                          </button>
+                          {!viewingEmployee.email_confirmed_at && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleResendInvitation(viewingEmployee.id);
+                                setViewingEmployee(null);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition"
+                            >
+                              Resend Invitation
+                            </button>
+                          )}
+                          {viewingEmployee.employee_id !== "superadmin" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleDeleteEmployee(viewingEmployee.id);
+                                setViewingEmployee(null);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 transition"
+                            >
+                              <Trash2 size={13} /> Revoke Access
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
                   </div>
                 </div>
               )}
