@@ -35,7 +35,7 @@ export async function verifyHrAccess(req: Request) {
     }
 
     const role = (employee.role_name || '').toLowerCase();
-    if (role === 'admin' || role === 'hr') {
+    if (role === 'superadmin' || role === 'admin' || role === 'hr') {
       return { isAuthorized: true, role: employee.role_name, employeeId: employee.id, user };
     }
 
