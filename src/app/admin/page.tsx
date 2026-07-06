@@ -1487,7 +1487,9 @@ export default function AdminPage() {
               setLocationWarningMsg(errData.message || "No GPS coordinates configured for your assigned branch. Please contact your administrator to configure branch coordinates.");
               setLocationWarningOpen(true);
             } else {
-              setLocationWarningMsg(errData.message || "An unexpected error occurred during attendance verification.");
+              setLocationWarningMsg(
+                errData.message || errData.error || "An unexpected error occurred during attendance verification."
+              );
               setLocationWarningOpen(true);
             }
           }
