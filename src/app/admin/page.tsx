@@ -1431,20 +1431,7 @@ export default function AdminPage() {
     const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
     if (!profileEmployee) return;
 
-    // Use localStorage keyed by employee ID + today's date so it resets every new day
-    const today = new Date().toISOString().split('T')[0];
-    const checkinKey = `checkin_${profileEmployee.id}_${today}`;
-
-    // Clear any stale keys from previous days
-    if (typeof window !== "undefined") {
-      Object.keys(localStorage)
-        .filter(k => k.startsWith(`checkin_${profileEmployee.id}_`) && k !== checkinKey)
-        .forEach(k => localStorage.removeItem(k));
-    }
-
-    // Only run the check once per calendar day
-    if (typeof window !== "undefined" && localStorage.getItem(checkinKey)) return;
-
+    // FOR TESTING: Location check runs every time the page/session is loaded.
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
@@ -1459,8 +1446,7 @@ export default function AdminPage() {
           });
 
           if (res.ok) {
-            // Mark today as checked-in so we don't repeat
-            localStorage.setItem(checkinKey, "true");
+            console.log("Attendance daily check-in logged.");
           } else {
             const errData = await res.json().catch(() => ({}));
             if (errData.error === 'not_in_location') {
@@ -1468,8 +1454,6 @@ export default function AdminPage() {
                 `Your current location does not match the required check-in area for your assigned branch.\n\nYour attendance has been logged as "Out of Location". Please proceed to your designated work location.`
               );
               setLocationWarningOpen(true);
-              // Still mark as done so we don't prompt again on this session
-              localStorage.setItem(checkinKey, "out_of_location");
             } else if (errData.error === 'no_branch') {
               setLocationWarningMsg("Your account has no branch assigned. Please contact the administrator.");
               setLocationWarningOpen(true);
@@ -13221,22 +13205,27 @@ export default function AdminPage() {
 
           {/* Location Warning Modal */}
           {locationWarningOpen && (
-            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 backdrop-blur-md">
               <div className="w-full max-w-md rounded-[32px] bg-white border border-rose-100 p-8 shadow-2xl text-center space-y-6 mx-4">
-                <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-100">
+                <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-100 animate-pulse">
                   <MapPin size={32} />
                 </div>
                 <div className="space-y-3">
-                  <h3 className="text-2xl font-bold text-[#1F251A]">Location Check Failed</h3>
+                  <h3 className="text-2xl font-bold text-[#1F251A]">Account Access Locked</h3>
                   <p className="text-sm text-[#5A6A51] leading-relaxed whitespace-pre-line">
                     {locationWarningMsg}
                   </p>
                 </div>
                 <button
-                  onClick={() => setLocationWarningOpen(false)}
+                  onClick={async () => {
+                    if (supabase) {
+                      await supabase.auth.signOut();
+                    }
+                    setLocationWarningOpen(false);
+                  }}
                   className="w-full rounded-2xl bg-rose-600 py-3 text-sm font-bold text-white hover:bg-rose-700 transition shadow-md"
                 >
-                  I Understand
+                  Sign Out &amp; Exit
                 </button>
               </div>
             </div>
