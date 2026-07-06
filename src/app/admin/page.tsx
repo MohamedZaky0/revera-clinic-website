@@ -1431,15 +1431,35 @@ export default function AdminPage() {
 
   // Geolocation Check-In on login resolution
   useEffect(() => {
-    if (!adminEmail || !session?.access_token || !adminRole || !adminDbId) return;
+    console.log("Attendance Location Check-In triggered for user:", {
+      email: adminEmail,
+      role: adminRole,
+      dbId: adminDbId
+    });
+
+    if (!adminEmail || !session?.access_token || !adminRole || !adminDbId) {
+      console.log("Skipping check-in: missing auth data.");
+      return;
+    }
     
     // Superadmin and Admin do not have attendance tracking and are exempt
-    if (adminRole === 'superadmin' || adminRole === 'admin') return;
+    if (adminRole === 'superadmin' || adminRole === 'admin') {
+      console.log("Skipping check-in: Admin/Superadmin bypass.");
+      return;
+    }
+
+    if (typeof window !== "undefined" && (!navigator || !navigator.geolocation)) {
+      console.warn("Geolocation not supported by browser/context.");
+      setLocationWarningMsg("Geolocation is not supported by your browser or connection context (requires HTTPS / localhost). Access is restricted until location verification can be performed.");
+      setLocationWarningOpen(true);
+      return;
+    }
 
     // FOR TESTING: Location check runs every time the page/session is loaded.
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
+        console.log("GPS coordinates received:", latitude, longitude);
         try {
           const res = await fetch('/api/hr/attendance', {
             method: 'POST',
@@ -1451,9 +1471,10 @@ export default function AdminPage() {
           });
 
           if (res.ok) {
-            console.log("Attendance daily check-in logged.");
+            console.log("Attendance daily check-in logged successfully.");
           } else {
             const errData = await res.json().catch(() => ({}));
+            console.warn("Check-in API rejected request:", errData);
             if (errData.error === 'not_in_location') {
               setLocationWarningMsg(
                 `Your current location does not match the required check-in area for your assigned branch.\n\nYour attendance has been logged as "Out of Location". Please proceed to your designated work location.`
@@ -1462,18 +1483,21 @@ export default function AdminPage() {
             } else if (errData.error === 'no_branch') {
               setLocationWarningMsg("Your account has no branch assigned. Please contact the administrator.");
               setLocationWarningOpen(true);
+            } else if (errData.error === 'no_location_configured') {
+              setLocationWarningMsg(errData.message || "No GPS coordinates configured for your assigned branch. Please contact your administrator to configure branch coordinates.");
+              setLocationWarningOpen(true);
             } else {
-              // Any other server error — log silently
-              console.warn("Check-in failed:", errData);
+              setLocationWarningMsg(errData.message || "An unexpected error occurred during attendance verification.");
+              setLocationWarningOpen(true);
             }
           }
         } catch (err) {
-          console.error("Daily checkin error:", err);
+          console.error("Daily checkin API error:", err);
         }
       },
       (geoErr) => {
-        console.warn("Geolocation denied:", geoErr);
-        setLocationWarningMsg("Location access was denied. Attendance check-in requires GPS access to verify your work location. Please enable location in your browser settings and refresh the page.");
+        console.warn("Geolocation permission denied or failed:", geoErr);
+        setLocationWarningMsg("Location access was denied or failed. Attendance check-in requires GPS access to verify your work location. Please enable location in your browser settings and refresh the page.");
         setLocationWarningOpen(true);
       },
       { enableHighAccuracy: true, timeout: 10000 }

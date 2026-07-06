@@ -103,21 +103,10 @@ export async function POST(req: Request) {
     }
 
     if (!branch.latitude || !branch.longitude) {
-      // Branch has no GPS coordinates configured — allow check-in without location enforcement
-      const { data, error } = await supabaseServer
-        .from('hr_attendance')
-        .upsert({
-          employee_id: employeeId,
-          date: new Date().toISOString().split('T')[0],
-          check_in_time: new Date().toISOString(),
-          latitude,
-          longitude,
-          status: 'Present'
-        }, { onConflict: 'employee_id,date' })
-        .select()
-        .single();
-      if (error) throw error;
-      return NextResponse.json(data);
+      return NextResponse.json(
+        { error: 'no_location_configured', message: `No GPS coordinates configured for branch: ${branch.name_en || 'Assigned Branch'}.` },
+        { status: 400 }
+      );
     }
 
     // Compute distance between employee and branch
