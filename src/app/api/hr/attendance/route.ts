@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyHrAccess } from '@/lib/auth';
+import https from 'https';
+import url from 'url';
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371e3;
@@ -15,6 +17,72 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
   return R * c;
+}
+
+function getFinalUrl(targetUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      const parsedUrl = url.parse(targetUrl);
+      const options = {
+        hostname: parsedUrl.hostname,
+        path: parsedUrl.path,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        timeout: 5000
+      };
+
+      const req = https.get(targetUrl, (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          resolve(getFinalUrl(res.headers.location));
+        } else {
+          resolve(targetUrl);
+        }
+      });
+      
+      req.on('error', () => {
+        resolve(targetUrl);
+      });
+      
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(targetUrl);
+      });
+    } catch (e) {
+      resolve(targetUrl);
+    }
+  });
+}
+
+async function extractCoordsFromMapsLink(mapsLink: string) {
+  if (!mapsLink) return null;
+  try {
+    const finalUrl = await getFinalUrl(mapsLink);
+    
+    // Pattern 1: /@30.001242,31.451330
+    const regexAt = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const matchAt = finalUrl.match(regexAt);
+    if (matchAt) {
+      return { latitude: parseFloat(matchAt[1]), longitude: parseFloat(matchAt[2]) };
+    }
+    
+    // Pattern 2: !3d30.0192534!4d31.4913222 (high-accuracy place pin)
+    const regexPlace = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
+    const matchPlace = finalUrl.match(regexPlace);
+    if (matchPlace) {
+      return { latitude: parseFloat(matchPlace[1]), longitude: parseFloat(matchPlace[2]) };
+    }
+
+    // Pattern 3: ?q=30.001242,31.451330
+    const regexQ = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const matchQ = finalUrl.match(regexQ);
+    if (matchQ) {
+      return { latitude: parseFloat(matchQ[1]), longitude: parseFloat(matchQ[2]) };
+    }
+  } catch (err) {
+    console.error("Error resolving maps link coordinates:", err);
+  }
+  return null;
 }
 
 export async function GET(req: Request) {
@@ -91,10 +159,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'no_branch', message: 'No branch assigned to employee.' }, { status: 400 });
     }
 
-    // Fetch branch coordinates
+    // Fetch branch coordinates and maps link
     const { data: branch, error: bErr } = await supabaseServer
       .from('branches')
-      .select('latitude, longitude, name_en')
+      .select('latitude, longitude, maps_link, name_en')
       .eq('id', employee.branch_id)
       .single();
 
@@ -102,9 +170,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Branch details not found.' }, { status: 404 });
     }
 
-    if (!branch.latitude || !branch.longitude) {
+    let targetLat = branch.latitude ? Number(branch.latitude) : null;
+    let targetLng = branch.longitude ? Number(branch.longitude) : null;
+
+    // Dynamically extract coordinates from the branch maps link for high accuracy
+    if (branch.maps_link) {
+      const parsedCoords = await extractCoordsFromMapsLink(branch.maps_link);
+      if (parsedCoords) {
+        targetLat = parsedCoords.latitude;
+        targetLng = parsedCoords.longitude;
+        console.log(`Resolved maps_link coords for ${branch.name_en}: ${targetLat}, ${targetLng}`);
+      }
+    }
+
+    if (!targetLat || !targetLng) {
       return NextResponse.json(
-        { error: 'no_location_configured', message: `No GPS coordinates configured for branch: ${branch.name_en || 'Assigned Branch'}.` },
+        { error: 'no_location_configured', message: `No GPS coordinates or Google Maps link configured for branch: ${branch.name_en || 'Assigned Branch'}.` },
         { status: 400 }
       );
     }
@@ -113,8 +194,8 @@ export async function POST(req: Request) {
     const dist = getDistanceInMeters(
       Number(latitude),
       Number(longitude),
-      Number(branch.latitude),
-      Number(branch.longitude)
+      targetLat,
+      targetLng
     );
 
     console.log(`Employee checkin distance to ${branch.name_en}: ${dist.toFixed(0)} meters`);
