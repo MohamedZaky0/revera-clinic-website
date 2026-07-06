@@ -72,6 +72,7 @@ import {
   X,
   ListOrdered,
   DoorOpen,
+  MapPin,
 } from "lucide-react";
 import RoomsManagerView from "@/components/RoomsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
@@ -647,6 +648,8 @@ export default function AdminPage() {
   const [activeMissingAlerts, setActiveMissingAlerts] = useState<any[]>([]);
   const [presenceModalOpen, setPresenceModalOpen] = useState(false);
   const [presenceCountdown, setPresenceCountdown] = useState(10);
+  const [locationWarningOpen, setLocationWarningOpen] = useState(false);
+  const [locationWarningMsg, setLocationWarningMsg] = useState("");
   // Profile settings states
   const [profilePassword, setProfilePassword] = useState("");
   const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
@@ -1426,48 +1429,66 @@ export default function AdminPage() {
   useEffect(() => {
     if (!adminEmail || employeesList.length === 0 || !session?.access_token) return;
     const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
-    
-    if (profileEmployee) {
-      // Check-in check
-      const checkinKey = `checkin_${profileEmployee.id}_${new Date().toISOString().split('T')[0]}`;
-      if (typeof window !== "undefined" && !sessionStorage.getItem(checkinKey)) {
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            const { latitude, longitude } = pos.coords;
-            try {
-              const res = await fetch('/api/hr/attendance', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${session.access_token}`
-                },
-                body: JSON.stringify({
-                  employeeId: profileEmployee.id,
-                  latitude,
-                  longitude
-                })
-              });
-              if (res.ok) {
-                sessionStorage.setItem(checkinKey, "true");
-                console.log("Attendance daily check-in logged.");
-              } else {
-                const err = await res.json();
-                if (err.error === 'not_in_location') {
-                  alert("You are not in the right location for the attendance.");
-                }
-              }
-            } catch (err) {
-              console.error("Daily checkin error:", err);
-            }
-          },
-          (err) => {
-            console.warn("Geolocation access error:", err);
-            alert("Location access is required for daily attendance check-in.");
-          },
-          { enableHighAccuracy: true }
-        );
-      }
+    if (!profileEmployee) return;
+
+    // Use localStorage keyed by employee ID + today's date so it resets every new day
+    const today = new Date().toISOString().split('T')[0];
+    const checkinKey = `checkin_${profileEmployee.id}_${today}`;
+
+    // Clear any stale keys from previous days
+    if (typeof window !== "undefined") {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith(`checkin_${profileEmployee.id}_`) && k !== checkinKey)
+        .forEach(k => localStorage.removeItem(k));
     }
+
+    // Only run the check once per calendar day
+    if (typeof window !== "undefined" && localStorage.getItem(checkinKey)) return;
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const res = await fetch('/api/hr/attendance', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ employeeId: profileEmployee.id, latitude, longitude })
+          });
+
+          if (res.ok) {
+            // Mark today as checked-in so we don't repeat
+            localStorage.setItem(checkinKey, "true");
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            if (errData.error === 'not_in_location') {
+              setLocationWarningMsg(
+                `Your current location does not match the required check-in area for your assigned branch.\n\nYour attendance has been logged as "Out of Location". Please proceed to your designated work location.`
+              );
+              setLocationWarningOpen(true);
+              // Still mark as done so we don't prompt again on this session
+              localStorage.setItem(checkinKey, "out_of_location");
+            } else if (errData.error === 'no_branch') {
+              setLocationWarningMsg("Your account has no branch assigned. Please contact the administrator.");
+              setLocationWarningOpen(true);
+            } else {
+              // Any other server error — log silently
+              console.warn("Check-in failed:", errData);
+            }
+          }
+        } catch (err) {
+          console.error("Daily checkin error:", err);
+        }
+      },
+      (geoErr) => {
+        console.warn("Geolocation denied:", geoErr);
+        setLocationWarningMsg("Location access was denied. Attendance check-in requires GPS access to verify your work location. Please enable location in your browser settings and refresh the page.");
+        setLocationWarningOpen(true);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   }, [adminEmail, employeesList, session]);
 
   // 30-minute Presence Monitor for standard staff
@@ -13193,6 +13214,29 @@ export default function AdminPage() {
                   className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
                 >
                   ✓ I am Present &amp; Working
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Location Warning Modal */}
+          {locationWarningOpen && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+              <div className="w-full max-w-md rounded-[32px] bg-white border border-rose-100 p-8 shadow-2xl text-center space-y-6 mx-4">
+                <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-100">
+                  <MapPin size={32} />
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-2xl font-bold text-[#1F251A]">Location Check Failed</h3>
+                  <p className="text-sm text-[#5A6A51] leading-relaxed whitespace-pre-line">
+                    {locationWarningMsg}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setLocationWarningOpen(false)}
+                  className="w-full rounded-2xl bg-rose-600 py-3 text-sm font-bold text-white hover:bg-rose-700 transition shadow-md"
+                >
+                  I Understand
                 </button>
               </div>
             </div>

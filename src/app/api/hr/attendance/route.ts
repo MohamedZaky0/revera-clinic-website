@@ -76,10 +76,11 @@ export async function POST(req: Request) {
         .upsert({
           employee_id: employeeId,
           date: new Date().toISOString().split('T')[0],
+          check_in_time: new Date().toISOString(),
           latitude,
           longitude,
           status: 'Present'
-        }, { onConflict: 'employee_id, date' })
+        }, { onConflict: 'employee_id,date' })
         .select()
         .single();
       if (error) throw error;
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
     }
 
     if (!employee.branch_id) {
-      return NextResponse.json({ error: 'No branch assigned to employee. Check-in location cannot be verified.' }, { status: 400 });
+      return NextResponse.json({ error: 'no_branch', message: 'No branch assigned to employee.' }, { status: 400 });
     }
 
     // Fetch branch coordinates
@@ -98,27 +99,28 @@ export async function POST(req: Request) {
       .single();
 
     if (bErr || !branch) {
-      return NextResponse.json({ error: 'Assigned branch details not found.' }, { status: 404 });
+      return NextResponse.json({ error: 'Branch details not found.' }, { status: 404 });
     }
 
     if (!branch.latitude || !branch.longitude) {
-      // If branch has no coordinates configured, allow check-in by default
+      // Branch has no GPS coordinates configured — allow check-in without location enforcement
       const { data, error } = await supabaseServer
         .from('hr_attendance')
         .upsert({
           employee_id: employeeId,
           date: new Date().toISOString().split('T')[0],
+          check_in_time: new Date().toISOString(),
           latitude,
           longitude,
           status: 'Present'
-        }, { onConflict: 'employee_id, date' })
+        }, { onConflict: 'employee_id,date' })
         .select()
         .single();
       if (error) throw error;
       return NextResponse.json(data);
     }
 
-    // Compute distance
+    // Compute distance between employee and branch
     const dist = getDistanceInMeters(
       Number(latitude),
       Number(longitude),
@@ -126,22 +128,39 @@ export async function POST(req: Request) {
       Number(branch.longitude)
     );
 
-    console.log(`Employee checkin distance to ${branch.name_en}: ${dist} meters`);
+    console.log(`Employee checkin distance to ${branch.name_en}: ${dist.toFixed(0)} meters`);
 
-    // Verify distance: limit to 500 meters
+    // Outside the 500m radius — log attendance as "Out of Location" and return error so frontend can warn
     if (dist > 500) {
-      return NextResponse.json({ error: 'not_in_location', message: 'You are not in the right location for the attendance.' }, { status: 400 });
+      // Still record the attempt with Out of Location status
+      await supabaseServer
+        .from('hr_attendance')
+        .upsert({
+          employee_id: employeeId,
+          date: new Date().toISOString().split('T')[0],
+          check_in_time: new Date().toISOString(),
+          latitude,
+          longitude,
+          status: 'Out of Location'
+        }, { onConflict: 'employee_id,date' });
+
+      return NextResponse.json(
+        { error: 'not_in_location', message: 'You are not in the right location for the attendance.', distance: Math.round(dist) },
+        { status: 400 }
+      );
     }
 
+    // Within range — log as Present
     const { data, error } = await supabaseServer
       .from('hr_attendance')
       .upsert({
         employee_id: employeeId,
         date: new Date().toISOString().split('T')[0],
+        check_in_time: new Date().toISOString(),
         latitude,
         longitude,
         status: 'Present'
-      }, { onConflict: 'employee_id, date' })
+      }, { onConflict: 'employee_id,date' })
       .select()
       .single();
 
