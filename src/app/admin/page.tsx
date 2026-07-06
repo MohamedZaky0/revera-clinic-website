@@ -579,6 +579,7 @@ export default function AdminPage() {
 
   const [adminEmail, setAdminEmail] = useState("");
   const [adminEmployeeId, setAdminEmployeeId] = useState("");
+  const [adminDbId, setAdminDbId] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -1067,6 +1068,7 @@ export default function AdminPage() {
         setAdminPermissions([]);
         setAdminEmail("");
         setAdminEmployeeId("");
+        setAdminDbId("");
         if (typeof window !== "undefined") {
           sessionStorage.removeItem("revera_admin_session_active");
         }
@@ -1094,6 +1096,7 @@ export default function AdminPage() {
           setAdminPermissions(authData.permissions || []);
           setAdminEmail(authData.email || "");
           setAdminEmployeeId(authData.employeeId || "");
+          setAdminDbId(authData.id || "");
         } else {
           console.warn("Unregistered employee session. Logging out.");
           await supabase.auth.signOut();
@@ -1101,6 +1104,7 @@ export default function AdminPage() {
           setAdminPermissions([]);
           setAdminEmail("");
           setAdminEmployeeId("");
+          setAdminDbId("");
         }
       } catch (err) {
         console.error("Error retrieving admin permissions:", err);
@@ -1427,13 +1431,10 @@ export default function AdminPage() {
 
   // Geolocation Check-In on login resolution
   useEffect(() => {
-    if (!adminEmail || employeesList.length === 0 || !session?.access_token || !adminRole) return;
+    if (!adminEmail || !session?.access_token || !adminRole || !adminDbId) return;
     
     // Superadmin and Admin do not have attendance tracking and are exempt
     if (adminRole === 'superadmin' || adminRole === 'admin') return;
-
-    const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
-    if (!profileEmployee) return;
 
     // FOR TESTING: Location check runs every time the page/session is loaded.
     navigator.geolocation.getCurrentPosition(
@@ -1446,7 +1447,7 @@ export default function AdminPage() {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${session.access_token}`
             },
-            body: JSON.stringify({ employeeId: profileEmployee.id, latitude, longitude })
+            body: JSON.stringify({ employeeId: adminDbId, latitude, longitude })
           });
 
           if (res.ok) {
@@ -1477,7 +1478,7 @@ export default function AdminPage() {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, [adminEmail, employeesList, session, adminRole]);
+  }, [adminEmail, session, adminRole, adminDbId]);
 
   // 30-minute Presence Monitor for standard staff
   useEffect(() => {

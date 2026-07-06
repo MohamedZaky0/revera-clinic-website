@@ -67,6 +67,7 @@ export async function GET(req: Request) {
     if (roleError) throw roleError;
 
     return NextResponse.json({
+      id: employee.id,
       role: employee.role_name,
       permissions: role?.permissions || [],
       email: employee.email,
