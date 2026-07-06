@@ -14637,22 +14637,48 @@ export default function AdminPage() {
                 <div className="space-y-6">
                   
                   {/* Customer Information */}
-                  <div className="overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white">
-                    <div className="bg-[#414E36] px-5 py-4 text-[#FBFBF9]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#C4AE7C]/90">Customer Information</p>
-                      <h4 className="mt-1 text-lg font-bold text-[#FBFBF9]">{viewingBooking.name}</h4>
-                    </div>
-                    <div className="p-5 space-y-4 text-sm text-[#414E36]">
-                      <div>
-                        <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Email</p>
-                        <p className="mt-0.5 break-all font-semibold">{viewingBooking.email}</p>
+                  {(() => {
+                    const customerRecord = dbCustomers.find(c => c.id === viewingBooking.customerId || c.phone === viewingBooking.phone);
+                    const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
+                    const spentAmount = customerRecord ? Number(customerRecord.spent || customerRecord.spent_amount || 0) : 0;
+                    const outstandingAmount = customerRecord ? Number(customerRecord.outstanding || 0) : 0;
+
+                    return (
+                      <div className="overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white">
+                        <div className="bg-[#414E36] px-5 py-4 text-[#FBFBF9]">
+                          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#C4AE7C]/90">Customer Information</p>
+                          <h4 className="mt-1 text-lg font-bold text-[#FBFBF9]">{viewingBooking.name}</h4>
+                        </div>
+                        <div className="p-5 space-y-4 text-sm text-[#414E36]">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Email</p>
+                              <p className="mt-0.5 break-all font-semibold">{viewingBooking.email || "—"}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Phone</p>
+                              <p className="mt-0.5 font-semibold">{viewingBooking.phone}</p>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-[#414E36]/10 pt-4 grid grid-cols-3 gap-2">
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Wallet Balance</p>
+                              <p className="mt-0.5 font-bold text-[#C4AE7C]">EGP {walletBalance.toFixed(0)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Total Spent</p>
+                              <p className="mt-0.5 font-bold text-green-600">EGP {spentAmount.toFixed(0)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Outstanding</p>
+                              <p className="mt-0.5 font-bold text-red-600">EGP {outstandingAmount.toFixed(0)}</p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Phone</p>
-                        <p className="mt-0.5 font-semibold">{viewingBooking.phone}</p>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   {/* Provider */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
@@ -16104,6 +16130,48 @@ export default function AdminPage() {
                     placeholder="e.g. Tagamoa, Street 90, Building 14"
                     className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
                   />
+                </div>
+              </div>
+
+              <hr className="border-[#414E36]/10" />
+
+              {/* Financial balances */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Financial Ledgers</h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Wallet Balance (EGP)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={custWallet}
+                      onChange={(e) => setCustWallet(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Total Spent (EGP)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={custSpent}
+                      onChange={(e) => setCustSpent(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Outstanding Balance (EGP)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={custOutstanding}
+                      onChange={(e) => setCustOutstanding(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
                 </div>
               </div>
 
