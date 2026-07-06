@@ -39,7 +39,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address } = body;
+    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId } = body;
 
     if (!email || !name || !roleName) {
       return NextResponse.json(
@@ -57,10 +57,10 @@ export async function POST(req: Request) {
     }
 
     const { data: roleData, error: roleError } = await supabaseServer
-      .from('roles')
-      .select('name')
-      .eq('name', roleName)
-      .maybeSingle();
+       .from('roles')
+       .select('name')
+       .eq('name', roleName)
+       .maybeSingle();
 
     if (roleError) throw roleError;
     if (!roleData) {
@@ -135,6 +135,7 @@ export async function POST(req: Request) {
         national_id_front: nationalIdFront || null,
         national_id_back: nationalIdBack || null,
         address: address || null,
+        branch_id: branchId || null,
       })
       .select()
       .single();
@@ -154,7 +155,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, resendInvite } = body;
+    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, resendInvite } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Employee ID is required.' }, { status: 400 });
@@ -171,7 +172,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
     }
 
-    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined)) {
+    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchId !== undefined)) {
       const updates: Record<string, any> = {};
       if (roleName) {
         if (employee.employee_id === 'superadmin') {
@@ -199,6 +200,7 @@ export async function PATCH(req: Request) {
       if (nationalIdFront !== undefined) updates.national_id_front = nationalIdFront;
       if (nationalIdBack !== undefined) updates.national_id_back = nationalIdBack;
       if (address !== undefined) updates.address = address;
+      if (branchId !== undefined) updates.branch_id = branchId || null;
 
       const { data: updatedEmp, error: updateError } = await supabaseServer
         .from('employee_accounts')

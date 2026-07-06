@@ -611,6 +611,7 @@ export default function AdminPage() {
   const [newEmployeeNationalIdFront, setNewEmployeeNationalIdFront] = useState("");
   const [newEmployeeNationalIdBack, setNewEmployeeNationalIdBack] = useState("");
   const [newEmployeeAddress, setNewEmployeeAddress] = useState("");
+  const [newEmployeeBranchId, setNewEmployeeBranchId] = useState("");
   const [employeeFilterDepartment, setEmployeeFilterDepartment] = useState("All");
   const [employeeFilterShift, setEmployeeFilterShift] = useState("All");
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
@@ -1258,10 +1259,13 @@ export default function AdminPage() {
       setProfileNatId(profileEmployee.national_id || "");
       setProfileNatIdFront(profileEmployee.national_id_front || "");
       setProfileNatIdBack(profileEmployee.national_id_back || "");
+      if (adminRole !== "superadmin" && adminRole !== "admin" && profileEmployee.branch_id) {
+        setBranch(profileEmployee.branch_id);
+      }
     } else if (adminEmail.toLowerCase() === "superadmin@revera.com") {
       setProfileName("System Owner");
     }
-  }, [adminEmail, employeesList]);
+  }, [adminEmail, employeesList, adminRole]);
 
   async function fetchRolesAndEmployees() {
     console.log("RBAC - fetchRolesAndEmployees called!");
@@ -2324,7 +2328,9 @@ export default function AdminPage() {
       .then(data => {
         const list: Branch[] = Array.isArray(data) ? data : [];
         setBranches(list);
-        if (list.length > 0) setBranch(list[0].id);
+        if (list.length > 0) {
+          setBranch((prev) => prev || list[0].id);
+        }
       })
       .catch(() => setBranches([]))
       .finally(() => setLoadingBranches(false));
@@ -4128,18 +4134,24 @@ export default function AdminPage() {
               >
                 <Menu size={18} />
               </button>
-              <div className="relative">
-                <select
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
-                  className="appearance-none rounded-xl border border-[#414E36]/15 bg-white py-2 pl-3 pr-8 text-sm font-medium text-[#1F251A] shadow-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 cursor-pointer"
-                >
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name_en}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
-              </div>
+              {adminRole === "superadmin" || adminRole === "admin" ? (
+                <div className="relative">
+                  <select
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    className="appearance-none rounded-xl border border-[#414E36]/15 bg-white py-2 pl-3 pr-8 text-sm font-medium text-[#1F251A] shadow-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 cursor-pointer"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name_en}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                </div>
+              ) : (
+                <div className="rounded-xl border border-[#414E36]/15 bg-white py-2 px-4 text-sm font-semibold text-[#1F251A] shadow-sm select-none">
+                  {branches.find((b) => b.id === branch)?.name_en || "Loading assigned branch..."}
+                </div>
+              )}
             </div>
 
             {/* Right: new entry, notifications, user profile */}
@@ -10499,6 +10511,7 @@ export default function AdminPage() {
                     setNewEmployeeNationalIdFront("");
                     setNewEmployeeNationalIdBack("");
                     setNewEmployeeAddress("");
+                    setNewEmployeeBranchId("");
                     setIsEditingEmployeeModalOpen(true);
                   }}
                   className="rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-md shrink-0"
@@ -10559,6 +10572,7 @@ export default function AdminPage() {
                         <th className="px-6 py-4">Employee Info</th>
                         <th className="px-6 py-4">Phone</th>
                         <th className="px-6 py-4">Department</th>
+                        <th className="px-6 py-4">Branch</th>
                         <th className="px-6 py-4">Shift</th>
                         <th className="px-6 py-4">Salary</th>
 
@@ -10569,7 +10583,7 @@ export default function AdminPage() {
                     <tbody className="divide-y divide-[#414E36]/5">
                       {loadingRolesAndEmployees ? (
                         <tr>
-                          <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                          <td colSpan={9} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
                             Loading employees...
                           </td>
                         </tr>
@@ -10591,7 +10605,7 @@ export default function AdminPage() {
                         if (filtered.length === 0) {
                           return (
                             <tr>
-                              <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                              <td colSpan={9} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
                                 No employees match your filters.
                               </td>
                             </tr>
@@ -10613,6 +10627,11 @@ export default function AdminPage() {
                               <td className="px-6 py-4">
                                 <span className="inline-block rounded-xl bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold text-[#8B7544]">
                                   {emp.department || "Reception"}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">
+                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
                                 </span>
                               </td>
                               <td className="px-6 py-4">
@@ -10656,6 +10675,7 @@ export default function AdminPage() {
                                           setNewEmployeeNationalIdFront(emp.national_id_front || "");
                                           setNewEmployeeNationalIdBack(emp.national_id_back || "");
                                           setNewEmployeeAddress(emp.address || "");
+                                          setNewEmployeeBranchId(emp.branch_id || "");
                                           setIsEditingEmployeeModalOpen(true);
                                         }}
                                         className="text-[#C4AE7C] hover:text-[#a38f61] transition"
@@ -10737,6 +10757,7 @@ export default function AdminPage() {
                                 nationalIdFront: newEmployeeNationalIdFront || null,
                                 nationalIdBack: newEmployeeNationalIdBack || null,
                                 address: newEmployeeAddress.trim() || null,
+                                branchId: newEmployeeBranchId || null,
                               }),
                             });
                             if (res.ok) {
@@ -10767,6 +10788,7 @@ export default function AdminPage() {
                                 nationalIdFront: newEmployeeNationalIdFront || null,
                                 nationalIdBack: newEmployeeNationalIdBack || null,
                                 address: newEmployeeAddress.trim() || null,
+                                branchId: newEmployeeBranchId || null,
                               }),
                             });
                             if (res.ok) {
@@ -10832,6 +10854,20 @@ export default function AdminPage() {
                             <option value="" disabled>Select Role</option>
                             {rolesList.map((role: any) => (
                               <option key={role.name} value={role.name}>{role.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Assigned Branch *</label>
+                          <select
+                            required
+                            value={newEmployeeBranchId}
+                            onChange={(e) => setNewEmployeeBranchId(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                          >
+                            <option value="" disabled>Select Branch</option>
+                            {branches.map((b) => (
+                              <option key={b.id} value={b.id}>{b.name_en}</option>
                             ))}
                           </select>
                         </div>
