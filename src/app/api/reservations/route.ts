@@ -208,6 +208,10 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
+    if (target.status === 'started' && (action === 'reject' || status === 'cancelled' || status === 'rejected')) {
+      return NextResponse.json({ error: 'Cannot cancel a booking that has already started.' }, { status: 400 });
+    }
+
     if (action === 'approve') {
       if (!timeSlot) return NextResponse.json({ error: 'Missing timeSlot' }, { status: 400 });
 

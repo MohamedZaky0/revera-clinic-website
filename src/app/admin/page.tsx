@@ -14514,123 +14514,6 @@ export default function AdminPage() {
                     )}
                   </div>
 
-                  {viewingBooking.status === 'pending' && hasPermission("bookings.approve_reject") && (
-                    <div className="rounded-2xl border-2 border-[#C4AE7C]/30 bg-[#EDF1EC] p-5 flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-bold text-[#1F251A]">Action Required</p>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">This booking is pending approval. Assign a doctor and confirm details.</p>
-                      </div>
-                      <div className="flex gap-3">
-                        <button
-                          disabled={loadingApproveId === viewingBooking.id}
-                          onClick={async () => {
-                            await openApprove(viewingBooking);
-                            setViewingBooking(null);
-                          }}
-                          className="rounded-3xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 flex items-center gap-1.5"
-                        >
-                          {loadingApproveId === viewingBooking.id ? (
-                            <>
-                              <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
-                              Loading...
-                            </>
-                          ) : (
-                            "Approve"
-                          )}
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (await showConfirm("Are you sure you want to reject this request?")) {
-                              await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ action: 'reject' }),
-                              });
-                              setViewingBooking(null);
-                              fetchRequests();
-                              fetchAllReservations();
-                            }
-                          }}
-                          className="rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#f7f6f2] transition"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {(viewingBooking.status === 'approved' || viewingBooking.status === 'confirmed') && hasPermission("bookings.edit") && (
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-bold text-[#1F251A]">Session Ready</p>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">The customer is ready to begin their clinical session.</p>
-                      </div>
-                      <div className="flex gap-2">
-                        {viewingBooking.status === 'approved' && (
-                          <button
-                            onClick={async () => {
-                              try {
-                                const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ status: 'confirmed' })
-                                });
-                                if (res.ok) {
-                                  const updated = await res.json();
-                                  setViewingBooking(updated);
-                                  fetchAllReservations();
-                                }
-                              } catch (err) {
-                                console.error(err);
-                              }
-                            }}
-                            className="rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#f7f6f2] transition"
-                          >
-                            Confirm
-                          </button>
-                        )}
-                        <button
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ status: 'started' })
-                              });
-                              if (res.ok) {
-                                const updated = await res.json();
-                                setViewingBooking(updated);
-                                fetchAllReservations();
-                              }
-                            } catch (err) {
-                              console.error(err);
-                            }
-                          }}
-                          className="rounded-3xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5"
-                        >
-                          Start Session
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {viewingBooking.status === 'started' && hasPermission("bookings.edit") && (
-                    <div className="rounded-2xl border-2 border-dashed border-[#C4AE7C]/30 bg-[#EDF1EC] p-5 flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-bold text-[#1F251A]">Session In Progress</p>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">The session is currently active. End session to process payment.</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setCheckoutBooking(viewingBooking);
-                        }}
-                        className="rounded-3xl bg-[#C4AE7C] px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#b59e6c] transition flex items-center gap-1.5"
-                      >
-                        End Session & Pay
-                      </button>
-                    </div>
-                  )}
-
                 </div>
 
                 {/* Right Column */}
@@ -14794,8 +14677,124 @@ export default function AdminPage() {
                     </button>
                   </div>
 
+                  {/* Workflow Action Flow Section */}
+                  {viewingBooking.status === 'pending' && hasPermission("bookings.approve_reject") && (
+                    <div className="rounded-2xl border-2 border-[#C4AE7C]/30 bg-[#EDF1EC] p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Workflow Actions</p>
+                      <p className="text-xs text-[#5A6A51] mb-4">This booking is pending approval. Assign a doctor and confirm details.</p>
+                      <div className="flex gap-3">
+                        <button
+                          disabled={loadingApproveId === viewingBooking.id}
+                          onClick={async () => {
+                            await openApprove(viewingBooking);
+                            setViewingBooking(null);
+                          }}
+                          className="flex-1 rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 flex items-center justify-center gap-1.5"
+                        >
+                          {loadingApproveId === viewingBooking.id ? (
+                            <>
+                              <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+                              Loading...
+                            </>
+                          ) : (
+                            "Approve"
+                          )}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (await showConfirm("Are you sure you want to reject this request?")) {
+                              await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'reject' }),
+                              });
+                              setViewingBooking(null);
+                              fetchRequests();
+                              fetchAllReservations();
+                            }
+                          }}
+                          className="flex-1 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {(viewingBooking.status === 'approved' || viewingBooking.status === 'confirmed') && hasPermission("bookings.edit") && (
+                    <div className="rounded-2xl border border-[#C4AE7C]/30 bg-white p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Session Flow</p>
+                      <p className="text-xs text-[#5A6A51] mb-4">The customer is ready to begin their clinical session.</p>
+                      <div className="flex gap-3">
+                        {viewingBooking.status === 'approved' && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ status: 'confirmed' })
+                                });
+                                if (res.ok) {
+                                  const updated = await res.json();
+                                  setViewingBooking(updated);
+                                  fetchAllReservations();
+                                }
+                              } catch (err) {
+                                console.error(err);
+                              }
+                            }}
+                            className="flex-1 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                          >
+                            Confirm
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ status: 'started' })
+                              });
+                              if (res.ok) {
+                                const updated = await res.json();
+                                setViewingBooking(updated);
+                                fetchAllReservations();
+                              }
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          className="flex-1 rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center justify-center gap-1.5"
+                        >
+                          Start Session
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {viewingBooking.status === 'started' && hasPermission("bookings.edit") && (
+                    <div className="rounded-2xl border-2 border-dashed border-[#C4AE7C]/30 bg-[#EDF1EC] p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Session Flow</p>
+                      <p className="text-xs text-[#5A6A51] mb-4">The session is currently active. End session to settle invoice.</p>
+                      <button
+                        onClick={() => {
+                          setCheckoutBooking(viewingBooking);
+                        }}
+                        className="w-full rounded-2xl bg-[#C4AE7C] py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#b59e6c] transition flex items-center justify-center gap-1.5 shadow-md"
+                      >
+                        End Session & Pay
+                      </button>
+                    </div>
+                  )}
+
                   {/* Cancel Booking Section */}
-                  {hasPermission("bookings.delete") && (
+                  {hasPermission("bookings.delete") && 
+                   viewingBooking.status !== 'started' && 
+                   viewingBooking.status !== 'completed' && 
+                   viewingBooking.status !== 'cancelled' && 
+                   viewingBooking.status !== 'rejected' && (
                     <div className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
                       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-red-800 mb-3">Cancel Booking</p>
                       <button
