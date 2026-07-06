@@ -196,7 +196,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds } = body;
+    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal } = body;
 
     const { data: target, error: findError } = await supabaseServer
       .from('reservations')
@@ -414,6 +414,42 @@ export async function PATCH(req: Request) {
         .single();
 
       if (updateError) throw updateError;
+
+      // Handle customer wallet and spent/outstanding updates on checkout / completed
+      if (status === 'completed' && target.customer_id) {
+        try {
+          const { data: customer, error: fetchCustErr } = await supabaseServer
+            .from('customers')
+            .select('wallet_balance, spent_amount, outstanding')
+            .eq('id', target.customer_id)
+            .single();
+
+          if (!fetchCustErr && customer) {
+            const currentWallet = Number(customer.wallet_balance || 0);
+            const currentSpent = Number(customer.spent_amount || 0);
+            const currentOutstanding = Number(customer.outstanding || 0);
+
+            const deposit = Number(walletDeposit || 0);
+            const withdrawal = Number(walletWithdrawal || 0);
+
+            const newWallet = Math.max(0, currentWallet + deposit - withdrawal);
+            const newSpent = currentSpent + Number(amountPaid || 0) + withdrawal;
+            const newOutstanding = currentOutstanding + Number(amountLeft || 0);
+
+            await supabaseServer
+              .from('customers')
+              .update({
+                wallet_balance: newWallet,
+                spent_amount: newSpent,
+                outstanding: newOutstanding
+              })
+              .eq('id', target.customer_id);
+          }
+        } catch (custErr) {
+          console.error("Failed to update customer wallet balance:", custErr);
+        }
+      }
+
       return NextResponse.json(mapRow(updated));
     } else {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

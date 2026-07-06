@@ -163,6 +163,7 @@ type Customer = {
   registration_date?: string;
   active?: boolean;
   spent_amount?: number;
+  wallet_balance?: number;
   area?: string | null;
   location_name?: string | null;
   street_name?: string | null;
@@ -723,6 +724,13 @@ export default function AdminPage() {
   const [deleteCustomerTarget, setDeleteCustomerTarget] = useState<Customer | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState(false);
 
+  // Checkout & Payment states
+  const [checkoutBooking, setCheckoutBooking] = useState<any>(null);
+  const [checkoutAmountPaid, setCheckoutAmountPaid] = useState<string>("");
+  const [useWalletBalance, setUseWalletBalance] = useState<boolean>(false);
+  const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(true);
+  const [savingCheckout, setSavingCheckout] = useState<boolean>(false);
+
   const [custName, setCustName] = useState("");
   const [custMobile, setCustMobile] = useState("");
   const [custEmail, setCustEmail] = useState("");
@@ -730,6 +738,7 @@ export default function AdminPage() {
   const [custActive, setCustActive] = useState(true);
   const [custSpent, setCustSpent] = useState("0");
   const [custOutstanding, setCustOutstanding] = useState("0");
+  const [custWallet, setCustWallet] = useState("0");
   const [custArea, setCustArea] = useState("");
   const [custLocationName, setCustLocationName] = useState("");
   const [custStreet, setCustStreet] = useState("");
@@ -2509,7 +2518,7 @@ export default function AdminPage() {
         bookings: c.number_of_bookings || 0,
         spent: Number(c.spent_amount || 0),
         outstanding: Number(c.outstanding || 0),
-        wallet: 0,
+        wallet: Number(c.wallet_balance || 0),
         active: isActive,
       };
     });
@@ -3569,6 +3578,7 @@ export default function AdminPage() {
     setCustActive(true);
     setCustSpent("0");
     setCustOutstanding("0");
+    setCustWallet("0");
     setCustArea("");
     setCustLocationName("");
     setCustStreet("");
@@ -3593,6 +3603,7 @@ export default function AdminPage() {
     setCustActive(c.active !== undefined ? c.active : true);
     setCustSpent(String(c.spent_amount !== undefined ? c.spent_amount : c.spent || 0));
     setCustOutstanding(String(c.outstanding || 0));
+    setCustWallet(String(c.wallet_balance || c.wallet || 0));
     setCustArea(c.area || "");
     setCustLocationName(c.location_name || "");
     setCustStreet(c.street_name || "");
@@ -3840,6 +3851,7 @@ export default function AdminPage() {
       active: custActive,
       spent_amount: parseFloat(custSpent) || 0,
       outstanding: parseFloat(custOutstanding) || 0,
+      wallet_balance: parseFloat(custWallet) || 0,
       area: custArea.trim() || null,
       location_name: custLocationName.trim() || null,
       street_name: custStreet.trim() || null,
@@ -14547,6 +14559,78 @@ export default function AdminPage() {
                     </div>
                   )}
 
+                  {(viewingBooking.status === 'approved' || viewingBooking.status === 'confirmed') && hasPermission("bookings.edit") && (
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-bold text-[#1F251A]">Session Ready</p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">The customer is ready to begin their clinical session.</p>
+                      </div>
+                      <div className="flex gap-2">
+                        {viewingBooking.status === 'approved' && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ status: 'confirmed' })
+                                });
+                                if (res.ok) {
+                                  const updated = await res.json();
+                                  setViewingBooking(updated);
+                                  fetchAllReservations();
+                                }
+                              } catch (err) {
+                                console.error(err);
+                              }
+                            }}
+                            className="rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                          >
+                            Confirm
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ status: 'started' })
+                              });
+                              if (res.ok) {
+                                const updated = await res.json();
+                                setViewingBooking(updated);
+                                fetchAllReservations();
+                              }
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          className="rounded-3xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5"
+                        >
+                          Start Session
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {viewingBooking.status === 'started' && hasPermission("bookings.edit") && (
+                    <div className="rounded-2xl border-2 border-dashed border-[#C4AE7C]/30 bg-[#EDF1EC] p-5 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-bold text-[#1F251A]">Session In Progress</p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">The session is currently active. End session to process payment.</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setCheckoutBooking(viewingBooking);
+                        }}
+                        className="rounded-3xl bg-[#C4AE7C] px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#b59e6c] transition flex items-center gap-1.5"
+                      >
+                        End Session & Pay
+                      </button>
+                    </div>
+                  )}
+
                 </div>
 
                 {/* Right Column */}
@@ -16422,6 +16506,233 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── PAYMENT SETTLEMENT MODAL ── */}
+      {checkoutBooking && (
+        (() => {
+          // 1. Calculate service cost
+          const svcIds = Array.isArray(checkoutBooking.serviceIds) ? checkoutBooking.serviceIds : [checkoutBooking.serviceId];
+          const bookingServicesList = svcIds.map((id: number) => {
+            const s = localServices.find(srv => srv.id === id);
+            return {
+              name: s?.en || `Service #${id}`,
+              price: s?.price ?? 500
+            };
+          });
+          const totalCost = bookingServicesList.reduce((sum: number, s: any) => sum + s.price, 0);
+
+          // 2. Fetch customer details
+          const customerRecord = dbCustomers.find(c => c.id === checkoutBooking.customerId || c.phone === checkoutBooking.phone);
+          const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
+
+          // 3. Math calculation
+          const walletDeduction = useWalletBalance ? Math.min(walletBalance, totalCost) : 0;
+          const netDue = Math.max(0, totalCost - walletDeduction);
+          
+          const amountPaidNum = parseFloat(checkoutAmountPaid) || 0;
+          const diff = amountPaidNum - netDue;
+
+          const changeAmount = diff > 0 ? diff : 0;
+          const remainingAmount = diff < 0 ? -diff : 0;
+
+          const handleConfirmCheckout = async () => {
+            setSavingCheckout(true);
+            try {
+              const res = await fetch(`/api/reservations?id=${checkoutBooking.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  status: "completed",
+                  amountPaid: amountPaidNum,
+                  amountLeft: remainingAmount,
+                  walletWithdrawal: walletDeduction,
+                  walletDeposit: changeAmount > 0 && depositChangeToWallet ? changeAmount : 0
+                })
+              });
+              if (res.ok) {
+                setCheckoutBooking(null);
+                setCheckoutAmountPaid("");
+                setUseWalletBalance(false);
+                setDepositChangeToWallet(true);
+                // Refresh list and details
+                fetchAllReservations();
+                fetchCustomers();
+                // Close the viewing booking drawer if open
+                setViewingBooking(null);
+              } else {
+                const err = await res.json();
+                alert(err.error || "Failed to complete checkout");
+              }
+            } catch (err) {
+              console.error(err);
+              alert("Error completing checkout");
+            } finally {
+              setSavingCheckout(false);
+            }
+          };
+
+          return (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <div className="w-full max-w-lg rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+                {/* Header */}
+                <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Invoice Checkout</p>
+                    <h3 className="text-xl font-bold text-[#1F251A] mt-1">Payment Settlement</h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setCheckoutBooking(null);
+                      setCheckoutAmountPaid("");
+                      setUseWalletBalance(false);
+                      setDepositChangeToWallet(true);
+                    }}
+                    className="rounded-full bg-[#F2EFE9] p-2 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="space-y-4 text-sm text-[#414E36]">
+                  {/* Customer Information */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">Customer / المريض</p>
+                    <p className="font-bold text-[#1F251A]">{checkoutBooking.name}</p>
+                    <p className="text-xs text-[#5A6A51] mt-0.5">{checkoutBooking.phone}</p>
+                  </div>
+
+                  {/* Services Invoice details */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-[#EDF1EC]/30 p-4 space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-1">Services List / الخدمات</p>
+                    {bookingServicesList.map((svc: any, idx: number) => (
+                      <div key={idx} className="flex justify-between font-medium">
+                        <span className="text-[#1F251A]">{svc.name}</span>
+                        <span>{svc.price} EGP</span>
+                      </div>
+                    ))}
+                    <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
+                      <span>Total Cost / الإجمالي</span>
+                      <span>{totalCost} EGP</span>
+                    </div>
+                  </div>
+
+                  {/* Wallet Option */}
+                  {walletBalance > 0 && (
+                    <div className="rounded-2xl border border-[#C4AE7C]/20 bg-[#FBFBF9] p-4 flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-[#1F251A] flex items-center gap-1.5">
+                          <span className="inline-block h-2 w-2 rounded-full bg-[#C4AE7C]"></span>
+                          Use Customer Wallet / استخدام المحفظة
+                        </p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">Available balance: {walletBalance} EGP</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={useWalletBalance}
+                          onChange={(e) => setUseWalletBalance(e.target.checked)}
+                          className="h-5 w-5 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Payment Inputs */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-[#5A6A51] mb-1">
+                        Net Due / المطلوب
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          disabled
+                          value={`${netDue} EGP`}
+                          className="w-full rounded-xl border border-[#414E36]/10 bg-[#EDF1EC]/30 px-3 py-2.5 text-sm font-bold text-[#1F251A] outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-[#5A6A51] mb-1">
+                        Amount Paid / المدفوع
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          value={checkoutAmountPaid}
+                          onChange={(e) => setCheckoutAmountPaid(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-10 py-2.5 text-sm font-bold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Calculations & Overpay Options */}
+                  {changeAmount > 0 && (
+                    <div className="rounded-2xl border border-green-200 bg-green-50/50 p-4 space-y-3">
+                      <div className="flex justify-between font-bold text-green-800 text-sm">
+                        <span>Change / الباقي</span>
+                        <span>{changeAmount} EGP</span>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={depositChangeToWallet}
+                          onChange={(e) => setDepositChangeToWallet(e.target.checked)}
+                          className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                        />
+                        <span className="text-xs font-semibold text-[#1F251A]">
+                          Put change in customer's wallet / حفظ الباقي في المحفظة
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
+                  {remainingAmount > 0 && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50/50 p-4 flex justify-between font-bold text-red-800 text-sm">
+                      <span>Outstanding Balance / المتبقي دين</span>
+                      <span>{remainingAmount} EGP</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="mt-6 flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
+                  <button
+                    onClick={() => {
+                      setCheckoutBooking(null);
+                      setCheckoutAmountPaid("");
+                      setUseWalletBalance(false);
+                      setDepositChangeToWallet(true);
+                    }}
+                    className="rounded-xl border border-[#414E36]/15 bg-white px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={savingCheckout}
+                    onClick={handleConfirmCheckout}
+                    className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 flex items-center gap-1.5 shadow-md"
+                  >
+                    {savingCheckout ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+                        Processing...
+                      </>
+                    ) : (
+                      "Confirm & Complete"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()
       )}
 
     </div>
