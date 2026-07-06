@@ -1427,7 +1427,11 @@ export default function AdminPage() {
 
   // Geolocation Check-In on login resolution
   useEffect(() => {
-    if (!adminEmail || employeesList.length === 0 || !session?.access_token) return;
+    if (!adminEmail || employeesList.length === 0 || !session?.access_token || !adminRole) return;
+    
+    // Superadmin and Admin do not have attendance tracking and are exempt
+    if (adminRole === 'superadmin' || adminRole === 'admin') return;
+
     const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
     if (!profileEmployee) return;
 
@@ -1473,7 +1477,7 @@ export default function AdminPage() {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, [adminEmail, employeesList, session]);
+  }, [adminEmail, employeesList, session, adminRole]);
 
   // 30-minute Presence Monitor for standard staff
   useEffect(() => {
