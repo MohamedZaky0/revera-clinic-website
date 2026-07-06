@@ -617,6 +617,23 @@ export default function AdminPage() {
   const [viewingEmployee, setViewingEmployee] = useState<any | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<any | null>(null);
   const [isEditingEmployeeModalOpen, setIsEditingEmployeeModalOpen] = useState(false);
+  // Profile settings states
+  const [profilePassword, setProfilePassword] = useState("");
+  const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
+  const [profilePasswordSaving, setProfilePasswordSaving] = useState(false);
+  const [profilePasswordError, setProfilePasswordError] = useState("");
+  const [profilePasswordSuccess, setProfilePasswordSuccess] = useState("");
+
+  // Personal profile states
+  const [profileName, setProfileName] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileAddress, setProfileAddress] = useState("");
+  const [profileNatId, setProfileNatId] = useState("");
+  const [profileNatIdFront, setProfileNatIdFront] = useState("");
+  const [profileNatIdBack, setProfileNatIdBack] = useState("");
+  const [updatingProfile, setUpdatingProfile] = useState(false);
+  const [profileUpdateError, setProfileUpdateError] = useState("");
+  const [profileUpdateSuccess, setProfileUpdateSuccess] = useState("");
 
 
   const [requests, setRequests] = useState<Req[]>([]);
@@ -1104,11 +1121,11 @@ export default function AdminPage() {
     if (adminRole === 'superadmin') return;
     if (adminPermissions.length > 0) {
       let isPermitted = false;
-      if (activeNav === 'Logout') {
+      if (activeNav === 'Logout' || activeNav === 'Profile') {
         isPermitted = true;
       } else {
         const settingsSubsections: Record<string, string> = {
-          "Profile": "settings.profile",
+          "Clinic Profile": "settings.profile",
           "Service Hours": "settings.service_hours",
           "Branches": "settings.branches",
           "Booking Settings": "settings.booking_settings",
@@ -1226,10 +1243,25 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    if ((activeNav === "Role Management" || activeNav === "Employees") && adminRole === "superadmin") {
+    if (activeNav === "Profile" || ((activeNav === "Role Management" || activeNav === "Employees") && adminRole === "superadmin")) {
       fetchRolesAndEmployees();
     }
   }, [activeNav, adminRole]);
+
+  useEffect(() => {
+    if (!adminEmail || employeesList.length === 0) return;
+    const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+    if (profileEmployee) {
+      setProfileName(profileEmployee.name || "");
+      setProfilePhone(profileEmployee.phone || "");
+      setProfileAddress(profileEmployee.address || "");
+      setProfileNatId(profileEmployee.national_id || "");
+      setProfileNatIdFront(profileEmployee.national_id_front || "");
+      setProfileNatIdBack(profileEmployee.national_id_back || "");
+    } else if (adminEmail.toLowerCase() === "superadmin@revera.com") {
+      setProfileName("System Owner");
+    }
+  }, [adminEmail, employeesList]);
 
   async function fetchRolesAndEmployees() {
     console.log("RBAC - fetchRolesAndEmployees called!");
@@ -1496,10 +1528,10 @@ export default function AdminPage() {
     console.log("RBAC Access Check - activeNav:", activeNav, "| adminRole:", adminRole, "| permissions:", adminPermissions);
     if (!adminRole) return false;
     if (adminRole === 'superadmin') return true;
-    if (activeNav === 'Logout') return true;
+    if (activeNav === 'Logout' || activeNav === 'Profile') return true;
     
     const settingsSubsections: Record<string, string> = {
-      "Profile": "settings.profile",
+      "Clinic Profile": "settings.profile",
       "Service Hours": "settings.service_hours",
       "Branches": "settings.branches",
       "Booking Settings": "settings.booking_settings",
@@ -2691,6 +2723,109 @@ export default function AdminPage() {
       })
       .catch((err) => console.error("fetchPageSettings error:", err))
       .finally(() => setLoadingPageSettings(false));
+  }
+
+  const handleProfileImageUpload = async (file: File, side: 'front' | 'back') => {
+    try {
+      const compressed = await compressImage(file, 1000, 1000, 0.75);
+      if (side === 'front') {
+        setProfileNatIdFront(compressed);
+      } else {
+        setProfileNatIdBack(compressed);
+      }
+    } catch (error) {
+      console.error("Error compressing profile image:", error);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (side === 'front') {
+          setProfileNatIdFront(reader.result as string);
+        } else {
+          setProfileNatIdBack(reader.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  async function handleSavePersonalProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setUpdatingProfile(true);
+    setProfileUpdateError("");
+    setProfileUpdateSuccess("");
+    try {
+      const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+      if (!profileEmployee) {
+        throw new Error("Could not locate employee account profile to update.");
+      }
+
+      // Check National ID format if entered
+      if (profileNatId.trim() && profileNatId.trim().length !== 14) {
+        throw new Error("Egyptian National ID must be exactly 14 digits.");
+      }
+
+      const res = await fetch("/api/employees", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: profileEmployee.id,
+          name: profileName.trim(),
+          phone: profilePhone.trim(),
+          address: profileAddress.trim(),
+          nationalId: profileNatId.trim() || null,
+          nationalIdFront: profileNatIdFront || null,
+          nationalIdBack: profileNatIdBack || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to update profile details.");
+      }
+
+      setProfileUpdateSuccess("Profile updated successfully!");
+      fetchRolesAndEmployees();
+    } catch (err: any) {
+      console.error("handleSavePersonalProfile error:", err);
+      setProfileUpdateError(err.message || "Something went wrong.");
+    } finally {
+      setUpdatingProfile(false);
+    }
+  }
+
+  async function handleSavePersonalPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!profilePassword || !profileConfirmPassword) {
+      setProfilePasswordError("Please fill in both password fields.");
+      return;
+    }
+    if (profilePassword !== profileConfirmPassword) {
+      setProfilePasswordError("Passwords do not match.");
+      return;
+    }
+    if (profilePassword.length < 6) {
+      setProfilePasswordError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setProfilePasswordSaving(true);
+    setProfilePasswordError("");
+    setProfilePasswordSuccess("");
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: profilePassword,
+      });
+
+      if (updateError) throw updateError;
+
+      setProfilePasswordSuccess("Password changed successfully!");
+      setProfilePassword("");
+      setProfileConfirmPassword("");
+    } catch (err: any) {
+      console.error("handleSavePersonalPassword error:", err);
+      setProfilePasswordError(err.message || "Failed to update password.");
+    } finally {
+      setProfilePasswordSaving(false);
+    }
   }
 
   // ── Settings Panel Handlers ──
@@ -3901,7 +4036,8 @@ export default function AdminPage() {
                     {settingsExpanded && (
                       <div className="mt-1 space-y-1 overflow-hidden rounded-2xl bg-black/15 py-1.5 pl-3 pr-1">
                         {[
-                          { label: "Profile", icon: User, perm: "settings.profile" },
+                          { label: "Profile", icon: User, perm: null },
+                          { label: "Clinic Profile", icon: Store, perm: "settings.profile" },
                           { label: "Service Hours", icon: Clock, perm: "settings.service_hours" },
                           { label: "Branches", icon: MapIcon, perm: "settings.branches" },
                           { label: "Rooms", icon: DoorOpen, perm: "settings.rooms" },
@@ -3911,6 +4047,7 @@ export default function AdminPage() {
                           { label: "Pages Settings", icon: FileText, perm: "settings.pages" },
                           { label: "Role Management", icon: Shield, perm: "settings.roles" }
                         ].filter(sub => {
+                          if (!sub.perm) return true;
                           if (adminRole === 'superadmin') return true;
                           return hasPermission(sub.perm);
                         }).map((sub) => {
@@ -4154,12 +4291,7 @@ export default function AdminPage() {
                   </div>
                 )}
               </div>
-
-              <button className="flex items-center gap-2 rounded-xl border border-[#414E36]/10 bg-white px-3 py-1.5 text-sm font-medium text-[#1F251A] shadow-sm transition hover:bg-[#f5f4f0]">
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#414E36] text-white text-xs font-bold">RC</span>
-                <span>Revera Clinics</span>
-                <ChevronDown size={14} className="text-[#5A6A51]" />
-              </button>
+              {/* Removed Revera Clinics button */}
             </div>
           </div>
 
@@ -9083,7 +9215,308 @@ export default function AdminPage() {
           )}
 
           {/* ── SETTINGS VIEWS ── */}
-          {activeNav === "Profile" && (
+          {activeNav === "Profile" && (() => {
+            const isSuperadminBypass = adminEmail?.toLowerCase() === "superadmin@revera.com";
+            const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+            
+            // Check Egyptian ID check details
+            let idCheckPassed = false;
+            let birthDate = "";
+            let gender = "";
+            let governorate = "";
+            
+            if (profileNatId && profileNatId.length === 14) {
+              const parsed = parseEgyptianNationalId(profileNatId) as any;
+              if (parsed.isValid) {
+                idCheckPassed = true;
+                birthDate = parsed.birthDate;
+                gender = parsed.gender;
+                governorate = parsed.governorate;
+              }
+            }
+
+            return (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Personal Profile</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Manage your personal employee profile details and security credentials.</p>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-3">
+                  {/* Left Section: Personal & Account details */}
+                  <div className="lg:col-span-2 space-y-6">
+                    
+                    {/* Account Overview Card */}
+                    <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5 flex flex-col md:flex-row gap-6 items-center">
+                      <div className="h-24 w-24 rounded-full bg-[#414E36] text-white flex items-center justify-center font-bold text-3xl shadow-inner uppercase shrink-0">
+                        {profileName ? profileName.slice(0, 2) : "EM"}
+                      </div>
+                      <div className="flex-1 text-center md:text-left space-y-2">
+                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+                          <h3 className="text-2xl font-bold text-[#1F251A]">{profileName || "Employee Account"}</h3>
+                          <span className="rounded-full bg-[#EDE4C8] px-3 py-1 text-xs font-semibold text-[#414E36] border border-[#C4AE7C]/30 capitalize animate-pulse">
+                            {isSuperadminBypass ? "superadmin" : profileEmployee?.role_name || "Employee"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-[#5A6A51] flex items-center justify-center md:justify-start gap-1.5">
+                          <CircleUser size={14} className="text-[#C4AE7C]" />
+                          <span>{adminEmail || "No Email linked"}</span>
+                        </p>
+                        {!isSuperadminBypass && (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 pt-4 border-t border-gray-100 text-xs">
+                            <div>
+                              <span className="text-[#8A9A81] block font-semibold uppercase tracking-wider text-[9px] mb-0.5">Department</span>
+                              <span className="font-semibold text-[#1F251A]">{profileEmployee?.department || "Reception"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8A9A81] block font-semibold uppercase tracking-wider text-[9px] mb-0.5">Shift</span>
+                              <span className="font-semibold text-[#1F251A]">{profileEmployee?.shift || "Day"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8A9A81] block font-semibold uppercase tracking-wider text-[9px] mb-0.5">Salary</span>
+                              <span className="font-semibold text-[#1F251A]">{profileEmployee?.salary ? `${Number(profileEmployee.salary).toLocaleString()} EGP` : "—"}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Edit Profile Form */}
+                    {!isSuperadminBypass && (
+                      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5">
+                        <h4 className="text-lg font-bold text-[#1F251A] mb-4">Edit Personal Information</h4>
+                        <form onSubmit={handleSavePersonalProfile} className="space-y-6">
+                          <div className="grid gap-6 md:grid-cols-2">
+                            <div>
+                              <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Full Name *</label>
+                              <input
+                                type="text"
+                                required
+                                value={profileName}
+                                onChange={(e) => setProfileName(e.target.value)}
+                                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Phone Number</label>
+                              <input
+                                type="text"
+                                value={profilePhone}
+                                onChange={(e) => setProfilePhone(e.target.value)}
+                                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                              />
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Home Address</label>
+                              <input
+                                type="text"
+                                value={profileAddress}
+                                onChange={(e) => setProfileAddress(e.target.value)}
+                                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                              />
+                            </div>
+                          </div>
+
+                          {profileUpdateError && (
+                            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 font-medium">
+                              {profileUpdateError}
+                            </div>
+                          )}
+                          {profileUpdateSuccess && (
+                            <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-xs text-green-700 font-medium">
+                              {profileUpdateSuccess}
+                            </div>
+                          )}
+
+                          <div className="flex justify-end pt-2">
+                            <button
+                              type="submit"
+                              disabled={updatingProfile}
+                              className="rounded-3xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                            >
+                              {updatingProfile ? "Saving..." : "Save Personal Details"}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Section: Security & Documents */}
+                  <div className="space-y-6">
+                    
+                    {/* Security Card */}
+                    <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5">
+                      <h4 className="text-lg font-bold text-[#1F251A] mb-4">Security Settings</h4>
+                      <p className="text-xs text-[#5A6A51] mb-5">Change your login credentials securely below.</p>
+                      <form onSubmit={handleSavePersonalPassword} className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">New Password</label>
+                          <input
+                            type="password"
+                            required
+                            value={profilePassword}
+                            onChange={(e) => setProfilePassword(e.target.value)}
+                            placeholder="At least 6 characters"
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Confirm New Password</label>
+                          <input
+                            type="password"
+                            required
+                            value={profileConfirmPassword}
+                            onChange={(e) => setProfileConfirmPassword(e.target.value)}
+                            placeholder="Re-enter password"
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                          />
+                        </div>
+
+                        {profilePasswordError && (
+                          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 font-medium">
+                            {profilePasswordError}
+                          </div>
+                        )}
+                        {profilePasswordSuccess && (
+                          <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-xs text-green-700 font-medium">
+                            {profilePasswordSuccess}
+                          </div>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={profilePasswordSaving}
+                          className="w-full rounded-3xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                        >
+                          {profilePasswordSaving ? "Updating..." : "Update Password"}
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Verified Documents Card (Only for regular employees, not superadmin bypass) */}
+                    {!isSuperadminBypass && (
+                      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5 space-y-5">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="text-[#C4AE7C]" size={20} />
+                          <h4 className="text-lg font-bold text-[#1F251A]">Identity Documents</h4>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">National ID (14 digits)</label>
+                            <input
+                              type="text"
+                              value={profileNatId}
+                              onChange={(e) => {
+                                const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 14);
+                                setProfileNatId(digitsOnly);
+                              }}
+                              placeholder="14-digit Egyptian National ID"
+                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-xs font-mono text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                            />
+                          </div>
+
+                          {idCheckPassed && (
+                            <div className="rounded-2xl border border-green-100 bg-green-50/50 p-4 space-y-2 text-xs">
+                              <div className="flex items-center gap-1.5 font-bold text-green-700">
+                                <ShieldCheck size={14} />
+                                <span>Egyptian ID Check Passed</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-[#414E36]">
+                                <div>
+                                  <span className="opacity-80 block text-[10px]">Birth Date</span>
+                                  <span className="font-semibold">{birthDate}</span>
+                                </div>
+                                <div>
+                                  <span className="opacity-80 block text-[10px]">Gender</span>
+                                  <span className="font-semibold">{gender}</span>
+                                </div>
+                                <div className="col-span-2">
+                                  <span className="opacity-80 block text-[10px]">Governorate</span>
+                                  <span className="font-semibold">{governorate}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="space-y-4 pt-2">
+                            <div>
+                              <span className="block text-[11px] font-semibold text-[#5A6A51] mb-2">ID Card - Front Side</span>
+                              <div className="flex flex-col gap-3">
+                                <input
+                                  type="file"
+                                  id="profile-nat-front"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    if (e.target.files?.[0]) handleProfileImageUpload(e.target.files[0], 'front');
+                                  }}
+                                />
+                                <label
+                                  htmlFor="profile-nat-front"
+                                  className="cursor-pointer rounded-xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] hover:bg-[#EDE4C8]/10 px-4 py-2.5 text-center text-xs font-semibold text-[#414E36] transition block"
+                                >
+                                  Upload Front Photo
+                                </label>
+                                {profileNatIdFront && (
+                                  <div className="relative border border-[#414E36]/10 rounded-xl overflow-hidden bg-gray-50 h-28 flex items-center justify-center">
+                                    <img src={profileNatIdFront} alt="ID Front Preview" className="h-full object-contain" />
+                                    <button
+                                      type="button"
+                                      onClick={() => setProfileNatIdFront("")}
+                                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md transition"
+                                    >
+                                      <Plus size={12} className="rotate-45" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div>
+                              <span className="block text-[11px] font-semibold text-[#5A6A51] mb-2">ID Card - Back Side</span>
+                              <div className="flex flex-col gap-3">
+                                <input
+                                  type="file"
+                                  id="profile-nat-back"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    if (e.target.files?.[0]) handleProfileImageUpload(e.target.files[0], 'back');
+                                  }}
+                                />
+                                <label
+                                  htmlFor="profile-nat-back"
+                                  className="cursor-pointer rounded-xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] hover:bg-[#EDE4C8]/10 px-4 py-2.5 text-center text-xs font-semibold text-[#414E36] transition block"
+                                >
+                                  Upload Back Photo
+                                </label>
+                                {profileNatIdBack && (
+                                  <div className="relative border border-[#414E36]/10 rounded-xl overflow-hidden bg-gray-50 h-28 flex items-center justify-center">
+                                    <img src={profileNatIdBack} alt="ID Back Preview" className="h-full object-contain" />
+                                    <button
+                                      type="button"
+                                      onClick={() => setProfileNatIdBack("")}
+                                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md transition"
+                                    >
+                                      <Plus size={12} className="rotate-45" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {activeNav === "Clinic Profile" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
