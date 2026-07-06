@@ -133,13 +133,25 @@ export async function GET(req: Request) {
     const serviceHours = await fetchCachedServiceHours();
 
     // Get all active clinical rooms for this branch (cached)
-    const dbRooms = await fetchCachedRooms(branchId);
+    let dbRooms = await fetchCachedRooms(branchId);
+    if (dbRooms.length === 0) {
+      // Fallback: If no clinical rooms exist, construct a default virtual clinical room so bookings are not blocked
+      dbRooms = [{ id: '00000000-0000-0000-0000-000000000000', name: 'Virtual Clinical Room', branch_id: branchId }];
+    }
 
     // Fetch service rooms compatibility (cached)
     let activeCompRooms: { id: string; name: string }[] = [];
     if (serviceId) {
       const compRoomIds = await fetchCachedServiceRooms(Number(serviceId));
-      activeCompRooms = dbRooms.filter((r: any) => compRoomIds.includes(r.id));
+      if (compRoomIds.length > 0) {
+        activeCompRooms = dbRooms.filter((r: any) => compRoomIds.includes(r.id));
+      }
+      // Fallback: If service is not mapped to any specific clinical rooms, allow booking in any clinical room of the branch
+      if (activeCompRooms.length === 0) {
+        activeCompRooms = dbRooms;
+      }
+    } else {
+      activeCompRooms = dbRooms;
     }
     const t1 = Date.now();
     console.log(`[API availability] Metadata load took ${t1 - t0}ms`);

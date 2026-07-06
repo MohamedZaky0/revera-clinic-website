@@ -222,11 +222,13 @@ export async function PATCH(req: Request) {
         roomsQuery = roomsQuery.eq('branch_id', target.branch_id);
       }
 
-      const { data: branchRooms, error: roomsError } = await roomsQuery;
+      const { data: rawBranchRooms, error: roomsError } = await roomsQuery;
       if (roomsError) throw roomsError;
 
-      if (!branchRooms || branchRooms.length === 0) {
-        return NextResponse.json({ error: 'No active clinical rooms found for this branch.' }, { status: 400 });
+      let branchRooms = rawBranchRooms || [];
+      if (branchRooms.length === 0) {
+        // Fallback: If no clinical rooms exist, construct a default virtual clinical room so bookings are not blocked
+        branchRooms = [{ id: '00000000-0000-0000-0000-000000000000', name: 'Virtual Clinical Room', branch_id: target.branch_id }];
       }
 
       // Find compatible rooms for the service
@@ -238,10 +240,11 @@ export async function PATCH(req: Request) {
       if (mappingError) throw mappingError;
 
       const mappedRoomIds = mappedRooms ? mappedRooms.map((mr: any) => mr.room_id) : [];
-      const serviceCompRooms = branchRooms.filter((r: any) => mappedRoomIds.includes(r.id));
+      let serviceCompRooms = branchRooms.filter((r: any) => mappedRoomIds.includes(r.id));
 
       if (serviceCompRooms.length === 0) {
-        return NextResponse.json({ error: 'No clinical rooms are configured to perform this service in this branch.' }, { status: 400 });
+        // Fallback: If service is not mapped to any specific clinical rooms, allow booking in any clinical room of the branch
+        serviceCompRooms = branchRooms;
       }
 
       // Fetch target service duration
