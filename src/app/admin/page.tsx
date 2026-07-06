@@ -10225,9 +10225,10 @@ export default function AdminPage() {
                                           setNewEmployeeAddress(emp.address || "");
                                           setIsEditingEmployeeModalOpen(true);
                                         }}
-                                        className="text-xs font-semibold text-[#C4AE7C] hover:underline transition"
+                                        className="text-[#C4AE7C] hover:text-[#a38f61] transition"
+                                        title="Edit Employee"
                                       >
-                                        Edit
+                                        <Pencil size={15} />
                                       </button>
                                       {!emp.email_confirmed_at && (
                                         <button
