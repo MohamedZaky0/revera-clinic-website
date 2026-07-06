@@ -76,3 +76,47 @@ DROP POLICY IF EXISTS "Allow public write access to hr_performance_reviews" ON p
 CREATE POLICY "Allow public read access to hr_performance_reviews" ON public.hr_performance_reviews FOR SELECT USING (true);
 CREATE POLICY "Allow service_role full access to hr_performance_reviews" ON public.hr_performance_reviews FOR ALL TO service_role USING (true);
 CREATE POLICY "Allow public write access to hr_performance_reviews" ON public.hr_performance_reviews FOR ALL USING (true);
+
+-- 4. Create HR Attendance Table
+CREATE TABLE IF NOT EXISTS public.hr_attendance (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id    uuid REFERENCES public.employee_accounts(id) ON DELETE CASCADE,
+  date           date NOT NULL,
+  check_in_time  timestamptz DEFAULT now(),
+  latitude       numeric,
+  longitude      numeric,
+  status         text NOT NULL DEFAULT 'Present', -- Present, Late, Absent
+  created_at     timestamptz DEFAULT now(),
+  UNIQUE (employee_id, date)
+);
+
+-- 5. Create HR Missing/Inactivity Alerts Table
+CREATE TABLE IF NOT EXISTS public.hr_missing_alerts (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id    uuid REFERENCES public.employee_accounts(id) ON DELETE CASCADE,
+  timestamp      timestamptz NOT NULL DEFAULT now(),
+  resolved       boolean NOT NULL DEFAULT false,
+  created_at     timestamptz DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE public.hr_attendance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.hr_missing_alerts ENABLE ROW LEVEL SECURITY;
+
+-- Attendance Policies
+DROP POLICY IF EXISTS "Allow public read access to hr_attendance" ON public.hr_attendance;
+DROP POLICY IF EXISTS "Allow service_role full access to hr_attendance" ON public.hr_attendance;
+DROP POLICY IF EXISTS "Allow public write access to hr_attendance" ON public.hr_attendance;
+
+CREATE POLICY "Allow public read access to hr_attendance" ON public.hr_attendance FOR SELECT USING (true);
+CREATE POLICY "Allow service_role full access to hr_attendance" ON public.hr_attendance FOR ALL TO service_role USING (true);
+CREATE POLICY "Allow public write access to hr_attendance" ON public.hr_attendance FOR ALL USING (true);
+
+-- Missing Alerts Policies
+DROP POLICY IF EXISTS "Allow public read access to hr_missing_alerts" ON public.hr_missing_alerts;
+DROP POLICY IF EXISTS "Allow service_role full access to hr_missing_alerts" ON public.hr_missing_alerts;
+DROP POLICY IF EXISTS "Allow public write access to hr_missing_alerts" ON public.hr_missing_alerts;
+
+CREATE POLICY "Allow public read access to hr_missing_alerts" ON public.hr_missing_alerts FOR SELECT USING (true);
+CREATE POLICY "Allow service_role full access to hr_missing_alerts" ON public.hr_missing_alerts FOR ALL TO service_role USING (true);
+CREATE POLICY "Allow public write access to hr_missing_alerts" ON public.hr_missing_alerts FOR ALL USING (true);

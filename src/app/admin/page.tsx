@@ -641,6 +641,12 @@ export default function AdminPage() {
   const [newReviewRating, setNewReviewRating] = useState(5);
   const [newReviewComments, setNewReviewComments] = useState("");
   const [newReviewGoals, setNewReviewGoals] = useState("");
+  // Attendance and Activity Monitoring states
+  const [attendanceList, setAttendanceList] = useState<any[]>([]);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [activeMissingAlerts, setActiveMissingAlerts] = useState<any[]>([]);
+  const [presenceModalOpen, setPresenceModalOpen] = useState(false);
+  const [presenceCountdown, setPresenceCountdown] = useState(10);
   // Profile settings states
   const [profilePassword, setProfilePassword] = useState("");
   const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
@@ -1364,11 +1370,48 @@ export default function AdminPage() {
     }
   }
 
+  async function fetchHrAttendance() {
+    if (!session?.access_token) return;
+    setLoadingAttendance(true);
+    try {
+      const res = await fetch('/api/hr/attendance', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAttendanceList(data);
+      }
+    } catch (err) {
+      console.error("Error loading attendance:", err);
+    } finally {
+      setLoadingAttendance(false);
+    }
+  }
+
+  async function fetchHrAlerts() {
+    if (!session?.access_token) return;
+    try {
+      const res = await fetch('/api/hr/alerts', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setActiveMissingAlerts(data);
+      }
+    } catch (err) {
+      console.error("Error loading missing alerts:", err);
+    }
+  }
+
   const fetchHrData = useCallback(async () => {
     await Promise.all([
       fetchHrPayroll(),
       fetchHrLeaves(),
       fetchHrPerformance(),
+      fetchHrAttendance(),
+      fetchHrAlerts(),
       fetchRolesAndEmployees()
     ]);
   }, [session]);
@@ -1378,6 +1421,122 @@ export default function AdminPage() {
       fetchHrData();
     }
   }, [activeNav, fetchHrData]);
+
+  // Geolocation Check-In on login resolution
+  useEffect(() => {
+    if (!adminEmail || employeesList.length === 0 || !session?.access_token) return;
+    const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+    
+    if (profileEmployee) {
+      // Check-in check
+      const checkinKey = `checkin_${profileEmployee.id}_${new Date().toISOString().split('T')[0]}`;
+      if (typeof window !== "undefined" && !sessionStorage.getItem(checkinKey)) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            try {
+              const res = await fetch('/api/hr/attendance', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({
+                  employeeId: profileEmployee.id,
+                  latitude,
+                  longitude
+                })
+              });
+              if (res.ok) {
+                sessionStorage.setItem(checkinKey, "true");
+                console.log("Attendance daily check-in logged.");
+              } else {
+                const err = await res.json();
+                if (err.error === 'not_in_location') {
+                  alert("You are not in the right location for the attendance.");
+                }
+              }
+            } catch (err) {
+              console.error("Daily checkin error:", err);
+            }
+          },
+          (err) => {
+            console.warn("Geolocation access error:", err);
+            alert("Location access is required for daily attendance check-in.");
+          },
+          { enableHighAccuracy: true }
+        );
+      }
+    }
+  }, [adminEmail, employeesList, session]);
+
+  // 30-minute Presence Monitor for standard staff
+  useEffect(() => {
+    if (!session || !adminRole) return;
+    // Only for standard employees (not superadmin, admin, or HR)
+    if (adminRole === 'superadmin' || adminRole === 'admin' || adminRole === 'HR') return;
+
+    const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+    if (!profileEmployee) return;
+
+    const isTestMode = typeof window !== "undefined" && window.location.search.includes("test_presence=true");
+    const intervalMs = isTestMode ? 15000 : 30 * 60 * 1000;
+
+    const interval = setInterval(() => {
+      setPresenceCountdown(10);
+      setPresenceModalOpen(true);
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }, [session, adminRole, adminEmail, employeesList]);
+
+  // Presence countdown timer logic
+  useEffect(() => {
+    if (!presenceModalOpen) return;
+    if (presenceCountdown <= 0) {
+      setPresenceModalOpen(false);
+      
+      const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+      if (profileEmployee && session?.access_token) {
+        fetch('/api/hr/alerts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ employeeId: profileEmployee.id })
+        }).then((res) => {
+          if (res.ok) {
+            alert("You did not respond in time. An inactivity alert has been sent to the administrator.");
+          }
+        }).catch((err) => console.error("Failed to send missing alert:", err));
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setPresenceCountdown(prev => prev - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [presenceModalOpen, presenceCountdown, session, adminEmail, employeesList]);
+
+  // Admin Missing Alerts Polling
+  useEffect(() => {
+    if (!session || !adminRole) return;
+    if (adminRole !== 'superadmin' && adminRole !== 'admin' && adminRole !== 'HR') return;
+
+    fetchHrAlerts();
+
+    const isTestMode = typeof window !== "undefined" && window.location.search.includes("test_presence=true");
+    const intervalMs = isTestMode ? 5000 : 30000;
+
+    const poll = setInterval(() => {
+      fetchHrAlerts();
+    }, intervalMs);
+
+    return () => clearInterval(poll);
+  }, [session, adminRole]);
 
   async function handleAdminLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -1961,7 +2120,7 @@ export default function AdminPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
-  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [loadingProviderAttendance, setLoadingProviderAttendance] = useState(false);
   const [savingAttendanceId, setSavingAttendanceId] = useState<string | null>(null);
 
   const [showProviderFilterPanel, setShowProviderFilterPanel] = useState(false);
@@ -2536,7 +2695,7 @@ export default function AdminPage() {
   }
 
   async function fetchAttendance(dateStr: string) {
-    setLoadingAttendance(true);
+    setLoadingProviderAttendance(true);
     try {
       const res = await fetch(`/api/provider-attendance?date=${dateStr}`, { cache: "no-store" });
       if (res.ok) {
@@ -2548,7 +2707,7 @@ export default function AdminPage() {
     } catch (err) {
       console.error("fetchAttendance error:", err);
     } finally {
-      setLoadingAttendance(false);
+      setLoadingProviderAttendance(false);
     }
   }
 
@@ -4403,6 +4562,47 @@ export default function AdminPage() {
           </div>
 
           <div className="py-8">
+            {/* Active Missing Employee Alerts Banner */}
+            {(adminRole === "superadmin" || adminRole === "admin" || adminRole === "HR") && activeMissingAlerts.length > 0 && (
+              <div className="mb-6 space-y-3">
+                {activeMissingAlerts.map((alertItem: any) => (
+                  <div
+                    key={alertItem.id}
+                    className="flex items-center justify-between gap-4 rounded-3xl border border-rose-200 bg-rose-50 px-6 py-4 text-rose-800 shadow-sm animate-pulse"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">⚠️</span>
+                      <p className="text-sm font-semibold">
+                        Alert: Employee <strong>{alertItem.employee_accounts?.name}</strong> ({alertItem.employee_accounts?.role_name}) went missing at {new Date(alertItem.timestamp).toLocaleTimeString()}!
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetch('/api/hr/alerts', {
+                            method: 'PATCH',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${session?.access_token}`
+                            },
+                            body: JSON.stringify({ id: alertItem.id, resolved: true })
+                          });
+                          if (res.ok) {
+                            fetchHrAlerts();
+                          }
+                        } catch (err) {
+                          console.error("Failed to resolve alert:", err);
+                        }
+                      }}
+                      className="rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 transition"
+                    >
+                      Dismiss Alert
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {!hasAccessToActiveNav ? (
               <div className="flex flex-col items-center justify-center py-24 text-center gap-4 bg-white rounded-[40px] shadow-[0_30px_80px_rgba(47,61,41,0.07)] p-8">
                 <div className="h-16 w-16 flex items-center justify-center rounded-full bg-red-50 text-red-600 border border-red-100">
@@ -12202,7 +12402,7 @@ export default function AdminPage() {
 
               {/* Sub-navigation Tabs */}
               <div className="flex border-b border-[#414E36]/10 gap-6">
-                {(["overview", "payroll", "leaves", "performance"] as const).map((tab) => (
+                {(["overview", "payroll", "leaves", "performance", "attendance"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setHrActiveSubTab(tab)}
@@ -12851,6 +13051,150 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
+
+              {/* Attendance Sub-tab */}
+              {hrActiveSubTab === "attendance" && (
+                <div className="space-y-6">
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                    <div className="p-6 border-b border-[#414E36]/10">
+                      <h3 className="text-lg font-bold text-[#1F251A]">Daily Attendance Log</h3>
+                      <p className="mt-1 text-xs text-[#5A6A51]">Attendance is recorded automatically on first login each day via GPS proximity check.</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                            <th className="px-6 py-4">Employee</th>
+                            <th className="px-6 py-4">Date</th>
+                            <th className="px-6 py-4">Check-in Time</th>
+                            <th className="px-6 py-4">Location (GPS)</th>
+                            <th className="px-6 py-4">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#414E36]/5">
+                          {loadingAttendance ? (
+                            <tr><td colSpan={5} className="px-6 py-16 text-center text-sm text-[#5A6A51]">Loading attendance records…</td></tr>
+                          ) : attendanceList.length === 0 ? (
+                            <tr><td colSpan={5} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">No attendance records found. Records appear after employees log in each day.</td></tr>
+                          ) : (
+                            attendanceList.map((rec: any) => (
+                              <tr key={rec.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="font-semibold text-[#1F251A]">{rec.employee_accounts?.name || "—"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{rec.employee_accounts?.role_name || "—"}</div>
+                                </td>
+                                <td className="px-6 py-4 text-xs text-[#1F251A]">{rec.date}</td>
+                                <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
+                                  {rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                                </td>
+                                <td className="px-6 py-4 text-xs text-[#5A6A51]">
+                                  {rec.latitude && rec.longitude
+                                    ? `${Number(rec.latitude).toFixed(4)}, ${Number(rec.longitude).toFixed(4)}`
+                                    : "—"}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
+                                    rec.status === 'Present' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                    rec.status === 'Late' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                    'bg-rose-50 text-rose-700 border border-rose-100'
+                                  }`}>
+                                    {rec.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Missing Alerts Log */}
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-[#414E36]/10">
+                      <h3 className="text-lg font-bold text-[#1F251A]">Inactivity Alerts</h3>
+                      <p className="mt-1 text-xs text-[#5A6A51]">Logged when an employee did not confirm presence within 10 seconds of the 30-minute activity check.</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                            <th className="px-6 py-4">Employee</th>
+                            <th className="px-6 py-4">Alert Time</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#414E36]/5">
+                          {activeMissingAlerts.length === 0 ? (
+                            <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-[#5A6A51] font-medium">No active inactivity alerts at this time.</td></tr>
+                          ) : (
+                            activeMissingAlerts.map((a: any) => (
+                              <tr key={a.id} className="hover:bg-rose-50/30 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="font-semibold text-[#1F251A]">{a.employee_accounts?.name || "—"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{a.employee_accounts?.role_name || "—"}</div>
+                                </td>
+                                <td className="px-6 py-4 text-xs text-[#1F251A]">{new Date(a.timestamp).toLocaleString()}</td>
+                                <td className="px-6 py-4">
+                                  <span className="inline-block rounded-xl px-2.5 py-1 text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                                    Unresolved
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <button
+                                    onClick={async () => {
+                                      const res = await fetch('/api/hr/alerts', {
+                                        method: 'PATCH',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'Authorization': `Bearer ${session?.access_token}`
+                                        },
+                                        body: JSON.stringify({ id: a.id, resolved: true })
+                                      });
+                                      if (res.ok) fetchHrAlerts();
+                                    }}
+                                    className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                                  >
+                                    Resolve
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Presence Activity Check Overlay Modal */}
+          {presenceModalOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div className="w-full max-w-md rounded-[32px] bg-white border border-[#414E36]/10 p-8 shadow-2xl text-center space-y-6 mx-4">
+                <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+                  <Clock size={32} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-bold text-[#1F251A]">Activity Verification</h3>
+                  <p className="text-sm text-[#5A6A51] leading-relaxed">
+                    Please verify that you are active at your workstation. If you do not click the button below within the next:
+                  </p>
+                  <div className={`text-5xl font-bold ${presenceCountdown <= 3 ? 'text-rose-600' : presenceCountdown <= 6 ? 'text-amber-500' : 'text-[#414E36]'} transition-colors`}>
+                    {presenceCountdown}s
+                  </div>
+                  <p className="text-xs text-[#5A6A51]">An inactivity alert will be sent to the administrator.</p>
+                </div>
+                <button
+                  onClick={() => setPresenceModalOpen(false)}
+                  className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
+                >
+                  ✓ I am Present &amp; Working
+                </button>
+              </div>
             </div>
           )}
 
