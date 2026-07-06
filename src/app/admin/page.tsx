@@ -1477,7 +1477,7 @@ export default function AdminPage() {
             console.warn("Check-in API rejected request:", errData);
             if (errData.error === 'not_in_location') {
               setLocationWarningMsg(
-                `Your current location does not match the required check-in area for your assigned branch.\n\nYour attendance has been logged as "Out of Location". Please proceed to your designated work location.`
+                `Your current location does not match the required check-in area for your assigned branch.\n\nYou are currently ${errData.distance || 'unknown'} meters away from the branch. Access is restricted while outside the 500-meter radius.`
               );
               setLocationWarningOpen(true);
             } else if (errData.error === 'no_branch') {
