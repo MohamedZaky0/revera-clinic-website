@@ -130,6 +130,7 @@ const SIDEBAR_ITEMS = [
   { label: "Providers", icon: ShieldCheck },
   { label: "Services", icon: Layers },
   { label: "Employees", icon: CircleUser },
+  { label: "HR", icon: ClipboardList },
   { label: "Settings", icon: Settings, submenu: true },
   { label: "Logout", icon: LogOut },
 ];
@@ -557,6 +558,7 @@ export default function AdminPage() {
     if (adminRole === 'superadmin') return SIDEBAR_ITEMS;
     return SIDEBAR_ITEMS.filter(item => {
       if (item.label === 'Logout') return true;
+      if (item.label === 'HR' && (adminRole === 'admin' || adminRole === 'HR')) return true;
       if (adminPermissions.includes(item.label)) return true;
       
       const parentScreenMap: Record<string, string> = {
@@ -618,6 +620,27 @@ export default function AdminPage() {
   const [viewingEmployee, setViewingEmployee] = useState<any | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<any | null>(null);
   const [isEditingEmployeeModalOpen, setIsEditingEmployeeModalOpen] = useState(false);
+
+  // HR Module states
+  const [hrActiveSubTab, setHrActiveSubTab] = useState("overview");
+  const [payrollList, setPayrollList] = useState<any[]>([]);
+  const [loadingPayroll, setLoadingPayroll] = useState(false);
+  const [leavesList, setLeavesList] = useState<any[]>([]);
+  const [loadingLeaves, setLoadingLeaves] = useState(false);
+  const [performanceReviews, setPerformanceReviews] = useState<any[]>([]);
+  const [loadingPerformance, setLoadingPerformance] = useState(false);
+
+  const [selectedPayrollMonth, setSelectedPayrollMonth] = useState("2026-07");
+  const [newLeaveEmployeeId, setNewLeaveEmployeeId] = useState("");
+  const [newLeaveType, setNewLeaveType] = useState("Sick");
+  const [newLeaveStartDate, setNewLeaveStartDate] = useState("");
+  const [newLeaveEndDate, setNewLeaveEndDate] = useState("");
+  const [newLeaveReason, setNewLeaveReason] = useState("");
+
+  const [newReviewEmployeeId, setNewReviewEmployeeId] = useState("");
+  const [newReviewRating, setNewReviewRating] = useState(5);
+  const [newReviewComments, setNewReviewComments] = useState("");
+  const [newReviewGoals, setNewReviewGoals] = useState("");
   // Profile settings states
   const [profilePassword, setProfilePassword] = useState("");
   const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
@@ -1283,6 +1306,78 @@ export default function AdminPage() {
       setLoadingRolesAndEmployees(false);
     }
   }
+
+  async function fetchHrPayroll() {
+    if (!session?.access_token) return;
+    setLoadingPayroll(true);
+    try {
+      const res = await fetch('/api/hr/payroll', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPayrollList(data);
+      }
+    } catch (err) {
+      console.error("Error loading payroll:", err);
+    } finally {
+      setLoadingPayroll(false);
+    }
+  }
+
+  async function fetchHrLeaves() {
+    if (!session?.access_token) return;
+    setLoadingLeaves(true);
+    try {
+      const res = await fetch('/api/hr/leaves', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLeavesList(data);
+      }
+    } catch (err) {
+      console.error("Error loading leaves:", err);
+    } finally {
+      setLoadingLeaves(false);
+    }
+  }
+
+  async function fetchHrPerformance() {
+    if (!session?.access_token) return;
+    setLoadingPerformance(true);
+    try {
+      const res = await fetch('/api/hr/performance', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPerformanceReviews(data);
+      }
+    } catch (err) {
+      console.error("Error loading performance reviews:", err);
+    } finally {
+      setLoadingPerformance(false);
+    }
+  }
+
+  const fetchHrData = useCallback(async () => {
+    await Promise.all([
+      fetchHrPayroll(),
+      fetchHrLeaves(),
+      fetchHrPerformance(),
+      fetchRolesAndEmployees()
+    ]);
+  }, [session]);
+
+  useEffect(() => {
+    if (activeNav === "HR") {
+      fetchHrData();
+    }
+  }, [activeNav, fetchHrData]);
 
   async function handleAdminLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -12091,6 +12186,671 @@ export default function AdminPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── HUMAN RESOURCES (HR) VIEW ── */}
+          {activeNav === "HR" && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Human Resources</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Manage workforce payroll, leaves, and performance evaluations.</p>
+                </div>
+              </div>
+
+              {/* Sub-navigation Tabs */}
+              <div className="flex border-b border-[#414E36]/10 gap-6">
+                {(["overview", "payroll", "leaves", "performance"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setHrActiveSubTab(tab)}
+                    className={`pb-3 text-sm font-bold capitalize transition-all border-b-2 -mb-[2px] ${
+                      hrActiveSubTab === tab
+                        ? "border-[#414E36] text-[#414E36]"
+                        : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              {/* Overview Sub-tab */}
+              {hrActiveSubTab === "overview" && (
+                <div className="space-y-6">
+                  {/* Summary Cards */}
+                  <div className="grid gap-6 sm:grid-cols-3">
+                    <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Active Employees</p>
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-3xl font-semibold text-[#1F251A]">{employeesList.length}</span>
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C4AE7C]/10 text-[#414E36]">
+                          <Users size={18} />
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Approved Leaves (This Month)</p>
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-3xl font-semibold text-[#1F251A]">
+                          {leavesList.filter(l => l.status === "Approved").length}
+                        </span>
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C4AE7C]/10 text-[#414E36]">
+                          <CalendarDays size={18} />
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Total Payroll Run ({selectedPayrollMonth})</p>
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-3xl font-semibold text-[#1F251A]">
+                          EGP {payrollList
+                            .filter(p => p.month === selectedPayrollMonth)
+                            .reduce((sum, p) => sum + Number(p.net_salary || 0), 0)
+                            .toLocaleString()}
+                        </span>
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C4AE7C]/10 text-[#414E36]">
+                          <DollarSign size={18} />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Employees Directory Card */}
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                    <div className="p-6 border-b border-[#414E36]/10 flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-[#1F251A]">Workforce Directory</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                            <th className="px-6 py-4">Employee Info</th>
+                            <th className="px-6 py-4">Department</th>
+                            <th className="px-6 py-4">System Role</th>
+                            <th className="px-6 py-4">Branch</th>
+                            <th className="px-6 py-4">Base Salary</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#414E36]/5">
+                          {employeesList.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                                No active employees found.
+                              </td>
+                            </tr>
+                          ) : (
+                            employeesList.map((emp: any) => (
+                              <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="font-semibold text-[#1F251A]">{emp.name}</div>
+                                  <div className="text-xs text-[#5A6A51]">{emp.email}</div>
+                                </td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.department || "—"}</td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.role_name || "—"}</td>
+                                <td className="px-6 py-4 text-xs text-[#5A6A51]">
+                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
+                                </td>
+                                <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                  EGP {Number(emp.salary || 0).toLocaleString()}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Payroll Sub-tab */}
+              {hrActiveSubTab === "payroll" && (
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-3xl border border-[#414E36]/10 bg-white shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm font-bold text-[#1F251A]">Select Payroll Month:</label>
+                      <select
+                        value={selectedPayrollMonth}
+                        onChange={(e) => setSelectedPayrollMonth(e.target.value)}
+                        className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2 text-sm text-[#414E36] outline-none"
+                      >
+                        <option value="2026-05">May 2026</option>
+                        <option value="2026-06">June 2026</option>
+                        <option value="2026-07">July 2026</option>
+                        <option value="2026-08">August 2026</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetch('/api/hr/payroll', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${session?.access_token}`
+                            },
+                            body: JSON.stringify({ month: selectedPayrollMonth })
+                          });
+                          if (res.ok) {
+                            alert("Payroll ran successfully!");
+                            fetchHrPayroll();
+                          } else {
+                            const err = await res.json();
+                            alert(err.error || "Failed to run payroll");
+                          }
+                        } catch (err) {
+                          alert("Failed to connect to API.");
+                        }
+                      }}
+                      className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2"
+                    >
+                      <Plus size={16} /> Run Payroll Sheet
+                    </button>
+                  </div>
+
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                            <th className="px-6 py-4">Employee</th>
+                            <th className="px-6 py-4">Month</th>
+                            <th className="px-6 py-4">Basic Salary</th>
+                            <th className="px-6 py-4">Bonuses</th>
+                            <th className="px-6 py-4">Deductions</th>
+                            <th className="px-6 py-4">Net Salary</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#414E36]/5">
+                          {payrollList.filter(p => p.month === selectedPayrollMonth).length === 0 ? (
+                            <tr>
+                              <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                                No payroll run exists for {selectedPayrollMonth}. Click "Run Payroll Sheet" to calculate.
+                              </td>
+                            </tr>
+                          ) : (
+                            payrollList
+                              .filter(p => p.month === selectedPayrollMonth)
+                              .map((pay: any) => (
+                                <tr key={pay.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                                  <td className="px-6 py-4">
+                                    <div className="font-semibold text-[#1F251A]">{pay.employee_accounts?.name || "—"}</div>
+                                    <div className="text-xs text-[#5A6A51]">{pay.employee_accounts?.email || "—"}</div>
+                                  </td>
+                                  <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{pay.month}</td>
+                                  <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
+                                    EGP {Number(pay.basic_salary).toLocaleString()}
+                                  </td>
+                                  <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
+                                    <input
+                                      type="number"
+                                      value={pay.bonuses}
+                                      disabled={pay.status === "Paid"}
+                                      onChange={async (e) => {
+                                        const val = Number(e.target.value);
+                                        setPayrollList(prev => prev.map(p => p.id === pay.id ? { ...p, bonuses: val, net_salary: p.basic_salary + val - p.deductions } : p));
+                                        await fetch('/api/hr/payroll', {
+                                          method: 'PATCH',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': `Bearer ${session?.access_token}`
+                                          },
+                                          body: JSON.stringify({ id: pay.id, bonuses: val })
+                                        });
+                                      }}
+                                      className="w-20 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] disabled:opacity-50"
+                                    />
+                                  </td>
+                                  <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
+                                    <input
+                                      type="number"
+                                      value={pay.deductions}
+                                      disabled={pay.status === "Paid"}
+                                      onChange={async (e) => {
+                                        const val = Number(e.target.value);
+                                        setPayrollList(prev => prev.map(p => p.id === pay.id ? { ...p, deductions: val, net_salary: p.basic_salary + p.bonuses - val } : p));
+                                        await fetch('/api/hr/payroll', {
+                                          method: 'PATCH',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': `Bearer ${session?.access_token}`
+                                          },
+                                          body: JSON.stringify({ id: pay.id, deductions: val })
+                                        });
+                                      }}
+                                      className="w-20 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] disabled:opacity-50"
+                                    />
+                                  </td>
+                                  <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                    EGP {Number(pay.net_salary).toLocaleString()}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
+                                      pay.status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
+                                    }`}>
+                                      {pay.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    {pay.status !== "Paid" && (
+                                      <button
+                                        onClick={async () => {
+                                          if (!confirm("Are you sure you want to mark this employee payroll as PAID?")) return;
+                                          try {
+                                            const res = await fetch('/api/hr/payroll', {
+                                              method: 'PATCH',
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': `Bearer ${session?.access_token}`
+                                              },
+                                              body: JSON.stringify({ id: pay.id, status: 'Paid' })
+                                            });
+                                            if (res.ok) {
+                                              fetchHrPayroll();
+                                            }
+                                          } catch (e) {
+                                            alert("Failed to pay payroll.");
+                                          }
+                                        }}
+                                        className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                                      >
+                                        Mark Paid
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Leaves Sub-tab */}
+              {hrActiveSubTab === "leaves" && (
+                <div className="grid gap-6 lg:grid-cols-3">
+                  {/* Leave Request List */}
+                  <div className="lg:col-span-2 rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                    <div className="p-6 border-b border-[#414E36]/10 flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-[#1F251A]">Leave Requests</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                            <th className="px-6 py-4">Employee</th>
+                            <th className="px-6 py-4">Type</th>
+                            <th className="px-6 py-4">Dates</th>
+                            <th className="px-6 py-4">Days</th>
+                            <th className="px-6 py-4">Reason</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#414E36]/5">
+                          {leavesList.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                                No leave requests submitted yet.
+                              </td>
+                            </tr>
+                          ) : (
+                            leavesList.map((leave: any) => (
+                              <tr key={leave.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="font-semibold text-[#1F251A]">{leave.employee_accounts?.name || "—"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{leave.employee_accounts?.role_name || "—"}</div>
+                                </td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{leave.leave_type}</td>
+                                <td className="px-6 py-4 text-xs text-[#1F251A]">
+                                  {leave.start_date} to {leave.end_date}
+                                </td>
+                                <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">{leave.days_count}</td>
+                                <td className="px-6 py-4 text-xs text-[#5A6A51] max-w-[150px] truncate" title={leave.reason}>{leave.reason || "—"}</td>
+                                <td className="px-6 py-4">
+                                  <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
+                                    leave.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                    leave.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
+                                    'bg-amber-50 text-amber-700 border border-amber-100'
+                                  }`}>
+                                    {leave.status}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
+                                  {leave.status === "Pending" && (
+                                    <>
+                                      <button
+                                        onClick={async () => {
+                                          const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+                                          await fetch('/api/hr/leaves', {
+                                            method: 'PATCH',
+                                            headers: {
+                                              'Content-Type': 'application/json',
+                                              'Authorization': `Bearer ${session?.access_token}`
+                                            },
+                                            body: JSON.stringify({ id: leave.id, status: 'Approved', approvedBy: profileEmployee?.id || null })
+                                          });
+                                          fetchHrLeaves();
+                                        }}
+                                        className="rounded-xl bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                                      >
+                                        Approve
+                                      </button>
+                                      <button
+                                        onClick={async () => {
+                                          const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+                                          await fetch('/api/hr/leaves', {
+                                            method: 'PATCH',
+                                            headers: {
+                                              'Content-Type': 'application/json',
+                                              'Authorization': `Bearer ${session?.access_token}`
+                                            },
+                                            body: JSON.stringify({ id: leave.id, status: 'Rejected', approvedBy: profileEmployee?.id || null })
+                                          });
+                                          fetchHrLeaves();
+                                        }}
+                                        className="rounded-xl bg-rose-600 px-2 py-1 text-xs font-bold text-white hover:bg-rose-700 transition"
+                                      >
+                                        Reject
+                                      </button>
+                                    </>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Submit Leave Request */}
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 p-6 shadow-sm h-fit">
+                    <h3 className="text-lg font-bold text-[#1F251A] mb-4">Request Leave</h3>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!newLeaveEmployeeId || !newLeaveStartDate || !newLeaveEndDate) {
+                          alert("All fields are required.");
+                          return;
+                        }
+                        try {
+                          const res = await fetch('/api/hr/leaves', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${session?.access_token}`
+                            },
+                            body: JSON.stringify({
+                              employeeId: newLeaveEmployeeId,
+                              leaveType: newLeaveType,
+                              startDate: newLeaveStartDate,
+                              endDate: newLeaveEndDate,
+                              reason: newLeaveReason
+                            })
+                          });
+                          if (res.ok) {
+                            setNewLeaveStartDate("");
+                            setNewLeaveEndDate("");
+                            setNewLeaveReason("");
+                            fetchHrLeaves();
+                            alert("Leave request submitted successfully!");
+                          } else {
+                            const err = await res.json();
+                            alert(err.error || "Failed to submit request.");
+                          }
+                        } catch (err) {
+                          alert("Failed to submit request.");
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Employee</label>
+                        <select
+                          value={newLeaveEmployeeId}
+                          onChange={(e) => setNewLeaveEmployeeId(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                          required
+                        >
+                          <option value="">Select Employee</option>
+                          {employeesList.map((emp) => (
+                            <option key={emp.id} value={emp.id}>{emp.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Type</label>
+                        <select
+                          value={newLeaveType}
+                          onChange={(e) => setNewLeaveType(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                        >
+                          <option value="Sick">Sick Leave</option>
+                          <option value="Annual">Annual Leave</option>
+                          <option value="Casual">Casual Leave</option>
+                          <option value="Unpaid">Unpaid Leave</option>
+                        </select>
+                      </div>
+
+                      <div className="grid gap-4 grid-cols-2">
+                        <div>
+                          <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Start Date</label>
+                          <input
+                            type="date"
+                            value={newLeaveStartDate}
+                            onChange={(e) => setNewLeaveStartDate(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">End Date</label>
+                          <input
+                            type="date"
+                            value={newLeaveEndDate}
+                            onChange={(e) => setNewLeaveEndDate(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Reason</label>
+                        <textarea
+                          placeholder="Why is leave needed?"
+                          value={newLeaveReason}
+                          onChange={(e) => setNewLeaveReason(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none h-20 resize-none"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                      >
+                        Submit Leave Request
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Performance Reviews Sub-tab */}
+              {hrActiveSubTab === "performance" && (
+                <div className="grid gap-6 lg:grid-cols-3">
+                  {/* Reviews Timeline List */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <h3 className="text-xl font-bold text-[#1F251A] mb-2">Performance Logs</h3>
+                    {performanceReviews.length === 0 ? (
+                      <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-12 text-center text-sm text-[#5A6A51]">
+                        No performance reviews submitted yet.
+                      </div>
+                    ) : (
+                      performanceReviews.map((rev: any) => (
+                        <div key={rev.id} className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm relative hover:border-[#414E36]/30 transition-all">
+                          <button
+                            onClick={async () => {
+                              if (!confirm("Delete this review?")) return;
+                              await fetch(`/api/hr/performance?id=${rev.id}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${session?.access_token}` }
+                              });
+                              fetchHrPerformance();
+                            }}
+                            className="absolute top-6 right-6 text-rose-600 hover:text-rose-700 transition"
+                            title="Delete Review"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                          <div className="flex items-start gap-4">
+                            <div className="h-12 w-12 rounded-full bg-[#C4AE7C]/15 text-[#414E36] flex items-center justify-center font-bold text-sm shrink-0">
+                              {rev.employee_accounts?.name?.slice(0, 2).toUpperCase() || "??"}
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="font-bold text-[#1F251A]">{rev.employee_accounts?.name || "—"}</h4>
+                              <p className="text-xs text-[#5A6A51]">Role: {rev.employee_accounts?.role_name || "—"}</p>
+                              <div className="flex items-center gap-1.5 py-1">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    size={14}
+                                    className={i < rev.rating ? "text-amber-400 fill-amber-400" : "text-gray-300"}
+                                  />
+                                ))}
+                                <span className="text-xs text-[#5A6A51] ml-1 font-semibold">{rev.review_date}</span>
+                              </div>
+                              <div className="mt-3 text-sm text-[#1F251A] bg-[#FBFBF9] p-3 rounded-2xl border border-[#414E36]/5">
+                                <p className="font-semibold text-xs text-[#5A6A51] mb-1">Evaluator Notes:</p>
+                                <p className="leading-relaxed">{rev.comments || "No comments written."}</p>
+                              </div>
+                              {rev.goals && (
+                                <div className="mt-2 text-sm text-[#1F251A] bg-[#C4AE7C]/5 p-3 rounded-2xl border border-[#C4AE7C]/10">
+                                  <p className="font-semibold text-xs text-[#8B7544] mb-1">Target Goals:</p>
+                                  <p className="leading-relaxed">{rev.goals}</p>
+                                </div>
+                              )}
+                              <p className="text-[10px] text-[#5A6A51] mt-3">Evaluated by: {rev.reviewer?.name || "System"}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Create Review Form */}
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 p-6 shadow-sm h-fit">
+                    <h3 className="text-lg font-bold text-[#1F251A] mb-4">Add Performance Review</h3>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!newReviewEmployeeId) {
+                          alert("Please select employee.");
+                          return;
+                        }
+                        const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+                        try {
+                          const res = await fetch('/api/hr/performance', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${session?.access_token}`
+                            },
+                            body: JSON.stringify({
+                              employeeId: newReviewEmployeeId,
+                              reviewerId: profileEmployee?.id || newReviewEmployeeId,
+                              rating: newReviewRating,
+                              comments: newReviewComments,
+                              goals: newReviewGoals
+                            })
+                          });
+                          if (res.ok) {
+                            setNewReviewComments("");
+                            setNewReviewGoals("");
+                            fetchHrPerformance();
+                            alert("Review created successfully!");
+                          } else {
+                            const err = await res.json();
+                            alert(err.error || "Failed to create review.");
+                          }
+                        } catch (err) {
+                          alert("Failed to submit review.");
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Employee Under Review</label>
+                        <select
+                          value={newReviewEmployeeId}
+                          onChange={(e) => setNewReviewEmployeeId(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                          required
+                        >
+                          <option value="">Select Employee</option>
+                          {employeesList.map((emp) => (
+                            <option key={emp.id} value={emp.id}>{emp.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Rating (1 to 5 Stars)</label>
+                        <select
+                          value={newReviewRating}
+                          onChange={(e) => setNewReviewRating(Number(e.target.value))}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                        >
+                          <option value={5}>5 Stars (Excellent)</option>
+                          <option value={4}>4 Stars (Good)</option>
+                          <option value={3}>3 Stars (Satisfactory)</option>
+                          <option value={2}>2 Stars (Needs Improvement)</option>
+                          <option value={1}>1 Star (Poor)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Comments</label>
+                        <textarea
+                          placeholder="Review comments and feedback..."
+                          value={newReviewComments}
+                          onChange={(e) => setNewReviewComments(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none h-24 resize-none"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Goals &amp; Next Steps</label>
+                        <textarea
+                          placeholder="What goals should they work towards next?"
+                          value={newReviewGoals}
+                          onChange={(e) => setNewReviewGoals(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none h-20 resize-none"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                      >
+                        Submit Performance Review
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
