@@ -10264,7 +10264,7 @@ export default function AdminPage() {
               {/* Add / Edit Employee Modal */}
               {isEditingEmployeeModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                  <div className="w-full max-w-lg rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.15)] border border-[#414E36]/10 relative">
+                  <div className="w-full max-w-lg rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.15)] border border-[#414E36]/10 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
                     <button
                       type="button"
                       onClick={() => setIsEditingEmployeeModalOpen(false)}
