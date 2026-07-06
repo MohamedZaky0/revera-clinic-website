@@ -98,7 +98,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://revera-clinic.vercel.app';
+    const requestUrl = new URL(req.url);
+    const siteUrl = requestUrl.origin;
     console.log('Sending invitation to:', cleanEmail, 'with redirectTo:', `${siteUrl}/auth/setup`);
     const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(
       cleanEmail,
@@ -221,7 +222,8 @@ export async function PATCH(req: Request) {
     }
 
     // 2. Resend invitation to an employee whose invite expired (fallback if roleName not provided)
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://revera-clinic.vercel.app';
+    const requestUrl = new URL(req.url);
+    const siteUrl = requestUrl.origin;
 
     if (employee.auth_user_id) {
       await supabaseServer.auth.admin.deleteUser(employee.auth_user_id).catch(() => {});
