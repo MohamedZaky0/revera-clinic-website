@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyHrAccess } from '@/lib/auth';
 import https from 'https';
-import url from 'url';
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371e3;
@@ -22,17 +21,14 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
 function getFinalUrl(targetUrl: string): Promise<string> {
   return new Promise((resolve) => {
     try {
-      const parsedUrl = url.parse(targetUrl);
       const options = {
-        hostname: parsedUrl.hostname,
-        path: parsedUrl.path,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         },
         timeout: 5000
       };
 
-      const req = https.get(targetUrl, (res) => {
+      const req = https.get(targetUrl, options, (res) => {
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           resolve(getFinalUrl(res.headers.location));
         } else {
