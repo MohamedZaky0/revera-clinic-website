@@ -92,7 +92,7 @@ export function BookingModal() {
   const [selectedDoctor, setSelectedDoctor] = useState<string>("");
   const [reservationsForDate, setReservationsForDate] = useState<any[]>([]);
 
-  const [branches, setBranches] = useState<{ id: string; name_en: string; name_ar: string; status: string }[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [branchId, setBranchId] = useState<string | null>(null);
 
   const days = getNext30Days();
@@ -302,8 +302,13 @@ export function BookingModal() {
     const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const weekdayName = weekdays[date.getDay()];
     
-    // Get clinic-wide service hours from page settings / translation context
-    const clinicDay = t.footer?.serviceHours?.find(
+    // Find active branch specific service hours
+    const selectedBranch = branches.find(b => b.id === branchId);
+    const activeHours = selectedBranch && Array.isArray(selectedBranch.service_hours) && selectedBranch.service_hours.length > 0
+      ? selectedBranch.service_hours
+      : (t.footer?.serviceHours || []);
+
+    const clinicDay = activeHours.find(
       (sh: any) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
     );
 
@@ -376,7 +381,7 @@ export function BookingModal() {
       start: formatMins(minStart),
       end: formatMins(maxEnd)
     };
-  }, [doctors, branchId, selectedService, t]);
+  }, [doctors, branchId, selectedService, t, branches]);
 
   const getAvailableDoctors = useCallback(() => {
     if (!selectedDate || !selectedTime || !selectedService) return [];

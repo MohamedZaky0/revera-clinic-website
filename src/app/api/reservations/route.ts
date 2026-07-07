@@ -48,6 +48,8 @@ export async function GET(req: Request) {
   const serviceId = params.get('serviceId');
   const date = params.get('date');
   const branchId = params.get('branchId');
+  const phone = params.get('phone');
+  const customerId = params.get('customerId');
 
   try {
     let q = supabaseServer
@@ -58,6 +60,8 @@ export async function GET(req: Request) {
     if (status) q = q.eq('status', status);
     if (serviceId) q = q.eq('service_id', Number(serviceId));
     if (date) q = q.eq('date', date);
+    if (phone) q = q.eq('phone', phone);
+    if (customerId) q = q.eq('customer_id', customerId);
     // Include bookings that match this branch OR have no branch set (website bookings without branch)
     if (branchId) q = q.or(`branch_id.eq.${branchId},branch_id.is.null`);
 

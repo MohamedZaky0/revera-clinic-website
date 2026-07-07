@@ -374,7 +374,8 @@ export function Navbar() {
             {/* Login / User info button */}
             {user ? (
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div
+                <Link
+                  href="/profile"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -385,11 +386,20 @@ export function Navbar() {
                     color: "var(--cr-primary)",
                     fontSize: "14px",
                     fontWeight: 600,
+                    textDecoration: "none",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.05)";
                   }}
                 >
                   <User size={16} />
                   <span>{user.name || user.mobile}</span>
-                </div>
+                </Link>
                 {isProfileIncomplete && (
                   <button
                     onClick={handleCompleteProfile}
@@ -685,7 +695,9 @@ export function Navbar() {
               {/* Mobile login / user info button */}
               {user ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  <div
+                  <Link
+                    href="/profile"
+                    onClick={() => setMenuOpen(false)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -696,11 +708,13 @@ export function Navbar() {
                       color: "var(--cr-primary)",
                       fontSize: "14px",
                       fontWeight: 600,
+                      textDecoration: "none",
+                      cursor: "pointer",
                     }}
                   >
                     <User size={16} />
                     <span>{user.name || user.mobile}</span>
-                  </div>
+                  </Link>
                   {isProfileIncomplete && (
                     <button
                       onClick={() => {

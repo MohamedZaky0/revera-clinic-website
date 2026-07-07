@@ -2184,6 +2184,8 @@ export default function AdminPage() {
   });
   const [savingBranch, setSavingBranch] = useState(false);
   const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
+  const [selectedBranchForHoursId, setSelectedBranchForHoursId] = useState<string>("");
+  const [savingBranchHours, setSavingBranchHours] = useState(false);
   const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
     { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
     { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
@@ -2315,7 +2317,12 @@ export default function AdminPage() {
     const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const weekdayName = weekdays[dateObj.getDay()];
 
-    const clinicDay = serviceHours.find(
+    const selectedBranch = branches.find(b => b.id === newPatientBranch);
+    const activeBranchHours = selectedBranch && Array.isArray(selectedBranch.service_hours) && selectedBranch.service_hours.length > 0
+      ? selectedBranch.service_hours
+      : serviceHours;
+
+    const clinicDay = activeBranchHours.find(
       (sh) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
     );
 
@@ -2391,7 +2398,7 @@ export default function AdminPage() {
       start: formatMins(minStart),
       end: formatMins(maxEnd)
     };
-  }, [providers, newPatientBranch, newPatientService, localServices, serviceHours]);
+  }, [providers, newPatientBranch, newPatientService, localServices, serviceHours, branches]);
 
   const getDayOperatingHoursApprove = useCallback((selectedReq: Req | null) => {
     if (!selectedReq) return { start: "09:00", end: "20:00" };
@@ -2402,7 +2409,12 @@ export default function AdminPage() {
     const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const weekdayName = weekdays[dateObj.getDay()];
 
-    const clinicDay = serviceHours.find(
+    const selectedBranch = branches.find(b => b.id === selectedReq?.branchId);
+    const activeBranchHours = selectedBranch && Array.isArray(selectedBranch.service_hours) && selectedBranch.service_hours.length > 0
+      ? selectedBranch.service_hours
+      : serviceHours;
+
+    const clinicDay = activeBranchHours.find(
       (sh) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
     );
 
@@ -2478,7 +2490,7 @@ export default function AdminPage() {
       start: formatMins(minStart),
       end: formatMins(maxEnd)
     };
-  }, [providers, localServices, serviceHours]);
+  }, [providers, localServices, serviceHours, branches]);
 
 
   // Derive unique customers from database
@@ -2629,11 +2641,31 @@ export default function AdminPage() {
         setBranches(list);
         if (list.length > 0) {
           setBranch((prev) => prev || list[0].id);
+          setSelectedBranchForHoursId((prev) => prev || list[0].id);
         }
       })
       .catch(() => setBranches([]))
       .finally(() => setLoadingBranches(false));
   }, []);
+
+  // Sync serviceHours state with active branch selection
+  useEffect(() => {
+    if (!selectedBranchForHoursId) return;
+    const branchRecord = branches.find(b => b.id === selectedBranchForHoursId);
+    if (branchRecord && Array.isArray(branchRecord.service_hours) && branchRecord.service_hours.length > 0) {
+      setServiceHours(branchRecord.service_hours);
+    } else {
+      setServiceHours([
+        { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+        { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+      ]);
+    }
+  }, [selectedBranchForHoursId, branches]);
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -3324,6 +3356,33 @@ export default function AdminPage() {
       alert("Error saving settings.");
     } finally {
       setSavingPageSettings(false);
+    }
+  }
+
+  async function handleSaveBranchServiceHours() {
+    if (!selectedBranchForHoursId) return;
+    setSavingBranchHours(true);
+    try {
+      const res = await fetch("/api/branches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedBranchForHoursId,
+          service_hours: serviceHours
+        })
+      });
+      if (res.ok) {
+        const updatedBranch = await res.json();
+        setBranches(prev => prev.map(b => b.id === updatedBranch.id ? updatedBranch : b));
+        alert("Branch service hours saved successfully!");
+      } else {
+        alert("Failed to save branch service hours.");
+      }
+    } catch (err) {
+      console.error("handleSaveBranchServiceHours error:", err);
+      alert("Error saving branch service hours.");
+    } finally {
+      setSavingBranchHours(false);
     }
   }
 
@@ -9968,13 +10027,27 @@ export default function AdminPage() {
                 <div>
                   <h2 className="text-4xl font-semibold text-[#1F251A]">Weekly Service Hours</h2>
                   <p className="mt-2 text-sm text-[#5A6A51]">Configure operating schedules for Zayed and other active branches.</p>
+                  
+                  {/* Branch selector select dropdown */}
+                  <div className="mt-4 flex items-center gap-3">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Active Branch:</label>
+                    <select
+                      value={selectedBranchForHoursId}
+                      onChange={(e) => setSelectedBranchForHoursId(e.target.value)}
+                      className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none transition focus:border-[#C4AE7C] font-semibold"
+                    >
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name_en} ({b.name_ar})</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <button
-                  onClick={() => savePageSettings()}
-                  disabled={savingPageSettings}
+                  onClick={() => handleSaveBranchServiceHours()}
+                  disabled={savingBranchHours || !selectedBranchForHoursId}
                   className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
                 >
-                  {savingPageSettings ? "Saving..." : "Save Changes"}
+                  {savingBranchHours ? "Saving..." : "Save Changes"}
                 </button>
               </div>
               <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-4">

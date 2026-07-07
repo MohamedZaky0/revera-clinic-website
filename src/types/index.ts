@@ -12,6 +12,13 @@ export interface Branch {
   maps_link?: string;
   status: "active" | "inactive";
   sort_order: number;
+  service_hours?: Array<{
+    day: string;
+    dayAr: string;
+    isOpen: boolean;
+    openTime: string;
+    closeTime: string;
+  }>;
   created_at?: string;
   updated_at?: string;
 }

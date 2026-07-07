@@ -47,6 +47,24 @@ async function fetchCachedServiceHours() {
   return cachedPageSettings;
 }
 
+async function fetchBranchServiceHours(branchId: string | null) {
+  if (branchId && branchId !== 'All' && branchId !== 'null' && branchId !== 'undefined') {
+    try {
+      const { data, error } = await supabaseServer
+        .from('branches')
+        .select('service_hours')
+        .eq('id', branchId)
+        .maybeSingle();
+      if (!error && data && Array.isArray(data.service_hours) && data.service_hours.length > 0) {
+        return data.service_hours;
+      }
+    } catch (err) {
+      console.error('Error fetching branch service hours:', err);
+    }
+  }
+  return await fetchCachedServiceHours();
+}
+
 async function fetchCachedRooms(branchId: string | null) {
   const key = branchId || 'all';
   const now = Date.now();
@@ -129,8 +147,8 @@ export async function GET(req: Request) {
       }
     }
 
-    // Fetch clinic-wide service hours from page settings (cached)
-    const serviceHours = await fetchCachedServiceHours();
+    // Fetch service hours for this branch
+    const serviceHours = await fetchBranchServiceHours(branchId);
 
     // Get all active clinical rooms for this branch (cached)
     let dbRooms = await fetchCachedRooms(branchId);
