@@ -677,6 +677,8 @@ export default function AdminPage() {
   const [selected, setSelected] = useState<Req | null>(null);
   const [viewingBooking, setViewingBooking] = useState<Req | null>(null);
   const [isEditingService, setIsEditingService] = useState(false);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState("");
   const [dayBookingsSelector, setDayBookingsSelector] = useState<{
     open: boolean;
     date: string;
@@ -921,6 +923,8 @@ export default function AdminPage() {
 
   useEffect(() => {
     setIsEditingService(false);
+    setIsEditingNotes(false);
+    setNotesDraft(viewingBooking?.notes || "");
   }, [viewingBooking]);
 
   const [scheduleDate, setScheduleDate] = useState<Date>(() => new Date());
@@ -14542,48 +14546,76 @@ export default function AdminPage() {
 
                   {/* Notes */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-sm font-bold text-[#1F251A]">Notes</p>
-                      {hasPermission("bookings.edit") && (
-                        <button
-                          onClick={async () => {
-                            const note = prompt("Enter note:", viewingBooking.notes || "");
-                            if (note !== null) {
-                              await saveNotes(note);
-                              setViewingBooking(prev => prev ? { ...prev, notes: note } : null);
-                            }
-                          }}
-                          className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
-                        >
-                          {viewingBooking.notes ? "Edit Note" : "+ Add Note"}
-                        </button>
-                      )}
-                    </div>
-                    {viewingBooking.notes ? (
-                      <div className="rounded-xl bg-[#F7F7F3] p-4 text-sm text-[#414E36]">
-                        {viewingBooking.notes}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
-                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
-                        <p className="text-xs font-semibold">no notes yet</p>
-                        {hasPermission("bookings.edit") && (
+                    {isEditingNotes ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-bold text-[#1F251A]">Edit Notes</p>
+                        </div>
+                        <textarea
+                          value={notesDraft}
+                          onChange={(e) => setNotesDraft(e.target.value)}
+                          placeholder="Enter notes about this booking..."
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition min-h-[100px]"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => setIsEditingNotes(false)}
+                            className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
+                          >
+                            Cancel
+                          </button>
                           <button
                             onClick={async () => {
-                              const note = prompt("Enter note:");
-                              if (note) {
-                                await saveNotes(note);
-                                setViewingBooking(prev => prev ? { ...prev, notes: note } : null);
-                              }
+                              await saveNotes(notesDraft);
+                              setViewingBooking(prev => prev ? { ...prev, notes: notesDraft } : null);
+                              setIsEditingNotes(false);
                             }}
-                            className="mt-2 text-xs font-bold text-[#414E36] hover:underline"
+                            className="rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
                           >
-                            Add your first note about this customer
+                            Save Note
                           </button>
-                        )}
+                        </div>
                       </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-sm font-bold text-[#1F251A]">Notes</p>
+                          {hasPermission("bookings.edit") && (
+                            <button
+                              onClick={() => {
+                                setNotesDraft(viewingBooking.notes || "");
+                                setIsEditingNotes(true);
+                              }}
+                              className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                            >
+                              {viewingBooking.notes ? "Edit Note" : "+ Add Note"}
+                            </button>
+                          )}
+                        </div>
+                        {viewingBooking.notes ? (
+                          <div className="rounded-xl bg-[#F7F7F3] p-4 text-sm text-[#414E36]">
+                            {viewingBooking.notes}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
+                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                            </svg>
+                            <p className="text-xs font-semibold">no notes yet</p>
+                            {hasPermission("bookings.edit") && (
+                              <button
+                                onClick={() => {
+                                  setNotesDraft("");
+                                  setIsEditingNotes(true);
+                                }}
+                                className="mt-2 text-xs font-bold text-[#414E36] hover:underline"
+                              >
+                                Add your first note about this customer
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 
