@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-06-27
+> **Last Updated:** 2026-07-09
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 
@@ -64,33 +64,30 @@ After that, check task-specific files:
 
 ---
 
-## Project Status Snapshot (as of 2026-06-27)
+## Project Status Snapshot (as of 2026-07-09)
 
 ### What Is Actually Built and Working
 - Public website (homepage, about, services, contact, blog stub)
-- Booking modal → `reservations` table (real Supabase writes)
-- Admin booking management (calendar, list, approve/reject, status changes)
+- Patient Profile (`/profile`) -> Persistent customer profile details, wallet ledgers, and visit logs history
+- Booking modal → `reservations` table (real Supabase writes with customer_id links)
+- Admin booking management (calendar, list, approve/reject, status changes, inline notes editor)
+- Customer Wallet Ledgers (real writes updating spent_amount, outstanding, and wallet_balance during checkout)
+- Branch-specific service hours (separate schedules for Sheikh Zayed / New Cairo stored in database and enforced in booking availability)
 - Service catalog CRUD (with drag-sort, bilingual names, branch pricing)
 - Branch management CRUD
 - Website CMS — hero slides (EN/AR) editable via admin
 - Provider records (doctors) — basic CRUD
-- **Admin authentication** — Supabase email/password login with session check; employee invite flow via Supabase Auth (RISK-002 partially resolved)
-- **Roles & permissions system** — `roles` + `employee_accounts` tables; permissions array drives admin panel section visibility
-- **Customer records** — full CRUD on `customers` table with demographics
-- **Provider attendance** — daily check-in/out tracking via `provider_attendance` table
 
 ### What Is Mock UI Only (hardcoded data, not Supabase)
 - All clinical: consultation notes, prescriptions, treatment plans, before/after photos
-- All billing: POS, invoicing, payments, refunds, package tracking
-- All reporting: every chart and metric shows static hardcoded values
+- Billing metrics: overall billing analytics reports are mock (but individual customer ledgers are real)
 - All marketing: WhatsApp is external `wa.me` links only; no campaigns or templates
 - Notification templates
-- Payroll
+- RBAC / roles and permissions
 
 ### Critical Gaps (do not assume these work)
-- **Admin auth is client-side only** — `/api/` routes are not token-protected; API calls can be made without a session (RISK-002 partially resolved, not fully)
+- **Admin has no authentication** — `/admin` is publicly accessible (RISK-002)
 - **Patient OTP auth is simulated** — no SMS sent, no user created (RISK-003)
-- **Customers and reservations are unlinked** — no FK between booking and customer record
 - Doctor shifts and availability — not built; derived only from existing bookings
 - Waitlist — not built
 
@@ -111,8 +108,7 @@ Next.js 15 (App Router) + TypeScript on Vercel. Single app serving both the publ
 5. **`branch` is the topmost scoping unit.** There is no `org_id` or `tenant_id`. Do not introduce one without a decision logged in `DECISIONS.md`.
 6. **Do not add localStorage writes** for admin data. The existing `serviceStore.ts` pattern (localStorage as primary, Supabase as secondary) is a known risk (RISK-004) — do not extend it.
 7. **Before any refactor touching hardcoded values**, read `PROPOSALS.md` first — a centralization plan already exists.
-8. **Admin auth is client-side only.** The admin page has a login form and session check, but all `/api/` routes are unprotected — they accept calls without a valid token. Do not add server-side token validation to routes without a plan logged in `DECISIONS.md`.
-9. **Superadmin bypass is hardcoded.** `superadmin@revera.com` in `/api/auth/me` returns full permissions unconditionally. Do not remove or rename this without coordinating with the clinic owner.
+8. **The admin panel has no auth.** Do not assume any middleware protects `/admin`.
 
 ---
 

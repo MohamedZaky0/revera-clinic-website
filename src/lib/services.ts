@@ -35,9 +35,9 @@ export function getDurationInMinutes(duration: string | null | undefined): numbe
 
 export const ALL_15MIN_SLOTS: string[] = (() => {
   const slots: string[] = [];
-  for (let h = 9; h <= 20; h++) {
+  for (let h = 9; h <= 21; h++) {
     for (const m of [0, 15, 30, 45]) {
-      if (h === 20 && m > 0) break;
+      if (h === 21 && m > 0) break;
       slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     }
   }

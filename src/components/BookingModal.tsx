@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { cachedFetch, prefetchUrl } from "@/lib/fetchCache";
 import { Category, ServiceItem, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -63,6 +64,13 @@ function formatDate(date: Date): string {
   });
 }
 
+function timeToMinutes(timeStr: string): number {
+  const norm = normaliseTo24hSlot(timeStr);
+  if (!norm) return 0;
+  const [hh, mm] = norm.split(":").map(Number);
+  return hh * 60 + mm;
+}
+
 export function BookingModal() {
   const { t, isRTL } = useLanguage();
 
@@ -80,8 +88,11 @@ export function BookingModal() {
   const [confirmed, setConfirmed] = useState(false);
   const [disabledDates, setDisabledDates] = useState<Record<string, number>>({});
   const [takenSlots, setTakenSlots] = useState<string[]>([]);
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [selectedDoctor, setSelectedDoctor] = useState<string>("");
+  const [reservationsForDate, setReservationsForDate] = useState<any[]>([]);
 
-  const [branches, setBranches] = useState<{ id: string; name_en: string; name_ar: string; status: string }[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [branchId, setBranchId] = useState<string | null>(null);
 
   const days = getNext30Days();
@@ -93,6 +104,8 @@ export function BookingModal() {
     setBranchId(branches[0]?.id ?? null);
     setSelectedDate(null);
     setSelectedTime(null);
+    setSelectedDoctor("");
+    setReservationsForDate([]);
     setName('');
     setEmail('');
     setPhone('');
@@ -105,6 +118,10 @@ export function BookingModal() {
     setOpen(false);
     resetState();
   }, [resetState]);
+
+  useEffect(() => {
+    setSelectedTime(null);
+  }, [selectedDate]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -125,6 +142,22 @@ export function BookingModal() {
     window.addEventListener("open-booking", handler);
     return () => window.removeEventListener("open-booking", handler);
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      const stored = localStorage.getItem("revera_user");
+      if (stored) {
+        try {
+          const cust = JSON.parse(stored);
+          if (cust.name) setName(cust.name);
+          if (cust.mobile) setPhone(cust.mobile);
+          if (cust.email) setEmail(cust.email);
+        } catch (err) {
+          console.error("Error reading revera_user in BookingModal:", err);
+        }
+      }
+    }
+  }, [open]);
 
   // Sync service toggle state from admin localStorage
   const [serviceToggles, setServiceToggles] = useState<ServiceToggleState>({});
@@ -162,11 +195,30 @@ export function BookingModal() {
       .catch(() => {});
   }, []);
 
-  // Fetch availability for next 30 days when modal opens, service changes, or branch changes
+  // Load doctors
+  useEffect(() => {
+    fetch("/api/providers")
+      .then((r) => r.json())
+      .then((data) => {
+        setDoctors(data || []);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Prefetch 30-day availability the moment serviceId + branchId are known
+  // — fires BEFORE the user even clicks "Next", so the calendar is warm
+  useEffect(() => {
+    if (!serviceId) return;
+    const branchQuery = branchId ? `&branchId=${branchId}` : "";
+    const url = `/api/availability?serviceId=${serviceId}&days=30${branchQuery}`;
+    prefetchUrl(url, 30000);
+  }, [serviceId, branchId]);
+
+  // Consume the cached 30-day data when the user actually reaches step 2 (date picker)
   useEffect(() => {
     if (!open || !serviceId) return;
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    fetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}`).then(r => r.json()).then((data) => {
+    cachedFetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}`, 30000).then((data) => {
       const map: Record<string, number> = {};
       if (Array.isArray(data)) {
         data.forEach((d: { date: string; approvedCount: number; isAvailable?: boolean }) => { 
@@ -179,64 +231,44 @@ export function BookingModal() {
     }).catch(()=>{});
   }, [open, serviceId, branchId]);
 
+  // Prefetch slots for the currently selected date so step 3 renders instantly
+  useEffect(() => {
+    if (!serviceId || !selectedDate) return;
+    const date = toLocalDateStr(selectedDate);
+    const branchQuery = branchId ? `&branchId=${branchId}` : "";
+    prefetchUrl(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}`, 5000);
+  }, [serviceId, selectedDate, branchId]);
+
   // Fetch taken time slots for a single selected date and calculate duration-based availability
   useEffect(() => {
     let active = true;
     if (!serviceId || !selectedDate) {
       Promise.resolve().then(() => {
-        if (active) setTakenSlots([]);
+        if (active) {
+          setTakenSlots([]);
+          setReservationsForDate([]);
+        }
       });
       return;
     }
     const date = toLocalDateStr(selectedDate);
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    fetch(`/api/reservations?serviceId=${serviceId}&date=${date}&status=approved${branchQuery}`)
-      .then(r=>r.json())
-      .then((list)=>{
+    cachedFetch(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}`, 5000)
+      .then((data) => {
         if (active) {
-          if (Array.isArray(list)) {
-            const targetDuration = getDurationInMinutes(selectedService?.duration);
-            const targetSlotsNeeded = Math.ceil(targetDuration / 15);
-            
-            const occupied = new Array(ALL_15MIN_SLOTS.length).fill(false);
-            
-            const bookings = list.map((i: { timeSlot?: string | null }) => i.timeSlot).filter(Boolean) as string[];
-            for (const b of bookings) {
-              const norm = normaliseTo24hSlot(b);
-              if (norm) {
-                const idx = ALL_15MIN_SLOTS.indexOf(norm);
-                if (idx >= 0) {
-                  for (let k = 0; k < targetSlotsNeeded; k++) {
-                    if (idx + k < occupied.length) {
-                      occupied[idx + k] = true;
-                    }
-                  }
-                }
-              }
-            }
-            
-            const unavailable: string[] = [];
-            for (let i = 0; i < ALL_15MIN_SLOTS.length; i++) {
-              let fit = true;
-              for (let k = 0; k < targetSlotsNeeded; k++) {
-                if (i + k >= occupied.length || occupied[i + k]) {
-                  fit = false;
-                  break;
-                }
-              }
-              if (!fit) {
-                unavailable.push(ALL_15MIN_SLOTS[i]);
-              }
-            }
-            setTakenSlots(unavailable);
+          if (data && Array.isArray(data.unavailableSlots)) {
+            setTakenSlots(data.unavailableSlots);
           } else {
-            console.error("Fetch reservations expected array, got", list);
             setTakenSlots([]);
           }
+          setReservationsForDate([]);
         }
       })
-      .catch(()=>{
-        if (active) setTakenSlots([]);
+      .catch(() => {
+        if (active) {
+          setTakenSlots([]);
+          setReservationsForDate([]);
+        }
       });
     return () => {
       active = false;
@@ -265,6 +297,149 @@ export function BookingModal() {
     if (step === 4) setStep(3);
   }
 
+  const getDayOperatingHours = useCallback((date: Date) => {
+    if (!date || !selectedService) return { start: "09:00", end: "20:00" };
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[date.getDay()];
+    
+    // Find active branch specific service hours
+    const selectedBranch = branches.find(b => b.id === branchId);
+    const activeHours = selectedBranch && Array.isArray(selectedBranch.service_hours) && selectedBranch.service_hours.length > 0
+      ? selectedBranch.service_hours
+      : (t.footer?.serviceHours || []);
+
+    const clinicDay = activeHours.find(
+      (sh: any) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
+    );
+
+    let clinicStartMins = 9 * 60; // 09:00 default
+    let clinicEndMins = 20 * 60;  // 20:00 default
+    let clinicClosed = false;
+
+    if (clinicDay) {
+      if (!clinicDay.isOpen) {
+        clinicClosed = true;
+      } else {
+        const [csh, csm] = clinicDay.openTime.split(":").map(Number);
+        const [ceh, cem] = clinicDay.closeTime.split(":").map(Number);
+        clinicStartMins = csh * 60 + csm;
+        clinicEndMins = ceh * 60 + cem;
+      }
+    }
+
+    if (clinicClosed) {
+      return { start: "23:59", end: "23:59" }; // clinic closed
+    }
+
+    let minStart = 24 * 60; // in minutes
+    let maxEnd = 0; // in minutes
+    let found = false;
+
+    doctors.forEach((doc) => {
+      // Check branch
+      if (branchId && doc.branchId && doc.branchId !== branchId) return;
+      
+      // Check service
+      if (doc.services && doc.services.length > 0) {
+        if (!doc.services.includes(selectedService.en)) return;
+      }
+
+      // Check working days & hours
+      if (doc.workingDaysHours) {
+        const dayConfig = doc.workingDaysHours[weekdayName];
+        if (dayConfig && dayConfig.isOpen) {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          if (startMins < minStart) minStart = startMins;
+          if (endMins > maxEnd) maxEnd = endMins;
+          found = true;
+        }
+      } else {
+        if (clinicStartMins < minStart) minStart = clinicStartMins;
+        if (clinicEndMins > maxEnd) maxEnd = clinicEndMins;
+        found = true;
+      }
+    });
+
+    if (found) {
+      if (minStart < clinicStartMins) minStart = clinicStartMins;
+      if (maxEnd > clinicEndMins) maxEnd = clinicEndMins;
+    } else {
+      minStart = clinicStartMins;
+      maxEnd = clinicEndMins;
+    }
+
+    const formatMins = (totalMins: number) => {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    return {
+      start: formatMins(minStart),
+      end: formatMins(maxEnd)
+    };
+  }, [doctors, branchId, selectedService, t, branches]);
+
+  const getAvailableDoctors = useCallback(() => {
+    if (!selectedDate || !selectedTime || !selectedService) return [];
+
+    const startNew = timeToMinutes(selectedTime);
+    const durationNew = getDurationInMinutes(selectedService.duration);
+    const endNew = startNew + durationNew;
+
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[selectedDate.getDay()];
+
+    return doctors.filter((doctor) => {
+      if (branchId && doctor.branchId && doctor.branchId !== branchId) {
+        return false;
+      }
+
+      if (doctor.services && doctor.services.length > 0) {
+        if (!doctor.services.includes(selectedService.en)) {
+          return false;
+        }
+      }
+
+      if (doctor.workingDaysHours) {
+        const dayConfig = doctor.workingDaysHours[weekdayName];
+        if (!dayConfig || !dayConfig.isOpen) {
+          return false;
+        }
+        
+        const [sh, sm] = dayConfig.start.split(":").map(Number);
+        const [eh, em] = dayConfig.end.split(":").map(Number);
+        const shiftStart = sh * 60 + sm;
+        const shiftEnd = eh * 60 + em;
+
+        if (startNew < shiftStart || endNew > shiftEnd) {
+          return false;
+        }
+      }
+
+      const hasOverlap = reservationsForDate.some((res) => {
+        if (res.doctorName && res.doctorName === doctor.name && res.status !== "rejected") {
+          if (res.timeSlot) {
+            const startRes = timeToMinutes(res.timeSlot);
+            const resService = dynamicServices.find((s) => s.id === res.serviceId);
+            const durationRes = getDurationInMinutes(resService?.duration);
+            const endRes = startRes + durationRes;
+
+            if (startNew < endRes && startRes < endNew) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
+
+      return !hasOverlap;
+    });
+  }, [selectedDate, selectedTime, selectedService, doctors, branchId, reservationsForDate, dynamicServices]);
+
   function handleConfirm() {
     if (!serviceId || !selectedDate || !selectedTime || !name || !email || !phone) return;
     const payload = {
@@ -274,6 +449,7 @@ export function BookingModal() {
       name, email, phone, notes,
       sessionType,
       branchId,
+      doctorName: selectedDoctor || null,
     };
     fetch('/api/reservations', { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } })
       .then(r => r.json())
@@ -545,26 +721,35 @@ export function BookingModal() {
                   {t.booking.selectTime}
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {TIME_SLOTS.map((slot) => {
-                     const isSelected = selectedTime === slot;
-                     const slot24 = normaliseTo24hSlot(slot) ?? "";
-                     const taken = takenSlots.includes(slot24);
-                    return (
-                      <button
-                        key={slot}
-                        onClick={() => !taken && setSelectedTime(slot)}
-                        className="rounded-xl py-3 text-center text-sm font-medium transition-colors"
-                        style={{
-                          backgroundColor: isSelected ? "var(--cr-primary)" : "var(--cr-secondary)",
-                          color: isSelected ? "var(--cr-white)" : "var(--cr-primary)",
-                          border: isSelected ? "none" : "1.5px solid var(--cr-accent)",
-                          opacity: taken ? 0.45 : 1,
-                        }}
-                      >
-                        {slot}
-                      </button>
-                    );
-                  })}
+                  {(() => {
+                    if (!selectedDate) return null;
+                    const { start, end } = getDayOperatingHours(selectedDate);
+                    const filteredSlots = TIME_SLOTS.filter((slot) => {
+                      const slot24 = normaliseTo24hSlot(slot) ?? "";
+                      return slot24 >= start && slot24 < end;
+                    });
+                    
+                    return filteredSlots.map((slot) => {
+                      const isSelected = selectedTime === slot;
+                      const slot24 = normaliseTo24hSlot(slot) ?? "";
+                      const taken = takenSlots.includes(slot24);
+                      return (
+                        <button
+                          key={slot}
+                          onClick={() => !taken && setSelectedTime(slot)}
+                          className="rounded-xl py-3 text-center text-sm font-medium transition-colors"
+                          style={{
+                            backgroundColor: isSelected ? "var(--cr-primary)" : "var(--cr-secondary)",
+                            color: isSelected ? "var(--cr-white)" : "var(--cr-primary)",
+                            border: isSelected ? "none" : "1.5px solid var(--cr-accent)",
+                            opacity: taken ? 0.45 : 1,
+                          }}
+                        >
+                          {slot}
+                        </button>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             )}
@@ -608,6 +793,12 @@ export function BookingModal() {
                       {selectedTime}
                     </p>
                   )}
+                  {selectedDoctor && (
+                    <p className="mb-0">
+                      <span className="font-semibold">{isRTL ? "الطبيب" : "Doctor"}: </span>
+                      {selectedDoctor}
+                    </p>
+                  )}
                 </div>
 
                 {/* Notes */}
@@ -622,34 +813,26 @@ export function BookingModal() {
                   placeholder={t.booking.notes}
                 />
 
-                {/* Session Type Selectors */}
-                <label className="block mb-2 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
-                  {isRTL ? "مكان الجلسة" : "Session Type"}
+                {/* Doctor Selection (Optional) */}
+                <label className="block mb-1 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
+                  {isRTL ? "الطبيب المعالج (اختياري)" : "Select Doctor (Optional)"}
                 </label>
-                <div className="flex gap-4 mb-4">
-                  <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer text-[#1F251A]">
-                    <input
-                      type="radio"
-                      name="sessionType"
-                      value="in_person"
-                      checked={sessionType === "in_person"}
-                      onChange={() => setSessionType("in_person")}
-                      className="accent-[#414E36]"
-                    />
-                    {isRTL ? "في العيادة (In Person)" : "In Person"}
-                  </label>
-                  <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer text-[#1F251A]">
-                    <input
-                      type="radio"
-                      name="sessionType"
-                      value="online"
-                      checked={sessionType === "online"}
-                      onChange={() => setSessionType("online")}
-                      className="accent-[#414E36]"
-                    />
-                    {isRTL ? "أونلاين (Online)" : "Online"}
-                  </label>
-                </div>
+                <select
+                  className="cr-input mb-3 bg-white text-[#1F251A] font-medium"
+                  value={selectedDoctor}
+                  onChange={(e) => setSelectedDoctor(e.target.value)}
+                >
+                  <option value="">
+                    {isRTL ? "أي طبيب / لا يوجد تفضيل" : "Any Doctor / No Preference"}
+                  </option>
+                  {getAvailableDoctors().map((doc: any) => (
+                    <option key={doc.id} value={doc.name}>
+                      {doc.name}
+                    </option>
+                  ))}
+                </select>
+
+
 
                 <label className="block mb-1 text-xs font-semibold">Name</label>
                 <input className="cr-input mb-2" value={name} onChange={(e)=>setName(e.target.value)} />

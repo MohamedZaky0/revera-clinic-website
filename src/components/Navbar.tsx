@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Phone, ChevronDown } from "lucide-react";
+import { Phone, ChevronDown, User, LogOut } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 const NAV_LINKS = [
   { key: "home" as const, href: "/" },
@@ -21,8 +22,46 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [user, setUser] = useState<{ id?: string; name?: string; mobile?: string; email?: string; gender?: string | null } | null>(null);
+  const isProfileIncomplete = !!(user && (!user.gender || !user.mobile || user.mobile.startsWith("guest_")));
+
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  useEffect(() => {
+    const checkUser = () => {
+      const stored = localStorage.getItem("revera_user");
+      if (stored) {
+        try {
+          setUser(JSON.parse(stored));
+        } catch {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    };
+    checkUser();
+
+    window.addEventListener("revera-auth-change", checkUser);
+
+    if (supabase) {
+      supabase.auth.onAuthStateChange(async (event: any, session: any) => {
+        if (!session?.user) {
+          if (event === "SIGNED_OUT") {
+            localStorage.removeItem("revera_user");
+            sessionStorage.removeItem("revera_profile_prompted");
+            setUser(null);
+            window.dispatchEvent(new CustomEvent("revera-auth-change"));
+          }
+        }
+      });
+    }
+
+    return () => {
+      window.removeEventListener("revera-auth-change", checkUser);
+    };
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -48,6 +87,38 @@ export function Navbar() {
   const handleAuth = () => {
     window.dispatchEvent(new CustomEvent("open-auth"));
     setMenuOpen(false);
+  };
+
+  const handleLogout = async () => {
+    localStorage.removeItem("revera_user");
+    setUser(null);
+    window.dispatchEvent(new CustomEvent("revera-auth-change"));
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+  };
+
+  const handleCompleteProfile = () => {
+    if (user) {
+      const nameParts = (user.name || "").trim().split(/\s+/);
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+      
+      const phoneVal = user.mobile || "";
+      const cleanedPhone = phoneVal.startsWith("guest_") ? "" : phoneVal;
+      
+      window.dispatchEvent(new CustomEvent("open-auth", {
+        detail: {
+          step: 3,
+          email: user.email || "",
+          firstName: firstName,
+          lastName: lastName,
+          phone: cleanedPhone,
+          customerId: user.id || null,
+          gender: user.gender || null
+        }
+      }));
+    }
   };
 
   return (
@@ -112,10 +183,10 @@ export function Navbar() {
 
             {/* Make Appointment CTA next to Contact */}
             <li>
-              <a
-                href="https://wa.me/201035595691?text=Hello%20Revera%2C%20I%27d%20love%20to%20schedule%20a%20consultation%20at%20your%20New%20Cairo%20branch.%20Please%20let%20me%20know%20your%20earliest%20availability.%20Thank%20you."
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("open-booking"));
+                }}
                 style={{
                   padding: "10px 16px",
                   borderRadius: "8px",
@@ -127,51 +198,52 @@ export function Navbar() {
                   cursor: "pointer",
                   transition: "transform 0.12s ease, opacity 0.12s ease",
                   whiteSpace: "nowrap",
-                  textDecoration: "none",
                   display: "inline-block",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLAnchorElement).style.opacity = "0.9";
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.9";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLAnchorElement).style.opacity = "1";
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
                 }}
               >
                 {t.nav.makeAppointment}
-              </a>
-              </li>
+              </button>
+            </li>
           </ul>
 
           {/* Right controls */}
           <div
             className="hidden lg:flex items-center shrink-0 flex-row"
             style={{
-              gap: "24px",
+              gap: user ? "12px" : "24px",
             }}
           >
             {/* Phone */}
-            <a
-              href="tel:+201035595691"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                color: "var(--cr-primary)",
-                textDecoration: "none",
-                fontSize: "15px",
-                fontWeight: 500,
-                transition: "opacity 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.opacity = "0.7";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.opacity = "1";
-              }}
-            >
-              <Phone size={18} strokeWidth={1.5} />
-              <span>(+20) 01035595691</span>
-            </a>
+            {!user && (
+              <a
+                href="tel:+201035595691"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  color: "var(--cr-primary)",
+                  textDecoration: "none",
+                  fontSize: "15px",
+                  fontWeight: 500,
+                  transition: "opacity 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.opacity = "0.7";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLAnchorElement).style.opacity = "1";
+                }}
+              >
+                <Phone size={18} strokeWidth={1.5} />
+                <span>(+20) 01035595691</span>
+              </a>
+            )}
 
             {/* Language dropdown */}
             <div style={{ position: "relative" }}>
@@ -299,29 +371,124 @@ export function Navbar() {
               )}
             </div>
 
-            {/* Login button */}
-            <button
-              disabled
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                background: "transparent",
-                color: "rgba(65, 78, 54, 0.45)",
-                border: "1.5px solid rgba(65, 78, 54, 0.25)",
-                padding: "10px 20px",
-                borderRadius: "6px",
-                cursor: "not-allowed",
-                fontSize: "14px",
-                fontWeight: 600,
-                transition: "all 0.2s ease",
-                whiteSpace: "nowrap",
-                opacity: 0.65,
-              }}
-            >
-              {/* TODO: Add login icon */}
-              {t.nav.login}
-            </button>
+            {/* Login / User info button */}
+            {user ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <Link
+                  href="/profile"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    background: "rgba(90,61,52,0.05)",
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    color: "var(--cr-primary)",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.05)";
+                  }}
+                >
+                  <User size={16} />
+                  <span>{user.name || user.mobile}</span>
+                </Link>
+                {isProfileIncomplete && (
+                  <button
+                    onClick={handleCompleteProfile}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      background: "rgba(196,174,124,0.15)",
+                      color: "var(--cr-primary)",
+                      border: "1.5px solid var(--cr-accent)",
+                      padding: "8px 14px",
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-accent)";
+                      (e.currentTarget as HTMLButtonElement).style.color = "white";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(196,174,124,0.15)";
+                      (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
+                    }}
+                  >
+                    <span>{isRTL ? "إكمال الملف" : "Complete Profile"}</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    background: "transparent",
+                    color: "var(--cr-primary)",
+                    border: "1.5px solid var(--cr-primary)",
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-primary)";
+                    (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-white)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                    (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
+                  }}
+                >
+                  <LogOut size={14} />
+                  <span>{isRTL ? "خروج" : "Logout"}</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleAuth}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: "transparent",
+                  color: "var(--cr-primary)",
+                  border: "1.5px solid var(--cr-primary)",
+                  padding: "10px 20px",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  transition: "all 0.2s ease",
+                  whiteSpace: "nowrap",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "var(--cr-primary)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-white)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--cr-primary)";
+                }}
+              >
+                <User size={16} />
+                <span>{t.nav.login}</span>
+              </button>
+            )}
           </div>
 
           {/* Mobile hamburger */}
@@ -421,10 +588,11 @@ export function Navbar() {
               }}
             >
               {/* Mobile Make Appointment */}
-              <a
-                href="https://wa.me/201035595691?text=Hello%20Revera%2C%20I%27d%20love%20to%20schedule%20a%20consultation%20at%20your%20New%20Cairo%20branch.%20Please%20let%20me%20know%20your%20earliest%20availability.%20Thank%20you."
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("open-booking"));
+                  setMenuOpen(false);
+                }}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -440,11 +608,10 @@ export function Navbar() {
                   fontWeight: 600,
                   transition: "all 0.12s ease",
                   width: "100%",
-                  textDecoration: "none",
                 }}
               >
                 {t.nav.makeAppointment}
-              </a>
+              </button>
 
               {/* Mobile phone */}
               <a
@@ -525,29 +692,104 @@ export function Navbar() {
                 </button>
               </div>
 
-              {/* Mobile login button */}
-              <button
-                disabled
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                  background: "rgba(65, 78, 54, 0.12)",
-                  color: "rgba(255, 255, 255, 0.7)",
-                  border: "none",
-                  padding: "12px 20px",
-                  borderRadius: "6px",
-                  cursor: "not-allowed",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  transition: "all 0.2s ease",
-                  width: "100%",
-                  opacity: 0.65,
-                }}
-              >
-                {t.nav.login}
-              </button>
+              {/* Mobile login / user info button */}
+              {user ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <Link
+                    href="/profile"
+                    onClick={() => setMenuOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      background: "rgba(90,61,52,0.05)",
+                      padding: "12px 16px",
+                      borderRadius: "6px",
+                      color: "var(--cr-primary)",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      textDecoration: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <User size={16} />
+                    <span>{user.name || user.mobile}</span>
+                  </Link>
+                  {isProfileIncomplete && (
+                    <button
+                      onClick={() => {
+                        handleCompleteProfile();
+                        setMenuOpen(false);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        background: "rgba(196,174,124,0.15)",
+                        color: "var(--cr-primary)",
+                        border: "1.5px solid var(--cr-accent)",
+                        padding: "12px 16px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        width: "100%",
+                      }}
+                    >
+                      <span>{isRTL ? "إكمال الملف الشخصي" : "Complete Profile"}</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setMenuOpen(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      background: "transparent",
+                      color: "var(--cr-primary)",
+                      border: "1.5px solid var(--cr-primary)",
+                      padding: "12px 20px",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      transition: "all 0.2s ease",
+                      width: "100%",
+                    }}
+                  >
+                    <LogOut size={16} />
+                    <span>{isRTL ? "تسجيل الخروج" : "Logout"}</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleAuth}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    background: "var(--cr-primary)",
+                    color: "var(--cr-white)",
+                    border: "none",
+                    padding: "12px 20px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    transition: "all 0.2s ease",
+                    width: "100%",
+                  }}
+                >
+                  <User size={16} />
+                  <span>{t.nav.login}</span>
+                </button>
+              )}
             </div>
           </div>
         )}

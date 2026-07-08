@@ -7,29 +7,7 @@ export const dynamic = 'force-dynamic';
 
 const JSON_FILE_PATH = path.join(process.cwd(), 'data', 'providers.json');
 
-const DEFAULT_PROVIDERS = [
-  {
-    name: "Dr. Ahmed Medhat",
-    bookings_count: 0,
-    services: ["Tattoo Removal (Small)", "Tattoo Removal (Medium)"],
-    more_count: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Radwa Seif",
-    bookings_count: 0,
-    services: ["Physio: Basic Relief (3)", "Physio: Standard Recovery (6)"],
-    more_count: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Sara El Gamel",
-    bookings_count: 1,
-    services: ["Half Arm", "Full Arms"],
-    more_count: 14,
-    rating: 0,
-  },
-];
+const DEFAULT_PROVIDERS: any[] = [];
 
 function mapProvider(p: Record<string, any>) {
   return {
@@ -39,6 +17,15 @@ function mapProvider(p: Record<string, any>) {
     services: p.services ?? [],
     more: p.more_count ?? 0,
     rating: Number(p.rating || 0),
+    image: p.image || null,
+    phone: p.phone || null,
+    gender: p.gender || null,
+    age: p.age ? Number(p.age) : null,
+    specialty: p.specialty || null,
+    nationalId: p.national_id || null,
+    workingDaysHours: p.working_days_hours || null,
+    branchId: p.branch_id || null,
+    startDate: p.start_date || null,
   };
 }
 
@@ -49,24 +36,14 @@ export async function GET() {
       .select('*')
       .order('name', { ascending: true });
 
-    if (!error && data) {
-      if (data.length === 0) {
-        // Seed default providers
-        const { data: seeded, error: seedError } = await supabaseServer
-          .from('providers')
-          .insert(DEFAULT_PROVIDERS)
-          .select();
-        
-        if (!seedError && seeded) {
-          return NextResponse.json(seeded.map(mapProvider));
-        } else {
-          console.warn("Failed to seed default providers to Supabase:", seedError);
-        }
-      } else {
-        return NextResponse.json(data.map(mapProvider));
-      }
+    if (!error && data && data.length > 0 && ('working_days_hours' in data[0])) {
+      return NextResponse.json(data.map(mapProvider));
     } else {
-      console.warn("Supabase providers query error, falling back to JSON:", error);
+      if (error) {
+        console.warn("Supabase providers query error, falling back to JSON:", error);
+      } else {
+        console.warn("Supabase providers missing columns (schema not migrated), falling back to JSON");
+      }
     }
   } catch (dbErr) {
     console.error("Database providers load error, falling back to JSON:", dbErr);
@@ -95,13 +72,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more } = body;
+  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate } = body;
   const newProvider = {
     name,
     services: services || [],
     rating: Number(rating || 0),
     more_count: Number(more || 0),
-    bookings_count: 0
+    bookings_count: 0,
+    image: image || null,
+    phone: phone || null,
+    gender: gender || null,
+    age: age ? Number(age) : null,
+    specialty: specialty || null,
+    national_id: nationalId || null,
+    working_days_hours: workingDaysHours || null,
+    branch_id: branchId || null,
+    start_date: startDate || null
   };
 
   try {
@@ -132,7 +118,16 @@ export async function POST(req: Request) {
       bookings: 0,
       services: services || [],
       more: Number(more || 0),
-      rating: Number(rating || 0)
+      rating: Number(rating || 0),
+      image: image || null,
+      phone: phone || null,
+      gender: gender || null,
+      age: age ? Number(age) : null,
+      specialty: specialty || null,
+      nationalId: nationalId || null,
+      workingDaysHours: workingDaysHours || null,
+      branchId: branchId || null,
+      startDate: startDate || null
     };
     list.push(localNew);
     fs.mkdirSync(path.dirname(JSON_FILE_PATH), { recursive: true });
@@ -156,12 +151,21 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more } = body;
+  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate } = body;
   const updates: Record<string, any> = {};
   if (name !== undefined) updates.name = name;
   if (services !== undefined) updates.services = services;
   if (rating !== undefined) updates.rating = Number(rating || 0);
   if (more !== undefined) updates.more_count = Number(more || 0);
+  if (image !== undefined) updates.image = image;
+  if (phone !== undefined) updates.phone = phone;
+  if (gender !== undefined) updates.gender = gender;
+  if (age !== undefined) updates.age = age ? Number(age) : null;
+  if (specialty !== undefined) updates.specialty = specialty;
+  if (nationalId !== undefined) updates.national_id = nationalId;
+  if (workingDaysHours !== undefined) updates.working_days_hours = workingDaysHours;
+  if (branchId !== undefined) updates.branch_id = branchId;
+  if (startDate !== undefined) updates.start_date = startDate;
 
   try {
     const { data, error } = await supabaseServer
@@ -186,9 +190,23 @@ export async function PATCH(req: Request) {
       const list = JSON.parse(fs.readFileSync(JSON_FILE_PATH, 'utf-8'));
       const index = list.findIndex((p: any) => p.id === id);
       if (index !== -1) {
+        // Map camelCase to snake_case updates for fallback JSON storage consistency
+        const jsonUpdates = {
+          ...updates,
+          image: updates.image !== undefined ? updates.image : list[index].image,
+          phone: updates.phone !== undefined ? updates.phone : list[index].phone,
+          gender: updates.gender !== undefined ? updates.gender : list[index].gender,
+          age: updates.age !== undefined ? updates.age : list[index].age,
+          specialty: updates.specialty !== undefined ? updates.specialty : list[index].specialty,
+          nationalId: updates.national_id !== undefined ? updates.national_id : list[index].nationalId,
+          workingDaysHours: updates.working_days_hours !== undefined ? updates.working_days_hours : list[index].workingDaysHours,
+          branchId: updates.branch_id !== undefined ? updates.branch_id : list[index].branchId,
+          startDate: updates.start_date !== undefined ? updates.start_date : list[index].startDate,
+        };
+
         list[index] = {
           ...list[index],
-          ...updates,
+          ...jsonUpdates,
           services: updates.services !== undefined ? updates.services : list[index].services,
           name: updates.name !== undefined ? updates.name : list[index].name,
           rating: updates.rating !== undefined ? updates.rating : list[index].rating,

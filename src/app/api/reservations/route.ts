@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { getDurationInMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot } from '@/lib/services';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -12,9 +13,14 @@ function fmtDate(d: unknown): string {
 }
 
 function mapRow(r: Record<string, any>) {
+  const serviceIds = Array.isArray(r.service_ids) ? r.service_ids : [];
+  if (serviceIds.length === 0 && r.service_id) {
+    serviceIds.push(r.service_id);
+  }
   return {
     id: r.id,
     serviceId: r.service_id,
+    serviceIds: serviceIds,
     date: fmtDate(r.date),
     requestedTime: r.requested_time,
     name: r.name,
@@ -27,6 +33,11 @@ function mapRow(r: Record<string, any>) {
     doctorName: r.doctor_name,
     createdAt: r.created_at,
     branchId: r.branch_id ?? null,
+    customerId: r.customer_id ?? null,
+    amountPaid: r.amount_paid ?? 0,
+    amountLeft: r.amount_left ?? null,
+    roomId: r.room_id ?? null,
+    rooms: r.rooms || [],
   };
 }
 
@@ -37,6 +48,8 @@ export async function GET(req: Request) {
   const serviceId = params.get('serviceId');
   const date = params.get('date');
   const branchId = params.get('branchId');
+  const phone = params.get('phone');
+  const customerId = params.get('customerId');
 
   try {
     let q = supabaseServer
@@ -47,7 +60,10 @@ export async function GET(req: Request) {
     if (status) q = q.eq('status', status);
     if (serviceId) q = q.eq('service_id', Number(serviceId));
     if (date) q = q.eq('date', date);
-    if (branchId) q = q.eq('branch_id', branchId);
+    if (phone) q = q.eq('phone', phone);
+    if (customerId) q = q.eq('customer_id', customerId);
+    // Include bookings that match this branch OR have no branch set (website bookings without branch)
+    if (branchId) q = q.or(`branch_id.eq.${branchId},branch_id.is.null`);
 
     const { data: rows, error } = await q;
 
@@ -62,12 +78,90 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId } = body;
+    const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId, doctorName } = body;
 
     if (!serviceId || !date || !name || !email || !phone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    if (email) {
+      const cleanEmail = email.trim().toLowerCase();
+      const { data: employeeCheck, error: empCheckError } = await supabaseServer
+        .from('employee_accounts')
+        .select('id')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+
+      if (empCheckError) throw empCheckError;
+      if (employeeCheck) {
+        return NextResponse.json(
+          { error: 'This email belongs to an administrator/employee account and cannot be used to book appointments.' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 1. Lookup or create customer profile
+    let customerId: string | null = null;
+    try {
+      const { data: customer, error: customerError } = await supabaseServer
+        .from('customers')
+        .select('id, number_of_bookings')
+        .eq('mobile', phone)
+        .maybeSingle();
+
+      if (customerError) {
+        console.error('Customer lookup error:', customerError);
+      }
+
+      if (customer) {
+        customerId = customer.id;
+        const newBookings = (customer.number_of_bookings || 0) + 1;
+        await supabaseServer
+          .from('customers')
+          .update({ number_of_bookings: newBookings })
+          .eq('id', customerId);
+      } else {
+        const { data: newCustomer, error: createError } = await supabaseServer
+          .from('customers')
+          .insert({
+            name,
+            mobile: phone,
+            email: email || null,
+            registration_date: new Date().toISOString(),
+            active: true,
+            spent_amount: 0,
+            outstanding: 0,
+            number_of_bookings: 1,
+          })
+          .select('id')
+          .single();
+
+        if (createError) {
+          console.error('Customer creation error:', createError);
+        } else if (newCustomer) {
+          customerId = newCustomer.id;
+        }
+      }
+    } catch (custErr) {
+      console.error('Customer integration error:', custErr);
+    }
+
+    // Fetch compatible rooms for this service
+    let compRoomIds: string[] = [];
+    try {
+      const { data: sRooms } = await supabaseServer
+        .from('service_rooms')
+        .select('room_id')
+        .eq('service_id', Number(serviceId));
+      if (sRooms && sRooms.length > 0) {
+        compRoomIds = sRooms.map((sr: any) => sr.room_id);
+      }
+    } catch (e) {
+      console.warn("Could not load service compatible rooms:", e);
+    }
+
+    // 2. Insert reservation linked to customer
     const { data, error } = await supabaseServer
       .from('reservations')
       .insert({
@@ -82,6 +176,11 @@ export async function POST(req: Request) {
         time_slot: null,
         session_type: sessionType || 'in_person',
         branch_id: branchId || null,
+        customer_id: customerId,
+        amount_paid: body.amountPaid !== undefined ? Number(body.amountPaid) : 0,
+        amount_left: body.amountLeft !== undefined ? Number(body.amountLeft) : null,
+        doctor_name: doctorName || null,
+        rooms: compRoomIds,
       })
       .select()
       .single();
@@ -101,7 +200,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType } = body;
+    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal } = body;
 
     const { data: target, error: findError } = await supabaseServer
       .from('reservations')
@@ -113,48 +212,164 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
+    if (target.status === 'started' && (action === 'reject' || status === 'cancelled' || status === 'rejected')) {
+      return NextResponse.json({ error: 'Cannot cancel a booking that has already started.' }, { status: 400 });
+    }
+
     if (action === 'approve') {
       if (!timeSlot) return NextResponse.json({ error: 'Missing timeSlot' }, { status: 400 });
 
-      let bookedQuery = supabaseServer
-        .from('reservations')
-        .select('*', { count: 'exact', head: true })
-        .eq('service_id', target.service_id)
-        .eq('date', target.date)
-        .eq('status', 'approved');
+      // Get all active, available clinical rooms in this branch
+      let roomsQuery = supabaseServer
+        .from('rooms')
+        .select('id, name')
+        .eq('type', 'clinical')
+        .eq('status', 'available');
 
       if (target.branch_id) {
-        bookedQuery = bookedQuery.eq('branch_id', target.branch_id);
-      } else {
-        bookedQuery = bookedQuery.is('branch_id', null);
+        roomsQuery = roomsQuery.eq('branch_id', target.branch_id);
       }
 
-      const { count: bookedCount, error: countError1 } = await bookedQuery;
+      const { data: rawBranchRooms, error: roomsError } = await roomsQuery;
+      if (roomsError) throw roomsError;
 
-      if (countError1) throw countError1;
-      if (Number(bookedCount || 0) >= 8) {
-        return NextResponse.json({ error: 'Day is fully booked' }, { status: 400 });
+      let branchRooms = rawBranchRooms || [];
+      if (branchRooms.length === 0) {
+        // Fallback: If no clinical rooms exist, construct a default virtual clinical room so bookings are not blocked
+        branchRooms = [{ id: '00000000-0000-0000-0000-000000000000', name: 'Virtual Clinical Room', branch_id: target.branch_id }];
       }
 
-      let slotQuery = supabaseServer
+      // Find compatible rooms for the service
+      const { data: mappedRooms, error: mappingError } = await supabaseServer
+        .from('service_rooms')
+        .select('room_id')
+        .eq('service_id', target.service_id);
+
+      if (mappingError) throw mappingError;
+
+      const mappedRoomIds = mappedRooms ? mappedRooms.map((mr: any) => mr.room_id) : [];
+      let serviceCompRooms = branchRooms.filter((r: any) => mappedRoomIds.includes(r.id));
+
+      if (serviceCompRooms.length === 0) {
+        // Fallback: If service is not mapped to any specific clinical rooms, allow booking in any clinical room of the branch
+        serviceCompRooms = branchRooms;
+      }
+
+      // Fetch target service duration
+      const { data: targetSvc, error: svcError } = await supabaseServer
+        .from('services')
+        .select('duration')
+        .eq('id', target.service_id)
+        .single();
+
+      if (svcError) throw svcError;
+
+      const targetDuration = targetSvc?.duration ? getDurationInMinutes(targetSvc.duration) : 30;
+      const targetSlotsCount = Math.ceil(targetDuration / 15);
+
+      const normSlot = normaliseTo24hSlot(timeSlot);
+      if (!normSlot) return NextResponse.json({ error: 'Invalid time slot format' }, { status: 400 });
+
+      const startIdx = ALL_15MIN_SLOTS.indexOf(normSlot);
+      if (startIdx === -1) return NextResponse.json({ error: 'Invalid time slot value' }, { status: 400 });
+
+      // Fetch all approved bookings for this date
+      const { data: dayBookings, error: bookingsError } = await supabaseServer
         .from('reservations')
-        .select('*', { count: 'exact', head: true })
-        .eq('service_id', target.service_id)
+        .select('id, room_id, time_slot, service_id')
         .eq('date', target.date)
         .eq('status', 'approved')
-        .eq('time_slot', timeSlot);
+        .not('room_id', 'is', null);
 
-      if (target.branch_id) {
-        slotQuery = slotQuery.eq('branch_id', target.branch_id);
-      } else {
-        slotQuery = slotQuery.is('branch_id', null);
+      if (bookingsError) throw bookingsError;
+
+      // Fetch all service durations to calculate overlap
+      const { data: allSvcs, error: allSvcsError } = await supabaseServer
+        .from('services')
+        .select('id, duration');
+
+      if (allSvcsError) throw allSvcsError;
+
+      const durationMap = new Map<number, number>();
+      if (allSvcs) {
+        allSvcs.forEach((s: any) => {
+          durationMap.set(s.id, getDurationInMinutes(s.duration));
+        });
       }
 
-      const { count: slotCount, error: countError2 } = await slotQuery;
+      // Determine which rooms are available (not occupied)
+      const availableRooms: { id: string; name: string }[] = [];
 
-      if (countError2) throw countError2;
-      if (Number(slotCount || 0) > 0) {
-        return NextResponse.json({ error: 'Time slot already taken' }, { status: 400 });
+      for (const room of serviceCompRooms) {
+        let roomOccupied = false;
+        const roomBookings = dayBookings ? dayBookings.filter((b: any) => b.room_id === room.id) : [];
+
+        for (const rb of roomBookings) {
+          const rbNorm = normaliseTo24hSlot(rb.time_slot);
+          if (!rbNorm) continue;
+          const rbStartIdx = ALL_15MIN_SLOTS.indexOf(rbNorm);
+          if (rbStartIdx === -1) continue;
+
+          const rbDuration = durationMap.get(rb.service_id) ?? 30;
+          const rbSlotsCount = Math.ceil(rbDuration / 15);
+
+          // Overlap condition:
+          if (rbStartIdx < startIdx + targetSlotsCount && startIdx < rbStartIdx + rbSlotsCount) {
+            roomOccupied = true;
+            break;
+          }
+        }
+
+        if (!roomOccupied) {
+          availableRooms.push(room);
+        }
+      }
+
+      if (availableRooms.length === 0) {
+        return NextResponse.json({ error: 'No clinical rooms are available at this time slot.' }, { status: 400 });
+      }
+
+      let chosenRoom = availableRooms[0];
+
+      // Priority algorithm: if more than 1 room is available, select the room with the fewest exclusive services
+      if (availableRooms.length > 1) {
+        const { data: allSR, error: allSRError } = await supabaseServer
+          .from('service_rooms')
+          .select('service_id, room_id');
+
+        if (allSRError) throw allSRError;
+
+        const serviceRoomCounts = new Map<number, number>();
+        if (allSR) {
+          allSR.forEach((sr: any) => {
+            const count = serviceRoomCounts.get(sr.service_id) ?? 0;
+            serviceRoomCounts.set(sr.service_id, count + 1);
+          });
+        }
+
+        const roomScores = new Map<string, number>();
+        availableRooms.forEach((room: any) => {
+          let exclusiveServices = 0;
+          if (allSR) {
+            allSR.forEach((sr: any) => {
+              if (sr.room_id === room.id) {
+                const mappedRoomsCount = serviceRoomCounts.get(sr.service_id) ?? 0;
+                if (mappedRoomsCount === 1) {
+                  exclusiveServices++;
+                }
+              }
+            });
+          }
+          roomScores.set(room.id, exclusiveServices);
+        });
+
+        availableRooms.sort((a: any, b: any) => {
+          const scoreA = roomScores.get(a.id) ?? 0;
+          const scoreB = roomScores.get(b.id) ?? 0;
+          return scoreA - scoreB;
+        });
+
+        chosenRoom = availableRooms[0];
       }
 
       const { data: updated, error: updateError } = await supabaseServer
@@ -162,7 +377,9 @@ export async function PATCH(req: Request) {
         .update({
           status: 'approved',
           time_slot: timeSlot,
-          doctor_name: doctorName || null
+          doctor_name: doctorName || null,
+          room_id: chosenRoom.id,
+          rooms: serviceCompRooms.map((r: any) => r.id)
         })
         .eq('id', id)
         .select()
@@ -170,7 +387,6 @@ export async function PATCH(req: Request) {
 
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
-
     } else if (action === 'reject') {
       const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
@@ -182,12 +398,21 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined) {
+    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (notes !== undefined) updates.notes = notes;
       if (doctorName !== undefined) updates.doctor_name = doctorName;
       if (sessionType !== undefined) updates.session_type = sessionType;
+      if (amountPaid !== undefined) updates.amount_paid = amountPaid;
+      if (amountLeft !== undefined) updates.amount_left = amountLeft;
+      if (serviceId !== undefined) updates.service_id = Number(serviceId);
+      if (serviceIds !== undefined) {
+        updates.service_ids = serviceIds.map(Number);
+        if (serviceIds.length > 0) {
+          updates.service_id = Number(serviceIds[0]);
+        }
+      }
 
       const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
@@ -197,6 +422,42 @@ export async function PATCH(req: Request) {
         .single();
 
       if (updateError) throw updateError;
+
+      // Handle customer wallet and spent/outstanding updates on checkout / completed
+      if (status === 'completed' && target.customer_id) {
+        try {
+          const { data: customer, error: fetchCustErr } = await supabaseServer
+            .from('customers')
+            .select('wallet_balance, spent_amount, outstanding')
+            .eq('id', target.customer_id)
+            .single();
+
+          if (!fetchCustErr && customer) {
+            const currentWallet = Number(customer.wallet_balance || 0);
+            const currentSpent = Number(customer.spent_amount || 0);
+            const currentOutstanding = Number(customer.outstanding || 0);
+
+            const deposit = Number(walletDeposit || 0);
+            const withdrawal = Number(walletWithdrawal || 0);
+
+            const newWallet = Math.max(0, currentWallet + deposit - withdrawal);
+            const newSpent = currentSpent + Number(amountPaid || 0) + withdrawal;
+            const newOutstanding = currentOutstanding + Number(amountLeft || 0);
+
+            await supabaseServer
+              .from('customers')
+              .update({
+                wallet_balance: newWallet,
+                spent_amount: newSpent,
+                outstanding: newOutstanding
+              })
+              .eq('id', target.customer_id);
+          }
+        } catch (custErr) {
+          console.error("Failed to update customer wallet balance:", custErr);
+        }
+      }
+
       return NextResponse.json(mapRow(updated));
     } else {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

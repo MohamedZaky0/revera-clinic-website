@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { supabase } from "@/lib/supabaseClient";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -70,11 +71,17 @@ import {
   GripVertical,
   X,
   ListOrdered,
+  DoorOpen,
+  MapPin,
 } from "lucide-react";
+import RoomsManagerView from "@/components/RoomsManagerView";
+import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
+import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
 
 type Req = {
   id: string;
   serviceId: number;
+  serviceIds?: number[];
   date: string;
   requestedTime?: string | null;
   name: string;
@@ -87,7 +94,34 @@ type Req = {
   doctorName?: string | null;
   createdAt?: string;
   branchId?: string | null;
+  customerId?: string | null;
+  amountPaid?: number;
+  amountLeft?: number | null;
+  roomId?: string | null;
+  rooms?: string[];
 };
+
+function getStatusBadgeClass(status: string): string {
+  const s = status?.toLowerCase() || 'pending';
+  switch (s) {
+    case 'approved':
+      return 'bg-green-50 text-green-700 border border-green-200/50';
+    case 'confirmed':
+      return 'bg-sky-50 text-sky-700 border border-sky-200/50';
+    case 'started':
+      return 'bg-indigo-50 text-indigo-700 border border-indigo-200/50';
+    case 'completed':
+      return 'bg-emerald-50 text-emerald-700 border border-emerald-200/50';
+    case 'cancelled':
+    case 'canceled':
+      return 'bg-gray-50 text-gray-500 border border-gray-200/50';
+    case 'rejected':
+      return 'bg-red-50 text-red-700 border border-red-200/50';
+    case 'pending':
+    default:
+      return 'bg-amber-50 text-amber-700 border border-amber-200/50';
+  }
+}
 
 const SLOTS = ALL_15MIN_SLOTS;
 
@@ -96,6 +130,8 @@ const SIDEBAR_ITEMS = [
   { label: "Customers", icon: Users },
   { label: "Providers", icon: ShieldCheck },
   { label: "Services", icon: Layers },
+  { label: "Employees", icon: CircleUser },
+  { label: "HR", icon: ClipboardList },
   { label: "Settings", icon: Settings, submenu: true },
   { label: "Logout", icon: LogOut },
 ];
@@ -107,33 +143,12 @@ const overviewCards = [
   { label: "Open requests", value: "9", accent: "bg-[#C4AE7C]/10", icon: FileText },
 ];
 
-const PROVIDERS = [
-  {
-    name: "Dr. Ahmed Medhat",
-    bookings: 0,
-    services: ["Tattoo Removal (Small)", "Tattoo Removal (Medium)"],
-    more: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Radwa Seif",
-    bookings: 0,
-    services: ["Physio: Basic Relief (3)", "Physio: Standard Recovery (6)"],
-    more: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Sara El Gamel",
-    bookings: 1,
-    services: ["Half Arm", "Full Arms"],
-    more: 14,
-    rating: 0,
-  },
-];
+const PROVIDERS: any[] = [];
 
 const TARGET_BONUSES = [] as const;
 
 type Customer = {
+  id?: string;
   email: string;
   name: string;
   phone: string;
@@ -142,6 +157,27 @@ type Customer = {
   spent: number;
   outstanding: number;
   wallet: number;
+  mobile?: string;
+  gender?: string | null;
+  number_of_bookings?: number;
+  registration_date?: string;
+  active?: boolean;
+  spent_amount?: number;
+  wallet_balance?: number;
+  area?: string | null;
+  location_name?: string | null;
+  street_name?: string | null;
+  building_no?: string | null;
+  floor_no?: string | null;
+  note?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  // new demographic fields
+  age?: number | null;
+  national_id?: string | null;
+  address?: string | null;
+  referral?: string | null;
+  occupation?: string | null;
 };
 
 const MOCK_PRESCRIPTIONS = [
@@ -327,12 +363,332 @@ const MOCK_PAYROLL = [
   { id: "PRL-006", name: "Hoda Aly", role: "Clinic Admin Assistant", base: "EGP 16,000.00", bonus: "EGP 1,500.00", deductions: "EGP 250.00", net: "EGP 17,250.00", period: "1 May - 31 May 2026", status: "Processing" },
 ];
 
+const PERMISSION_STRUCTURE = [
+  {
+    category: "Bookings Management",
+    prefix: "bookings",
+    items: [
+      { key: "bookings.view_calendar", label: "View Calendar" },
+      { key: "bookings.view_list", label: "View Bookings List" },
+      { key: "bookings.create", label: "Create Bookings" },
+      { key: "bookings.edit", label: "Edit/Reschedule Bookings" },
+      { key: "bookings.approve_reject", label: "Approve/Reject Requests" },
+      { key: "bookings.delete", label: "Delete/Cancel Bookings" }
+    ]
+  },
+  {
+    category: "Customer Management",
+    prefix: "customers",
+    items: [
+      { key: "customers.view", label: "View Customer Profiles" },
+      { key: "customers.create", label: "Create Patients" },
+      { key: "customers.edit", label: "Edit Patients" },
+      { key: "customers.delete", label: "Delete Patients" },
+      { key: "customers.import", label: "Import Patients (CSV)" }
+    ]
+  },
+  {
+    category: "Provider (Doctor) Management",
+    prefix: "providers",
+    items: [
+      { key: "providers.view", label: "View Provider Profiles" },
+      { key: "providers.create", label: "Add New Providers" },
+      { key: "providers.edit", label: "Edit Provider Details" },
+      { key: "providers.delete", label: "Delete Providers" },
+      { key: "providers.attendance", label: "Manage Provider Attendance" }
+    ]
+  },
+  {
+    category: "Services Management",
+    prefix: "services",
+    items: [
+      { key: "services.view", label: "View Services List" },
+      { key: "services.create", label: "Create Services & Categories" },
+      { key: "services.edit", label: "Edit Services & Toggle Status" },
+      { key: "services.delete", label: "Delete Services" }
+    ]
+  },
+  {
+    category: "Settings & System Control",
+    prefix: "settings",
+    items: [
+      { key: "settings.sms", label: "Configure SMS Gateway" },
+      { key: "settings.medical_forms", label: "Manage Medical Forms" },
+      { key: "settings.roles", label: "Manage Employee Roles & Accounts" },
+      { key: "settings.profile", label: "Manage Company Profile" },
+      { key: "settings.service_hours", label: "Manage Service Hours" },
+      { key: "settings.branches", label: "Manage Branches" },
+      { key: "settings.booking_settings", label: "Manage Booking Settings" },
+      { key: "settings.notification", label: "Manage Notification Settings" },
+      { key: "settings.queue", label: "Manage Queue Settings" },
+      { key: "settings.pages", label: "Manage Pages Settings (CMS)" }
+    ]
+  }
+];
+
+function parseEgyptianNationalId(id: string) {
+  if (!id || id.length !== 14 || !/^\d{14}$/.test(id)) {
+    return { isValid: false, reason: "National ID must be exactly 14 digits." };
+  }
+
+  const centuryDigit = parseInt(id.charAt(0));
+  if (centuryDigit !== 2 && centuryDigit !== 3) {
+    return { isValid: false, reason: "Invalid first digit (must start with 2 or 3)." };
+  }
+
+  const yearPart = id.substring(1, 3);
+  const monthPart = id.substring(3, 5);
+  const dayPart = id.substring(5, 7);
+
+  const year = (centuryDigit === 2 ? 1900 : 2000) + parseInt(yearPart);
+  const month = parseInt(monthPart);
+  const day = parseInt(dayPart);
+
+  // Validate date
+  const birthDate = new Date(year, month - 1, day);
+  if (
+    birthDate.getFullYear() !== year ||
+    birthDate.getMonth() !== month - 1 ||
+    birthDate.getDate() !== day
+  ) {
+    return { isValid: false, reason: "Invalid birth date encoded in ID." };
+  }
+
+  const govCode = id.substring(7, 9);
+  const governorates: Record<string, string> = {
+    "01": "Cairo",
+    "02": "Alexandria",
+    "03": "Port Said",
+    "04": "Suez",
+    "11": "Damietta",
+    "12": "Dakahlia",
+    "13": "Sharkia",
+    "14": "Kalyobia",
+    "15": "Kafr El-Sheikh",
+    "16": "Gharbia",
+    "17": "Menoufia",
+    "18": "Beheira",
+    "19": "Ismailia",
+    "21": "Giza",
+    "22": "Beni Suef",
+    "23": "Fayoum",
+    "24": "Minya",
+    "25": "Asyut",
+    "26": "Sohag",
+    "27": "Qena",
+    "28": "Aswan",
+    "29": "Luxor",
+    "31": "Red Sea",
+    "32": "New Valley",
+    "33": "Matrouh",
+    "34": "North Sinai",
+    "35": "South Sinai",
+    "88": "Foreign birth"
+  };
+
+  const governorate = governorates[govCode] || "Unknown Governorate";
+
+  const genderDigit = parseInt(id.charAt(12));
+  const gender = genderDigit % 2 === 0 ? "Female" : "Male";
+
+  return {
+    isValid: true,
+    birthDate: birthDate.toLocaleDateString("en-US", { dateStyle: "long" }),
+    governorate,
+    gender
+  };
+}
+
 export default function AdminPage() {
+  const { showConfirm } = useAlertConfirm();
+  // Auth state
+  const [session, setSession] = useState<any>(null);
+  // Rooms state
+  const [rooms, setRooms] = useState<any[]>([]);
+
+  function fetchRooms() {
+    cachedFetch("/api/rooms", 5000)
+      .then(data => {
+        setRooms(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setRooms([]));
+  }
+  const [authChecking, setAuthChecking] = useState(true);
+  const lastActivityRef = useRef<number>(Date.now());
+  const [adminRole, setAdminRole] = useState<string | null>(null);
+  const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
+  const hasPermission = useCallback((permKey: string): boolean => {
+    if (adminRole === 'superadmin') return true;
+    if (!adminPermissions) return false;
+    if (adminPermissions.includes(permKey)) return true;
+    
+    // Backward compatibility mappings
+    if (["customers.create", "customers.edit", "customers.import"].includes(permKey)) {
+      if (adminPermissions.includes("customers.create_edit") || adminPermissions.includes("Customers")) return true;
+    }
+    if (permKey === "customers.delete") {
+      if (adminPermissions.includes("customers.delete") || adminPermissions.includes("Customers")) return true;
+    }
+    if (["providers.create", "providers.edit"].includes(permKey)) {
+      if (adminPermissions.includes("providers.create_edit") || adminPermissions.includes("Providers")) return true;
+    }
+    if (permKey === "providers.delete") {
+      if (adminPermissions.includes("providers.delete") || adminPermissions.includes("Providers")) return true;
+    }
+    if (["services.create", "services.edit", "services.delete"].includes(permKey)) {
+      if (adminPermissions.includes("services.create_edit_delete") || adminPermissions.includes("Services")) return true;
+    }
+
+    const parentScreenMap: Record<string, string> = {
+      "bookings": "Bookings",
+      "customers": "Customers",
+      "providers": "Providers",
+      "services": "Services",
+      "settings": "Settings"
+    };
+    const category = permKey.split('.')[0];
+    const legacyScreen = parentScreenMap[category];
+    if (legacyScreen && adminPermissions.includes(legacyScreen)) {
+      return true;
+    }
+
+    return false;
+  }, [adminRole, adminPermissions]);
+
+  const permittedSidebarItems = useMemo(() => {
+    if (!adminRole) return [];
+    if (adminRole === 'superadmin') return SIDEBAR_ITEMS;
+    return SIDEBAR_ITEMS.filter(item => {
+      if (item.label === 'Logout') return true;
+      if (item.label === 'HR' && (adminRole === 'admin' || adminRole === 'HR')) return true;
+      if (adminPermissions.includes(item.label)) return true;
+      
+      const parentScreenMap: Record<string, string> = {
+        "Bookings": "bookings",
+        "Customers": "customers",
+        "Providers": "providers",
+        "Services": "services",
+        "Employees": "employees",
+        "Settings": "settings"
+      };
+      const prefix = parentScreenMap[item.label];
+      if (prefix && adminPermissions.some(p => p.startsWith(prefix + "."))) return true;
+      
+      return false;
+    });
+  }, [adminRole, adminPermissions]);
+
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminEmployeeId, setAdminEmployeeId] = useState("");
+  const [adminDbId, setAdminDbId] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // Setup password states (for invited users / password resets)
+  const [showSetupPasswordModal, setShowSetupPasswordModal] = useState(false);
+  const [setupPassword, setSetupPassword] = useState("");
+  const [setupConfirmPassword, setSetupConfirmPassword] = useState("");
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupError, setSetupError] = useState("");
+  const [setupSuccess, setSetupSuccess] = useState("");
+
+  // Role Management state
+  const [rolesList, setRolesList] = useState<any[]>([]);
+  const [employeesList, setEmployeesList] = useState<any[]>([]);
+  const [loadingRolesAndEmployees, setLoadingRolesAndEmployees] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRolePermissions, setNewRolePermissions] = useState<string[]>([]);
+  const [newEmployeeEmail, setNewEmployeeEmail] = useState("");
+  const [newEmployeeName, setNewEmployeeName] = useState("");
+  const [newEmployeeRole, setNewEmployeeRole] = useState("");
+  const [roleCreateError, setRoleCreateError] = useState("");
+  const [roleCreateSuccess, setRoleCreateSuccess] = useState("");
+  const [employeeCreateError, setEmployeeCreateError] = useState("");
+  const [employeeCreateSuccess, setEmployeeCreateSuccess] = useState("");
+
+  const [newEmployeePhone, setNewEmployeePhone] = useState("");
+  const [newEmployeeDepartment, setNewEmployeeDepartment] = useState("Reception");
+  const [newEmployeeShift, setNewEmployeeShift] = useState("Day");
+  const [newEmployeeSalary, setNewEmployeeSalary] = useState("0");
+  const [newEmployeeNationalId, setNewEmployeeNationalId] = useState("");
+  const [newEmployeeNationalIdFront, setNewEmployeeNationalIdFront] = useState("");
+  const [newEmployeeNationalIdBack, setNewEmployeeNationalIdBack] = useState("");
+  const [newEmployeeAddress, setNewEmployeeAddress] = useState("");
+  const [newEmployeeBranchId, setNewEmployeeBranchId] = useState("");
+  const [employeeFilterDepartment, setEmployeeFilterDepartment] = useState("All");
+  const [employeeFilterShift, setEmployeeFilterShift] = useState("All");
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
+  const [viewingEmployee, setViewingEmployee] = useState<any | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<any | null>(null);
+  const [isEditingEmployeeModalOpen, setIsEditingEmployeeModalOpen] = useState(false);
+
+  // HR Module states
+  const [hrActiveSubTab, setHrActiveSubTab] = useState("overview");
+  const [payrollList, setPayrollList] = useState<any[]>([]);
+  const [loadingPayroll, setLoadingPayroll] = useState(false);
+  const [leavesList, setLeavesList] = useState<any[]>([]);
+  const [loadingLeaves, setLoadingLeaves] = useState(false);
+  const [performanceReviews, setPerformanceReviews] = useState<any[]>([]);
+  const [loadingPerformance, setLoadingPerformance] = useState(false);
+
+  const [selectedPayrollMonth, setSelectedPayrollMonth] = useState("2026-07");
+  const [newLeaveEmployeeId, setNewLeaveEmployeeId] = useState("");
+  const [newLeaveType, setNewLeaveType] = useState("Sick");
+  const [newLeaveStartDate, setNewLeaveStartDate] = useState("");
+  const [newLeaveEndDate, setNewLeaveEndDate] = useState("");
+  const [newLeaveReason, setNewLeaveReason] = useState("");
+
+  const [newReviewEmployeeId, setNewReviewEmployeeId] = useState("");
+  const [newReviewRating, setNewReviewRating] = useState(5);
+  const [newReviewComments, setNewReviewComments] = useState("");
+  const [newReviewGoals, setNewReviewGoals] = useState("");
+  // Attendance and Activity Monitoring states
+  const [attendanceList, setAttendanceList] = useState<any[]>([]);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [activeMissingAlerts, setActiveMissingAlerts] = useState<any[]>([]);
+  const [presenceModalOpen, setPresenceModalOpen] = useState(false);
+  const [presenceCountdown, setPresenceCountdown] = useState(10);
+  const [locationWarningOpen, setLocationWarningOpen] = useState(false);
+  const [locationWarningMsg, setLocationWarningMsg] = useState("");
+  // Profile settings states
+  const [profilePassword, setProfilePassword] = useState("");
+  const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
+  const [profilePasswordSaving, setProfilePasswordSaving] = useState(false);
+  const [profilePasswordError, setProfilePasswordError] = useState("");
+  const [profilePasswordSuccess, setProfilePasswordSuccess] = useState("");
+
+  // Personal profile states
+  const [profileName, setProfileName] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileAddress, setProfileAddress] = useState("");
+  const [profileNatId, setProfileNatId] = useState("");
+  const [profileNatIdFront, setProfileNatIdFront] = useState("");
+  const [profileNatIdBack, setProfileNatIdBack] = useState("");
+  const [updatingProfile, setUpdatingProfile] = useState(false);
+  const [profileUpdateError, setProfileUpdateError] = useState("");
+  const [profileUpdateSuccess, setProfileUpdateSuccess] = useState("");
+
+
   const [requests, setRequests] = useState<Req[]>([]);
   const [allReservations, setAllReservations] = useState<Req[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Req | null>(null);
   const [viewingBooking, setViewingBooking] = useState<Req | null>(null);
+  const [isEditingService, setIsEditingService] = useState(false);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [dayBookingsSelector, setDayBookingsSelector] = useState<{
+    open: boolean;
+    date: string;
+    bookings: any[];
+  }>({
+    open: false,
+    date: "",
+    bookings: [],
+  });
+  const [loadingApproveId, setLoadingApproveId] = useState<string | null>(null);
   const [doctorName, setDoctorName] = useState<string>("Dr. Sara El Gamel");
   const [slot, setSlot] = useState<string>("12:00");
   const [activeNav, setActiveNav] = useState("Bookings");
@@ -340,8 +696,67 @@ export default function AdminPage() {
   const [providerTab, setProviderTab] = useState<"Providers" | "Attendance">("Providers");
   const [branch, setBranch] = useState<string>(""); // branch id; empty = all branches
   const [lang, setLang] = useState<"EN" | "AR">("EN");
-  const [notifCount] = useState(1);
+  const [showQuickActionMenu, setShowQuickActionMenu] = useState(false);
+  const [showNotificationMenu, setShowNotificationMenu] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([
+    {
+      id: "system-1",
+      title: "Clinic System Active",
+      message: "Twilio SMS integration and Supabase auth are fully operational.",
+      time: "10m ago",
+      read: false,
+      type: "system"
+    }
+  ]);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [showExportCustomersModal, setShowExportCustomersModal] = useState(false);
+  const [dbCustomers, setDbCustomers] = useState<Customer[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [showCustomerFilterPanel, setShowCustomerFilterPanel] = useState(false);
+  const [customerFilterGender, setCustomerFilterGender] = useState("All");
+  const [customerFilterStatus, setCustomerFilterStatus] = useState("All");
+  const [customerFilterReferral, setCustomerFilterReferral] = useState("All");
+  const [showImportCustomersModal, setShowImportCustomersModal] = useState(false);
+
+  // Customer Add/Edit Form states
+  const [showCustomerFormModal, setShowCustomerFormModal] = useState(false);
+  const [selectedCustomerForEdit, setSelectedCustomerForEdit] = useState<Customer | null>(null);
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [customerFormError, setCustomerFormError] = useState("");
+  const [deleteCustomerTarget, setDeleteCustomerTarget] = useState<Customer | null>(null);
+  const [deletingCustomer, setDeletingCustomer] = useState(false);
+
+  // Checkout & Payment states
+  const [checkoutBooking, setCheckoutBooking] = useState<any>(null);
+  const [checkoutAmountPaid, setCheckoutAmountPaid] = useState<string>("");
+  const [useWalletBalance, setUseWalletBalance] = useState<boolean>(false);
+  const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(true);
+  const [savingCheckout, setSavingCheckout] = useState<boolean>(false);
+
+  const [custName, setCustName] = useState("");
+  const [custMobile, setCustMobile] = useState("");
+  const [custEmail, setCustEmail] = useState("");
+  const [custGender, setCustGender] = useState<"Male" | "Female" | "">("");
+  const [custActive, setCustActive] = useState(true);
+  const [custSpent, setCustSpent] = useState("0");
+  const [custOutstanding, setCustOutstanding] = useState("0");
+  const [custWallet, setCustWallet] = useState("0");
+  const [custArea, setCustArea] = useState("");
+  const [custLocationName, setCustLocationName] = useState("");
+  const [custStreet, setCustStreet] = useState("");
+  const [custBuilding, setCustBuilding] = useState("");
+  const [custFloor, setCustFloor] = useState("");
+  const [custNote, setCustNote] = useState("");
+
+  // New Customer Profile fields
+  const [custAge, setCustAge] = useState("");
+  const [custNationalId, setCustNationalId] = useState("");
+  const [custAddress, setCustAddress] = useState("");
+  const [custReferral, setCustReferral] = useState("");
+  const [custOccupation, setCustOccupation] = useState("");
+
+  // Customer Profile details drawer state
+  const [viewingCustomerProfile, setViewingCustomerProfile] = useState<Customer | null>(null);
   const [couponSearch, setCouponSearch] = useState("");
   const [couponDate, setCouponDate] = useState("");
   const [couponStatus, setCouponStatus] = useState("All");
@@ -497,6 +912,21 @@ export default function AdminPage() {
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
   const [calendarView, setCalendarView] = useState<"Calendar" | "List" | "Schedule">("Calendar");
+  useEffect(() => {
+    if (adminRole === 'superadmin') return;
+    if (adminPermissions.length > 0) {
+      if (!hasPermission("bookings.view_calendar") && hasPermission("bookings.view_list")) {
+        setCalendarView("List");
+      }
+    }
+  }, [adminPermissions, adminRole, hasPermission]);
+
+  useEffect(() => {
+    setIsEditingService(false);
+    setIsEditingNotes(false);
+    setNotesDraft(viewingBooking?.notes || "");
+  }, [viewingBooking]);
+
   const [scheduleDate, setScheduleDate] = useState<Date>(() => new Date());
   const [scheduleProviderFilter, setScheduleProviderFilter] = useState<string>("All");
   const [scheduleServiceFilter, setScheduleServiceFilter] = useState<string>("All");
@@ -530,7 +960,6 @@ export default function AdminPage() {
   const [newPatientBranch, setNewPatientBranch] = useState("");
   const [approveUnavailableSlots, setApproveUnavailableSlots] = useState<string[]>([]);
   const [manualUnavailableSlots, setManualUnavailableSlots] = useState<string[]>([]);
-
   const filteredReservations = useMemo(() => {
     return allReservations.filter((r) => {
       const matchStatus = statusFilter === "All" || r.status === statusFilter;
@@ -545,7 +974,7 @@ export default function AdminPage() {
     const monthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}`;
 
     filteredReservations.forEach((reservation) => {
-      if (!reservation.date || reservation.status !== 'approved') return;
+      if (!reservation.date || !['approved', 'confirmed', 'started', 'completed'].includes(reservation.status)) return;
       // Slice directly — avoids UTC conversion that shifts dates for non-UTC timezones
       const normalizedDate = String(reservation.date).slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) return;
@@ -565,6 +994,800 @@ export default function AdminPage() {
 
   // per-service toggle state: visible & status
   const [serviceToggles, setServiceToggles] = useState<Record<number, { visible: boolean; active: boolean }>>({});
+
+  // Synchronize dynamic bookings into notifications list
+  useEffect(() => {
+    if (!allReservations || allReservations.length === 0) return;
+
+    const latestReservations = [...allReservations]
+      .sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      })
+      .slice(0, 5);
+
+    const generatedNotifications = latestReservations.map((res) => {
+      const isCancelled = res.status === "cancelled";
+      const serviceName = localServices.find((s) => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
+      const timeString = res.timeSlot || res.requestedTime || "unspecified time";
+      return {
+        id: res.id || String(Math.random()),
+        title: isCancelled ? "Appointment Cancelled" : "New Booking Received",
+        message: `${res.name || "A patient"} reserved ${serviceName} on ${res.date} at ${timeString}.`,
+        time: res.createdAt ? new Date(res.createdAt).toLocaleDateString() : "Just now",
+        read: false,
+        type: isCancelled ? "cancelled" : "booking"
+      };
+    });
+
+    setNotifications([
+      {
+        id: "system-1",
+        title: "Clinic System Active",
+        message: "Twilio SMS integration and Supabase auth are fully operational.",
+        time: "Active",
+        read: false,
+        type: "system"
+      },
+      ...generatedNotifications
+    ]);
+  }, [allReservations, localServices]);
+
+  // Auth and Role Management effects & handlers
+  useEffect(() => {
+    if (!supabase) {
+      setAuthChecking(false);
+      return;
+    }
+
+    // 1. Initial sessionStorage Session Guard: Log out if browser/tab was closed
+    supabase.auth.getSession().then(({ data: { session: cachedSession } }: any) => {
+      const isSessionActive = typeof window !== "undefined" && sessionStorage.getItem("revera_admin_session_active");
+      if (cachedSession && !isSessionActive) {
+        console.log("Stale login session detected (tab reopened). Logging out.");
+        supabase.auth.signOut().then(() => {
+          setAuthChecking(false);
+        }).catch((err: any) => {
+          console.warn("signOut error:", err);
+          setAuthChecking(false);
+        });
+      } else {
+        if (cachedSession) {
+          handleAuthSession(cachedSession);
+        } else {
+          setAuthChecking(false);
+        }
+      }
+    }).catch((err: any) => {
+      console.warn("getSession error:", err);
+      setAuthChecking(false);
+    });
+
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, newSession: any) => {
+      if (event === "SIGNED_OUT") {
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("revera_admin_session_active");
+        }
+      }
+      handleAuthSession(newSession);
+    });
+
+    async function handleAuthSession(currSession: any) {
+      setSession(currSession);
+      if (!currSession?.user) {
+        setAdminRole(null);
+        setAdminPermissions([]);
+        setAdminEmail("");
+        setAdminEmployeeId("");
+        setAdminDbId("");
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("revera_admin_session_active");
+        }
+        setAuthChecking(false);
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("revera_admin_session_active", "true");
+      }
+      // Reset activity timer upon successful authentication
+      lastActivityRef.current = Date.now();
+
+      try {
+        const token = currSession.access_token;
+        const res = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (res.ok) {
+          const authData = await res.json();
+          setAdminRole(authData.role);
+          setAdminPermissions(authData.permissions || []);
+          setAdminEmail(authData.email || "");
+          setAdminEmployeeId(authData.employeeId || "");
+          setAdminDbId(authData.id || "");
+        } else {
+          console.warn("Unregistered employee session. Logging out.");
+          await supabase.auth.signOut();
+          setAdminRole(null);
+          setAdminPermissions([]);
+          setAdminEmail("");
+          setAdminEmployeeId("");
+          setAdminDbId("");
+        }
+      } catch (err) {
+        console.error("Error retrieving admin permissions:", err);
+      } finally {
+        setAuthChecking(false);
+      }
+    }
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // 3. Inactivity idle timeout: auto logout after 1 hour of complete inactivity
+  useEffect(() => {
+    if (!session || !adminRole) return;
+
+    const resetTimer = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    events.forEach((event) => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    // Check every 10 seconds. Timeout is 1 hour (3600000 ms)
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - lastActivityRef.current;
+      if (elapsed >= 3600000) {
+        clearInterval(interval);
+        console.log("Inactivity timeout reached. Logging out.");
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("revera_admin_session_active");
+        }
+        supabase.auth.signOut().then(() => {
+          alert("Your session has expired due to 1 hour of inactivity. Please log in again.");
+        });
+      }
+    }, 10000);
+
+    return () => {
+      events.forEach((event) => {
+        window.removeEventListener(event, resetTimer);
+      });
+      clearInterval(interval);
+    };
+  }, [session, adminRole]);
+
+  useEffect(() => {
+    if (adminRole === 'superadmin') return;
+    if (adminPermissions.length > 0) {
+      let isPermitted = false;
+      if (activeNav === 'Logout' || activeNav === 'Profile') {
+        isPermitted = true;
+      } else {
+        const settingsSubsections: Record<string, string> = {
+          "Clinic Profile": "settings.profile",
+          "Service Hours": "settings.service_hours",
+          "Branches": "settings.branches",
+          "Booking Settings": "settings.booking_settings",
+          "Notification Settings": "settings.notification",
+          "Queue Settings": "settings.queue",
+          "Pages Settings": "settings.pages",
+          "Role Management": "settings.roles"
+        };
+        if (settingsSubsections[activeNav]) {
+          isPermitted = hasPermission(settingsSubsections[activeNav]);
+        } else {
+          const parentScreenMap: Record<string, string> = {
+            "Bookings": "bookings",
+            "Customers": "customers",
+            "Providers": "providers",
+            "Services": "services",
+            "Settings": "settings"
+          };
+          const prefix = parentScreenMap[activeNav];
+          if (prefix) {
+            isPermitted = adminPermissions.includes(activeNav) || adminPermissions.some(p => p.startsWith(prefix + "."));
+          } else {
+            isPermitted = adminPermissions.includes(activeNav);
+          }
+        }
+      }
+
+      if (!isPermitted && permittedSidebarItems.length > 0) {
+        const firstPermitted = permittedSidebarItems.find(item => item.label !== 'Logout');
+        if (firstPermitted) {
+          setActiveNav(firstPermitted.label);
+        }
+      }
+    }
+  }, [adminPermissions, adminRole, activeNav, permittedSidebarItems, hasPermission]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get("setup") === "true" || searchParams.get("recovery") === "true") {
+        setShowSetupPasswordModal(true);
+      }
+    }
+  }, []);
+
+  // Automatically select the first permitted sub-tab in Bookings and Providers view
+  useEffect(() => {
+    if (adminRole === 'superadmin') return;
+
+    if (activeNav === "Bookings") {
+      const hasCalendar = hasPermission("bookings.view_calendar");
+      const hasList = hasPermission("bookings.view_list");
+      if (hasList && !hasCalendar && (calendarView === "Calendar" || calendarView === "Schedule")) {
+        setCalendarView("List");
+      } else if (hasCalendar && !hasList && calendarView === "List") {
+        setCalendarView("Calendar");
+      }
+    }
+
+    if (activeNav === "Providers") {
+      const hasView = hasPermission("providers.view");
+      const hasAttendance = hasPermission("providers.attendance");
+      if (hasAttendance && !hasView && providerTab === "Providers") {
+        setProviderTab("Attendance");
+      } else if (hasView && !hasAttendance && providerTab === "Attendance") {
+        setProviderTab("Providers");
+      }
+    }
+  }, [activeNav, adminRole, adminPermissions, hasPermission, calendarView, providerTab]);
+
+  async function handleSetupPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!setupPassword || !setupConfirmPassword) {
+      setSetupError("Please fill in both fields.");
+      return;
+    }
+    if (setupPassword !== setupConfirmPassword) {
+      setSetupError("Passwords do not match.");
+      return;
+    }
+    if (setupPassword.length < 6) {
+      setSetupError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setSetupLoading(true);
+    setSetupError("");
+    setSetupSuccess("");
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: setupPassword,
+      });
+
+      if (error) {
+        setSetupError(error.message);
+      } else {
+        setSetupSuccess("Your password has been successfully configured! Redirecting to dashboard...");
+        setTimeout(() => {
+          setShowSetupPasswordModal(false);
+          // Remove query params from URL so it doesn't reopen
+          if (typeof window !== "undefined") {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("setup");
+            url.searchParams.delete("recovery");
+            window.history.replaceState({}, document.title, url.pathname + url.search);
+          }
+        }, 3000);
+      }
+    } catch (err: any) {
+      setSetupError(err.message || "Failed to update password.");
+    } finally {
+      setSetupLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeNav === "Profile" || ((activeNav === "Role Management" || activeNav === "Employees") && adminRole === "superadmin")) {
+      fetchRolesAndEmployees();
+    }
+  }, [activeNav, adminRole]);
+
+  useEffect(() => {
+    if (!adminEmail || employeesList.length === 0) return;
+    const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+    if (profileEmployee) {
+      setProfileName(profileEmployee.name || "");
+      setProfilePhone(profileEmployee.phone || "");
+      setProfileAddress(profileEmployee.address || "");
+      setProfileNatId(profileEmployee.national_id || "");
+      setProfileNatIdFront(profileEmployee.national_id_front || "");
+      setProfileNatIdBack(profileEmployee.national_id_back || "");
+      if (adminRole !== "superadmin" && adminRole !== "admin" && profileEmployee.branch_id) {
+        setBranch(profileEmployee.branch_id);
+      }
+    } else if (adminEmail.toLowerCase() === "superadmin@revera.com") {
+      setProfileName("System Owner");
+    }
+  }, [adminEmail, employeesList, adminRole]);
+
+  async function fetchRolesAndEmployees() {
+    console.log("RBAC - fetchRolesAndEmployees called!");
+    setLoadingRolesAndEmployees(true);
+    try {
+      const [roles, emps] = await Promise.all([
+        cachedFetch('/api/roles', 10000),
+        cachedFetch('/api/employees', 10000)
+      ]);
+      setRolesList(roles);
+      setEmployeesList(emps);
+    } catch (err) {
+      console.error("Error loading roles and employees:", err);
+    } finally {
+      setLoadingRolesAndEmployees(false);
+    }
+  }
+
+  async function fetchHrPayroll() {
+    if (!session?.access_token) return;
+    setLoadingPayroll(true);
+    try {
+      const res = await fetch('/api/hr/payroll', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPayrollList(data);
+      }
+    } catch (err) {
+      console.error("Error loading payroll:", err);
+    } finally {
+      setLoadingPayroll(false);
+    }
+  }
+
+  async function fetchHrLeaves() {
+    if (!session?.access_token) return;
+    setLoadingLeaves(true);
+    try {
+      const res = await fetch('/api/hr/leaves', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLeavesList(data);
+      }
+    } catch (err) {
+      console.error("Error loading leaves:", err);
+    } finally {
+      setLoadingLeaves(false);
+    }
+  }
+
+  async function fetchHrPerformance() {
+    if (!session?.access_token) return;
+    setLoadingPerformance(true);
+    try {
+      const res = await fetch('/api/hr/performance', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPerformanceReviews(data);
+      }
+    } catch (err) {
+      console.error("Error loading performance reviews:", err);
+    } finally {
+      setLoadingPerformance(false);
+    }
+  }
+
+  async function fetchHrAttendance() {
+    if (!session?.access_token) return;
+    setLoadingAttendance(true);
+    try {
+      const res = await fetch('/api/hr/attendance', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAttendanceList(data);
+      }
+    } catch (err) {
+      console.error("Error loading attendance:", err);
+    } finally {
+      setLoadingAttendance(false);
+    }
+  }
+
+  async function fetchHrAlerts() {
+    if (!session?.access_token) return;
+    try {
+      const res = await fetch('/api/hr/alerts', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setActiveMissingAlerts(data);
+      }
+    } catch (err) {
+      console.error("Error loading missing alerts:", err);
+    }
+  }
+
+  const fetchHrData = useCallback(async () => {
+    await Promise.all([
+      fetchHrPayroll(),
+      fetchHrLeaves(),
+      fetchHrPerformance(),
+      fetchHrAttendance(),
+      fetchHrAlerts(),
+      fetchRolesAndEmployees()
+    ]);
+  }, [session]);
+
+  useEffect(() => {
+    if (activeNav === "HR") {
+      fetchHrData();
+    }
+  }, [activeNav, fetchHrData]);
+
+  // Geolocation Check-In on login resolution
+  useEffect(() => {
+    console.log("Attendance Location Check-In triggered for user:", {
+      email: adminEmail,
+      role: adminRole,
+      dbId: adminDbId
+    });
+
+    if (!adminEmail || !session?.access_token || !adminRole || !adminDbId) {
+      console.log("Skipping check-in: missing auth data.");
+      return;
+    }
+    
+    // Superadmin and Admin do not have attendance tracking and are exempt
+    if (adminRole === 'superadmin' || adminRole === 'admin') {
+      console.log("Skipping check-in: Admin/Superadmin bypass.");
+      return;
+    }
+
+    if (typeof window !== "undefined" && (!navigator || !navigator.geolocation)) {
+      console.warn("Geolocation not supported by browser/context.");
+      setLocationWarningMsg("Geolocation is not supported by your browser or connection context (requires HTTPS / localhost). Access is restricted until location verification can be performed.");
+      setLocationWarningOpen(true);
+      return;
+    }
+
+    // FOR TESTING: Location check runs every time the page/session is loaded.
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        console.log("GPS coordinates received:", latitude, longitude);
+        try {
+          const res = await fetch('/api/hr/attendance', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ employeeId: adminDbId, latitude, longitude })
+          });
+
+          if (res.ok) {
+            console.log("Attendance daily check-in logged successfully.");
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            console.warn("Check-in API rejected request:", errData);
+            if (errData.error === 'not_in_location') {
+              setLocationWarningMsg(
+                `Your current location does not match the required check-in area for your assigned branch.\n\nYou are currently ${errData.distance || 'unknown'} meters away from the branch. Access is restricted while outside the 500-meter radius.`
+              );
+              setLocationWarningOpen(true);
+            } else if (errData.error === 'no_branch') {
+              setLocationWarningMsg("Your account has no branch assigned. Please contact the administrator.");
+              setLocationWarningOpen(true);
+            } else if (errData.error === 'no_location_configured') {
+              setLocationWarningMsg(errData.message || "No GPS coordinates configured for your assigned branch. Please contact your administrator to configure branch coordinates.");
+              setLocationWarningOpen(true);
+            } else {
+              setLocationWarningMsg(
+                errData.message || errData.error || "An unexpected error occurred during attendance verification."
+              );
+              setLocationWarningOpen(true);
+            }
+          }
+        } catch (err) {
+          console.error("Daily checkin API error:", err);
+        }
+      },
+      (geoErr) => {
+        console.warn("Geolocation permission denied or failed:", geoErr);
+        setLocationWarningMsg("Location access was denied or failed. Attendance check-in requires GPS access to verify your work location. Please enable location in your browser settings and refresh the page.");
+        setLocationWarningOpen(true);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, [adminEmail, session, adminRole, adminDbId]);
+
+  // 30-minute Presence Monitor for standard staff
+  useEffect(() => {
+    if (!session || !adminRole) return;
+    // Only for standard employees (not superadmin, admin, or HR)
+    if (adminRole === 'superadmin' || adminRole === 'admin' || adminRole === 'HR') return;
+
+    const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+    if (!profileEmployee) return;
+
+    const isTestMode = typeof window !== "undefined" && window.location.search.includes("test_presence=true");
+    const intervalMs = isTestMode ? 15000 : 30 * 60 * 1000;
+
+    const interval = setInterval(() => {
+      setPresenceCountdown(10);
+      setPresenceModalOpen(true);
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }, [session, adminRole, adminEmail, employeesList]);
+
+  // Presence countdown timer logic
+  useEffect(() => {
+    if (!presenceModalOpen) return;
+    if (presenceCountdown <= 0) {
+      setPresenceModalOpen(false);
+      
+      const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+      if (profileEmployee && session?.access_token) {
+        fetch('/api/hr/alerts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ employeeId: profileEmployee.id })
+        }).then((res) => {
+          if (res.ok) {
+            alert("You did not respond in time. An inactivity alert has been sent to the administrator.");
+          }
+        }).catch((err) => console.error("Failed to send missing alert:", err));
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setPresenceCountdown(prev => prev - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [presenceModalOpen, presenceCountdown, session, adminEmail, employeesList]);
+
+  // Admin Missing Alerts Polling
+  useEffect(() => {
+    if (!session || !adminRole) return;
+    if (adminRole !== 'superadmin' && adminRole !== 'admin' && adminRole !== 'HR') return;
+
+    fetchHrAlerts();
+
+    const isTestMode = typeof window !== "undefined" && window.location.search.includes("test_presence=true");
+    const intervalMs = isTestMode ? 5000 : 30000;
+
+    const poll = setInterval(() => {
+      fetchHrAlerts();
+    }, intervalMs);
+
+    return () => clearInterval(poll);
+  }, [session, adminRole]);
+
+  async function handleAdminLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!loginEmail || !loginPassword) {
+      setLoginError("Please enter both email/ID and password.");
+      return;
+    }
+    setLoginLoading(true);
+    setLoginError("");
+
+    let emailToSign = loginEmail.trim();
+    if (!emailToSign.includes("@")) {
+      try {
+        const res = await fetch(`/api/auth/employee-email?id=${encodeURIComponent(emailToSign)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.email) {
+            emailToSign = data.email;
+          }
+        } else {
+          setLoginError("Invalid Employee ID or account not found.");
+          setLoginLoading(false);
+          return;
+        }
+      } catch (err) {
+        setLoginError("Failed to lookup Employee ID. Please try entering your full email.");
+        setLoginLoading(false);
+        return;
+      }
+    }
+    // Verify that the email is not registered as a customer
+    try {
+      const checkRes = await fetch(`/api/customers?email=${encodeURIComponent(emailToSign)}`);
+      if (checkRes.ok) {
+        const customer = await checkRes.json();
+        if (customer) {
+          setLoginError("This email is registered as a customer and cannot be used for administrator access.");
+          setLoginLoading(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Customer email verification failed:", err);
+    }
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: emailToSign,
+        password: loginPassword,
+      });
+
+      if (error) {
+        setLoginError(error.message);
+        setLoginLoading(false);
+        return;
+      }
+    } catch (err: any) {
+      setLoginError(err.message || "An authentication error occurred.");
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  async function handleCreateRole(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newRoleName.trim()) return;
+    setRoleCreateError("");
+    setRoleCreateSuccess("");
+
+    try {
+      const res = await fetch('/api/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newRoleName, permissions: newRolePermissions })
+      });
+
+      if (res.ok) {
+        setNewRoleName("");
+        setNewRolePermissions([]);
+        setRoleCreateSuccess("Role saved successfully!");
+        fetchRolesAndEmployees();
+        setTimeout(() => setRoleCreateSuccess(""), 3000);
+      } else {
+        const data = await res.json();
+        setRoleCreateError(data.error || "Failed to create role.");
+      }
+    } catch (err: any) {
+      setRoleCreateError(err.message || "Network error.");
+    }
+  }
+
+  async function handleDeleteRole(name: string) {
+    if (!(await showConfirm(`Are you sure you want to delete the role '${name}'? This will disconnect employee accounts assigned to this role.`))) return;
+    try {
+      const res = await fetch(`/api/roles?name=${encodeURIComponent(name)}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchRolesAndEmployees();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to delete role.");
+      }
+    } catch (err: any) {
+      alert("Error deleting role: " + err.message);
+    }
+  }
+
+  async function handleCreateEmployee(e: React.FormEvent) {
+    e.preventDefault();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!newEmployeeName.trim() || !newEmployeeEmail.trim() || !newEmployeeRole) return;
+    if (!emailRegex.test(newEmployeeEmail.trim())) {
+      setEmployeeCreateError("Please enter a valid email address.");
+      return;
+    }
+    setEmployeeCreateError("");
+    setEmployeeCreateSuccess("");
+
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: newEmployeeEmail.trim().toLowerCase(),
+          name: newEmployeeName.trim(),
+          roleName: newEmployeeRole,
+        })
+      });
+
+      if (res.ok) {
+        setNewEmployeeEmail("");
+        setNewEmployeeName("");
+        setNewEmployeeRole("");
+        setEmployeeCreateSuccess(`Invitation sent to ${newEmployeeEmail.trim()}! They will receive an email to set their password.`);
+        clearFetchCache();
+        fetchRolesAndEmployees();
+        setTimeout(() => setEmployeeCreateSuccess(""), 6000);
+      } else {
+        const data = await res.json();
+        setEmployeeCreateError(data.error || "Failed to send invitation.");
+      }
+    } catch (err: any) {
+      setEmployeeCreateError(err.message || "Network error.");
+    }
+  }
+
+  async function handleDeleteEmployee(id: string) {
+    if (!(await showConfirm("Are you sure you want to delete this employee account? They will lose access to the admin panel immediately."))) return;
+    try {
+      const res = await fetch(`/api/employees?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        clearFetchCache();
+        fetchRolesAndEmployees();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to revoke credentials.");
+      }
+    } catch (err: any) {
+      alert("Error deleting account: " + err.message);
+    }
+  }
+
+  async function handleResendInvitation(id: string) {
+    if (!(await showConfirm("Resend the invitation email to this employee? Their old invite link will be invalidated."))) return;
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        alert('Invitation re-sent successfully! The employee will receive a new email.');
+        fetchRolesAndEmployees();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to resend invitation.');
+      }
+    } catch (err: any) {
+      alert('Error resending invitation: ' + err.message);
+    }
+  }
+
+  async function handleUpdateEmployeeRole(id: string, newRole: string) {
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, roleName: newRole }),
+      });
+      if (res.ok) {
+        fetchRolesAndEmployees();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to update employee role.");
+      }
+    } catch (err: any) {
+      alert("Error updating employee role: " + err.message);
+    }
+  }
 
   // Force English/LTR context on Admin page
   useEffect(() => {
@@ -607,6 +1830,44 @@ export default function AdminPage() {
     setServiceToggles({ ...defaults, ...storedToggles });
   }, []);
   // BRANCHES is now derived from the real branches state loaded from Supabase
+
+  const hasAccessToActiveNav = useMemo(() => {
+    console.log("RBAC Access Check - activeNav:", activeNav, "| adminRole:", adminRole, "| permissions:", adminPermissions);
+    if (!adminRole) return false;
+    if (adminRole === 'superadmin') return true;
+    if (activeNav === 'Logout' || activeNav === 'Profile') return true;
+    
+    const settingsSubsections: Record<string, string> = {
+      "Clinic Profile": "settings.profile",
+      "Service Hours": "settings.service_hours",
+      "Branches": "settings.branches",
+      "Booking Settings": "settings.booking_settings",
+      "Notification Settings": "settings.notification",
+      "Queue Settings": "settings.queue",
+      "Pages Settings": "settings.pages",
+      "Role Management": "settings.roles"
+    };
+    
+    if (settingsSubsections[activeNav]) {
+      const perm = settingsSubsections[activeNav];
+      return hasPermission(perm);
+    }
+    
+    const parentScreenMap: Record<string, string> = {
+      "Bookings": "bookings",
+      "Customers": "customers",
+      "Providers": "providers",
+      "Services": "services",
+      "Settings": "settings"
+    };
+    
+    const prefix = parentScreenMap[activeNav];
+    if (prefix) {
+      return adminPermissions.includes(activeNav) || adminPermissions.some(p => p.startsWith(prefix + "."));
+    }
+    
+    return false;
+  }, [adminRole, adminPermissions, activeNav, hasPermission]);
 
   const [prescriptionsExpanded, setPrescriptionsExpanded] = useState(false);
   const [prescriptionsSearch, setPrescriptionsSearch] = useState("");
@@ -774,7 +2035,109 @@ export default function AdminPage() {
     }
   ]);
   const [providers, setProviders] = useState<any[]>(PROVIDERS);
-  
+
+  const isDoctorAvailableAdmin = useCallback((
+    doctor: any,
+    branchId: string | null,
+    dateStr: string | null,
+    timeSlotStr: string | null,
+    serviceId: number | null
+  ): boolean => {
+    if (!dateStr || !timeSlotStr || !serviceId) return true;
+
+    if (branchId && doctor.branchId && doctor.branchId !== branchId) {
+      return false;
+    }
+
+    const targetService = localServices.find(s => s.id === serviceId);
+    if (targetService) {
+      if (doctor.services && doctor.services.length > 0) {
+        if (!doctor.services.includes(targetService.en)) {
+          return false;
+        }
+      }
+    }
+
+    const timeToMinutes = (timeStr: string): number => {
+      const norm = normaliseTo24hSlot(timeStr);
+      if (!norm) return 0;
+      const [hh, mm] = norm.split(":").map(Number);
+      return hh * 60 + mm;
+    };
+
+    const startNew = timeToMinutes(timeSlotStr);
+    const durationNew = targetService ? getDurationInMinutes(targetService.duration) : 30;
+    const endNew = startNew + durationNew;
+
+    if (doctor.workingDaysHours) {
+      const dateObj = new Date(dateStr);
+      if (!isNaN(dateObj.getTime())) {
+        const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const weekdayName = weekdays[dateObj.getDay()];
+        const dayConfig = doctor.workingDaysHours[weekdayName];
+        if (!dayConfig || !dayConfig.isOpen) {
+          return false;
+        }
+        const [sh, sm] = dayConfig.start.split(":").map(Number);
+        const [eh, em] = dayConfig.end.split(":").map(Number);
+        const shiftStart = sh * 60 + sm;
+        const shiftEnd = eh * 60 + em;
+
+        if (startNew < shiftStart || endNew > shiftEnd) {
+          return false;
+        }
+      }
+    }
+
+    const hasOverlap = allReservations.some((res) => {
+      if (res.doctorName && res.doctorName === doctor.name && res.status !== "rejected") {
+        if (res.date === dateStr && res.timeSlot) {
+          const startRes = timeToMinutes(res.timeSlot);
+          const resService = localServices.find((s) => s.id === res.serviceId);
+          const durationRes = resService ? getDurationInMinutes(resService.duration) : 30;
+          const endRes = startRes + durationRes;
+
+          if (startNew < endRes && startRes < endNew) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+
+    return !hasOverlap;
+  }, [localServices, allReservations]);
+
+  const availableDoctorsNewPatient = useMemo(() => {
+    return providers.filter(p => isDoctorAvailableAdmin(p, newPatientBranch, newPatientDate, newPatientTimeSlot, newPatientService));
+  }, [providers, newPatientBranch, newPatientDate, newPatientTimeSlot, newPatientService, isDoctorAvailableAdmin]);
+
+  useEffect(() => {
+    if (availableDoctorsNewPatient.length > 0) {
+      if (!availableDoctorsNewPatient.some(d => d.name === newPatientDoctor)) {
+        setNewPatientDoctor(availableDoctorsNewPatient[0].name);
+      }
+    } else {
+      setNewPatientDoctor("");
+    }
+  }, [availableDoctorsNewPatient, newPatientDoctor]);
+
+  const availableDoctorsApprove = useMemo(() => {
+    if (!selected) return [];
+    return providers.filter(p => isDoctorAvailableAdmin(p, selected.branchId ?? null, selected.date, slot, selected.serviceId));
+  }, [providers, selected, slot, isDoctorAvailableAdmin]);
+
+  useEffect(() => {
+    if (selected && availableDoctorsApprove.length > 0) {
+      if (!availableDoctorsApprove.some(d => d.name === doctorName)) {
+        setDoctorName(availableDoctorsApprove[0].name);
+      }
+    } else if (selected) {
+      setDoctorName("");
+    }
+  }, [availableDoctorsApprove, doctorName, selected]);
+
+
   // Custom provider modal states
   const [showProviderModal, setShowProviderModal] = useState(false);
   const [providerModalMode, setProviderModalMode] = useState<"add" | "edit">("add");
@@ -783,7 +2146,37 @@ export default function AdminPage() {
   const [providerFormRating, setProviderFormRating] = useState(5);
   const [providerFormMore, setProviderFormMore] = useState(0);
   const [providerFormSelectedServices, setProviderFormSelectedServices] = useState<string[]>([]);
+  const [providerFormImage, setProviderFormImage] = useState("");
+  const [providerFormPhone, setProviderFormPhone] = useState("");
+  const [providerFormGender, setProviderFormGender] = useState<"Male" | "Female" | "">("");
+  const [providerFormAge, setProviderFormAge] = useState<string>("");
+  const [providerFormSpecialty, setProviderFormSpecialty] = useState("");
+  const [providerFormNationalId, setProviderFormNationalId] = useState("");
+  const [providerFormBranchId, setProviderFormBranchId] = useState("");
+  const [providerFormStartDate, setProviderFormStartDate] = useState("");
+  const [providerFormWorkingDaysHours, setProviderFormWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string }>>({
+    Sunday: { isOpen: false, start: "10:00", end: "20:00" },
+    Monday: { isOpen: false, start: "10:00", end: "20:00" },
+    Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
+    Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
+    Thursday: { isOpen: false, start: "10:00", end: "20:00" },
+    Friday: { isOpen: false, start: "10:00", end: "20:00" },
+    Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+  });
   const [savingProvider, setSavingProvider] = useState(false);
+  const [attendanceDate, setAttendanceDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [loadingProviderAttendance, setLoadingProviderAttendance] = useState(false);
+  const [savingAttendanceId, setSavingAttendanceId] = useState<string | null>(null);
+
+  const [showProviderFilterPanel, setShowProviderFilterPanel] = useState(false);
+  const [providerFilterBranchId, setProviderFilterBranchId] = useState("All");
+  const [providerFilterSpecialty, setProviderFilterSpecialty] = useState("All");
+  const [providerFilterGender, setProviderFilterGender] = useState("All");
+  const [providerSearchQuery, setProviderSearchQuery] = useState("");
 
   const [loadingPageSettings, setLoadingPageSettings] = useState(false);
   const [savingPageSettings, setSavingPageSettings] = useState(false);
@@ -795,14 +2188,16 @@ export default function AdminPage() {
   });
   const [savingBranch, setSavingBranch] = useState(false);
   const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
+  const [selectedBranchForHoursId, setSelectedBranchForHoursId] = useState<string>("");
+  const [savingBranchHours, setSavingBranchHours] = useState(false);
   const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
-    { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "10:00", closeTime: "20:00" },
-    { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+    { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+    { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
   ]);  const [pageSettingsLangTab, setPageSettingsLangTab] = useState<"en" | "ar">("en");
   const [aboutImage1, setAboutImage1] = useState<string>("");
   const [aboutImage2, setAboutImage2] = useState<string>("");
@@ -847,6 +2242,43 @@ export default function AdminPage() {
   const [smsTemplateSearch, setSmsTemplateSearch] = useState("");
   const [smsLogSearch, setSmsLogSearch] = useState("");
   const [settingsUserSearch, setSettingsUserSearch] = useState("");
+
+  // ── Clinic Profile Settings State ──
+  const [clinicName, setClinicName] = useState("Revera Clinics");
+  const [clinicNameAr, setClinicNameAr] = useState("ريفيرا كلينيك");
+  const [clinicLocation, setClinicLocation] = useState("Sheikh Zayed City, Giza");
+  const [clinicLocationAr, setClinicLocationAr] = useState("مدينة الشيخ زايد، الجيزة");
+  const [clinicEmail, setClinicEmail] = useState("info@reveraclinics.com");
+  const [clinicPhone, setClinicPhone] = useState("+20 2 3796 2200");
+  const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
+  const [savingClinicProfile, setSavingClinicProfile] = useState(false);
+
+  // ── Booking Settings State ──
+  const [bookingMinAdvance, setBookingMinAdvance] = useState(2);
+  const [bookingMaxAdvance, setBookingMaxAdvance] = useState(30);
+  const [bookingCancelWindow, setBookingCancelWindow] = useState(4);
+  const [bookingMaxPerSlot, setBookingMaxPerSlot] = useState(3);
+  const [bookingInstantApproval, setBookingInstantApproval] = useState(false);
+  const [bookingShowDoctorNotes, setBookingShowDoctorNotes] = useState(true);
+  const [savingBookingSettings, setSavingBookingSettings] = useState(false);
+
+  // ── Notification Settings State ──
+  const [notifSmsOtp, setNotifSmsOtp] = useState(true);
+  const [notifWhatsApp, setNotifWhatsApp] = useState(true);
+  const [notifEmailConfirm, setNotifEmailConfirm] = useState(false);
+  const [notifSmsTemplate, setNotifSmsTemplate] = useState("Hello {name}, your appointment for {service} is confirmed on {date} at {time}. See you at Revera Clinics!");
+  const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("مرحباً {name}، تم تأكيد موعدك لخدمة {service} بتاريخ {date} الساعة {time}. نراك في ريفيرا كلينيك!");
+  const [notifReminderHours, setNotifReminderHours] = useState(24);
+  const [notifStaffEmail, setNotifStaffEmail] = useState("admin@reveraclinics.com");
+  const [savingNotificationSettings, setSavingNotificationSettings] = useState(false);
+
+  // ── Queue Settings State ──
+  const [queueVirtualRoom, setQueueVirtualRoom] = useState(false);
+  const [queueShowOnScreens, setQueueShowOnScreens] = useState(true);
+  const [queueAutoCheckIn, setQueueAutoCheckIn] = useState(false);
+  const [queueAlertThreshold, setQueueAlertThreshold] = useState(2);
+  const [queueAvgSessionDuration, setQueueAvgSessionDuration] = useState(20);
+  const [savingQueueSettings, setSavingQueueSettings] = useState(false);
   const [eCommerceSearch, setECommerceSearch] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
   const [purchaseSearch, setPurchaseSearch] = useState("");
@@ -881,26 +2313,232 @@ export default function AdminPage() {
     }));
   }
 
-  // Derive unique customers from all reservations
-  const customers = useMemo<Customer[]>(() => {
-    const map = new globalThis.Map<string, Customer>();
-    allReservations.forEach((r) => {
-      if (!map.has(r.email)) {
-        map.set(r.email, {
-          email: r.email,
-          name: r.name,
-          phone: r.phone,
-          createdAt: r.createdAt ?? r.date,
-          bookings: 0,
-          spent: 0,
-          outstanding: 0,
-          wallet: 0,
-        });
+  const getDayOperatingHoursAdmin = useCallback((dateStr: string | null) => {
+    if (!dateStr || !newPatientService) return { start: "09:00", end: "20:00" };
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
+
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[dateObj.getDay()];
+
+    const selectedBranch = branches.find(b => b.id === newPatientBranch);
+    const activeBranchHours = selectedBranch && Array.isArray(selectedBranch.service_hours) && selectedBranch.service_hours.length > 0
+      ? selectedBranch.service_hours
+      : serviceHours;
+
+    const clinicDay = activeBranchHours.find(
+      (sh) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
+    );
+
+    let clinicStartMins = 9 * 60; // 09:00 default
+    let clinicEndMins = 20 * 60;  // 20:00 default
+    let clinicClosed = false;
+
+    if (clinicDay) {
+      if (!clinicDay.isOpen) {
+        clinicClosed = true;
+      } else {
+        const [csh, csm] = clinicDay.openTime.split(":").map(Number);
+        const [ceh, cem] = clinicDay.closeTime.split(":").map(Number);
+        clinicStartMins = csh * 60 + csm;
+        clinicEndMins = ceh * 60 + cem;
       }
-      map.get(r.email)!.bookings += 1;
+    }
+
+    if (clinicClosed) {
+      return { start: "23:59", end: "23:59" };
+    }
+    
+    const targetService = localServices.find(s => s.id === newPatientService);
+    if (!targetService) return { start: "09:00", end: "20:00" };
+
+    let minStart = 24 * 60; // in minutes
+    let maxEnd = 0; // in minutes
+    let found = false;
+
+    providers.forEach((doc) => {
+      // Check branch
+      if (newPatientBranch && doc.branchId && doc.branchId !== newPatientBranch) return;
+      
+      // Check service
+      if (doc.services && doc.services.length > 0) {
+        if (!doc.services.includes(targetService.en)) return;
+      }
+
+      // Check working days & hours
+      if (doc.workingDaysHours) {
+        const dayConfig = doc.workingDaysHours[weekdayName];
+        if (dayConfig && dayConfig.isOpen) {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          if (startMins < minStart) minStart = startMins;
+          if (endMins > maxEnd) maxEnd = endMins;
+          found = true;
+        }
+      } else {
+        if (clinicStartMins < minStart) minStart = clinicStartMins;
+        if (clinicEndMins > maxEnd) maxEnd = clinicEndMins;
+        found = true;
+      }
     });
-    return Array.from(map.values());
-  }, [allReservations]);
+
+    if (found) {
+      if (minStart < clinicStartMins) minStart = clinicStartMins;
+      if (maxEnd > clinicEndMins) maxEnd = clinicEndMins;
+    } else {
+      minStart = clinicStartMins;
+      maxEnd = clinicEndMins;
+    }
+
+    const formatMins = (totalMins: number) => {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    return {
+      start: formatMins(minStart),
+      end: formatMins(maxEnd)
+    };
+  }, [providers, newPatientBranch, newPatientService, localServices, serviceHours, branches]);
+
+  const getDayOperatingHoursApprove = useCallback((selectedReq: Req | null) => {
+    if (!selectedReq) return { start: "09:00", end: "20:00" };
+    const dateStr = selectedReq.date;
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
+
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[dateObj.getDay()];
+
+    const selectedBranch = branches.find(b => b.id === selectedReq?.branchId);
+    const activeBranchHours = selectedBranch && Array.isArray(selectedBranch.service_hours) && selectedBranch.service_hours.length > 0
+      ? selectedBranch.service_hours
+      : serviceHours;
+
+    const clinicDay = activeBranchHours.find(
+      (sh) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
+    );
+
+    let clinicStartMins = 9 * 60; // 09:00 default
+    let clinicEndMins = 20 * 60;  // 20:00 default
+    let clinicClosed = false;
+
+    if (clinicDay) {
+      if (!clinicDay.isOpen) {
+        clinicClosed = true;
+      } else {
+        const [csh, csm] = clinicDay.openTime.split(":").map(Number);
+        const [ceh, cem] = clinicDay.closeTime.split(":").map(Number);
+        clinicStartMins = csh * 60 + csm;
+        clinicEndMins = ceh * 60 + cem;
+      }
+    }
+
+    if (clinicClosed) {
+      return { start: "23:59", end: "23:59" };
+    }
+    
+    const targetService = localServices.find(s => s.id === selectedReq.serviceId);
+    if (!targetService) return { start: "09:00", end: "20:00" };
+
+    let minStart = 24 * 60; // in minutes
+    let maxEnd = 0; // in minutes
+    let found = false;
+
+    providers.forEach((doc) => {
+      // Check branch
+      if (selectedReq.branchId && doc.branchId && doc.branchId !== selectedReq.branchId) return;
+      
+      // Check service
+      if (doc.services && doc.services.length > 0) {
+        if (!doc.services.includes(targetService.en)) return;
+      }
+
+      // Check working days & hours
+      if (doc.workingDaysHours) {
+        const dayConfig = doc.workingDaysHours[weekdayName];
+        if (dayConfig && dayConfig.isOpen) {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          if (startMins < minStart) minStart = startMins;
+          if (endMins > maxEnd) maxEnd = endMins;
+          found = true;
+        }
+      } else {
+        if (clinicStartMins < minStart) minStart = clinicStartMins;
+        if (clinicEndMins > maxEnd) maxEnd = clinicEndMins;
+        found = true;
+      }
+    });
+
+    if (found) {
+      if (minStart < clinicStartMins) minStart = clinicStartMins;
+      if (maxEnd > clinicEndMins) maxEnd = clinicEndMins;
+    } else {
+      minStart = clinicStartMins;
+      maxEnd = clinicEndMins;
+    }
+
+    const formatMins = (totalMins: number) => {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    return {
+      start: formatMins(minStart),
+      end: formatMins(maxEnd)
+    };
+  }, [providers, localServices, serviceHours, branches]);
+
+
+  // Derive unique customers from database
+  const customers = useMemo<Customer[]>(() => {
+    const now = new Date();
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const list = Array.isArray(dbCustomers) ? dbCustomers : [];
+
+    return list.map((c) => {
+      // Find if this customer has a booking in the last 2 weeks
+      const customerReservations = allReservations.filter((r) => 
+        (r.phone && (r.phone === c.mobile || r.phone === c.phone)) ||
+        (r.customerId && r.customerId === c.id)
+      );
+
+      const hasRecentBooking = customerReservations.some((r) => {
+        if (!r.date) return false;
+        const bookingDate = new Date(String(r.date).slice(0, 10) + 'T00:00:00');
+        return bookingDate >= twoWeeksAgo;
+      });
+
+      // Determine active status:
+      // If explicitly set to inactive in DB, then it's inactive.
+      // Otherwise, active only if they have a booking in the last 2 weeks OR if they registered in the last 2 weeks.
+      const regDateStr = c.registration_date || c.created_at || now.toISOString();
+      const regDate = new Date(regDateStr);
+      const registeredRecently = regDate >= twoWeeksAgo;
+      const isActive = c.active !== false && (hasRecentBooking || registeredRecently);
+
+      return {
+        ...c,
+        id: c.id,
+        email: c.email || "",
+        name: c.name,
+        phone: c.mobile || "",
+        createdAt: regDateStr,
+        bookings: c.number_of_bookings || 0,
+        spent: Number(c.spent_amount || 0),
+        outstanding: Number(c.outstanding || 0),
+        wallet: Number(c.wallet_balance || 0),
+        active: isActive,
+      };
+    });
+  }, [dbCustomers, allReservations]);
 
   const todaysBookingsCount = useMemo(() => {
     const getLocalDateString = (d: Date) => {
@@ -910,13 +2548,29 @@ export default function AdminPage() {
       return `${year}-${month}-${day}`;
     };
     const todayStr = getLocalDateString(new Date());
+    const ALL_ACTIVE = ['approved', 'confirmed', 'started', 'completed', 'pending'];
+    const todays = allReservations.filter(
+      r => String(r.date).slice(0, 10) === todayStr && ALL_ACTIVE.includes(r.status)
+    );
+    console.log('[Today Bookings] todayStr:', todayStr, '| all reservation dates:', allReservations.map(r => `${String(r.date).slice(0,10)}(${r.status})`));
+    return todays.length;
+  }, [allReservations]);
+
+  const comingAppointmentsCount = useMemo(() => {
+    const getLocalDateString = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const todayStr = getLocalDateString(new Date());
     return allReservations.filter(
-      r => String(r.date).slice(0, 10) === todayStr && r.status === 'approved'
+      r => ['approved', 'confirmed', 'started', 'completed'].includes(r.status) && String(r.date).slice(0, 10) >= todayStr
     ).length;
   }, [allReservations]);
 
   const dynamicOverviewCards = useMemo(() => {
-    const activeBookings = allReservations.filter((r) => r.status === "approved");
+    const activeBookings = allReservations.filter((r) => ['approved', 'confirmed', 'started', 'completed'].includes(r.status));
     const activeBookingsCount = activeBookings.length;
     const newCustomersCount = customers.length;
     const openRequestsCount = requests.length;
@@ -949,30 +2603,73 @@ export default function AdminPage() {
   }, [allReservations, customers.length, requests.length]);
 
   const filteredCustomers = useMemo(() => {
-    if (!customerSearch.trim()) return customers;
-    const q = customerSearch.toLowerCase();
-    return customers.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
-    );
-  }, [customers, customerSearch]);
+    let list = customers;
+
+    if (customerFilterGender !== "All") {
+      list = list.filter((c) => c.gender === customerFilterGender);
+    }
+
+    if (customerFilterStatus !== "All") {
+      const wantActive = customerFilterStatus === "Active";
+      list = list.filter((c) => (c.active !== undefined ? c.active : true) === wantActive);
+    }
+
+    if (customerFilterReferral !== "All") {
+      list = list.filter((c) => c.referral === customerFilterReferral);
+    }
+
+    if (customerSearch.trim()) {
+      const q = customerSearch.toLowerCase();
+      list = list.filter((c) => {
+        const nameMatch = (c.name || "").toLowerCase().includes(q);
+        const emailMatch = (c.email || "").toLowerCase().includes(q);
+        const phoneMatch = (c.mobile || c.phone || "").toLowerCase().includes(q);
+        const nationalIdMatch = (c.national_id || "").toLowerCase().includes(q);
+        return nameMatch || emailMatch || phoneMatch || nationalIdMatch;
+      });
+    }
+
+    return list;
+  }, [customers, customerSearch, customerFilterGender, customerFilterStatus, customerFilterReferral]);
 
   useEffect(() => {
-    fetchRequests();
-    fetchAllReservations();
+    fetchCustomers();
     fetchPageSettings();
     fetchProviders();
+    fetchRooms();
     // Fetch branches and set default branch
     setLoadingBranches(true);
-    fetch("/api/branches")
-      .then(r => r.json())
+    cachedFetch("/api/branches", 30000)
       .then(data => {
         const list: Branch[] = Array.isArray(data) ? data : [];
         setBranches(list);
-        if (list.length > 0) setBranch(list[0].id);
+        if (list.length > 0) {
+          setBranch((prev) => prev || list[0].id);
+          setSelectedBranchForHoursId((prev) => prev || list[0].id);
+        }
       })
       .catch(() => setBranches([]))
       .finally(() => setLoadingBranches(false));
   }, []);
+
+  // Sync serviceHours state with active branch selection
+  useEffect(() => {
+    if (!selectedBranchForHoursId) return;
+    const branchRecord = branches.find(b => b.id === selectedBranchForHoursId);
+    if (branchRecord && Array.isArray(branchRecord.service_hours) && branchRecord.service_hours.length > 0) {
+      setServiceHours(branchRecord.service_hours);
+    } else {
+      setServiceHours([
+        { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+        { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+      ]);
+    }
+  }, [selectedBranchForHoursId, branches]);
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -980,11 +2677,43 @@ export default function AdminPage() {
     });
   }, [activeNav]);
 
-  // Re-fetch bookings whenever branch selection changes
+  // Re-fetch bookings whenever branch selection changes and poll every 2 seconds for new requests
   useEffect(() => {
     if (!branch) return; // wait until branches are loaded
-    fetchRequests();
-    fetchAllReservations();
+
+    let isMounted = true;
+    let timerId: NodeJS.Timeout;
+
+    const poll = async () => {
+      try {
+        // Clear specific endpoints cache entries to force fresh server response
+        clearFetchCache(`/api/reservations?status=pending&branchId=${branch}`);
+        clearFetchCache(`/api/reservations?branchId=${branch}`);
+        
+        await Promise.all([
+          fetchRequests() || Promise.resolve(),
+          fetchAllReservations() || Promise.resolve()
+        ]);
+      } catch (err) {
+        if (err instanceof TypeError || String(err).includes("Failed to fetch")) {
+          console.warn("Polling network connection lost (Failed to fetch)");
+        } else {
+          console.error("Polling error:", err);
+        }
+      } finally {
+        if (isMounted) {
+          // Schedule next poll in 2 seconds after the current fetches complete
+          timerId = setTimeout(poll, 2000);
+        }
+      }
+    };
+
+    poll();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timerId);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branch]);
 
@@ -1010,15 +2739,24 @@ export default function AdminPage() {
       return;
     }
     const branchQuery = newPatientBranch ? `&branchId=${newPatientBranch}` : "";
-    fetch(`/api/reservations?serviceId=${newPatientService}&date=${newPatientDate}&status=approved${branchQuery}`, { cache: "no-store" })
+    fetch(`/api/availability?date=${newPatientDate}&serviceId=${newPatientService}${branchQuery}`, { cache: "no-store" })
       .then(r => r.json())
-      .then(list => {
-        if (Array.isArray(list)) {
-          const unavailable = getUnavailableSlots(list, Number(newPatientService));
+      .then(data => {
+        if (data && Array.isArray(data.unavailableSlots)) {
+          const { start, end } = getDayOperatingHoursAdmin(newPatientDate);
+          const unavailable = data.unavailableSlots;
           setManualUnavailableSlots(unavailable);
-          // Auto-select first available slot if current is unavailable or empty
-          if (!newPatientTimeSlot || unavailable.includes(newPatientTimeSlot)) {
-            const first = SLOTS.find((s) => !unavailable.includes(s)) || SLOTS[0];
+          // Auto-select first available slot if current is unavailable, empty, or outside operating hours
+          const filteredSlots = SLOTS.filter((s) => {
+            const norm = normaliseTo24hSlot(s) ?? "";
+            return norm >= start && norm < end;
+          });
+          const isCurrentInvalid = !newPatientTimeSlot || 
+            unavailable.includes(newPatientTimeSlot) ||
+            !filteredSlots.includes(newPatientTimeSlot);
+
+          if (isCurrentInvalid) {
+            const first = filteredSlots.find((s) => !unavailable.includes(s)) || filteredSlots[0] || SLOTS[0];
             setNewPatientTimeSlot(first);
           }
         }
@@ -1028,8 +2766,7 @@ export default function AdminPage() {
   }, [showAddBookingModal, newPatientService, newPatientDate, newPatientBranch]);
 
   function fetchProviders() {
-    fetch("/api/providers", { cache: "no-store" })
-      .then((res) => res.json())
+    cachedFetch("/api/providers", 10000)
       .then((data) => {
         if (Array.isArray(data)) {
           setProviders(data);
@@ -1038,6 +2775,61 @@ export default function AdminPage() {
       .catch((err) => console.error("fetchProviders error:", err));
   }
 
+  async function fetchAttendance(dateStr: string) {
+    setLoadingProviderAttendance(true);
+    try {
+      const res = await fetch(`/api/provider-attendance?date=${dateStr}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setAttendanceRecords(data);
+      } else {
+        console.error("Failed to fetch attendance");
+      }
+    } catch (err) {
+      console.error("fetchAttendance error:", err);
+    } finally {
+      setLoadingProviderAttendance(false);
+    }
+  }
+
+  async function handleToggleAttendance(providerId: string, status: "Present" | "Absent" | "On Leave") {
+    setSavingAttendanceId(providerId);
+    try {
+      const existing = attendanceRecords.find(r => r.provider_id === providerId);
+      const payload = {
+        providerId,
+        date: attendanceDate,
+        status,
+        checkIn: status === "Present" ? "09:00" : null,
+        checkOut: status === "Present" ? "17:00" : null,
+        notes: existing?.notes || ""
+      };
+
+      const res = await fetch("/api/provider-attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        fetchAttendance(attendanceDate);
+      } else {
+        alert("Failed to save attendance record.");
+      }
+    } catch (err) {
+      console.error("handleToggleAttendance error:", err);
+      alert("Error saving attendance.");
+    } finally {
+      setSavingAttendanceId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (providerTab === "Attendance") {
+      fetchAttendance(attendanceDate);
+    }
+  }, [providerTab, attendanceDate, fetchAttendance]);
+
   function openAddProviderModal() {
     setProviderModalMode("add");
     setProviderEditingId(null);
@@ -1045,6 +2837,23 @@ export default function AdminPage() {
     setProviderFormRating(5);
     setProviderFormMore(0);
     setProviderFormSelectedServices([]);
+    setProviderFormImage("");
+    setProviderFormPhone("");
+    setProviderFormGender("");
+    setProviderFormAge("");
+    setProviderFormSpecialty("");
+    setProviderFormNationalId("");
+    setProviderFormBranchId(branches.length > 0 ? branches[0].id : "");
+    setProviderFormStartDate("");
+    setProviderFormWorkingDaysHours({
+      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
+      Monday: { isOpen: false, start: "09:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
+      Friday: { isOpen: false, start: "09:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
+    });
     setShowProviderModal(true);
   }
 
@@ -1055,6 +2864,23 @@ export default function AdminPage() {
     setProviderFormRating(provider.rating || 5);
     setProviderFormMore(provider.more || 0);
     setProviderFormSelectedServices(provider.services || []);
+    setProviderFormImage(provider.image || "");
+    setProviderFormPhone(provider.phone || "");
+    setProviderFormGender(provider.gender || "");
+    setProviderFormAge(provider.age ? String(provider.age) : "");
+    setProviderFormSpecialty(provider.specialty || "");
+    setProviderFormNationalId(provider.nationalId || "");
+    setProviderFormBranchId(provider.branchId || "");
+    setProviderFormStartDate(provider.startDate || "");
+    setProviderFormWorkingDaysHours(provider.workingDaysHours || {
+      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
+      Monday: { isOpen: false, start: "09:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
+      Friday: { isOpen: false, start: "09:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
+    });
     setShowProviderModal(true);
   }
 
@@ -1070,7 +2896,16 @@ export default function AdminPage() {
       name: providerFormName.trim(),
       services: providerFormSelectedServices,
       rating: Number(providerFormRating),
-      more: Math.max(0, providerFormSelectedServices.length - 2)
+      more: Math.max(0, providerFormSelectedServices.length - 2),
+      image: providerFormImage || null,
+      phone: providerFormPhone || null,
+      gender: providerFormGender || null,
+      age: providerFormAge ? Number(providerFormAge) : null,
+      specialty: providerFormSpecialty || null,
+      nationalId: providerFormNationalId || null,
+      workingDaysHours: providerFormWorkingDaysHours,
+      branchId: providerFormBranchId || null,
+      startDate: providerFormStartDate || null
     };
 
     const isEdit = providerModalMode === "edit";
@@ -1101,9 +2936,9 @@ export default function AdminPage() {
       });
   }
 
-  function handleDeleteProvider(id: string) {
+  async function handleDeleteProvider(id: string) {
     if (!id) return;
-    if (confirm("Are you sure you want to delete this provider?")) {
+    if (await showConfirm("Are you sure you want to delete this provider?")) {
       fetch(`/api/providers?id=${id}`, {
         method: "DELETE"
       })
@@ -1125,8 +2960,7 @@ export default function AdminPage() {
 
   function fetchPageSettings() {
     setLoadingPageSettings(true);
-    fetch("/api/page-settings", { cache: "no-store" })
-      .then((r) => r.json())
+    cachedFetch("/api/page-settings", 15000)
       .then((data) => {
         if (data) {
           setHomeHeroSlides(data.hero?.slides || []);
@@ -1230,6 +3064,179 @@ export default function AdminPage() {
       })
       .catch((err) => console.error("fetchPageSettings error:", err))
       .finally(() => setLoadingPageSettings(false));
+  }
+
+  const handleProfileImageUpload = async (file: File, side: 'front' | 'back') => {
+    try {
+      const compressed = await compressImage(file, 1000, 1000, 0.75);
+      if (side === 'front') {
+        setProfileNatIdFront(compressed);
+      } else {
+        setProfileNatIdBack(compressed);
+      }
+    } catch (error) {
+      console.error("Error compressing profile image:", error);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (side === 'front') {
+          setProfileNatIdFront(reader.result as string);
+        } else {
+          setProfileNatIdBack(reader.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  async function handleSavePersonalProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setUpdatingProfile(true);
+    setProfileUpdateError("");
+    setProfileUpdateSuccess("");
+    try {
+      const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+      if (!profileEmployee) {
+        throw new Error("Could not locate employee account profile to update.");
+      }
+
+      // Check National ID format if entered
+      if (profileNatId.trim() && profileNatId.trim().length !== 14) {
+        throw new Error("Egyptian National ID must be exactly 14 digits.");
+      }
+
+      const res = await fetch("/api/employees", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: profileEmployee.id,
+          name: profileName.trim(),
+          phone: profilePhone.trim(),
+          address: profileAddress.trim(),
+          nationalId: profileNatId.trim() || null,
+          nationalIdFront: profileNatIdFront || null,
+          nationalIdBack: profileNatIdBack || null,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to update profile details.");
+      }
+
+      setProfileUpdateSuccess("Profile updated successfully!");
+      fetchRolesAndEmployees();
+    } catch (err: any) {
+      console.error("handleSavePersonalProfile error:", err);
+      setProfileUpdateError(err.message || "Something went wrong.");
+    } finally {
+      setUpdatingProfile(false);
+    }
+  }
+
+  async function handleSavePersonalPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!profilePassword || !profileConfirmPassword) {
+      setProfilePasswordError("Please fill in both password fields.");
+      return;
+    }
+    if (profilePassword !== profileConfirmPassword) {
+      setProfilePasswordError("Passwords do not match.");
+      return;
+    }
+    if (profilePassword.length < 6) {
+      setProfilePasswordError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setProfilePasswordSaving(true);
+    setProfilePasswordError("");
+    setProfilePasswordSuccess("");
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: profilePassword,
+      });
+
+      if (updateError) throw updateError;
+
+      setProfilePasswordSuccess("Password changed successfully!");
+      setProfilePassword("");
+      setProfileConfirmPassword("");
+    } catch (err: any) {
+      console.error("handleSavePersonalPassword error:", err);
+      setProfilePasswordError(err.message || "Failed to update password.");
+    } finally {
+      setProfilePasswordSaving(false);
+    }
+  }
+
+  // ── Settings Panel Handlers ──
+  async function handleSaveClinicProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingClinicProfile(true);
+    try {
+      await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clinic: { name: clinicName, name_ar: clinicNameAr, location: clinicLocation, location_ar: clinicLocationAr, email: clinicEmail, phone: clinicPhone, whatsapp: clinicWhatsapp }
+        }),
+      });
+    } catch (err) {
+      console.error("handleSaveClinicProfile error:", err);
+    } finally {
+      setSavingClinicProfile(false);
+    }
+  }
+
+  async function handleSaveBookingSettings() {
+    setSavingBookingSettings(true);
+    try {
+      await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          booking: { minAdvance: bookingMinAdvance, maxAdvance: bookingMaxAdvance, cancelWindow: bookingCancelWindow, maxPerSlot: bookingMaxPerSlot, instantApproval: bookingInstantApproval, showDoctorNotes: bookingShowDoctorNotes }
+        }),
+      });
+    } catch (err) {
+      console.error("handleSaveBookingSettings error:", err);
+    } finally {
+      setSavingBookingSettings(false);
+    }
+  }
+
+  async function handleSaveNotificationSettings() {
+    setSavingNotificationSettings(true);
+    try {
+      await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notifications: { smsOtp: notifSmsOtp, whatsapp: notifWhatsApp, email: notifEmailConfirm, smsTemplate: notifSmsTemplate, smsTemplateAr: notifSmsTemplateAr, reminderHours: notifReminderHours, staffEmail: notifStaffEmail }
+        }),
+      });
+    } catch (err) {
+      console.error("handleSaveNotificationSettings error:", err);
+    } finally {
+      setSavingNotificationSettings(false);
+    }
+  }
+
+  async function handleSaveQueueSettings() {
+    setSavingQueueSettings(true);
+    try {
+      await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          queue: { virtualRoom: queueVirtualRoom, showOnScreens: queueShowOnScreens, autoCheckIn: queueAutoCheckIn, alertThreshold: queueAlertThreshold, avgSessionDuration: queueAvgSessionDuration }
+        }),
+      });
+    } catch (err) {
+      console.error("handleSaveQueueSettings error:", err);
+    } finally {
+      setSavingQueueSettings(false);
+    }
   }
 
   async function savePageSettings(overrideData?: any) {
@@ -1343,6 +3350,7 @@ export default function AdminPage() {
       });
       if (res.ok) {
         alert("Homepage settings saved successfully! Check the public website homepage to see changes.");
+        clearFetchCache();
         fetchPageSettings();
       } else {
         alert("Failed to save settings. Please try again.");
@@ -1352,6 +3360,33 @@ export default function AdminPage() {
       alert("Error saving settings.");
     } finally {
       setSavingPageSettings(false);
+    }
+  }
+
+  async function handleSaveBranchServiceHours() {
+    if (!selectedBranchForHoursId) return;
+    setSavingBranchHours(true);
+    try {
+      const res = await fetch("/api/branches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedBranchForHoursId,
+          service_hours: serviceHours
+        })
+      });
+      if (res.ok) {
+        const updatedBranch = await res.json();
+        setBranches(prev => prev.map(b => b.id === updatedBranch.id ? updatedBranch : b));
+        alert("Branch service hours saved successfully!");
+      } else {
+        alert("Failed to save branch service hours.");
+      }
+    } catch (err) {
+      console.error("handleSaveBranchServiceHours error:", err);
+      alert("Error saving branch service hours.");
+    } finally {
+      setSavingBranchHours(false);
     }
   }
 
@@ -1398,12 +3433,12 @@ export default function AdminPage() {
     setHomeHeroSlidesAr([...homeHeroSlidesAr, newArSlide]);
   };
 
-  const handleDeleteSlide = (index: number) => {
+  const handleDeleteSlide = async (index: number) => {
     console.log("handleDeleteSlide called for index:", index);
     console.log("Current English slides count:", homeHeroSlides.length);
     console.log("Current Arabic slides count:", homeHeroSlidesAr.length);
     
-    if (confirm("Are you sure you want to delete this slide?")) {
+    if (await showConfirm("Are you sure you want to delete this slide?")) {
       const newEn = homeHeroSlides.filter((_, i) => i !== index);
       const newAr = homeHeroSlidesAr.filter((_, i) => i !== index);
       
@@ -1445,8 +3480,7 @@ export default function AdminPage() {
   function fetchRequests() {
     setLoading(true);
     const branchParam = branch ? `&branchId=${branch}` : "";
-    fetch(`/api/reservations?status=pending${branchParam}`, { cache: "no-store" })
-      .then((r) => r.json())
+    return cachedFetch(`/api/reservations?status=pending${branchParam}`, 2000)
       .then((data) => {
         if (Array.isArray(data)) {
           setRequests(data);
@@ -1457,7 +3491,11 @@ export default function AdminPage() {
         setLoading(false);
       })
       .catch((err) => {
-        console.error("fetchRequests error:", err);
+        if (err instanceof TypeError || String(err).includes("Failed to fetch")) {
+          console.warn("fetchRequests: Network connection lost (Failed to fetch)");
+        } else {
+          console.error("fetchRequests error:", err);
+        }
         setRequests([]);
         setLoading(false);
       });
@@ -1478,10 +3516,473 @@ export default function AdminPage() {
       .catch(() => setScheduleReservations([]));
   }
 
+  function fetchCustomers() {
+    setLoadingCustomers(true);
+    cachedFetch("/api/customers", 4000)
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setDbCustomers(data);
+        } else {
+          console.error("fetchCustomers: expected array, got", data);
+          setDbCustomers([]);
+        }
+      })
+      .catch((err) => {
+        console.error("fetchCustomers error:", err);
+        setDbCustomers([]);
+      })
+      .finally(() => {
+        setLoadingCustomers(false);
+      });
+  }
+
+  function handleExportBookingsCSV() {
+    if (allReservations.length === 0) {
+      alert("No reservations to export.");
+      return;
+    }
+    const headers = ["ID", "Patient Name", "Email", "Phone", "Date", "Time Slot", "Session Type", "Doctor", "Status", "Notes"];
+    const rows = allReservations.map(r => [
+      r.id,
+      r.name,
+      r.email,
+      r.phone,
+      r.date,
+      r.timeSlot || r.requestedTime || "",
+      r.sessionType || "in_person",
+      r.doctorName || "",
+      r.status,
+      (r.notes || "").replace(/"/g, '""')
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.map(val => `"${val}"`).join(","))].join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `reservations_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function handleExportCustomersCSV() {
+    if (customers.length === 0) {
+      alert("No customers available to export.");
+      return;
+    }
+
+    const headers = [
+      "id",
+      "Customer Name",
+      "Mobile",
+      "Gender",
+      "Email",
+      "Number of Bookings",
+      "Registration Date",
+      "Active",
+      "Spent Amount",
+      "Outstanding",
+      "Area",
+      "Location Name",
+      "Street Name",
+      "Building No.",
+      "Floor No.",
+      "Note"
+    ];
+
+    const escapeCSV = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      let str = String(val);
+      str = str.replace(/"/g, '""');
+      if (str.includes(',') || str.includes('\n') || str.includes('\r') || str.includes('"')) {
+        return `"${str}"`;
+      }
+      return `"${str}"`;
+    };
+
+    const rows = customers.map(c => [
+      escapeCSV(c.id || ""),
+      escapeCSV(c.name || ""),
+      escapeCSV(c.mobile || c.phone || ""),
+      escapeCSV(c.gender || ""),
+      escapeCSV(c.email || ""),
+      escapeCSV(c.number_of_bookings !== undefined ? c.number_of_bookings : c.bookings),
+      escapeCSV(c.registration_date ? new Date(c.registration_date).toLocaleDateString("en-GB") : (c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-GB") : "")),
+      escapeCSV(c.active !== undefined ? (c.active ? "Yes" : "No") : "Yes"),
+      escapeCSV(c.spent_amount !== undefined ? c.spent_amount : c.spent),
+      escapeCSV(c.outstanding || 0),
+      escapeCSV(c.area || ""),
+      escapeCSV(c.location_name || ""),
+      escapeCSV(c.street_name || ""),
+      escapeCSV(c.building_no || ""),
+      escapeCSV(c.floor_no || ""),
+      escapeCSV(c.note || "")
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `customers_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setShowExportCustomersModal(false);
+  }
+
+  function handleOpenAddCustomer() {
+    setCustName("");
+    setCustMobile("");
+    setCustEmail("");
+    setCustGender("");
+    setCustActive(true);
+    setCustSpent("0");
+    setCustOutstanding("0");
+    setCustWallet("0");
+    setCustArea("");
+    setCustLocationName("");
+    setCustStreet("");
+    setCustBuilding("");
+    setCustFloor("");
+    setCustNote("");
+    setCustAge("");
+    setCustNationalId("");
+    setCustAddress("");
+    setCustReferral("");
+    setCustOccupation("");
+    setCustomerFormError("");
+    setSelectedCustomerForEdit(null);
+    setShowCustomerFormModal(true);
+  }
+
+  function handleOpenEditCustomer(c: Customer) {
+    setCustName(c.name || "");
+    setCustMobile(c.mobile || c.phone || "");
+    setCustEmail(c.email || "");
+    setCustGender((c.gender as any) || "");
+    setCustActive(c.active !== undefined ? c.active : true);
+    setCustSpent(String(c.spent_amount !== undefined ? c.spent_amount : c.spent || 0));
+    setCustOutstanding(String(c.outstanding || 0));
+    setCustWallet(String(c.wallet_balance || c.wallet || 0));
+    setCustArea(c.area || "");
+    setCustLocationName(c.location_name || "");
+    setCustStreet(c.street_name || "");
+    setCustBuilding(c.building_no || "");
+    setCustFloor(c.floor_no || "");
+    setCustNote(c.note || "");
+    setCustAge(c.age !== undefined && c.age !== null ? String(c.age) : "");
+    setCustNationalId(c.national_id || "");
+    setCustAddress(c.address || "");
+    setCustReferral(c.referral || "");
+    setCustOccupation(c.occupation || "");
+    setCustomerFormError("");
+    setSelectedCustomerForEdit(c);
+    setShowCustomerFormModal(true);
+  }
+
+  // CSV Import state and functions
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importHeaders, setImportHeaders] = useState<string[]>([]);
+  const [importRows, setImportRows] = useState<Record<string, string>[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importProgress, setImportProgress] = useState(0);
+  const [importLog, setImportLog] = useState<{ name: string; status: "success" | "error"; error?: string }[]>([]);
+
+  const parseCSV = (text: string) => {
+    const lines: string[] = [];
+    let currentLine = "";
+    let inQuotes = false;
+    
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if ((char === '\n' || char === '\r') && !inQuotes) {
+        if (currentLine.trim()) {
+          lines.push(currentLine);
+        }
+        currentLine = "";
+        if (char === '\r' && text[i+1] === '\n') {
+          i++;
+        }
+      } else {
+        currentLine += char;
+      }
+    }
+    if (currentLine.trim()) {
+      lines.push(currentLine);
+    }
+    
+    if (lines.length === 0) return { headers: [], rows: [] };
+    
+    const splitCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let currentVal = "";
+      let quoteActive = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          quoteActive = !quoteActive;
+        } else if (char === ',' && !quoteActive) {
+          result.push(currentVal.trim());
+          currentVal = "";
+        } else {
+          currentVal += char;
+        }
+      }
+      result.push(currentVal.trim());
+      return result;
+    };
+    
+    const headers = splitCSVLine(lines[0]);
+    const headersClean = headers.map(h => h.toLowerCase().replace(/[\s_]+/g, ''));
+    const rows: Record<string, string>[] = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const values = splitCSVLine(lines[i]);
+      const row: Record<string, string> = {};
+      headersClean.forEach((header, idx) => {
+        row[header] = values[idx] || "";
+      });
+      rows.push(row);
+    }
+    
+    return { headers, rows };
+  };
+
+  const mapRowToCustomer = (row: Record<string, string>) => {
+    const keys = Object.keys(row);
+    const getVal = (possibleHeaders: string[]) => {
+      const match = keys.find(k => possibleHeaders.includes(k.toLowerCase().replace(/[\s_]+/g, '')));
+      return match ? row[match] : "";
+    };
+
+    return {
+      name: getVal(["name", "fullname", "patientname", "patient"]),
+      mobile: getVal(["mobile", "phone", "phonenumber", "mobilephone", "tel"]),
+      email: getVal(["email", "emailaddress"]),
+      gender: getVal(["gender", "sex"]),
+      age: getVal(["age"]),
+      national_id: getVal(["nationalid", "national_id", "idcard"]),
+      address: getVal(["address", "location"]),
+      referral: getVal(["referral", "referralsource"]),
+      occupation: getVal(["occupation", "job"]),
+      note: getVal(["note", "notes", "comments", "description"])
+    };
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const { headers, rows } = parseCSV(text);
+      if (headers.length === 0 || rows.length === 0) {
+        setImportError("The selected CSV file appears to be empty or invalid.");
+        return;
+      }
+      setImportHeaders(headers);
+      setImportRows(rows);
+      setImportError("");
+    };
+    reader.onerror = () => {
+      setImportError("Error reading the CSV file.");
+    };
+    reader.readAsText(file);
+  };
+
+  const handleStartImport = async () => {
+    if (importRows.length === 0) return;
+    setImportLoading(true);
+    setImportProgress(0);
+    setImportLog([]);
+    
+    const logs: { name: string; status: "success" | "error"; error?: string }[] = [];
+    
+    for (let i = 0; i < importRows.length; i++) {
+      const rawRow = importRows[i];
+      const mapped = mapRowToCustomer(rawRow);
+      
+      if (!mapped.name || !mapped.mobile) {
+        logs.push({
+          name: mapped.name || `Row ${i + 1}`,
+          status: "error",
+          error: "Missing required fields (Name and Mobile are required)."
+        });
+        setImportLog([...logs]);
+        setImportProgress(Math.round(((i + 1) / importRows.length) * 100));
+        continue;
+      }
+      
+      try {
+        const response = await fetch("/api/customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: mapped.name,
+            mobile: mapped.mobile,
+            email: mapped.email || null,
+            gender: mapped.gender || null,
+            age: mapped.age ? Number(mapped.age) : null,
+            national_id: mapped.national_id || null,
+            address: mapped.address || null,
+            referral: mapped.referral || null,
+            occupation: mapped.occupation || null,
+            note: mapped.note || null,
+            active: true
+          })
+        });
+        
+        const data = await response.json();
+        if (!response.ok) {
+          logs.push({
+            name: mapped.name,
+            status: "error",
+            error: data.error || "Failed to save to database."
+          });
+        } else {
+          logs.push({
+            name: mapped.name,
+            status: "success"
+          });
+        }
+      } catch (err: any) {
+        logs.push({
+          name: mapped.name,
+          status: "error",
+          error: err.message || "Network error."
+        });
+      }
+      
+      setImportLog([...logs]);
+      setImportProgress(Math.round(((i + 1) / importRows.length) * 100));
+    }
+    
+    setImportLoading(false);
+    fetchCustomers();
+  };
+
+  const handleCloseImportModal = () => {
+    setShowImportCustomersModal(false);
+    setImportFile(null);
+    setImportHeaders([]);
+    setImportRows([]);
+    setImportLoading(false);
+    setImportError("");
+    setImportProgress(0);
+    setImportLog([]);
+  };
+
+  function handleSaveCustomer() {
+    if (!custName.trim()) {
+      setCustomerFormError("Customer name is required.");
+      return;
+    }
+    if (!custMobile.trim()) {
+      setCustomerFormError("Mobile number is required.");
+      return;
+    }
+
+    // Validate Egyptian mobile number format
+    let cleanedMobile = custMobile.trim();
+    if (cleanedMobile.startsWith("+20")) {
+      cleanedMobile = "0" + cleanedMobile.slice(3);
+    } else if (cleanedMobile.startsWith("0020")) {
+      cleanedMobile = "0" + cleanedMobile.slice(4);
+    }
+    if (!/^01[0125]\d{8}$/.test(cleanedMobile)) {
+      setCustomerFormError("Please enter a valid Egyptian mobile number (11 digits, starting with 010, 011, 012, or 015).");
+      return;
+    }
+
+    setSavingCustomer(true);
+    setCustomerFormError("");
+
+    const payload = {
+      id: selectedCustomerForEdit?.id || undefined,
+      name: custName.trim(),
+      mobile: cleanedMobile,
+      email: custEmail.trim() || null,
+      gender: custGender || null,
+      active: custActive,
+      spent_amount: parseFloat(custSpent) || 0,
+      outstanding: parseFloat(custOutstanding) || 0,
+      wallet_balance: parseFloat(custWallet) || 0,
+      area: custArea.trim() || null,
+      location_name: custLocationName.trim() || null,
+      street_name: custStreet.trim() || null,
+      building_no: custBuilding.trim() || null,
+      floor_no: custFloor.trim() || null,
+      note: custNote.trim() || null,
+      // new demographic fields
+      age: custAge ? parseInt(custAge) : null,
+      national_id: custNationalId.trim() || null,
+      address: custAddress.trim() || null,
+      referral: custReferral.trim() || null,
+      occupation: custOccupation.trim() || null,
+    };
+
+    fetch("/api/customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to save customer");
+        }
+        return data;
+      })
+      .then(() => {
+        fetchCustomers();
+        setShowCustomerFormModal(false);
+      })
+      .catch((err) => {
+        console.error("handleSaveCustomer error:", err);
+        setCustomerFormError(err.message || "An error occurred while saving the customer.");
+      })
+      .finally(() => {
+        setSavingCustomer(false);
+      });
+  }
+
+  function handleDeleteCustomer(id: string) {
+    setDeletingCustomer(true);
+    fetch(`/api/customers?id=${id}`, {
+      method: "DELETE",
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to delete customer");
+        }
+        return data;
+      })
+      .then(() => {
+        fetchCustomers();
+        setDeleteCustomerTarget(null);
+        setShowCustomerFormModal(false);
+      })
+      .catch((err) => {
+        console.error("handleDeleteCustomer error:", err);
+        alert(err.message || "An error occurred while deleting the customer.");
+      })
+      .finally(() => {
+        setDeletingCustomer(false);
+      });
+  }
+
   function fetchAllReservations() {
     const branchParam = branch ? `?branchId=${branch}` : "";
-    fetch(`/api/reservations${branchParam}`, { cache: "no-store" })
-      .then((r) => r.json())
+    return cachedFetch(`/api/reservations${branchParam}`, 2000)
       .then((data) => {
         if (Array.isArray(data)) {
           setAllReservations(data);
@@ -1491,7 +3992,11 @@ export default function AdminPage() {
         }
       })
       .catch((err) => {
-        console.error("fetchAllReservations error:", err);
+        if (err instanceof TypeError || String(err).includes("Failed to fetch")) {
+          console.warn("fetchAllReservations: Network connection lost (Failed to fetch)");
+        } else {
+          console.error("fetchAllReservations error:", err);
+        }
         setAllReservations([]);
       });
 
@@ -1501,7 +4006,7 @@ export default function AdminPage() {
     }
   }
 
-  function getUnavailableSlots(approvedBookings: Req[], targetServiceId: number): string[] {
+  function getUnavailableSlots(approvedBookings: Req[], targetServiceId: number, end?: string): string[] {
     const svc = localServices.find(s => s.id === targetServiceId);
     const targetDuration = getDurationInMinutes(svc?.duration);
     const targetSlotsNeeded = Math.ceil(targetDuration / 15);
@@ -1528,7 +4033,12 @@ export default function AdminPage() {
     for (let i = 0; i < ALL_15MIN_SLOTS.length; i++) {
       let fit = true;
       for (let k = 0; k < targetSlotsNeeded; k++) {
-        if (i + k >= occupied.length || occupied[i + k]) {
+        const slotIdx = i + k;
+        if (slotIdx >= occupied.length || occupied[slotIdx]) {
+          fit = false;
+          break;
+        }
+        if (end && ALL_15MIN_SLOTS[slotIdx] >= end) {
           fit = false;
           break;
         }
@@ -1541,14 +4051,26 @@ export default function AdminPage() {
   }
 
   async function openApprove(r: Req) {
-    setSelected(r);
-    const qs = `serviceId=${r.serviceId}&date=${r.date}&status=approved`;
-    const taken = await fetch("/api/reservations?" + qs).then((res) => res.json());
-    const unavailable = getUnavailableSlots(Array.isArray(taken) ? taken : [], r.serviceId);
-    setApproveUnavailableSlots(unavailable);
-    const first = SLOTS.find((s) => !unavailable.includes(s)) || SLOTS[0];
-    setSlot(first);
-    setDoctorName("Dr. Sara El Gamel");
+    setLoadingApproveId(r.id);
+    try {
+      const branchParam = r.branchId ? `&branchId=${r.branchId}` : "";
+      const data = await fetch(`/api/availability?date=${r.date}&serviceId=${r.serviceId}${branchParam}`).then((res) => res.json());
+      const { start, end } = getDayOperatingHoursApprove(r);
+      const unavailable = data && Array.isArray(data.unavailableSlots) ? data.unavailableSlots : [];
+      setApproveUnavailableSlots(unavailable);
+      const filteredSlots = SLOTS.filter((s) => {
+        const norm = normaliseTo24hSlot(s) ?? "";
+        return norm >= start && norm < end;
+      });
+      const first = filteredSlots.find((s) => !unavailable.includes(s)) || filteredSlots[0] || SLOTS[0];
+      setSlot(first);
+      setDoctorName("Dr. Sara El Gamel");
+      setSelected(r);
+    } catch (err) {
+      console.error("openApprove error:", err);
+    } finally {
+      setLoadingApproveId(null);
+    }
   }
 
   async function approve() {
@@ -1564,13 +4086,48 @@ export default function AdminPage() {
     const json = await res.json();
     if (!res.ok) alert(json.error || "Failed");
     setSelected(null);
+    clearFetchCache();
     fetchRequests();
     fetchAllReservations();
+  }
+
+  async function handleManualPhoneChange(val: string) {
+    setNewPatientPhone(val);
+    
+    // Clean and validate Egyptian mobile number
+    let cleaned = val.replace(/[^\d]/g, "");
+    if (cleaned.startsWith("201") && cleaned.length === 12) {
+      cleaned = "0" + cleaned.slice(2);
+    } else if (cleaned.startsWith("1") && cleaned.length === 10) {
+      cleaned = "0" + cleaned;
+    }
+    
+    if (/^01[0-9]{9}$/.test(cleaned)) {
+      try {
+        const res = await fetch(`/api/customers?mobile=${cleaned}`);
+        if (res.ok) {
+          const customer = await res.json();
+          if (customer) {
+            if (customer.name) setNewPatientName(customer.name);
+            if (customer.email) setNewPatientEmail(customer.email);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching customer by phone:", err);
+      }
+    }
   }
 
   async function handleCreateManualBooking() {
     if (!newPatientName || !newPatientEmail || !newPatientPhone || !newPatientDate) {
       alert("Please fill in all required fields (Name, Email, Phone, Date).");
+      return;
+    }
+
+    // Validate Egyptian mobile number format
+    const cleanedMobile = newPatientPhone.trim();
+    if (!/^01[0125]\d{8}$/.test(cleanedMobile)) {
+      alert("Please enter a valid Egyptian mobile number (must be 11 digits and start with 010, 011, 012, or 015).");
       return;
     }
 
@@ -1630,6 +4187,7 @@ export default function AdminPage() {
       setNewPatientStatus("approved");
 
       setShowAddBookingModal(false);
+      clearFetchCache();
       fetchRequests();
       fetchAllReservations();
       alert("Manual booking created successfully!");
@@ -1661,6 +4219,106 @@ export default function AdminPage() {
     []
   );
 
+  if (authChecking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F2EFE9] text-[#414E36]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#C4AE7C] border-t-transparent"></div>
+          <p className="text-sm font-semibold tracking-wider">Verifying administrator session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session || !adminRole) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F2EFE9] px-4">
+        <div className="w-full max-w-md rounded-[32px] bg-[#FBFBF9] p-8 shadow-[0_20px_60px_rgba(31,37,26,0.15)] animate-fadeIn">
+          <div className="mb-8 flex flex-col items-center">
+            <div className="mb-4 relative h-16 w-16 overflow-hidden rounded-2xl bg-[#414E36] p-2.5 shadow-md">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/main_logo.png"
+                alt="Revera Clinics"
+                style={{ objectFit: "contain", width: "100%", height: "100%" }}
+              />
+            </div>
+            <p className="text-xs uppercase tracking-[0.3em] text-[#5A6A51]/80 font-bold mb-1">Revera Clinics</p>
+            <h2 className="text-2xl font-bold text-[#1F251A]">Admin Access Control</h2>
+          </div>
+
+          <form onSubmit={handleAdminLogin} className="space-y-5" noValidate>
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Email Address or Employee ID</label>
+              <input
+                type="text"
+                required
+                placeholder="Enter email or employee ID"
+                value={loginEmail}
+                onChange={(e) => {
+                  setLoginEmail(e.target.value);
+                  if (loginError) setLoginError("");
+                }}
+                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Password</label>
+              <input
+                type="password"
+                required
+                placeholder="Enter password"
+                value={loginPassword}
+                onChange={(e) => {
+                  setLoginPassword(e.target.value);
+                  if (loginError) setLoginError("");
+                }}
+                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+              />
+            </div>
+
+            {loginError && (
+              <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-xl p-3">
+                ⚠️ {loginError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full rounded-2xl bg-[#414E36] py-3.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loginLoading ? "Authenticating..." : "Access Dashboard"}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+  const uniqueSpecialties = Array.from(new Set(providers.map((p) => p.specialty).filter(Boolean)));
+  const filteredProviders = providers.filter((p) => {
+    if (providerFilterBranchId !== "All" && p.branchId !== providerFilterBranchId) return false;
+    if (providerFilterSpecialty !== "All" && p.specialty !== providerFilterSpecialty) return false;
+    if (providerFilterGender !== "All" && p.gender !== providerFilterGender) return false;
+    if (providerSearchQuery.trim()) {
+      const q = providerSearchQuery.toLowerCase();
+      const nameMatch = p.name?.toLowerCase().includes(q);
+      const specMatch = p.specialty?.toLowerCase().includes(q);
+      const phoneMatch = p.phone?.toLowerCase().includes(q);
+      if (!nameMatch && !specMatch && !phoneMatch) return false;
+    }
+    return true;
+  });
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  function handleMarkAllAsRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }
+  function handleMarkAsRead(id: string) {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  }
+
   return (
     <div className="min-h-screen bg-[#F2EFE9] text-[#1F251A]">
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[280px_1fr]">
@@ -1676,19 +4334,19 @@ export default function AdminPage() {
         }`}>
           <div className="mb-10 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative h-14 w-14 overflow-hidden rounded-2xl bg-[#C4AE7C]/15 p-3">
+              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-white shadow-md p-2">
                 <Image
                   src="/images/main_logo.png"
                   alt="Revera Clinics"
                   fill
-                  style={{ objectFit: "contain" }}
+                  style={{ objectFit: "contain", padding: "4px" }}
                 />
               </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-[#FBFBF9]/70">
+              <div className="flex flex-col justify-center">
+                <p className="text-[10px] uppercase tracking-[0.3em] text-[#FBFBF9]/60 leading-none mb-1">
                   Revera Clinics
                 </p>
-                <h1 className="text-xl font-semibold">Admin</h1>
+                <h1 className="text-xl font-semibold leading-tight">Admin</h1>
               </div>
             </div>
             <button
@@ -1702,7 +4360,7 @@ export default function AdminPage() {
           </div>
 
           <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
-            {SIDEBAR_ITEMS.map((item) => {
+            {permittedSidebarItems.map((item) => {
               if (item.label === "Settings") {
                 const Icon = item.icon;
                 const active = [
@@ -1714,6 +4372,7 @@ export default function AdminPage() {
                   "Notification Settings",
                   "Queue Settings",
                   "Pages Settings",
+                  "Role Management"
                 ].includes(activeNav);
                 return (
                   <div key={item.label} className="space-y-1">
@@ -1748,15 +4407,21 @@ export default function AdminPage() {
                     {settingsExpanded && (
                       <div className="mt-1 space-y-1 overflow-hidden rounded-2xl bg-black/15 py-1.5 pl-3 pr-1">
                         {[
-                          { label: "Profile", icon: User },
-                          { label: "Service Hours", icon: Clock },
-                          { label: "Branches", icon: MapIcon },
-                          { label: "Users", icon: Users },
-                          { label: "Booking Settings", icon: CalendarDays },
-                          { label: "Notification Settings", icon: Bell },
-                          { label: "Queue Settings", icon: ListOrdered },
-                          { label: "Pages Settings", icon: FileText },
-                        ].map((sub) => {
+                          { label: "Profile", icon: User, perm: null },
+                          { label: "Clinic Profile", icon: Store, perm: "settings.profile" },
+                          { label: "Service Hours", icon: Clock, perm: "settings.service_hours" },
+                          { label: "Branches", icon: MapIcon, perm: "settings.branches" },
+                          { label: "Rooms", icon: DoorOpen, perm: "settings.rooms" },
+                          { label: "Booking Settings", icon: CalendarDays, perm: "settings.booking_settings" },
+                          { label: "Notification Settings", icon: Bell, perm: "settings.notification" },
+                          { label: "Queue Settings", icon: ListOrdered, perm: "settings.queue" },
+                          { label: "Pages Settings", icon: FileText, perm: "settings.pages" },
+                          { label: "Role Management", icon: Shield, perm: "settings.roles" }
+                        ].filter(sub => {
+                          if (!sub.perm) return true;
+                          if (adminRole === 'superadmin') return true;
+                          return hasPermission(sub.perm);
+                        }).map((sub) => {
                           const SubIcon = sub.icon;
                           const subActive = activeNav === sub.label;
                           return (
@@ -1787,7 +4452,15 @@ export default function AdminPage() {
                 <button
                   key={item.label}
                   type="button"
-                  onClick={() => setActiveNav(item.label)}
+                  onClick={async () => {
+                    if (item.label === "Logout") {
+                      if (supabase) {
+                        await supabase.auth.signOut();
+                      }
+                    } else {
+                      setActiveNav(item.label);
+                    }
+                  }}
                   className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
                     active
                       ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
@@ -1826,44 +4499,233 @@ export default function AdminPage() {
               >
                 <Menu size={18} />
               </button>
-              <div className="relative">
-                <select
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
-                  className="appearance-none rounded-xl border border-[#414E36]/15 bg-white py-2 pl-3 pr-8 text-sm font-medium text-[#1F251A] shadow-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 cursor-pointer"
-                >
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name_en}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
-              </div>
+              {adminRole === "superadmin" || adminRole === "admin" ? (
+                <div className="relative">
+                  <select
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    className="appearance-none rounded-xl border border-[#414E36]/15 bg-white py-2 pl-3 pr-8 text-sm font-medium text-[#1F251A] shadow-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 cursor-pointer"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name_en}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                </div>
+              ) : (
+                <div className="rounded-xl border border-[#414E36]/15 bg-white py-2 px-4 text-sm font-semibold text-[#1F251A] shadow-sm select-none">
+                  {branches.find((b) => b.id === branch)?.name_en || "Loading assigned branch..."}
+                </div>
+              )}
             </div>
 
             {/* Right: new entry, notifications, user profile */}
             <div className="flex items-center gap-3">
-              <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36] text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26]">
-                <Plus size={18} />
-              </button>
+              {/* Quick Actions Dropdown */}
               <div className="relative">
-                <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/8 text-[#414E36] transition hover:bg-[#414E36]/15">
-                  <Bell size={18} />
+                <button
+                  onClick={() => {
+                    setShowQuickActionMenu(prev => !prev);
+                    setShowNotificationMenu(false);
+                  }}
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-[#FBFBF9] shadow-sm transition ${
+                    showQuickActionMenu ? "bg-[#2e3a26]" : "bg-[#414E36] hover:bg-[#2e3a26]"
+                  }`}
+                  title="Quick Actions"
+                >
+                  <Plus size={18} className={`transition-transform duration-200 ${showQuickActionMenu ? "rotate-45" : ""}`} />
                 </button>
-                {notifCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                    {notifCount}
-                  </span>
+                {showQuickActionMenu && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-[#E6E9EB] bg-white p-2 shadow-[0_15px_40px_rgba(47,61,41,0.12)] z-50 animate-fadeIn">
+                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#E6E9EB] mb-1">
+                      Quick Creation
+                    </div>
+                    {hasPermission("bookings.create") && (
+                      <button
+                        onClick={() => {
+                          setShowQuickActionMenu(false);
+                          setShowAddBookingModal(true);
+                        }}
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                      >
+                        <Plus size={14} className="text-[#C4AE7C]" /> New Appointment
+                      </button>
+                    )}
+                    {hasPermission("customers.create") && (
+                      <button
+                        onClick={() => {
+                          setShowQuickActionMenu(false);
+                          handleOpenAddCustomer();
+                        }}
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                      >
+                        <Plus size={14} className="text-[#C4AE7C]" /> New Patient
+                      </button>
+                    )}
+                    {hasPermission("providers.create") && (
+                      <button
+                        onClick={() => {
+                          setShowQuickActionMenu(false);
+                          openAddProviderModal();
+                        }}
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                      >
+                        <Plus size={14} className="text-[#C4AE7C]" /> New Doctor / Provider
+                      </button>
+                    )}
+                    {hasPermission("services.create") && (
+                      <button
+                        onClick={() => {
+                          setShowQuickActionMenu(false);
+                          setShowAddCategoryModal(true);
+                        }}
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-[#414E36] hover:bg-[#EDF1EC] flex items-center gap-2 transition"
+                      >
+                        <Plus size={14} className="text-[#C4AE7C]" /> New Service Category
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-              <button className="flex items-center gap-2 rounded-xl border border-[#414E36]/10 bg-white px-3 py-1.5 text-sm font-medium text-[#1F251A] shadow-sm transition hover:bg-[#f5f4f0]">
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#414E36] text-white text-xs font-bold">RC</span>
-                <span>Revera Clinics</span>
-                <ChevronDown size={14} className="text-[#5A6A51]" />
-              </button>
+
+              {/* Notifications Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowNotificationMenu(prev => !prev);
+                    setShowQuickActionMenu(false);
+                  }}
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${
+                    showNotificationMenu || unreadCount > 0
+                      ? "bg-[#C4AE7C]/20 text-[#414E36]"
+                      : "bg-[#414E36]/8 text-[#414E36] hover:bg-[#414E36]/15"
+                  }`}
+                  title="Notifications"
+                >
+                  <Bell size={18} />
+                </button>
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white pointer-events-none animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
+                {showNotificationMenu && (
+                  <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-[#E6E9EB] bg-white shadow-[0_15px_40px_rgba(47,61,41,0.12)] z-50 animate-fadeIn overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-[#E6E9EB] bg-[#FBFBF9] px-4 py-3">
+                      <span className="text-xs font-bold uppercase tracking-wider text-[#1F251A]">Notifications</span>
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllAsRead}
+                          className="text-[11px] font-semibold text-[#C4AE7C] hover:underline"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto divide-y divide-[#E6E9EB]">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-gray-400 italic">No notifications yet.</div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => handleMarkAsRead(n.id)}
+                            className={`p-3 text-left transition hover:bg-[#EDF1EC]/40 cursor-pointer ${
+                              !n.read ? "bg-[#EDE4C8]/10" : ""
+                            }`}
+                          >
+                            <div className="flex items-start gap-2.5">
+                              <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${
+                                n.type === "cancelled"
+                                  ? "bg-red-500"
+                                  : n.type === "system"
+                                    ? "bg-amber-500"
+                                    : "bg-green-500"
+                              }`} />
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-semibold text-xs text-[#1F251A]">{n.title}</span>
+                                  <span className="text-[10px] text-[#5A6A51] whitespace-nowrap">{n.time}</span>
+                                </div>
+                                <p className="text-[11px] text-[#414E36] leading-relaxed mt-0.5">{n.message}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="border-t border-[#E6E9EB] bg-[#FBFBF9] px-4 py-2.5 text-center">
+                      <button
+                        onClick={() => {
+                          setShowNotificationMenu(false);
+                          setActiveNav("Bookings");
+                        }}
+                        className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26]"
+                      >
+                        View all bookings
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Removed Revera Clinics button */}
             </div>
           </div>
 
           <div className="py-8">
+            {/* Active Missing Employee Alerts Banner */}
+            {(adminRole === "superadmin" || adminRole === "admin" || adminRole === "HR") && activeMissingAlerts.length > 0 && (
+              <div className="mb-6 space-y-3">
+                {activeMissingAlerts.map((alertItem: any) => (
+                  <div
+                    key={alertItem.id}
+                    className="flex items-center justify-between gap-4 rounded-3xl border border-rose-200 bg-rose-50 px-6 py-4 text-rose-800 shadow-sm animate-pulse"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">⚠️</span>
+                      <p className="text-sm font-semibold">
+                        Alert: Employee <strong>{alertItem.employee_accounts?.name}</strong> ({alertItem.employee_accounts?.role_name}) went missing at {new Date(alertItem.timestamp).toLocaleTimeString()}!
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetch('/api/hr/alerts', {
+                            method: 'PATCH',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${session?.access_token}`
+                            },
+                            body: JSON.stringify({ id: alertItem.id, resolved: true })
+                          });
+                          if (res.ok) {
+                            fetchHrAlerts();
+                          }
+                        } catch (err) {
+                          console.error("Failed to resolve alert:", err);
+                        }
+                      }}
+                      className="rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700 transition"
+                    >
+                      Dismiss Alert
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!hasAccessToActiveNav ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center gap-4 bg-white rounded-[40px] shadow-[0_30px_80px_rgba(47,61,41,0.07)] p-8">
+                <div className="h-16 w-16 flex items-center justify-center rounded-full bg-red-50 text-red-600 border border-red-100">
+                  <Shield size={32} />
+                </div>
+                <h3 className="text-2xl font-bold text-[#1F251A]">Access Restrained</h3>
+                <p className="text-sm text-[#5A6A51] max-w-md leading-relaxed">
+                  Your administrator account role does not have authorization to view the <strong>"{activeNav}"</strong> module. Please contact the super admin to request access privileges.
+                </p>
+              </div>
+            ) : (
+              <>
 
           {/* ── PROVIDERS VIEW ── */}
           {activeNav === "Providers" && (
@@ -1872,100 +4734,174 @@ export default function AdminPage() {
                 <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                   <div>
                     <h1 className="text-4xl font-semibold text-[#1F251A]">Providers</h1>
-                    <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#5A6A51]">
-                      <button
-                        type="button"
-                        onClick={() => setProviderTab("Providers")}
-                        className={`rounded-full px-5 py-3 transition ${
-                          providerTab === "Providers"
-                            ? "bg-[#414E36] text-[#FBFBF9]"
-                            : "bg-[#F2EFE9] text-[#5A6A51] hover:bg-[#EDF1EC]"
-                        }`}
-                      >
-                        Providers
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setProviderTab("Attendance")}
-                        className={`rounded-full px-5 py-3 transition ${
-                          providerTab === "Attendance"
-                            ? "bg-[#414E36] text-[#FBFBF9]"
-                            : "bg-[#F2EFE9] text-[#5A6A51] hover:bg-[#EDF1EC]"
-                        }`}
-                      >
-                        Attendance
-                      </button>
-                    </div>
+
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <button className="inline-flex items-center gap-2 rounded-3xl border border-[#E6E9EB] bg-white px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]">
-                      <Filter size={16} /> Filter
-                    </button>
                     <button
-                      onClick={openAddProviderModal}
-                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                      onClick={() => setShowProviderFilterPanel(prev => !prev)}
+                      className={`inline-flex items-center gap-2 rounded-3xl border px-4 py-3 text-sm font-semibold transition ${
+                        showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()
+                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                          : "border-[#E6E9EB] bg-white text-[#414E36] hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]"
+                      }`}
                     >
-                      <Plus size={16} /> Add
+                      <Filter size={16} /> Filter
+                      {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()) && (
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#414E36] text-[10px] font-bold text-white">!</span>
+                      )}
                     </button>
+
+                    {hasPermission("providers.create") && (
+                      <button
+                        onClick={openAddProviderModal}
+                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                      >
+                        <Plus size={16} /> Add
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                  <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                    <span>Name</span>
-                    <span>Bookings</span>
-                    <span>Services</span>
-                    <span>Rating</span>
-                  </div>
-                  <div className="divide-y divide-[#E6E9EB]">
-                    {providers.map((provider) => (
-                      <div key={provider.id || provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
-                        <span className="font-semibold text-[#1F251A]">{provider.name}</span>
-                        <span>{provider.bookings}</span>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {provider.services.slice(0, 2).map((service: string) => (
-                            <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
-                              {service}
-                            </span>
-                          ))}
-                          {provider.services.length > 2 && (
-                            <span
-                              className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36] cursor-help"
-                              title={provider.services.slice(2).join(", ")}
-                            >
-                              +{provider.services.length - 2} More
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="inline-flex items-center gap-2 text-[#5A6A51]">
-                            <Star size={16} className="text-[#C4AE7C]" />
-                            {provider.rating}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            {provider.id && (
-                              <button
-                                onClick={() => handleDeleteProvider(provider.id)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
-                                title="Delete Provider"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => openEditProviderModal(provider)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
-                              title="Edit Provider"
-                            >
-                              <Pencil size={14} />
-                            </button>
-                          </div>
-                        </div>
+                {/* Dynamic Filters Drawer */}
+                {showProviderFilterPanel && (
+                  <div className="mb-6 grid grid-cols-1 gap-4 rounded-[24px] border border-[#E6E9EB] bg-[#F7F7F9] p-5 md:grid-cols-4 items-end shadow-sm">
+                    {/* Search Input */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Search Doctor</label>
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                        <input
+                          type="text"
+                          value={providerSearchQuery}
+                          onChange={(e) => setProviderSearchQuery(e.target.value)}
+                          placeholder="Search name, specialty..."
+                          className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-1 focus:ring-[#C4AE7C]"
+                        />
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Branch Dropdown */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Branch</label>
+                      <select
+                        value={providerFilterBranchId}
+                        onChange={(e) => setProviderFilterBranchId(e.target.value)}
+                        className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                      >
+                        <option value="All">All Branches</option>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>{b.name_en}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Specialty Dropdown */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Specialty</label>
+                      <select
+                        value={providerFilterSpecialty}
+                        onChange={(e) => setProviderFilterSpecialty(e.target.value)}
+                        className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                      >
+                        <option value="All">All Specialties</option>
+                        {uniqueSpecialties.map((spec) => (
+                          <option key={spec} value={spec}>{spec}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Gender and Clear Options */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Gender</label>
+                        <select
+                          value={providerFilterGender}
+                          onChange={(e) => setProviderFilterGender(e.target.value)}
+                          className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                        >
+                          <option value="All">All</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setProviderFilterBranchId("All");
+                          setProviderFilterSpecialty("All");
+                          setProviderFilterGender("All");
+                          setProviderSearchQuery("");
+                        }}
+                        className="h-[42px] w-full rounded-2xl border border-red-200 bg-red-50/50 text-xs font-bold text-red-600 hover:bg-red-100/70 transition"
+                      >
+                        Clear
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                      <span>Name</span>
+                      <span>Bookings</span>
+                      <span>Services</span>
+                      <span>Rating</span>
+                    </div>
+                    <div className="divide-y divide-[#E6E9EB]">
+                      {filteredProviders.length === 0 ? (
+                        <div className="text-center py-16 text-gray-400 italic">No doctors/providers matching filters.</div>
+                      ) : (
+                        filteredProviders.map((provider) => (
+                          <div key={provider.id || provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
+                            <span className="font-semibold text-[#1F251A]">{provider.name}</span>
+                            <span>{provider.bookings}</span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {provider.services.slice(0, 2).map((service: string) => (
+                                <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
+                                  {service}
+                                </span>
+                              ))}
+                              {provider.services.length > 2 && (
+                                <span
+                                  className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36] cursor-help"
+                                  title={provider.services.slice(2).join(", ")}
+                                >
+                                  +{provider.services.length - 2} More
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="inline-flex items-center gap-2 text-[#5A6A51]">
+                                <Star size={16} className="text-[#C4AE7C]" />
+                                {provider.rating}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                {provider.id && hasPermission("providers.delete") && (
+                                  <button
+                                    onClick={() => handleDeleteProvider(provider.id)}
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
+                                    title="Delete Provider"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                )}
+                                {hasPermission("providers.edit") && (
+                                  <button
+                                    onClick={() => openEditProviderModal(provider)}
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
+                                    title="Edit Provider"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
               </div>
             </section>
           )}
@@ -2061,9 +4997,9 @@ export default function AdminPage() {
                       }`}
                     >
                       {/* Category header row */}
-                      <button
+                      <div
                         onClick={() => toggleCategoryExpand(cat.key)}
-                        className="flex w-full items-center justify-between gap-4 px-5 py-4 transition hover:bg-[#F9F9F7]"
+                        className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 transition hover:bg-[#F9F9F7]"
                       >
                         <div className="flex items-center gap-3">
                           {/* Category Drag Handle */}
@@ -2115,7 +5051,7 @@ export default function AdminPage() {
                               setEditingService(null);
                               setShowAddServiceModal(true);
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+                            className={`${hasPermission("services.create") ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-lg border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-medium text-[#414E36] transition hover:bg-[#EDF1EC]`}
                           >
                             <Plus size={12} /> Add Service
                           </button>
@@ -2123,7 +5059,7 @@ export default function AdminPage() {
                             <ChevronDown size={18} />
                           </span>
                         </div>
-                      </button>
+                      </div>
 
                       {/* Services sub-table */}
                       {isExpanded && (
@@ -2254,11 +5190,16 @@ export default function AdminPage() {
                                           <div className="flex flex-col items-center gap-1">
                                             <button
                                               type="button"
-                                              onClick={() => toggleService(svc.id, "active")}
-                                              className="relative h-6 w-11 rounded-full focus:outline-none transition-colors duration-300"
+                                              onClick={() => {
+                                                if (hasPermission("services.edit")) {
+                                                  toggleService(svc.id, "active");
+                                                }
+                                              }}
+                                              className={`relative h-6 w-11 rounded-full focus:outline-none transition-colors duration-300 ${!hasPermission("services.edit") ? "opacity-60 cursor-not-allowed" : ""}`}
                                               style={{ 
                                                 backgroundColor: toggles.active ? "#C4AE7C" : "#d1d5db"
                                               }}
+                                              disabled={!hasPermission("services.edit")}
                                             >
                                               <span
                                                 className="absolute top-[4px] h-4 w-4 rounded-full bg-white shadow-md"
@@ -2274,14 +5215,16 @@ export default function AdminPage() {
                                           </div>
                                         </td>
                                         <td className="px-3 py-3 text-center">
-                                          <button
-                                            type="button"
-                                            onClick={() => handleEditService(svc)}
-                                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                            title="Edit Service"
-                                          >
-                                            <Pencil size={12} />
-                                          </button>
+                                          {hasPermission("services.edit") && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleEditService(svc)}
+                                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                              title="Edit Service"
+                                            >
+                                              <Pencil size={12} />
+                                            </button>
+                                          )}
                                         </td>
                                       </tr>
                                     );
@@ -2389,6 +5332,7 @@ export default function AdminPage() {
                 </div>
               )}
 
+
               {/* ── ADD CATEGORY MODAL ── */}
               {showAddCategoryModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
@@ -2454,7 +5398,7 @@ export default function AdminPage() {
                         {editingService ? "Edit Service" : "Add Service"}
                       </h3>
                       <div className="flex items-center gap-3">
-                        {editingService && (
+                        {editingService && hasPermission("services.delete") && (
                           <button
                             type="button"
                             onClick={() => {
@@ -4336,49 +7280,140 @@ export default function AdminPage() {
           {/* ── CUSTOMERS VIEW ── */}
           {activeNav === "Customers" && (
             <div>
-              {/* Page header */}
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <h2 className="text-2xl font-semibold text-[#1F251A]">Customers</h2>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#f5f4f0]">
-                    <Filter size={14} /> Filter
-                  </button>
-                  <button className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-4 py-2 text-sm font-medium text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26]">
-                    <Download size={14} /> Export
-                  </button>
-                  <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/30 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#414E36]/5">
-                    <Upload size={14} /> Import
-                  </button>
-                  <button className="inline-flex items-center gap-2 rounded-lg bg-[#C4AE7C] px-4 py-2 text-sm font-semibold text-[#414E36] shadow-sm transition hover:bg-[#b59e6c]">
-                    <Plus size={14} /> Add
-                  </button>
+              {/* Page header and premium controls panel */}
+              <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-[#1F251A]">Patients Directory</h2>
+                    <p className="text-xs text-[#5A6A51]">Manage demographic profiles and clinical histories</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => setShowCustomerFilterPanel(prev => !prev)}
+                      className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                        showCustomerFilterPanel || customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All"
+                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                          : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
+                      }`}
+                    >
+                      <Filter size={14} /> Filter
+                      {(customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All") && (
+                        <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={() => setShowExportCustomersModal(true)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
+                    >
+                      <Download size={14} /> Export
+                    </button>
+                    
+                    {hasPermission("customers.import") && (
+                      <button
+                        onClick={() => setShowImportCustomersModal(true)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
+                      >
+                        <Upload size={14} /> Import
+                      </button>
+                    )}
+                    
+                    {hasPermission("customers.create") && (
+                      <button
+                        onClick={handleOpenAddCustomer}
+                        className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                      >
+                        <Plus size={14} /> Add Patient
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Unified Search and Quick Info Bar */}
+                <div className="flex flex-wrap items-center gap-3 border-t border-[#414E36]/5 pt-4">
+                  <div className="relative flex-1 max-w-md">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] z-10 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      placeholder="Search by name, phone, national ID..."
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:bg-white focus:ring-2 focus:ring-[#C4AE7C]/15"
+                    />
+                  </div>
+                  <div className="text-xs text-[#5A6A51] ml-auto">
+                    Total Patients: <span className="font-bold text-[#1F251A]">{filteredCustomers.length}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Stat cards */}
-              <div className="mb-6 flex flex-wrap gap-4">
-                <div className="min-w-[180px] rounded-2xl border border-[#414E36]/10 bg-white px-6 py-4 shadow-sm">
-                  <p className="text-2xl font-bold text-[#1F251A]">0</p>
-                  <p className="mt-1 text-sm text-[#5A6A51]">Remaining Amount</p>
-                </div>
-                <div className="min-w-[180px] rounded-2xl border border-[#414E36]/10 bg-white px-6 py-4 shadow-sm">
-                  <p className="text-2xl font-bold text-[#1F251A]">0</p>
-                  <p className="mt-1 text-sm text-[#5A6A51]">Total Wallet Balance</p>
-                </div>
-              </div>
+              {/* Toggleable Customer Filters Drawer */}
+              {showCustomerFilterPanel && (
+                <div className="mb-6 grid grid-cols-1 gap-4 rounded-3xl border border-[#414E36]/10 bg-[#F9F9F7] p-5 md:grid-cols-4 items-end shadow-sm animate-fadeIn">
+                  {/* Gender Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Gender</label>
+                    <select
+                      value={customerFilterGender}
+                      onChange={(e) => setCustomerFilterGender(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/10 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                    >
+                      <option value="All">All Genders</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
 
-              {/* Search */}
-              <div className="mb-4 flex items-center gap-3">
-                <div className="relative flex-1 max-w-xs">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
-                  <input
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                    placeholder="Search customers…"
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
-                  />
+                  {/* Status Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Status</label>
+                    <select
+                      value={customerFilterStatus}
+                      onChange={(e) => setCustomerFilterStatus(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/10 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                    >
+                      <option value="All">All Statuses</option>
+                      <option value="Active">Active Only</option>
+                      <option value="Inactive">Inactive Only</option>
+                    </select>
+                  </div>
+
+                  {/* Referral Source Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Referral Source</label>
+                    <select
+                      value={customerFilterReferral}
+                      onChange={(e) => setCustomerFilterReferral(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/10 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
+                    >
+                      <option value="All">All Referrals</option>
+                      <option value="Google">Google Search</option>
+                      <option value="Facebook">Facebook</option>
+                      <option value="Instagram">Instagram</option>
+                      <option value="Friend">Friend / Family</option>
+                      <option value="Doctor Referral">Doctor Referral</option>
+                      <option value="Walk-in">Walk-in</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  {/* Clear Button */}
+                  <div>
+                    <button
+                      onClick={() => {
+                        setCustomerFilterGender("All");
+                        setCustomerFilterStatus("All");
+                        setCustomerFilterReferral("All");
+                        setCustomerSearch("");
+                      }}
+                      className="h-[42px] w-full rounded-2xl border border-red-200 bg-red-50 text-xs font-bold text-red-600 hover:bg-red-100 transition"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Table */}
               <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white shadow-sm">
@@ -4386,18 +7421,17 @@ export default function AdminPage() {
                   <thead>
                     <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Customer</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Phone</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Email</th>
                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Created At</th>
                       <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Bookings</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Spent</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Outstanding</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Wallet</th>
                       <th className="px-4 py-3"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#414E36]/8">
                     {filteredCustomers.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-5 py-8 text-center text-[#5A6A51]">
+                        <td colSpan={6} className="px-5 py-8 text-center text-[#5A6A51]">
                           No customers found.
                         </td>
                       </tr>
@@ -4406,21 +7440,47 @@ export default function AdminPage() {
                       const dt = new Date(c.createdAt);
                       const dateStr = dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
                       const timeStr = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+                      const uniqueKey = c.id || c.email || c.phone;
+                      const displayPhone = c.mobile || c.phone || "—";
+                      const displayEmail = c.email || "—";
                       return (
-                        <tr key={c.email} className="transition hover:bg-[#F9F9F7]">
+                        <tr key={uniqueKey} className="transition hover:bg-[#F9F9F7]">
                           <td className="px-5 py-4 font-semibold text-[#1F251A]">{c.name}</td>
+                          <td className="px-5 py-4 text-[#1F251A]">{displayPhone}</td>
+                          <td className="px-5 py-4 text-[#5A6A51]">{displayEmail}</td>
                           <td className="px-5 py-4 text-[#5A6A51]">
                             <span className="block font-medium text-[#1F251A]">{dateStr}</span>
                             <span className="text-xs">{timeStr}</span>
                           </td>
                           <td className="px-5 py-4 text-center text-[#1F251A]">{c.bookings}</td>
-                          <td className="px-5 py-4 text-center text-[#1F251A]">{c.spent}</td>
-                          <td className="px-5 py-4 text-center text-[#1F251A]">{c.outstanding}</td>
-                          <td className="px-5 py-4 text-center text-[#1F251A]">{c.wallet}</td>
                           <td className="px-4 py-4 text-center">
-                            <button className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]">
-                              <Info size={14} />
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => setViewingCustomerProfile(c)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                title="View Customer Profile & Booking History"
+                              >
+                                <Info size={14} />
+                              </button>
+                              {hasPermission("customers.edit") && (
+                                <button
+                                  onClick={() => handleOpenEditCustomer(c)}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                  title="Edit Customer"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              )}
+                              {hasPermission("customers.delete") && (
+                                <button
+                                  onClick={() => setDeleteCustomerTarget(c)}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50"
+                                  title="Delete Customer"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -5357,8 +8417,8 @@ export default function AdminPage() {
                               <div className="flex items-center justify-between border-b border-[#414E36]/8 pb-2">
                                 <h4 className="font-bold text-[#414E36] text-sm">Result Case #{index + 1}</h4>
                                 <button
-                                  onClick={() => {
-                                    if (confirm("Are you sure you want to delete this result case?")) {
+                                  onClick={async () => {
+                                    if (await showConfirm("Are you sure you want to delete this result case?")) {
                                       const updated = beforeAfterPairs.filter((_, i) => i !== index);
                                       setBeforeAfterPairs(updated);
                                       savePageSettings({ results: { pairs: updated } });
@@ -6573,35 +9633,393 @@ export default function AdminPage() {
           )}
 
           {/* ── SETTINGS VIEWS ── */}
-          {activeNav === "Profile" && (
+          {activeNav === "Profile" && (() => {
+            const isSuperadminBypass = adminEmail?.toLowerCase() === "superadmin@revera.com";
+            const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+            
+            // Check Egyptian ID check details
+            let idCheckPassed = false;
+            let birthDate = "";
+            let gender = "";
+            let governorate = "";
+            
+            if (profileNatId && profileNatId.length === 14) {
+              const parsed = parseEgyptianNationalId(profileNatId) as any;
+              if (parsed.isValid) {
+                idCheckPassed = true;
+                birthDate = parsed.birthDate;
+                gender = parsed.gender;
+                governorate = parsed.governorate;
+              }
+            }
+
+            return (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Personal Profile</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Manage your personal employee profile details and security credentials.</p>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-3">
+                  {/* Left Section: Personal & Account details */}
+                  <div className="lg:col-span-2 space-y-6">
+                    
+                    {/* Account Overview Card */}
+                    <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5 flex flex-col md:flex-row gap-6 items-center">
+                      <div className="h-24 w-24 rounded-full bg-[#414E36] text-white flex items-center justify-center font-bold text-3xl shadow-inner uppercase shrink-0">
+                        {profileName ? profileName.slice(0, 2) : "EM"}
+                      </div>
+                      <div className="flex-1 text-center md:text-left space-y-2">
+                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+                          <h3 className="text-2xl font-bold text-[#1F251A]">{profileName || "Employee Account"}</h3>
+                          <span className="rounded-full bg-[#EDE4C8] px-3 py-1 text-xs font-semibold text-[#414E36] border border-[#C4AE7C]/30 capitalize animate-pulse">
+                            {isSuperadminBypass ? "superadmin" : profileEmployee?.role_name || "Employee"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-[#5A6A51] flex items-center justify-center md:justify-start gap-1.5">
+                          <CircleUser size={14} className="text-[#C4AE7C]" />
+                          <span>{adminEmail || "No Email linked"}</span>
+                        </p>
+                        {!isSuperadminBypass && (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 pt-4 border-t border-gray-100 text-xs">
+                            <div>
+                              <span className="text-[#8A9A81] block font-semibold uppercase tracking-wider text-[9px] mb-0.5">Department</span>
+                              <span className="font-semibold text-[#1F251A]">{profileEmployee?.department || "Reception"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8A9A81] block font-semibold uppercase tracking-wider text-[9px] mb-0.5">Shift</span>
+                              <span className="font-semibold text-[#1F251A]">{profileEmployee?.shift || "Day"}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8A9A81] block font-semibold uppercase tracking-wider text-[9px] mb-0.5">Salary</span>
+                              <span className="font-semibold text-[#1F251A]">{profileEmployee?.salary ? `${Number(profileEmployee.salary).toLocaleString()} EGP` : "—"}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Edit Profile Form */}
+                    {!isSuperadminBypass && (
+                      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5">
+                        <h4 className="text-lg font-bold text-[#1F251A] mb-4">Edit Personal Information</h4>
+                        <form onSubmit={handleSavePersonalProfile} className="space-y-6">
+                          <div className="grid gap-6 md:grid-cols-2">
+                            <div>
+                              <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Full Name *</label>
+                              <input
+                                type="text"
+                                required
+                                value={profileName}
+                                onChange={(e) => setProfileName(e.target.value)}
+                                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Phone Number</label>
+                              <input
+                                type="text"
+                                value={profilePhone}
+                                onChange={(e) => setProfilePhone(e.target.value)}
+                                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                              />
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Home Address</label>
+                              <input
+                                type="text"
+                                value={profileAddress}
+                                onChange={(e) => setProfileAddress(e.target.value)}
+                                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                              />
+                            </div>
+                          </div>
+
+                          {profileUpdateError && (
+                            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 font-medium">
+                              {profileUpdateError}
+                            </div>
+                          )}
+                          {profileUpdateSuccess && (
+                            <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-xs text-green-700 font-medium">
+                              {profileUpdateSuccess}
+                            </div>
+                          )}
+
+                          <div className="flex justify-end pt-2">
+                            <button
+                              type="submit"
+                              disabled={updatingProfile}
+                              className="rounded-3xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                            >
+                              {updatingProfile ? "Saving..." : "Save Personal Details"}
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Section: Security & Documents */}
+                  <div className="space-y-6">
+                    
+                    {/* Security Card */}
+                    <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5">
+                      <h4 className="text-lg font-bold text-[#1F251A] mb-4">Security Settings</h4>
+                      <p className="text-xs text-[#5A6A51] mb-5">Change your login credentials securely below.</p>
+                      <form onSubmit={handleSavePersonalPassword} className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">New Password</label>
+                          <input
+                            type="password"
+                            required
+                            value={profilePassword}
+                            onChange={(e) => setProfilePassword(e.target.value)}
+                            placeholder="At least 6 characters"
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Confirm New Password</label>
+                          <input
+                            type="password"
+                            required
+                            value={profileConfirmPassword}
+                            onChange={(e) => setProfileConfirmPassword(e.target.value)}
+                            placeholder="Re-enter password"
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                          />
+                        </div>
+
+                        {profilePasswordError && (
+                          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 font-medium">
+                            {profilePasswordError}
+                          </div>
+                        )}
+                        {profilePasswordSuccess && (
+                          <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-xs text-green-700 font-medium">
+                            {profilePasswordSuccess}
+                          </div>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={profilePasswordSaving}
+                          className="w-full rounded-3xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                        >
+                          {profilePasswordSaving ? "Updating..." : "Update Password"}
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Verified Documents Card (Only for regular employees, not superadmin bypass) */}
+                    {!isSuperadminBypass && (
+                      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5 space-y-5">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="text-[#C4AE7C]" size={20} />
+                          <h4 className="text-lg font-bold text-[#1F251A]">Identity Documents</h4>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">National ID (14 digits)</label>
+                            <input
+                              type="text"
+                              value={profileNatId}
+                              onChange={(e) => {
+                                const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 14);
+                                setProfileNatId(digitsOnly);
+                              }}
+                              placeholder="14-digit Egyptian National ID"
+                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-xs font-mono text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                            />
+                          </div>
+
+                          {idCheckPassed && (
+                            <div className="rounded-2xl border border-green-100 bg-green-50/50 p-4 space-y-2 text-xs">
+                              <div className="flex items-center gap-1.5 font-bold text-green-700">
+                                <ShieldCheck size={14} />
+                                <span>Egyptian ID Check Passed</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-[#414E36]">
+                                <div>
+                                  <span className="opacity-80 block text-[10px]">Birth Date</span>
+                                  <span className="font-semibold">{birthDate}</span>
+                                </div>
+                                <div>
+                                  <span className="opacity-80 block text-[10px]">Gender</span>
+                                  <span className="font-semibold">{gender}</span>
+                                </div>
+                                <div className="col-span-2">
+                                  <span className="opacity-80 block text-[10px]">Governorate</span>
+                                  <span className="font-semibold">{governorate}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="space-y-4 pt-2">
+                            <div>
+                              <span className="block text-[11px] font-semibold text-[#5A6A51] mb-2">ID Card - Front Side</span>
+                              <div className="flex flex-col gap-3">
+                                <input
+                                  type="file"
+                                  id="profile-nat-front"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    if (e.target.files?.[0]) handleProfileImageUpload(e.target.files[0], 'front');
+                                  }}
+                                />
+                                <label
+                                  htmlFor="profile-nat-front"
+                                  className="cursor-pointer rounded-xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] hover:bg-[#EDE4C8]/10 px-4 py-2.5 text-center text-xs font-semibold text-[#414E36] transition block"
+                                >
+                                  Upload Front Photo
+                                </label>
+                                {profileNatIdFront && (
+                                  <div className="relative border border-[#414E36]/10 rounded-xl overflow-hidden bg-gray-50 h-28 flex items-center justify-center">
+                                    <img src={profileNatIdFront} alt="ID Front Preview" className="h-full object-contain" />
+                                    <button
+                                      type="button"
+                                      onClick={() => setProfileNatIdFront("")}
+                                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md transition"
+                                    >
+                                      <Plus size={12} className="rotate-45" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div>
+                              <span className="block text-[11px] font-semibold text-[#5A6A51] mb-2">ID Card - Back Side</span>
+                              <div className="flex flex-col gap-3">
+                                <input
+                                  type="file"
+                                  id="profile-nat-back"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    if (e.target.files?.[0]) handleProfileImageUpload(e.target.files[0], 'back');
+                                  }}
+                                />
+                                <label
+                                  htmlFor="profile-nat-back"
+                                  className="cursor-pointer rounded-xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] hover:bg-[#EDE4C8]/10 px-4 py-2.5 text-center text-xs font-semibold text-[#414E36] transition block"
+                                >
+                                  Upload Back Photo
+                                </label>
+                                {profileNatIdBack && (
+                                  <div className="relative border border-[#414E36]/10 rounded-xl overflow-hidden bg-gray-50 h-28 flex items-center justify-center">
+                                    <img src={profileNatIdBack} alt="ID Back Preview" className="h-full object-contain" />
+                                    <button
+                                      type="button"
+                                      onClick={() => setProfileNatIdBack("")}
+                                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md transition"
+                                    >
+                                      <Plus size={12} className="rotate-45" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {activeNav === "Clinic Profile" && (
             <div className="space-y-6">
-              <div className="mb-6">
-                <h2 className="text-4xl font-semibold text-[#1F251A]">Clinic Profile Settings</h2>
-                <p className="mt-2 text-sm text-[#5A6A51]">Configure the core identity, branches, and contact settings of your clinic.</p>
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Clinic Profile Settings</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Configure the core identity, contact details, and localization of your clinic.</p>
+                </div>
+                <button
+                  form="clinic-profile-form"
+                  type="submit"
+                  disabled={savingClinicProfile}
+                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+                >
+                  {savingClinicProfile ? "Saving..." : "Save Profile"}
+                </button>
               </div>
               <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl">
-                <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+                <form id="clinic-profile-form" className="space-y-6" onSubmit={handleSaveClinicProfile}>
                   <div className="grid gap-6 md:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Clinic Brand Name</label>
-                      <input type="text" defaultValue="Revera Clinics" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Clinic Brand Name (EN)</label>
+                      <input
+                        type="text"
+                        value={clinicName}
+                        onChange={(e) => setClinicName(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Primary Branch Location</label>
-                      <input type="text" defaultValue="Sheikh Zayed City, Giza" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">اسم العلامة التجارية (AR)</label>
+                      <input
+                        type="text"
+                        dir="rtl"
+                        value={clinicNameAr}
+                        onChange={(e) => setClinicNameAr(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition text-right"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Primary Location (EN)</label>
+                      <input
+                        type="text"
+                        value={clinicLocation}
+                        onChange={(e) => setClinicLocation(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">الموقع الرئيسي (AR)</label>
+                      <input
+                        type="text"
+                        dir="rtl"
+                        value={clinicLocationAr}
+                        onChange={(e) => setClinicLocationAr(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition text-right"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Inquiries Email</label>
-                      <input type="email" defaultValue="info@reveraclinics.com" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
+                      <input
+                        type="email"
+                        value={clinicEmail}
+                        onChange={(e) => setClinicEmail(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Inquiries Phone</label>
-                      <input type="text" defaultValue="+20 2 3796 2200" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
+                      <input
+                        type="text"
+                        value={clinicPhone}
+                        onChange={(e) => setClinicPhone(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">WhatsApp Number</label>
+                      <input
+                        type="text"
+                        value={clinicWhatsapp}
+                        onChange={(e) => setClinicWhatsapp(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
+                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Used for the WhatsApp floating chat button visible on all public pages.</span>
                     </div>
                   </div>
-                  <button type="submit" className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]">
-                    Save Profile Changes
-                  </button>
                 </form>
               </div>
             </div>
@@ -6613,13 +10031,27 @@ export default function AdminPage() {
                 <div>
                   <h2 className="text-4xl font-semibold text-[#1F251A]">Weekly Service Hours</h2>
                   <p className="mt-2 text-sm text-[#5A6A51]">Configure operating schedules for Zayed and other active branches.</p>
+                  
+                  {/* Branch selector select dropdown */}
+                  <div className="mt-4 flex items-center gap-3">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Active Branch:</label>
+                    <select
+                      value={selectedBranchForHoursId}
+                      onChange={(e) => setSelectedBranchForHoursId(e.target.value)}
+                      className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none transition focus:border-[#C4AE7C] font-semibold"
+                    >
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name_en} ({b.name_ar})</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <button
-                  onClick={() => savePageSettings()}
-                  disabled={savingPageSettings}
+                  onClick={() => handleSaveBranchServiceHours()}
+                  disabled={savingBranchHours || !selectedBranchForHoursId}
                   className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
                 >
-                  {savingPageSettings ? "Saving..." : "Save Changes"}
+                  {savingBranchHours ? "Saving..." : "Save Changes"}
                 </button>
               </div>
               <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-4">
@@ -6731,7 +10163,7 @@ export default function AdminPage() {
                           >Edit</button>
                           <button
                             onClick={async () => {
-                              if (!confirm(`Delete "${br.name_en}"?`)) return;
+                              if (!(await showConfirm(`Delete "${br.name_en}"?`))) return;
                               setDeletingBranchId(br.id);
                               await fetch(`/api/branches?id=${br.id}`, { method: "DELETE" });
                               setBranches(prev => prev.filter(b => b.id !== br.id));
@@ -6828,65 +10260,300 @@ export default function AdminPage() {
               )}
             </div>
           )}
-
-          {activeNav === "Users" && (
+          {activeNav === "Rooms" && (
+            <RoomsManagerView
+              branches={branches}
+              services={localServices}
+              selectedBranchId={branch}
+            />
+          )}
+          {activeNav === "Booking Settings" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Users</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Manage administrative accounts, role levels, and statuses.</p>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Booking Settings</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Configure appointment rules, advance booking limits, and slot management.</p>
                 </div>
-                <button className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]">
-                  <Plus size={16} /> Invite User
+                <button
+                  onClick={handleSaveBookingSettings}
+                  disabled={savingBookingSettings}
+                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+                >
+                  {savingBookingSettings ? "Saving..." : "Save Booking Settings"}
                 </button>
               </div>
-              <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="relative flex-1">
-                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5A6A51]/50" />
+
+              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-6">
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Min Advance Booking (Hours)</label>
+                    <select
+                      value={bookingMinAdvance}
+                      onChange={(e) => setBookingMinAdvance(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    >
+                      {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"}</option>)}
+                    </select>
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Minimum time before appointment that bookings are allowed.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Max Advance Booking (Days)</label>
+                    <select
+                      value={bookingMaxAdvance}
+                      onChange={(e) => setBookingMaxAdvance(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    >
+                      {[7, 14, 30, 60, 90].map(d => <option key={d} value={d}>{d} Days</option>)}
+                    </select>
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">How far in advance patients can schedule.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Cancellation Window (Hours)</label>
+                    <select
+                      value={bookingCancelWindow}
+                      onChange={(e) => setBookingCancelWindow(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    >
+                      {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"} Before</option>)}
+                    </select>
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">How early a patient must cancel to avoid a penalty.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Max Bookings Per Slot</label>
                     <input
-                      type="text"
-                      placeholder="Search users by name or email..."
-                      value={settingsUserSearch}
-                      onChange={(e) => setSettingsUserSearch(e.target.value)}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-white py-3 pl-12 pr-4 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={bookingMaxPerSlot}
+                      onChange={(e) => setBookingMaxPerSlot(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
                     />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Maximum concurrent appointments per time slot.</span>
                   </div>
                 </div>
-                <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                  <table className="w-full min-w-[900px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                        <th className="px-6 py-4 text-left">Username</th>
-                        <th className="px-6 py-4 text-left">Email Address</th>
-                        <th className="px-6 py-4 text-left">Access Role</th>
-                        <th className="px-6 py-4 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
-                      {[
-                        { name: "Ahmed Medhat", email: "dr.ahmed@reveraclinics.com", role: "Super Admin / Doctor", status: "Active" },
-                        { name: "Mariam Salem", email: "mariam.nurse@reveraclinics.com", role: "Nurse Practitioner", status: "Active" },
-                        { name: "Youssef Fadel", email: "youssef.reception@reveraclinics.com", role: "Clinic Front Desk Manager", status: "Active" },
-                      ].filter(u => 
-                        u.name.toLowerCase().includes(settingsUserSearch.toLowerCase()) ||
-                        u.email.toLowerCase().includes(settingsUserSearch.toLowerCase())
-                      ).map((user, idx) => (
-                        <tr key={idx} className="transition hover:bg-[#F9F9F7]">
-                          <td className="px-6 py-5 font-semibold text-[#1F251A]">{user.name}</td>
-                          <td className="px-6 py-5 font-mono text-xs text-[#5A6A51]">{user.email}</td>
-                          <td className="px-6 py-5 text-[#5A6A51] font-semibold">{user.role}</td>
-                          <td className="px-6 py-5 text-center">
-                            <span className="inline-block rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">{user.status}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
+                <div className="border-t border-[#F2EFE9] pt-6 space-y-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bookingInstantApproval}
+                      onChange={(e) => setBookingInstantApproval(e.target.checked)}
+                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Instant Approval</span>
+                      <span className="text-xs text-[#5A6A51]">Automatically approve bookings without manual admin review.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bookingShowDoctorNotes}
+                      onChange={(e) => setBookingShowDoctorNotes(e.target.checked)}
+                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Show Doctor Notes to Patient</span>
+                      <span className="text-xs text-[#5A6A51]">Display post-visit notes from the provider in the patient portal.</span>
+                    </div>
+                  </label>
                 </div>
               </div>
             </div>
           )}
+
+          {activeNav === "Notification Settings" && (
+            <div className="space-y-6">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Notification Settings</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Manage SMS, WhatsApp, email confirmations, and reminder scheduling.</p>
+                </div>
+                <button
+                  onClick={handleSaveNotificationSettings}
+                  disabled={savingNotificationSettings}
+                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+                >
+                  {savingNotificationSettings ? "Saving..." : "Save Notification Settings"}
+                </button>
+              </div>
+
+              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-6">
+                <div className="space-y-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={notifSmsOtp} onChange={(e) => setNotifSmsOtp(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">SMS OTP Verification</span>
+                      <span className="text-xs text-[#5A6A51]">Send one-time passwords to patients during login and booking.</span>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={notifWhatsApp} onChange={(e) => setNotifWhatsApp(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">WhatsApp Confirmations</span>
+                      <span className="text-xs text-[#5A6A51]">Send appointment confirmations and reminders via WhatsApp.</span>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={notifEmailConfirm} onChange={(e) => setNotifEmailConfirm(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Email Confirmations</span>
+                      <span className="text-xs text-[#5A6A51]">Send email confirmations in addition to SMS (requires SMTP config).</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="border-t border-[#F2EFE9] pt-6 space-y-5">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">SMS Confirmation Template (EN)</label>
+                    <textarea
+                      value={notifSmsTemplate}
+                      onChange={(e) => setNotifSmsTemplate(e.target.value)}
+                      rows={3}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition font-mono"
+                    />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Supports variables: <code>{`{name}`}</code>, <code>{`{service}`}</code>, <code>{`{date}`}</code>, <code>{`{time}`}</code>.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">قالب رسالة التأكيد النصية (AR)</label>
+                    <textarea
+                      value={notifSmsTemplateAr}
+                      onChange={(e) => setNotifSmsTemplateAr(e.target.value)}
+                      rows={3}
+                      dir="rtl"
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition font-mono text-right"
+                    />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block text-right">يدعم الحقول المتغيرة: <code>{`{name}`}</code>، <code>{`{service}`}</code>، <code>{`{date}`}</code>، <code>{`{time}`}</code>.</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-[#F2EFE9] pt-6 grid gap-6 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Reminder Timing (Hours Before)</label>
+                    <select
+                      value={notifReminderHours}
+                      onChange={(e) => setNotifReminderHours(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition font-semibold"
+                    >
+                      <option value={2}>2 Hours Before</option>
+                      <option value={6}>6 Hours Before</option>
+                      <option value={12}>12 Hours Before</option>
+                      <option value={24}>24 Hours Before (1 Day)</option>
+                      <option value={48}>48 Hours Before (2 Days)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Staff Summary Daily Email</label>
+                    <input
+                      type="email"
+                      value={notifStaffEmail}
+                      onChange={(e) => setNotifStaffEmail(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Sends a daily summary of appointments to this address.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeNav === "Queue Settings" && (
+            <div className="space-y-6">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Queue &amp; Waiting Room Settings</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Configure lobby display screens, check-in thresholds and session calculations.</p>
+                </div>
+                <button
+                  onClick={handleSaveQueueSettings}
+                  disabled={savingQueueSettings}
+                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+                >
+                  {savingQueueSettings ? "Saving..." : "Save Queue Settings"}
+                </button>
+              </div>
+
+              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-6">
+                <div className="space-y-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={queueVirtualRoom}
+                      onChange={(e) => setQueueVirtualRoom(e.target.checked)}
+                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Enable Virtual Waiting Room Tracker</span>
+                      <span className="text-xs text-[#5A6A51]">Allows checked-in patients to track live queue position via mobile.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={queueShowOnScreens}
+                      onChange={(e) => setQueueShowOnScreens(e.target.checked)}
+                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Display Queue on Lobby TV Screens</span>
+                      <span className="text-xs text-[#5A6A51]">Show queue statuses on public dashboard screens inside clinic lobbies.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={queueAutoCheckIn}
+                      onChange={(e) => setQueueAutoCheckIn(e.target.checked)}
+                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-sm font-semibold text-[#1F251A] block">Auto Check-In on Arrival</span>
+                      <span className="text-xs text-[#5A6A51]">Use geofencing or terminal scan to auto register presence on patient arrival.</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="border-t border-[#F2EFE9] pt-6 grid gap-6 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Queue Alert SMS Threshold</label>
+                    <select
+                      value={queueAlertThreshold}
+                      onChange={(e) => setQueueAlertThreshold(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    >
+                      <option value={1}>1 Patient Ahead</option>
+                      <option value={2}>2 Patients Ahead</option>
+                      <option value={3}>3 Patients Ahead</option>
+                      <option value={4}>4 Patients Ahead</option>
+                      <option value={5}>5 Patients Ahead</option>
+                    </select>
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Trigger SMS warning alert to patient before their turn.</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Average Session Duration (Minutes)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={queueAvgSessionDuration}
+                      onChange={(e) => setQueueAvgSessionDuration(Number(e.target.value))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Used for calculating estimated waiting room delays.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
 
           {activeNav === "Manage Areas" && (
             <div className="space-y-6">
@@ -6931,47 +10598,1194 @@ export default function AdminPage() {
             </div>
           )}
 
-          {activeNav === "Roles and permissions" && (
-            <div className="space-y-6">
+          {activeNav === "Role Management" && adminRole === "superadmin" && (
+            <div className="space-y-8 animate-fadeIn">
               <div className="mb-6">
-                <h2 className="text-4xl font-semibold text-[#1F251A]">Roles & Access Permissions</h2>
-                <p className="mt-2 text-sm text-[#5A6A51]">Modify administrative authorization settings across system modules.</p>
+                <h2 className="text-4xl font-semibold text-[#1F251A]">Role & Credentials Management</h2>
+                <p className="mt-2 text-sm text-[#5A6A51]">Define system roles, set view permissions, and provision employee credentials.</p>
               </div>
-              <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-                <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                  <table className="w-full min-w-[900px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                        <th className="px-6 py-4 text-left">Module / Feature</th>
-                        <th className="px-6 py-4 text-center">Super Admin</th>
-                        <th className="px-6 py-4 text-center">Doctor</th>
-                        <th className="px-6 py-4 text-center">Nurse</th>
-                        <th className="px-6 py-4 text-center">Receptionist</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
-                      {[
-                        { mod: "Bookings Management", values: [true, true, true, true] },
-                        { mod: "Finances & Payroll", values: [true, false, false, false] },
-                        { mod: "Inventory & POS", values: [true, true, true, true] },
-                        { mod: "SMS Campaigns & Setup", values: [true, false, false, false] },
-                        { mod: "System Core Settings", values: [true, false, false, false] },
-                      ].map((perm, idx) => (
-                        <tr key={idx} className="transition hover:bg-[#F9F9F7]">
-                          <td className="px-6 py-5 font-semibold text-[#1F251A]">{perm.mod}</td>
-                          {perm.values.map((v, vIdx) => (
-                            <td key={vIdx} className="px-6 py-5 text-center">
-                              <input type="checkbox" defaultChecked={v} disabled={vIdx === 0} className="h-4.5 w-4.5 accent-[#414E36] rounded" />
-                            </td>
-                          ))}
+
+              {/* Grid for Roles and Employee Accounts */}
+              <div className="grid gap-8 lg:grid-cols-1">
+                {/* 1. Manage Roles Card */}
+                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+                  <h3 className="text-xl font-bold text-[#1F251A] mb-4">Define System Roles</h3>
+                  
+                  {/* Create Role Form */}
+                  <form onSubmit={handleCreateRole} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Role Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. receptionist"
+                          value={newRoleName}
+                          onChange={(e) => {
+                            setNewRoleName(e.target.value);
+                            if (roleCreateError) setRoleCreateError("");
+                          }}
+                          className="w-full max-w-md rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-3">Permissions & Access Control</label>
+                        <div className="grid gap-4 md:grid-cols-2 max-h-[400px] overflow-y-auto rounded-3xl border border-[#414E36]/10 p-5 bg-[#FBFBF9]">
+                          {PERMISSION_STRUCTURE.map((group) => {
+                            const allChecked = group.items.every(item => newRolePermissions.includes(item.key));
+                            const someChecked = group.items.some(item => newRolePermissions.includes(item.key)) && !allChecked;
+
+                            return (
+                              <div key={group.category} className="rounded-2xl border border-[#414E36]/10 bg-white p-4 shadow-sm flex flex-col justify-between">
+                                <div>
+                                  <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-2 mb-3">
+                                    <label className="flex items-center gap-2 text-xs font-bold text-[#1F251A] cursor-pointer select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={allChecked}
+                                        ref={(el) => {
+                                          if (el) el.indeterminate = someChecked;
+                                        }}
+                                        onChange={(e) => {
+                                          const keys = group.items.map(item => item.key);
+                                          if (e.target.checked) {
+                                            setNewRolePermissions(prev => [...new Set([...prev, ...keys])]);
+                                          } else {
+                                            setNewRolePermissions(prev => prev.filter(p => !keys.includes(p)));
+                                          }
+                                        }}
+                                        className="h-4 w-4 accent-[#414E36] rounded"
+                                      />
+                                      {group.category}
+                                    </label>
+                                    <span className="text-[10px] font-bold text-[#414E36] bg-[#414E36]/5 px-2 py-0.5 rounded-full">
+                                      {group.items.filter(item => newRolePermissions.includes(item.key)).length} / {group.items.length}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {group.items.map((item) => (
+                                      <label key={item.key} className="flex items-center gap-2.5 text-xs font-semibold text-[#414E36] cursor-pointer select-none hover:text-[#1F251A] transition">
+                                        <input
+                                          type="checkbox"
+                                          checked={newRolePermissions.includes(item.key)}
+                                          onChange={(e) => {
+                                            if (e.target.checked) {
+                                              setNewRolePermissions(prev => [...prev, item.key]);
+                                            } else {
+                                              setNewRolePermissions(prev => prev.filter(p => p !== item.key));
+                                            }
+                                          }}
+                                          className="h-4 w-4 accent-[#414E36] rounded"
+                                        />
+                                        {item.label}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {roleCreateError && <p className="text-xs text-red-600 font-medium">⚠️ {roleCreateError}</p>}
+                    {roleCreateSuccess && <p className="text-xs text-green-700 font-medium">✅ {roleCreateSuccess}</p>}
+
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                    >
+                      Save Role
+                    </button>
+                  </form>
+
+                  {/* Roles Table */}
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                          <th className="px-6 py-4 text-left">Role Name</th>
+                          <th className="px-6 py-4 text-left">Allowed Modules</th>
+                          <th className="px-6 py-4 text-center">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
+                        {loadingRolesAndEmployees ? (
+                          <tr>
+                            <td colSpan={3} className="px-6 py-5 text-center text-xs text-gray-400">Loading roles...</td>
+                          </tr>
+                        ) : rolesList.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="px-6 py-5 text-center text-xs text-gray-400">No roles configured.</td>
+                          </tr>
+                        ) : rolesList.map((r) => (
+                          <tr key={r.id} className="transition hover:bg-[#F9F9F7]">
+                            <td className="px-6 py-4 font-bold text-[#1F251A] capitalize">{r.name}</td>
+                            <td className="px-6 py-4 text-xs font-semibold text-[#5A6A51]">
+                              <div className="flex flex-wrap gap-1.5">
+                                {r.permissions.map((p: string) => (
+                                  <span key={p} className="rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-[#414E36] border border-[#414E36]/10">{p}</span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              {r.name !== 'superadmin' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRole(r.name)}
+                                  className="text-red-600 hover:text-red-800 transition"
+                                  title="Delete Role"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              ) : <span className="text-xs text-gray-400 font-semibold italic">System Locked</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 2. Manage Employees / Credentials Provisioning */}
+                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+                  <h3 className="text-xl font-bold text-[#1F251A] mb-4">Provision Employee Credentials</h3>
+                  
+                  {/* Create Employee Form — OAuth Invite Flow */}
+                  <form onSubmit={handleCreateEmployee} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Full Name</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Sara El Gamel"
+                          value={newEmployeeName}
+                          onChange={(e) => {
+                            setNewEmployeeName(e.target.value);
+                            if (employeeCreateError) setEmployeeCreateError("");
+                          }}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Work Email Address</label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="e.g. sara@gmail.com"
+                          value={newEmployeeEmail}
+                          onChange={(e) => {
+                            setNewEmployeeEmail(e.target.value);
+                            if (employeeCreateError) setEmployeeCreateError("");
+                          }}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Assign Role</label>
+                        <select
+                          required
+                          value={newEmployeeRole}
+                          onChange={(e) => {
+                            setNewEmployeeRole(e.target.value);
+                            if (employeeCreateError) setEmployeeCreateError("");
+                          }}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                        >
+                          <option value="">Select Role...</option>
+                          {rolesList.map(r => (
+                            <option key={r.id} value={r.name} className="capitalize">{r.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Invite info banner */}
+                    <div className="flex items-start gap-2.5 rounded-2xl bg-[#EDF5E8] border border-[#414E36]/15 px-4 py-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mt-0.5 shrink-0 text-[#414E36]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      <p className="text-xs text-[#414E36] font-medium leading-relaxed">
+                        An official <strong>invitation email</strong> will be sent to the employee&apos;s address. They will set their own password via the link — no password is stored by the admin.
+                      </p>
+                    </div>
+
+                    {employeeCreateError && <p className="text-xs text-red-600 font-medium">⚠️ {employeeCreateError}</p>}
+                    {employeeCreateSuccess && <p className="text-xs text-green-700 font-medium">✅ {employeeCreateSuccess}</p>}
+
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                      Send Invitation
+                    </button>
+                  </form>
+
+                  {/* Employees Table */}
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                          <th className="px-6 py-4 text-left">Full Name</th>
+                          <th className="px-6 py-4 text-left">Assigned Role</th>
+                          <th className="px-6 py-4 text-left">Login Email</th>
+                          <th className="px-6 py-4 text-center">Status</th>
+                          <th className="px-6 py-4 text-center">Actions</th>
+                        </tr>
+
+                      </thead>
+                      <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
+                        {loadingRolesAndEmployees ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">Loading accounts...</td>
+                          </tr>
+                        ) : employeesList.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">No employee accounts provisioned yet. Use the form above to send an invitation.</td>
+                          </tr>
+                        ) : employeesList.map((emp) => (
+                          <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
+                            <td className="px-6 py-4 font-semibold text-[#1F251A]">{emp.name || emp.employee_id || '—'}</td>
+                            <td className="px-6 py-4 text-xs font-semibold text-[#414E36]">
+                              {adminRole === "superadmin" && emp.employee_id !== "superadmin" ? (
+                                <select
+                                  value={emp.role_name}
+                                  onChange={(e) => handleUpdateEmployeeRole(emp.id, e.target.value)}
+                                  className="rounded-lg border border-[#E6E9EB] bg-[#FBFBF9] px-2 py-1 text-xs font-semibold text-[#414E36] focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36] outline-none"
+                                >
+                                  {rolesList.map((r) => (
+                                    <option key={r.id} value={r.name}>
+                                      {r.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span className="capitalize">{emp.role_name}</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">{emp.email}</td>
+                            <td className="px-6 py-4 text-center">
+                              {emp.email_confirmed_at ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">✓ Active</span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">⏳ Invite Pending</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              {emp.employee_id !== 'superadmin' ? (
+                                <div className="flex items-center justify-center gap-2">
+                                  {!emp.email_confirmed_at && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleResendInvitation(emp.id)}
+                                      className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100"
+                                      title="Resend Invitation Email"
+                                    >
+                                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9z"/></svg>
+                                      Resend
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteEmployee(emp.id)}
+                                    className="text-red-600 hover:text-red-800 transition"
+                                    title="Revoke Access"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              ) : <span className="text-xs text-gray-400 font-semibold italic">System Owner</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* ===================== EMPLOYEES SECTION ===================== */}
+          {activeNav === "Employees" && adminRole === "superadmin" && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Staff &amp; Employees</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Manage all staff accounts, departments, shifts, salaries, and system roles.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingEmployee(null);
+                    setNewEmployeeName("");
+                    setNewEmployeeEmail("");
+                    setNewEmployeeRole("");
+                    setNewEmployeePhone("");
+                    setNewEmployeeDepartment("Reception");
+                    setNewEmployeeShift("Day");
+                    setNewEmployeeSalary("0");
+                    setNewEmployeeNationalId("");
+                    setNewEmployeeNationalIdFront("");
+                    setNewEmployeeNationalIdBack("");
+                    setNewEmployeeAddress("");
+                    setNewEmployeeBranchId("");
+                    setIsEditingEmployeeModalOpen(true);
+                  }}
+                  className="rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-md shrink-0"
+                >
+                  <Plus size={16} />
+                  Add Employee
+                </button>
+              </div>
+
+              {/* Filters & Search */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 bg-white p-5 rounded-3xl border border-[#414E36]/10 shadow-sm">
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                    <Search size={15} />
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search name, phone, email..."
+                    value={employeeSearchQuery}
+                    onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] pl-10 pr-4 py-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+                <select
+                  value={employeeFilterDepartment}
+                  onChange={(e) => setEmployeeFilterDepartment(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                >
+                  <option value="All">All Departments</option>
+                  <option value="Medical">Medical</option>
+                  <option value="Reception">Reception</option>
+                  <option value="Nursing">Nursing</option>
+                  <option value="Administration">Administration</option>
+                  <option value="Finance">Finance</option>
+                  <option value="Other">Other</option>
+                </select>
+                <select
+                  value={employeeFilterShift}
+                  onChange={(e) => setEmployeeFilterShift(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                >
+                  <option value="All">All Shifts</option>
+                  <option value="Day">Day Shift</option>
+                  <option value="Night">Night Shift</option>
+                </select>
+                <div className="flex items-center justify-end text-xs font-semibold text-[#5A6A51] px-2">
+                  {loadingRolesAndEmployees ? "Loading..." : `${employeesList.length} Total Employees`}
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-sm">
+                    <thead>
+                      <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                        <th className="px-6 py-4">ID</th>
+                        <th className="px-6 py-4">Employee Info</th>
+                        <th className="px-6 py-4">Phone</th>
+                        <th className="px-6 py-4">Department</th>
+                        <th className="px-6 py-4">Branch</th>
+                        <th className="px-6 py-4">Shift</th>
+                        <th className="px-6 py-4">Salary</th>
+
+                        <th className="px-6 py-4 text-center">Status</th>
+                        <th className="px-6 py-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#414E36]/5">
+                      {loadingRolesAndEmployees ? (
+                        <tr>
+                          <td colSpan={9} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                            Loading employees...
+                          </td>
+                        </tr>
+                      ) : (() => {
+                        const filtered = employeesList.filter((emp: any) => {
+                          if (employeeFilterDepartment !== "All" && emp.department !== employeeFilterDepartment) return false;
+                          if (employeeFilterShift !== "All" && emp.shift !== employeeFilterShift) return false;
+                          if (employeeSearchQuery.trim()) {
+                            const q = employeeSearchQuery.toLowerCase();
+                            if (
+                              !emp.name?.toLowerCase().includes(q) &&
+                              !emp.email?.toLowerCase().includes(q) &&
+                              !emp.phone?.toLowerCase().includes(q) &&
+                              !emp.employee_id?.toLowerCase().includes(q)
+                            ) return false;
+                          }
+                          return true;
+                        });
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={9} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                                No employees match your filters.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return filtered.map((emp: any) => {
+                          const isSuperadmin = emp.employee_id === "superadmin";
+                          const shortId = emp.employee_id?.includes("@")
+                            ? emp.employee_id.split("@")[0]
+                            : emp.id?.slice(0, 8);
+                          return (
+                            <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                              <td className="px-6 py-4 text-xs font-mono font-bold text-[#5A6A51]">{shortId}</td>
+                              <td className="px-6 py-4">
+                                <div className="font-semibold text-[#1F251A] text-sm">{emp.name || <span className="italic text-gray-400">No name</span>}</div>
+                                <div className="text-xs text-[#5A6A51]">{emp.email}</div>
+                              </td>
+                              <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.phone || "—"}</td>
+                              <td className="px-6 py-4">
+                                <span className="inline-block rounded-xl bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold text-[#8B7544]">
+                                  {emp.department || "Reception"}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">
+                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`inline-block rounded-xl px-3 py-1 text-xs font-semibold ${emp.shift === "Night" ? "bg-indigo-50 text-indigo-700" : "bg-amber-50 text-amber-700"}`}>
+                                  {emp.shift || "Day"}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-xs font-bold text-[#1F251A]">
+                                {Number(emp.salary || 0).toLocaleString()} EGP
+                              </td>
+
+                              <td className="px-6 py-4 text-center">
+                                <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
+                                  {emp.email_confirmed_at ? "Active" : "Invited"}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center justify-end gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewingEmployee(emp)}
+                                    className="text-[#5A6A51] hover:text-[#414E36] transition"
+                                    title="View Info"
+                                  >
+                                    <Info size={16} />
+                                  </button>
+                                  {!isSuperadmin && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingEmployee(emp);
+                                          setNewEmployeeName(emp.name || "");
+                                          setNewEmployeeEmail(emp.email || "");
+                                          setNewEmployeeRole(emp.role_name || "");
+                                          setNewEmployeePhone(emp.phone || "");
+                                          setNewEmployeeDepartment(emp.department || "Reception");
+                                          setNewEmployeeShift(emp.shift || "Day");
+                                          setNewEmployeeSalary(String(emp.salary || 0));
+                                          setNewEmployeeNationalId(emp.national_id || "");
+                                          setNewEmployeeNationalIdFront(emp.national_id_front || "");
+                                          setNewEmployeeNationalIdBack(emp.national_id_back || "");
+                                          setNewEmployeeAddress(emp.address || "");
+                                          setNewEmployeeBranchId(emp.branch_id || "");
+                                          setIsEditingEmployeeModalOpen(true);
+                                        }}
+                                        className="text-[#C4AE7C] hover:text-[#a38f61] transition"
+                                        title="Edit Employee"
+                                      >
+                                        <Pencil size={15} />
+                                      </button>
+                                      {!emp.email_confirmed_at && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleResendInvitation(emp.id)}
+                                          className="text-xs font-semibold text-amber-600 hover:underline transition"
+                                          title="Resend invitation email"
+                                        >
+                                          Resend
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteEmployee(emp.id)}
+                                        className="text-red-500 hover:text-red-700 transition"
+                                        title="Revoke access"
+                                      >
+                                        <Trash2 size={15} />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Add / Edit Employee Modal */}
+              {isEditingEmployeeModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                  <div className="w-full max-w-lg rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.15)] border border-[#414E36]/10 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingEmployeeModalOpen(false)}
+                      className="absolute right-6 top-6 h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition font-bold text-lg"
+                    >
+                      &times;
+                    </button>
+                    <h3 className="text-2xl font-bold text-[#1F251A] mb-1">
+                      {editingEmployee ? "Edit Employee" : "Add New Employee"}
+                    </h3>
+                    <p className="text-xs text-[#5A6A51] mb-6">
+                      {editingEmployee
+                        ? "Update shift, department, salary, and role details."
+                        : "Fill in the details below to invite a new staff member."}
+                    </p>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!newEmployeeName.trim() || !newEmployeeRole) {
+                          alert("Name and System Role are required.");
+                          return;
+                        }
+                        try {
+                          if (editingEmployee) {
+                            const res = await fetch("/api/employees", {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                id: editingEmployee.id,
+                                name: newEmployeeName.trim(),
+                                roleName: newEmployeeRole,
+                                phone: newEmployeePhone.trim(),
+                                department: newEmployeeDepartment,
+                                shift: newEmployeeShift,
+                                salary: Number(newEmployeeSalary),
+                                nationalId: newEmployeeNationalId.trim() || null,
+                                nationalIdFront: newEmployeeNationalIdFront || null,
+                                nationalIdBack: newEmployeeNationalIdBack || null,
+                                address: newEmployeeAddress.trim() || null,
+                                branchId: newEmployeeBranchId || null,
+                              }),
+                            });
+                            if (res.ok) {
+                              setIsEditingEmployeeModalOpen(false);
+                              clearFetchCache();
+                              fetchRolesAndEmployees();
+                            } else {
+                              const d = await res.json();
+                              alert(d.error || "Failed to update employee.");
+                            }
+                          } else {
+                            if (!newEmployeeEmail.trim()) {
+                              alert("Email is required.");
+                              return;
+                            }
+                            const res = await fetch("/api/employees", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                email: newEmployeeEmail.trim().toLowerCase(),
+                                name: newEmployeeName.trim(),
+                                roleName: newEmployeeRole,
+                                phone: newEmployeePhone.trim(),
+                                department: newEmployeeDepartment,
+                                shift: newEmployeeShift,
+                                salary: Number(newEmployeeSalary),
+                                nationalId: newEmployeeNationalId.trim() || null,
+                                nationalIdFront: newEmployeeNationalIdFront || null,
+                                nationalIdBack: newEmployeeNationalIdBack || null,
+                                address: newEmployeeAddress.trim() || null,
+                                branchId: newEmployeeBranchId || null,
+                              }),
+                            });
+                            if (res.ok) {
+                              setIsEditingEmployeeModalOpen(false);
+                              clearFetchCache();
+                              fetchRolesAndEmployees();
+                            } else {
+                              const d = await res.json();
+                              alert(d.error || "Failed to invite employee.");
+                            }
+                          }
+                        } catch (err: any) {
+                          alert(err.message || "An error occurred.");
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Full Name *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Mohamed Ali"
+                            value={newEmployeeName}
+                            onChange={(e) => setNewEmployeeName(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Email Address {editingEmployee ? "" : "*"}</label>
+                          <input
+                            type="email"
+                            required={!editingEmployee}
+                            disabled={!!editingEmployee}
+                            placeholder="staff@revera.com"
+                            value={newEmployeeEmail}
+                            onChange={(e) => setNewEmployeeEmail(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] disabled:opacity-50 disabled:cursor-not-allowed"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Phone Number</label>
+                          <input
+                            type="text"
+                            placeholder="01012345678"
+                            value={newEmployeePhone}
+                            onChange={(e) => setNewEmployeePhone(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">System Role *</label>
+                          <select
+                            required
+                            value={newEmployeeRole}
+                            onChange={(e) => setNewEmployeeRole(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                          >
+                            <option value="" disabled>Select Role</option>
+                            {rolesList.map((role: any) => (
+                              <option key={role.name} value={role.name}>{role.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Assigned Branch *</label>
+                          <select
+                            required
+                            value={newEmployeeBranchId}
+                            onChange={(e) => setNewEmployeeBranchId(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                          >
+                            <option value="" disabled>Select Branch</option>
+                            {branches.map((b) => (
+                              <option key={b.id} value={b.id}>{b.name_en}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Department</label>
+                          <select
+                            value={newEmployeeDepartment}
+                            onChange={(e) => setNewEmployeeDepartment(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                          >
+                            <option value="Medical">Medical</option>
+                            <option value="Reception">Reception</option>
+                            <option value="Nursing">Nursing</option>
+                            <option value="Administration">Administration</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Shift</label>
+                          <select
+                            value={newEmployeeShift}
+                            onChange={(e) => setNewEmployeeShift(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                          >
+                            <option value="Day">Day</option>
+                            <option value="Night">Night</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Salary (EGP)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={newEmployeeSalary}
+                            onChange={(e) => setNewEmployeeSalary(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* --- NEW EMPLOYEE PROFILE FIELDS (National ID, Photo Uploads, Address) --- */}
+                      <div className="border-t border-[#414E36]/10 pt-4 space-y-4">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">National ID (14 Digits)</label>
+                            <input
+                              type="text"
+                              maxLength={14}
+                              placeholder="e.g. 29503152101234"
+                              value={newEmployeeNationalId}
+                              onChange={(e) => {
+                                // only numbers
+                                const val = e.target.value.replace(/\D/g, "");
+                                setNewEmployeeNationalId(val);
+                              }}
+                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] font-mono"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Home Address</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 15 El-Ghad St, Pyramids, Giza"
+                              value={newEmployeeAddress}
+                              onChange={(e) => setNewEmployeeAddress(e.target.value)}
+                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Interactive Egyptian National ID Check */}
+                        {newEmployeeNationalId.trim() && (() => {
+                          const check = parseEgyptianNationalId(newEmployeeNationalId.trim());
+                          if (check.isValid) {
+                            return (
+                              <div className="rounded-2xl bg-green-50/50 border border-green-200/50 p-3.5 space-y-1.5 text-xs">
+                                <div className="flex items-center gap-1.5 font-bold text-green-800">
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
+                                  Egyptian National ID Check Passed
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 text-green-700 font-medium">
+                                  <div>
+                                    <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Birth Date</span>
+                                    {check.birthDate}
+                                  </div>
+                                  <div>
+                                    <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Gender</span>
+                                    {check.gender}
+                                  </div>
+                                  <div>
+                                    <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Governorate</span>
+                                    {check.governorate}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div className="rounded-2xl bg-amber-50/50 border border-amber-200/50 p-3.5 text-xs text-amber-700 font-semibold flex items-center gap-1.5">
+                                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] text-white">!</span>
+                                ID Check: {check.reason}
+                              </div>
+                            );
+                          }
+                        })()}
+
+                        {/* Front / Back ID Photo Uploads */}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {/* ID Front */}
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">National ID - Front Side</label>
+                            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-4 text-center">
+                              {newEmployeeNationalIdFront ? (
+                                <div className="relative w-full group">
+                                  <img
+                                    src={newEmployeeNationalIdFront}
+                                    alt="ID Front"
+                                    className="h-28 w-full object-cover rounded-xl border border-[#414E36]/10"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewEmployeeNationalIdFront("")}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white hover:bg-red-600 transition rounded-full h-6 w-6 flex items-center justify-center shadow font-bold text-xs"
+                                  >
+                                    &times;
+                                  </button>
+                                </div>
+                              ) : (
+                                <label className="flex flex-col items-center justify-center cursor-pointer py-4 w-full">
+                                  <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
+                                  <span className="text-[11px] font-semibold text-[#414E36]">Upload Front Side</span>
+                                  <span className="text-[9px] text-gray-400 mt-0.5">JPEG, PNG up to 5MB</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        try {
+                                          const compressed = await compressImage(file, 1200, 1200, 0.8);
+                                          setNewEmployeeNationalIdFront(compressed);
+                                        } catch (err) {
+                                          const reader = new FileReader();
+                                          reader.onloadend = () => {
+                                            setNewEmployeeNationalIdFront(reader.result as string);
+                                          };
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* ID Back */}
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">National ID - Back Side</label>
+                            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-4 text-center">
+                              {newEmployeeNationalIdBack ? (
+                                <div className="relative w-full group">
+                                  <img
+                                    src={newEmployeeNationalIdBack}
+                                    alt="ID Back"
+                                    className="h-28 w-full object-cover rounded-xl border border-[#414E36]/10"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewEmployeeNationalIdBack("")}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white hover:bg-red-600 transition rounded-full h-6 w-6 flex items-center justify-center shadow font-bold text-xs"
+                                  >
+                                    &times;
+                                  </button>
+                                </div>
+                              ) : (
+                                <label className="flex flex-col items-center justify-center cursor-pointer py-4 w-full">
+                                  <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
+                                  <span className="text-[11px] font-semibold text-[#414E36]">Upload Back Side</span>
+                                  <span className="text-[9px] text-gray-400 mt-0.5">JPEG, PNG up to 5MB</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        try {
+                                          const compressed = await compressImage(file, 1200, 1200, 0.8);
+                                          setNewEmployeeNationalIdBack(compressed);
+                                        } catch (err) {
+                                          const reader = new FileReader();
+                                          reader.onloadend = () => {
+                                            setNewEmployeeNationalIdBack(reader.result as string);
+                                          };
+                                          reader.readAsDataURL(file);
+                                        }
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingEmployeeModalOpen(false)}
+                          className="rounded-2xl border border-[#414E36]/15 px-5 py-2.5 text-sm font-semibold text-[#414E36] hover:bg-gray-50 transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#2e3a26] transition shadow-md"
+                        >
+                          {editingEmployee ? "Save Changes" : "Send Invitation"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* View Employee Details — Slide-Over Drawer */}
+              {viewingEmployee && (
+                <div
+                  className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-xs transition-opacity duration-300"
+                  onClick={() => setViewingEmployee(null)}
+                >
+                  <div
+                    className="w-full max-w-2xl bg-[#FBFBF9] h-full shadow-2xl flex flex-col animate-slideOver overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Drawer Header */}
+                    <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 text-lg font-bold">
+                          {viewingEmployee.name ? viewingEmployee.name.charAt(0).toUpperCase() : "E"}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-[#1F251A]">{viewingEmployee.name || "No name"}</h3>
+                          <p className="text-xs text-[#5A6A51]">Employee Profile &amp; Staff Details</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setViewingEmployee(null)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    {/* Drawer Content */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+
+                      {/* Profile Details Card */}
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                          <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Staff Profile</h4>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingEmployee(viewingEmployee);
+                              setNewEmployeeName(viewingEmployee.name || "");
+                              setNewEmployeeEmail(viewingEmployee.email || "");
+                              setNewEmployeeRole(viewingEmployee.role_name || "");
+                              setNewEmployeePhone(viewingEmployee.phone || "");
+                              setNewEmployeeDepartment(viewingEmployee.department || "Reception");
+                              setNewEmployeeShift(viewingEmployee.shift || "Day");
+                              setNewEmployeeSalary(String(viewingEmployee.salary || 0));
+                              setNewEmployeeNationalId(viewingEmployee.national_id || "");
+                              setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
+                              setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
+                              setNewEmployeeAddress(viewingEmployee.address || "");
+                              setViewingEmployee(null);
+                              setIsEditingEmployeeModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+                          >
+                            <Pencil size={12} /> Edit Profile
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employee ID</span>
+                            <span className="font-semibold text-[#1F251A] font-mono text-xs">{viewingEmployee.employee_id || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
+                            <span className="font-semibold text-[#1F251A] break-all">{viewingEmployee.email || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.phone || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">System Role</span>
+                            <span className="inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">
+                              {viewingEmployee.role_name || "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Department</span>
+                            <span className="inline-block rounded-xl bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold text-[#8B7544]">
+                              {viewingEmployee.department || "Reception"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Shift</span>
+                            <span className={`inline-block rounded-xl px-3 py-1 text-xs font-semibold ${viewingEmployee.shift === "Night" ? "bg-indigo-50 text-indigo-700" : "bg-amber-50 text-amber-700"}`}>
+                              {viewingEmployee.shift || "Day"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Monthly Salary</span>
+                            <span className="font-bold text-[#1F251A]">{Number(viewingEmployee.salary || 0).toLocaleString()} EGP</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Account Status</span>
+                            <span className={`inline-flex items-center gap-1 text-xs font-bold ${viewingEmployee.email_confirmed_at ? "text-green-700" : "text-amber-700"}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-green-600" : "bg-amber-500"}`} />
+                              {viewingEmployee.email_confirmed_at ? "Active" : "Pending Invitation"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
+                            <span className="font-semibold text-[#1F251A] font-mono text-xs">{viewingEmployee.national_id || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Added On</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {viewingEmployee.created_at
+                                ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { dateStyle: "long" })
+                                : "—"}
+                            </span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Home Address</span>
+                            <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
+                              {viewingEmployee.address || "—"}
+                            </span>
+                          </div>
+
+                          {/* ID Check Info Card */}
+                          {viewingEmployee.national_id && (() => {
+                            const check = parseEgyptianNationalId(viewingEmployee.national_id);
+                            if (check.isValid) {
+                              return (
+                                <div className="col-span-2 rounded-xl bg-green-50/50 border border-green-200/50 p-4 space-y-2 text-xs">
+                                  <div className="flex items-center gap-1.5 font-bold text-green-800">
+                                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
+                                    Verified Egyptian National ID Check
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-4 text-green-700 font-medium">
+                                    <div>
+                                      <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Birth Date</span>
+                                      {check.birthDate}
+                                    </div>
+                                    <div>
+                                      <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Gender</span>
+                                      {check.gender}
+                                    </div>
+                                    <div>
+                                      <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Governorate</span>
+                                      {check.governorate}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+
+                          {/* Front / Back ID Photo Previews */}
+                          {(viewingEmployee.national_id_front || viewingEmployee.national_id_back) && (
+                            <div className="col-span-2 space-y-2 border-t border-[#414E36]/10 pt-3">
+                              <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider">ID Document Photos</span>
+                              <div className="grid grid-cols-2 gap-4">
+                                {viewingEmployee.national_id_front && (
+                                  <div className="space-y-1">
+                                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">Front Side</span>
+                                    <a
+                                      href={viewingEmployee.national_id_front}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
+                                      title="Click to view full size"
+                                    >
+                                      <img
+                                        src={viewingEmployee.national_id_front}
+                                        alt="ID Front"
+                                        className="h-28 w-full object-cover"
+                                      />
+                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
+                                        View Full Size
+                                      </div>
+                                    </a>
+                                  </div>
+                                )}
+                                {viewingEmployee.national_id_back && (
+                                  <div className="space-y-1">
+                                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">Back Side</span>
+                                    <a
+                                      href={viewingEmployee.national_id_back}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
+                                      title="Click to view full size"
+                                    >
+                                      <img
+                                        src={viewingEmployee.national_id_back}
+                                        alt="ID Back"
+                                        className="h-28 w-full object-cover"
+                                      />
+                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
+                                        View Full Size
+                                      </div>
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Quick Actions Card */}
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-3">
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C] border-b border-[#414E36]/10 pb-3">Quick Actions</h4>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingEmployee(viewingEmployee);
+                              setNewEmployeeName(viewingEmployee.name || "");
+                              setNewEmployeeEmail(viewingEmployee.email || "");
+                              setNewEmployeeRole(viewingEmployee.role_name || "");
+                              setNewEmployeePhone(viewingEmployee.phone || "");
+                              setNewEmployeeDepartment(viewingEmployee.department || "Reception");
+                              setNewEmployeeShift(viewingEmployee.shift || "Day");
+                              setNewEmployeeSalary(String(viewingEmployee.salary || 0));
+                              setNewEmployeeNationalId(viewingEmployee.national_id || "");
+                              setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
+                              setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
+                              setNewEmployeeAddress(viewingEmployee.address || "");
+                              setViewingEmployee(null);
+                              setIsEditingEmployeeModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition"
+                          >
+                            <Pencil size={13} /> Edit Employee
+                          </button>
+                          {!viewingEmployee.email_confirmed_at && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleResendInvitation(viewingEmployee.id);
+                                setViewingEmployee(null);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition"
+                            >
+                              Resend Invitation
+                            </button>
+                          )}
+                          {viewingEmployee.employee_id !== "superadmin" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleDeleteEmployee(viewingEmployee.id);
+                                setViewingEmployee(null);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 transition"
+                            >
+                              <Trash2 size={13} /> Revoke Access
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {/* ============================================================= */}
 
           {activeNav === "SMS Configuration" && (
             <div className="space-y-6">
@@ -7700,6 +12514,843 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* ── HUMAN RESOURCES (HR) VIEW ── */}
+          {activeNav === "HR" && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Human Resources</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Manage workforce payroll, leaves, and performance evaluations.</p>
+                </div>
+              </div>
+
+              {/* Sub-navigation Tabs */}
+              <div className="flex border-b border-[#414E36]/10 gap-6">
+                {(["overview", "payroll", "leaves", "performance", "attendance"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setHrActiveSubTab(tab)}
+                    className={`pb-3 text-sm font-bold capitalize transition-all border-b-2 -mb-[2px] ${
+                      hrActiveSubTab === tab
+                        ? "border-[#414E36] text-[#414E36]"
+                        : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              {/* Overview Sub-tab */}
+              {hrActiveSubTab === "overview" && (
+                <div className="space-y-6">
+                  {/* Summary Cards */}
+                  <div className="grid gap-6 sm:grid-cols-3">
+                    <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Active Employees</p>
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-3xl font-semibold text-[#1F251A]">{employeesList.length}</span>
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C4AE7C]/10 text-[#414E36]">
+                          <Users size={18} />
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Approved Leaves (This Month)</p>
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-3xl font-semibold text-[#1F251A]">
+                          {leavesList.filter(l => l.status === "Approved").length}
+                        </span>
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C4AE7C]/10 text-[#414E36]">
+                          <CalendarDays size={18} />
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Total Payroll Run ({selectedPayrollMonth})</p>
+                      <div className="mt-4 flex items-center justify-between">
+                        <span className="text-3xl font-semibold text-[#1F251A]">
+                          EGP {payrollList
+                            .filter(p => p.month === selectedPayrollMonth)
+                            .reduce((sum, p) => sum + Number(p.net_salary || 0), 0)
+                            .toLocaleString()}
+                        </span>
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C4AE7C]/10 text-[#414E36]">
+                          <DollarSign size={18} />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Employees Directory Card */}
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                    <div className="p-6 border-b border-[#414E36]/10 flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-[#1F251A]">Workforce Directory</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                            <th className="px-6 py-4">Employee Info</th>
+                            <th className="px-6 py-4">Department</th>
+                            <th className="px-6 py-4">System Role</th>
+                            <th className="px-6 py-4">Branch</th>
+                            <th className="px-6 py-4">Base Salary</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#414E36]/5">
+                          {employeesList.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                                No active employees found.
+                              </td>
+                            </tr>
+                          ) : (
+                            employeesList.map((emp: any) => (
+                              <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="font-semibold text-[#1F251A]">{emp.name}</div>
+                                  <div className="text-xs text-[#5A6A51]">{emp.email}</div>
+                                </td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.department || "—"}</td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.role_name || "—"}</td>
+                                <td className="px-6 py-4 text-xs text-[#5A6A51]">
+                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
+                                </td>
+                                <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                  EGP {Number(emp.salary || 0).toLocaleString()}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Payroll Sub-tab */}
+              {hrActiveSubTab === "payroll" && (
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-3xl border border-[#414E36]/10 bg-white shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm font-bold text-[#1F251A]">Select Payroll Month:</label>
+                      <select
+                        value={selectedPayrollMonth}
+                        onChange={(e) => setSelectedPayrollMonth(e.target.value)}
+                        className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2 text-sm text-[#414E36] outline-none"
+                      >
+                        <option value="2026-05">May 2026</option>
+                        <option value="2026-06">June 2026</option>
+                        <option value="2026-07">July 2026</option>
+                        <option value="2026-08">August 2026</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetch('/api/hr/payroll', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${session?.access_token}`
+                            },
+                            body: JSON.stringify({ month: selectedPayrollMonth })
+                          });
+                          if (res.ok) {
+                            alert("Payroll ran successfully!");
+                            fetchHrPayroll();
+                          } else {
+                            const err = await res.json();
+                            alert(err.error || "Failed to run payroll");
+                          }
+                        } catch (err) {
+                          alert("Failed to connect to API.");
+                        }
+                      }}
+                      className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2"
+                    >
+                      <Plus size={16} /> Run Payroll Sheet
+                    </button>
+                  </div>
+
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                            <th className="px-6 py-4">Employee</th>
+                            <th className="px-6 py-4">Month</th>
+                            <th className="px-6 py-4">Basic Salary</th>
+                            <th className="px-6 py-4">Bonuses</th>
+                            <th className="px-6 py-4">Deductions</th>
+                            <th className="px-6 py-4">Net Salary</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#414E36]/5">
+                          {payrollList.filter(p => p.month === selectedPayrollMonth).length === 0 ? (
+                            <tr>
+                              <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                                No payroll run exists for {selectedPayrollMonth}. Click "Run Payroll Sheet" to calculate.
+                              </td>
+                            </tr>
+                          ) : (
+                            payrollList
+                              .filter(p => p.month === selectedPayrollMonth)
+                              .map((pay: any) => (
+                                <tr key={pay.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                                  <td className="px-6 py-4">
+                                    <div className="font-semibold text-[#1F251A]">{pay.employee_accounts?.name || "—"}</div>
+                                    <div className="text-xs text-[#5A6A51]">{pay.employee_accounts?.email || "—"}</div>
+                                  </td>
+                                  <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{pay.month}</td>
+                                  <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
+                                    EGP {Number(pay.basic_salary).toLocaleString()}
+                                  </td>
+                                  <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
+                                    <input
+                                      type="number"
+                                      value={pay.bonuses}
+                                      disabled={pay.status === "Paid"}
+                                      onChange={async (e) => {
+                                        const val = Number(e.target.value);
+                                        setPayrollList(prev => prev.map(p => p.id === pay.id ? { ...p, bonuses: val, net_salary: p.basic_salary + val - p.deductions } : p));
+                                        await fetch('/api/hr/payroll', {
+                                          method: 'PATCH',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': `Bearer ${session?.access_token}`
+                                          },
+                                          body: JSON.stringify({ id: pay.id, bonuses: val })
+                                        });
+                                      }}
+                                      className="w-20 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] disabled:opacity-50"
+                                    />
+                                  </td>
+                                  <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
+                                    <input
+                                      type="number"
+                                      value={pay.deductions}
+                                      disabled={pay.status === "Paid"}
+                                      onChange={async (e) => {
+                                        const val = Number(e.target.value);
+                                        setPayrollList(prev => prev.map(p => p.id === pay.id ? { ...p, deductions: val, net_salary: p.basic_salary + p.bonuses - val } : p));
+                                        await fetch('/api/hr/payroll', {
+                                          method: 'PATCH',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': `Bearer ${session?.access_token}`
+                                          },
+                                          body: JSON.stringify({ id: pay.id, deductions: val })
+                                        });
+                                      }}
+                                      className="w-20 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] disabled:opacity-50"
+                                    />
+                                  </td>
+                                  <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                    EGP {Number(pay.net_salary).toLocaleString()}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
+                                      pay.status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
+                                    }`}>
+                                      {pay.status}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                    {pay.status !== "Paid" && (
+                                      <button
+                                        onClick={async () => {
+                                          if (!confirm("Are you sure you want to mark this employee payroll as PAID?")) return;
+                                          try {
+                                            const res = await fetch('/api/hr/payroll', {
+                                              method: 'PATCH',
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': `Bearer ${session?.access_token}`
+                                              },
+                                              body: JSON.stringify({ id: pay.id, status: 'Paid' })
+                                            });
+                                            if (res.ok) {
+                                              fetchHrPayroll();
+                                            }
+                                          } catch (e) {
+                                            alert("Failed to pay payroll.");
+                                          }
+                                        }}
+                                        className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                                      >
+                                        Mark Paid
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Leaves Sub-tab */}
+              {hrActiveSubTab === "leaves" && (
+                <div className="grid gap-6 lg:grid-cols-3">
+                  {/* Leave Request List */}
+                  <div className="lg:col-span-2 rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                    <div className="p-6 border-b border-[#414E36]/10 flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-[#1F251A]">Leave Requests</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                            <th className="px-6 py-4">Employee</th>
+                            <th className="px-6 py-4">Type</th>
+                            <th className="px-6 py-4">Dates</th>
+                            <th className="px-6 py-4">Days</th>
+                            <th className="px-6 py-4">Reason</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#414E36]/5">
+                          {leavesList.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                                No leave requests submitted yet.
+                              </td>
+                            </tr>
+                          ) : (
+                            leavesList.map((leave: any) => (
+                              <tr key={leave.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="font-semibold text-[#1F251A]">{leave.employee_accounts?.name || "—"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{leave.employee_accounts?.role_name || "—"}</div>
+                                </td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{leave.leave_type}</td>
+                                <td className="px-6 py-4 text-xs text-[#1F251A]">
+                                  {leave.start_date} to {leave.end_date}
+                                </td>
+                                <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">{leave.days_count}</td>
+                                <td className="px-6 py-4 text-xs text-[#5A6A51] max-w-[150px] truncate" title={leave.reason}>{leave.reason || "—"}</td>
+                                <td className="px-6 py-4">
+                                  <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
+                                    leave.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                    leave.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
+                                    'bg-amber-50 text-amber-700 border border-amber-100'
+                                  }`}>
+                                    {leave.status}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
+                                  {leave.status === "Pending" && (
+                                    <>
+                                      <button
+                                        onClick={async () => {
+                                          const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+                                          await fetch('/api/hr/leaves', {
+                                            method: 'PATCH',
+                                            headers: {
+                                              'Content-Type': 'application/json',
+                                              'Authorization': `Bearer ${session?.access_token}`
+                                            },
+                                            body: JSON.stringify({ id: leave.id, status: 'Approved', approvedBy: profileEmployee?.id || null })
+                                          });
+                                          fetchHrLeaves();
+                                        }}
+                                        className="rounded-xl bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                                      >
+                                        Approve
+                                      </button>
+                                      <button
+                                        onClick={async () => {
+                                          const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+                                          await fetch('/api/hr/leaves', {
+                                            method: 'PATCH',
+                                            headers: {
+                                              'Content-Type': 'application/json',
+                                              'Authorization': `Bearer ${session?.access_token}`
+                                            },
+                                            body: JSON.stringify({ id: leave.id, status: 'Rejected', approvedBy: profileEmployee?.id || null })
+                                          });
+                                          fetchHrLeaves();
+                                        }}
+                                        className="rounded-xl bg-rose-600 px-2 py-1 text-xs font-bold text-white hover:bg-rose-700 transition"
+                                      >
+                                        Reject
+                                      </button>
+                                    </>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Submit Leave Request */}
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 p-6 shadow-sm h-fit">
+                    <h3 className="text-lg font-bold text-[#1F251A] mb-4">Request Leave</h3>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!newLeaveEmployeeId || !newLeaveStartDate || !newLeaveEndDate) {
+                          alert("All fields are required.");
+                          return;
+                        }
+                        try {
+                          const res = await fetch('/api/hr/leaves', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${session?.access_token}`
+                            },
+                            body: JSON.stringify({
+                              employeeId: newLeaveEmployeeId,
+                              leaveType: newLeaveType,
+                              startDate: newLeaveStartDate,
+                              endDate: newLeaveEndDate,
+                              reason: newLeaveReason
+                            })
+                          });
+                          if (res.ok) {
+                            setNewLeaveStartDate("");
+                            setNewLeaveEndDate("");
+                            setNewLeaveReason("");
+                            fetchHrLeaves();
+                            alert("Leave request submitted successfully!");
+                          } else {
+                            const err = await res.json();
+                            alert(err.error || "Failed to submit request.");
+                          }
+                        } catch (err) {
+                          alert("Failed to submit request.");
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Employee</label>
+                        <select
+                          value={newLeaveEmployeeId}
+                          onChange={(e) => setNewLeaveEmployeeId(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                          required
+                        >
+                          <option value="">Select Employee</option>
+                          {employeesList.map((emp) => (
+                            <option key={emp.id} value={emp.id}>{emp.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Type</label>
+                        <select
+                          value={newLeaveType}
+                          onChange={(e) => setNewLeaveType(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                        >
+                          <option value="Sick">Sick Leave</option>
+                          <option value="Annual">Annual Leave</option>
+                          <option value="Casual">Casual Leave</option>
+                          <option value="Unpaid">Unpaid Leave</option>
+                        </select>
+                      </div>
+
+                      <div className="grid gap-4 grid-cols-2">
+                        <div>
+                          <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Start Date</label>
+                          <input
+                            type="date"
+                            value={newLeaveStartDate}
+                            onChange={(e) => setNewLeaveStartDate(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">End Date</label>
+                          <input
+                            type="date"
+                            value={newLeaveEndDate}
+                            onChange={(e) => setNewLeaveEndDate(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Reason</label>
+                        <textarea
+                          placeholder="Why is leave needed?"
+                          value={newLeaveReason}
+                          onChange={(e) => setNewLeaveReason(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none h-20 resize-none"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                      >
+                        Submit Leave Request
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Performance Reviews Sub-tab */}
+              {hrActiveSubTab === "performance" && (
+                <div className="grid gap-6 lg:grid-cols-3">
+                  {/* Reviews Timeline List */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <h3 className="text-xl font-bold text-[#1F251A] mb-2">Performance Logs</h3>
+                    {performanceReviews.length === 0 ? (
+                      <div className="rounded-[32px] border border-[#414E36]/10 bg-white p-12 text-center text-sm text-[#5A6A51]">
+                        No performance reviews submitted yet.
+                      </div>
+                    ) : (
+                      performanceReviews.map((rev: any) => (
+                        <div key={rev.id} className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm relative hover:border-[#414E36]/30 transition-all">
+                          <button
+                            onClick={async () => {
+                              if (!confirm("Delete this review?")) return;
+                              await fetch(`/api/hr/performance?id=${rev.id}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${session?.access_token}` }
+                              });
+                              fetchHrPerformance();
+                            }}
+                            className="absolute top-6 right-6 text-rose-600 hover:text-rose-700 transition"
+                            title="Delete Review"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                          <div className="flex items-start gap-4">
+                            <div className="h-12 w-12 rounded-full bg-[#C4AE7C]/15 text-[#414E36] flex items-center justify-center font-bold text-sm shrink-0">
+                              {rev.employee_accounts?.name?.slice(0, 2).toUpperCase() || "??"}
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="font-bold text-[#1F251A]">{rev.employee_accounts?.name || "—"}</h4>
+                              <p className="text-xs text-[#5A6A51]">Role: {rev.employee_accounts?.role_name || "—"}</p>
+                              <div className="flex items-center gap-1.5 py-1">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    size={14}
+                                    className={i < rev.rating ? "text-amber-400 fill-amber-400" : "text-gray-300"}
+                                  />
+                                ))}
+                                <span className="text-xs text-[#5A6A51] ml-1 font-semibold">{rev.review_date}</span>
+                              </div>
+                              <div className="mt-3 text-sm text-[#1F251A] bg-[#FBFBF9] p-3 rounded-2xl border border-[#414E36]/5">
+                                <p className="font-semibold text-xs text-[#5A6A51] mb-1">Evaluator Notes:</p>
+                                <p className="leading-relaxed">{rev.comments || "No comments written."}</p>
+                              </div>
+                              {rev.goals && (
+                                <div className="mt-2 text-sm text-[#1F251A] bg-[#C4AE7C]/5 p-3 rounded-2xl border border-[#C4AE7C]/10">
+                                  <p className="font-semibold text-xs text-[#8B7544] mb-1">Target Goals:</p>
+                                  <p className="leading-relaxed">{rev.goals}</p>
+                                </div>
+                              )}
+                              <p className="text-[10px] text-[#5A6A51] mt-3">Evaluated by: {rev.reviewer?.name || "System"}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Create Review Form */}
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 p-6 shadow-sm h-fit">
+                    <h3 className="text-lg font-bold text-[#1F251A] mb-4">Add Performance Review</h3>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!newReviewEmployeeId) {
+                          alert("Please select employee.");
+                          return;
+                        }
+                        const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+                        try {
+                          const res = await fetch('/api/hr/performance', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${session?.access_token}`
+                            },
+                            body: JSON.stringify({
+                              employeeId: newReviewEmployeeId,
+                              reviewerId: profileEmployee?.id || newReviewEmployeeId,
+                              rating: newReviewRating,
+                              comments: newReviewComments,
+                              goals: newReviewGoals
+                            })
+                          });
+                          if (res.ok) {
+                            setNewReviewComments("");
+                            setNewReviewGoals("");
+                            fetchHrPerformance();
+                            alert("Review created successfully!");
+                          } else {
+                            const err = await res.json();
+                            alert(err.error || "Failed to create review.");
+                          }
+                        } catch (err) {
+                          alert("Failed to submit review.");
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Employee Under Review</label>
+                        <select
+                          value={newReviewEmployeeId}
+                          onChange={(e) => setNewReviewEmployeeId(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                          required
+                        >
+                          <option value="">Select Employee</option>
+                          {employeesList.map((emp) => (
+                            <option key={emp.id} value={emp.id}>{emp.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Rating (1 to 5 Stars)</label>
+                        <select
+                          value={newReviewRating}
+                          onChange={(e) => setNewReviewRating(Number(e.target.value))}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none"
+                        >
+                          <option value={5}>5 Stars (Excellent)</option>
+                          <option value={4}>4 Stars (Good)</option>
+                          <option value={3}>3 Stars (Satisfactory)</option>
+                          <option value={2}>2 Stars (Needs Improvement)</option>
+                          <option value={1}>1 Star (Poor)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Comments</label>
+                        <textarea
+                          placeholder="Review comments and feedback..."
+                          value={newReviewComments}
+                          onChange={(e) => setNewReviewComments(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none h-24 resize-none"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Goals &amp; Next Steps</label>
+                        <textarea
+                          placeholder="What goals should they work towards next?"
+                          value={newReviewGoals}
+                          onChange={(e) => setNewReviewGoals(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none h-20 resize-none"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                      >
+                        Submit Performance Review
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Attendance Sub-tab */}
+              {hrActiveSubTab === "attendance" && (
+                <div className="space-y-6">
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                    <div className="p-6 border-b border-[#414E36]/10">
+                      <h3 className="text-lg font-bold text-[#1F251A]">Daily Attendance Log</h3>
+                      <p className="mt-1 text-xs text-[#5A6A51]">Attendance is recorded automatically on first login each day via GPS proximity check.</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                            <th className="px-6 py-4">Employee</th>
+                            <th className="px-6 py-4">Date</th>
+                            <th className="px-6 py-4">Check-in Time</th>
+                            <th className="px-6 py-4">Location (GPS)</th>
+                            <th className="px-6 py-4">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#414E36]/5">
+                          {loadingAttendance ? (
+                            <tr><td colSpan={5} className="px-6 py-16 text-center text-sm text-[#5A6A51]">Loading attendance records…</td></tr>
+                          ) : attendanceList.length === 0 ? (
+                            <tr><td colSpan={5} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">No attendance records found. Records appear after employees log in each day.</td></tr>
+                          ) : (
+                            attendanceList.map((rec: any) => (
+                              <tr key={rec.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="font-semibold text-[#1F251A]">{rec.employee_accounts?.name || "—"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{rec.employee_accounts?.role_name || "—"}</div>
+                                </td>
+                                <td className="px-6 py-4 text-xs text-[#1F251A]">{rec.date}</td>
+                                <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
+                                  {rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                                </td>
+                                <td className="px-6 py-4 text-xs text-[#5A6A51]">
+                                  {rec.latitude && rec.longitude
+                                    ? `${Number(rec.latitude).toFixed(4)}, ${Number(rec.longitude).toFixed(4)}`
+                                    : "—"}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
+                                    rec.status === 'Present' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                    rec.status === 'Late' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                    'bg-rose-50 text-rose-700 border border-rose-100'
+                                  }`}>
+                                    {rec.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Missing Alerts Log */}
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-[#414E36]/10">
+                      <h3 className="text-lg font-bold text-[#1F251A]">Inactivity Alerts</h3>
+                      <p className="mt-1 text-xs text-[#5A6A51]">Logged when an employee did not confirm presence within 10 seconds of the 30-minute activity check.</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                            <th className="px-6 py-4">Employee</th>
+                            <th className="px-6 py-4">Alert Time</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#414E36]/5">
+                          {activeMissingAlerts.length === 0 ? (
+                            <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-[#5A6A51] font-medium">No active inactivity alerts at this time.</td></tr>
+                          ) : (
+                            activeMissingAlerts.map((a: any) => (
+                              <tr key={a.id} className="hover:bg-rose-50/30 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="font-semibold text-[#1F251A]">{a.employee_accounts?.name || "—"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{a.employee_accounts?.role_name || "—"}</div>
+                                </td>
+                                <td className="px-6 py-4 text-xs text-[#1F251A]">{new Date(a.timestamp).toLocaleString()}</td>
+                                <td className="px-6 py-4">
+                                  <span className="inline-block rounded-xl px-2.5 py-1 text-xs font-bold bg-rose-50 text-rose-700 border border-rose-100">
+                                    Unresolved
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <button
+                                    onClick={async () => {
+                                      const res = await fetch('/api/hr/alerts', {
+                                        method: 'PATCH',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'Authorization': `Bearer ${session?.access_token}`
+                                        },
+                                        body: JSON.stringify({ id: a.id, resolved: true })
+                                      });
+                                      if (res.ok) fetchHrAlerts();
+                                    }}
+                                    className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                                  >
+                                    Resolve
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Presence Activity Check Overlay Modal */}
+          {presenceModalOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div className="w-full max-w-md rounded-[32px] bg-white border border-[#414E36]/10 p-8 shadow-2xl text-center space-y-6 mx-4">
+                <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+                  <Clock size={32} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-bold text-[#1F251A]">Activity Verification</h3>
+                  <p className="text-sm text-[#5A6A51] leading-relaxed">
+                    Please verify that you are active at your workstation. If you do not click the button below within the next:
+                  </p>
+                  <div className={`text-5xl font-bold ${presenceCountdown <= 3 ? 'text-rose-600' : presenceCountdown <= 6 ? 'text-amber-500' : 'text-[#414E36]'} transition-colors`}>
+                    {presenceCountdown}s
+                  </div>
+                  <p className="text-xs text-[#5A6A51]">An inactivity alert will be sent to the administrator.</p>
+                </div>
+                <button
+                  onClick={() => setPresenceModalOpen(false)}
+                  className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
+                >
+                  ✓ I am Present &amp; Working
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Location Warning Modal */}
+          {locationWarningOpen && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 backdrop-blur-md">
+              <div className="w-full max-w-md rounded-[32px] bg-white border border-rose-100 p-8 shadow-2xl text-center space-y-6 mx-4">
+                <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-100 animate-pulse">
+                  <MapPin size={32} />
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-2xl font-bold text-[#1F251A]">Account Access Locked</h3>
+                  <p className="text-sm text-[#5A6A51] leading-relaxed whitespace-pre-line">
+                    {locationWarningMsg}
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (supabase) {
+                      await supabase.auth.signOut();
+                    }
+                    setLocationWarningOpen(false);
+                  }}
+                  className="w-full rounded-2xl bg-rose-600 py-3 text-sm font-bold text-white hover:bg-rose-700 transition shadow-md"
+                >
+                  Sign Out &amp; Exit
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ── BOOKINGS VIEW ── */}
           {activeNav === "Bookings" && (
           <>
@@ -7720,7 +13371,11 @@ export default function AdminPage() {
           <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             {/* ── CALENDAR VIEW SWITCHER ── */}
             <div className="flex items-center gap-1 p-1 w-fit rounded-full border border-[#414E36]/12 bg-white shadow-sm">
-              {(["Calendar", "List", "Schedule"] as const).map((view) => (
+              {(["Calendar", "List", "Schedule"] as const).filter(view => {
+                if (view === "Calendar" || view === "Schedule") return hasPermission("bookings.view_calendar");
+                if (view === "List") return hasPermission("bookings.view_list");
+                return true;
+              }).map((view) => (
                 <button
                   key={view}
                   onClick={() => setCalendarView(view)}
@@ -7737,18 +13392,33 @@ export default function AdminPage() {
 
             <div className="flex flex-wrap items-center gap-3">
               <button
-                onClick={() => setShowAddBookingModal(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] w-fit"
+                onClick={() => setShowFilterModal(true)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#414E36]/15 bg-white text-[#414E36] transition hover:bg-[#f7f6f2] shadow-sm"
+                title="Filter Bookings"
               >
-                <Plus size={18} /> New booking
+                <Filter size={18} />
               </button>
+              <button
+                onClick={handleExportBookingsCSV}
+                className="inline-flex items-center gap-2 rounded-full bg-[#C4AE7C] px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#b59e6c] w-fit shadow-sm"
+              >
+                <Download size={16} /> Export
+              </button>
+              {hasPermission("bookings.create") && (
+                <button
+                  onClick={() => setShowAddBookingModal(true)}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] w-fit shadow-sm"
+                >
+                  <Plus size={18} /> New booking
+                </button>
+              )}
             </div>
           </div>
 
           {calendarView === "Calendar" && (
           <section className="mb-8 flex flex-col gap-6">
             {/* ── Dashboard summary row ── */}
-            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
               {/* Today's bookings stat */}
               <div
                 onClick={() => { setCalendarMonth(new Date()); setShowTodayBookingsModal(true); }}
@@ -7767,39 +13437,13 @@ export default function AdminPage() {
                 <p className="mt-3 text-4xl font-bold text-[#C4AE7C]">{requests.length}</p>
                 <p className="mt-1 text-sm text-[#5A6A51]">{requests.length === 0 ? "No pending requests" : "Awaiting approval"}</p>
               </div>
-              {/* Latest confirmed booking */}
-              {(() => {
-                const latestApproved = allReservations.find(r => r.status === 'approved');
-                return (
-                  <div
-                    onClick={() => latestApproved && setViewingBooking(latestApproved)}
-                    className={`rounded-[32px] bg-[#E8EDDF]/80 p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] transition ${latestApproved ? 'cursor-pointer hover:shadow-[0_30px_80px_rgba(47,61,41,0.12)]' : ''}`}
-                  >
-                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]/80">Latest confirmed</p>
-                    <p className="mt-3 text-base font-semibold text-[#1F251A] line-clamp-2">
-                      {latestApproved ? latestApproved.name : "No bookings yet"}
-                    </p>
-                    <p className="mt-1 text-sm text-[#5A6A51]">
-                      {latestApproved ? (latestApproved.doctorName || 'Dr. Sara El Gamel') : "—"}
-                    </p>
-                  </div>
-                );
-              })()}
-              {/* Quick actions */}
-              <div className="rounded-[32px] bg-[#414E36] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] flex flex-col gap-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-[#FBFBF9]/60">Quick actions</p>
-                <button
-                  onClick={() => setShowFilterModal(true)}
-                  className="rounded-2xl bg-[#FBFBF9]/10 px-4 py-3 text-left text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#FBFBF9]/20"
-                >
-                  Filter bookings
-                </button>
-                <button
-                  onClick={() => setShowActionsMenuModal(true)}
-                  className="rounded-2xl bg-[#C4AE7C] px-4 py-3 text-left text-sm font-semibold text-[#414E36] transition hover:bg-[#b59e6c]"
-                >
-                  Actions menu
-                </button>
+              {/* Coming appointments stat */}
+              <div
+                className="rounded-[32px] bg-[#E8EDDF]/80 p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]"
+              >
+                <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]/80">Coming appointments</p>
+                <p className="mt-3 text-4xl font-bold text-[#1F251A]">{comingAppointmentsCount}</p>
+                <p className="mt-1 text-sm text-[#5A6A51]">Upcoming approved bookings</p>
               </div>
             </div>
 
@@ -7857,10 +13501,16 @@ export default function AdminPage() {
                           onClick={() => {
                             if (bookingCount > 0) {
                               const bookingsForDay = filteredReservations.filter(
-                                (r) => String(r.date).slice(0, 10) === dateKey && r.status === 'approved'
+                                (r) => String(r.date).slice(0, 10) === dateKey && ['approved', 'confirmed', 'started', 'completed'].includes(r.status)
                               );
-                              if (bookingsForDay.length > 0) {
+                              if (bookingsForDay.length === 1) {
                                 setViewingBooking(bookingsForDay[0]);
+                              } else if (bookingsForDay.length > 1) {
+                                setDayBookingsSelector({
+                                  open: true,
+                                  date: dateKey,
+                                  bookings: bookingsForDay
+                                });
                               }
                             }
                           }}
@@ -7897,7 +13547,7 @@ export default function AdminPage() {
                 <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">All bookings — list</h3>
               </div>
               <span className="rounded-full bg-[#EDF1EC] px-4 py-2 text-sm font-semibold text-[#5A6A51]">
-                {filteredReservations.filter(r => r.status === 'approved').length} approved
+                {filteredReservations.filter(r => ['approved', 'confirmed', 'started', 'completed'].includes(r.status)).length} active
               </span>
             </div>
             {filteredReservations.length === 0 ? (
@@ -7927,14 +13577,7 @@ export default function AdminPage() {
                           : '—';
                         const timeLabel = r.timeSlot || r.requestedTime || null;
                         const refId = `#${r.id.replace(/-/g,'').slice(0,8).toUpperCase()}`;
-                        const statusColors: Record<string, string> = {
-                          approved:  'bg-[#414E36]/10 text-[#414E36]',
-                          pending:   'bg-[#C4AE7C]/25 text-[#7a6a3a]',
-                          rejected:  'bg-red-100 text-red-600',
-                          cancelled: 'bg-red-100 text-red-500',
-                          canceled:  'bg-red-100 text-red-500',
-                        };
-                        const statusClass = statusColors[r.status?.toLowerCase()] ?? 'bg-[#EDF1EC] text-[#5A6A51]';
+                        const statusClass = getStatusBadgeClass(r.status);
                         return (
                           <tr key={r.id} className="group transition-colors hover:bg-[#EDF1EC]/40">
                             <td className="px-4 py-4 font-mono font-bold text-[#1F251A] whitespace-nowrap">{refId}</td>
@@ -8246,12 +13889,7 @@ export default function AdminPage() {
                   Pending approvals
                 </h4>
               </div>
-              <button
-                onClick={() => setShowAddBookingModal(true)}
-                className="inline-flex items-center gap-2 rounded-3xl bg-[#C4AE7C] px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#b59e6c]"
-              >
-                <Plus size={16} /> Add request
-              </button>
+
             </div>
 
             {loading && <p>Loading requests…</p>}
@@ -8262,24 +13900,29 @@ export default function AdminPage() {
             )}
 
             <div className="space-y-4">
-              {requests.map((req) => (
-                <div
-                  key={req.id}
-                  className="rounded-3xl border border-[#414E36]/10 bg-[#F7F7F3] p-5"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-lg font-semibold text-[#1F251A]">
-                        {req.name}
-                      </p>
-                      <p className="mt-1 text-sm text-[#5A6A51]">
-                        {req.email} • {req.phone} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === req.branchId)?.name_en || "Default/All"}</span>
-                      </p>
+              {requests.map((req) => {
+                const service = localServices.find(s => s.id === req.serviceId);
+                return (
+                  <div
+                    key={req.id}
+                    className="rounded-3xl border border-[#414E36]/10 bg-[#F7F7F3] p-5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-semibold text-[#1F251A]">
+                          {req.name}
+                        </p>
+                        <p className="text-sm font-semibold text-[#414E36] mt-0.5">
+                          Service: {service ? service.en : `Service #${req.serviceId}`}
+                        </p>
+                        <p className="mt-1 text-xs text-[#5A6A51]">
+                          {req.email} • {req.phone} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === req.branchId)?.name_en || "Default/All"}</span>
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#414E36]">
+                        {req.status}
+                      </span>
                     </div>
-                    <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#414E36]">
-                      {req.status}
-                    </span>
-                  </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-3xl bg-[#FBFBF9] p-4">
                       <p className="text-xs uppercase tracking-[0.25em] text-[#5A6A51]/80">
@@ -8299,41 +13942,54 @@ export default function AdminPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openApprove(req);
-                      }}
-                      className="rounded-3xl bg-[#414E36] px-4 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        await fetch(
-                          "/api/reservations?id=" + encodeURIComponent(req.id),
-                          {
-                            method: "PATCH",
-                            body: JSON.stringify({ action: "reject" }),
-                            headers: { "Content-Type": "application/json" },
-                          }
-                        );
-                        fetchRequests();
-                        fetchAllReservations();
-                      }}
-                      className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#f7f6f2]"
-                    >
-                      Reject
-                    </button>
-                  </div>
+                  {hasPermission("bookings.approve_reject") && (
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        disabled={loadingApproveId === req.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openApprove(req);
+                        }}
+                        className="rounded-3xl bg-[#414E36] px-4 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-60 flex items-center gap-2"
+                      >
+                        {loadingApproveId === req.id ? (
+                          <>
+                            <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+                            Loading...
+                          </>
+                        ) : (
+                          "Approve"
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await fetch(
+                            "/api/reservations?id=" + encodeURIComponent(req.id),
+                            {
+                              method: "PATCH",
+                              body: JSON.stringify({ action: "reject" }),
+                              headers: { "Content-Type": "application/json" },
+                            }
+                          );
+                          fetchRequests();
+                          fetchAllReservations();
+                        }}
+                        className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] px-4 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#f7f6f2]"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
+              );
+            })}
             </div>
           </section>
+          </>
+          )}
           </>
           )}
           </div>
@@ -8371,14 +14027,21 @@ export default function AdminPage() {
               onChange={(e) => setSlot(e.target.value)}
               className="mb-4 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
             >
-              {SLOTS.map((s) => {
-                const isUnavailable = approveUnavailableSlots.includes(s);
-                return (
-                  <option key={s} value={s} disabled={isUnavailable}>
-                    {s} {isUnavailable ? "(Unavailable)" : ""}
-                  </option>
-                );
-              })}
+              {(() => {
+                const { start, end } = getDayOperatingHoursApprove(selected);
+                const filteredSlots = SLOTS.filter((s) => {
+                  const norm = normaliseTo24hSlot(s) ?? "";
+                  return norm >= start && norm < end;
+                });
+                return filteredSlots.map((s) => {
+                  const isUnavailable = approveUnavailableSlots.includes(s);
+                  return (
+                    <option key={s} value={s} disabled={isUnavailable}>
+                      {s} {isUnavailable ? "(Unavailable)" : ""}
+                    </option>
+                  );
+                });
+              })()}
             </select>
 
             <label className="mb-2 block text-sm font-semibold text-[#414E36]">
@@ -8389,11 +14052,14 @@ export default function AdminPage() {
               onChange={(e) => setDoctorName(e.target.value)}
               className="mb-6 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
             >
-              {providers.map((p) => (
+              {availableDoctorsApprove.map((p) => (
                 <option key={p.id || p.name} value={p.name}>
                   {p.name}
                 </option>
               ))}
+              {availableDoctorsApprove.length === 0 && (
+                <option value="">No Available Doctors</option>
+              )}
             </select>
 
             <div className="flex flex-wrap gap-3">
@@ -8416,9 +14082,66 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Date bookings selector modal */}
+      {dayBookingsSelector.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-lg rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] border border-[#414E36]/10">
+            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Select Appointment</p>
+                <h3 className="mt-2 text-xl font-semibold text-[#1F251A]">
+                  Bookings on {new Date(dayBookingsSelector.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                </h3>
+              </div>
+              <button
+                onClick={() => setDayBookingsSelector({ open: false, date: "", bookings: [] })}
+                className="rounded-full bg-white border border-[#414E36]/10 p-2 text-[#414E36] hover:bg-[#EDF1EC] transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-1">
+              {dayBookingsSelector.bookings.map((b: any) => {
+                const svc = localServices.find(s => s.id === b.serviceId);
+                const rm = rooms.find(room => room.id === b.roomId);
+                
+                return (
+                  <div
+                    key={b.id}
+                    onClick={() => {
+                      setViewingBooking(b);
+                      setDayBookingsSelector({ open: false, date: "", bookings: [] });
+                    }}
+                    className="flex items-center justify-between gap-4 rounded-2xl border border-[#414E36]/10 bg-white p-4 hover:bg-[#EDF1EC]/30 hover:border-[#414E36]/30 transition cursor-pointer group"
+                  >
+                    <div className="space-y-1">
+                      <p className="font-bold text-[#1F251A] group-hover:text-[#414E36] transition-colors">{b.name}</p>
+                      <p className="text-xs text-[#5A6A51] font-medium">{svc ? svc.en : `Service #${b.serviceId}`}</p>
+                      {rm && (
+                        <p className="text-[11px] text-[#5A6A51] flex items-center gap-1">
+                          <DoorOpen size={10} /> {rm.name}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-flex rounded-full bg-[#414E36]/10 text-[#414E36] px-2.5 py-1 text-xs font-semibold">
+                        {b.timeSlot || b.requestedTime || "N/A"}
+                      </span>
+                      <p className="text-[10px] text-[#5A6A51]/80 mt-1 capitalize font-medium">{b.status}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {viewingBooking && (() => {
-        const service = localServices.find(s => s.id === viewingBooking.serviceId);
-        const serviceName = service ? service.en : "Half Arms";
+        const selectedServiceIds: number[] = Array.isArray(viewingBooking.serviceIds) 
+          ? viewingBooking.serviceIds 
+          : (viewingBooking.serviceId ? [Number(viewingBooking.serviceId)] : []);
         
         // Price Details map in EGP
         const prices: Record<number, number> = {
@@ -8427,7 +14150,18 @@ export default function AdminPage() {
           21: 300, 22: 350, 23: 300,
           31: 400, 32: 350, 33: 400, 34: 500
         };
-        const cost = service?.price ?? prices[viewingBooking.serviceId] ?? 500;
+
+        const bookingServices = selectedServiceIds.map(id => {
+          const s = localServices.find(item => item.id === id);
+          return {
+            id,
+            name: s ? s.en : `Service #${id}`,
+            price: s?.price ?? prices[id] ?? 500
+          };
+        });
+
+        const serviceNames = bookingServices.map(bs => bs.name).join(", ");
+        const cost = bookingServices.reduce((sum, bs) => sum + bs.price, 0);
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4">
@@ -8455,7 +14189,10 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setViewingBooking(null)}
+                  onClick={() => {
+                    setViewingBooking(null);
+                    setIsEditingService(false);
+                  }}
                   className="rounded-full bg-[#F2EFE9] p-2 text-[#414E36] transition hover:bg-[#e4e0d6]"
                 >
                   <X size={20} />
@@ -8472,7 +14209,7 @@ export default function AdminPage() {
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICE</p>
-                      <p className="mt-1 text-base font-semibold text-[#1F251A]">{serviceName}</p>
+                      <p className="mt-1 text-base font-semibold text-[#1F251A]">{serviceNames}</p>
                     </div>
                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">BOOKING DATE</p>
@@ -8484,6 +14221,7 @@ export default function AdminPage() {
                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-1">SESSION TYPE</p>
                        <select
                          value={viewingBooking.sessionType || "in_person"}
+                         disabled={!hasPermission("bookings.edit")}
                          onChange={async (e) => {
                            const newType = e.target.value;
                            await fetch(`/api/reservations?id=${viewingBooking.id}`, {
@@ -8494,7 +14232,7 @@ export default function AdminPage() {
                            setViewingBooking(prev => prev ? { ...prev, sessionType: newType } : null);
                            fetchAllReservations();
                          }}
-                         className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer"
+                         className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                        >
                          <option value="in_person">In Person / في العيادة</option>
                          <option value="online">Online / أونلاين</option>
@@ -8522,49 +14260,268 @@ export default function AdminPage() {
                   </div>
 
                   {/* Services & Adjustments */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICES</p>
-                      <p className="text-sm text-[#1F251A] mt-1 font-semibold">{serviceName}</p>
+                  <div className="flex flex-col gap-3 border-b border-[#414E36]/10 pb-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICES</p>
+                      </div>
+                      {!isEditingService && (
+                        <button
+                          onClick={() => setIsEditingService(true)}
+                          disabled={!hasPermission("bookings.edit")}
+                          className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Add Service
+                        </button>
+                      )}
                     </div>
-                    <button className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition">
-                      Add Service
-                    </button>
+
+                    <div className="flex flex-wrap gap-2">
+                      {bookingServices.map((bs, index) => (
+                        <div key={`${bs.id}-${index}`} className="flex items-center gap-2 bg-[#EDF1EC] rounded-xl px-3 py-1.5 text-sm font-semibold text-[#1F251A] shadow-sm">
+                          <span>{bs.name}</span>
+                          <span className="text-xs font-medium text-[#5A6A51]">({bs.price} EGP)</span>
+                          {bookingServices.length > 1 && hasPermission("bookings.edit") && (
+                            <button
+                              onClick={async () => {
+                                const updatedIds = selectedServiceIds.filter((_, i) => i !== index);
+                                try {
+                                  const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                    method: "PATCH",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ serviceIds: updatedIds }),
+                                  });
+                                  if (res.ok) {
+                                    const updated = await res.json();
+                                    setViewingBooking(updated);
+                                    fetchAllReservations();
+                                  } else {
+                                    const err = await res.json();
+                                    alert(err.error || "Failed to remove service");
+                                  }
+                                } catch (err) {
+                                  console.error(err);
+                                  alert("Error removing service");
+                                }
+                              }}
+                              className="text-red-600 hover:text-red-800 ml-1 font-bold text-lg leading-none"
+                              title="Remove service"
+                            >
+                              &times;
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {isEditingService && (
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <select
+                          value=""
+                          onChange={async (e) => {
+                            const newServiceId = Number(e.target.value);
+                            if (!newServiceId) return;
+                            const updatedServiceIds = [...selectedServiceIds, newServiceId];
+                            try {
+                              const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ serviceIds: updatedServiceIds }),
+                              });
+                              if (res.ok) {
+                                const updated = await res.json();
+                                setViewingBooking(updated);
+                                fetchAllReservations();
+                                setIsEditingService(false);
+                              } else {
+                                const err = await res.json();
+                                alert(err.error || "Failed to add service");
+                              }
+                            } catch (err) {
+                              console.error(err);
+                              alert("Error adding service");
+                            }
+                          }}
+                          className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-sm text-[#1F251A] outline-none font-semibold focus:border-[#C4AE7C]"
+                        >
+                          <option value="" disabled>Select a service to add</option>
+                          {localServices
+                            .filter(svc => !selectedServiceIds.includes(svc.id))
+                            .map((svc) => (
+                              <option key={svc.id} value={svc.id}>
+                                {svc.en}
+                              </option>
+                            ))}
+                        </select>
+                        <button
+                          onClick={() => setIsEditingService(false)}
+                          className="text-xs font-semibold text-[#5A6A51] hover:underline"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
 
+                  {/*
+                   * Dev Notes:
+                   * - Implementation: Will require an 'adjustments' table or a JSON column in reservations to store reasons and positive/negative values.
+                   *   The frontend will show a form modal allowing reception/finance staff to add credits/debits.
+                   * - Technical Caveat / Gap: Requires strict role permission audit checks (e.g. only 'finance' or 'superadmin' roles can apply adjustments).
+                   *   All changes must write an audit trail log in a ledger table.
+                   * - Last Updated: July 5, 2026 2:45 PM
+                   * - Milestone: Postponed / Phase 2
+                   * - Module: Bookings / Billing
+                   * - Parent Feature: Billing System
+                   * - Place: Booking Details drawer / Extra Adjustment Section
+                   * - End Dev: Pending DB Schema
+                   * - Priority: Medium
+                   * - Started Dev: July 5, 2026 2:00 PM
+                   * - Status: Locked
+                   * - Sub-Features: Empty
+                   * - User Role: Finance Manager / Superadmin
+                   * - What: Allows adding positive or negative financial adjustments to the base price of a booking.
+                   * - Where: Located inside the booking details drawer under 'Extra Adjustment'.
+                   * - Why: Handles manual discounts, on-the-fly custom service adjustments, or refunds without altering core service pricing.
+                   */}
                   <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">EXTRA ADJUSTMENT</p>
                       <p className="text-sm text-[#1F251A] mt-1 font-semibold">0.00 EGP</p>
                     </div>
-                    <button className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition">
+                    <button
+                      disabled={true}
+                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-gray-400 bg-gray-50 cursor-not-allowed opacity-50 flex items-center gap-1"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                       Adjustment
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">AMOUNT TO PAY</p>
-                      <p className="text-sm text-[#d93838] mt-1 font-bold">Remaining: {cost} EGP</p>
+                  {/* Payment Details */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-4 shadow-sm">
+                    <p className="text-sm font-bold text-[#1F251A]">Payment Details / تفاصيل الدفع</p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">
+                          Amount Paid / المدفوع
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={!hasPermission("bookings.edit")}
+                            value={viewingBooking.amountPaid ?? 0}
+                            onChange={async (e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              // Autocalculate remaining left
+                              const remaining = Math.max(0, cost - val);
+                              await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ amountPaid: val, amountLeft: remaining })
+                              });
+                              setViewingBooking(prev => prev ? { ...prev, amountPaid: val, amountLeft: remaining } : null);
+                              fetchAllReservations();
+                            }}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-12 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] disabled:opacity-60 disabled:cursor-not-allowed"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">
+                          Amount Left (Remaining) / المتبقي
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={!hasPermission("bookings.edit")}
+                            value={viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null ? viewingBooking.amountLeft : Math.max(0, cost - (viewingBooking.amountPaid ?? 0))}
+                            onChange={async (e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ amountLeft: val })
+                              });
+                              setViewingBooking(prev => prev ? { ...prev, amountLeft: val } : null);
+                              fetchAllReservations();
+                            }}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-12 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] disabled:opacity-60 disabled:cursor-not-allowed"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   {/* Products */}
+                  {/*
+                   * Dev Notes:
+                   * - Implementation: Needs a 'products' table for catalog inventory and a 'reservation_products' junction table.
+                   *   The frontend should use an inventory picker modal showing live stock count.
+                   * - Technical Caveat / Gap: Inventory sync is critical. Real-time depletion check on checkout prevents overselling.
+                   * - Last Updated: July 5, 2026 2:45 PM
+                   * - Milestone: Postponed / Phase 2
+                   * - Module: Inventory / Products
+                   * - Parent Feature: Products System
+                   * - Place: Booking Details drawer / Products Section
+                   * - End Dev: Pending DB Schema
+                   * - Priority: Medium
+                   * - Started Dev: July 5, 2026 2:00 PM
+                   * - Status: Locked
+                   * - Sub-Features: Live Inventory Picker, Stock Reconciliation
+                   * - User Role: Pharmacist / Receptionist
+                   * - What: Allows prescribing/linking retail skincare or medical products to a patient's booking invoice.
+                   * - Where: Located inside the booking details drawer under 'Products'.
+                   * - Why: Consolidates clinical services and related products into a single final invoice for the patient.
+                   */}
                   <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS</p>
                       <p className="text-sm text-[#5A6A51] mt-1">No products added</p>
                     </div>
-                    <button className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition">
+                    <button
+                      disabled={true}
+                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-gray-400 bg-gray-50 cursor-not-allowed opacity-50 flex items-center gap-1"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                       See Products
                     </button>
                   </div>
 
                   {/* Prescriptions */}
+                  {/*
+                   * Dev Notes:
+                   * - Implementation: Requires a 'prescriptions' table with foreign keys to doctor, patient, and reservation, plus a 'prescription_items' table.
+                   *   The frontend should present a clean autocomplete selector for medicines, dosage rules, and duration.
+                   * - Technical Caveat / Gap: Needs integration with a drugs database API or static dictionary, and validation for active substance overlaps.
+                   * - Last Updated: July 5, 2026 2:45 PM
+                   * - Milestone: Postponed / Phase 2
+                   * - Module: Medical / Clinical
+                   * - Parent Feature: E-Prescriptions System
+                   * - Place: Booking Details drawer / Prescriptions Section
+                   * - End Dev: Pending DB Schema
+                   * - Priority: High
+                   * - Started Dev: July 5, 2026 2:00 PM
+                   * - Status: Locked
+                   * - Sub-Features: Autocomplete Drug Search, PDF Exporter
+                   * - User Role: Doctor / Clinician
+                   * - What: Digital prescription builder for writing treatment plans and medical prescriptions.
+                   * - Where: Located inside the booking details drawer under 'Prescriptions'.
+                   * - Why: Digitizes clinical workflows and allows patient records to keep a history of prescribed items.
+                   */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-sm font-bold text-[#1F251A]">Prescriptions</p>
-                      <button className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition">
+                      <button
+                        disabled={true}
+                        className="rounded-2xl bg-[#414E36]/50 px-3 py-1 text-xs font-semibold text-[#FBFBF9]/80 cursor-not-allowed flex items-center gap-1"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                         + Add Prescription
                       </button>
                     </div>
@@ -8577,7 +14534,11 @@ export default function AdminPage() {
                         <polyline points="10 9 9 9 8 9" />
                       </svg>
                       <p className="text-xs font-semibold">no prescriptions yet</p>
-                      <button className="mt-2 text-xs font-bold text-[#414E36] hover:underline">
+                      <button
+                        disabled={true}
+                        className="mt-2 text-xs font-bold text-gray-400 cursor-not-allowed flex items-center gap-1"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                         + Create First Prescription
                       </button>
                     </div>
@@ -8585,83 +14546,78 @@ export default function AdminPage() {
 
                   {/* Notes */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-sm font-bold text-[#1F251A]">Notes</p>
-                      <button
-                        onClick={async () => {
-                          const note = prompt("Enter note:", viewingBooking.notes || "");
-                          if (note !== null) {
-                            await saveNotes(note);
-                            setViewingBooking(prev => prev ? { ...prev, notes: note } : null);
-                          }
-                        }}
-                        className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
-                      >
-                        {viewingBooking.notes ? "Edit Note" : "+ Add Note"}
-                      </button>
-                    </div>
-                    {viewingBooking.notes ? (
-                      <div className="rounded-xl bg-[#F7F7F3] p-4 text-sm text-[#414E36]">
-                        {viewingBooking.notes}
+                    {isEditingNotes ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-bold text-[#1F251A]">Edit Notes</p>
+                        </div>
+                        <textarea
+                          value={notesDraft}
+                          onChange={(e) => setNotesDraft(e.target.value)}
+                          placeholder="Enter notes about this booking..."
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition min-h-[100px]"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => setIsEditingNotes(false)}
+                            className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await saveNotes(notesDraft);
+                              setViewingBooking(prev => prev ? { ...prev, notes: notesDraft } : null);
+                              setIsEditingNotes(false);
+                            }}
+                            className="rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                          >
+                            Save Note
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
-                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
-                        <p className="text-xs font-semibold">no notes yet</p>
-                        <button
-                          onClick={async () => {
-                            const note = prompt("Enter note:");
-                            if (note) {
-                              await saveNotes(note);
-                              setViewingBooking(prev => prev ? { ...prev, notes: note } : null);
-                            }
-                          }}
-                          className="mt-2 text-xs font-bold text-[#414E36] hover:underline"
-                        >
-                          Add your first note about this customer
-                        </button>
-                      </div>
+                      <>
+                        <div className="flex items-center justify-between mb-4">
+                          <p className="text-sm font-bold text-[#1F251A]">Notes</p>
+                          {hasPermission("bookings.edit") && (
+                            <button
+                              onClick={() => {
+                                setNotesDraft(viewingBooking.notes || "");
+                                setIsEditingNotes(true);
+                              }}
+                              className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                            >
+                              {viewingBooking.notes ? "Edit Note" : "+ Add Note"}
+                            </button>
+                          )}
+                        </div>
+                        {viewingBooking.notes ? (
+                          <div className="rounded-xl bg-[#F7F7F3] p-4 text-sm text-[#414E36]">
+                            {viewingBooking.notes}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
+                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                            </svg>
+                            <p className="text-xs font-semibold">no notes yet</p>
+                            {hasPermission("bookings.edit") && (
+                              <button
+                                onClick={() => {
+                                  setNotesDraft("");
+                                  setIsEditingNotes(true);
+                                }}
+                                className="mt-2 text-xs font-bold text-[#414E36] hover:underline"
+                              >
+                                Add your first note about this customer
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
-
-                  {viewingBooking.status === 'pending' && (
-                    <div className="rounded-2xl border-2 border-[#C4AE7C]/30 bg-[#EDF1EC] p-5 flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-bold text-[#1F251A]">Action Required</p>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">This booking is pending approval. Assign a doctor and confirm details.</p>
-                      </div>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => {
-                            setViewingBooking(null);
-                            openApprove(viewingBooking);
-                          }}
-                          className="rounded-3xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (confirm("Are you sure you want to reject this request?")) {
-                              await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ action: 'reject' }),
-                              });
-                              setViewingBooking(null);
-                              fetchRequests();
-                              fetchAllReservations();
-                            }
-                          }}
-                          className="rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#f7f6f2] transition"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  )}
 
                 </div>
 
@@ -8669,22 +14625,48 @@ export default function AdminPage() {
                 <div className="space-y-6">
                   
                   {/* Customer Information */}
-                  <div className="overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white">
-                    <div className="bg-[#414E36] px-5 py-4 text-[#FBFBF9]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#C4AE7C]/90">Customer Information</p>
-                      <h4 className="mt-1 text-lg font-bold text-[#FBFBF9]">{viewingBooking.name}</h4>
-                    </div>
-                    <div className="p-5 space-y-4 text-sm text-[#414E36]">
-                      <div>
-                        <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Email</p>
-                        <p className="mt-0.5 break-all font-semibold">{viewingBooking.email}</p>
+                  {(() => {
+                    const customerRecord = dbCustomers.find(c => c.id === viewingBooking.customerId || c.phone === viewingBooking.phone);
+                    const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
+                    const spentAmount = customerRecord ? Number(customerRecord.spent || customerRecord.spent_amount || 0) : 0;
+                    const outstandingAmount = customerRecord ? Number(customerRecord.outstanding || 0) : 0;
+
+                    return (
+                      <div className="overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white">
+                        <div className="bg-[#414E36] px-5 py-4 text-[#FBFBF9]">
+                          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#C4AE7C]/90">Customer Information</p>
+                          <h4 className="mt-1 text-lg font-bold text-[#FBFBF9]">{viewingBooking.name}</h4>
+                        </div>
+                        <div className="p-5 space-y-4 text-sm text-[#414E36]">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Email</p>
+                              <p className="mt-0.5 break-all font-semibold">{viewingBooking.email || "—"}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Phone</p>
+                              <p className="mt-0.5 font-semibold">{viewingBooking.phone}</p>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-[#414E36]/10 pt-4 grid grid-cols-3 gap-2">
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Wallet Balance</p>
+                              <p className="mt-0.5 font-bold text-[#C4AE7C]">EGP {walletBalance.toFixed(0)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Total Spent</p>
+                              <p className="mt-0.5 font-bold text-green-600">EGP {spentAmount.toFixed(0)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Outstanding</p>
+                              <p className="mt-0.5 font-bold text-red-600">EGP {outstandingAmount.toFixed(0)}</p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Phone</p>
-                        <p className="mt-0.5 font-semibold">{viewingBooking.phone}</p>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   {/* Provider */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
@@ -8702,6 +14684,7 @@ export default function AdminPage() {
                     </div>
                     <select
                       value={viewingBooking.doctorName || "Dr. Sara El Gamel"}
+                      disabled={!hasPermission("bookings.edit")}
                       onChange={async (e) => {
                         const newDoc = e.target.value;
                         await fetch(`/api/reservations?id=${viewingBooking.id}`, {
@@ -8712,7 +14695,7 @@ export default function AdminPage() {
                         setViewingBooking(prev => prev ? { ...prev, doctorName: newDoc } : null);
                         fetchAllReservations();
                       }}
-                      className="w-full rounded-xl border border-[#414E36]/10 bg-[#FBFBF9] px-3 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer"
+                      className="w-full rounded-xl border border-[#414E36]/10 bg-[#FBFBF9] px-3 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {providers.map((p) => (
                         <option key={p.id || p.name} value={p.name}>
@@ -8721,6 +14704,53 @@ export default function AdminPage() {
                       ))}
                     </select>
                   </div>
+
+                  {/* Assigned Room or Compatible Rooms */}
+                  {viewingBooking.roomId ? (
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Assigned Room</p>
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-[#414E36]/10 flex items-center justify-center text-[#414E36]">
+                          <DoorOpen size={18} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-[#1F251A]">
+                            {(() => {
+                              const r = rooms.find(rm => rm.id === viewingBooking.roomId);
+                              return r ? r.name : "Loading...";
+                            })()}
+                          </p>
+                          <p className="text-xs text-[#5A6A51] capitalize">
+                            {(() => {
+                              const r = rooms.find(rm => rm.id === viewingBooking.roomId);
+                              return r ? `${r.type} Room` : "";
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Compatible Rooms</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(() => {
+                          const compatibleList = rooms.filter(rm => viewingBooking.rooms?.includes(rm.id));
+                          if (compatibleList.length === 0) {
+                            return <p className="text-xs text-[#5A6A51] italic">No compatible clinical rooms configured for this service.</p>;
+                          }
+                          return compatibleList.map(rm => (
+                            <span 
+                              key={rm.id} 
+                              className="inline-flex items-center gap-1.5 rounded-full border border-[#414E36]/10 bg-[#EDF1EC] px-3 py-1 text-xs font-semibold text-[#414E36]"
+                            >
+                              <DoorOpen size={12} />
+                              {rm.name}
+                            </span>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Service Status */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 text-sm">
@@ -8752,29 +14782,150 @@ export default function AdminPage() {
                     </button>
                   </div>
 
-                  {/* Danger Zone / Remove Booking */}
-                  <div className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-red-800 mb-3">Danger Zone</p>
-                    <button
-                      onClick={async () => {
-                        if (confirm("Are you sure you want to permanently delete/remove this booking?")) {
-                          const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                            method: "DELETE",
-                          });
-                          if (res.ok) {
+                  {/* Workflow Action Flow Section */}
+                  {viewingBooking.status === 'pending' && hasPermission("bookings.approve_reject") && (
+                    <div className="rounded-2xl border-2 border-[#C4AE7C]/30 bg-[#EDF1EC] p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Workflow Actions</p>
+                      <p className="text-xs text-[#5A6A51] mb-4">This booking is pending approval. Assign a doctor and confirm details.</p>
+                      <div className="flex gap-3">
+                        <button
+                          disabled={loadingApproveId === viewingBooking.id}
+                          onClick={async () => {
+                            await openApprove(viewingBooking);
                             setViewingBooking(null);
-                            fetchRequests();
-                            fetchAllReservations();
-                          } else {
-                            alert("Failed to delete booking.");
+                          }}
+                          className="flex-1 rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 flex items-center justify-center gap-1.5"
+                        >
+                          {loadingApproveId === viewingBooking.id ? (
+                            <>
+                              <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+                              Loading...
+                            </>
+                          ) : (
+                            "Approve"
+                          )}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (await showConfirm("Are you sure you want to reject this request?")) {
+                              await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'reject' }),
+                              });
+                              setViewingBooking(null);
+                              fetchRequests();
+                              fetchAllReservations();
+                            }
+                          }}
+                          className="flex-1 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {(viewingBooking.status === 'approved' || viewingBooking.status === 'confirmed') && hasPermission("bookings.edit") && (
+                    <div className="rounded-2xl border border-[#C4AE7C]/30 bg-white p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Session Flow</p>
+                      <p className="text-xs text-[#5A6A51] mb-4">The customer is ready to begin their clinical session.</p>
+                      <div className="flex gap-3">
+                        {viewingBooking.status === 'approved' && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ status: 'confirmed' })
+                                });
+                                if (res.ok) {
+                                  const updated = await res.json();
+                                  setViewingBooking(updated);
+                                  fetchAllReservations();
+                                }
+                              } catch (err) {
+                                console.error(err);
+                              }
+                            }}
+                            className="flex-1 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                          >
+                            Confirm
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ status: 'started' })
+                              });
+                              if (res.ok) {
+                                const updated = await res.json();
+                                setViewingBooking(updated);
+                                fetchAllReservations();
+                              }
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          className="flex-1 rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center justify-center gap-1.5"
+                        >
+                          Start Session
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {viewingBooking.status === 'started' && hasPermission("bookings.edit") && (
+                    <div className="rounded-2xl border-2 border-dashed border-[#C4AE7C]/30 bg-[#EDF1EC] p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Session Flow</p>
+                      <p className="text-xs text-[#5A6A51] mb-4">The session is currently active. End session to settle invoice.</p>
+                      <button
+                        onClick={() => {
+                          setCheckoutBooking(viewingBooking);
+                        }}
+                        className="w-full rounded-2xl bg-[#C4AE7C] py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#b59e6c] transition flex items-center justify-center gap-1.5 shadow-md"
+                      >
+                        End Session & Pay
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Cancel Booking Section */}
+                  {hasPermission("bookings.delete") && 
+                   viewingBooking.status !== 'started' && 
+                   viewingBooking.status !== 'completed' && 
+                   viewingBooking.status !== 'cancelled' && 
+                   viewingBooking.status !== 'rejected' && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-red-800 mb-3">Cancel Booking</p>
+                      <button
+                        onClick={async () => {
+                          if (await showConfirm("Are you sure you want to cancel this booking?")) {
+                            const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ action: "reject" }),
+                            });
+                            if (res.ok) {
+                              setViewingBooking(null);
+                              fetchRequests();
+                              fetchAllReservations();
+                              alert("Booking canceled successfully!");
+                            } else {
+                              alert("Failed to cancel booking.");
+                            }
                           }
-                        }
-                      }}
-                      className="w-full rounded-2xl bg-red-600 py-2.5 text-xs font-bold text-white hover:bg-red-700 transition"
-                    >
-                      Remove Booking
-                    </button>
-                  </div>
+                        }}
+                        className="w-full rounded-2xl bg-red-600 py-2.5 text-xs font-bold text-white hover:bg-red-700 transition"
+                      >
+                        Cancel Booking
+                      </button>
+                    </div>
+                  )}
 
                 </div>
 
@@ -8881,7 +15032,8 @@ export default function AdminPage() {
               };
               const todayStr = getLocalDateString(new Date());
               const todaysBookings = allReservations.filter(
-                r => String(r.date).slice(0, 10) === todayStr && r.status === 'approved'
+                r => String(r.date).slice(0, 10) === todayStr &&
+                  ['approved', 'confirmed', 'started', 'completed', 'pending'].includes(r.status)
               );
 
               if (todaysBookings.length === 0) {
@@ -9078,26 +15230,7 @@ export default function AdminPage() {
               >
                 Export Bookings to CSV
               </button>
-              <button
-                onClick={async () => {
-                  if (confirm("WARNING: This will permanently delete ALL bookings and requests. Are you sure you want to proceed?")) {
-                    const poolRes = await fetch('/api/reservations?id=all', {
-                      method: 'DELETE'
-                    });
-                    if (poolRes.ok) {
-                      alert("Successfully cleared all bookings!");
-                      fetchRequests();
-                      fetchAllReservations();
-                    } else {
-                      alert("Failed to clear database.");
-                    }
-                    setShowActionsMenuModal(false);
-                  }
-                }}
-                className="w-full rounded-2xl border border-red-200 bg-red-50 py-3.5 text-sm font-bold text-red-700 hover:bg-red-100 transition"
-              >
-                Clear Database Bookings
-              </button>
+
             </div>
           </div>
         </div>
@@ -9121,6 +15254,20 @@ export default function AdminPage() {
             </div>
 
             <div className="space-y-4">
+              {/* 1. Phone Number at top */}
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number *</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="Enter phone (e.g. 01012345678)"
+                  value={newPatientPhone}
+                  onChange={(e) => handleManualPhoneChange(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                />
+              </div>
+
+              {/* 2. Patient Name and Email side-by-side */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Patient Name *</label>
@@ -9146,18 +15293,8 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number *</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="Enter phone"
-                    value={newPatientPhone}
-                    onChange={(e) => setNewPatientPhone(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  />
-                </div>
+              {/* 3. Booking Date and Time Slot stacked vertically */}
+              <div className="space-y-4">
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Booking Date *</label>
                   <input
@@ -9168,8 +15305,33 @@ export default function AdminPage() {
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Time Slot / Requested Time</label>
+                  <select
+                    value={newPatientTimeSlot}
+                    onChange={(e) => setNewPatientTimeSlot(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                  >
+                    {(() => {
+                      const { start, end } = getDayOperatingHoursAdmin(newPatientDate);
+                      const filteredSlots = SLOTS.filter((s) => {
+                        const norm = normaliseTo24hSlot(s) ?? "";
+                        return norm >= start && norm < end;
+                      });
+                      return filteredSlots.map(s => {
+                        const isUnavailable = manualUnavailableSlots.includes(s);
+                        return (
+                          <option key={s} value={s} disabled={isUnavailable}>
+                            {s} {isUnavailable ? "(Unavailable)" : ""}
+                          </option>
+                        );
+                      });
+                    })()}
+                  </select>
+                </div>
               </div>
 
+              {/* 4. Service Type and Session Type */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Service Type</label>
@@ -9196,6 +15358,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              {/* 5. Branch and Status */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branch</label>
@@ -9223,6 +15386,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
+              {/* 6. Doctor Name if Approved */}
               {newPatientStatus === 'approved' && (
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Assign Doctor</label>
@@ -9231,31 +15395,17 @@ export default function AdminPage() {
                     onChange={(e) => setNewPatientDoctor(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   >
-                    {providers.map(p => (
+                    {availableDoctorsNewPatient.map(p => (
                       <option key={p.id || p.name} value={p.name}>{p.name}</option>
                     ))}
+                    {availableDoctorsNewPatient.length === 0 && (
+                      <option value="">No Available Doctors</option>
+                    )}
                   </select>
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Time Slot / Requested Time</label>
-                <select
-                  value={newPatientTimeSlot}
-                  onChange={(e) => setNewPatientTimeSlot(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
-                >
-                  {SLOTS.map(s => {
-                    const isUnavailable = manualUnavailableSlots.includes(s);
-                    return (
-                      <option key={s} value={s} disabled={isUnavailable}>
-                        {s} {isUnavailable ? "(Unavailable)" : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
+              {/* 7. Notes */}
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Notes (Optional)</label>
                 <textarea
@@ -9345,7 +15495,7 @@ export default function AdminPage() {
                         onClick={() => {
                           setShowSearchModal(false);
                           setSearchQuery("");
-                          if (r.status === 'approved') {
+                          if (['approved', 'confirmed', 'started', 'completed'].includes(r.status)) {
                             setViewingBooking(r);
                           } else {
                             alert(`This booking request is ${r.status}. You can review it in the Pending approvals section.`);
@@ -9367,11 +15517,7 @@ export default function AdminPage() {
                         </div>
                         <div className="text-right">
                           <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider ${
-                            r.status === 'approved' 
-                              ? 'bg-green-100 text-green-800' 
-                              : r.status === 'rejected' 
-                                ? 'bg-red-100 text-red-800' 
-                                : 'bg-amber-100 text-amber-800'
+                            getStatusBadgeClass(r.status)
                           }`}>
                             {r.status}
                           </span>
@@ -9410,35 +15556,141 @@ export default function AdminPage() {
             </div>
 
             {/* Scrollable Form Content */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Dr. Jane Doe"
-                  value={providerFormName}
-                  onChange={(e) => setProviderFormName(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                />
+            <div className="flex-1 overflow-y-auto space-y-5 pr-1">
+              
+              {/* Row 1: Name & Specialty */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dr. Jane Doe"
+                    value={providerFormName}
+                    onChange={(e) => setProviderFormName(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Specialty</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dermatologist"
+                    value={providerFormSpecialty}
+                    onChange={(e) => setProviderFormSpecialty(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Rating (1-5)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="5"
-                  step="0.1"
-                  placeholder="e.g. 5"
-                  value={providerFormRating}
-                  onChange={(e) => setProviderFormRating(Number(e.target.value))}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                />
+              {/* Row 2: Phone & National ID */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 01012345678"
+                    value={providerFormPhone}
+                    onChange={(e) => setProviderFormPhone(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">National ID</label>
+                  <input
+                    type="text"
+                    placeholder="14-digit National ID"
+                    value={providerFormNationalId}
+                    onChange={(e) => setProviderFormNationalId(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
               </div>
 
+              {/* Row 3: Gender & Age */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Gender</label>
+                  <select
+                    value={providerFormGender}
+                    onChange={(e) => setProviderFormGender(e.target.value as "Male" | "Female" | "")}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Age</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 35"
+                    value={providerFormAge}
+                    onChange={(e) => setProviderFormAge(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              {/* Row 4: Branch & Start Date */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branch</label>
+                  <select
+                    value={providerFormBranchId}
+                    onChange={(e) => setProviderFormBranchId(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  >
+                    <option value="">Default/All Branches</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name_en} ({b.name_ar})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
+                  <input
+                    type="date"
+                    value={providerFormStartDate}
+                    onChange={(e) => setProviderFormStartDate(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              {/* Row 5: Rating & Provider Image URL/Base64 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-1">
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Rating (1-5)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    step="0.1"
+                    placeholder="e.g. 5"
+                    value={providerFormRating}
+                    onChange={(e) => setProviderFormRating(Number(e.target.value))}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Image URL or Base64</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. /images/doctors/dr-doe.jpg"
+                    value={providerFormImage}
+                    onChange={(e) => setProviderFormImage(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              {/* Services Offered */}
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Select Services Offered</label>
-                <div className="max-h-[30vh] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2">
+                <div className="max-h-[22vh] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2">
                   {allServicesList.map((svc) => {
                     const isChecked = providerFormSelectedServices.includes(svc.en);
                     return (
@@ -9464,6 +15716,65 @@ export default function AdminPage() {
                   })}
                 </div>
               </div>
+
+              {/* Weekly Working Schedule */}
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2.5">Weekly Working Days & Hours</label>
+                <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                  {Object.keys(providerFormWorkingDaysHours).map((day) => {
+                    const sched = providerFormWorkingDaysHours[day];
+                    return (
+                      <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
+                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={sched.isOpen}
+                            onChange={(e) => {
+                              setProviderFormWorkingDaysHours({
+                                ...providerFormWorkingDaysHours,
+                                [day]: { ...sched, isOpen: e.target.checked }
+                              });
+                            }}
+                            className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                          />
+                          <span className="text-xs font-bold text-[#414E36] w-24">{day}</span>
+                        </label>
+
+                        {sched.isOpen ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="time"
+                              value={sched.start}
+                              onChange={(e) => {
+                                setProviderFormWorkingDaysHours({
+                                  ...providerFormWorkingDaysHours,
+                                  [day]: { ...sched, start: e.target.value }
+                                });
+                              }}
+                              className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                            />
+                            <span className="text-xs text-[#5A6A51]">to</span>
+                            <input
+                              type="time"
+                              value={sched.end}
+                              onChange={(e) => {
+                                setProviderFormWorkingDaysHours({
+                                  ...providerFormWorkingDaysHours,
+                                  [day]: { ...sched, end: e.target.value }
+                                });
+                              }}
+                              className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">Off / Closed</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
             </div>
 
             {/* Footer Actions */}
@@ -9485,6 +15796,1115 @@ export default function AdminPage() {
 
           </div>
         </div>
+      )}
+
+      {/* ── EXPORT CUSTOMERS MODAL ── */}
+      {showExportCustomersModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowExportCustomersModal(false); }}
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36]">
+                  <Download size={18} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-[#1F251A]">Export Customers</h3>
+                  <p className="text-xs text-[#5A6A51]">{customers.length} customer{customers.length !== 1 ? "s" : ""} will be exported</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowExportCustomersModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-[#5A6A51]">
+                The exported CSV file will contain the following data columns for each customer:
+              </p>
+
+              {/* Column Chips */}
+              <div className="flex flex-wrap gap-2">
+                {["ID", "Customer Name", "Mobile", "Gender", "Email", "Number of Bookings", "Registration Date", "Active", "Spent Amount", "Outstanding", "Area", "Location Name", "Street Name", "Building No.", "Floor No.", "Note"].map((col) => (
+                  <span
+                    key={col}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#414E36]/15 bg-[#EDF1EC] px-3 py-1 text-xs font-medium text-[#414E36]"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#C4AE7C] flex-shrink-0" />
+                    {col}
+                  </span>
+                ))}
+              </div>
+
+              {/* Stats row */}
+              <div className="grid grid-cols-3 gap-3 rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-4">
+                <div className="text-center">
+                  <p className="text-xl font-bold text-[#1F251A]">{customers.length}</p>
+                  <p className="text-xs text-[#5A6A51] mt-0.5">Total Customers</p>
+                </div>
+                <div className="text-center border-x border-[#414E36]/10">
+                  <p className="text-xl font-bold text-[#1F251A]">16</p>
+                  <p className="text-xs text-[#5A6A51] mt-0.5">Columns</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-[#414E36]">CSV</p>
+                  <p className="text-xs text-[#5A6A51] mt-0.5">Format</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-[#5A6A51] flex items-center gap-1.5">
+                <FileText size={12} className="text-[#C4AE7C]" />
+                The file will be UTF-8 encoded (BOM) for full compatibility with Microsoft Excel and Google Sheets.
+              </p>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+              <button
+                onClick={() => setShowExportCustomersModal(false)}
+                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExportCustomersCSV}
+                disabled={loadingCustomers}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Download size={15} />
+                {loadingCustomers ? "Loading..." : "Export CSV"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── IMPORT CUSTOMERS MODAL ── */}
+      {showImportCustomersModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget && !importLoading) handleCloseImportModal(); }}
+        >
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 overflow-hidden my-8 animate-fadeIn">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36]">
+                  <Upload size={18} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-[#1F251A]">Import Customers / Patients</h3>
+                  <p className="text-xs text-[#5A6A51]">Upload a CSV file containing patient demographic details</p>
+                </div>
+              </div>
+              <button
+                disabled={importLoading}
+                onClick={handleCloseImportModal}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36] disabled:opacity-50"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              {!importFile ? (
+                // Step 1: Upload File Instructions and Box
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-[#414E36]/25 rounded-2xl p-8 bg-[#FBFBF9] hover:bg-[#F5F4F0] transition group relative">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <Upload className="h-10 w-10 text-[#C4AE7C] mb-3 transition-transform group-hover:-translate-y-1" />
+                  <span className="text-sm font-semibold text-[#1F251A]">Click to select CSV File</span>
+                  <span className="text-xs text-[#5A6A51] mt-1">Accepts standard .csv comma-separated values</span>
+                  <div className="mt-4 text-[10px] text-gray-400 text-center max-w-sm">
+                    For best matching, make sure your CSV contains columns like: <strong>Name, Phone/Mobile, Email, Gender, National ID, Age</strong>.
+                  </div>
+                </div>
+              ) : (
+                // Step 2: File Selected and Parsed
+                <div className="space-y-4">
+                  {/* File Info Card */}
+                  <div className="flex items-center justify-between rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-3">
+                    <div className="flex items-center gap-3">
+                      <FileText size={24} className="text-[#C4AE7C]" />
+                      <div>
+                        <p className="text-sm font-semibold text-[#1F251A]">{importFile.name}</p>
+                        <p className="text-xs text-[#5A6A51]">
+                          {(importFile.size / 1024).toFixed(1)} KB • {importRows.length} rows found
+                        </p>
+                      </div>
+                    </div>
+                    {!importLoading && (
+                      <button
+                        onClick={() => {
+                          setImportFile(null);
+                          setImportRows([]);
+                          setImportHeaders([]);
+                          setImportError("");
+                          setImportLog([]);
+                        }}
+                        className="text-xs font-semibold text-red-500 hover:underline"
+                      >
+                        Change File
+                      </button>
+                    )}
+                  </div>
+
+                  {importError && (
+                    <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs text-red-600">
+                      {importError}
+                    </div>
+                  )}
+
+                  {/* CSV Columns Detected */}
+                  {!importLoading && importHeaders.length > 0 && (
+                    <div className="space-y-1.5">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Headers Detected</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {importHeaders.map(h => (
+                          <span key={h} className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-600 border border-gray-200">
+                            {h}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rows Preview */}
+                  {!importLoading && importRows.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Preview (First 3 Rows Mapping)</h4>
+                      <div className="overflow-x-auto rounded-xl border border-[#414E36]/10 bg-white">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-gray-50 border-b border-gray-100">
+                            <tr>
+                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Name</th>
+                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Phone</th>
+                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Email</th>
+                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">National ID</th>
+                              <th className="px-3 py-2 font-semibold text-[#5A6A51]">Gender</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {importRows.slice(0, 3).map((row, idx) => {
+                              const m = mapRowToCustomer(row);
+                              return (
+                                <tr key={idx} className="hover:bg-gray-50/50">
+                                  <td className="px-3 py-2 font-medium text-[#1F251A]">{m.name || <span className="text-red-400 italic">Missing</span>}</td>
+                                  <td className="px-3 py-2 text-gray-600">{m.mobile || <span className="text-red-400 italic">Missing</span>}</td>
+                                  <td className="px-3 py-2 text-gray-600">{m.email || "-"}</td>
+                                  <td className="px-3 py-2 text-gray-600">{m.national_id || "-"}</td>
+                                  <td className="px-3 py-2 text-gray-600">{m.gender || "-"}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Progress & Live Log */}
+                  {(importLoading || importLog.length > 0) && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-[#1F251A]">
+                          {importLoading ? `Importing patients...` : "Import Complete"}
+                        </span>
+                        <span className="font-bold text-[#C4AE7C]">{importProgress}%</span>
+                      </div>
+                      
+                      {/* Progress Bar container */}
+                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#414E36] transition-all duration-200"
+                          style={{ width: `${importProgress}%` }}
+                        />
+                      </div>
+
+                      {/* Log Container */}
+                      <div className="h-40 overflow-y-auto rounded-xl border border-[#414E36]/10 bg-gray-50 p-3 space-y-1 text-[11px] font-mono">
+                        {importLog.map((log, idx) => (
+                          <div key={idx} className="flex justify-between items-center py-0.5 border-b border-gray-100/50 last:border-0">
+                            <span className="font-medium text-gray-700 truncate max-w-sm">{log.name}</span>
+                            {log.status === "success" ? (
+                              <span className="text-green-600 font-semibold bg-green-50 px-1.5 rounded">Success</span>
+                            ) : (
+                              <span className="text-red-600 font-semibold bg-red-50 px-1.5 rounded" title={log.error}>
+                                Error: {log.error || "failed"}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+              <button
+                disabled={importLoading}
+                onClick={handleCloseImportModal}
+                className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC] disabled:opacity-50"
+              >
+                {importProgress === 100 ? "Close" : "Cancel"}
+              </button>
+              {importFile && importRows.length > 0 && importProgress < 100 && (
+                <button
+                  onClick={handleStartImport}
+                  disabled={importLoading}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60"
+                >
+                  {importLoading ? (
+                    <>
+                      <svg className="mr-2 h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Importing...
+                    </>
+                  ) : (
+                    `Import ${importRows.length} Patients`
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADD/EDIT CUSTOMER MODAL ── */}
+      {showCustomerFormModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCustomerFormModal(false); }}
+        >
+          <div className="w-full max-w-2xl rounded-2xl bg-[#FBFBF9] shadow-2xl border border-[#414E36]/10 overflow-hidden my-8">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36]">
+                  <Plus size={18} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-[#1F251A]">
+                    {selectedCustomerForEdit ? "Edit Customer Details" : "Add New Customer"}
+                  </h3>
+                  <p className="text-xs text-[#5A6A51]">
+                    {selectedCustomerForEdit ? `Editing profile of ${custName}` : "Create a new customer profile in Supabase"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCustomerFormModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 max-h-[70vh] overflow-y-auto space-y-5 custom-scrollbar">
+              {customerFormError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                  {customerFormError}
+                </div>
+              )}
+
+              {/* Personal Information section */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Patient Profile Details</h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">
+                      Customer Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={custName}
+                      onChange={(e) => setCustName(e.target.value)}
+                      placeholder="e.g. Mohamed Aly"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">
+                      Mobile Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={custMobile}
+                      onChange={(e) => setCustMobile(e.target.value)}
+                      placeholder="e.g. 01012345678"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      value={custEmail}
+                      onChange={(e) => setCustEmail(e.target.value)}
+                      placeholder="e.g. mohamed@example.com"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Age</label>
+                    <input
+                      type="number"
+                      value={custAge}
+                      onChange={(e) => setCustAge(e.target.value)}
+                      placeholder="e.g. 28"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Gender</label>
+                    <select
+                      value={custGender}
+                      onChange={(e) => setCustGender(e.target.value as any)}
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male / ذكر</option>
+                      <option value="Female">Female / أنثى</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">National ID</label>
+                    <input
+                      type="text"
+                      value={custNationalId}
+                      onChange={(e) => setCustNationalId(e.target.value)}
+                      placeholder="Enter 14-digit National ID"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Referral Source</label>
+                    <input
+                      type="text"
+                      value={custReferral}
+                      onChange={(e) => setCustReferral(e.target.value)}
+                      placeholder="e.g. Facebook page, Friend"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Occupation</label>
+                    <input
+                      type="text"
+                      value={custOccupation}
+                      onChange={(e) => setCustOccupation(e.target.value)}
+                      placeholder="e.g. Engineer, Doctor"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-[#414E36]/10" />
+
+              {/* Address details */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Address & Location Details</h4>
+                <div>
+                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Address</label>
+                  <input
+                    type="text"
+                    value={custAddress}
+                    onChange={(e) => setCustAddress(e.target.value)}
+                    placeholder="e.g. Tagamoa, Street 90, Building 14"
+                    className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                  />
+                </div>
+              </div>
+
+              <hr className="border-[#414E36]/10" />
+
+              {/* Financial balances */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Financial Ledgers</h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Wallet Balance (EGP)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={custWallet}
+                      onChange={(e) => setCustWallet(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Total Spent (EGP)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={custSpent}
+                      onChange={(e) => setCustSpent(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Outstanding Balance (EGP)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={custOutstanding}
+                      onChange={(e) => setCustOutstanding(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-[#414E36]/10" />
+
+              {/* Status and Notes section */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Profile Status & Notes</h4>
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={custActive}
+                        onChange={(e) => setCustActive(e.target.checked)}
+                        className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                      />
+                      <span className="text-sm font-semibold text-[#1F251A]">Active Profile</span>
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Internal Notes (Optional)</label>
+                    <textarea
+                      value={custNote}
+                      onChange={(e) => setCustNote(e.target.value)}
+                      placeholder="Add patient history, clinic preferences, or other notes..."
+                      rows={3}
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+              <div>
+                {selectedCustomerForEdit && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteCustomerTarget(selectedCustomerForEdit)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm transition hover:bg-red-50 hover:border-red-300"
+                  >
+                    <Trash2 size={14} />
+                    Delete Customer
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerFormModal(false)}
+                  className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCustomer}
+                  disabled={savingCustomer}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {savingCustomer ? "Saving..." : "Save Customer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DELETE CUSTOMER CONFIRMATION MODAL ── */}
+      {deleteCustomerTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+            <div className="mb-5 flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 border border-red-100">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#1F251A]">Delete Customer?</h3>
+                <p className="mt-2 text-sm text-[#5A6A51] leading-relaxed">
+                  Are you sure you want to delete the customer profile for{" "}
+                  <span className="font-semibold text-[#1F251A]">{deleteCustomerTarget.name}</span>?
+                  This action will permanently remove their records from Supabase. Any linked reservations will be unlinked (set to guest status).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
+              <button
+                type="button"
+                onClick={() => setDeleteCustomerTarget(null)}
+                className="rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteCustomer(deleteCustomerTarget.id!)}
+                disabled={deletingCustomer}
+                className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {deletingCustomer ? "Deleting..." : "Yes, Delete Customer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CUSTOMER PROFILE & BOOKING HISTORY DRAWER ── */}
+      {viewingCustomerProfile && (
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-xs transition-opacity duration-300"
+          onClick={() => setViewingCustomerProfile(null)}
+        >
+          <div
+            className="w-full max-w-2xl bg-[#FBFBF9] h-full shadow-2xl flex flex-col animate-slideOver overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10">
+                  <User size={20} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[#1F251A]">{viewingCustomerProfile.name}</h3>
+                  <p className="text-xs text-[#5A6A51]">Patient Profile & Clinic Engagement History</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingCustomerProfile(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Drawer Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+              {/* Profile Details Cards */}
+              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Personal Profile</h4>
+                  {hasPermission("customers.edit") && (
+                    <button
+                      onClick={() => {
+                        handleOpenEditCustomer(viewingCustomerProfile);
+                        setViewingCustomerProfile(null);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+                    >
+                      <Pencil size={12} /> Edit Profile
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
+                    <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Age</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Gender</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
+                    <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Referral Source</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
+                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Profile Status</span>
+                    <span className={`inline-flex items-center gap-1 text-xs font-bold ${
+                      viewingCustomerProfile.active !== false ? "text-green-700" : "text-gray-400"
+                    }`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-green-600" : "bg-gray-400"}`} />
+                      {viewingCustomerProfile.active !== false ? "Active Patient" : "Inactive"}
+                    </span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Address</span>
+                    <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
+                      {viewingCustomerProfile.address || [
+                        viewingCustomerProfile.building_no,
+                        viewingCustomerProfile.street_name,
+                        viewingCustomerProfile.floor_no,
+                        viewingCustomerProfile.area,
+                        viewingCustomerProfile.location_name
+                      ].filter(Boolean).join(", ") || "—"}
+                    </span>
+                  </div>
+                  {viewingCustomerProfile.note && (
+                    <div className="col-span-2">
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Notes & Observations</span>
+                      <p className="text-xs text-[#5A6A51] bg-amber-50/40 border border-amber-200/50 rounded-xl p-3 leading-relaxed">
+                        {viewingCustomerProfile.note}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Booking History Card */}
+              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                <div className="border-b border-[#414E36]/10 pb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Booking History</h4>
+                  <span className="text-xs font-semibold bg-[#EDF1EC] text-[#414E36] px-2.5 py-1 rounded-md">
+                    Total: {
+                      allReservations.filter(
+                        (r) =>
+                          r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
+                          r.customerId === viewingCustomerProfile.id
+                      ).length
+                    }
+                  </span>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-[#E6E9EB]">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] font-bold text-[#5A6A51] uppercase tracking-wider text-[10px]">
+                        <th className="px-4 py-3 text-left">Date / Slot</th>
+                        <th className="px-4 py-3 text-left">Service</th>
+                        <th className="px-4 py-3 text-left">Provider</th>
+                        <th className="px-4 py-3 text-right">Paid</th>
+                        <th className="px-4 py-3 text-right">Left</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                      {(() => {
+                        const history = allReservations.filter(
+                          (r) =>
+                            r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
+                            r.customerId === viewingCustomerProfile.id
+                        );
+                        if (history.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-6 text-center text-gray-400 italic">
+                                No booking history records found for this patient.
+                              </td>
+                            </tr>
+                          );
+                        }
+                        return history.map((res) => {
+                          const resDt = new Date(res.date);
+                          const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                          const serv = localServices.find(s => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
+                          const statusClass = getStatusBadgeClass(res.status);
+
+                          const pricesMap: Record<number, number> = {
+                            1: 400, 2: 500, 3: 450, 4: 600, 5: 800, 6: 700, 7: 1500,
+                            11: 600, 12: 500, 13: 800, 14: 1200, 15: 1500, 16: 1000, 17: 400,
+                            21: 300, 22: 350, 23: 300,
+                            31: 400, 32: 350, 33: 400, 34: 500
+                          };
+                          const serviceCost = localServices.find(s => s.id === res.serviceId)?.price ?? pricesMap[res.serviceId] ?? 500;
+                          const spent = res.amountPaid ?? 0;
+                          const left = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : Math.max(0, serviceCost - spent);
+
+                          return (
+                            <tr key={res.id} className="hover:bg-[#F9F9F7]">
+                              <td className="px-4 py-3">
+                                <span className="block font-semibold text-[#1F251A]">{formattedDate}</span>
+                                <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "—"}</span>
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
+                              <td className="px-4 py-3">{res.doctorName || "—"}</td>
+                              <td className="px-4 py-3 text-right font-medium text-green-700">{spent} EGP</td>
+                              <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusClass}`}>
+                                  {res.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="flex items-center justify-end px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
+              <button
+                type="button"
+                onClick={() => setViewingCustomerProfile(null)}
+                className="rounded-lg border border-[#414E36]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+              >
+                Close Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Setup Password Modal (shown after accepting invite or password reset) ── */}
+      {showSetupPasswordModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="relative w-full max-w-md mx-4 rounded-3xl bg-white shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-br from-[#1F251A] to-[#414E36] px-8 py-8 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#C4AE7C]/20 ring-2 ring-[#C4AE7C]/40">
+                <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#C4AE7C" strokeWidth={2}>
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-1">Set Your Password</h2>
+              <p className="text-sm text-[#C4AE7C]/80">
+                Welcome! Please create a secure password to complete your account setup.
+              </p>
+            </div>
+
+            {/* Body */}
+            <div className="px-8 py-7">
+              {setupSuccess ? (
+                <div className="flex flex-col items-center gap-4 text-center py-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                    <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+                  <p className="text-green-700 font-semibold text-base">{setupSuccess}</p>
+                  <p className="text-sm text-[#5A6A51]">You will be redirected automatically…</p>
+                </div>
+              ) : (
+                <form onSubmit={handleSetupPassword} className="space-y-5">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={setupPassword}
+                      onChange={(e) => setSetupPassword(e.target.value)}
+                      placeholder="At least 6 characters"
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                      disabled={setupLoading}
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                      Confirm Password
+                    </label>
+                    <input
+                      type="password"
+                      value={setupConfirmPassword}
+                      onChange={(e) => setSetupConfirmPassword(e.target.value)}
+                      placeholder="Re-enter your password"
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                      disabled={setupLoading}
+                    />
+                  </div>
+
+                  {setupError && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-medium">
+                      {setupError}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={setupLoading}
+                    className="w-full rounded-xl bg-[#414E36] px-6 py-3.5 text-sm font-bold text-white transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {setupLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                        </svg>
+                        Setting password…
+                      </span>
+                    ) : "Confirm & Access Dashboard"}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PAYMENT SETTLEMENT MODAL ── */}
+      {checkoutBooking && (
+        (() => {
+          // 1. Calculate service cost
+          const svcIds = Array.isArray(checkoutBooking.serviceIds) ? checkoutBooking.serviceIds : [checkoutBooking.serviceId];
+          const bookingServicesList = svcIds.map((id: number) => {
+            const s = localServices.find(srv => srv.id === id);
+            return {
+              name: s?.en || `Service #${id}`,
+              price: s?.price ?? 500
+            };
+          });
+          const totalCost = bookingServicesList.reduce((sum: number, s: any) => sum + s.price, 0);
+
+          // 2. Fetch customer details
+          const customerRecord = dbCustomers.find(c => c.id === checkoutBooking.customerId || c.phone === checkoutBooking.phone);
+          const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
+
+          // 3. Math calculation
+          const walletDeduction = useWalletBalance ? Math.min(walletBalance, totalCost) : 0;
+          const netDue = Math.max(0, totalCost - walletDeduction);
+          
+          const amountPaidNum = parseFloat(checkoutAmountPaid) || 0;
+          const diff = amountPaidNum - netDue;
+
+          const changeAmount = diff > 0 ? diff : 0;
+          const remainingAmount = diff < 0 ? -diff : 0;
+
+          const handleConfirmCheckout = async () => {
+            setSavingCheckout(true);
+            try {
+              const res = await fetch(`/api/reservations?id=${checkoutBooking.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  status: "completed",
+                  amountPaid: amountPaidNum,
+                  amountLeft: remainingAmount,
+                  walletWithdrawal: walletDeduction,
+                  walletDeposit: changeAmount > 0 && depositChangeToWallet ? changeAmount : 0
+                })
+              });
+              if (res.ok) {
+                setCheckoutBooking(null);
+                setCheckoutAmountPaid("");
+                setUseWalletBalance(false);
+                setDepositChangeToWallet(true);
+                // Refresh list and details
+                fetchAllReservations();
+                fetchCustomers();
+                // Close the viewing booking drawer if open
+                setViewingBooking(null);
+              } else {
+                const err = await res.json();
+                alert(err.error || "Failed to complete checkout");
+              }
+            } catch (err) {
+              console.error(err);
+              alert("Error completing checkout");
+            } finally {
+              setSavingCheckout(false);
+            }
+          };
+
+          return (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+              <div className="w-full max-w-lg rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+                {/* Header */}
+                <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Invoice Checkout</p>
+                    <h3 className="text-xl font-bold text-[#1F251A] mt-1">Payment Settlement</h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setCheckoutBooking(null);
+                      setCheckoutAmountPaid("");
+                      setUseWalletBalance(false);
+                      setDepositChangeToWallet(true);
+                    }}
+                    className="rounded-full bg-[#F2EFE9] p-2 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="space-y-4 text-sm text-[#414E36]">
+                  {/* Customer Information */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">Customer / المريض</p>
+                    <p className="font-bold text-[#1F251A]">{checkoutBooking.name}</p>
+                    <p className="text-xs text-[#5A6A51] mt-0.5">{checkoutBooking.phone}</p>
+                  </div>
+
+                  {/* Services Invoice details */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-[#EDF1EC]/30 p-4 space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-1">Services List / الخدمات</p>
+                    {bookingServicesList.map((svc: any, idx: number) => (
+                      <div key={idx} className="flex justify-between font-medium">
+                        <span className="text-[#1F251A]">{svc.name}</span>
+                        <span>{svc.price} EGP</span>
+                      </div>
+                    ))}
+                    <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
+                      <span>Total Cost / الإجمالي</span>
+                      <span>{totalCost} EGP</span>
+                    </div>
+                  </div>
+
+                  {/* Wallet Option */}
+                  {walletBalance > 0 && (
+                    <div className="rounded-2xl border border-[#C4AE7C]/20 bg-[#FBFBF9] p-4 flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-[#1F251A] flex items-center gap-1.5">
+                          <span className="inline-block h-2 w-2 rounded-full bg-[#C4AE7C]"></span>
+                          Use Customer Wallet / استخدام المحفظة
+                        </p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">Available balance: {walletBalance} EGP</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={useWalletBalance}
+                          onChange={(e) => setUseWalletBalance(e.target.checked)}
+                          className="h-5 w-5 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Payment Inputs */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-[#5A6A51] mb-1">
+                        Net Due / المطلوب
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          disabled
+                          value={`${netDue} EGP`}
+                          className="w-full rounded-xl border border-[#414E36]/10 bg-[#EDF1EC]/30 px-3 py-2.5 text-sm font-bold text-[#1F251A] outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-[#5A6A51] mb-1">
+                        Amount Paid / المدفوع
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          value={checkoutAmountPaid}
+                          onChange={(e) => setCheckoutAmountPaid(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-10 py-2.5 text-sm font-bold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Calculations & Overpay Options */}
+                  {changeAmount > 0 && (
+                    <div className="rounded-2xl border border-green-200 bg-green-50/50 p-4 space-y-3">
+                      <div className="flex justify-between font-bold text-green-800 text-sm">
+                        <span>Change / الباقي</span>
+                        <span>{changeAmount} EGP</span>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={depositChangeToWallet}
+                          onChange={(e) => setDepositChangeToWallet(e.target.checked)}
+                          className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                        />
+                        <span className="text-xs font-semibold text-[#1F251A]">
+                          Put change in customer's wallet / حفظ الباقي في المحفظة
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
+                  {remainingAmount > 0 && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50/50 p-4 flex justify-between font-bold text-red-800 text-sm">
+                      <span>Outstanding Balance / المتبقي دين</span>
+                      <span>{remainingAmount} EGP</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="mt-6 flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
+                  <button
+                    onClick={() => {
+                      setCheckoutBooking(null);
+                      setCheckoutAmountPaid("");
+                      setUseWalletBalance(false);
+                      setDepositChangeToWallet(true);
+                    }}
+                    className="rounded-xl border border-[#414E36]/15 bg-white px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={savingCheckout}
+                    onClick={handleConfirmCheckout}
+                    className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 flex items-center gap-1.5 shadow-md"
+                  >
+                    {savingCheckout ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+                        Processing...
+                      </>
+                    ) : (
+                      "Confirm & Complete"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()
       )}
 
     </div>
