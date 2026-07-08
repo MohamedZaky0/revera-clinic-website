@@ -36,7 +36,7 @@ Returns all branches ordered by `sort_order`.
 
 Create or update a branch. If body contains `id`, updates that branch. Otherwise creates new.
 
-**Body:** Branch fields (name_en, name_ar, address_en, address_ar, phone, maps_embed, maps_link, status, sort_order)
+**Body:** Branch fields (name_en, name_ar, address_en, address_ar, phone, maps_embed, maps_link, status, sort_order, service_hours)
 
 **Response:** Created or updated `Branch`
 
@@ -165,8 +165,10 @@ Returns reservations. Filterable by query params.
 - `serviceId` — numeric service ID
 - `date` — YYYY-MM-DD
 - `branchId` — UUID
+- `phone` — Patient phone filter (returns only matched bookings)
+- `customerId` — UUID customer identifier filter
 
-**Response:** `ReservationRow[]` — `{ id, serviceId, date, requestedTime, name, email, phone, notes, status, timeSlot, sessionType, doctorName, createdAt, branchId }`
+**Response:** `ReservationRow[]` — `{ id, serviceId, date, requestedTime, name, email, phone, notes, status, timeSlot, sessionType, doctorName, createdAt, branchId, customerId }`
 
 ---
 
@@ -174,7 +176,7 @@ Returns reservations. Filterable by query params.
 
 Creates a new reservation with status 'pending'.
 
-**Body:** `{ serviceId, date, requestedTime?, name, email, phone, notes?, sessionType?, branchId? }`
+**Body:** `{ serviceId, date, requestedTime?, name, email, phone, notes?, sessionType?, branchId?, customerId? }`
 
 Required: serviceId, date, name, email, phone.
 
@@ -193,8 +195,9 @@ Updates a reservation. Supports three modes:
 **Reject:** `{ action: "reject" }`
 - Sets status to 'rejected'
 
-**Generic update:** `{ status?, notes?, doctorName?, sessionType? }`
+**Generic update (includes checkout/wallet adjustments):** `{ status?, notes?, doctorName?, sessionType?, amountPaid?, amountLeft?, walletDeposit?, walletWithdrawal? }`
 - Updates any combination of those fields
+- Transitioning to status `'completed'` triggers patient balance ledger calculations
 
 **Response:** Updated reservation
 
@@ -213,6 +216,38 @@ Deletes a reservation. Pass `id=all` to delete all reservations.
 Returns availability for the next `days` days (default 30) for a given service + branch.
 
 For each date: counts approved bookings, calculates whether at least one contiguous block
-of free 15-minute slots exists to fit the service's duration.
+of free 15-minute slots exists to fit the service's duration. Uses branch-specific service hours if available.
 
 **Response:** Array of `{ date, approvedCount, approvedSlots, isAvailable }`
+
+---
+
+## GET /api/customers
+
+Returns all customers, or a single customer matching the queried params.
+
+**Query params:**
+- `mobile` — Retrieve a single customer matching this mobile number
+- `email` — Retrieve a single customer matching this email
+
+**Response:** Single `Customer` object, or `Customer[]` array
+
+---
+
+## POST /api/customers
+
+Creates or updates a customer profile record.
+
+**Body:** `{ id?, name, mobile, gender?, email?, active?, spent_amount?, outstanding?, wallet_balance?, area?, location_name?, street_name?, building_no?, floor_no?, note?, age?, national_id?, address?, referral?, occupation? }`
+
+Required: `name`, `mobile`. If `id` is present, updates the existing customer. Otherwise creates a new record.
+
+**Response:** Created or updated `Customer` object, status 201 (created) or 200 (updated)
+
+---
+
+## DELETE /api/customers?id={id}
+
+Deletes a customer profile record. Nullifies references in `reservations` to prevent foreign key violations, and deletes the linked account in Supabase Auth if applicable.
+
+**Response:** `{ message: "Customer deleted successfully" }`

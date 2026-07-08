@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-07-09
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 
@@ -64,12 +64,15 @@ After that, check task-specific files:
 
 ---
 
-## Project Status Snapshot (as of 2026-06-26)
+## Project Status Snapshot (as of 2026-07-09)
 
 ### What Is Actually Built and Working
 - Public website (homepage, about, services, contact, blog stub)
-- Booking modal → `reservations` table (real Supabase writes)
-- Admin booking management (calendar, list, approve/reject, status changes)
+- Patient Profile (`/profile`) -> Persistent customer profile details, wallet ledgers, and visit logs history
+- Booking modal → `reservations` table (real Supabase writes with customer_id links)
+- Admin booking management (calendar, list, approve/reject, status changes, inline notes editor)
+- Customer Wallet Ledgers (real writes updating spent_amount, outstanding, and wallet_balance during checkout)
+- Branch-specific service hours (separate schedules for Sheikh Zayed / New Cairo stored in database and enforced in booking availability)
 - Service catalog CRUD (with drag-sort, bilingual names, branch pricing)
 - Branch management CRUD
 - Website CMS — hero slides (EN/AR) editable via admin
@@ -77,8 +80,7 @@ After that, check task-specific files:
 
 ### What Is Mock UI Only (hardcoded data, not Supabase)
 - All clinical: consultation notes, prescriptions, treatment plans, before/after photos
-- All billing: POS, invoicing, payments, refunds, package tracking
-- All reporting: every chart and metric shows static hardcoded values
+- Billing metrics: overall billing analytics reports are mock (but individual customer ledgers are real)
 - All marketing: WhatsApp is external `wa.me` links only; no campaigns or templates
 - Notification templates
 - RBAC / roles and permissions

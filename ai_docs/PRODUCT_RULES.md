@@ -46,7 +46,7 @@ The availability endpoint checks whether a contiguous block of 15-min slots equa
 service's duration is free. A service with duration 1:00 Hour needs 4 consecutive free
 15-min slots.
 
-Operating hours are 09:00–20:00 (44 slots × 15 min). Defined in `src/lib/services.ts:ALL_15MIN_SLOTS`.
+Operating hours are defined by the branch's specific `service_hours` table configuration when a `branchId` is specified. If not specified or no branch-specific hours are set, the global clinic-wide hours (09:00–20:00) defined in `src/lib/services.ts:ALL_15MIN_SLOTS` are used as a fallback.
 
 ---
 
@@ -107,12 +107,21 @@ These keys will need changing when forking for client #2.
 
 ---
 
+## Customer Wallet Rules
+**Enforced in:** `PATCH /api/reservations` (checkout/settlement action)
+
+When completing a reservation, the receptionist processes a payment settlement. If the reservation's status is updated to `'completed'`, the linked customer's profile is updated:
+- **Wallet Balance**: Decreased by any `walletWithdrawal` amount used for payment and increased by any `walletDeposit` (overpayment change saved to wallet).
+- **Total Spent**: Increased by the amount paid plus any wallet balance used to offset the cost.
+- **Outstanding Debt**: Increased by any unpaid remainder (`amountLeft`).
+
+---
+
 ## What Is NOT Enforced (But May Be Assumed)
 
 The following are **not currently enforced in code**:
 - Patient phone OTP verification (auth modal is UI-only, OTP is simulated)
 - Service visible/active flags filtering public service list
-- RBAC / role-based access control (no roles, no permissions system)
 - Package/session tracking (not built)
-- Payment processing (not wired to any payment gateway)
+- External Payment Gateway processing (payments are logged as cash/card settlements in the admin dashboard ledger only)
 - Automated reminders (enable_reminder flag exists on services but no sending logic found)

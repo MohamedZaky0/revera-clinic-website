@@ -59,8 +59,40 @@ files exist in the repository.
 | `maps_link` | text | Google Maps URL, nullable |
 | `status` | text | 'active' or 'inactive' |
 | `sort_order` | integer | Display order |
+| `service_hours` | JSONB | Array of branch-specific hours, nullable |
 | `created_at` | timestamptz | nullable |
 | `updated_at` | timestamptz | nullable |
+
+---
+
+### `customers`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `name` | text | Customer full name |
+| `mobile` | text | Mobile number, unique |
+| `gender` | text | 'Male' or 'Female', nullable |
+| `email` | text | Email, unique, nullable |
+| `number_of_bookings` | integer | Count of bookings, default 0 |
+| `registration_date` | timestamptz | Date of registration, default now() |
+| `active` | boolean | Is customer active, default true |
+| `spent_amount` | numeric | Total spent amount, default 0 |
+| `outstanding` | numeric | Outstanding patient debt, default 0 |
+| `wallet_balance` | numeric | Customer wallet credit balance, default 0 |
+| `area` | text | Address area, nullable |
+| `location_name` | text | location name, nullable |
+| `street_name` | text | Street name, nullable |
+| `building_no` | text | Building number, nullable |
+| `floor_no` | text | Floor number, nullable |
+| `note` | text | Administrative customer notes, nullable |
+| `age` | integer | Customer age, nullable |
+| `national_id` | text | National ID card number, unique, nullable |
+| `address` | text | Detailed address string, nullable |
+| `referral` | text | Referral source, nullable |
+| `occupation` | text | Job title/occupation, nullable |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
 
 ---
 
@@ -81,6 +113,7 @@ files exist in the repository.
 | `session_type` | text | 'in_person' or 'online' |
 | `doctor_name` | text | Assigned doctor name, nullable |
 | `branch_id` | UUID | FK → branches.id, nullable |
+| `customer_id` | UUID | FK → customers.id, nullable |
 | `created_at` | timestamptz | |
 
 **Business rules enforced in code:**
@@ -160,7 +193,7 @@ The full page content structure mirrors the `Translation` type in `src/types/ind
 
 ## Notes on Schema Gaps
 
-- No `patients` or `users` table confirmed in the database. Patient info is collected per-reservation (name/email/phone) only — no persistent patient records.
+- Persistent patient records are stored in the `customers` table, and connected to `reservations` via `customer_id`.
 - No `staff` table. Providers are stored with minimal fields (name, services list, rating).
 - No `shifts` or `availability` table. Availability is calculated by scanning reservations.
 - No RLS (Row Level Security) policies confirmed — Supabase service role key is used server-side for all operations, bypassing RLS.

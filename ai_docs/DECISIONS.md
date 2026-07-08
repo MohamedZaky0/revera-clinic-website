@@ -94,3 +94,46 @@ user JWT tokens.
 
 **Reconsider if:**
 Patient auth is wired to real authentication and patient-specific data access is needed.
+
+---
+
+## DEC-004: Persistent Customer Database Table and Wallet Ledgers
+
+**Date:** 2026-07-06
+**Status:** Decided — active
+
+**Context:**
+Originally, patient details were captured on a per-reservation basis only. We decided to create a persistent `customers` table to track unified histories, financial stats (wallet balance, spent amount, outstanding balance), and support customer wallet checkout/settlement flows.
+
+**Reason:**
+- Tracks patient value and debt across bookings.
+- Enables patients to pay using saved wallet credits.
+- Replaces mock financial pages with real data.
+
+---
+
+## DEC-005: Branch-Specific Service Hours
+
+**Date:** 2026-07-07
+**Status:** Decided — active
+
+**Context:**
+Branches initially shared a single hardcoded schedule. We decided to parameterize hours by introducing a `service_hours` JSONB column on the `branches` table.
+
+**Reason:**
+- Permits different branches (e.g. Sheikh Zayed, New Cairo) to operate on distinct weekly calendars.
+- Integrates branch-specific hours directly into public booking calendars and admin validation engines.
+
+---
+
+## DEC-006: Inline Drawer Notes Editing
+
+**Date:** 2026-07-08
+**Status:** Decided — active
+
+**Context:**
+Admin notes were previously updated via browser-default `window.prompt()` popup boxes. We decided to replace this with an inline textarea editor directly inside the booking details drawer.
+
+**Reason:**
+- Provides a clean, modern, and unified admin aesthetic.
+- Prevents jarring native browser dialog interruptions.
