@@ -128,8 +128,8 @@ export function Navbar() {
         top: 0,
         zIndex: 100,
         transition: "background 0.3s ease, box-shadow 0.3s ease",
-        background: scrolled ? "rgba(255,255,255,0.98)" : "transparent",
-        boxShadow: scrolled ? "0 2px 20px rgba(90,61,52,0.08)" : "none",
+        background: (pathname === "/profile" || scrolled) ? "rgba(255,255,255,0.98)" : "transparent",
+        boxShadow: (pathname === "/profile" || scrolled) ? "0 2px 20px rgba(90,61,52,0.08)" : "none",
       }}
     >
       <div className="cr-container">

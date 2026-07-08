@@ -196,8 +196,8 @@ export async function POST(req: Request) {
 
     console.log(`Employee checkin distance to ${branch.name_en}: ${dist.toFixed(0)} meters`);
 
-    // Outside the 500m radius — log attendance as "Out of Location" and return error so frontend can warn
-    if (dist > 500) {
+    // Outside the 800m radius — log attendance as "Out of Location" and return error so frontend can warn
+    if (dist > 800) {
       // Still record the attempt with Out of Location status
       await supabaseServer
         .from('hr_attendance')
