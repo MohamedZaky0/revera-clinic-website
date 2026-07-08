@@ -59,6 +59,7 @@ export async function POST(req: Request) {
     active,
     spent_amount,
     outstanding,
+    wallet_balance,
     area,
     location_name,
     street_name,
@@ -77,6 +78,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Name and Mobile number are required' }, { status: 400 });
   }
 
+  if (email) {
+    const cleanEmail = email.trim().toLowerCase();
+    const { data: employeeCheck, error: empCheckError } = await supabaseServer
+      .from('employee_accounts')
+      .select('id')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+
+    if (empCheckError) throw empCheckError;
+    if (employeeCheck) {
+      return NextResponse.json(
+        { error: 'This email is registered as an administrator/employee account and cannot be used for a customer profile.' },
+        { status: 400 }
+      );
+    }
+  }
+
   const customerData = {
     name,
     mobile,
@@ -85,6 +103,7 @@ export async function POST(req: Request) {
     active: active ?? true,
     spent_amount: Number(spent_amount || 0),
     outstanding: Number(outstanding || 0),
+    wallet_balance: Number(wallet_balance || 0),
     area: area || null,
     location_name: location_name || null,
     street_name: street_name || null,
@@ -150,12 +169,56 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
     }
 
-    const { error } = await supabaseServer
+    // 1. Fetch customer email and mobile before deleting them
+    const { data: customer, error: fetchError } = await supabaseServer
+      .from('customers')
+      .select('email, mobile')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+
+    if (customer) {
+      // 2. Lookup and delete from Supabase Auth
+      try {
+        const { data: { users }, error: listError } = await supabaseServer.auth.admin.listUsers({
+          perPage: 1000
+        });
+        if (!listError && users) {
+          const authUser = users.find((u: any) => 
+            (customer.email && u.email?.toLowerCase() === customer.email.toLowerCase()) ||
+            (customer.mobile && u.phone === customer.mobile) ||
+            (customer.mobile && u.phone === `+20${customer.mobile.startsWith('0') ? customer.mobile.slice(1) : customer.mobile}`)
+          );
+
+          if (authUser) {
+            console.log(`Deleting auth user: ${authUser.id} for email ${authUser.email}`);
+            const { error: deleteAuthError } = await supabaseServer.auth.admin.deleteUser(authUser.id);
+            if (deleteAuthError) {
+              console.error(`Failed to delete auth user ${authUser.id}:`, deleteAuthError);
+            }
+          }
+        }
+      } catch (authErr) {
+        console.error("Error looking up/deleting auth user:", authErr);
+      }
+    }
+
+    // 3. Set customer_id to null in all reservations referencing this customer to avoid foreign key violation
+    const { error: updateError } = await supabaseServer
+      .from('reservations')
+      .update({ customer_id: null })
+      .eq('customer_id', id);
+
+    if (updateError) throw updateError;
+
+    // 4. Delete the customer
+    const { error: deleteError } = await supabaseServer
       .from('customers')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (deleteError) throw deleteError;
 
     return NextResponse.json({ message: 'Customer deleted successfully' });
   } catch (err: any) {

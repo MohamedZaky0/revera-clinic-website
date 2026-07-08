@@ -19,6 +19,21 @@ export async function GET(req: Request) {
 
     const email = user.email || '';
 
+    // Verify this email is not registered as a customer
+    const { data: customerCheck, error: custCheckError } = await supabaseServer
+      .from('customers')
+      .select('id')
+      .eq('email', email.trim().toLowerCase())
+      .maybeSingle();
+
+    if (custCheckError) throw custCheckError;
+    if (customerCheck) {
+      return NextResponse.json(
+        { error: 'This email is registered as a customer and cannot be used for administrator access.' },
+        { status: 403 }
+      );
+    }
+
     // 1. Check if user is the hardcoded superadmin bypass
     if (email.toLowerCase() === 'superadmin@revera.com') {
       return NextResponse.json({
@@ -52,6 +67,7 @@ export async function GET(req: Request) {
     if (roleError) throw roleError;
 
     return NextResponse.json({
+      id: employee.id,
       role: employee.role_name,
       permissions: role?.permissions || [],
       email: employee.email,

@@ -1,6 +1,6 @@
 # PRODUCT_RULES.md — Revera Clinics Business Rules (Enforced in Code)
 
-> **Last Updated:** 2026-06-27
+> **Last Updated:** 2026-06-26
 > **Source:** Confirmed from live code only — no speculation
 > **Previous content was for a different project — discarded entirely**
 
@@ -46,7 +46,7 @@ The availability endpoint checks whether a contiguous block of 15-min slots equa
 service's duration is free. A service with duration 1:00 Hour needs 4 consecutive free
 15-min slots.
 
-Operating hours are 09:00–20:00 (44 slots × 15 min). Defined in `src/lib/services.ts:ALL_15MIN_SLOTS`.
+Operating hours are defined by the branch's specific `service_hours` table configuration when a `branchId` is specified. If not specified or no branch-specific hours are set, the global clinic-wide hours (09:00–20:00) defined in `src/lib/services.ts:ALL_15MIN_SLOTS` are used as a fallback.
 
 ---
 
@@ -84,33 +84,8 @@ without filtering by visible/active.
 
 ## Admin Panel Rules
 
-### Authentication — Supabase email/password
-**Enforced in:** `src/app/admin/page.tsx` — `useEffect` on mount
-
-On load, the admin page calls `supabase.auth.getSession()`. If no session exists, it renders a full-screen login form instead of the panel. On successful login, it calls `GET /api/auth/me` (Bearer token) to retrieve the employee's role and permissions.
-
-**Superadmin bypass:** `superadmin@revera.com` → always returns full permissions without any DB lookup. This is hardcoded in `/api/auth/me`.
-
----
-
-### Roles and permissions
-**Enforced in:** `src/app/admin/page.tsx` + `/api/auth/me`
-
-Each employee has a `role_name` referencing the `roles` table. Each role has a `permissions` string array. The admin panel uses this array to show/hide sections. Known permission strings: `'Bookings'`, `'Customers'`, `'Providers'`, `'Services'`, `'Settings'`.
-
----
-
-### Employee invite flow
-**Enforced in:** `POST /api/employees` + `src/app/auth/callback/page.tsx`
-
-New employees are invited via Supabase Auth invite email (not a manual password). They click the invite link → `/auth/callback` → set their own password → redirected to `/admin?setup=true`. The admin page prompts them to complete setup on first login.
-
----
-
-### Superadmin account is protected
-**Enforced in:** `DELETE /api/employees` and `DELETE /api/roles`
-
-Attempting to delete `employee_id = 'superadmin'` or `role name = 'superadmin'` returns HTTP 400.
+### No authentication on admin panel
+**Confirmed:** `/admin` page has no login gate. No middleware protects it. Anyone with the URL can access it.
 
 ---
 
@@ -132,13 +107,21 @@ These keys will need changing when forking for client #2.
 
 ---
 
+## Customer Wallet Rules
+**Enforced in:** `PATCH /api/reservations` (checkout/settlement action)
+
+When completing a reservation, the receptionist processes a payment settlement. If the reservation's status is updated to `'completed'`, the linked customer's profile is updated:
+- **Wallet Balance**: Decreased by any `walletWithdrawal` amount used for payment and increased by any `walletDeposit` (overpayment change saved to wallet).
+- **Total Spent**: Increased by the amount paid plus any wallet balance used to offset the cost.
+- **Outstanding Debt**: Increased by any unpaid remainder (`amountLeft`).
+
+---
+
 ## What Is NOT Enforced (But May Be Assumed)
 
 The following are **not currently enforced in code**:
 - Patient phone OTP verification (auth modal is UI-only, OTP is simulated)
 - Service visible/active flags filtering public service list
-- API-level authentication (all `/api/` routes are callable without a token except `/api/auth/me`)
 - Package/session tracking (not built)
-- Payment processing (not wired to any payment gateway)
+- External Payment Gateway processing (payments are logged as cash/card settlements in the admin dashboard ledger only)
 - Automated reminders (enable_reminder flag exists on services but no sending logic found)
-- Customers linked to reservations (no FK; booking name/phone is not auto-matched to a customer record)

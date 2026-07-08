@@ -55,7 +55,7 @@ export function AuthModal() {
   const [step, setStep] = useState<AuthStep>(1);
   const [demoMode, setDemoMode] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [authType, setAuthType] = useState<"phone" | "email">("phone");
+  const [authType, setAuthType] = useState<"phone" | "email">("email");
 
   // Step 1: Phone Auth
   const [phone, setPhone] = useState("");
@@ -98,7 +98,7 @@ export function AuthModal() {
     setHasPhoneInDb(false);
     setDemoMode(false);
     setVerifying(false);
-    setAuthType("phone");
+    setAuthType("email");
     setEmailInput("");
     setPasswordInput("");
     setIsSignUp(false);
@@ -152,6 +152,8 @@ export function AuthModal() {
 
     supabase.auth.getSession().then(({ data: { session } }: any) => {
       handleSessionCheck(session);
+    }).catch((err: any) => {
+      console.warn("AuthModal getSession error:", err);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any, session: any) => {
@@ -163,6 +165,36 @@ export function AuthModal() {
 
     async function handleSessionCheck(session: any) {
       if (!session?.user) return;
+
+      const emailVal = session.user.email;
+      if (emailVal) {
+        try {
+          const checkEmpRes = await fetch(`/api/auth/employee-email?email=${encodeURIComponent(emailVal)}`);
+          if (checkEmpRes.ok) {
+            const { exists } = await checkEmpRes.json();
+            if (exists) {
+              const loginInProgress = typeof window !== "undefined" && sessionStorage.getItem("customer_login_in_progress");
+              if (loginInProgress) {
+                alert("This email is registered as an administrator/employee account and cannot be used for customer access.");
+                await supabase.auth.signOut();
+                localStorage.removeItem("revera_user");
+                window.dispatchEvent(new CustomEvent("revera-auth-change"));
+                setOpen(false);
+                resetState();
+              } else {
+                localStorage.removeItem("revera_user");
+                window.dispatchEvent(new CustomEvent("revera-auth-change"));
+              }
+              if (typeof window !== "undefined") {
+                sessionStorage.removeItem("customer_login_in_progress");
+              }
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("Employee verification check failed:", err);
+        }
+      }
 
       const stored = localStorage.getItem("revera_user");
       let parsedStored = null;
@@ -353,6 +385,9 @@ export function AuthModal() {
     }
 
     if (verifiedSuccess) {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("customer_login_in_progress", "true");
+      }
       try {
         const res = await fetch(`/api/customers?mobile=${localPhone}`);
         if (res.ok) {
@@ -407,6 +442,23 @@ export function AuthModal() {
     setEmailError("");
     setPasswordError("");
     setVerifying(true);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("customer_login_in_progress", "true");
+    }
+
+    try {
+      const checkEmpRes = await fetch(`/api/auth/employee-email?email=${encodeURIComponent(emailInput)}`);
+      if (checkEmpRes.ok) {
+        const { exists } = await checkEmpRes.json();
+        if (exists) {
+          setEmailError("This email is registered as an administrator/employee account and cannot be used for customer access.");
+          setVerifying(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Employee verification check failed:", err);
+    }
 
     if (!supabase) {
       console.warn("Supabase not initialized. Using demo email auth fallback.");
@@ -484,6 +536,9 @@ export function AuthModal() {
       return;
     }
     try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("customer_login_in_progress", "true");
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
@@ -499,11 +554,21 @@ export function AuthModal() {
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (!firstName || !lastName || !gender) {
+      alert(isRTL ? "يرجى ملء جميع الحقول المطلوبة" : "Please fill in all required fields");
       return;
     }
     const { localPhone, isValid } = cleanAndFormatPhone(phone);
     if (!isValid) {
       alert(isRTL ? "يرجى إدخال رقم هاتف مصري صحيح" : "Please enter a valid Egyptian phone number");
+      return;
+    }
+    if (!email || !email.trim()) {
+      alert(isRTL ? "البريد الإلكتروني مطلوب" : "Email Address is required");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      alert(isRTL ? "يرجى إدخال بريد إلكتروني صحيح" : "Please enter a valid email address");
       return;
     }
     setVerifying(true);
@@ -581,39 +646,7 @@ export function AuthModal() {
           </button>
         </div>
 
-        {/* Tab Buttons (Phone vs Email) */}
-        {step === 1 && (
-          <div className="flex border-b border-gray-100 mb-5">
-            <button
-              onClick={() => setAuthType("phone")}
-              className="flex-1 pb-2 text-sm font-semibold transition-colors border-b-2"
-              style={{
-                borderColor: authType === "phone" ? "var(--cr-primary)" : "transparent",
-                color: authType === "phone" ? "var(--cr-primary)" : "var(--cr-accent)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                borderBottom: authType === "phone" ? "2px solid var(--cr-primary)" : "none"
-              }}
-            >
-              {isRTL ? "الهاتف المحمول" : "Mobile Phone"}
-            </button>
-            <button
-              onClick={() => setAuthType("email")}
-              className="flex-1 pb-2 text-sm font-semibold transition-colors border-b-2"
-              style={{
-                borderColor: authType === "email" ? "var(--cr-primary)" : "transparent",
-                color: authType === "email" ? "var(--cr-primary)" : "var(--cr-accent)",
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                borderBottom: authType === "email" ? "2px solid var(--cr-primary)" : "none"
-              }}
-            >
-              {isRTL ? "البريد الإلكتروني" : "Email Address"}
-            </button>
-          </div>
-        )}
+        {/* Tab Buttons (Phone vs Email) - Hidden for now */}
 
         {/* Step 1: Phone Auth tab */}
         {step === 1 && authType === "phone" && (
@@ -658,6 +691,29 @@ export function AuthModal() {
         {/* Step 1: Email Auth tab */}
         {step === 1 && authType === "email" && (
           <form onSubmit={handleEmailAuth} className="flex flex-col gap-4" noValidate>
+            {isSignUp && (
+              /* Name row */
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <input
+                  type="text"
+                  className="cr-input"
+                  placeholder={t.auth.firstName}
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                />
+                <input
+                  type="text"
+                  className="cr-input"
+                  placeholder={t.auth.lastName}
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                />
+              </div>
+            )}
+
+            {/* Email Address */}
             <div>
               <input
                 type="email"
@@ -677,6 +733,24 @@ export function AuthModal() {
               )}
             </div>
 
+            {isSignUp && (
+              /* Mobile Phone */
+              <div>
+                <input
+                  type="tel"
+                  className="cr-input"
+                  placeholder={t.auth.phonePlaceholder}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                />
+                <p className="mt-1.5 text-xs text-gray-400">
+                  {t.auth.phoneHint}
+                </p>
+              </div>
+            )}
+
+            {/* Password */}
             <div>
               <input
                 type="password"
@@ -695,6 +769,38 @@ export function AuthModal() {
                 </p>
               )}
             </div>
+
+            {isSignUp && (
+              /* Gender */
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--cr-accent)" }}>
+                  {t.auth.gender}
+                </p>
+                <div className="flex gap-4">
+                  {(["female", "male"] as const).map((g) => (
+                    <label
+                      key={g}
+                      className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium transition-colors"
+                      style={{
+                        backgroundColor: gender === g ? "var(--cr-primary)" : "var(--cr-secondary)",
+                        color: gender === g ? "var(--cr-white)" : "var(--cr-primary)",
+                        border: gender === g ? "none" : "1.5px solid var(--cr-accent)",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="signup_gender"
+                        value={g}
+                        checked={gender === g}
+                        onChange={() => setGender(g)}
+                        className="sr-only"
+                      />
+                      {g === "female" ? t.auth.female : t.auth.male}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -849,6 +955,7 @@ export function AuthModal() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 aria-label={t.auth.email}
+                required
               />
             )}
 

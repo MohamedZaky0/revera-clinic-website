@@ -183,10 +183,10 @@ export function Navbar() {
 
             {/* Make Appointment CTA next to Contact */}
             <li>
-              <a
-                href="https://wa.me/201035595691?text=Hello%20Revera%2C%20I%27d%20love%20to%20schedule%20a%20consultation%20at%20your%20New%20Cairo%20branch.%20Please%20let%20me%20know%20your%20earliest%20availability.%20Thank%20you."
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("open-booking"));
+                }}
                 style={{
                   padding: "10px 16px",
                   borderRadius: "8px",
@@ -198,19 +198,18 @@ export function Navbar() {
                   cursor: "pointer",
                   transition: "transform 0.12s ease, opacity 0.12s ease",
                   whiteSpace: "nowrap",
-                  textDecoration: "none",
                   display: "inline-block",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLAnchorElement).style.opacity = "0.9";
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.9";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLAnchorElement).style.opacity = "1";
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
                 }}
               >
                 {t.nav.makeAppointment}
-              </a>
-              </li>
+              </button>
+            </li>
           </ul>
 
           {/* Right controls */}
@@ -375,7 +374,8 @@ export function Navbar() {
             {/* Login / User info button */}
             {user ? (
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div
+                <Link
+                  href="/profile"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -386,11 +386,20 @@ export function Navbar() {
                     color: "var(--cr-primary)",
                     fontSize: "14px",
                     fontWeight: 600,
+                    textDecoration: "none",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "rgba(90,61,52,0.05)";
                   }}
                 >
                   <User size={16} />
                   <span>{user.name || user.mobile}</span>
-                </div>
+                </Link>
                 {isProfileIncomplete && (
                   <button
                     onClick={handleCompleteProfile}
@@ -579,10 +588,11 @@ export function Navbar() {
               }}
             >
               {/* Mobile Make Appointment */}
-              <a
-                href="https://wa.me/201035595691?text=Hello%20Revera%2C%20I%27d%20love%20to%20schedule%20a%20consultation%20at%20your%20New%20Cairo%20branch.%20Please%20let%20me%20know%20your%20earliest%20availability.%20Thank%20you."
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("open-booking"));
+                  setMenuOpen(false);
+                }}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -598,11 +608,10 @@ export function Navbar() {
                   fontWeight: 600,
                   transition: "all 0.12s ease",
                   width: "100%",
-                  textDecoration: "none",
                 }}
               >
                 {t.nav.makeAppointment}
-              </a>
+              </button>
 
               {/* Mobile phone */}
               <a
@@ -686,7 +695,9 @@ export function Navbar() {
               {/* Mobile login / user info button */}
               {user ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  <div
+                  <Link
+                    href="/profile"
+                    onClick={() => setMenuOpen(false)}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -697,11 +708,13 @@ export function Navbar() {
                       color: "var(--cr-primary)",
                       fontSize: "14px",
                       fontWeight: 600,
+                      textDecoration: "none",
+                      cursor: "pointer",
                     }}
                   >
                     <User size={16} />
                     <span>{user.name || user.mobile}</span>
-                  </div>
+                  </Link>
                   {isProfileIncomplete && (
                     <button
                       onClick={() => {

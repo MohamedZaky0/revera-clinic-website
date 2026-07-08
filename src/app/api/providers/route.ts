@@ -7,29 +7,7 @@ export const dynamic = 'force-dynamic';
 
 const JSON_FILE_PATH = path.join(process.cwd(), 'data', 'providers.json');
 
-const DEFAULT_PROVIDERS = [
-  {
-    name: "Dr. Ahmed Medhat",
-    bookings_count: 0,
-    services: ["Tattoo Removal (Small)", "Tattoo Removal (Medium)"],
-    more_count: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Radwa Seif",
-    bookings_count: 0,
-    services: ["Physio: Basic Relief (3)", "Physio: Standard Recovery (6)"],
-    more_count: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Sara El Gamel",
-    bookings_count: 1,
-    services: ["Half Arm", "Full Arms"],
-    more_count: 14,
-    rating: 0,
-  },
-];
+const DEFAULT_PROVIDERS: any[] = [];
 
 function mapProvider(p: Record<string, any>) {
   return {
@@ -58,24 +36,14 @@ export async function GET() {
       .select('*')
       .order('name', { ascending: true });
 
-    if (!error && data) {
-      if (data.length === 0) {
-        // Seed default providers
-        const { data: seeded, error: seedError } = await supabaseServer
-          .from('providers')
-          .insert(DEFAULT_PROVIDERS)
-          .select();
-        
-        if (!seedError && seeded) {
-          return NextResponse.json(seeded.map(mapProvider));
-        } else {
-          console.warn("Failed to seed default providers to Supabase:", seedError);
-        }
-      } else {
-        return NextResponse.json(data.map(mapProvider));
-      }
+    if (!error && data && data.length > 0 && ('working_days_hours' in data[0])) {
+      return NextResponse.json(data.map(mapProvider));
     } else {
-      console.warn("Supabase providers query error, falling back to JSON:", error);
+      if (error) {
+        console.warn("Supabase providers query error, falling back to JSON:", error);
+      } else {
+        console.warn("Supabase providers missing columns (schema not migrated), falling back to JSON");
+      }
     }
   } catch (dbErr) {
     console.error("Database providers load error, falling back to JSON:", dbErr);
