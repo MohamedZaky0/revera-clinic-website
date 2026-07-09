@@ -93,6 +93,7 @@ type Req = {
   sessionType?: string;
   doctorName?: string | null;
   createdAt?: string;
+  isManual?: boolean;
   branchId?: string | null;
   customerId?: string | null;
   amountPaid?: number;
@@ -4146,6 +4147,7 @@ export default function AdminPage() {
       timeSlot: newPatientStatus === 'approved' ? newPatientTimeSlot : null,
       doctorName: newPatientStatus === 'approved' ? newPatientDoctor : null,
       branchId: newPatientBranch || null,
+      isManual: true,
     };
 
     const res = await fetch("/api/reservations", {
@@ -14404,6 +14406,13 @@ export default function AdminPage() {
                     }`}>
                       {viewingBooking.status}
                     </span>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider ${
+                      viewingBooking.isManual 
+                        ? 'bg-gray-100 text-gray-700 border border-gray-200' 
+                        : 'bg-[#C4AE7C]/20 text-[#414E36]'
+                    }`}>
+                      {viewingBooking.isManual ? "Manual Booking" : "Website Booking"}
+                    </span>
                   </div>
                 </div>
                 <button
@@ -14828,7 +14837,77 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  {(viewingBooking.status === 'approved' || viewingBooking.status === 'confirmed') && hasPermission("bookings.edit") && (
+                  {/* WhatsApp confirmation step for website bookings in 'approved' status */}
+                  {viewingBooking.status === 'approved' && !viewingBooking.isManual && (
+                    (() => {
+                      // Clean phone: if it starts with 0, prepend 2. If it doesn't have 20 prefix, add it.
+                      let whatsappPhone = viewingBooking.phone.trim().replace(/\s+/g, '');
+                      if (whatsappPhone.startsWith('0')) {
+                        whatsappPhone = '2' + whatsappPhone;
+                      } else if (!whatsappPhone.startsWith('2') && whatsappPhone.length === 10) {
+                        whatsappPhone = '2' + whatsappPhone;
+                      }
+                      if (!whatsappPhone.startsWith('+') && !whatsappPhone.startsWith('2') && whatsappPhone.length === 11) {
+                        whatsappPhone = '2' + whatsappPhone.slice(1);
+                      }
+
+                      const branch = branches.find(b => b.id === viewingBooking.branchId);
+                      const branchNameForMsg = branch ? (isRTL ? branch.name_ar : branch.name_en) : "Revera Clinics";
+                      const timeSlotForMsg = viewingBooking.timeSlot || viewingBooking.requestedTime || "scheduled time";
+
+                      const textMessage = `Hello ${viewingBooking.name}! This is Revera Clinics. We are pleased to confirm your booking for ${serviceNames} on ${viewingBooking.date} at ${timeSlotForMsg} at our ${branchNameForMsg} branch. Looking forward to seeing you!\n\nمرحباً ${viewingBooking.name}، يسعدنا في عيادات ريفيرا تأكيد موعدكم لـ ${serviceNames} يوم ${viewingBooking.date} الساعة ${timeSlotForMsg} في فرع ${branchNameForMsg}. بانتظاركم!`;
+
+                      const whatsappLink = `https://api.whatsapp.com/send/?phone=${whatsappPhone}&text=${encodeURIComponent(textMessage)}&type=phone_number&app_absent=0`;
+
+                      return (
+                        <div className="rounded-2xl border border-[#C4AE7C]/40 bg-[#FBFBF9] p-5 space-y-4 shadow-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-2.5 w-2.5 rounded-full bg-[#25D366] animate-pulse"></span>
+                            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A]">WhatsApp Confirmation</p>
+                          </div>
+                          <p className="text-xs text-[#5A6A51] leading-relaxed">
+                            This is a website booking. Please send the booking details confirmation message to the patient on WhatsApp, then mark it as Confirmed.
+                          </p>
+                          <div className="flex flex-col gap-2">
+                            <a
+                              href={whatsappLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full rounded-2xl bg-[#25D366] hover:bg-[#20ba56] text-white py-2.5 text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm"
+                            >
+                              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.403.002 9.794-4.382 9.797-9.77.001-2.61-1.01-5.063-2.85-6.907-1.838-1.842-4.284-2.858-6.892-2.858-5.406 0-9.798 4.382-9.802 9.77-.001 1.5.395 2.964 1.15 4.3l-.986 3.6 3.689-.968.389.232zm12.534-7.143c-.303-.151-1.792-.883-2.07-.984-.277-.101-.48-.151-.68.151-.2.302-.777.984-.952 1.185-.175.201-.35.226-.653.076-1.517-.759-2.661-1.286-3.715-3.102-.28-.48.28-.446.802-1.49.088-.176.044-.328-.022-.48-.066-.151-.577-1.39-.79-1.897-.208-.5-.436-.433-.598-.441-.155-.008-.332-.01-.508-.01-.176 0-.464.066-.707.328-.242.261-.927.905-.927 2.203 0 1.298.944 2.548 1.076 2.724.131.176 1.859 2.839 4.502 3.98.629.271 1.12.433 1.503.554.632.201 1.208.173 1.663.105.507-.076 1.792-.733 2.048-1.439.256-.707.256-1.314.18-1.44-.076-.127-.278-.201-.58-.352z"/>
+                              </svg>
+                              Confirm on WhatsApp
+                            </a>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ status: 'confirmed' })
+                                  });
+                                  if (res.ok) {
+                                    const updated = await res.json();
+                                    setViewingBooking(updated);
+                                    fetchAllReservations();
+                                  }
+                                } catch (err) {
+                                  console.error(err);
+                                }
+                              }}
+                              className="w-full rounded-2xl bg-[#414E36] hover:bg-[#2e3a26] text-white py-2.5 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md"
+                            >
+                              Mark as Confirmed
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
+
+                  {((viewingBooking.status === 'confirmed') || (viewingBooking.status === 'approved' && viewingBooking.isManual)) && hasPermission("bookings.edit") && (
                     <div className="rounded-2xl border border-[#C4AE7C]/30 bg-white p-5">
                       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Session Flow</p>
                       <p className="text-xs text-[#5A6A51] mb-4">The customer is ready to begin their clinical session.</p>
