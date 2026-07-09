@@ -14855,7 +14855,7 @@ export default function AdminPage() {
                       const branchNameForMsg = branch ? (isRTL ? branch.name_ar : branch.name_en) : "Revera Clinics";
                       const timeSlotForMsg = viewingBooking.timeSlot || viewingBooking.requestedTime || "scheduled time";
 
-                      const textMessage = `Hello ${viewingBooking.name}! This is Revera Clinics. We are pleased to confirm your booking for ${serviceNames} on ${viewingBooking.date} at ${timeSlotForMsg} at our ${branchNameForMsg} branch. Looking forward to seeing you!\n\nمرحباً ${viewingBooking.name}، يسعدنا في عيادات ريفيرا تأكيد موعدكم لـ ${serviceNames} يوم ${viewingBooking.date} الساعة ${timeSlotForMsg} في فرع ${branchNameForMsg}. بانتظاركم!`;
+                      const textMessage = `Hello ${viewingBooking.name}! This is Revera Clinics. We are pleased to confirm your booking for ${serviceNames} on ${viewingBooking.date} at ${timeSlotForMsg} at our ${branchNameForMsg} branch. Looking forward to seeing you!`;
 
                       const whatsappLink = `https://api.whatsapp.com/send/?phone=${whatsappPhone}&text=${encodeURIComponent(textMessage)}&type=phone_number&app_absent=0`;
 

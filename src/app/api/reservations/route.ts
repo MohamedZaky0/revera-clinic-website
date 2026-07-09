@@ -162,29 +162,43 @@ export async function POST(req: Request) {
     }
 
     // 2. Insert reservation linked to customer
-    const { data, error } = await supabaseServer
+    const insertPayload: any = {
+      service_id: Number(serviceId),
+      date,
+      requested_time: requestedTime || null,
+      name,
+      email,
+      phone,
+      notes: notes || '',
+      status: 'pending',
+      time_slot: null,
+      session_type: sessionType || 'in_person',
+      branch_id: branchId || null,
+      customer_id: customerId,
+      amount_paid: body.amountPaid !== undefined ? Number(body.amountPaid) : 0,
+      amount_left: body.amountLeft !== undefined ? Number(body.amountLeft) : null,
+      doctor_name: doctorName || null,
+      is_manual: body.isManual ?? false,
+      rooms: compRoomIds,
+    };
+
+    let { data, error } = await supabaseServer
       .from('reservations')
-      .insert({
-        service_id: Number(serviceId),
-        date,
-        requested_time: requestedTime || null,
-        name,
-        email,
-        phone,
-        notes: notes || '',
-        status: 'pending',
-        time_slot: null,
-        session_type: sessionType || 'in_person',
-        branch_id: branchId || null,
-        customer_id: customerId,
-        amount_paid: body.amountPaid !== undefined ? Number(body.amountPaid) : 0,
-        amount_left: body.amountLeft !== undefined ? Number(body.amountLeft) : null,
-        doctor_name: doctorName || null,
-        is_manual: body.isManual ?? false,
-        rooms: compRoomIds,
-      })
+      .insert(insertPayload)
       .select()
       .single();
+
+    if (error && error.code === '42703') {
+      console.warn("Column 'is_manual' does not exist in the database. Retrying insert without it.");
+      delete insertPayload.is_manual;
+      const retryResult = await supabaseServer
+        .from('reservations')
+        .insert(insertPayload)
+        .select()
+        .single();
+      data = retryResult.data;
+      error = retryResult.error;
+    }
 
     if (error) throw error;
     return NextResponse.json(mapRow(data), { status: 201 });
