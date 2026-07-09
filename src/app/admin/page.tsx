@@ -501,6 +501,7 @@ function parseEgyptianNationalId(id: string) {
 
 export default function AdminPage() {
   const { showConfirm } = useAlertConfirm();
+  const { isRTL } = useLanguage();
   // Auth state
   const [session, setSession] = useState<any>(null);
   // Rooms state
@@ -732,6 +733,7 @@ export default function AdminPage() {
   const [useWalletBalance, setUseWalletBalance] = useState<boolean>(false);
   const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(true);
   const [savingCheckout, setSavingCheckout] = useState<boolean>(false);
+  const [invoiceBooking, setInvoiceBooking] = useState<any>(null);
 
   const [custName, setCustName] = useState("");
   const [custMobile, setCustMobile] = useState("");
@@ -4212,6 +4214,222 @@ export default function AdminPage() {
     }
     fetchRequests();
     fetchAllReservations();
+  }
+
+  function handlePrintInvoice(booking: any, servicesList: any[], totalCost: number, walletUsed: number, branchName: string) {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Please allow popups to print/download the invoice.");
+      return;
+    }
+
+    const serviceRows = servicesList.map(s => `
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #F2EFE9; text-align: left; color: #1F251A; font-weight: 600;">${s.name}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #F2EFE9; text-align: center; color: #5A6A51;">1</td>
+        <td style="padding: 12px; border-bottom: 1px solid #F2EFE9; text-align: right; color: #1F251A;">EGP ${s.price.toLocaleString()}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #F2EFE9; text-align: right; color: #1F251A; font-weight: bold;">EGP ${s.price.toLocaleString()}</td>
+      </tr>
+    `).join("");
+
+    const invoiceNo = `REV-INV-${booking.id.slice(0, 8).toUpperCase()}`;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Invoice ${invoiceNo} - Revera Clinics</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Sora:wght@300;400;600;700&display=swap');
+            body {
+              font-family: 'Sora', sans-serif;
+              margin: 40px;
+              color: #1F251A;
+              background-color: #fff;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              border-bottom: 2px solid #414E36;
+              padding-bottom: 24px;
+              margin-bottom: 30px;
+            }
+            .logo-area h1 {
+              font-family: 'Marcellus', serif;
+              color: #414E36;
+              margin: 0;
+              font-size: 28px;
+              letter-spacing: 0.1em;
+            }
+            .logo-area p {
+              margin: 4px 0 0 0;
+              font-size: 12px;
+              color: #5A6A51;
+            }
+            .invoice-title-area {
+              text-align: right;
+            }
+            .invoice-title-area h2 {
+              margin: 0;
+              color: #C4AE7C;
+              font-size: 32px;
+              font-family: 'Marcellus', serif;
+              letter-spacing: 0.05em;
+            }
+            .invoice-title-area p {
+              margin: 6px 0 0 0;
+              font-size: 13px;
+              color: #5A6A51;
+            }
+            .billing-info {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 40px;
+              font-size: 14px;
+            }
+            .billed-to, .booking-details {
+              width: 48%;
+            }
+            .billing-info h3 {
+              color: #414E36;
+              font-size: 14px;
+              text-transform: uppercase;
+              letter-spacing: 0.1em;
+              margin-bottom: 12px;
+              border-bottom: 1px solid rgba(65, 78, 54, 0.1);
+              padding-bottom: 6px;
+            }
+            .billing-info p {
+              margin: 6px 0;
+              line-height: 1.4;
+            }
+            .table-container {
+              margin-bottom: 40px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 14px;
+            }
+            th {
+              background-color: #EDF1EC;
+              color: #414E36;
+              font-weight: 600;
+              padding: 12px;
+              text-align: left;
+              text-transform: uppercase;
+              font-size: 12px;
+              letter-spacing: 0.05em;
+            }
+            .summary-table {
+              width: 320px;
+              margin-left: auto;
+              font-size: 14px;
+            }
+            .summary-table td {
+              padding: 8px 12px;
+            }
+            .summary-table tr.total-row {
+              font-weight: bold;
+              font-size: 16px;
+              color: #414E36;
+              border-top: 2px solid #414E36;
+            }
+            .footer {
+              margin-top: 60px;
+              text-align: center;
+              border-top: 1px solid #F2EFE9;
+              padding-top: 20px;
+              font-size: 12px;
+              color: #5A6A51;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo-area">
+              <h1>REVERA CLINICS</h1>
+              <p>Sheikh Zayed / New Cairo Branches</p>
+              <p>Phone: (+20) 01035595691</p>
+              <p>Email: inquiries@reveraclinics.com</p>
+            </div>
+            <div class="invoice-title-area">
+              <h2>INVOICE</h2>
+              <p><strong>Invoice No:</strong> ${invoiceNo}</p>
+              <p><strong>Date:</strong> ${booking.date}</p>
+            </div>
+          </div>
+
+          <div class="billing-info">
+            <div class="billed-to">
+              <h3>Billed To</h3>
+              <p><strong>Patient Name:</strong> ${booking.name}</p>
+              <p><strong>Phone:</strong> ${booking.phone}</p>
+              <p><strong>Email:</strong> ${booking.email || "—"}</p>
+            </div>
+            <div class="booking-details">
+              <h3>Booking Details</h3>
+              <p><strong>Date:</strong> ${booking.date}</p>
+              <p><strong>Time Slot:</strong> ${booking.timeSlot || "—"}</p>
+              <p><strong>Doctor:</strong> ${booking.doctorName || "—"}</p>
+              <p><strong>Branch:</strong> ${branchName}</p>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th style="text-align: left;">Service Rendered</th>
+                  <th style="text-align: center; width: 60px;">Qty</th>
+                  <th style="text-align: right; width: 120px;">Unit Price</th>
+                  <th style="text-align: right; width: 120px;">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${serviceRows}
+              </tbody>
+            </table>
+          </div>
+
+          <table class="summary-table">
+            <tr>
+              <td style="color: #5A6A51;">Subtotal:</td>
+              <td style="text-align: right; font-weight: 600;">EGP ${totalCost.toLocaleString()}</td>
+            </tr>
+            ${walletUsed > 0 ? `
+            <tr>
+              <td style="color: #5A6A51;">Paid from Wallet:</td>
+              <td style="text-align: right; font-weight: 600; color: #414E36;">- EGP ${walletUsed.toLocaleString()}</td>
+            </tr>
+            ` : ""}
+            <tr class="total-row">
+              <td>Amount Paid:</td>
+              <td style="text-align: right;">EGP ${booking.amountPaid.toLocaleString()}</td>
+            </tr>
+            ${booking.amountLeft > 0 ? `
+            <tr style="color: #DC2626; font-weight: 600;">
+              <td>Outstanding Due:</td>
+              <td style="text-align: right;">EGP ${booking.amountLeft.toLocaleString()}</td>
+            </tr>
+            ` : ""}
+          </table>
+
+          <div class="footer">
+            <p>Thank you for choosing Revera Clinics!</p>
+            <p style="font-size: 10px; margin-top: 6px; color: #A3A3A3;">Generated automatically on ${new Date().toLocaleDateString()}</p>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   }
 
   const calendarDays = useMemo(
@@ -14759,28 +14977,30 @@ export default function AdminPage() {
                   </div>
 
                   {/* Invoice */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-gray-100 rounded-lg text-[#5A6A51]">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                          <line x1="16" y1="2" x2="16" y2="6" />
-                          <line x1="8" y1="2" x2="8" y2="6" />
-                          <line x1="3" y1="10" x2="21" y2="10" />
-                        </svg>
+                  {viewingBooking.status === 'completed' && (
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-gray-100 rounded-lg text-[#5A6A51]">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-[#1F251A]">Booking Invoice</p>
+                          <p className="text-xs text-[#5A6A51] mt-0.5">Generate and download invoice for this booking.</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold text-[#1F251A]">Booking Invoice</p>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">Generate and download invoice for this booking.</p>
-                      </div>
+                      <button
+                        onClick={() => setInvoiceBooking(viewingBooking)}
+                        className="mt-4 w-full rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                      >
+                        Download Invoice
+                      </button>
                     </div>
-                    <button
-                      onClick={() => alert("Invoice downloaded successfully!")}
-                      className="mt-4 w-full rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
-                    >
-                      Download Invoice
-                    </button>
-                  </div>
+                  )}
 
                   {/* Workflow Action Flow Section */}
                   {viewingBooking.status === 'pending' && hasPermission("bookings.approve_reject") && (
@@ -16901,6 +17121,161 @@ export default function AdminPage() {
                     )}
                   </button>
                 </div>
+              </div>
+            </div>
+          );
+        })()
+      )}
+
+      {/* ── BOOKING INVOICE MODAL ── */}
+      {invoiceBooking && (
+        (() => {
+          // 1. Calculate service cost
+          const svcIds = Array.isArray(invoiceBooking.serviceIds) ? invoiceBooking.serviceIds : [invoiceBooking.serviceId];
+          const bookingServicesList = svcIds.map((id: number) => {
+            const s = localServices.find(srv => srv.id === id);
+            return {
+              name: s?.en || `Service #${id}`,
+              nameAr: s?.ar || `خدمة #${id}`,
+              price: s?.price ?? 500
+            };
+          });
+          const totalCost = bookingServicesList.reduce((sum: number, s: any) => sum + s.price, 0);
+          
+          // 2. Fetch customer and branch details
+          const walletUsed = Math.max(0, totalCost - (invoiceBooking.amountPaid ?? 0) - (invoiceBooking.amountLeft ?? 0));
+          const branch = branches.find(b => b.id === invoiceBooking.branchId);
+          const branchName = branch ? (isRTL ? branch.name_ar : branch.name_en) : "Revera Zayed Clinic";
+          const invoiceNo = `REV-INV-${invoiceBooking.id.slice(0, 8).toUpperCase()}`;
+
+          return (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+              <div className="w-full max-w-3xl rounded-[32px] bg-white p-8 shadow-2xl border border-[#414E36]/10 my-8">
+                
+                {/* Header Actions */}
+                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4 mb-6">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#C4AE7C]">Invoice Preview</span>
+                    <h3 className="text-lg font-bold text-[#1F251A] mt-0.5 font-sans">Booking Invoice Details</h3>
+                  </div>
+                  <button
+                    onClick={() => setInvoiceBooking(null)}
+                    className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200 transition"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Printable Invoice Container */}
+                <div className="border border-gray-100 rounded-3xl p-6 sm:p-8 bg-[#FBFBF9]/30">
+                  {/* Top Header */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-[#414E36]/20">
+                    <div>
+                      <h1 className="text-xl font-bold tracking-wider text-[#414E36]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
+                      <p className="text-xs text-[#5A6A51] mt-1 font-semibold">Sheikh Zayed / New Cairo</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Phone: (+20) 01035595691</p>
+                      <p className="text-[11px] text-gray-400">Email: inquiries@reveraclinics.com</p>
+                    </div>
+                    <div className="sm:text-right">
+                      <h2 className="text-2xl font-bold tracking-wide text-[#C4AE7C]" style={{ fontFamily: "Marcellus, serif" }}>INVOICE</h2>
+                      <p className="text-xs text-[#1F251A] mt-1.5 font-bold">No: {invoiceNo}</p>
+                      <p className="text-[11px] text-[#5A6A51] mt-0.5">Date: {invoiceBooking.date}</p>
+                    </div>
+                  </div>
+
+                  {/* Customer / Billing Info */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 my-6 text-xs leading-relaxed">
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2 border-b pb-1">Billed To</p>
+                      <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name}</p>
+                      <p className="text-[#5A6A51] mt-1"><strong>Phone:</strong> {invoiceBooking.phone}</p>
+                      <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
+                    </div>
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2 border-b pb-1">Booking Details</p>
+                      <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
+                      <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
+                      <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
+                    </div>
+                  </div>
+
+                  {/* Table of Services */}
+                  <div className="overflow-x-auto my-6 border border-gray-100 rounded-2xl bg-white">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-100">
+                          <th className="p-3 text-left">Service Rendered</th>
+                          <th className="p-3 text-center w-16">Qty</th>
+                          <th className="p-3 text-right w-24">Unit Price</th>
+                          <th className="p-3 text-right w-24">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {bookingServicesList.map((s: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-gray-50/50">
+                            <td className="p-3 font-semibold text-[#1F251A]">{s.name}</td>
+                            <td className="p-3 text-center text-gray-500">1</td>
+                            <td className="p-3 text-right text-gray-600">EGP {s.price.toLocaleString()}</td>
+                            <td className="p-3 text-right font-bold text-[#1F251A]">EGP {s.price.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Pricing Summary */}
+                  <div className="flex justify-end text-xs my-6">
+                    <div className="w-64 space-y-2.5">
+                      <div className="flex justify-between text-gray-500">
+                        <span>Subtotal:</span>
+                        <span className="font-semibold text-[#1F251A]">EGP {totalCost.toLocaleString()}</span>
+                      </div>
+                      {walletUsed > 0 && (
+                        <div className="flex justify-between text-green-700">
+                          <span>Paid from Wallet:</span>
+                          <span className="font-bold">- EGP {walletUsed.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between border-t border-[#414E36] pt-2 text-sm font-bold text-[#414E36]">
+                        <span>Amount Paid:</span>
+                        <span>EGP {invoiceBooking.amountPaid.toLocaleString()}</span>
+                      </div>
+                      {invoiceBooking.amountLeft > 0 && (
+                        <div className="flex justify-between font-bold text-red-600">
+                          <span>Outstanding Due:</span>
+                          <span>EGP {invoiceBooking.amountLeft.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Thank you */}
+                  <div className="text-center text-[10px] text-gray-400 mt-6 pt-4 border-t border-dashed border-gray-200">
+                    <p>Thank you for choosing Revera Clinics!</p>
+                  </div>
+                </div>
+
+                {/* Bottom Buttons */}
+                <div className="flex items-center justify-end gap-3 mt-6 border-t border-gray-100 pt-4">
+                  <button
+                    onClick={() => setInvoiceBooking(null)}
+                    className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => handlePrintInvoice(invoiceBooking, bookingServicesList, totalCost, walletUsed, branchName)}
+                    className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="6 9 6 2 18 2 18 9" />
+                      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                      <rect x="6" y="14" width="12" height="8" />
+                    </svg>
+                    Print / Save PDF
+                  </button>
+                </div>
+
               </div>
             </div>
           );
