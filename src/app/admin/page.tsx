@@ -14616,65 +14616,7 @@ export default function AdminPage() {
                     </button>
                   </div>
 
-                  {/* Payment Details */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-4 shadow-sm">
-                    <p className="text-sm font-bold text-[#1F251A]">Payment Details / تفاصيل الدفع</p>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">
-                          Amount Paid / المدفوع
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min="0"
-                            disabled={!hasPermission("bookings.edit")}
-                            value={viewingBooking.amountPaid ?? 0}
-                            onChange={async (e) => {
-                              const val = parseFloat(e.target.value) || 0;
-                              // Autocalculate remaining left
-                              const remaining = Math.max(0, cost - val);
-                              await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ amountPaid: val, amountLeft: remaining })
-                              });
-                              setViewingBooking(prev => prev ? { ...prev, amountPaid: val, amountLeft: remaining } : null);
-                              fetchAllReservations();
-                            }}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-12 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] disabled:opacity-60 disabled:cursor-not-allowed"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
-                        </div>
-                      </div>
 
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">
-                          Amount Left (Remaining) / المتبقي
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min="0"
-                            disabled={!hasPermission("bookings.edit")}
-                            value={viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null ? viewingBooking.amountLeft : Math.max(0, cost - (viewingBooking.amountPaid ?? 0))}
-                            onChange={async (e) => {
-                              const val = parseFloat(e.target.value) || 0;
-                              await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                                method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ amountLeft: val })
-                              });
-                              setViewingBooking(prev => prev ? { ...prev, amountLeft: val } : null);
-                              fetchAllReservations();
-                            }}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white pl-3 pr-12 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] disabled:opacity-60 disabled:cursor-not-allowed"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5A6A51]">EGP</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
 
                   {/* Products */}
                   {/*
