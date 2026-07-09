@@ -30,8 +30,8 @@ function mapRow(r: Record<string, any>) {
     status: r.status,
     timeSlot: r.time_slot,
     sessionType: r.session_type,
-    doctorName: r.doctor_name,
     createdAt: r.created_at,
+    isManual: r.is_manual ?? false,
     branchId: r.branch_id ?? null,
     customerId: r.customer_id ?? null,
     amountPaid: r.amount_paid ?? 0,
@@ -180,6 +180,7 @@ export async function POST(req: Request) {
         amount_paid: body.amountPaid !== undefined ? Number(body.amountPaid) : 0,
         amount_left: body.amountLeft !== undefined ? Number(body.amountLeft) : null,
         doctor_name: doctorName || null,
+        is_manual: body.isManual ?? false,
         rooms: compRoomIds,
       })
       .select()
