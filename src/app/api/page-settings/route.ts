@@ -68,6 +68,15 @@ const DEFAULT_SETTINGS = {
           image: "/images/hero/slide-3.jpg"
         }
       ]
+    },
+    booking: {
+      minAdvance: 2,
+      maxAdvance: 30,
+      cancelWindow: 2,
+      maxPerSlot: 1,
+      instantApproval: false,
+      showDoctorNotes: false,
+      depositPercentage: 20
     }
   }
 };

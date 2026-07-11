@@ -118,6 +118,8 @@ function getStatusBadgeClass(status: string): string {
       return 'bg-gray-50 text-gray-500 border border-gray-200/50';
     case 'rejected':
       return 'bg-red-50 text-red-700 border border-red-200/50';
+    case 'pending_deposit':
+      return 'bg-purple-50 text-purple-700 border border-purple-200/50';
     case 'pending':
     default:
       return 'bg-amber-50 text-amber-700 border border-amber-200/50';
@@ -2256,13 +2258,13 @@ export default function AdminPage() {
   const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
   const [savingClinicProfile, setSavingClinicProfile] = useState(false);
 
-  // ── Booking Settings State ──
   const [bookingMinAdvance, setBookingMinAdvance] = useState(2);
   const [bookingMaxAdvance, setBookingMaxAdvance] = useState(30);
   const [bookingCancelWindow, setBookingCancelWindow] = useState(4);
   const [bookingMaxPerSlot, setBookingMaxPerSlot] = useState(3);
   const [bookingInstantApproval, setBookingInstantApproval] = useState(false);
   const [bookingShowDoctorNotes, setBookingShowDoctorNotes] = useState(true);
+  const [bookingDepositPercentage, setBookingDepositPercentage] = useState(20);
   const [savingBookingSettings, setSavingBookingSettings] = useState(false);
 
   // ── Notification Settings State ──
@@ -3060,6 +3062,16 @@ export default function AdminPage() {
           setWcuImage1(data.whyChooseUs?.image1 || "");
           setWcuImage2(data.whyChooseUs?.image2 || "");
 
+           if (data.booking) {
+            setBookingMinAdvance(data.booking.minAdvance ?? 2);
+            setBookingMaxAdvance(data.booking.maxAdvance ?? 30);
+            setBookingCancelWindow(data.booking.cancelWindow ?? 4);
+            setBookingMaxPerSlot(data.booking.maxPerSlot ?? 3);
+            setBookingInstantApproval(data.booking.instantApproval ?? false);
+            setBookingShowDoctorNotes(data.booking.showDoctorNotes ?? true);
+            setBookingDepositPercentage(data.booking.depositPercentage ?? 20);
+          }
+
           if (data.footer && data.footer.serviceHours) {
             setServiceHours(data.footer.serviceHours);
           }
@@ -3198,7 +3210,15 @@ export default function AdminPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          booking: { minAdvance: bookingMinAdvance, maxAdvance: bookingMaxAdvance, cancelWindow: bookingCancelWindow, maxPerSlot: bookingMaxPerSlot, instantApproval: bookingInstantApproval, showDoctorNotes: bookingShowDoctorNotes }
+          booking: {
+            minAdvance: bookingMinAdvance,
+            maxAdvance: bookingMaxAdvance,
+            cancelWindow: bookingCancelWindow,
+            maxPerSlot: bookingMaxPerSlot,
+            instantApproval: bookingInstantApproval,
+            showDoctorNotes: bookingShowDoctorNotes,
+            depositPercentage: bookingDepositPercentage
+          }
         }),
       });
     } catch (err) {
@@ -10553,6 +10573,19 @@ export default function AdminPage() {
                     />
                     <span className="text-[11px] text-[#8A9A81] mt-1 block">Maximum concurrent appointments per time slot.</span>
                   </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Reservation Deposit (%)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={bookingDepositPercentage}
+                      onChange={(e) => setBookingDepositPercentage(Math.max(0, Math.min(100, Number(e.target.value))))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Percentage of service price to secure a booking. Set to 0 to disable.</span>
+                  </div>
                 </div>
 
                 <div className="border-t border-[#F2EFE9] pt-6 space-y-4">
@@ -14794,6 +14827,63 @@ export default function AdminPage() {
                 <div className="space-y-6">
 
                   {/* Workflow Action Flow Section */}
+                  {viewingBooking.status === 'pending_deposit' && (
+                    <div className="rounded-2xl border-2 border-purple-300 bg-purple-50 p-5 space-y-4">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-2.5 w-2.5 rounded-full bg-purple-600 animate-pulse"></span>
+                        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-purple-900">Pending Deposit</p>
+                      </div>
+                      <p className="text-xs text-purple-700 leading-relaxed">
+                        This website booking requires a reservation deposit. The patient has not yet paid the deposit online. You can manually register the payment if they paid via cash/bank transfer.
+                      </p>
+                      {(() => {
+                        const svc = localServices.find(s => s.id === viewingBooking.serviceId);
+                        const svcPrice = (svc && svc.price !== undefined) ? svc.price : 0;
+                        const depVal = Math.round(svcPrice * (bookingDepositPercentage / 100));
+                        return (
+                          <div className="rounded-xl bg-white p-3 text-xs space-y-1 text-purple-900 font-semibold border border-purple-200">
+                            <div className="flex justify-between">
+                              <span>Service Price:</span>
+                              <span>EGP {svcPrice}</span>
+                            </div>
+                            <div className="flex justify-between text-purple-700">
+                              <span>Deposit Amount ({bookingDepositPercentage}%):</span>
+                              <span>EGP {depVal}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      <button
+                        onClick={async () => {
+                          const svc = localServices.find(s => s.id === viewingBooking.serviceId);
+                          const svcPrice = (svc && svc.price !== undefined) ? svc.price : 0;
+                          const depVal = Math.round(svcPrice * (bookingDepositPercentage / 100));
+                          const remaining = svcPrice - depVal;
+
+                          if (await showConfirm(`Mark deposit of EGP ${depVal} as paid? This will move the booking to Pending.`)) {
+                            const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                status: 'pending',
+                                amountPaid: depVal,
+                                amountLeft: remaining
+                              }),
+                            });
+                            if (res.ok) {
+                              setViewingBooking(null);
+                              fetchRequests();
+                              fetchAllReservations();
+                            }
+                          }
+                        }}
+                        className="w-full rounded-2xl bg-purple-700 py-2.5 text-xs font-bold text-white hover:bg-purple-800 transition flex items-center justify-center gap-1.5"
+                      >
+                        Mark Deposit as Paid
+                      </button>
+                    </div>
+                  )}
+
                   {viewingBooking.status === 'pending' && hasPermission("bookings.approve_reject") && (
                     <div className="rounded-2xl border-2 border-[#C4AE7C]/30 bg-[#EDF1EC] p-5">
                       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Workflow Actions</p>
@@ -15338,7 +15428,7 @@ export default function AdminPage() {
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Status</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {['All', 'approved', 'pending', 'rejected'].map(st => (
+                  {['All', 'approved', 'pending', 'rejected', 'pending_deposit'].map(st => (
                     <button
                       key={st}
                       onClick={() => setStatusFilter(st)}
@@ -15348,7 +15438,7 @@ export default function AdminPage() {
                           : 'border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#f7f6f2]'
                       }`}
                     >
-                      {st === 'approved' ? 'Approved' : st === 'pending' ? 'Pending' : st === 'rejected' ? 'Rejected' : 'All'}
+                      {st === 'approved' ? 'Approved' : st === 'pending' ? 'Pending' : st === 'rejected' ? 'Rejected' : st === 'pending_deposit' ? 'Pending Deposit' : 'All'}
                     </button>
                   ))}
                 </div>

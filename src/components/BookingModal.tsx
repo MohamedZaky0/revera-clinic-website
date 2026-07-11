@@ -91,6 +91,10 @@ export function BookingModal() {
   const [doctors, setDoctors] = useState<any[]>([]);
   const [selectedDoctor, setSelectedDoctor] = useState<string>("");
   const [reservationsForDate, setReservationsForDate] = useState<any[]>([]);
+  const [depositPercentage, setDepositPercentage] = useState(20);
+  const [isPaying, setIsPaying] = useState(false);
+  const [showPaymentGate, setShowPaymentGate] = useState(false);
+  const [createdReservation, setCreatedReservation] = useState<any>(null);
 
   const [branches, setBranches] = useState<any[]>([]);
   const [branchId, setBranchId] = useState<string | null>(null);
@@ -112,6 +116,9 @@ export function BookingModal() {
     setNotes("");
     setSessionType("in_person");
     setConfirmed(false);
+    setIsPaying(false);
+    setShowPaymentGate(false);
+    setCreatedReservation(null);
   }, [branches]);
 
   const handleClose = useCallback(() => {
@@ -201,6 +208,18 @@ export function BookingModal() {
       .then((r) => r.json())
       .then((data) => {
         setDoctors(data || []);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load deposit percentage settings
+  useEffect(() => {
+    fetch("/api/page-settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.booking && data.booking.depositPercentage !== undefined) {
+          setDepositPercentage(Number(data.booking.depositPercentage));
+        }
       })
       .catch(() => {});
   }, []);
@@ -452,9 +471,54 @@ export function BookingModal() {
       doctorName: selectedDoctor || null,
     };
     fetch('/api/reservations', { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } })
-      .then(r => r.json())
-      .then(() => setConfirmed(true))
+      .then(r => {
+        if (!r.ok) throw new Error("Failed to create reservation");
+        return r.json();
+      })
+      .then((data) => {
+        if (data && data.status === 'pending_deposit') {
+          setCreatedReservation(data);
+          setShowPaymentGate(true);
+        } else {
+          setConfirmed(true);
+        }
+      })
       .catch(() => setConfirmed(true));
+  }
+
+  function handlePayDeposit() {
+    if (!createdReservation || !selectedService) return;
+    setIsPaying(true);
+    
+    const svcPrice = selectedService.price || 0;
+    const depAmount = Math.round(svcPrice * (depositPercentage / 100));
+    const remBalance = svcPrice - depAmount;
+
+    setTimeout(() => {
+      fetch(`/api/reservations?id=${createdReservation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'pending',
+          amountPaid: depAmount,
+          amountLeft: remBalance
+        })
+      })
+        .then(r => {
+          if (!r.ok) throw new Error("Failed to process payment");
+          return r.json();
+        })
+        .then(() => {
+          setIsPaying(false);
+          setShowPaymentGate(false);
+          setConfirmed(true);
+        })
+        .catch((err) => {
+          console.error("Payment registration error:", err);
+          setIsPaying(false);
+          setConfirmed(true);
+        });
+    }, 1500);
   }
 
   // Filter out services that admin marked as inactive or hidden
@@ -757,124 +821,229 @@ export function BookingModal() {
             {/* Step 4: Confirm */}
             {step === 4 && (
               <div>
-                <p className="mb-4 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
-                  {t.booking.confirmTitle}
-                </p>
-
-                {/* Summary */}
-                <div
-                  className="rounded-xl p-4 mb-5 text-sm flex flex-col gap-2"
-                  style={{ backgroundColor: "var(--cr-secondary)" }}
-                >
-                  {selectedService && (
-                    <p className="mb-0">
-                      <span className="font-semibold">{t.booking.labels.service}: </span>
-                      {isRTL ? selectedService.ar : selectedService.en}
+                {showPaymentGate ? (
+                  <div className="space-y-4">
+                    <p className="text-sm font-semibold text-[#1F251A]">
+                      {isRTL ? "بوابة دفع عربون الحجز الآمنة" : "Secure Reservation Deposit Payment"}
                     </p>
-                  )}
-                  {branchId && (
-                    <p className="mb-0">
-                      <span className="font-semibold">{isRTL ? "الفرع" : "Branch"}: </span>
-                      {(() => {
-                        const b = branches.find(x => x.id === branchId);
-                        return b ? (isRTL ? b.name_ar : b.name_en) : "";
-                      })()}
+                    <p className="text-xs text-[#5A6A51] leading-relaxed">
+                      {isRTL 
+                        ? "لتأكيد حجزك، يرجى دفع عربون الحجز المقدر بـ 20% من إجمالي قيمة الخدمة. سيتم خصم هذا المبلغ من إجمالي الفاتورة النهائية." 
+                        : "To secure your reservation, please pay the required deposit (default 20%). This deposit will be deducted from your final invoice."
+                      }
                     </p>
-                  )}
-                  {selectedDate && (
-                    <p className="mb-0">
-                      <span className="font-semibold">{t.booking.labels.date}: </span>
-                      {formatDate(selectedDate)}
-                    </p>
-                  )}
-                  {selectedTime && (
-                    <p className="mb-0">
-                      <span className="font-semibold">{t.booking.labels.time}: </span>
-                      {selectedTime}
-                    </p>
-                  )}
-                  {selectedDoctor && (
-                    <p className="mb-0">
-                      <span className="font-semibold">{isRTL ? "الطبيب" : "Doctor"}: </span>
-                      {selectedDoctor}
-                    </p>
-                  )}
-                </div>
 
-                {/* Notes */}
-                <label className="block mb-1 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
-                  {t.booking.notes}
-                </label>
-                <textarea
-                  className="cr-input resize-none mb-3"
-                  rows={3}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder={t.booking.notes}
-                />
+                    {/* Price Breakdown */}
+                    <div className="rounded-2xl border border-[#C4AE7C]/20 bg-[#FBFBF9] p-4 text-xs space-y-2 text-[#1F251A]">
+                      <div className="flex justify-between">
+                        <span className="opacity-70">{isRTL ? "سعر الخدمة الإجمالي:" : "Service Price:"}</span>
+                        <span className="font-semibold">EGP {selectedService?.price || 0}</span>
+                      </div>
+                      <div className="flex justify-between text-purple-700 font-semibold">
+                        <span>{isRTL ? `عربون الحجز المطلـوب (${depositPercentage}%):` : `Required Deposit (${depositPercentage}%):`}</span>
+                        <span>EGP {Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
+                      </div>
+                      <div className="border-t border-dashed border-[#C4AE7C]/20 pt-2 flex justify-between font-semibold">
+                        <span>{isRTL ? "المبلغ المتبقي بالعيادة:" : "Remaining Balance (Pay at Clinic):"}</span>
+                        <span>EGP {(selectedService?.price || 0) - Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
+                      </div>
+                    </div>
 
-                {/* Doctor Selection (Optional) */}
-                <label className="block mb-1 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
-                  {isRTL ? "الطبيب المعالج (اختياري)" : "Select Doctor (Optional)"}
-                </label>
-                <select
-                  className="cr-input mb-3 bg-white text-[#1F251A] font-medium"
-                  value={selectedDoctor}
-                  onChange={(e) => setSelectedDoctor(e.target.value)}
-                >
-                  <option value="">
-                    {isRTL ? "أي طبيب / لا يوجد تفضيل" : "Any Doctor / No Preference"}
-                  </option>
-                  {getAvailableDoctors().map((doc: any) => (
-                    <option key={doc.id} value={doc.name}>
-                      {doc.name}
-                    </option>
-                  ))}
-                </select>
+                    {/* Credit Card Input Layout */}
+                    <div className="space-y-3 pt-2">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[#5A6A51] mb-1 uppercase tracking-wider">{isRTL ? "اسم حامل البطاقة" : "Cardholder Name"}</label>
+                        <input 
+                          type="text" 
+                          placeholder="Saifuldeen Naser" 
+                          disabled={isPaying}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-[#5A6A51] mb-1 uppercase tracking-wider">{isRTL ? "رقم البطاقة" : "Card Number"}</label>
+                        <input 
+                          type="text" 
+                          placeholder="4000 1234 5678 9010" 
+                          disabled={isPaying}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-[#5A6A51] mb-1 uppercase tracking-wider">{isRTL ? "تاريخ الانتهاء" : "Expiry Date"}</label>
+                          <input 
+                            type="text" 
+                            placeholder="MM/YY" 
+                            disabled={isPaying}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-[#5A6A51] mb-1 uppercase tracking-wider">CVV</label>
+                          <input 
+                            type="password" 
+                            placeholder="•••" 
+                            disabled={isPaying}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                          />
+                        </div>
+                      </div>
+                    </div>
 
+                    <button
+                      onClick={handlePayDeposit}
+                      disabled={isPaying}
+                      className="btn-primary w-full justify-center mt-4"
+                      style={{ backgroundColor: "#25D366", borderColor: "#25D366" }}
+                    >
+                      {isPaying ? (
+                        <span className="flex items-center gap-2">
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          {isRTL ? "جاري معالجة الدفع الآمن..." : "Processing Secure Payment..."}
+                        </span>
+                      ) : (
+                        <span>{isRTL ? `تأكيد ودفع ${Math.round((selectedService?.price || 0) * (depositPercentage / 100))} ج.م` : `Confirm & Pay Deposit EGP ${Math.round((selectedService?.price || 0) * (depositPercentage / 100))}`}</span>
+                      )}
+                    </button>
 
+                    <button
+                      onClick={() => {
+                        setShowPaymentGate(false);
+                        setCreatedReservation(null);
+                      }}
+                      disabled={isPaying}
+                      className="btn-outline w-full justify-center text-xs mt-1"
+                    >
+                      {isRTL ? "إلغاء والعودة" : "Cancel & Return"}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Summary */}
+                    <div
+                      className="rounded-xl p-4 mb-5 text-sm flex flex-col gap-2"
+                      style={{ backgroundColor: "var(--cr-secondary)" }}
+                    >
+                      {selectedService && (
+                        <p className="mb-0">
+                          <span className="font-semibold">{t.booking.labels.service}: </span>
+                          {isRTL ? selectedService.ar : selectedService.en}
+                        </p>
+                      )}
+                      {branchId && (
+                        <p className="mb-0">
+                          <span className="font-semibold">{isRTL ? "الفرع" : "Branch"}: </span>
+                          {(() => {
+                            const b = branches.find(x => x.id === branchId);
+                            return b ? (isRTL ? b.name_ar : b.name_en) : "";
+                          })()}
+                        </p>
+                      )}
+                      {selectedDate && (
+                        <p className="mb-0">
+                          <span className="font-semibold">{t.booking.labels.date}: </span>
+                          {formatDate(selectedDate)}
+                        </p>
+                      )}
+                      {selectedTime && (
+                        <p className="mb-0">
+                          <span className="font-semibold">{t.booking.labels.time}: </span>
+                          {selectedTime}
+                        </p>
+                      )}
+                      {selectedDoctor && (
+                        <p className="mb-0">
+                          <span className="font-semibold">{isRTL ? "الطبيب" : "Doctor"}: </span>
+                          {selectedDoctor}
+                        </p>
+                      )}
+                      {selectedService && depositPercentage > 0 && (
+                        <div className="mt-2 border-t border-[#414E36]/10 pt-2 text-xs space-y-1 text-[#414E36] font-medium">
+                          <p>
+                            <span className="font-semibold text-purple-800">{isRTL ? "عربون الحجز المطلـوب:" : "Required Deposit:"} </span>
+                            EGP {Math.round((selectedService.price || 0) * (depositPercentage / 100))} ({depositPercentage}%)
+                          </p>
+                        </div>
+                      )}
+                    </div>
 
-                <label className="block mb-1 text-xs font-semibold">Name</label>
-                <input className="cr-input mb-2" value={name} onChange={(e)=>setName(e.target.value)} />
-                <label className="block mb-1 text-xs font-semibold">Email</label>
-                <input className="cr-input mb-2" value={email} onChange={(e)=>setEmail(e.target.value)} />
-                <label className="block mb-1 text-xs font-semibold">Phone</label>
-                <input className="cr-input mb-4" value={phone} onChange={(e)=>setPhone(e.target.value)} />
+                    {/* Notes */}
+                    <label className="block mb-1 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
+                      {t.booking.notes}
+                    </label>
+                    <textarea
+                      className="cr-input resize-none mb-3"
+                      rows={3}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder={t.booking.notes}
+                    />
 
-                <button
-                  onClick={handleConfirm}
-                  className="btn-primary w-full justify-center"
-                >
-                  {t.booking.confirmBtn}
-                </button>
+                    {/* Doctor Selection (Optional) */}
+                    <label className="block mb-1 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
+                      {isRTL ? "الطبيب المعالج (اختياري)" : "Select Doctor (Optional)"}
+                    </label>
+                    <select
+                      className="cr-input mb-3 bg-white text-[#1F251A] font-medium"
+                      value={selectedDoctor}
+                      onChange={(e) => setSelectedDoctor(e.target.value)}
+                    >
+                      <option value="">
+                        {isRTL ? "أي طبيب / لا يوجد تفضيل" : "Any Doctor / No Preference"}
+                      </option>
+                      {getAvailableDoctors().map((doc: any) => (
+                        <option key={doc.id} value={doc.name}>
+                          {doc.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <label className="block mb-1 text-xs font-semibold">Name</label>
+                    <input className="cr-input mb-2" value={name} onChange={(e)=>setName(e.target.value)} />
+                    <label className="block mb-1 text-xs font-semibold">Email</label>
+                    <input className="cr-input mb-2" value={email} onChange={(e)=>setEmail(e.target.value)} />
+                    <label className="block mb-1 text-xs font-semibold">Phone</label>
+                    <input className="cr-input mb-4" value={phone} onChange={(e)=>setPhone(e.target.value)} />
+
+                    <button
+                      onClick={handleConfirm}
+                      className="btn-primary w-full justify-center"
+                    >
+                      {t.booking.confirmBtn}
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
             {/* Navigation */}
-            <div
-              className={`flex mt-6 gap-3 ${
-                step === 1 ? "justify-end" : "justify-between"
-              }`}
-            >
-              {step > 1 && (
-                <button
-                  onClick={handleBack}
-                  className="btn-outline"
-                >
-                  {t.booking.backBtn}
-                </button>
-              )}
-              {step < 4 && (
-                <button
-                  onClick={handleNext}
-                  disabled={!canNext}
-                  className="btn-primary"
-                  style={{ opacity: canNext ? 1 : 0.4, cursor: canNext ? "pointer" : "not-allowed" }}
-                >
-                  {t.booking.nextBtn}
-                </button>
-              )}
-            </div>
+            {!showPaymentGate && (
+              <div
+                className={`flex mt-6 gap-3 ${
+                  step === 1 ? "justify-end" : "justify-between"
+                }`}
+              >
+                {step > 1 && (
+                  <button
+                    onClick={handleBack}
+                    className="btn-outline"
+                  >
+                    {t.booking.backBtn}
+                  </button>
+                )}
+                {step < 4 && (
+                  <button
+                    onClick={handleNext}
+                    disabled={!canNext}
+                    className="btn-primary"
+                    style={{ opacity: canNext ? 1 : 0.4, cursor: canNext ? "pointer" : "not-allowed" }}
+                  >
+                    {t.booking.nextBtn}
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>

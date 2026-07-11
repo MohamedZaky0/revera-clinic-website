@@ -100,11 +100,11 @@ export async function POST(req: Request) {
 
     const requestUrl = new URL(req.url);
     const siteUrl = requestUrl.origin;
-    console.log('Sending invitation to:', cleanEmail, 'with redirectTo:', `${siteUrl}/auth/setup`);
+    console.log('Sending invitation to:', cleanEmail, 'with redirectTo:', `${siteUrl}/auth/callback?next=/auth/setup`);
     const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(
       cleanEmail,
       {
-        redirectTo: `${siteUrl}/auth/setup`,
+        redirectTo: `${siteUrl}/auth/callback?next=/auth/setup`,
         data: {
           full_name: cleanName,
           role: roleName,
@@ -234,7 +234,7 @@ export async function PATCH(req: Request) {
     const { data: inviteData, error: inviteError } = await supabaseServer.auth.admin.inviteUserByEmail(
       employee.email,
       {
-        redirectTo: `${siteUrl}/auth/setup`,
+        redirectTo: `${siteUrl}/auth/callback?next=/auth/setup`,
         data: {
           full_name: employee.name,
           role: employee.role_name,

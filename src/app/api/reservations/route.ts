@@ -161,6 +161,47 @@ export async function POST(req: Request) {
       console.warn("Could not load service compatible rooms:", e);
     }
 
+    // Fetch service price
+    let servicePrice = 0;
+    try {
+      const { data: svc } = await supabaseServer
+        .from('services')
+        .select('price')
+        .eq('id', Number(serviceId))
+        .maybeSingle();
+      if (svc) {
+        servicePrice = Number(svc.price) || 0;
+      }
+    } catch (e) {
+      console.error("Could not fetch service details for price calculation:", e);
+    }
+
+    // Fetch deposit settings
+    let depositPercentage = 20; // Default 20%
+    try {
+      const { data: pageSet } = await supabaseServer
+        .from('page_settings')
+        .select('value')
+        .eq('key', 'home')
+        .maybeSingle();
+      if (pageSet && pageSet.value?.booking?.depositPercentage !== undefined) {
+        depositPercentage = Number(pageSet.value.booking.depositPercentage);
+      }
+    } catch (e) {
+      console.error("Could not fetch deposit percentage settings:", e);
+    }
+
+    const isManualBooking = body.isManual ?? false;
+    let initialStatus = 'pending';
+    let initialAmountPaid = body.amountPaid !== undefined ? Number(body.amountPaid) : 0;
+    let initialAmountLeft = body.amountLeft !== undefined ? (body.amountLeft !== null ? Number(body.amountLeft) : null) : servicePrice;
+
+    if (!isManualBooking && depositPercentage > 0) {
+      initialStatus = 'pending_deposit';
+      initialAmountPaid = 0;
+      initialAmountLeft = servicePrice;
+    }
+
     // 2. Insert reservation linked to customer
     const insertPayload: any = {
       service_id: Number(serviceId),
@@ -170,15 +211,15 @@ export async function POST(req: Request) {
       email,
       phone,
       notes: notes || '',
-      status: 'pending',
+      status: initialStatus,
       time_slot: null,
       session_type: sessionType || 'in_person',
       branch_id: branchId || null,
       customer_id: customerId,
-      amount_paid: body.amountPaid !== undefined ? Number(body.amountPaid) : 0,
-      amount_left: body.amountLeft !== undefined ? Number(body.amountLeft) : null,
+      amount_paid: initialAmountPaid,
+      amount_left: initialAmountLeft,
       doctor_name: doctorName || null,
-      is_manual: body.isManual ?? false,
+      is_manual: isManualBooking,
       rooms: compRoomIds,
     };
 
@@ -188,16 +229,40 @@ export async function POST(req: Request) {
       .select()
       .single();
 
-    if (error && error.code === '42703') {
-      console.warn("Column 'is_manual' does not exist in the database. Retrying insert without it.");
-      delete insertPayload.is_manual;
-      const retryResult = await supabaseServer
-        .from('reservations')
-        .insert(insertPayload)
-        .select()
-        .single();
-      data = retryResult.data;
-      error = retryResult.error;
+    if (error) {
+      let retried = false;
+      if (error.code === '42703') {
+        console.warn("Column 'is_manual' does not exist in the database. Retrying insert without it.");
+        delete insertPayload.is_manual;
+        retried = true;
+      }
+      if (error.code === '23514' && insertPayload.status === 'pending_deposit') {
+        console.warn("Status constraint check failed for 'pending_deposit'. Retrying with 'pending'.");
+        insertPayload.status = 'pending';
+        retried = true;
+      }
+      if (retried) {
+        const retryResult = await supabaseServer
+          .from('reservations')
+          .insert(insertPayload)
+          .select()
+          .single();
+        data = retryResult.data;
+        error = retryResult.error;
+
+        // Double fallback if it fails on the other code
+        if (error && error.code === '23514' && insertPayload.status === 'pending_deposit') {
+          console.warn("Status constraint check failed for 'pending_deposit' on retry. Falling back to 'pending'.");
+          insertPayload.status = 'pending';
+          const finalResult = await supabaseServer
+            .from('reservations')
+            .insert(insertPayload)
+            .select()
+            .single();
+          data = finalResult.data;
+          error = finalResult.error;
+        }
+      }
     }
 
     if (error) throw error;
