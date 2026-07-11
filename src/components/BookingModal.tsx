@@ -238,20 +238,20 @@ export function BookingModal() {
       .catch(() => {});
   }, []);
 
-  // Prefetch 30-day availability the moment serviceId + branchId are known
+  // Prefetch 30-day availability the moment serviceId + branchId + sessionType are known
   // — fires BEFORE the user even clicks "Next", so the calendar is warm
   useEffect(() => {
     if (!serviceId) return;
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    const url = `/api/availability?serviceId=${serviceId}&days=30${branchQuery}`;
+    const url = `/api/availability?serviceId=${serviceId}&days=30${branchQuery}&sessionType=${sessionType}`;
     prefetchUrl(url, 30000);
-  }, [serviceId, branchId]);
+  }, [serviceId, branchId, sessionType]);
 
   // Consume the cached 30-day data when the user actually reaches step 2 (date picker)
   useEffect(() => {
     if (!open || !serviceId) return;
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    cachedFetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}`, 30000).then((data) => {
+    cachedFetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}&sessionType=${sessionType}`, 30000).then((data) => {
       const map: Record<string, number> = {};
       if (Array.isArray(data)) {
         data.forEach((d: { date: string; approvedCount: number; isAvailable?: boolean }) => { 
@@ -262,15 +262,15 @@ export function BookingModal() {
       }
       setDisabledDates(map);
     }).catch(()=>{});
-  }, [open, serviceId, branchId]);
+  }, [open, serviceId, branchId, sessionType]);
 
   // Prefetch slots for the currently selected date so step 3 renders instantly
   useEffect(() => {
     if (!serviceId || !selectedDate) return;
     const date = toLocalDateStr(selectedDate);
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    prefetchUrl(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}`, 5000);
-  }, [serviceId, selectedDate, branchId]);
+    prefetchUrl(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}&sessionType=${sessionType}`, 5000);
+  }, [serviceId, selectedDate, branchId, sessionType]);
 
   // Fetch taken time slots for a single selected date and calculate duration-based availability
   useEffect(() => {
@@ -286,7 +286,7 @@ export function BookingModal() {
     }
     const date = toLocalDateStr(selectedDate);
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    cachedFetch(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}`, 5000)
+    cachedFetch(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}&sessionType=${sessionType}`, 5000)
       .then((data) => {
         if (active) {
           if (data && Array.isArray(data.unavailableSlots)) {
@@ -306,7 +306,7 @@ export function BookingModal() {
     return () => {
       active = false;
     };
-  }, [serviceId, selectedDate, branchId, selectedService]);
+  }, [serviceId, selectedDate, branchId, selectedService, sessionType]);
 
   // Close on Escape key
   useEffect(() => {
@@ -703,33 +703,84 @@ Attached is my payment transaction receipt photo.`;
             {/* Step 1: Service selection */}
             {step === 1 && (
               <div>
-                {branches.length > 0 && (
-                  <div className="mb-6">
-                    <p className="mb-3 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
-                      {isRTL ? "اختر الفرع" : "Select Branch"}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {branches.map((branch) => {
-                        const label = isRTL ? branch.name_ar : branch.name_en;
-                        const isActive = branchId === branch.id;
-                        return (
-                          <button
-                            key={branch.id}
-                            type="button"
-                            onClick={() => setBranchId(branch.id)}
-                            className="rounded-full px-4 py-2 text-xs font-semibold transition-colors"
-                            style={{
-                              backgroundColor: isActive ? "var(--cr-primary)" : "var(--cr-secondary)",
-                              color: isActive ? "var(--cr-white)" : "var(--cr-primary)",
-                              border: isActive ? "none" : "1.5px solid rgba(65, 78, 54, 0.18)",
-                            }}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
+                {/* Session Type Switcher */}
+                <div className="mb-6">
+                  <p className="mb-3 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
+                    {isRTL ? "نوع الجلسة" : "Session Type"}
+                  </p>
+                  <div className="flex rounded-3xl border border-[#414E36]/15 p-1 bg-[#F2EFE9]/30">
+                    <button
+                      type="button"
+                      onClick={() => setSessionType("in_person")}
+                      className={`flex-1 rounded-2xl py-2.5 text-xs font-bold transition-all ${
+                        sessionType === "in_person"
+                          ? "bg-[#414E36] text-[#FBFBF9] shadow-sm"
+                          : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      {isRTL ? "بالعيادة (حضوري)" : "In-Clinic (In-Person)"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSessionType("online")}
+                      className={`flex-1 rounded-2xl py-2.5 text-xs font-bold transition-all ${
+                        sessionType === "online"
+                          ? "bg-[#414E36] text-[#FBFBF9] shadow-sm"
+                          : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      {isRTL ? "استشارة عبر الإنترنت" : "Online Consultation"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Conditional Branch Picker or Online Info */}
+                {sessionType === "online" ? (
+                  <div className="mb-6 rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 flex items-start gap-2.5 text-xs text-[#414E36] leading-relaxed">
+                    <svg className="w-5 h-5 shrink-0 text-[#C4AE7C] mt-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <div>
+                      <p className="font-bold mb-0.5">
+                        {isRTL ? "استشارة فيديو افتراضية" : "Virtual Video Consultation"}
+                      </p>
+                      <p className="opacity-90">
+                        {isRTL 
+                          ? "تُجرى هذه الجلسة افتراضياً عبر الإنترنت. لا داعي لزيارة مقر العيادة."
+                          : "This session is conducted virtually. You do not need to visit any clinic location."
+                        }
+                      </p>
                     </div>
                   </div>
+                ) : (
+                  branches.length > 0 && (
+                    <div className="mb-6">
+                      <p className="mb-3 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
+                        {isRTL ? "اختر الفرع" : "Select Branch"}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {branches.map((branch) => {
+                          const label = isRTL ? branch.name_ar : branch.name_en;
+                          const isActive = branchId === branch.id;
+                          return (
+                            <button
+                              key={branch.id}
+                              type="button"
+                              onClick={() => setBranchId(branch.id)}
+                              className="rounded-full px-4 py-2 text-xs font-semibold transition-colors"
+                              style={{
+                                backgroundColor: isActive ? "var(--cr-primary)" : "var(--cr-secondary)",
+                                color: isActive ? "var(--cr-white)" : "var(--cr-primary)",
+                                border: isActive ? "none" : "1.5px solid rgba(65, 78, 54, 0.18)",
+                              }}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )
                 )}
 
                 <p className="mb-4 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
@@ -920,12 +971,12 @@ Attached is my payment transaction receipt photo.`;
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "عنوان إنستاباي الخاص بالعيادة" : "CLINIC INSTAPAY ADDRESS"}</p>
-                          <p className="text-xs font-bold text-[#1F251A] mt-0.5">revera@instapay</p>
+                          <p className="text-xs font-bold text-[#1F251A] mt-0.5">name@instapay</p>
                         </div>
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText("revera@instapay");
+                            navigator.clipboard.writeText("name@instapay");
                             setCopiedAddress(true);
                             setTimeout(() => setCopiedAddress(false), 2000);
                           }}

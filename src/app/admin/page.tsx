@@ -2171,6 +2171,19 @@ export default function AdminPage() {
     Friday: { isOpen: false, start: "10:00", end: "20:00" },
     Saturday: { isOpen: false, start: "10:00", end: "20:00" }
   });
+  const [providerFormOnlineWorkingDaysHours, setProviderFormOnlineWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string }>>({
+    Sunday: { isOpen: false, start: "10:00", end: "20:00" },
+    Monday: { isOpen: false, start: "10:00", end: "20:00" },
+    Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
+    Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
+    Thursday: { isOpen: false, start: "10:00", end: "20:00" },
+    Friday: { isOpen: false, start: "10:00", end: "20:00" },
+    Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+  });
+  const [providerFormScheduleTab, setProviderFormScheduleTab] = useState<"in_person" | "online">("in_person");
+  const [showAuditLogsModal, setShowAuditLogsModal] = useState(false);
+  const [auditLogsList, setAuditLogsList] = useState<any[]>([]);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
   const [savingProvider, setSavingProvider] = useState(false);
   const [attendanceDate, setAttendanceDate] = useState(() => {
     const d = new Date();
@@ -2783,6 +2796,17 @@ export default function AdminPage() {
       .catch((err) => console.error("fetchProviders error:", err));
   }
 
+  function fetchAuditLogs() {
+    setLoadingAuditLogs(true);
+    fetch("/api/providers/schedule-audit-logs")
+      .then((res) => res.json())
+      .then((data) => {
+        setAuditLogsList(data || []);
+      })
+      .catch((err) => console.error("fetchAuditLogs error:", err))
+      .finally(() => setLoadingAuditLogs(false));
+  }
+
   async function fetchAttendance(dateStr: string) {
     setLoadingProviderAttendance(true);
     try {
@@ -2862,6 +2886,16 @@ export default function AdminPage() {
       Friday: { isOpen: false, start: "09:00", end: "20:00" },
       Saturday: { isOpen: false, start: "09:00", end: "20:00" }
     });
+    setProviderFormOnlineWorkingDaysHours({
+      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
+      Monday: { isOpen: false, start: "09:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
+      Friday: { isOpen: false, start: "09:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
+    });
+    setProviderFormScheduleTab("in_person");
     setShowProviderModal(true);
   }
 
@@ -2880,7 +2914,9 @@ export default function AdminPage() {
     setProviderFormNationalId(provider.nationalId || "");
     setProviderFormBranchId(provider.branchId || "");
     setProviderFormStartDate(provider.startDate || "");
-    setProviderFormWorkingDaysHours(provider.workingDaysHours || {
+
+    const rawSched = provider.workingDaysHours || {};
+    let inClinicSched = {
       Sunday: { isOpen: false, start: "09:00", end: "20:00" },
       Monday: { isOpen: false, start: "09:00", end: "20:00" },
       Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
@@ -2888,7 +2924,24 @@ export default function AdminPage() {
       Thursday: { isOpen: false, start: "09:00", end: "20:00" },
       Friday: { isOpen: false, start: "09:00", end: "20:00" },
       Saturday: { isOpen: false, start: "09:00", end: "20:00" }
-    });
+    };
+    let onlineSched = { ...inClinicSched };
+
+    if (rawSched.in_person) {
+      inClinicSched = { ...inClinicSched, ...rawSched.in_person };
+    } else {
+      inClinicSched = { ...inClinicSched, ...rawSched };
+    }
+
+    if (rawSched.online) {
+      onlineSched = { ...onlineSched, ...rawSched.online };
+    } else if (!rawSched.in_person) {
+      onlineSched = { ...onlineSched, ...rawSched };
+    }
+
+    setProviderFormWorkingDaysHours(inClinicSched);
+    setProviderFormOnlineWorkingDaysHours(onlineSched);
+    setProviderFormScheduleTab("in_person");
     setShowProviderModal(true);
   }
 
@@ -2896,6 +2949,28 @@ export default function AdminPage() {
     if (!providerFormName.trim()) {
       alert("Provider Name is required.");
       return;
+    }
+
+    // Overlap validation between In-Clinic and Online schedules
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    for (const day of weekdays) {
+      const inClinic = providerFormWorkingDaysHours[day];
+      const online = providerFormOnlineWorkingDaysHours[day];
+      if (inClinic && online && inClinic.isOpen && online.isOpen) {
+        const timeToMins = (tStr: string) => {
+          const [h, m] = tStr.split(":").map(Number);
+          return h * 60 + m;
+        };
+        const start1 = timeToMins(inClinic.start);
+        const end1 = timeToMins(inClinic.end);
+        const start2 = timeToMins(online.start);
+        const end2 = timeToMins(online.end);
+
+        if (start1 < end2 && start2 < end1) {
+          alert(`Schedule overlap detected on ${day}! In-Clinic hours (${inClinic.start} - ${inClinic.end}) and Online hours (${online.start} - ${online.end}) cannot overlap.`);
+          return;
+        }
+      }
     }
 
     setSavingProvider(true);
@@ -2911,7 +2986,10 @@ export default function AdminPage() {
       age: providerFormAge ? Number(providerFormAge) : null,
       specialty: providerFormSpecialty || null,
       nationalId: providerFormNationalId || null,
-      workingDaysHours: providerFormWorkingDaysHours,
+      workingDaysHours: {
+        in_person: providerFormWorkingDaysHours,
+        online: providerFormOnlineWorkingDaysHours
+      },
       branchId: providerFormBranchId || null,
       startDate: providerFormStartDate || null
     };
@@ -2922,7 +3000,10 @@ export default function AdminPage() {
 
     fetch(url, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(session?.access_token ? { "Authorization": `Bearer ${session.access_token}` } : {})
+      },
       body: JSON.stringify(payload)
     })
       .then((res) => res.json())
@@ -5007,6 +5088,16 @@ export default function AdminPage() {
                       {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()) && (
                         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#414E36] text-[10px] font-bold text-white">!</span>
                       )}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        fetchAuditLogs();
+                        setShowAuditLogsModal(true);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/30 bg-white px-5 py-3 text-sm font-semibold text-[#414E36] hover:bg-[#F2EFE9] transition shadow-sm"
+                    >
+                      <ClipboardList size={16} /> Audit Logs
                     </button>
 
                     {hasPermission("providers.create") && (
@@ -16171,59 +16262,91 @@ export default function AdminPage() {
 
               {/* Weekly Working Schedule */}
               <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2.5">Weekly Working Days & Hours</label>
-                <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
-                  {Object.keys(providerFormWorkingDaysHours).map((day) => {
-                    const sched = providerFormWorkingDaysHours[day];
-                    return (
-                      <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
-                        <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={sched.isOpen}
-                            onChange={(e) => {
-                              setProviderFormWorkingDaysHours({
-                                ...providerFormWorkingDaysHours,
-                                [day]: { ...sched, isOpen: e.target.checked }
-                              });
-                            }}
-                            className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
-                          />
-                          <span className="text-xs font-bold text-[#414E36] w-24">{day}</span>
-                        </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Weekly Working Days & Hours</label>
+                  <div className="flex rounded-lg border border-[#414E36]/15 p-0.5 bg-gray-50 text-[10px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setProviderFormScheduleTab("in_person")}
+                      className={`px-3 py-1 rounded transition-colors ${
+                        providerFormScheduleTab === "in_person"
+                          ? "bg-[#414E36] text-white"
+                          : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      In-Clinic
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProviderFormScheduleTab("online")}
+                      className={`px-3 py-1 rounded transition-colors ${
+                        providerFormScheduleTab === "online"
+                          ? "bg-[#414E36] text-white"
+                          : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      Online
+                    </button>
+                  </div>
+                </div>
 
-                        {sched.isOpen ? (
-                          <div className="flex items-center gap-2">
+                <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                  {(() => {
+                    const activeSched = providerFormScheduleTab === "in_person" ? providerFormWorkingDaysHours : providerFormOnlineWorkingDaysHours;
+                    const setActiveSched = providerFormScheduleTab === "in_person" ? setProviderFormWorkingDaysHours : setProviderFormOnlineWorkingDaysHours;
+
+                    return Object.keys(activeSched).map((day) => {
+                      const sched = activeSched[day];
+                      return (
+                        <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
+                          <label className="flex items-center gap-2.5 cursor-pointer select-none">
                             <input
-                              type="time"
-                              value={sched.start}
+                              type="checkbox"
+                              checked={sched.isOpen}
                               onChange={(e) => {
-                                setProviderFormWorkingDaysHours({
-                                  ...providerFormWorkingDaysHours,
-                                  [day]: { ...sched, start: e.target.value }
+                                setActiveSched({
+                                  ...activeSched,
+                                  [day]: { ...sched, isOpen: e.target.checked }
                                 });
                               }}
-                              className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                              className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
                             />
-                            <span className="text-xs text-[#5A6A51]">to</span>
-                            <input
-                              type="time"
-                              value={sched.end}
-                              onChange={(e) => {
-                                setProviderFormWorkingDaysHours({
-                                  ...providerFormWorkingDaysHours,
-                                  [day]: { ...sched, end: e.target.value }
-                                });
-                              }}
-                              className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400 italic">Off / Closed</span>
-                        )}
-                      </div>
-                    );
-                  })}
+                            <span className="text-xs font-bold text-[#414E36] w-24">{day}</span>
+                          </label>
+
+                          {sched.isOpen ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="time"
+                                value={sched.start}
+                                onChange={(e) => {
+                                  setActiveSched({
+                                    ...activeSched,
+                                    [day]: { ...sched, start: e.target.value }
+                                  });
+                                }}
+                                className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                              />
+                              <span className="text-xs text-[#5A6A51]">to</span>
+                              <input
+                                type="time"
+                                value={sched.end}
+                                onChange={(e) => {
+                                  setActiveSched({
+                                    ...activeSched,
+                                    [day]: { ...sched, end: e.target.value }
+                                  });
+                                }}
+                                className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400 italic">Off / Closed</span>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
@@ -16246,6 +16369,124 @@ export default function AdminPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Doctor Schedule Audit Logs Modal */}
+      {showAuditLogsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
+          <div className="w-full max-w-4xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4 shrink-0">
+              <div>
+                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Audit History</p>
+                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">Doctor Schedule Audit Logs</h3>
+              </div>
+              <button
+                onClick={() => setShowAuditLogsModal(false)}
+                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+              {loadingAuditLogs ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                  <span className="h-8 w-8 animate-spin rounded-full border-4 border-[#414E36] border-t-transparent" />
+                  <p className="text-xs text-[#5A6A51] font-semibold">Loading Audit Records...</p>
+                </div>
+              ) : auditLogsList.length === 0 ? (
+                <div className="text-center py-20 text-[#5A6A51] italic text-sm">
+                  No schedule change audit logs found.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {auditLogsList.map((log) => {
+                    const formatSchedPreview = (sched: any) => {
+                      if (!sched) return <span className="text-gray-400 italic">None</span>;
+                      if (sched.in_person || sched.online) {
+                        return (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px] font-mono leading-relaxed mt-2">
+                            {sched.in_person && (
+                              <div className="rounded-xl bg-white border border-[#414E36]/10 p-3">
+                                <p className="font-bold text-[#414E36] border-b pb-1 mb-1 text-[10px] uppercase">In-Clinic Schedule</p>
+                                {Object.entries(sched.in_person).map(([d, config]: any) => (
+                                  config.isOpen && <div key={d}>{d}: {config.start} - {config.end}</div>
+                                ))}
+                              </div>
+                            )}
+                            {sched.online && (
+                              <div className="rounded-xl bg-white border border-[#414E36]/10 p-3">
+                                <p className="font-bold text-[#414E36] border-b pb-1 mb-1 text-[10px] uppercase">Online Schedule</p>
+                                {Object.entries(sched.online).map(([d, config]: any) => (
+                                  config.isOpen && <div key={d}>{d}: {config.start} - {config.end}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="rounded-xl bg-white border border-[#414E36]/10 p-3 text-[11px] font-mono leading-relaxed mt-1">
+                          {Object.entries(sched).map(([d, config]: any) => (
+                            config.isOpen && <div key={d}>{d}: {config.start} - {config.end}</div>
+                          ))}
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <div key={log.id} className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/40 p-4 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-[#414E36]/10 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-[#1F251A] text-sm">{log.provider_name}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              log.action === "create_schedule" 
+                                ? "bg-green-100 text-green-700 border border-green-200" 
+                                : "bg-blue-100 text-blue-700 border border-blue-200"
+                            }`}>
+                              {log.action === "create_schedule" ? "Created" : "Updated"}
+                            </span>
+                          </div>
+                          <div className="text-gray-500 text-[11px]">
+                            {new Date(log.created_at).toLocaleString()}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                          <div>
+                            <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">Previous Schedule</p>
+                            <div className="mt-1">{formatSchedPreview(log.previous_schedule)}</div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">New Schedule</p>
+                            <div className="mt-1">{formatSchedPreview(log.new_schedule)}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center text-[10px] text-[#5A6A51] border-t border-[#414E36]/5 pt-2">
+                          <span>Changed By: <strong className="text-[#414E36]">{log.changed_by}</strong></span>
+                          <span className="opacity-60 font-mono">ID: {log.id.slice(0, 8)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-[#414E36]/10 pt-4 mt-4 shrink-0 flex justify-end">
+              <button
+                onClick={() => setShowAuditLogsModal(false)}
+                className="rounded-3xl border border-[#414E36]/20 bg-[#fff] px-8 py-3 text-sm font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+              >
+                Close Audit Logs
+              </button>
+            </div>
           </div>
         </div>
       )}

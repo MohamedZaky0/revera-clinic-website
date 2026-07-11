@@ -299,157 +299,165 @@ export async function PATCH(req: Request) {
     if (action === 'approve') {
       if (!timeSlot) return NextResponse.json({ error: 'Missing timeSlot' }, { status: 400 });
 
-      // Get all active, available clinical rooms in this branch
-      let roomsQuery = supabaseServer
-        .from('rooms')
-        .select('id, name')
-        .eq('type', 'clinical')
-        .eq('status', 'available');
+      let chosenRoomId: string | null = null;
+      let serviceCompRoomIds: string[] = [];
 
-      if (target.branch_id) {
-        roomsQuery = roomsQuery.eq('branch_id', target.branch_id);
-      }
+      if (target.session_type !== 'online') {
+        // Get all active, available clinical rooms in this branch
+        let roomsQuery = supabaseServer
+          .from('rooms')
+          .select('id, name')
+          .eq('type', 'clinical')
+          .eq('status', 'available');
 
-      const { data: rawBranchRooms, error: roomsError } = await roomsQuery;
-      if (roomsError) throw roomsError;
-
-      let branchRooms = rawBranchRooms || [];
-      if (branchRooms.length === 0) {
-        // Fallback: If no clinical rooms exist, construct a default virtual clinical room so bookings are not blocked
-        branchRooms = [{ id: '00000000-0000-0000-0000-000000000000', name: 'Virtual Clinical Room', branch_id: target.branch_id }];
-      }
-
-      // Find compatible rooms for the service
-      const { data: mappedRooms, error: mappingError } = await supabaseServer
-        .from('service_rooms')
-        .select('room_id')
-        .eq('service_id', target.service_id);
-
-      if (mappingError) throw mappingError;
-
-      const mappedRoomIds = mappedRooms ? mappedRooms.map((mr: any) => mr.room_id) : [];
-      let serviceCompRooms = branchRooms.filter((r: any) => mappedRoomIds.includes(r.id));
-
-      if (serviceCompRooms.length === 0) {
-        // Fallback: If service is not mapped to any specific clinical rooms, allow booking in any clinical room of the branch
-        serviceCompRooms = branchRooms;
-      }
-
-      // Fetch target service duration
-      const { data: targetSvc, error: svcError } = await supabaseServer
-        .from('services')
-        .select('duration')
-        .eq('id', target.service_id)
-        .single();
-
-      if (svcError) throw svcError;
-
-      const targetDuration = targetSvc?.duration ? getDurationInMinutes(targetSvc.duration) : 30;
-      const targetSlotsCount = Math.ceil(targetDuration / 15);
-
-      const normSlot = normaliseTo24hSlot(timeSlot);
-      if (!normSlot) return NextResponse.json({ error: 'Invalid time slot format' }, { status: 400 });
-
-      const startIdx = ALL_15MIN_SLOTS.indexOf(normSlot);
-      if (startIdx === -1) return NextResponse.json({ error: 'Invalid time slot value' }, { status: 400 });
-
-      // Fetch all approved bookings for this date
-      const { data: dayBookings, error: bookingsError } = await supabaseServer
-        .from('reservations')
-        .select('id, room_id, time_slot, service_id')
-        .eq('date', target.date)
-        .eq('status', 'approved')
-        .not('room_id', 'is', null);
-
-      if (bookingsError) throw bookingsError;
-
-      // Fetch all service durations to calculate overlap
-      const { data: allSvcs, error: allSvcsError } = await supabaseServer
-        .from('services')
-        .select('id, duration');
-
-      if (allSvcsError) throw allSvcsError;
-
-      const durationMap = new Map<number, number>();
-      if (allSvcs) {
-        allSvcs.forEach((s: any) => {
-          durationMap.set(s.id, getDurationInMinutes(s.duration));
-        });
-      }
-
-      // Determine which rooms are available (not occupied)
-      const availableRooms: { id: string; name: string }[] = [];
-
-      for (const room of serviceCompRooms) {
-        let roomOccupied = false;
-        const roomBookings = dayBookings ? dayBookings.filter((b: any) => b.room_id === room.id) : [];
-
-        for (const rb of roomBookings) {
-          const rbNorm = normaliseTo24hSlot(rb.time_slot);
-          if (!rbNorm) continue;
-          const rbStartIdx = ALL_15MIN_SLOTS.indexOf(rbNorm);
-          if (rbStartIdx === -1) continue;
-
-          const rbDuration = durationMap.get(rb.service_id) ?? 30;
-          const rbSlotsCount = Math.ceil(rbDuration / 15);
-
-          // Overlap condition:
-          if (rbStartIdx < startIdx + targetSlotsCount && startIdx < rbStartIdx + rbSlotsCount) {
-            roomOccupied = true;
-            break;
-          }
+        if (target.branch_id) {
+          roomsQuery = roomsQuery.eq('branch_id', target.branch_id);
         }
 
-        if (!roomOccupied) {
-          availableRooms.push(room);
+        const { data: rawBranchRooms, error: roomsError } = await roomsQuery;
+        if (roomsError) throw roomsError;
+
+        let branchRooms = rawBranchRooms || [];
+        if (branchRooms.length === 0) {
+          // Fallback: If no clinical rooms exist, construct a default virtual clinical room so bookings are not blocked
+          branchRooms = [{ id: '00000000-0000-0000-0000-000000000000', name: 'Virtual Clinical Room', branch_id: target.branch_id }];
         }
-      }
 
-      if (availableRooms.length === 0) {
-        return NextResponse.json({ error: 'No clinical rooms are available at this time slot.' }, { status: 400 });
-      }
-
-      let chosenRoom = availableRooms[0];
-
-      // Priority algorithm: if more than 1 room is available, select the room with the fewest exclusive services
-      if (availableRooms.length > 1) {
-        const { data: allSR, error: allSRError } = await supabaseServer
+        // Find compatible rooms for the service
+        const { data: mappedRooms, error: mappingError } = await supabaseServer
           .from('service_rooms')
-          .select('service_id, room_id');
+          .select('room_id')
+          .eq('service_id', target.service_id);
 
-        if (allSRError) throw allSRError;
+        if (mappingError) throw mappingError;
 
-        const serviceRoomCounts = new Map<number, number>();
-        if (allSR) {
-          allSR.forEach((sr: any) => {
-            const count = serviceRoomCounts.get(sr.service_id) ?? 0;
-            serviceRoomCounts.set(sr.service_id, count + 1);
+        const mappedRoomIds = mappedRooms ? mappedRooms.map((mr: any) => mr.room_id) : [];
+        let serviceCompRooms = branchRooms.filter((r: any) => mappedRoomIds.includes(r.id));
+
+        if (serviceCompRooms.length === 0) {
+          // Fallback: If service is not mapped to any specific clinical rooms, allow booking in any clinical room of the branch
+          serviceCompRooms = branchRooms;
+        }
+
+        // Fetch target service duration
+        const { data: targetSvc, error: svcError } = await supabaseServer
+          .from('services')
+          .select('duration')
+          .eq('id', target.service_id)
+          .single();
+
+        if (svcError) throw svcError;
+
+        const targetDuration = targetSvc?.duration ? getDurationInMinutes(targetSvc.duration) : 30;
+        const targetSlotsCount = Math.ceil(targetDuration / 15);
+
+        const normSlot = normaliseTo24hSlot(timeSlot);
+        if (!normSlot) return NextResponse.json({ error: 'Invalid time slot format' }, { status: 400 });
+
+        const startIdx = ALL_15MIN_SLOTS.indexOf(normSlot);
+        if (startIdx === -1) return NextResponse.json({ error: 'Invalid time slot value' }, { status: 400 });
+
+        // Fetch all approved bookings for this date
+        const { data: dayBookings, error: bookingsError } = await supabaseServer
+          .from('reservations')
+          .select('id, room_id, time_slot, service_id')
+          .eq('date', target.date)
+          .eq('status', 'approved')
+          .not('room_id', 'is', null);
+
+        if (bookingsError) throw bookingsError;
+
+        // Fetch all service durations to calculate overlap
+        const { data: allSvcs, error: allSvcsError } = await supabaseServer
+          .from('services')
+          .select('id, duration');
+
+        if (allSvcsError) throw allSvcsError;
+
+        const durationMap = new Map<number, number>();
+        if (allSvcs) {
+          allSvcs.forEach((s: any) => {
+            durationMap.set(s.id, getDurationInMinutes(s.duration));
           });
         }
 
-        const roomScores = new Map<string, number>();
-        availableRooms.forEach((room: any) => {
-          let exclusiveServices = 0;
+        // Determine which rooms are available (not occupied)
+        const availableRooms: { id: string; name: string }[] = [];
+
+        for (const room of serviceCompRooms) {
+          let roomOccupied = false;
+          const roomBookings = dayBookings ? dayBookings.filter((b: any) => b.room_id === room.id) : [];
+
+          for (const rb of roomBookings) {
+            const rbNorm = normaliseTo24hSlot(rb.time_slot);
+            if (!rbNorm) continue;
+            const rbStartIdx = ALL_15MIN_SLOTS.indexOf(rbNorm);
+            if (rbStartIdx === -1) continue;
+
+            const rbDuration = durationMap.get(rb.service_id) ?? 30;
+            const rbSlotsCount = Math.ceil(rbDuration / 15);
+
+            // Overlap condition:
+            if (rbStartIdx < startIdx + targetSlotsCount && startIdx < rbStartIdx + rbSlotsCount) {
+              roomOccupied = true;
+              break;
+            }
+          }
+
+          if (!roomOccupied) {
+            availableRooms.push(room);
+          }
+        }
+
+        if (availableRooms.length === 0) {
+          return NextResponse.json({ error: 'No clinical rooms are available at this time slot.' }, { status: 400 });
+        }
+
+        let chosenRoom = availableRooms[0];
+
+        // Priority algorithm: if more than 1 room is available, select the room with the fewest exclusive services
+        if (availableRooms.length > 1) {
+          const { data: allSR, error: allSRError } = await supabaseServer
+            .from('service_rooms')
+            .select('service_id, room_id');
+
+          if (allSRError) throw allSRError;
+
+          const serviceRoomCounts = new Map<number, number>();
           if (allSR) {
             allSR.forEach((sr: any) => {
-              if (sr.room_id === room.id) {
-                const mappedRoomsCount = serviceRoomCounts.get(sr.service_id) ?? 0;
-                if (mappedRoomsCount === 1) {
-                  exclusiveServices++;
-                }
-              }
+              const count = serviceRoomCounts.get(sr.service_id) ?? 0;
+              serviceRoomCounts.set(sr.service_id, count + 1);
             });
           }
-          roomScores.set(room.id, exclusiveServices);
-        });
 
-        availableRooms.sort((a: any, b: any) => {
-          const scoreA = roomScores.get(a.id) ?? 0;
-          const scoreB = roomScores.get(b.id) ?? 0;
-          return scoreA - scoreB;
-        });
+          const roomScores = new Map<string, number>();
+          availableRooms.forEach((room: any) => {
+            let exclusiveServices = 0;
+            if (allSR) {
+              allSR.forEach((sr: any) => {
+                if (sr.room_id === room.id) {
+                  const mappedRoomsCount = serviceRoomCounts.get(sr.service_id) ?? 0;
+                  if (mappedRoomsCount === 1) {
+                    exclusiveServices++;
+                  }
+                }
+              });
+            }
+            roomScores.set(room.id, exclusiveServices);
+          });
 
-        chosenRoom = availableRooms[0];
+          availableRooms.sort((a: any, b: any) => {
+            const scoreA = roomScores.get(a.id) ?? 0;
+            const scoreB = roomScores.get(b.id) ?? 0;
+            return scoreA - scoreB;
+          });
+
+          chosenRoom = availableRooms[0];
+        }
+
+        chosenRoomId = chosenRoom.id;
+        serviceCompRoomIds = serviceCompRooms.map((r: any) => r.id);
       }
 
       const { data: updated, error: updateError } = await supabaseServer
@@ -458,8 +466,8 @@ export async function PATCH(req: Request) {
           status: 'approved',
           time_slot: timeSlot,
           doctor_name: doctorName || null,
-          room_id: chosenRoom.id,
-          rooms: serviceCompRooms.map((r: any) => r.id)
+          room_id: chosenRoomId,
+          rooms: serviceCompRoomIds
         })
         .eq('id', id)
         .select()

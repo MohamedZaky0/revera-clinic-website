@@ -90,6 +90,20 @@ export async function POST(req: Request) {
     start_date: startDate || null
   };
 
+  const authHeader = req.headers.get('Authorization') || '';
+  const token = authHeader.replace('Bearer ', '').trim();
+  let changedBy = 'System/Unknown';
+  if (token) {
+    try {
+      const { data: { user } } = await supabaseServer.auth.getUser(token);
+      if (user?.email) {
+        changedBy = user.email;
+      }
+    } catch (e) {
+      console.warn("Could not get user from auth token in providers API:", e);
+    }
+  }
+
   try {
     const { data, error } = await supabaseServer
       .from('providers')
@@ -98,6 +112,22 @@ export async function POST(req: Request) {
       .single();
 
     if (!error && data) {
+      if (workingDaysHours) {
+        try {
+          await supabaseServer
+            .from('provider_schedule_audit_logs')
+            .insert({
+              provider_id: data.id,
+              provider_name: data.name,
+              changed_by: changedBy,
+              action: 'create_schedule',
+              previous_schedule: null,
+              new_schedule: workingDaysHours
+            });
+        } catch (auditErr: any) {
+          console.warn("Could not write provider schedule audit log:", auditErr.message);
+        }
+      }
       return NextResponse.json(mapProvider(data), { status: 201 });
     } else {
       console.warn("Supabase providers insert error, falling back to JSON:", error);
@@ -167,6 +197,32 @@ export async function PATCH(req: Request) {
   if (branchId !== undefined) updates.branch_id = branchId;
   if (startDate !== undefined) updates.start_date = startDate;
 
+  const authHeader = req.headers.get('Authorization') || '';
+  const token = authHeader.replace('Bearer ', '').trim();
+  let changedBy = 'System/Unknown';
+  if (token) {
+    try {
+      const { data: { user } } = await supabaseServer.auth.getUser(token);
+      if (user?.email) {
+        changedBy = user.email;
+      }
+    } catch (e) {
+      console.warn("Could not get user from auth token in providers API:", e);
+    }
+  }
+
+  let oldProvider: any = null;
+  try {
+    const { data } = await supabaseServer
+      .from('providers')
+      .select('name, working_days_hours')
+      .eq('id', id)
+      .maybeSingle();
+    oldProvider = data;
+  } catch (e) {
+    console.warn("Could not fetch old provider for audit logging:", e);
+  }
+
   try {
     const { data, error } = await supabaseServer
       .from('providers')
@@ -176,6 +232,22 @@ export async function PATCH(req: Request) {
       .single();
 
     if (!error && data) {
+      if (workingDaysHours !== undefined && oldProvider) {
+        try {
+          await supabaseServer
+            .from('provider_schedule_audit_logs')
+            .insert({
+              provider_id: id,
+              provider_name: oldProvider.name,
+              changed_by: changedBy,
+              action: 'update_schedule',
+              previous_schedule: oldProvider.working_days_hours,
+              new_schedule: workingDaysHours
+            });
+        } catch (auditErr: any) {
+          console.warn("Could not write provider schedule audit log:", auditErr.message);
+        }
+      }
       return NextResponse.json(mapProvider(data));
     } else {
       console.warn("Supabase providers update error, falling back to JSON:", error);
