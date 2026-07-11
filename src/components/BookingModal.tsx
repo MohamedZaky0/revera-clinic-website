@@ -693,6 +693,28 @@ Attached is my payment transaction receipt photo.`;
               })}
             </div>
 
+            {/* Deposit Awareness Banner */}
+            {!showPaymentGate && depositPercentage > 0 && (
+              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/50 p-3.5 flex items-start gap-2.5 text-xs text-amber-800 leading-relaxed font-medium">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-amber-700">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <div>
+                  <p className="font-bold mb-0.5 text-amber-900">
+                    {isRTL ? "ملاحظة هامة حول تأكيد الحجز" : "Important Booking Confirmation Notice"}
+                  </p>
+                  <p className="opacity-90">
+                    {isRTL 
+                      ? `يرجى العلم أن الحجز لا يعتبر مؤكداً حتى يتم دفع عربون الحجز المقدر بـ ${depositPercentage}%. سيبقى الحجز معلقاً لحين إتمام الدفع.` 
+                      : `Please note that your booking is not confirmed until the required ${depositPercentage}% reservation deposit is paid. It will remain pending deposit until payment is completed.`
+                    }
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Step 1: Service selection */}
             {step === 1 && (
               <div>
