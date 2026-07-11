@@ -1982,7 +1982,7 @@ export default function AdminPage() {
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
   const [smsExpanded, setSMSExpanded] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
-  const [pagesSettingsTab, setPagesSettingsTab] = useState<"Home" | "About Us" | "Services" | "Booking T&C">("Home");
+  const [pagesSettingsTab, setPagesSettingsTab] = useState<"Home" | "About Us" | "Services">("Home");
   const [termsText, setTermsText] = useState("");
   const [homeHeroSlides, setHomeHeroSlides] = useState<any[]>([
     {
@@ -3305,7 +3305,8 @@ export default function AdminPage() {
             maxPerSlot: bookingMaxPerSlot,
             instantApproval: bookingInstantApproval,
             showDoctorNotes: bookingShowDoctorNotes,
-            depositPercentage: bookingDepositPercentage
+            depositPercentage: bookingDepositPercentage,
+            termsText: termsText
           }
         }),
       });
@@ -8474,7 +8475,7 @@ export default function AdminPage() {
 
               {/* Page tabs */}
               <div className="flex items-center gap-1 p-1 w-fit rounded-full border border-[#414E36]/12 bg-white shadow-sm">
-                {(["Home", "About Us", "Services", "Booking T&C"] as const).map((page) => (
+                {(["Home", "About Us", "Services"] as const).map((page) => (
                   <button
                     key={page}
                     onClick={() => setPagesSettingsTab(page)}
@@ -9978,37 +9979,7 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* Booking T&C Panel */}
-              {pagesSettingsTab === "Booking T&C" && (
-                <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-                  <div>
-                    <h3 className="text-2xl font-bold text-[#1F251A]">Booking Terms & Conditions</h3>
-                    <p className="text-sm text-[#5A6A51] mt-1">Write the terms and conditions patients must agree to before completing a booking. Leave empty to disable the checkbox gate.</p>
-                  </div>
 
-                  <div className="space-y-2">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Terms & Conditions Text (English)</label>
-                    <textarea
-                      rows={14}
-                      value={termsText}
-                      onChange={(e) => setTermsText(e.target.value)}
-                      placeholder={"By proceeding with this booking, you agree to our terms and conditions:\n\n• Deposits are non-refundable within 24 hours of the appointment.\n• Please arrive 10 minutes before your scheduled time.\n• Revera reserves the right to cancel or reschedule appointments.\n\nFor more information, contact us at +20 103 559 5691."}
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-y leading-relaxed font-mono"
-                    />
-                    <p className="text-[11px] text-[#8A9A81]">This text will appear in the booking modal. If left empty, no T&C checkbox will be shown.</p>
-                  </div>
-
-                  <div className="flex justify-end pt-4 border-t border-[#F2EFE9]">
-                    <button
-                      disabled={savingPageSettings}
-                      onClick={() => savePageSettings({ booking: { termsText } })}
-                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
-                    >
-                      {savingPageSettings ? "Saving..." : "Save Terms & Conditions"}
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -10663,97 +10634,125 @@ export default function AdminPage() {
                 </button>
               </div>
 
-              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] max-w-2xl space-y-6">
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Min Advance Booking (Hours)</label>
-                    <select
-                      value={bookingMinAdvance}
-                      onChange={(e) => setBookingMinAdvance(Number(e.target.value))}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                    >
-                      {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"}</option>)}
-                    </select>
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Minimum time before appointment that bookings are allowed.</span>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Left Column: Booking Rules */}
+                <div className="lg:col-span-7 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                  <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">Booking Rules</h3>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Min Advance Booking (Hours)</label>
+                      <select
+                        value={bookingMinAdvance}
+                        onChange={(e) => setBookingMinAdvance(Number(e.target.value))}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      >
+                        {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"}</option>)}
+                      </select>
+                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Minimum time before appointment that bookings are allowed.</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Max Advance Booking (Days)</label>
+                      <select
+                        value={bookingMaxAdvance}
+                        onChange={(e) => setBookingMaxAdvance(Number(e.target.value))}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      >
+                        {[7, 14, 30, 60, 90].map(d => <option key={d} value={d}>{d} Days</option>)}
+                      </select>
+                      <span className="text-[11px] text-[#8A9A81] mt-1 block">How far in advance patients can schedule.</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Cancellation Window (Hours)</label>
+                      <select
+                        value={bookingCancelWindow}
+                        onChange={(e) => setBookingCancelWindow(Number(e.target.value))}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      >
+                        {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"} Before</option>)}
+                      </select>
+                      <span className="text-[11px] text-[#8A9A81] mt-1 block">How early a patient must cancel to avoid a penalty.</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Max Bookings Per Slot</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={bookingMaxPerSlot}
+                        onChange={(e) => setBookingMaxPerSlot(Number(e.target.value))}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
+                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Maximum concurrent appointments per time slot.</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Reservation Deposit (%)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={bookingDepositPercentage}
+                        onChange={(e) => setBookingDepositPercentage(Math.max(0, Math.min(100, Number(e.target.value))))}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
+                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Percentage of service price to secure a booking. Set to 0 to disable.</span>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Max Advance Booking (Days)</label>
-                    <select
-                      value={bookingMaxAdvance}
-                      onChange={(e) => setBookingMaxAdvance(Number(e.target.value))}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                    >
-                      {[7, 14, 30, 60, 90].map(d => <option key={d} value={d}>{d} Days</option>)}
-                    </select>
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block">How far in advance patients can schedule.</span>
-                  </div>
+                  <div className="border-t border-[#F2EFE9] pt-6 space-y-4">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={bookingInstantApproval}
+                        onChange={(e) => setBookingInstantApproval(e.target.checked)}
+                        className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                      />
+                      <div>
+                        <span className="text-sm font-semibold text-[#1F251A] block">Instant Approval</span>
+                        <span className="text-xs text-[#5A6A51]">Automatically approve bookings without manual admin review.</span>
+                      </div>
+                    </label>
 
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Cancellation Window (Hours)</label>
-                    <select
-                      value={bookingCancelWindow}
-                      onChange={(e) => setBookingCancelWindow(Number(e.target.value))}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                    >
-                      {[1, 2, 4, 6, 12, 24].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"} Before</option>)}
-                    </select>
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block">How early a patient must cancel to avoid a penalty.</span>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Max Bookings Per Slot</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={bookingMaxPerSlot}
-                      onChange={(e) => setBookingMaxPerSlot(Number(e.target.value))}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                    />
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Maximum concurrent appointments per time slot.</span>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Reservation Deposit (%)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={bookingDepositPercentage}
-                      onChange={(e) => setBookingDepositPercentage(Math.max(0, Math.min(100, Number(e.target.value))))}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                    />
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Percentage of service price to secure a booking. Set to 0 to disable.</span>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={bookingShowDoctorNotes}
+                        onChange={(e) => setBookingShowDoctorNotes(e.target.checked)}
+                        className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                      />
+                      <div>
+                        <span className="text-sm font-semibold text-[#1F251A] block">Show Doctor Notes to Patient</span>
+                        <span className="text-xs text-[#5A6A51]">Display post-visit notes from the provider in the patient portal.</span>
+                      </div>
+                    </label>
                   </div>
                 </div>
 
-                <div className="border-t border-[#F2EFE9] pt-6 space-y-4">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={bookingInstantApproval}
-                      onChange={(e) => setBookingInstantApproval(e.target.checked)}
-                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
-                    />
-                    <div>
-                      <span className="text-sm font-semibold text-[#1F251A] block">Instant Approval</span>
-                      <span className="text-xs text-[#5A6A51]">Automatically approve bookings without manual admin review.</span>
-                    </div>
-                  </label>
+                {/* Right Column: Terms & Conditions Editor */}
+                <div className="lg:col-span-5 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">Terms & Conditions Editor</h3>
+                    <p className="text-xs text-[#5A6A51] mt-1.5 leading-relaxed">
+                      Write the booking, cancellation, refund, and privacy policies patients must review and agree to. Leave empty to disable the gate.
+                    </p>
+                  </div>
 
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={bookingShowDoctorNotes}
-                      onChange={(e) => setBookingShowDoctorNotes(e.target.checked)}
-                      className="accent-[#414E36] w-4 h-4 cursor-pointer"
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Terms & Conditions Text</label>
+                    <textarea
+                      rows={14}
+                      value={termsText}
+                      onChange={(e) => setTermsText(e.target.value)}
+                      placeholder={"By proceeding with this booking, you agree to our terms and conditions:\n\n• Deposits are non-refundable within 24 hours of the appointment.\n• Please arrive 10 minutes before your scheduled time.\n• Revera reserves the right to cancel or reschedule appointments.\n\nFor more information, contact us at +20 103 559 5691."}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] resize-y leading-relaxed font-mono"
                     />
-                    <div>
-                      <span className="text-sm font-semibold text-[#1F251A] block">Show Doctor Notes to Patient</span>
-                      <span className="text-xs text-[#5A6A51]">Display post-visit notes from the provider in the patient portal.</span>
-                    </div>
-                  </label>
+                    <p className="text-[10px] text-[#8A9A81]">
+                      This text is displayed on Step 4 of the reservation modal. If empty, the checkbox gate will be hidden.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
