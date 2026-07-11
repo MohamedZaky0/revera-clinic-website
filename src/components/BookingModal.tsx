@@ -95,6 +95,9 @@ export function BookingModal() {
   const [isPaying, setIsPaying] = useState(false);
   const [showPaymentGate, setShowPaymentGate] = useState(false);
   const [createdReservation, setCreatedReservation] = useState<any>(null);
+  const [instapayAddress, setInstapayAddress] = useState("");
+  const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
+  const [copiedAddress, setCopiedAddress] = useState(false);
 
   const [branches, setBranches] = useState<any[]>([]);
   const [branchId, setBranchId] = useState<string | null>(null);
@@ -119,6 +122,8 @@ export function BookingModal() {
     setIsPaying(false);
     setShowPaymentGate(false);
     setCreatedReservation(null);
+    setInstapayAddress("");
+    setCopiedAddress(false);
   }, [branches]);
 
   const handleClose = useCallback(() => {
@@ -219,6 +224,9 @@ export function BookingModal() {
       .then((data) => {
         if (data && data.booking && data.booking.depositPercentage !== undefined) {
           setDepositPercentage(Number(data.booking.depositPercentage));
+        }
+        if (data && data.clinic && data.clinic.whatsapp) {
+          setClinicWhatsapp(data.clinic.whatsapp);
         }
       })
       .catch(() => {});
@@ -488,11 +496,41 @@ export function BookingModal() {
 
   function handlePayDeposit() {
     if (!createdReservation || !selectedService) return;
+    if (!instapayAddress.trim()) {
+      alert(isRTL ? "يرجى إدخال عنوان إنستاباي الخاص بك" : "Please enter your InstaPay address");
+      return;
+    }
+    
     setIsPaying(true);
     
     const svcPrice = selectedService.price || 0;
     const depAmount = Math.round(svcPrice * (depositPercentage / 100));
     const remBalance = svcPrice - depAmount;
+    
+    const updatedNotes = notes 
+      ? `${notes}\n[InstaPay Address: ${instapayAddress}]`
+      : `[InstaPay Address: ${instapayAddress}]`;
+
+    const formattedDate = selectedDate ? formatDate(selectedDate) : "";
+    const svcName = isRTL ? selectedService.ar : selectedService.en;
+    
+    const textMessage = `Hello Revera Clinics,
+
+I have paid the reservation deposit for my booking:
+• Patient: ${name}
+• Phone: ${phone}
+• Service: ${svcName}
+• Date: ${formattedDate} at ${selectedTime}
+• Deposit Amount: EGP ${depAmount}
+• My InstaPay Address: ${instapayAddress}
+
+Attached is my payment transaction receipt photo.`;
+
+    let cleanPhone = clinicWhatsapp.trim().replace(/\s+/g, '').replace('+', '');
+    if (!cleanPhone.startsWith('2') && cleanPhone.length === 11 && cleanPhone.startsWith('0')) {
+      cleanPhone = '2' + cleanPhone.slice(1);
+    }
+    const whatsappLink = `https://api.whatsapp.com/send/?phone=${cleanPhone}&text=${encodeURIComponent(textMessage)}&type=phone_number&app_absent=0`;
 
     setTimeout(() => {
       fetch(`/api/reservations?id=${createdReservation.id}`, {
@@ -501,7 +539,8 @@ export function BookingModal() {
         body: JSON.stringify({
           status: 'pending',
           amountPaid: depAmount,
-          amountLeft: remBalance
+          amountLeft: remBalance,
+          notes: updatedNotes
         })
       })
         .then(r => {
@@ -512,11 +551,13 @@ export function BookingModal() {
           setIsPaying(false);
           setShowPaymentGate(false);
           setConfirmed(true);
+          window.open(whatsappLink, '_blank');
         })
         .catch((err) => {
           console.error("Payment registration error:", err);
           setIsPaying(false);
           setConfirmed(true);
+          window.open(whatsappLink, '_blank');
         });
     }, 1500);
   }
@@ -823,13 +864,13 @@ export function BookingModal() {
               <div>
                 {showPaymentGate ? (
                   <div className="space-y-4">
-                    <p className="text-sm font-semibold text-[#1F251A]">
-                      {isRTL ? "بوابة دفع عربون الحجز الآمنة" : "Secure Reservation Deposit Payment"}
+                    <p className="text-sm font-bold text-[#1F251A]">
+                      {isRTL ? "دفع عربون الحجز عبر إنستاباي" : "Reservation Deposit via InstaPay"}
                     </p>
                     <p className="text-xs text-[#5A6A51] leading-relaxed">
                       {isRTL 
-                        ? "لتأكيد حجزك، يرجى دفع عربون الحجز المقدر بـ 20% من إجمالي قيمة الخدمة. سيتم خصم هذا المبلغ من إجمالي الفاتورة النهائية." 
-                        : "To secure your reservation, please pay the required deposit (default 20%). This deposit will be deducted from your final invoice."
+                        ? "لتأكيد حجزك، يرجى تحويل عربون الحجز المقدر بـ 20% عبر تطبيق إنستاباي، ثم أدخل اسم حسابك وأرسل صورة التحويل عبر الواتساب." 
+                        : "To secure your reservation, please pay the required deposit (default 20%) via InstaPay, then input your account name below and send the transaction confirmation screenshot on WhatsApp."
                       }
                     </p>
 
@@ -839,71 +880,98 @@ export function BookingModal() {
                         <span className="opacity-70">{isRTL ? "سعر الخدمة الإجمالي:" : "Service Price:"}</span>
                         <span className="font-semibold">EGP {selectedService?.price || 0}</span>
                       </div>
-                      <div className="flex justify-between text-purple-700 font-semibold">
+                      <div className="flex justify-between text-purple-700 font-bold">
                         <span>{isRTL ? `عربون الحجز المطلـوب (${depositPercentage}%):` : `Required Deposit (${depositPercentage}%):`}</span>
                         <span>EGP {Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
                       </div>
-                      <div className="border-t border-dashed border-[#C4AE7C]/20 pt-2 flex justify-between font-semibold">
+                      <div className="border-t border-dashed border-[#C4AE7C]/20 pt-2 flex justify-between font-bold">
                         <span>{isRTL ? "المبلغ المتبقي بالعيادة:" : "Remaining Balance (Pay at Clinic):"}</span>
                         <span>EGP {(selectedService?.price || 0) - Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
                       </div>
                     </div>
 
-                    {/* Credit Card Input Layout */}
-                    <div className="space-y-3 pt-2">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[#5A6A51] mb-1 uppercase tracking-wider">{isRTL ? "اسم حامل البطاقة" : "Cardholder Name"}</label>
-                        <input 
-                          type="text" 
-                          placeholder="Saifuldeen Naser" 
-                          disabled={isPaying}
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-[#5A6A51] mb-1 uppercase tracking-wider">{isRTL ? "رقم البطاقة" : "Card Number"}</label>
-                        <input 
-                          type="text" 
-                          placeholder="4000 1234 5678 9010" 
-                          disabled={isPaying}
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
+                    {/* Clinic InstaPay Info Box */}
+                    <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 space-y-3">
+                      <div className="flex items-center justify-between">
                         <div>
-                          <label className="block text-[11px] font-semibold text-[#5A6A51] mb-1 uppercase tracking-wider">{isRTL ? "تاريخ الانتهاء" : "Expiry Date"}</label>
-                          <input 
-                            type="text" 
-                            placeholder="MM/YY" 
-                            disabled={isPaying}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                          />
+                          <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "عنوان إنستاباي الخاص بالعيادة" : "CLINIC INSTAPAY ADDRESS"}</p>
+                          <p className="text-xs font-bold text-[#1F251A] mt-0.5">revera@instapay</p>
                         </div>
-                        <div>
-                          <label className="block text-[11px] font-semibold text-[#5A6A51] mb-1 uppercase tracking-wider">CVV</label>
-                          <input 
-                            type="password" 
-                            placeholder="•••" 
-                            disabled={isPaying}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText("revera@instapay");
+                            setCopiedAddress(true);
+                            setTimeout(() => setCopiedAddress(false), 2000);
+                          }}
+                          className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                        >
+                          {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
+                        </button>
+                      </div>
+
+                      <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط تحويل إنستاباي" : "INSTAPAY QUICK LINK"}</span>
+                        <a 
+                          href="https://www.instapay.eg" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs font-bold text-[#C4AE7C] hover:underline"
+                        >
+                          {isRTL ? "فتح تطبيق إنستاباي" : "Open InstaPay"} &rarr;
+                        </a>
+                      </div>
+
+                      {/* InstaPay QR Code */}
+                      <div className="pt-2 text-center">
+                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{isRTL ? "امسح رمز الاستجابة السريعة (QR)" : "SCAN QR CODE TO PAY"}</p>
+                        <div className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm">
+                          <img 
+                            src="/images/instapay_qr.png" 
+                            alt="InstaPay QR Code" 
+                            className="w-32 h-32 object-contain"
                           />
                         </div>
                       </div>
                     </div>
 
+                    {/* Patient's InstaPay Account Name Input */}
+                    <div className="space-y-1.5">
+                      <label className="block text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider">
+                        {isRTL ? "عنوان إنستاباي الخاص بك (الذي قمت بالتحويل منه)" : "Your InstaPay Address (Sent From)"}
+                      </label>
+                      <input 
+                        type="text" 
+                        placeholder="name@instapay" 
+                        value={instapayAddress}
+                        onChange={(e) => setInstapayAddress(e.target.value)}
+                        disabled={isPaying}
+                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36] font-medium"
+                      />
+                      <span className="text-[10px] text-[#8A9A81] block">
+                        {isRTL ? "مثال: name@instapay أو رقم الهاتف المسجل بإنستاباي" : "Example: name@instapay or phone number registered on InstaPay"}
+                      </span>
+                    </div>
+
+                    {/* Green WhatsApp Action Button */}
                     <button
                       onClick={handlePayDeposit}
                       disabled={isPaying}
-                      className="btn-primary w-full justify-center mt-4"
-                      style={{ backgroundColor: "#25D366", borderColor: "#25D366" }}
+                      className="w-full justify-center mt-4 rounded-2xl py-3 px-4 text-xs font-bold text-white transition flex items-center justify-center gap-2"
+                      style={{ backgroundColor: "#25D366" }}
                     >
                       {isPaying ? (
-                        <span className="flex items-center gap-2">
+                        <>
                           <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          {isRTL ? "جاري معالجة الدفع الآمن..." : "Processing Secure Payment..."}
-                        </span>
+                          {isRTL ? "جاري الحفظ والتحويل..." : "Saving & Redirecting..."}
+                        </>
                       ) : (
-                        <span>{isRTL ? `تأكيد ودفع ${Math.round((selectedService?.price || 0) * (depositPercentage / 100))} ج.م` : `Confirm & Pay Deposit EGP ${Math.round((selectedService?.price || 0) * (depositPercentage / 100))}`}</span>
+                        <>
+                          <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-4.322c1.7.925 3.328 1.459 5.166 1.46 5.485.001 9.948-4.462 9.951-9.95.002-2.658-1.031-5.158-2.906-7.037C17.228 2.275 14.73 1.24 12.072 1.24a9.957 9.957 0 0 0-9.951 9.956c-.001 1.93.513 3.567 1.492 5.093l-.999 3.65 3.743-.981zM17.476 14.398c-.329-.165-1.947-.961-2.245-1.07-.3-.109-.518-.165-.736.165-.218.329-.844 1.07-1.034 1.289-.19.217-.38.244-.709.079a8.932 8.932 0 0 1-2.736-1.688 9.842 9.842 0 0 1-1.893-2.358c-.19-.329-.02-.507.145-.671.148-.148.33-.382.495-.572.164-.19.219-.328.328-.547.11-.219.055-.41-.027-.574-.082-.164-.736-1.776-1.009-2.433-.266-.64-.539-.553-.736-.563-.19-.01-.409-.012-.627-.012s-.573.082-.873.409c-.3.329-1.145 1.12-1.145 2.732s1.173 3.17 1.336 3.389c.164.22 2.308 3.525 5.59 4.945.78.337 1.39.539 1.86.688.784.248 1.498.213 2.062.128.629-.094 1.947-.796 2.219-1.564.272-.767.272-1.424.19-1.564-.081-.138-.3-.22-.629-.385z"/>
+                          </svg>
+                          {isRTL ? "تأكيد وإرسال صورة التحويل" : "Confirm & Send Screenshot"}
+                        </>
                       )}
                     </button>
 
