@@ -39,7 +39,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId } = body;
+    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName } = body;
 
     if (!email || !name || !roleName) {
       return NextResponse.json(
@@ -136,6 +136,8 @@ export async function POST(req: Request) {
         national_id_back: nationalIdBack || null,
         address: address || null,
         branch_id: branchId || null,
+        contract_file: contractFile || null,
+        contract_file_name: contractFileName || null,
       })
       .select()
       .single();
@@ -155,7 +157,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, resendInvite } = body;
+    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, resendInvite } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Employee ID is required.' }, { status: 400 });
@@ -201,6 +203,8 @@ export async function PATCH(req: Request) {
       if (nationalIdBack !== undefined) updates.national_id_back = nationalIdBack;
       if (address !== undefined) updates.address = address;
       if (branchId !== undefined) updates.branch_id = branchId || null;
+      if (contractFile !== undefined) updates.contract_file = contractFile;
+      if (contractFileName !== undefined) updates.contract_file_name = contractFileName;
 
       const { data: updatedEmp, error: updateError } = await supabaseServer
         .from('employee_accounts')

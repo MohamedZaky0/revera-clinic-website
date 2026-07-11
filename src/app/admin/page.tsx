@@ -621,6 +621,8 @@ export default function AdminPage() {
   const [newEmployeeNationalIdBack, setNewEmployeeNationalIdBack] = useState("");
   const [newEmployeeAddress, setNewEmployeeAddress] = useState("");
   const [newEmployeeBranchId, setNewEmployeeBranchId] = useState("");
+  const [newEmployeeContract, setNewEmployeeContract] = useState("");
+  const [newEmployeeContractName, setNewEmployeeContractName] = useState("");
   const [employeeFilterDepartment, setEmployeeFilterDepartment] = useState("All");
   const [employeeFilterShift, setEmployeeFilterShift] = useState("All");
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
@@ -11185,6 +11187,8 @@ export default function AdminPage() {
                     setNewEmployeeNationalIdBack("");
                     setNewEmployeeAddress("");
                     setNewEmployeeBranchId("");
+                    setNewEmployeeContract("");
+                    setNewEmployeeContractName("");
                     setIsEditingEmployeeModalOpen(true);
                   }}
                   className="rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-md shrink-0"
@@ -11349,6 +11353,8 @@ export default function AdminPage() {
                                           setNewEmployeeNationalIdBack(emp.national_id_back || "");
                                           setNewEmployeeAddress(emp.address || "");
                                           setNewEmployeeBranchId(emp.branch_id || "");
+                                          setNewEmployeeContract(emp.contract_file || "");
+                                          setNewEmployeeContractName(emp.contract_file_name || "");
                                           setIsEditingEmployeeModalOpen(true);
                                         }}
                                         className="text-[#C4AE7C] hover:text-[#a38f61] transition"
@@ -11431,6 +11437,8 @@ export default function AdminPage() {
                                 nationalIdBack: newEmployeeNationalIdBack || null,
                                 address: newEmployeeAddress.trim() || null,
                                 branchId: newEmployeeBranchId || null,
+                                contractFile: newEmployeeContract || null,
+                                contractFileName: newEmployeeContractName || null,
                               }),
                             });
                             if (res.ok) {
@@ -11462,6 +11470,8 @@ export default function AdminPage() {
                                 nationalIdBack: newEmployeeNationalIdBack || null,
                                 address: newEmployeeAddress.trim() || null,
                                 branchId: newEmployeeBranchId || null,
+                                contractFile: newEmployeeContract || null,
+                                contractFileName: newEmployeeContractName || null,
                               }),
                             });
                             if (res.ok) {
@@ -11754,6 +11764,50 @@ export default function AdminPage() {
                         </div>
                       </div>
 
+                      {/* Employment Contract Upload */}
+                      <div className="border border-[#414E36]/10 rounded-2xl bg-[#F7F7F5] p-4">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">Employment Contract</label>
+                        <div className="rounded-2xl border border-dashed border-[#414E36]/20 bg-white overflow-hidden">
+                          {newEmployeeContract ? (
+                            <div className="flex items-center justify-between gap-2 p-3 bg-[#EDF1EC] rounded-2xl">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <FileText className="h-5 w-5 text-[#5A6A51] shrink-0" />
+                                <span className="text-xs font-semibold text-[#414E36] truncate">{newEmployeeContractName || "Contract File"}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => { setNewEmployeeContract(""); setNewEmployeeContractName(""); }}
+                                className="bg-red-500 text-white hover:bg-red-600 transition rounded-full h-5 w-5 shrink-0 flex items-center justify-center font-bold text-xs"
+                              >
+                                &times;
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="flex flex-col items-center justify-center cursor-pointer py-5 w-full">
+                              <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
+                              <span className="text-[11px] font-semibold text-[#414E36]">Upload Contract (PDF, Word, or Image)</span>
+                              <span className="text-[9px] text-gray-400 mt-0.5">PDF, DOCX, PNG, JPEG – up to 10MB</span>
+                              <input
+                                type="file"
+                                accept=".pdf,.doc,.docx,image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                      setNewEmployeeContract(reader.result as string);
+                                      setNewEmployeeContractName(file.name);
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="flex justify-end gap-3 pt-2">
                         <button
                           type="button"
@@ -11826,6 +11880,8 @@ export default function AdminPage() {
                               setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
                               setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
                               setNewEmployeeAddress(viewingEmployee.address || "");
+                              setNewEmployeeContract(viewingEmployee.contract_file || "");
+                              setNewEmployeeContractName(viewingEmployee.contract_file_name || "");
                               setViewingEmployee(null);
                               setIsEditingEmployeeModalOpen(true);
                             }}
@@ -11976,6 +12032,20 @@ export default function AdminPage() {
                               </div>
                             </div>
                           )}
+                          {/* Employment Contract */}
+                          {viewingEmployee.contract_file && (
+                            <div className="mt-4 pt-4 border-t border-[#414E36]/10">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">Employment Contract</p>
+                              <a
+                                href={viewingEmployee.contract_file}
+                                download={viewingEmployee.contract_file_name || "contract"}
+                                className="inline-flex items-center gap-2 rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition"
+                              >
+                                <FileText className="h-4 w-4 text-[#5A6A51]" />
+                                {viewingEmployee.contract_file_name || "Download Contract"}
+                              </a>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -11998,6 +12068,8 @@ export default function AdminPage() {
                               setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
                               setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
                               setNewEmployeeAddress(viewingEmployee.address || "");
+                              setNewEmployeeContract(viewingEmployee.contract_file || "");
+                              setNewEmployeeContractName(viewingEmployee.contract_file_name || "");
                               setViewingEmployee(null);
                               setIsEditingEmployeeModalOpen(true);
                             }}
