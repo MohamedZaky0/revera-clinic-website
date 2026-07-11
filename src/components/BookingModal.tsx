@@ -526,11 +526,7 @@ I have paid the reservation deposit for my booking:
 
 Attached is my payment transaction receipt photo.`;
 
-    let cleanPhone = clinicWhatsapp.trim().replace(/\s+/g, '').replace('+', '');
-    if (!cleanPhone.startsWith('2') && cleanPhone.length === 11 && cleanPhone.startsWith('0')) {
-      cleanPhone = '2' + cleanPhone.slice(1);
-    }
-    const whatsappLink = `https://api.whatsapp.com/send/?phone=${cleanPhone}&text=${encodeURIComponent(textMessage)}&type=phone_number&app_absent=0`;
+    const whatsappLink = `http://wa.me/+201035595691?text=${encodeURIComponent(textMessage)}`;
 
     setTimeout(() => {
       fetch(`/api/reservations?id=${createdReservation.id}`, {
