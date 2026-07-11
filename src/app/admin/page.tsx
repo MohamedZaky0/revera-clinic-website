@@ -2698,12 +2698,16 @@ export default function AdminPage() {
     });
   }, [activeNav]);
 
-  // Re-fetch bookings whenever branch selection changes and poll every 2 seconds for new requests
+  // Re-fetch bookings whenever branch selection changes and poll every 15 seconds for new requests
   useEffect(() => {
     if (!branch) return; // wait until branches are loaded
 
     let isMounted = true;
     let timerId: NodeJS.Timeout;
+
+    // Initial load WITH spinner
+    fetchRequests(true);
+    fetchAllReservations();
 
     const poll = async () => {
       try {
@@ -2712,7 +2716,7 @@ export default function AdminPage() {
         clearFetchCache(`/api/reservations?branchId=${branch}`);
         
         await Promise.all([
-          fetchRequests() || Promise.resolve(),
+          fetchRequests(false) || Promise.resolve(),
           fetchAllReservations() || Promise.resolve()
         ]);
       } catch (err) {
@@ -2723,13 +2727,14 @@ export default function AdminPage() {
         }
       } finally {
         if (isMounted) {
-          // Schedule next poll in 2 seconds after the current fetches complete
-          timerId = setTimeout(poll, 2000);
+          // Schedule next poll in 15 seconds
+          timerId = setTimeout(poll, 15000);
         }
       }
     };
 
-    poll();
+    // Start background poll after 15 seconds
+    timerId = setTimeout(poll, 15000);
 
     return () => {
       isMounted = false;
@@ -3599,8 +3604,10 @@ export default function AdminPage() {
     }
   };
 
-  function fetchRequests() {
-    setLoading(true);
+  function fetchRequests(showSpinner = false) {
+    if (showSpinner) {
+      setLoading(true);
+    }
     const branchParam = branch ? `&branchId=${branch}` : "";
     return cachedFetch(`/api/reservations?status=pending${branchParam}`, 2000)
       .then((data) => {
@@ -3610,7 +3617,7 @@ export default function AdminPage() {
           console.error("fetchRequests: expected array, got", data);
           setRequests([]);
         }
-        setLoading(false);
+        if (showSpinner) setLoading(false);
       })
       .catch((err) => {
         if (err instanceof TypeError || String(err).includes("Failed to fetch")) {
@@ -3619,7 +3626,7 @@ export default function AdminPage() {
           console.error("fetchRequests error:", err);
         }
         setRequests([]);
-        setLoading(false);
+        if (showSpinner) setLoading(false);
       });
   }
 
