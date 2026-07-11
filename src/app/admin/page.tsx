@@ -1982,7 +1982,8 @@ export default function AdminPage() {
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
   const [smsExpanded, setSMSExpanded] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
-  const [pagesSettingsTab, setPagesSettingsTab] = useState<"Home" | "About Us" | "Services">("Home");
+  const [pagesSettingsTab, setPagesSettingsTab] = useState<"Home" | "About Us" | "Services" | "Booking T&C">("Home");
+  const [termsText, setTermsText] = useState("");
   const [homeHeroSlides, setHomeHeroSlides] = useState<any[]>([
     {
       welcome: "Welcome to Revera Clinics",
@@ -3077,6 +3078,10 @@ export default function AdminPage() {
           if (data.footer && data.footer.serviceHours) {
             setServiceHours(data.footer.serviceHours);
           }
+
+          if (data.booking) {
+            setTermsText(data.booking.termsText || "");
+          }
         }
       })
       .catch((err) => console.error("fetchPageSettings error:", err))
@@ -3364,6 +3369,16 @@ export default function AdminPage() {
       },
       footer: {
         serviceHours: sHours
+      },
+      booking: {
+        minAdvance: bookingMinAdvance,
+        maxAdvance: bookingMaxAdvance,
+        cancelWindow: bookingCancelWindow,
+        maxPerSlot: bookingMaxPerSlot,
+        instantApproval: bookingInstantApproval,
+        showDoctorNotes: bookingShowDoctorNotes,
+        depositPercentage: bookingDepositPercentage,
+        termsText: overrideData?.booking?.termsText !== undefined ? overrideData.booking.termsText : termsText,
       }
     };
 
@@ -8368,7 +8383,7 @@ export default function AdminPage() {
 
               {/* Page tabs */}
               <div className="flex items-center gap-1 p-1 w-fit rounded-full border border-[#414E36]/12 bg-white shadow-sm">
-                {(["Home", "About Us", "Services"] as const).map((page) => (
+                {(["Home", "About Us", "Services", "Booking T&C"] as const).map((page) => (
                   <button
                     key={page}
                     onClick={() => setPagesSettingsTab(page)}
@@ -9868,6 +9883,38 @@ export default function AdminPage() {
                         {savingPageSettings ? "Saving..." : "Save All Changes"}
                       </button>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Booking T&C Panel */}
+              {pagesSettingsTab === "Booking T&C" && (
+                <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                  <div>
+                    <h3 className="text-2xl font-bold text-[#1F251A]">Booking Terms & Conditions</h3>
+                    <p className="text-sm text-[#5A6A51] mt-1">Write the terms and conditions patients must agree to before completing a booking. Leave empty to disable the checkbox gate.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Terms & Conditions Text (English)</label>
+                    <textarea
+                      rows={14}
+                      value={termsText}
+                      onChange={(e) => setTermsText(e.target.value)}
+                      placeholder={"By proceeding with this booking, you agree to our terms and conditions:\n\n• Deposits are non-refundable within 24 hours of the appointment.\n• Please arrive 10 minutes before your scheduled time.\n• Revera reserves the right to cancel or reschedule appointments.\n\nFor more information, contact us at +20 103 559 5691."}
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-y leading-relaxed font-mono"
+                    />
+                    <p className="text-[11px] text-[#8A9A81]">This text will appear in the booking modal. If left empty, no T&C checkbox will be shown.</p>
+                  </div>
+
+                  <div className="flex justify-end pt-4 border-t border-[#F2EFE9]">
+                    <button
+                      disabled={savingPageSettings}
+                      onClick={() => savePageSettings({ booking: { termsText } })}
+                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
+                    >
+                      {savingPageSettings ? "Saving..." : "Save Terms & Conditions"}
+                    </button>
                   </div>
                 </div>
               )}

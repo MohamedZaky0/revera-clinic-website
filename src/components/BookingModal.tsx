@@ -98,6 +98,8 @@ export function BookingModal() {
   const [instapayAddress, setInstapayAddress] = useState("");
   const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [termsText, setTermsText] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const [branches, setBranches] = useState<any[]>([]);
   const [branchId, setBranchId] = useState<string | null>(null);
@@ -124,6 +126,7 @@ export function BookingModal() {
     setCreatedReservation(null);
     setInstapayAddress("");
     setCopiedAddress(false);
+    setAcceptedTerms(false);
   }, [branches]);
 
   const handleClose = useCallback(() => {
@@ -227,6 +230,9 @@ export function BookingModal() {
         }
         if (data && data.clinic && data.clinic.whatsapp) {
           setClinicWhatsapp(data.clinic.whatsapp);
+        }
+        if (data && data.booking && data.booking.termsText) {
+          setTermsText(data.booking.termsText);
         }
       })
       .catch(() => {});
@@ -1093,9 +1099,29 @@ Attached is my payment transaction receipt photo.`;
                     <label className="block mb-1 text-xs font-semibold">Phone</label>
                     <input className="cr-input mb-4" value={phone} onChange={(e)=>setPhone(e.target.value)} />
 
+                    {/* Terms & Conditions Gate */}
+                    {termsText.trim() && (
+                      <div className="mb-4 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 space-y-3">
+                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "الشروط والأحكام" : "Terms & Conditions"}</p>
+                        <div className="max-h-32 overflow-y-auto rounded-xl bg-white border border-[#414E36]/10 p-3 text-[11px] text-[#414E36] leading-relaxed whitespace-pre-wrap">{termsText}</div>
+                        <label className="flex items-start gap-2.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={acceptedTerms}
+                            onChange={(e) => setAcceptedTerms(e.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded accent-[#414E36] shrink-0"
+                          />
+                          <span className="text-[11px] font-semibold text-[#414E36] leading-relaxed">
+                            {isRTL ? "أوافق على الشروط والأحكام" : "I have read and agree to the Terms & Conditions"}
+                          </span>
+                        </label>
+                      </div>
+                    )}
+
                     <button
                       onClick={handleConfirm}
-                      className="btn-primary w-full justify-center"
+                      disabled={termsText.trim() !== "" && !acceptedTerms}
+                      className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {t.booking.confirmBtn}
                     </button>
