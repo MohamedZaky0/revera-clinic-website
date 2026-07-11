@@ -693,27 +693,6 @@ Attached is my payment transaction receipt photo.`;
               })}
             </div>
 
-            {/* Deposit Awareness Banner */}
-            {!showPaymentGate && depositPercentage > 0 && (
-              <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/50 p-3.5 flex items-start gap-2.5 text-xs text-amber-800 leading-relaxed font-medium">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-amber-700">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-                <div>
-                  <p className="font-bold mb-0.5 text-amber-900">
-                    {isRTL ? "ملاحظة هامة حول تأكيد الحجز" : "Important Booking Confirmation Notice"}
-                  </p>
-                  <p className="opacity-90">
-                    {isRTL 
-                      ? `يرجى العلم أن الحجز لا يعتبر مؤكداً حتى يتم دفع عربون الحجز المقدر بـ ${depositPercentage}%. سيبقى الحجز معلقاً لحين إتمام الدفع.` 
-                      : `Please note that your booking is not confirmed until the required ${depositPercentage}% reservation deposit is paid. It will remain pending deposit until payment is completed.`
-                    }
-                  </p>
-                </div>
-              </div>
-            )}
 
             {/* Step 1: Service selection */}
             {step === 1 && (
@@ -891,6 +870,28 @@ Attached is my payment transaction receipt photo.`;
                         : "To secure your reservation, please pay the required deposit (default 20%) via InstaPay, then input your account name below and send the transaction confirmation screenshot on WhatsApp."
                       }
                     </p>
+
+                    {/* Deposit Awareness Banner */}
+                    {depositPercentage > 0 && (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-3.5 flex items-start gap-2.5 text-xs text-amber-800 leading-relaxed font-medium">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-amber-700">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <div>
+                          <p className="font-bold mb-0.5 text-amber-900">
+                            {isRTL ? "تنبيه هام حول تأكيد الحجز" : "Important Booking Confirmation Notice"}
+                          </p>
+                          <p className="opacity-90">
+                            {isRTL 
+                              ? `يرجى العلم أن حجزك لا يعتبر مؤكداً حتى يتم سداد عربون الحجز (20%). سيبقى الحجز معلقاً لحين إتمام التحويل وإرسال الصورة.` 
+                              : `Please note that your booking is not confirmed until the required 20% reservation deposit is paid. It will remain pending deposit until the transfer is made and receipt screenshot is received.`
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Price Breakdown */}
                     <div className="rounded-2xl border border-[#C4AE7C]/20 bg-[#FBFBF9] p-4 text-xs space-y-2 text-[#1F251A]">
