@@ -11801,7 +11801,7 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      <div className="grid gap-4 sm:grid-cols-3">
+                      <div className="grid gap-4 sm:grid-cols-2">
                         <div>
                           <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Department</label>
                           <select
@@ -11819,37 +11819,6 @@ export default function AdminPage() {
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Shift</label>
-                          <div className="flex items-center gap-1.5">
-                            <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-2.5 py-2 w-full focus-within:border-[#C4AE7C] transition-colors">
-                              <input
-                                type="time"
-                                value={newEmployeeShiftStart}
-                                onChange={(e) => handleShiftStartChange(e.target.value)}
-                                onClick={(e) => {
-                                  try { e.currentTarget.showPicker(); } catch {}
-                                }}
-                                className="bg-transparent text-xs text-[#1F251A] outline-none w-full pr-5 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                              />
-                              <Clock size={12} className="text-[#5A6A51] absolute right-2.5 pointer-events-none" />
-                            </div>
-                            <span className="text-[10px] font-semibold text-[#5A6A51] select-none">to</span>
-                            <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-2.5 py-2 w-full focus-within:border-[#C4AE7C] transition-colors">
-                              <input
-                                type="time"
-                                value={newEmployeeShiftEnd}
-                                onChange={(e) => handleShiftEndChange(e.target.value)}
-                                onClick={(e) => {
-                                  try { e.currentTarget.showPicker(); } catch {}
-                                }}
-                                className="bg-transparent text-xs text-[#1F251A] outline-none w-full pr-5 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                              />
-                              <Clock size={12} className="text-[#5A6A51] absolute right-2.5 pointer-events-none" />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div>
                           <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Salary (EGP)</label>
                           <input
                             type="number"
@@ -11858,6 +11827,37 @@ export default function AdminPage() {
                             onChange={(e) => setNewEmployeeSalary(e.target.value)}
                             className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                           />
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Shift</label>
+                        <div className="flex items-center gap-2 max-w-[320px]">
+                          <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-3.5 py-2.5 w-full focus-within:border-[#C4AE7C] transition-colors">
+                            <input
+                              type="time"
+                              value={newEmployeeShiftStart}
+                              onChange={(e) => handleShiftStartChange(e.target.value)}
+                              onClick={(e) => {
+                                try { e.currentTarget.showPicker(); } catch {}
+                              }}
+                              className="bg-transparent text-sm text-[#1F251A] outline-none w-full pr-6 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                            />
+                            <Clock size={14} className="text-[#5A6A51] absolute right-3.5 pointer-events-none" />
+                          </div>
+                          <span className="text-sm font-semibold text-[#5A6A51] select-none">to</span>
+                          <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-3.5 py-2.5 w-full focus-within:border-[#C4AE7C] transition-colors">
+                            <input
+                              type="time"
+                              value={newEmployeeShiftEnd}
+                              onChange={(e) => handleShiftEndChange(e.target.value)}
+                              onClick={(e) => {
+                                try { e.currentTarget.showPicker(); } catch {}
+                              }}
+                              className="bg-transparent text-sm text-[#1F251A] outline-none w-full pr-6 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                            />
+                            <Clock size={14} className="text-[#5A6A51] absolute right-3.5 pointer-events-none" />
+                          </div>
                         </div>
                       </div>
 
