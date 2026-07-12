@@ -688,6 +688,7 @@ export default function AdminPage() {
   const [newEmployeeNationalIdBack, setNewEmployeeNationalIdBack] = useState("");
   const [newEmployeeAddress, setNewEmployeeAddress] = useState("");
   const [newEmployeeBranchId, setNewEmployeeBranchId] = useState("");
+  const [activeInfoFeature, setActiveInfoFeature] = useState<{ title: string; description: string } | null>(null);
   const [newEmployeeContract, setNewEmployeeContract] = useState("");
   const [newEmployeeContractName, setNewEmployeeContractName] = useState("");
   const [employeeFilterDepartment, setEmployeeFilterDepartment] = useState("All");
@@ -10735,7 +10736,20 @@ export default function AdminPage() {
                   <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">Booking Rules</h3>
                   <div className="grid gap-6 md:grid-cols-2">
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Min Advance Booking (Hours)</label>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Min Advance Booking (Hours)</label>
+                        <button
+                          type="button"
+                          onClick={() => setActiveInfoFeature({
+                            title: "Min Advance Booking (Hours)",
+                            description: "This setting restricts how close to the appointment time a patient can book. For example, if set to 2 hours, patients cannot book an appointment that starts within the next 2 hours. This prevents last-minute surprise bookings and gives your staff sufficient lead time to prepare for the arriving patient."
+                          })}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
                       <select
                         value={bookingMinAdvance}
                         onChange={(e) => setBookingMinAdvance(Number(e.target.value))}
@@ -10747,7 +10761,20 @@ export default function AdminPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Max Advance Booking (Days)</label>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Max Advance Booking (Days)</label>
+                        <button
+                          type="button"
+                          onClick={() => setActiveInfoFeature({
+                            title: "Max Advance Booking (Days)",
+                            description: "This setting defines how far in the future patients are allowed to book appointments. For example, if set to 30 Days, patients can only choose slots within the next 30 days. This keeps your schedule manageable and prevents patients from booking slots too far in advance, which are prone to cancellations."
+                          })}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
                       <select
                         value={bookingMaxAdvance}
                         onChange={(e) => setBookingMaxAdvance(Number(e.target.value))}
@@ -10759,7 +10786,20 @@ export default function AdminPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Cancellation Window (Hours)</label>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Cancellation Window (Hours)</label>
+                        <button
+                          type="button"
+                          onClick={() => setActiveInfoFeature({
+                            title: "Cancellation Window (Hours)",
+                            description: "This setting defines the minimum hours before an appointment that a patient can cancel or reschedule without penalty. For example, if set to 24 hours, patients must cancel at least 24 hours prior to the slot. Cancellations attempted inside this window may forfeit their deposit or require clinic intervention."
+                          })}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
                       <select
                         value={bookingCancelWindow}
                         onChange={(e) => setBookingCancelWindow(Number(e.target.value))}
@@ -10771,7 +10811,20 @@ export default function AdminPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Max Bookings Per Slot</label>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Max Bookings Per Slot</label>
+                        <button
+                          type="button"
+                          onClick={() => setActiveInfoFeature({
+                            title: "Max Bookings Per Slot",
+                            description: "This setting defines the maximum number of appointments that can be scheduled concurrently in a single time slot for the clinic. It ensures you do not exceed clinic capacity or overwhelm staff. If the limit is reached, that slot will show as full and unavailable to other patients."
+                          })}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
                       <input
                         type="number"
                         min={1}
@@ -10784,7 +10837,20 @@ export default function AdminPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Reservation Deposit (%)</label>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Reservation Deposit (%)</label>
+                        <button
+                          type="button"
+                          onClick={() => setActiveInfoFeature({
+                            title: "Reservation Deposit (%)",
+                            description: "This setting sets a required prepayment percentage of the service cost to secure an appointment. For example, if set to 20%, a patient must pay 20% of the service fee via InstaPay or bank transfer before their reservation is confirmed. Set this to 0% to allow booking without any prepayment."
+                          })}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
                       <input
                         type="number"
                         min={0}
@@ -10806,7 +10872,24 @@ export default function AdminPage() {
                         className="accent-[#414E36] w-4 h-4 cursor-pointer"
                       />
                       <div>
-                        <span className="text-sm font-semibold text-[#1F251A] block">Instant Approval</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-semibold text-[#1F251A]">Instant Approval</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setActiveInfoFeature({
+                                title: "Instant Approval",
+                                description: "When enabled, bookings made by patients are automatically marked as Approved and confirmed without requiring manual review by the clinic administrator. When disabled, bookings are marked as Pending and must be manually approved by your admin team."
+                              });
+                            }}
+                            className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                            title="Click for info"
+                          >
+                            <Info size={13} />
+                          </button>
+                        </div>
                         <span className="text-xs text-[#5A6A51]">Automatically approve bookings without manual admin review.</span>
                       </div>
                     </label>
@@ -10819,7 +10902,24 @@ export default function AdminPage() {
                         className="accent-[#414E36] w-4 h-4 cursor-pointer"
                       />
                       <div>
-                        <span className="text-sm font-semibold text-[#1F251A] block">Show Doctor Notes to Patient</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-semibold text-[#1F251A]">Show Doctor Notes to Patient</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setActiveInfoFeature({
+                                title: "Show Doctor Notes to Patient",
+                                description: "When enabled, post-visit summary notes written by the provider (e.g. diagnoses, advice, instructions) will be visible to the patient inside their personal profile dashboard. When disabled, notes remain strictly private for internal staff use."
+                              });
+                            }}
+                            className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                            title="Click for info"
+                          >
+                            <Info size={13} />
+                          </button>
+                        </div>
                         <span className="text-xs text-[#5A6A51]">Display post-visit notes from the provider in the patient portal.</span>
                       </div>
                     </label>
@@ -10836,7 +10936,20 @@ export default function AdminPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Terms & Conditions Text</label>
+                    <div className="flex items-center gap-1.5">
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Terms & Conditions Text</label>
+                      <button
+                        type="button"
+                        onClick={() => setActiveInfoFeature({
+                          title: "Terms & Conditions Text",
+                          description: "Write the booking policies, clinic guidelines, refund rules, and terms that patients must review and agree to on Step 5 of the checkout modal. Leaving this field completely empty will automatically hide the terms checkbox gate during booking."
+                        })}
+                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                        title="Click for info"
+                      >
+                        <Info size={13} />
+                      </button>
+                    </div>
                     <textarea
                       rows={14}
                       value={termsText}
@@ -10874,21 +10987,72 @@ export default function AdminPage() {
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" checked={notifSmsOtp} onChange={(e) => setNotifSmsOtp(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
                     <div>
-                      <span className="text-sm font-semibold text-[#1F251A] block">SMS OTP Verification</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-semibold text-[#1F251A]">SMS OTP Verification</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActiveInfoFeature({
+                              title: "SMS OTP Verification",
+                              description: "When enabled, the system sends a One-Time Password (OTP) via SMS to verify the patient's phone number during login and checkout. This ensures patient profiles are tied to active numbers, preventing spam bookings and database clutter."
+                            });
+                          }}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
                       <span className="text-xs text-[#5A6A51]">Send one-time passwords to patients during login and booking.</span>
                     </div>
                   </label>
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" checked={notifWhatsApp} onChange={(e) => setNotifWhatsApp(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
                     <div>
-                      <span className="text-sm font-semibold text-[#1F251A] block">WhatsApp Confirmations</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-semibold text-[#1F251A]">WhatsApp Confirmations</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActiveInfoFeature({
+                              title: "WhatsApp Confirmations",
+                              description: "When enabled, the system automatically sends booking confirmation messages, reschedule alerts, and timing reminders directly to the patient's WhatsApp number, which has a higher open rate than traditional SMS."
+                            });
+                          }}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
                       <span className="text-xs text-[#5A6A51]">Send appointment confirmations and reminders via WhatsApp.</span>
                     </div>
                   </label>
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" checked={notifEmailConfirm} onChange={(e) => setNotifEmailConfirm(e.target.checked)} className="accent-[#414E36] w-4 h-4 cursor-pointer" />
                     <div>
-                      <span className="text-sm font-semibold text-[#1F251A] block">Email Confirmations</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-semibold text-[#1F251A]">Email Confirmations</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActiveInfoFeature({
+                              title: "Email Confirmations",
+                              description: "When enabled, the system sends booking receipts and confirmation details to the patient's email address (requires configuring a valid SMTP mail server in the clinic backend)."
+                            });
+                          }}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
                       <span className="text-xs text-[#5A6A51]">Send email confirmations in addition to SMS (requires SMTP config).</span>
                     </div>
                   </label>
@@ -10896,7 +11060,20 @@ export default function AdminPage() {
 
                 <div className="border-t border-[#F2EFE9] pt-6 space-y-5">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">SMS Confirmation Template (EN)</label>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SMS Confirmation Template (EN)</label>
+                      <button
+                        type="button"
+                        onClick={() => setActiveInfoFeature({
+                          title: "SMS Confirmation Template (EN)",
+                          description: "Configure the English message sent to patients when their booking is approved. You can use dynamic variables like {name} for patient name, {service} for service name, {date} for appointment date, and {time} for slot time."
+                        })}
+                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                        title="Click for info"
+                      >
+                        <Info size={13} />
+                      </button>
+                    </div>
                     <textarea
                       value={notifSmsTemplate}
                       onChange={(e) => setNotifSmsTemplate(e.target.value)}
@@ -10907,7 +11084,20 @@ export default function AdminPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">قالب رسالة التأكيد النصية (AR)</label>
+                    <div className="flex items-center justify-end gap-1.5 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveInfoFeature({
+                          title: "قالب رسالة التأكيد النصية (AR)",
+                          description: "قم بتهيئة نص الرسالة باللغة العربية التي تُرسل للمرضى عند تأكيد الحجز. يدعم الحقول المتغيرة مثل {name} لاسم المريض، و {service} لاسم الخدمة، و {date} لتاريخ الموعد، و {time} لوقت الموعد."
+                        })}
+                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                        title="Click for info"
+                      >
+                        <Info size={13} />
+                      </button>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] text-right">قالب رسالة التأكيد النصية (AR)</label>
+                    </div>
                     <textarea
                       value={notifSmsTemplateAr}
                       onChange={(e) => setNotifSmsTemplateAr(e.target.value)}
@@ -10921,7 +11111,20 @@ export default function AdminPage() {
 
                 <div className="border-t border-[#F2EFE9] pt-6 grid gap-6 md:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Reminder Timing (Hours Before)</label>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Reminder Timing (Hours Before)</label>
+                      <button
+                        type="button"
+                        onClick={() => setActiveInfoFeature({
+                          title: "Reminder Timing (Hours Before)",
+                          description: "Set how many hours before the appointment the system should send a reminder notification (via SMS or WhatsApp) to the patient. This dramatically reduces no-show rates."
+                        })}
+                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                        title="Click for info"
+                      >
+                        <Info size={13} />
+                      </button>
+                    </div>
                     <select
                       value={notifReminderHours}
                       onChange={(e) => setNotifReminderHours(Number(e.target.value))}
@@ -10936,7 +11139,20 @@ export default function AdminPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Staff Summary Daily Email</label>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Staff Summary Daily Email</label>
+                      <button
+                        type="button"
+                        onClick={() => setActiveInfoFeature({
+                          title: "Staff Summary Daily Email",
+                          description: "Enter the email address where the clinic should receive a consolidated daily summary of all appointments scheduled for the upcoming day. Perfect for clinic directors or administration leads."
+                        })}
+                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                        title="Click for info"
+                      >
+                        <Info size={13} />
+                      </button>
+                    </div>
                     <input
                       type="email"
                       value={notifStaffEmail}
@@ -10976,7 +11192,24 @@ export default function AdminPage() {
                       className="accent-[#414E36] w-4 h-4 cursor-pointer"
                     />
                     <div>
-                      <span className="text-sm font-semibold text-[#1F251A] block">Enable Virtual Waiting Room Tracker</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-semibold text-[#1F251A]">Enable Virtual Waiting Room Tracker</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActiveInfoFeature({
+                              title: "Enable Virtual Waiting Room Tracker",
+                              description: "When enabled, patients who have checked in can open the clinic's web portal on their phone and see a live view of their position in the queue (e.g. '3rd in line'). They receive automatic updates as the queue progresses, allowing them to wait comfortably outside the clinic."
+                            });
+                          }}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
                       <span className="text-xs text-[#5A6A51]">Allows checked-in patients to track live queue position via mobile.</span>
                     </div>
                   </label>
@@ -10989,7 +11222,24 @@ export default function AdminPage() {
                       className="accent-[#414E36] w-4 h-4 cursor-pointer"
                     />
                     <div>
-                      <span className="text-sm font-semibold text-[#1F251A] block">Display Queue on Lobby TV Screens</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-semibold text-[#1F251A]">Display Queue on Lobby TV Screens</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActiveInfoFeature({
+                              title: "Display Queue on Lobby TV Screens",
+                              description: "When enabled, a real-time queue board is projected onto TV screens in the clinic lobby, showing patients' ticket numbers and current calling status. This reduces reception desk inquiries and keeps the lobby atmosphere calm and organized."
+                            });
+                          }}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
                       <span className="text-xs text-[#5A6A51]">Show queue statuses on public dashboard screens inside clinic lobbies.</span>
                     </div>
                   </label>
@@ -11002,7 +11252,24 @@ export default function AdminPage() {
                       className="accent-[#414E36] w-4 h-4 cursor-pointer"
                     />
                     <div>
-                      <span className="text-sm font-semibold text-[#1F251A] block">Auto Check-In on Arrival</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-semibold text-[#1F251A]">Auto Check-In on Arrival</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActiveInfoFeature({
+                              title: "Auto Check-In on Arrival",
+                              description: "When enabled, the system automatically detects a patient's arrival using GPS geofencing (when they enter the clinic's location boundary) or by scanning a QR code at reception. This eliminates manual check-in steps and instantly places the patient in the queue."
+                            });
+                          }}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
                       <span className="text-xs text-[#5A6A51]">Use geofencing or terminal scan to auto register presence on patient arrival.</span>
                     </div>
                   </label>
@@ -11010,7 +11277,20 @@ export default function AdminPage() {
 
                 <div className="border-t border-[#F2EFE9] pt-6 grid gap-6 md:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Queue Alert SMS Threshold</label>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Queue Alert SMS Threshold</label>
+                      <button
+                        type="button"
+                        onClick={() => setActiveInfoFeature({
+                          title: "Queue Alert SMS Threshold",
+                          description: "Set how many patients ahead of them the system should send a heads-up SMS alert to notify the next patient to return to the waiting room. For example, set to '2 Patients Ahead' so the patient is alerted when there are only 2 people before their turn."
+                        })}
+                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                        title="Click for info"
+                      >
+                        <Info size={13} />
+                      </button>
+                    </div>
                     <select
                       value={queueAlertThreshold}
                       onChange={(e) => setQueueAlertThreshold(Number(e.target.value))}
@@ -11026,7 +11306,20 @@ export default function AdminPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Average Session Duration (Minutes)</label>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Average Session Duration (Minutes)</label>
+                      <button
+                        type="button"
+                        onClick={() => setActiveInfoFeature({
+                          title: "Average Session Duration (Minutes)",
+                          description: "Enter the average time in minutes that a doctor's appointment or treatment session typically takes. This value is used to calculate estimated wait times for patients in the queue. For example, if set to 20 minutes and there are 3 patients ahead, the system estimates a 60-minute wait."
+                        })}
+                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                        title="Click for info"
+                      >
+                        <Info size={13} />
+                      </button>
+                    </div>
                     <input
                       type="number"
                       min={1}
@@ -17905,6 +18198,36 @@ export default function AdminPage() {
             </div>
           );
         })()
+      )}
+
+      {activeInfoFeature && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/60 backdrop-blur-sm p-4 transition-opacity duration-300">
+          <div className="bg-[#FBFBF9] rounded-[32px] border border-[#414E36]/10 p-6 max-w-md w-full shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+            <h4 className="text-lg font-bold text-[#1F251A] pr-8 mb-2 flex items-center gap-2">
+              <Info className="text-[#C4AE7C] shrink-0" size={20} />
+              {activeInfoFeature.title}
+            </h4>
+            <div className="text-sm text-[#5A6A51] leading-relaxed space-y-2 font-medium">
+              <p>{activeInfoFeature.description}</p>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setActiveInfoFeature(null)}
+                className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
+              >
+                Got it
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveInfoFeature(null)}
+              className="absolute top-5 right-5 text-[#5A6A51]/60 hover:text-[#1F251A] transition-colors hover:bg-gray-100 p-1.5 rounded-full"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
       )}
 
     </div>
