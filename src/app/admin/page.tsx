@@ -11432,7 +11432,21 @@ export default function AdminPage() {
                       ) : (() => {
                         const filtered = employeesList.filter((emp: any) => {
                           if (employeeFilterDepartment !== "All" && emp.department !== employeeFilterDepartment) return false;
-                          if (employeeFilterShift !== "All" && emp.shift !== employeeFilterShift) return false;
+                          if (employeeFilterShift !== "All") {
+                            const empShift = (emp.shift || "").toLowerCase();
+                            const filterVal = employeeFilterShift.toLowerCase();
+                            if (filterVal === "day") {
+                              if (!empShift.includes("day") && !empShift.includes("am") && (empShift.includes("night") || empShift.includes("pm"))) {
+                                return false;
+                              }
+                            } else if (filterVal === "night") {
+                              if (!empShift.includes("night") && !empShift.includes("pm")) {
+                                return false;
+                              }
+                            } else if (emp.shift !== employeeFilterShift) {
+                              return false;
+                            }
+                          }
                           if (employeeSearchQuery.trim()) {
                             const q = employeeSearchQuery.toLowerCase();
                             if (
@@ -11477,14 +11491,13 @@ export default function AdminPage() {
                                 </span>
                               </td>
                               <td className="px-6 py-4">
-                                <span className={`inline-block rounded-xl px-3 py-1 text-xs font-semibold ${emp.shift === "Night" ? "bg-indigo-50 text-indigo-700" : "bg-amber-50 text-amber-700"}`}>
+                                <span className={`inline-block rounded-xl px-3 py-1 text-xs font-semibold ${(emp.shift || "").toLowerCase().includes("night") || (emp.shift || "").toLowerCase().includes("pm") ? "bg-indigo-50 text-indigo-700 border border-indigo-150" : "bg-amber-50 text-amber-700 border border-amber-150"}`}>
                                   {emp.shift || "Day"}
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-xs font-bold text-[#1F251A]">
                                 {Number(emp.salary || 0).toLocaleString()} EGP
                               </td>
-
                               <td className="px-6 py-4 text-center">
                                 <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
                                   {emp.email_confirmed_at ? "Active" : "Invited"}
@@ -11737,17 +11750,18 @@ export default function AdminPage() {
                             <option value="Other">Other</option>
                           </select>
                         </div>
+
                         <div>
                           <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Shift</label>
-                          <select
+                          <input
+                            type="text"
+                            placeholder="e.g. 10 PM to 9 AM"
                             value={newEmployeeShift}
                             onChange={(e) => setNewEmployeeShift(e.target.value)}
-                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
-                          >
-                            <option value="Day">Day</option>
-                            <option value="Night">Night</option>
-                          </select>
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
                         </div>
+
                         <div>
                           <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Salary (EGP)</label>
                           <input
@@ -13681,6 +13695,7 @@ export default function AdminPage() {
                           <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
                             <th className="px-6 py-4">Employee</th>
                             <th className="px-6 py-4">Date</th>
+                            <th className="px-6 py-4">Shift</th>
                             <th className="px-6 py-4">Check-in Time</th>
                             <th className="px-6 py-4">Check-out Time</th>
                             <th className="px-6 py-4">On Leave</th>
@@ -13690,9 +13705,9 @@ export default function AdminPage() {
                         </thead>
                         <tbody className="divide-y divide-[#414E36]/5">
                           {loadingAttendance ? (
-                            <tr><td colSpan={7} className="px-6 py-16 text-center text-sm text-[#5A6A51]">Loading attendance records…</td></tr>
+                            <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51]">Loading attendance records…</td></tr>
                           ) : attendanceList.length === 0 ? (
-                            <tr><td colSpan={7} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">No attendance records found. Records appear after employees log in each day.</td></tr>
+                            <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">No attendance records found. Records appear after employees log in each day.</td></tr>
                           ) : (
                             attendanceList.map((rec: any) => (
                               <tr key={rec.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
@@ -13701,6 +13716,15 @@ export default function AdminPage() {
                                   <div className="text-xs text-[#5A6A51]">{rec.employee_accounts?.role_name || "—"}</div>
                                 </td>
                                 <td className="px-6 py-4 text-xs text-[#1F251A]">{rec.date}</td>
+                                <td className="px-6 py-4 text-xs">
+                                  <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
+                                    (rec.employee_accounts?.shift || "").toLowerCase().includes("night") || (rec.employee_accounts?.shift || "").toLowerCase().includes("pm")
+                                      ? "bg-indigo-50 text-indigo-700 border border-indigo-100"
+                                      : "bg-amber-50 text-amber-700 border border-amber-100"
+                                  }`}>
+                                    {rec.employee_accounts?.shift || "Day"}
+                                  </span>
+                                </td>
                                 <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
                                   {rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
                                 </td>

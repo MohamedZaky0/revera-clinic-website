@@ -90,7 +90,7 @@ export async function GET(req: Request) {
   try {
     const { data: attendance, error } = await supabaseServer
       .from('hr_attendance')
-      .select('*, employee_accounts(id, name, email, department, role_name)')
+      .select('*, employee_accounts(id, name, email, department, role_name, shift)')
       .order('date', { ascending: false });
 
     if (error) throw error;
