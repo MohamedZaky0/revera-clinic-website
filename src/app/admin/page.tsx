@@ -615,6 +615,73 @@ export default function AdminPage() {
   const [newEmployeePhone, setNewEmployeePhone] = useState("");
   const [newEmployeeDepartment, setNewEmployeeDepartment] = useState("Reception");
   const [newEmployeeShift, setNewEmployeeShift] = useState("Day");
+  const [newEmployeeShiftStart, setNewEmployeeShiftStart] = useState("09:00");
+  const [newEmployeeShiftEnd, setNewEmployeeShiftEnd] = useState("17:00");
+
+  const parseTime12Hour = (time12: string): string => {
+    if (!time12) return "09:00";
+    const clean = time12.trim().toUpperCase();
+    const match = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+    if (!match) return "09:00";
+    let [_, hoursStr, minutesStr, ampm] = match;
+    let hours = parseInt(hoursStr, 10);
+    if (ampm === "PM" && hours < 12) hours += 12;
+    if (ampm === "AM" && hours === 12) hours = 0;
+    const hoursFormatted = hours < 10 ? '0' + hours : hours;
+    return `${hoursFormatted}:${minutesStr}`;
+  };
+
+  const parseShiftString = (shiftStr: string): { start: string; end: string } => {
+    if (!shiftStr || shiftStr === "Day" || shiftStr === "Night") {
+      if (shiftStr === "Night") {
+        return { start: "20:00", end: "08:00" };
+      }
+      return { start: "09:00", end: "17:00" };
+    }
+    const parts = shiftStr.split(/\s+to\s+/i);
+    if (parts.length === 2) {
+      return {
+        start: parseTime12Hour(parts[0]),
+        end: parseTime12Hour(parts[1])
+      };
+    }
+    return { start: "09:00", end: "17:00" };
+  };
+
+  const formatTime12Hour = (time24: string): string => {
+    if (!time24) return "12:00 AM";
+    const [hoursStr, minutesStr] = time24.split(":");
+    let hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+    if (isNaN(hours) || isNaN(minutes)) return "12:00 AM";
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const minutesFormatted = minutes < 10 ? '0' + minutes : minutes;
+    const hoursFormatted = hours < 10 ? '0' + hours : hours;
+    return `${hoursFormatted}:${minutesFormatted} ${ampm}`;
+  };
+
+  const updateShiftState = (shiftStr: string) => {
+    setNewEmployeeShift(shiftStr);
+    const parsed = parseShiftString(shiftStr);
+    setNewEmployeeShiftStart(parsed.start);
+    setNewEmployeeShiftEnd(parsed.end);
+  };
+
+  const handleShiftStartChange = (val: string) => {
+    setNewEmployeeShiftStart(val);
+    const formattedStart = formatTime12Hour(val);
+    const formattedEnd = formatTime12Hour(newEmployeeShiftEnd);
+    setNewEmployeeShift(`${formattedStart} to ${formattedEnd}`);
+  };
+
+  const handleShiftEndChange = (val: string) => {
+    setNewEmployeeShiftEnd(val);
+    const formattedStart = formatTime12Hour(newEmployeeShiftStart);
+    const formattedEnd = formatTime12Hour(val);
+    setNewEmployeeShift(`${formattedStart} to ${formattedEnd}`);
+  };
   const [newEmployeeSalary, setNewEmployeeSalary] = useState("0");
   const [newEmployeeNationalId, setNewEmployeeNationalId] = useState("");
   const [newEmployeeNationalIdFront, setNewEmployeeNationalIdFront] = useState("");
@@ -11345,7 +11412,7 @@ export default function AdminPage() {
                     setNewEmployeeRole("");
                     setNewEmployeePhone("");
                     setNewEmployeeDepartment("Reception");
-                    setNewEmployeeShift("Day");
+                    updateShiftState("Day");
                     setNewEmployeeSalary("0");
                     setNewEmployeeNationalId("");
                     setNewEmployeeNationalIdFront("");
@@ -11524,7 +11591,7 @@ export default function AdminPage() {
                                           setNewEmployeeRole(emp.role_name || "");
                                           setNewEmployeePhone(emp.phone || "");
                                           setNewEmployeeDepartment(emp.department || "Reception");
-                                          setNewEmployeeShift(emp.shift || "Day");
+                                          updateShiftState(emp.shift || "Day");
                                           setNewEmployeeSalary(String(emp.salary || 0));
                                           setNewEmployeeNationalId(emp.national_id || "");
                                           setNewEmployeeNationalIdFront(emp.national_id_front || "");
@@ -11753,13 +11820,33 @@ export default function AdminPage() {
 
                         <div>
                           <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Shift</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. 10 PM to 9 AM"
-                            value={newEmployeeShift}
-                            onChange={(e) => setNewEmployeeShift(e.target.value)}
-                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                          />
+                          <div className="flex items-center gap-1.5">
+                            <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-2.5 py-2 w-full focus-within:border-[#C4AE7C] transition-colors">
+                              <input
+                                type="time"
+                                value={newEmployeeShiftStart}
+                                onChange={(e) => handleShiftStartChange(e.target.value)}
+                                onClick={(e) => {
+                                  try { e.currentTarget.showPicker(); } catch {}
+                                }}
+                                className="bg-transparent text-xs text-[#1F251A] outline-none w-full pr-5 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                              />
+                              <Clock size={12} className="text-[#5A6A51] absolute right-2.5 pointer-events-none" />
+                            </div>
+                            <span className="text-[10px] font-semibold text-[#5A6A51] select-none">to</span>
+                            <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-2.5 py-2 w-full focus-within:border-[#C4AE7C] transition-colors">
+                              <input
+                                type="time"
+                                value={newEmployeeShiftEnd}
+                                onChange={(e) => handleShiftEndChange(e.target.value)}
+                                onClick={(e) => {
+                                  try { e.currentTarget.showPicker(); } catch {}
+                                }}
+                                className="bg-transparent text-xs text-[#1F251A] outline-none w-full pr-5 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                              />
+                              <Clock size={12} className="text-[#5A6A51] absolute right-2.5 pointer-events-none" />
+                            </div>
+                          </div>
                         </div>
 
                         <div>
@@ -12053,7 +12140,7 @@ export default function AdminPage() {
                               setNewEmployeeRole(viewingEmployee.role_name || "");
                               setNewEmployeePhone(viewingEmployee.phone || "");
                               setNewEmployeeDepartment(viewingEmployee.department || "Reception");
-                              setNewEmployeeShift(viewingEmployee.shift || "Day");
+                              updateShiftState(viewingEmployee.shift || "Day");
                               setNewEmployeeSalary(String(viewingEmployee.salary || 0));
                               setNewEmployeeNationalId(viewingEmployee.national_id || "");
                               setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
@@ -12241,7 +12328,7 @@ export default function AdminPage() {
                               setNewEmployeeRole(viewingEmployee.role_name || "");
                               setNewEmployeePhone(viewingEmployee.phone || "");
                               setNewEmployeeDepartment(viewingEmployee.department || "Reception");
-                              setNewEmployeeShift(viewingEmployee.shift || "Day");
+                              updateShiftState(viewingEmployee.shift || "Day");
                               setNewEmployeeSalary(String(viewingEmployee.salary || 0));
                               setNewEmployeeNationalId(viewingEmployee.national_id || "");
                               setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
