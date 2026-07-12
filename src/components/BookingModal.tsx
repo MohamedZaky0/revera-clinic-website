@@ -502,6 +502,10 @@ export function BookingModal() {
 
   function handlePayDeposit() {
     if (!createdReservation || !selectedService) return;
+    if (termsText.trim() !== "" && !acceptedTerms) {
+      alert(isRTL ? "يرجى الموافقة على الشروط والأحكام أولاً" : "Please agree to the Terms & Conditions first");
+      return;
+    }
     if (!instapayAddress.trim()) {
       alert(isRTL ? "يرجى إدخال عنوان إنستاباي الخاص بك" : "Please enter your InstaPay address");
       return;
@@ -1029,11 +1033,30 @@ Attached is my payment transaction receipt photo.`;
                       </span>
                     </div>
 
+                    {/* Terms & Conditions Gate on Payment Page */}
+                    {termsText.trim() && (
+                      <div className="mt-4 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 space-y-3 text-left">
+                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "الشروط والأحكام" : "Terms & Conditions"}</p>
+                        <div className="max-h-24 overflow-y-auto rounded-xl bg-white border border-[#414E36]/10 p-3 text-[11px] text-[#414E36] leading-relaxed whitespace-pre-wrap">{termsText}</div>
+                        <label className="flex items-start gap-2.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={acceptedTerms}
+                            onChange={(e) => setAcceptedTerms(e.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded accent-[#414E36] shrink-0"
+                          />
+                          <span className="text-[11px] font-semibold text-[#414E36] leading-relaxed">
+                            {isRTL ? "أوافق على الشروط والأحكام" : "I have read and agree to the Terms & Conditions"}
+                          </span>
+                        </label>
+                      </div>
+                    )}
+
                     {/* Green WhatsApp Action Button */}
                     <button
                       onClick={handlePayDeposit}
-                      disabled={isPaying}
-                      className="w-full justify-center mt-4 rounded-2xl py-3 px-4 text-xs font-bold text-white transition flex items-center justify-center gap-2"
+                      disabled={isPaying || (termsText.trim() !== "" && !acceptedTerms)}
+                      className="w-full justify-center mt-4 rounded-2xl py-3 px-4 text-xs font-bold text-white transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ backgroundColor: "#25D366" }}
                     >
                       {isPaying ? (
