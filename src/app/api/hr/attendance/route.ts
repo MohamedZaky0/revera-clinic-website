@@ -94,7 +94,28 @@ export async function GET(req: Request) {
       .order('date', { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json(attendance);
+
+    // Fetch approved leave requests to display leave status dynamically
+    const { data: leaves } = await supabaseServer
+      .from('hr_leave_requests')
+      .select('employee_id, start_date, end_date, leave_type')
+      .eq('status', 'Approved');
+
+    const approvedLeaves = leaves || [];
+
+    const enriched = (attendance || []).map((rec: any) => {
+      const match = approvedLeaves.find((l: any) => {
+        if (l.employee_id !== rec.employee_id) return false;
+        const rDate = rec.date; // YYYY-MM-DD
+        return rDate >= l.start_date && rDate <= l.end_date;
+      });
+      return {
+        ...rec,
+        leave_status: match ? `Yes (${match.leave_type})` : 'No'
+      };
+    });
+
+    return NextResponse.json(enriched);
   } catch (err: any) {
     console.error('GET /api/hr/attendance error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
@@ -234,6 +255,46 @@ export async function POST(req: Request) {
     return NextResponse.json(data);
   } catch (err: any) {
     console.error('POST /api/hr/attendance error:', err);
+    return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request) {
+  const authHeader = req.headers.get('Authorization') || '';
+  const token = authHeader.replace('Bearer ', '').trim();
+
+  if (!token) {
+    return NextResponse.json({ error: 'No authorization token provided' }, { status: 401 });
+  }
+
+  const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+  }
+
+  try {
+    const { employeeId } = await req.json();
+
+    if (!employeeId) {
+      return NextResponse.json({ error: 'Missing required parameters.' }, { status: 400 });
+    }
+
+    const dateStr = new Date().toISOString().split('T')[0];
+
+    const { data, error } = await supabaseServer
+      .from('hr_attendance')
+      .update({
+        check_out_time: new Date().toISOString()
+      })
+      .eq('employee_id', employeeId)
+      .eq('date', dateStr)
+      .select()
+      .maybeSingle();
+
+    if (error) throw error;
+    return NextResponse.json(data || { success: true });
+  } catch (err: any) {
+    console.error('PATCH /api/hr/attendance error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
   }
 }

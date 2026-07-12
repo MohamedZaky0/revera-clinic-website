@@ -1160,8 +1160,10 @@ export default function AdminPage() {
         if (typeof window !== "undefined") {
           sessionStorage.removeItem("revera_admin_session_active");
         }
-        supabase.auth.signOut().then(() => {
-          alert("Your session has expired due to 1 hour of inactivity. Please log in again.");
+        triggerCheckout().finally(() => {
+          supabase.auth.signOut().then(() => {
+            alert("Your session has expired due to 1 hour of inactivity. Please log in again.");
+          });
         });
       }
     }, 10000);
@@ -1429,6 +1431,24 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error("Error loading missing alerts:", err);
+    }
+  }
+
+  async function triggerCheckout() {
+    if (session?.access_token && adminDbId && adminRole && adminRole !== 'superadmin' && adminRole !== 'admin') {
+      try {
+        console.log("Logging attendance check-out for user:", adminDbId);
+        await fetch('/api/hr/attendance', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ employeeId: adminDbId })
+        });
+      } catch (err) {
+        console.error("Error during attendance check-out:", err);
+      }
     }
   }
 
@@ -4801,6 +4821,7 @@ export default function AdminPage() {
                   onClick={async () => {
                     if (item.label === "Logout") {
                       if (supabase) {
+                        await triggerCheckout();
                         await supabase.auth.signOut();
                       }
                     } else {
@@ -13661,15 +13682,17 @@ export default function AdminPage() {
                             <th className="px-6 py-4">Employee</th>
                             <th className="px-6 py-4">Date</th>
                             <th className="px-6 py-4">Check-in Time</th>
+                            <th className="px-6 py-4">Check-out Time</th>
+                            <th className="px-6 py-4">On Leave</th>
                             <th className="px-6 py-4">Location (GPS)</th>
                             <th className="px-6 py-4">Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#414E36]/5">
                           {loadingAttendance ? (
-                            <tr><td colSpan={5} className="px-6 py-16 text-center text-sm text-[#5A6A51]">Loading attendance records…</td></tr>
+                            <tr><td colSpan={7} className="px-6 py-16 text-center text-sm text-[#5A6A51]">Loading attendance records…</td></tr>
                           ) : attendanceList.length === 0 ? (
-                            <tr><td colSpan={5} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">No attendance records found. Records appear after employees log in each day.</td></tr>
+                            <tr><td colSpan={7} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">No attendance records found. Records appear after employees log in each day.</td></tr>
                           ) : (
                             attendanceList.map((rec: any) => (
                               <tr key={rec.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
@@ -13680,6 +13703,18 @@ export default function AdminPage() {
                                 <td className="px-6 py-4 text-xs text-[#1F251A]">{rec.date}</td>
                                 <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
                                   {rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                                </td>
+                                <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
+                                  {rec.check_out_time ? new Date(rec.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                                </td>
+                                <td className="px-6 py-4 text-xs">
+                                  <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
+                                    rec.leave_status && rec.leave_status !== 'No'
+                                      ? 'bg-purple-50 text-purple-700 border border-purple-100'
+                                      : 'text-[#5A6A51]'
+                                  }`}>
+                                    {rec.leave_status || "No"}
+                                  </span>
                                 </td>
                                 <td className="px-6 py-4 text-xs text-[#5A6A51]">
                                   {rec.latitude && rec.longitude
