@@ -678,43 +678,51 @@ Attached is my payment transaction receipt photo.`;
         ) : (
           <>
             {/* Step progress */}
-            <div className="flex items-center justify-between mb-8">
-              {stepsList.map((label, i) => {
-                const stepNum = (i + 1) as Step;
-                const isActive = step === stepNum;
-                const isDone = step > stepNum;
-                return (
-                  <div key={i} className={`flex flex-1 flex-col items-center gap-1.5 ${isRTL ? "items-center" : ""}`}>
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors"
-                      style={{
-                        backgroundColor: isActive || isDone ? "var(--cr-primary)" : "var(--cr-secondary)",
-                        color: isActive || isDone ? "var(--cr-white)" : "var(--cr-accent)",
-                      }}
-                    >
-                      {isDone ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      ) : (
-                        stepNum
-                      )}
-                    </div>
-                    <span
-                      className="text-center text-xs leading-tight"
-                      style={{ color: isActive ? "var(--cr-primary)" : "var(--cr-accent)" }}
-                    >
-                      {label}
-                    </span>
-                    {i < stepsList.length - 1 && (
+            <div className="relative mb-8">
+              {/* Connecting line */}
+              <div 
+                className="absolute top-4 left-0 right-0 h-0.5 bg-[#414E36]/10 -translate-y-1/2 z-0" 
+                style={{
+                  left: `${100 / (stepsList.length * 2)}%`,
+                  right: `${100 / (stepsList.length * 2)}%`
+                }}
+              />
+              <div 
+                className="grid relative z-10"
+                style={{ gridTemplateColumns: `repeat(${stepsList.length}, minmax(0, 1fr))` }}
+              >
+                {stepsList.map((label, i) => {
+                  const stepNum = (i + 1) as Step;
+                  const isActive = step === stepNum;
+                  const isDone = step > stepNum;
+                  return (
+                    <div key={i} className="flex flex-col items-center gap-1.5">
                       <div
-                        className={`hidden sm:block h-px flex-1 absolute`}
-                        aria-hidden="true"
-                      />
-                    )}
-                  </div>
-                );
-              })}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors border-2"
+                        style={{
+                          backgroundColor: isActive || isDone ? "var(--cr-primary)" : "#ffffff",
+                          color: isActive || isDone ? "#ffffff" : "var(--cr-accent)",
+                          borderColor: isActive || isDone ? "var(--cr-primary)" : "var(--cr-secondary)"
+                        }}
+                      >
+                        {isDone ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        ) : (
+                          stepNum
+                        )}
+                      </div>
+                      <span
+                        className="text-center text-[11px] leading-tight font-semibold px-1"
+                        style={{ color: isActive ? "var(--cr-primary)" : "var(--cr-accent)" }}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
 
@@ -1020,7 +1028,7 @@ Attached is my payment transaction receipt photo.`;
                 <input className="cr-input mb-4" value={phone} onChange={(e)=>setPhone(e.target.value)} />
 
                 {/* Terms & Conditions Gate */}
-                {termsText.trim() && (
+                {termsText.trim() && depositPercentage === 0 && (
                   <div className="mb-4 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 space-y-3">
                     <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "الشروط والأحكام" : "Terms & Conditions"}</p>
                     <div className="max-h-32 overflow-y-auto rounded-xl bg-white border border-[#414E36]/10 p-3 text-[11px] text-[#414E36] leading-relaxed whitespace-pre-wrap">{termsText}</div>
@@ -1040,10 +1048,13 @@ Attached is my payment transaction receipt photo.`;
 
                 <button
                   onClick={handleConfirm}
-                  disabled={termsText.trim() !== "" && !acceptedTerms}
+                  disabled={depositPercentage === 0 && termsText.trim() !== "" && !acceptedTerms}
                   className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {t.booking.confirmBtn}
+                  {depositPercentage > 0 
+                    ? (isRTL ? "الذهاب للدفع" : "Proceed to Payment")
+                    : t.booking.confirmBtn
+                  }
                 </button>
               </div>
             )}
