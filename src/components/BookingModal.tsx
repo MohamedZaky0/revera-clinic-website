@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cachedFetch, prefetchUrl } from "@/lib/fetchCache";
 import { Category, ServiceItem, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
@@ -13,7 +13,7 @@ import {
   LocalCategory 
 } from "@/lib/serviceStore";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 function getNext30Days(): Date[] {
   const days: Date[] = [];
@@ -93,7 +93,6 @@ export function BookingModal() {
   const [reservationsForDate, setReservationsForDate] = useState<any[]>([]);
   const [depositPercentage, setDepositPercentage] = useState(20);
   const [isPaying, setIsPaying] = useState(false);
-  const [showPaymentGate, setShowPaymentGate] = useState(false);
   const [createdReservation, setCreatedReservation] = useState<any>(null);
   const [instapayAddress, setInstapayAddress] = useState("");
   const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
@@ -103,6 +102,19 @@ export function BookingModal() {
 
   const [branches, setBranches] = useState<any[]>([]);
   const [branchId, setBranchId] = useState<string | null>(null);
+
+  const stepsList = useMemo(() => {
+    const isPaymentRequired = depositPercentage > 0;
+    if (isPaymentRequired) {
+      return isRTL 
+        ? ["اختر الخدمة", "اختر التاريخ", "اختر الوقت", "تأكيد", "الدفع"]
+        : ["Select Service", "Select Date", "Select Time", "Confirm", "Payment"];
+    } else {
+      return isRTL
+        ? ["اختر الخدمة", "اختر التاريخ", "اختر الوقت", "تأكيد"]
+        : ["Select Service", "Select Date", "Select Time", "Confirm"];
+    }
+  }, [depositPercentage, isRTL]);
 
   const days = getNext30Days();
 
@@ -122,7 +134,6 @@ export function BookingModal() {
     setSessionType("in_person");
     setConfirmed(false);
     setIsPaying(false);
-    setShowPaymentGate(false);
     setCreatedReservation(null);
     setInstapayAddress("");
     setCopiedAddress(false);
@@ -328,6 +339,10 @@ export function BookingModal() {
     if (step === 2) setStep(1);
     if (step === 3) setStep(2);
     if (step === 4) setStep(3);
+    if (step === 5) {
+      setStep(4);
+      setCreatedReservation(null);
+    }
   }
 
   const getDayOperatingHours = useCallback((date: Date) => {
@@ -492,7 +507,7 @@ export function BookingModal() {
       .then((data) => {
         if (data && data.status === 'pending_deposit') {
           setCreatedReservation(data);
-          setShowPaymentGate(true);
+          setStep(5);
         } else {
           setConfirmed(true);
         }
@@ -555,7 +570,6 @@ Attached is my payment transaction receipt photo.`;
         })
         .then(() => {
           setIsPaying(false);
-          setShowPaymentGate(false);
           setConfirmed(true);
           window.open(whatsappLink, '_blank');
         })
@@ -665,7 +679,7 @@ Attached is my payment transaction receipt photo.`;
           <>
             {/* Step progress */}
             <div className="flex items-center justify-between mb-8">
-              {t.booking.steps.map((label, i) => {
+              {stepsList.map((label, i) => {
                 const stepNum = (i + 1) as Step;
                 const isActive = step === stepNum;
                 const isDone = step > stepNum;
@@ -692,7 +706,7 @@ Attached is my payment transaction receipt photo.`;
                     >
                       {label}
                     </span>
-                    {i < t.booking.steps.length - 1 && (
+                    {i < stepsList.length - 1 && (
                       <div
                         className={`hidden sm:block h-px flex-1 absolute`}
                         aria-hidden="true"
@@ -916,296 +930,294 @@ Attached is my payment transaction receipt photo.`;
                 </div>
               </div>
             )}
-
             {/* Step 4: Confirm */}
             {step === 4 && (
               <div>
-                {showPaymentGate ? (
-                  <div className="space-y-4">
-                    <p className="text-sm font-bold text-[#1F251A]">
-                      {isRTL ? "دفع عربون الحجز عبر إنستاباي" : "Reservation Deposit via InstaPay"}
+                {/* Summary */}
+                <div
+                  className="rounded-xl p-4 mb-5 text-sm flex flex-col gap-2"
+                  style={{ backgroundColor: "var(--cr-secondary)" }}
+                >
+                  {selectedService && (
+                    <p className="mb-0">
+                      <span className="font-semibold">{t.booking.labels.service}: </span>
+                      {isRTL ? selectedService.ar : selectedService.en}
                     </p>
-                    <p className="text-xs text-[#5A6A51] leading-relaxed">
-                      {isRTL 
-                        ? "لتأكيد حجزك، يرجى تحويل عربون الحجز المقدر بـ 20% عبر تطبيق إنستاباي، ثم أدخل اسم حسابك وأرسل صورة التحويل عبر الواتساب." 
-                        : "To secure your reservation, please pay the required deposit (default 20%) via InstaPay, then input your account name below and send the transaction confirmation screenshot on WhatsApp."
-                      }
+                  )}
+                  {branchId && (
+                    <p className="mb-0">
+                      <span className="font-semibold">{isRTL ? "الفرع" : "Branch"}: </span>
+                      {(() => {
+                        const b = branches.find(x => x.id === branchId);
+                        return b ? (isRTL ? b.name_ar : b.name_en) : "";
+                      })()}
                     </p>
-
-                    {/* Deposit Awareness Banner */}
-                    {depositPercentage > 0 && (
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-3.5 flex items-start gap-2.5 text-xs text-amber-800 leading-relaxed font-medium">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-amber-700">
-                          <circle cx="12" cy="12" r="10" />
-                          <line x1="12" y1="8" x2="12" y2="12" />
-                          <line x1="12" y1="16" x2="12.01" y2="16" />
-                        </svg>
-                        <div>
-                          <p className="font-bold mb-0.5 text-amber-900">
-                            {isRTL ? "تنبيه هام حول تأكيد الحجز" : "Important Booking Confirmation Notice"}
-                          </p>
-                          <p className="opacity-90">
-                            {isRTL 
-                              ? `يرجى العلم أن حجزك لا يعتبر مؤكداً حتى يتم سداد عربون الحجز (20%). سيبقى الحجز معلقاً لحين إتمام التحويل وإرسال الصورة.` 
-                              : `Please note that your booking is not confirmed until the required 20% reservation deposit is paid. It will remain pending deposit until the transfer is made and receipt screenshot is received.`
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Price Breakdown */}
-                    <div className="rounded-2xl border border-[#C4AE7C]/20 bg-[#FBFBF9] p-4 text-xs space-y-2 text-[#1F251A]">
-                      <div className="flex justify-between">
-                        <span className="opacity-70">{isRTL ? "سعر الخدمة الإجمالي:" : "Service Price:"}</span>
-                        <span className="font-semibold">EGP {selectedService?.price || 0}</span>
-                      </div>
-                      <div className="flex justify-between text-purple-700 font-bold">
-                        <span>{isRTL ? `عربون الحجز المطلـوب (${depositPercentage}%):` : `Required Deposit (${depositPercentage}%):`}</span>
-                        <span>EGP {Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
-                      </div>
-                      <div className="border-t border-dashed border-[#C4AE7C]/20 pt-2 flex justify-between font-bold">
-                        <span>{isRTL ? "المبلغ المتبقي بالعيادة:" : "Remaining Balance (Pay at Clinic):"}</span>
-                        <span>EGP {(selectedService?.price || 0) - Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
-                      </div>
+                  )}
+                  {selectedDate && (
+                    <p className="mb-0">
+                      <span className="font-semibold">{t.booking.labels.date}: </span>
+                      {formatDate(selectedDate)}
+                    </p>
+                  )}
+                  {selectedTime && (
+                    <p className="mb-0">
+                      <span className="font-semibold">{t.booking.labels.time}: </span>
+                      {selectedTime}
+                    </p>
+                  )}
+                  {selectedDoctor && (
+                    <p className="mb-0">
+                      <span className="font-semibold">{isRTL ? "الطبيب" : "Doctor"}: </span>
+                      {selectedDoctor}
+                    </p>
+                  )}
+                  {selectedService && depositPercentage > 0 && (
+                    <div className="mt-2 border-t border-[#414E36]/10 pt-2 text-xs space-y-1 text-[#414E36] font-medium">
+                      <p>
+                        <span className="font-semibold text-purple-800">{isRTL ? "عربون الحجز المطلـوب:" : "Required Deposit:"} </span>
+                        EGP {Math.round((selectedService.price || 0) * (depositPercentage / 100))} ({depositPercentage}%)
+                      </p>
                     </div>
+                  )}
+                </div>
 
-                    {/* Clinic InstaPay Info Box */}
-                    <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "عنوان إنستاباي الخاص بالعيادة" : "CLINIC INSTAPAY ADDRESS"}</p>
-                          <p className="text-xs font-bold text-[#1F251A] mt-0.5">name@instapay</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText("name@instapay");
-                            setCopiedAddress(true);
-                            setTimeout(() => setCopiedAddress(false), 2000);
-                          }}
-                          className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
-                        >
-                          {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
-                        </button>
-                      </div>
+                {/* Notes */}
+                <label className="block mb-1 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
+                  {t.booking.notes}
+                </label>
+                <textarea
+                  className="cr-input resize-none mb-3"
+                  rows={3}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={t.booking.notes}
+                />
 
-                      <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط تحويل إنستاباي" : "INSTAPAY QUICK LINK"}</span>
-                        <a 
-                          href="https://www.instapay.eg" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-xs font-bold text-[#C4AE7C] hover:underline"
-                        >
-                          {isRTL ? "فتح تطبيق إنستاباي" : "Open InstaPay"} &rarr;
-                        </a>
-                      </div>
+                {/* Doctor Selection (Optional) */}
+                <label className="block mb-1 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
+                  {isRTL ? "الطبيب المعالج (اختياري)" : "Select Doctor (Optional)"}
+                </label>
+                <select
+                  className="cr-input mb-3 bg-white text-[#1F251A] font-medium"
+                  value={selectedDoctor}
+                  onChange={(e) => setSelectedDoctor(e.target.value)}
+                >
+                  <option value="">
+                    {isRTL ? "أي طبيب / لا يوجد تفضيل" : "Any Doctor / No Preference"}
+                  </option>
+                  {getAvailableDoctors().map((doc: any) => (
+                    <option key={doc.id} value={doc.name}>
+                      {doc.name}
+                    </option>
+                  ))}
+                </select>
 
-                      {/* InstaPay QR Code */}
-                      <div className="pt-2 text-center">
-                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{isRTL ? "امسح رمز الاستجابة السريعة (QR)" : "SCAN QR CODE TO PAY"}</p>
-                        <div className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm">
-                          <img 
-                            src="/images/instapay_qr.png" 
-                            alt="InstaPay QR Code" 
-                            className="w-32 h-32 object-contain"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                <label className="block mb-1 text-xs font-semibold">Name</label>
+                <input className="cr-input mb-2" value={name} onChange={(e)=>setName(e.target.value)} />
+                <label className="block mb-1 text-xs font-semibold">Email</label>
+                <input className="cr-input mb-2" value={email} onChange={(e)=>setEmail(e.target.value)} />
+                <label className="block mb-1 text-xs font-semibold">Phone</label>
+                <input className="cr-input mb-4" value={phone} onChange={(e)=>setPhone(e.target.value)} />
 
-                    {/* Patient's InstaPay Account Name Input */}
-                    <div className="space-y-1.5">
-                      <label className="block text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider">
-                        {isRTL ? "عنوان إنستاباي الخاص بك (الذي قمت بالتحويل منه)" : "Your InstaPay Address (Sent From)"}
-                      </label>
-                      <input 
-                        type="text" 
-                        placeholder="name@instapay" 
-                        value={instapayAddress}
-                        onChange={(e) => setInstapayAddress(e.target.value)}
-                        disabled={isPaying}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36] font-medium"
+                {/* Terms & Conditions Gate */}
+                {termsText.trim() && (
+                  <div className="mb-4 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 space-y-3">
+                    <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "الشروط والأحكام" : "Terms & Conditions"}</p>
+                    <div className="max-h-32 overflow-y-auto rounded-xl bg-white border border-[#414E36]/10 p-3 text-[11px] text-[#414E36] leading-relaxed whitespace-pre-wrap">{termsText}</div>
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded accent-[#414E36] shrink-0"
                       />
-                      <span className="text-[10px] text-[#8A9A81] block">
-                        {isRTL ? "مثال: name@instapay أو رقم الهاتف المسجل بإنستاباي" : "Example: name@instapay or phone number registered on InstaPay"}
+                      <span className="text-[11px] font-semibold text-[#414E36] leading-relaxed">
+                        {isRTL ? "أوافق على الشروط والأحكام" : "I have read and agree to the Terms & Conditions"}
                       </span>
+                    </label>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleConfirm}
+                  disabled={termsText.trim() !== "" && !acceptedTerms}
+                  className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {t.booking.confirmBtn}
+                </button>
+              </div>
+            )}
+
+            {/* Step 5: Payment */}
+            {step === 5 && (
+              <div className="space-y-4">
+                <p className="text-sm font-bold text-[#1F251A]">
+                  {isRTL ? "دفع عربون الحجز عبر إنستاباي" : "Reservation Deposit via InstaPay"}
+                </p>
+                <p className="text-xs text-[#5A6A51] leading-relaxed">
+                  {isRTL 
+                    ? "لتأكيد حجزك، يرجى تحويل عربون الحجز المقدر بـ 20% عبر تطبيق إنستاباي، ثم أدخل اسم حسابك وأرسل صورة التحويل عبر الواتساب." 
+                    : "To secure your reservation, please pay the required deposit (default 20%) via InstaPay, then input your account name below and send the transaction confirmation screenshot on WhatsApp."
+                  }
+                </p>
+
+                {/* Deposit Awareness Banner */}
+                {depositPercentage > 0 && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-3.5 flex items-start gap-2.5 text-xs text-amber-800 leading-relaxed font-medium">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-amber-700">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <div>
+                      <p className="font-bold mb-0.5 text-amber-900">
+                        {isRTL ? "تنبيه هام حول تأكيد الحجز" : "Important Booking Confirmation Notice"}
+                      </p>
+                      <p className="opacity-90">
+                        {isRTL 
+                          ? `يرجى العلم أن حجزك لا يعتبر مؤكداً حتى يتم سداد عربون الحجز (20%). سيبقى الحجز معلقاً لحين إتمام التحويل وإرسال الصورة.` 
+                          : `Please note that your booking is not confirmed until the required 20% reservation deposit is paid. It will remain pending deposit until the transfer is made and receipt screenshot is received.`
+                        }
+                      </p>
                     </div>
+                  </div>
+                )}
 
-                    {/* Terms & Conditions Gate on Payment Page */}
-                    {termsText.trim() && (
-                      <div className="mt-4 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 space-y-3 text-left">
-                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "الشروط والأحكام" : "Terms & Conditions"}</p>
-                        <div className="max-h-24 overflow-y-auto rounded-xl bg-white border border-[#414E36]/10 p-3 text-[11px] text-[#414E36] leading-relaxed whitespace-pre-wrap">{termsText}</div>
-                        <label className="flex items-start gap-2.5 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={acceptedTerms}
-                            onChange={(e) => setAcceptedTerms(e.target.checked)}
-                            className="mt-0.5 h-4 w-4 rounded accent-[#414E36] shrink-0"
-                          />
-                          <span className="text-[11px] font-semibold text-[#414E36] leading-relaxed">
-                            {isRTL ? "أوافق على الشروط والأحكام" : "I have read and agree to the Terms & Conditions"}
-                          </span>
-                        </label>
-                      </div>
-                    )}
+                {/* Price Breakdown */}
+                <div className="rounded-2xl border border-[#C4AE7C]/20 bg-[#FBFBF9] p-4 text-xs space-y-2 text-[#1F251A]">
+                  <div className="flex justify-between">
+                    <span className="opacity-70">{isRTL ? "سعر الخدمة الإجمالي:" : "Service Price:"}</span>
+                    <span className="font-semibold">EGP {selectedService?.price || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-purple-700 font-bold">
+                    <span>{isRTL ? `عربون الحجز المطلـوب (${depositPercentage}%):` : `Required Deposit (${depositPercentage}%):`}</span>
+                    <span>EGP {Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
+                  </div>
+                  <div className="border-t border-dashed border-[#C4AE7C]/20 pt-2 flex justify-between font-bold">
+                    <span>{isRTL ? "المبلغ المتبقي بالعيادة:" : "Remaining Balance (Pay at Clinic):"}</span>
+                    <span>EGP {(selectedService?.price || 0) - Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
+                  </div>
+                </div>
 
-                    {/* Green WhatsApp Action Button */}
+                {/* Clinic InstaPay Info Box */}
+                <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "عنوان إنستاباي الخاص بالعيادة" : "CLINIC INSTAPAY ADDRESS"}</p>
+                      <p className="text-xs font-bold text-[#1F251A] mt-0.5">name@instapay</p>
+                    </div>
                     <button
-                      onClick={handlePayDeposit}
-                      disabled={isPaying || (termsText.trim() !== "" && !acceptedTerms)}
-                      className="w-full justify-center mt-4 rounded-2xl py-3 px-4 text-xs font-bold text-white transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: "#25D366" }}
-                    >
-                      {isPaying ? (
-                        <>
-                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          {isRTL ? "جاري الحفظ والتحويل..." : "Saving & Redirecting..."}
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-4.322c1.7.925 3.328 1.459 5.166 1.46 5.485.001 9.948-4.462 9.951-9.95.002-2.658-1.031-5.158-2.906-7.037C17.228 2.275 14.73 1.24 12.072 1.24a9.957 9.957 0 0 0-9.951 9.956c-.001 1.93.513 3.567 1.492 5.093l-.999 3.65 3.743-.981zM17.476 14.398c-.329-.165-1.947-.961-2.245-1.07-.3-.109-.518-.165-.736.165-.218.329-.844 1.07-1.034 1.289-.19.217-.38.244-.709.079a8.932 8.932 0 0 1-2.736-1.688 9.842 9.842 0 0 1-1.893-2.358c-.19-.329-.02-.507.145-.671.148-.148.33-.382.495-.572.164-.19.219-.328.328-.547.11-.219.055-.41-.027-.574-.082-.164-.736-1.776-1.009-2.433-.266-.64-.539-.553-.736-.563-.19-.01-.409-.012-.627-.012s-.573.082-.873.409c-.3.329-1.145 1.12-1.145 2.732s1.173 3.17 1.336 3.389c.164.22 2.308 3.525 5.59 4.945.78.337 1.39.539 1.86.688.784.248 1.498.213 2.062.128.629-.094 1.947-.796 2.219-1.564.272-.767.272-1.424.19-1.564-.081-.138-.3-.22-.629-.385z"/>
-                          </svg>
-                          {isRTL ? "تأكيد وإرسال صورة التحويل" : "Confirm & Send Screenshot"}
-                        </>
-                      )}
-                    </button>
-
-                    <button
+                      type="button"
                       onClick={() => {
-                        setShowPaymentGate(false);
-                        setCreatedReservation(null);
+                        navigator.clipboard.writeText("name@instapay");
+                        setCopiedAddress(true);
+                        setTimeout(() => setCopiedAddress(false), 2000);
                       }}
-                      disabled={isPaying}
-                      className="btn-outline w-full justify-center text-xs mt-1"
+                      className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
                     >
-                      {isRTL ? "إلغاء والعودة" : "Cancel & Return"}
+                      {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
                     </button>
                   </div>
-                ) : (
-                  <>
-                    {/* Summary */}
-                    <div
-                      className="rounded-xl p-4 mb-5 text-sm flex flex-col gap-2"
-                      style={{ backgroundColor: "var(--cr-secondary)" }}
+
+                  <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط تحويل إنستاباي" : "INSTAPAY QUICK LINK"}</span>
+                    <a 
+                      href="https://www.instapay.eg" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs font-bold text-[#C4AE7C] hover:underline"
                     >
-                      {selectedService && (
-                        <p className="mb-0">
-                          <span className="font-semibold">{t.booking.labels.service}: </span>
-                          {isRTL ? selectedService.ar : selectedService.en}
-                        </p>
-                      )}
-                      {branchId && (
-                        <p className="mb-0">
-                          <span className="font-semibold">{isRTL ? "الفرع" : "Branch"}: </span>
-                          {(() => {
-                            const b = branches.find(x => x.id === branchId);
-                            return b ? (isRTL ? b.name_ar : b.name_en) : "";
-                          })()}
-                        </p>
-                      )}
-                      {selectedDate && (
-                        <p className="mb-0">
-                          <span className="font-semibold">{t.booking.labels.date}: </span>
-                          {formatDate(selectedDate)}
-                        </p>
-                      )}
-                      {selectedTime && (
-                        <p className="mb-0">
-                          <span className="font-semibold">{t.booking.labels.time}: </span>
-                          {selectedTime}
-                        </p>
-                      )}
-                      {selectedDoctor && (
-                        <p className="mb-0">
-                          <span className="font-semibold">{isRTL ? "الطبيب" : "Doctor"}: </span>
-                          {selectedDoctor}
-                        </p>
-                      )}
-                      {selectedService && depositPercentage > 0 && (
-                        <div className="mt-2 border-t border-[#414E36]/10 pt-2 text-xs space-y-1 text-[#414E36] font-medium">
-                          <p>
-                            <span className="font-semibold text-purple-800">{isRTL ? "عربون الحجز المطلـوب:" : "Required Deposit:"} </span>
-                            EGP {Math.round((selectedService.price || 0) * (depositPercentage / 100))} ({depositPercentage}%)
-                          </p>
-                        </div>
-                      )}
+                      {isRTL ? "فتح تطبيق إنستاباي" : "Open InstaPay"} &rarr;
+                    </a>
+                  </div>
+
+                  {/* InstaPay QR Code */}
+                  <div className="pt-2 text-center">
+                    <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{isRTL ? "امسح رمز الاستجابة السريعة (QR)" : "SCAN QR CODE TO PAY"}</p>
+                    <div className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm">
+                      <img 
+                        src="/images/instapay_qr.png" 
+                        alt="InstaPay QR Code" 
+                        className="w-32 h-32 object-contain"
+                      />
                     </div>
+                  </div>
+                </div>
 
-                    {/* Notes */}
-                    <label className="block mb-1 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
-                      {t.booking.notes}
+                {/* Patient's InstaPay Account Name Input */}
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider">
+                    {isRTL ? "عنوان إنستاباي الخاص بك (الذي قمت بالتحويل منه)" : "Your InstaPay Address (Sent From)"}
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="name@instapay" 
+                    value={instapayAddress}
+                    onChange={(e) => setInstapayAddress(e.target.value)}
+                    disabled={isPaying}
+                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36] font-medium"
+                  />
+                  <span className="text-[10px] text-[#8A9A81] block">
+                    {isRTL ? "مثال: name@instapay أو رقم الهاتف المسجل بإنستاباي" : "Example: name@instapay or phone number registered on InstaPay"}
+                  </span>
+                </div>
+
+                {/* Terms & Conditions Gate on Payment Page */}
+                {termsText.trim() && (
+                  <div className="mt-4 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 space-y-3 text-left">
+                    <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "الشروط والأحكام" : "Terms & Conditions"}</p>
+                    <div className="max-h-24 overflow-y-auto rounded-xl bg-white border border-[#414E36]/10 p-3 text-[11px] text-[#414E36] leading-relaxed whitespace-pre-wrap">{termsText}</div>
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded accent-[#414E36] shrink-0"
+                      />
+                      <span className="text-[11px] font-semibold text-[#414E36] leading-relaxed">
+                        {isRTL ? "أوافق على الشروط والأحكام" : "I have read and agree to the Terms & Conditions"}
+                      </span>
                     </label>
-                    <textarea
-                      className="cr-input resize-none mb-3"
-                      rows={3}
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder={t.booking.notes}
-                    />
-
-                    {/* Doctor Selection (Optional) */}
-                    <label className="block mb-1 text-xs font-semibold" style={{ color: "var(--cr-accent)" }}>
-                      {isRTL ? "الطبيب المعالج (اختياري)" : "Select Doctor (Optional)"}
-                    </label>
-                    <select
-                      className="cr-input mb-3 bg-white text-[#1F251A] font-medium"
-                      value={selectedDoctor}
-                      onChange={(e) => setSelectedDoctor(e.target.value)}
-                    >
-                      <option value="">
-                        {isRTL ? "أي طبيب / لا يوجد تفضيل" : "Any Doctor / No Preference"}
-                      </option>
-                      {getAvailableDoctors().map((doc: any) => (
-                        <option key={doc.id} value={doc.name}>
-                          {doc.name}
-                        </option>
-                      ))}
-                    </select>
-
-                    <label className="block mb-1 text-xs font-semibold">Name</label>
-                    <input className="cr-input mb-2" value={name} onChange={(e)=>setName(e.target.value)} />
-                    <label className="block mb-1 text-xs font-semibold">Email</label>
-                    <input className="cr-input mb-2" value={email} onChange={(e)=>setEmail(e.target.value)} />
-                    <label className="block mb-1 text-xs font-semibold">Phone</label>
-                    <input className="cr-input mb-4" value={phone} onChange={(e)=>setPhone(e.target.value)} />
-
-                    {/* Terms & Conditions Gate */}
-                    {termsText.trim() && (
-                      <div className="mb-4 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 space-y-3">
-                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "الشروط والأحكام" : "Terms & Conditions"}</p>
-                        <div className="max-h-32 overflow-y-auto rounded-xl bg-white border border-[#414E36]/10 p-3 text-[11px] text-[#414E36] leading-relaxed whitespace-pre-wrap">{termsText}</div>
-                        <label className="flex items-start gap-2.5 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={acceptedTerms}
-                            onChange={(e) => setAcceptedTerms(e.target.checked)}
-                            className="mt-0.5 h-4 w-4 rounded accent-[#414E36] shrink-0"
-                          />
-                          <span className="text-[11px] font-semibold text-[#414E36] leading-relaxed">
-                            {isRTL ? "أوافق على الشروط والأحكام" : "I have read and agree to the Terms & Conditions"}
-                          </span>
-                        </label>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={handleConfirm}
-                      disabled={termsText.trim() !== "" && !acceptedTerms}
-                      className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {t.booking.confirmBtn}
-                    </button>
-                  </>
+                  </div>
                 )}
+
+                {/* Green WhatsApp Action Button */}
+                <button
+                  onClick={handlePayDeposit}
+                  disabled={isPaying || (termsText.trim() !== "" && !acceptedTerms)}
+                  className="w-full justify-center mt-4 rounded-2xl py-3 px-4 text-xs font-bold text-white transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: "#25D366" }}
+                >
+                  {isPaying ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      {isRTL ? "جاري الحفظ والتحويل..." : "Saving & Redirecting..."}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-4.322c1.7.925 3.328 1.459 5.166 1.46 5.485.001 9.948-4.462 9.951-9.95.002-2.658-1.031-5.158-2.906-7.037C17.228 2.275 14.73 1.24 12.072 1.24a9.957 9.957 0 0 0-9.951 9.956c-.001 1.93.513 3.567 1.492 5.093l-.999 3.65 3.743-.981zM17.476 14.398c-.329-.165-1.947-.961-2.245-1.07-.3-.109-.518-.165-.736.165-.218.329-.844 1.07-1.034 1.289-.19.217-.38.244-.709.079a8.932 8.932 0 0 1-2.736-1.688 9.842 9.842 0 0 1-1.893-2.358c-.19-.329-.02-.507.145-.671.148-.148.33-.382.495-.572.164-.19.219-.328.328-.547.11-.219.055-.41-.027-.574-.082-.164-.736-1.776-1.009-2.433-.266-.64-.539-.553-.736-.563-.19-.01-.409-.012-.627-.012s-.573.082-.873.409c-.3.329-1.145 1.12-1.145 2.732s1.173 3.17 1.336 3.389c.164.22 2.308 3.525 5.59 4.945.78.337 1.39.539 1.86.688.784.248 1.498.213 2.062.128.629-.094 1.947-.796 2.219-1.564.272-.767.272-1.424.19-1.564-.081-.138-.3-.22-.629-.385z" />
+                      </svg>
+                      {isRTL ? "تأكيد وإرسال صورة التحويل" : "Confirm & Send Screenshot"}
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    setStep(4);
+                    setCreatedReservation(null);
+                  }}
+                  disabled={isPaying}
+                  className="btn-outline w-full justify-center text-xs mt-1"
+                >
+                  {isRTL ? "إلغاء والعودة" : "Cancel & Return"}
+                </button>
               </div>
             )}
 
             {/* Navigation */}
-            {!showPaymentGate && (
+            {step < 5 && (
               <div
                 className={`flex mt-6 gap-3 ${
                   step === 1 ? "justify-end" : "justify-between"
@@ -1230,7 +1242,7 @@ Attached is my payment transaction receipt photo.`;
                   </button>
                 )}
               </div>
-            )}
+            ) }
           </>
         )}
       </div>
