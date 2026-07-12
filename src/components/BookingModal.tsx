@@ -714,7 +714,7 @@ Attached is my payment transaction receipt photo.`;
                         )}
                       </div>
                       <span
-                        className="text-center text-[11px] leading-tight font-semibold px-1"
+                        className="text-center text-[11px] leading-tight font-semibold px-1 whitespace-nowrap"
                         style={{ color: isActive ? "var(--cr-primary)" : "var(--cr-accent)" }}
                       >
                         {label}
