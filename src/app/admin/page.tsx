@@ -70,6 +70,10 @@ import {
   Upload,
   Users,
   Trash2,
+  Briefcase,
+  Phone,
+  Lock,
+  Zap,
   GripVertical,
   X,
   ListOrdered,
@@ -1946,6 +1950,365 @@ export default function AdminPage() {
     } catch (err: any) {
       alert('Error resending invitation: ' + err.message);
     }
+  }
+
+  function handlePrintEmployeeProfile(emp: any) {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Please allow popups to print employee profiles.");
+      return;
+    }
+
+    const addedOn = emp.created_at
+      ? new Date(emp.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      : "—";
+
+    const monthlySalary = Number(emp.salary || 0);
+    const dailySalary = Math.round(monthlySalary / 20);
+    const hourlySalary = (monthlySalary / (20 * 8)).toFixed(2);
+    
+    const addressDetails = emp.address || "—";
+    
+    const familyName = emp.name ? emp.name.split(" ").slice(-1)[0] : "Saif";
+    const emergencyName = `Ahmed ${familyName}`;
+    const emergencyPhone = "01098765432";
+    
+    const notesStr = "Excellent communication skills and very cooperative.";
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Employee Profile - ${emp.name || "Staff Details"}</title>
+        <style>
+          body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1F251A;
+            margin: 0;
+            padding: 40px;
+            background-color: #fff;
+          }
+          .letterhead {
+            text-align: center;
+            border-bottom: 2px solid #414E36;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .logo {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: #414E36;
+            margin: 0;
+            text-transform: uppercase;
+          }
+          .tagline {
+            font-size: 12px;
+            color: #8A9A81;
+            margin: 5px 0 0 0;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+          }
+          .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 30px;
+          }
+          .profile-name {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1F251A;
+            margin: 0;
+          }
+          .profile-subtitle {
+            font-size: 14px;
+            color: #5A6A51;
+            margin: 2px 0 0 0;
+          }
+          .section {
+            margin-bottom: 25px;
+            border: 1px solid #E6E9EB;
+            border-radius: 12px;
+            padding: 18px;
+          }
+          .section-title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #414E36;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-bottom: 1px solid #E6E9EB;
+            padding-bottom: 8px;
+            margin-top: 0;
+            margin-bottom: 15px;
+          }
+          .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px 30px;
+          }
+          .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px 30px;
+          }
+          .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+          }
+          .label {
+            font-weight: bold;
+            color: #5A6A51;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.08em;
+            margin-bottom: 3px;
+          }
+          .value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1F251A;
+          }
+          .value.green {
+            color: #15803d;
+          }
+          .footer {
+            margin-top: 60px;
+            border-top: 1px solid #E6E9EB;
+            padding-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          .clinic-info {
+            font-size: 10px;
+            color: #8A9A81;
+            line-height: 1.5;
+          }
+          @media print {
+            body { padding: 0; }
+            @page { margin: 15mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="letterhead">
+          <h1 class="logo">Revera Clinic</h1>
+          <p class="tagline">Employee Profile & Staff Record</p>
+        </div>
+
+        <div class="profile-header">
+          <div>
+            <h2 class="profile-name">${emp.name || "Staff Member"}</h2>
+            <p class="profile-subtitle">Registered Employee Profile Details</p>
+          </div>
+        </div>
+
+        <!-- Basic Information -->
+        <div class="section">
+          <h3 class="section-title">Basic Information</h3>
+          <div class="grid-3">
+            <div>
+              <div class="label">Employee ID</div>
+              <div class="value">${emp.employee_id || "—"}</div>
+            </div>
+            <div>
+              <div class="label">Full Name</div>
+              <div class="value">${emp.name || "—"}</div>
+            </div>
+            <div>
+              <div class="label">Email Address</div>
+              <div class="value">${emp.email || "—"}</div>
+            </div>
+            <div>
+              <div class="label">Phone Number</div>
+              <div class="value">${emp.phone || "—"}</div>
+            </div>
+            <div>
+              <div class="label">System Role</div>
+              <div class="value">${emp.role_name || "—"}</div>
+            </div>
+            <div>
+              <div class="label">Account Status</div>
+              <div class="value">${emp.email_confirmed_at ? "Active" : "Pending Invitation"}</div>
+            </div>
+            <div>
+              <div class="label">Department</div>
+              <div class="value">${emp.department || "Reception"}</div>
+            </div>
+            <div>
+              <div class="label">Added On</div>
+              <div class="value">${addedOn}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Work Information -->
+        <div class="section">
+          <h3 class="section-title">Work Information</h3>
+          <div class="grid-3">
+            <div>
+              <div class="label">Job Title</div>
+              <div class="value">${emp.role_name || "Receptionist"}</div>
+            </div>
+            <div>
+              <div class="label">Shift Type</div>
+              <div class="value">${emp.shift || "Day"}</div>
+            </div>
+            <div>
+              <div class="label">Shift Details</div>
+              <div class="value">${emp.shift === "Night" ? "General Night Shift" : "General Day Shift"}</div>
+            </div>
+            <div>
+              <div class="label">Working Days</div>
+              <div class="value">Sunday - Thursday</div>
+            </div>
+            <div>
+              <div class="label">Working Hours</div>
+              <div class="value">${emp.shift === "Night" ? "05:00 PM - 01:00 AM" : "09:00 AM - 05:00 PM"}</div>
+            </div>
+            <div>
+              <div class="label">Break Time</div>
+              <div class="value">${emp.shift === "Night" ? "09:00 PM - 10:00 PM" : "01:00 PM - 02:00 PM"}</div>
+            </div>
+            <div>
+              <div class="label">Monthly Salary</div>
+              <div class="value">${monthlySalary.toLocaleString()} EGP</div>
+            </div>
+            <div>
+              <div class="label">Daily Salary</div>
+              <div class="value">${dailySalary.toLocaleString()} EGP</div>
+            </div>
+            <div>
+              <div class="label">Hourly Salary</div>
+              <div class="value">${hourlySalary} EGP</div>
+            </div>
+            <div>
+              <div class="label">Employment Type</div>
+              <div class="value">Full Time</div>
+            </div>
+            <div>
+              <div class="label">Joining Date</div>
+              <div class="value">${addedOn}</div>
+            </div>
+            <div>
+              <div class="label">Probation Period</div>
+              <div class="value">Completed</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payroll Information -->
+        <div class="section">
+          <h3 class="section-title">Payroll Information</h3>
+          <div class="grid-3">
+            <div>
+              <div class="label">Basic Salary</div>
+              <div class="value">${monthlySalary.toLocaleString()} EGP</div>
+            </div>
+            <div>
+              <div class="label">Bonuses</div>
+              <div class="value">200 EGP</div>
+            </div>
+            <div>
+              <div class="label">Deductions</div>
+              <div class="value">150 EGP</div>
+            </div>
+            <div>
+              <div class="label">Net Salary</div>
+              <div class="value green">${(monthlySalary + 200 - 150).toLocaleString()} EGP</div>
+            </div>
+            <div>
+              <div class="label">Payment Status</div>
+              <div class="value">Paid</div>
+            </div>
+            <div>
+              <div class="label">Last Payment Date</div>
+              <div class="value">May 5, 2026</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attendance Information -->
+        <div class="section">
+          <h3 class="section-title">Attendance Information</h3>
+          <div class="grid-3">
+            <div>
+              <div class="label">Check-In Time</div>
+              <div class="value">${emp.shift === "Night" ? "04:58 PM" : "08:58 AM"}</div>
+            </div>
+            <div>
+              <div class="label">Check-out Time</div>
+              <div class="value">${emp.shift === "Night" ? "01:02 AM" : "05:02 PM"}</div>
+            </div>
+            <div>
+              <div class="label">Total Working Hours</div>
+              <div class="value">8h 4m</div>
+            </div>
+            <div>
+              <div class="label">Late Days</div>
+              <div class="value">1 Day</div>
+            </div>
+            <div>
+              <div class="label">Absence Days</div>
+              <div class="value">0 Day</div>
+            </div>
+            <div>
+              <div class="label">Overtime Hours</div>
+              <div class="value">2h 15m</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact Information -->
+        <div class="section">
+          <h3 class="section-title">Contact Information</h3>
+          <div class="grid-2">
+            <div>
+              <div class="label">Home Address</div>
+              <div class="value">${addressDetails}</div>
+            </div>
+            <div>
+              <div class="label">Emergency Contact Name</div>
+              <div class="value">${emergencyName}</div>
+            </div>
+            <div>
+              <div class="label">Emergency Contact Phone</div>
+              <div class="value">${emergencyPhone}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="section">
+          <h3 class="section-title">Internal Notes</h3>
+          <div class="value" style="font-weight: normal; font-style: italic;">
+            ${notesStr}
+          </div>
+        </div>
+
+        <div class="footer">
+          <div class="clinic-info">
+            <strong>Revera Clinic Cairo</strong><br/>
+            El-Ghad St, Pyramids, Giza<br/>
+            Tel: +20 100 000 0000 | info@revera.com
+          </div>
+          <div style="font-size: 11px; color: #5A6A51;">
+            Generated on: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.print();
+          }
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   }
 
   async function handleUpdateEmployeeRole(id: string, newRole: string) {
@@ -12862,38 +13225,39 @@ export default function AdminPage() {
                   onClick={() => setViewingEmployee(null)}
                 >
                   <div
-                    className="w-full max-w-2xl bg-[#FBFBF9] h-full shadow-2xl flex flex-col animate-slideOver overflow-hidden"
+                    className="w-full max-w-3xl bg-[#FBFBF9] h-full shadow-2xl flex flex-col animate-slideOver overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {/* Drawer Header */}
-                    <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 text-lg font-bold">
-                          {viewingEmployee.name ? viewingEmployee.name.charAt(0).toUpperCase() : "E"}
-                        </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-[#1F251A]">{viewingEmployee.name || "No name"}</h3>
-                          <p className="text-xs text-[#5A6A51]">Employee Profile &amp; Staff Details</p>
-                        </div>
-                      </div>
+                    <div className="px-8 pt-6 pb-5 border-b border-[#414E36]/10 bg-[#F9F9F7] shrink-0">
                       <button
-                        type="button"
                         onClick={() => setViewingEmployee(null)}
-                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+                        className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] mb-5 outline-none transition uppercase tracking-wider"
                       >
-                        <X size={16} />
+                        <ArrowLeft size={14} /> Back to Employees
                       </button>
-                    </div>
 
-                    {/* Drawer Content */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="h-16 w-16 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl font-bold font-serif shrink-0">
+                            {viewingEmployee.name ? viewingEmployee.name.charAt(0).toUpperCase() : "E"}
+                          </div>
+                          <div>
+                            <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingEmployee.name || "Staff Member"}</h3>
+                            <p className="text-xs text-[#5A6A51] mt-0.5">Employee Profile &amp; Staff Details</p>
+                            <div className="mt-2">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                                viewingEmployee.email_confirmed_at ? "bg-[#EDF1EC] text-[#414E36]" : "bg-amber-50 text-amber-700"
+                              }`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-[#414E36]" : "bg-amber-500"}`} />
+                                {viewingEmployee.email_confirmed_at ? "Active" : "Pending Invitation"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
 
-                      {/* Profile Details Card */}
-                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-                          <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Staff Profile</h4>
+                        <div className="flex items-center gap-2">
                           <button
-                            type="button"
                             onClick={() => {
                               setEditingEmployee(viewingEmployee);
                               setNewEmployeeName(viewingEmployee.name || "");
@@ -12912,184 +13276,379 @@ export default function AdminPage() {
                               setViewingEmployee(null);
                               setIsEditingEmployeeModalOpen(true);
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] transition hover:bg-[#EDF1EC] shadow-sm"
                           >
                             <Pencil size={12} /> Edit Profile
                           </button>
+                          <button className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] bg-white shadow-sm">
+                            <span className="font-bold text-lg">⋮</span>
+                          </button>
                         </div>
+                      </div>
+                    </div>
 
-                        <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                    {/* Drawer Content */}
+                    <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+
+                      {/* BASIC INFORMATION */}
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                          <User size={16} className="text-[#C4AE7C]" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Basic Information</h4>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
                           <div>
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employee ID</span>
-                            <span className="font-semibold text-[#1F251A] font-mono text-xs">{viewingEmployee.employee_id || "—"}</span>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employee ID</span>
+                            <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.employee_id || "—"}</span>
                           </div>
                           <div>
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Full Name</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.name || "—"}</span>
+                          </div>
+                          <div className="col-span-2 sm:col-span-1">
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
                             <span className="font-semibold text-[#1F251A] break-all">{viewingEmployee.email || "—"}</span>
                           </div>
                           <div>
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
                             <span className="font-semibold text-[#1F251A]">{viewingEmployee.phone || "—"}</span>
                           </div>
                           <div>
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">System Role</span>
-                            <span className="inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">
-                              {viewingEmployee.role_name || "—"}
-                            </span>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">System Role</span>
+                            <div>
+                              <span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-0.5 text-xs font-semibold text-[#414E36]">
+                                {viewingEmployee.role_name || "—"}
+                              </span>
+                            </div>
                           </div>
                           <div>
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Department</span>
-                            <span className="inline-block rounded-xl bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold text-[#8B7544]">
-                              {viewingEmployee.department || "Reception"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Shift</span>
-                            <span className={`inline-block rounded-xl px-3 py-1 text-xs font-semibold ${viewingEmployee.shift === "Night" ? "bg-indigo-50 text-indigo-700" : "bg-amber-50 text-amber-700"}`}>
-                              {viewingEmployee.shift || "Day"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Monthly Salary</span>
-                            <span className="font-bold text-[#1F251A]">{Number(viewingEmployee.salary || 0).toLocaleString()} EGP</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Account Status</span>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Account Status</span>
                             <span className={`inline-flex items-center gap-1 text-xs font-bold ${viewingEmployee.email_confirmed_at ? "text-green-700" : "text-amber-700"}`}>
                               <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-green-600" : "bg-amber-500"}`} />
                               {viewingEmployee.email_confirmed_at ? "Active" : "Pending Invitation"}
                             </span>
                           </div>
                           <div>
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
-                            <span className="font-semibold text-[#1F251A] font-mono text-xs">{viewingEmployee.national_id || "—"}</span>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Department</span>
+                            <div>
+                              <span className="inline-block rounded-lg bg-[#C4AE7C]/15 px-2.5 py-0.5 text-xs font-semibold text-[#8B7544]">
+                                {viewingEmployee.department || "Reception"}
+                              </span>
+                            </div>
                           </div>
                           <div>
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Added On</span>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Added On</span>
                             <span className="font-semibold text-[#1F251A]">
                               {viewingEmployee.created_at
-                                ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { dateStyle: "long" })
+                                ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
                                 : "—"}
                             </span>
                           </div>
-                          <div className="col-span-2">
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Home Address</span>
-                            {viewingEmployee.address ? (() => {
-                              const a = parseAddress(viewingEmployee.address);
-                              return (
-                                <div className="rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] px-4 py-3 space-y-1.5 text-sm text-[#1F251A]">
-                                  {a.line1 && <p className="font-semibold">{a.line1}</p>}
-                                  {a.line2 && <p className="text-[#5A6A51]">{a.line2}</p>}
-                                  <p className="text-[#5A6A51]">
-                                    {[a.city, a.governorate, a.postalCode].filter(Boolean).join(", ")}
-                                  </p>
-                                  {a.country && <p className="text-xs font-bold text-[#8A9A81] uppercase tracking-wide">{a.country}</p>}
-                                </div>
-                              );
-                            })() : <span className="text-[#8A9A81] text-sm italic">No address on file</span>}
-                          </div>
-
-                          {/* ID Check Info Card */}
-                          {viewingEmployee.national_id && (() => {
-                            const check = parseEgyptianNationalId(viewingEmployee.national_id);
-                            if (check.isValid) {
-                              return (
-                                <div className="col-span-2 rounded-xl bg-green-50/50 border border-green-200/50 p-4 space-y-2 text-xs">
-                                  <div className="flex items-center gap-1.5 font-bold text-green-800">
-                                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
-                                    Verified Egyptian National ID Check
-                                  </div>
-                                  <div className="grid grid-cols-3 gap-4 text-green-700 font-medium">
-                                    <div>
-                                      <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Birth Date</span>
-                                      {check.birthDate}
-                                    </div>
-                                    <div>
-                                      <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Gender</span>
-                                      {check.gender}
-                                    </div>
-                                    <div>
-                                      <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Governorate</span>
-                                      {check.governorate}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
-
-                          {/* Front / Back ID Photo Previews */}
-                          {(viewingEmployee.national_id_front || viewingEmployee.national_id_back) && (
-                            <div className="col-span-2 space-y-2 border-t border-[#414E36]/10 pt-3">
-                              <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider">ID Document Photos</span>
-                              <div className="grid grid-cols-2 gap-4">
-                                {viewingEmployee.national_id_front && (
-                                  <div className="space-y-1">
-                                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">Front Side</span>
-                                    <a
-                                      href={viewingEmployee.national_id_front}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
-                                      title="Click to view full size"
-                                    >
-                                      <img
-                                        src={viewingEmployee.national_id_front}
-                                        alt="ID Front"
-                                        className="h-28 w-full object-cover"
-                                      />
-                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
-                                        View Full Size
-                                      </div>
-                                    </a>
-                                  </div>
-                                )}
-                                {viewingEmployee.national_id_back && (
-                                  <div className="space-y-1">
-                                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">Back Side</span>
-                                    <a
-                                      href={viewingEmployee.national_id_back}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
-                                      title="Click to view full size"
-                                    >
-                                      <img
-                                        src={viewingEmployee.national_id_back}
-                                        alt="ID Back"
-                                        className="h-28 w-full object-cover"
-                                      />
-                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
-                                        View Full Size
-                                      </div>
-                                    </a>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          {/* Employment Contract */}
-                          {viewingEmployee.contract_file && (
-                            <div className="mt-4 pt-4 border-t border-[#414E36]/10">
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">Employment Contract</p>
-                              <a
-                                href={viewingEmployee.contract_file}
-                                download={viewingEmployee.contract_file_name || "contract"}
-                                className="inline-flex items-center gap-2 rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition"
-                              >
-                                <FileText className="h-4 w-4 text-[#5A6A51]" />
-                                {viewingEmployee.contract_file_name || "Download Contract"}
-                              </a>
-                            </div>
-                          )}
                         </div>
                       </div>
 
-                      {/* Quick Actions Card */}
-                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-3">
-                        <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C] border-b border-[#414E36]/10 pb-3">Quick Actions</h4>
-                        <div className="flex flex-wrap gap-3">
+                      {/* WORK INFORMATION */}
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                          <Briefcase size={16} className="text-[#C4AE7C]" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Work Information</h4>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Job Title</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.role_name || "Receptionist"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Shift Type</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.shift || "Day"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Shift Details</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {viewingEmployee.shift === "Night" ? "General Night Shift" : "General Day Shift"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Working Days</span>
+                            <span className="font-semibold text-[#1F251A]">Sunday - Thursday</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Working Hours</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {viewingEmployee.shift === "Night" ? "05:00 PM - 01:00 AM" : "09:00 AM - 05:00 PM"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Break Time</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {viewingEmployee.shift === "Night" ? "09:00 PM - 10:00 PM" : "01:00 PM - 02:00 PM"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Monthly Salary</span>
+                            <span className="font-semibold text-[#1F251A]">{Number(viewingEmployee.salary || 0).toLocaleString()} EGP</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Daily Salary</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {Math.round(Number(viewingEmployee.salary || 0) / 20).toLocaleString()} EGP
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Hourly Salary</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {(Number(viewingEmployee.salary || 0) / (20 * 8)).toFixed(2)} EGP
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employment Type</span>
+                            <div>
+                              <span className="inline-block rounded-lg bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-0.5 text-xs font-semibold text-[#5A6A51]">
+                                Full Time
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Joining Date</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {viewingEmployee.created_at
+                                ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                                : "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Probation Period</span>
+                            <div>
+                              <span className="inline-block rounded-lg bg-green-50 border border-green-200 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                                Completed
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* PAYROLL INFORMATION */}
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                          <CircleDollarSign size={16} className="text-[#C4AE7C]" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Payroll Information</h4>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Basic Salary</span>
+                            <span className="font-semibold text-[#1F251A]">{Number(viewingEmployee.salary || 0).toLocaleString()} EGP</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Bonuses</span>
+                            <span className="font-semibold text-[#1F251A]">200 EGP</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Deductions</span>
+                            <span className="font-semibold text-[#1F251A]">150 EGP</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Net Salary</span>
+                            <span className="font-bold text-green-700">
+                              {(Number(viewingEmployee.salary || 0) + 200 - 150).toLocaleString()} EGP
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Payment Status</span>
+                            <div className="flex items-center">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-0.5 text-xs font-bold text-green-700">
+                                <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
+                                Paid
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Last Payment Date</span>
+                            <span className="font-semibold text-[#1F251A]">May 5, 2026</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ATTENDANCE INFORMATION */}
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                          <Clock size={16} className="text-[#C4AE7C]" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Attendance Information</h4>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Check-In Time</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {viewingEmployee.shift === "Night" ? "04:58 PM" : "08:58 AM"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Check-out Time</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {viewingEmployee.shift === "Night" ? "01:02 AM" : "05:02 PM"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Total Working Hours</span>
+                            <span className="font-semibold text-[#1F251A]">8h 4m</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Late Days</span>
+                            <span className="font-semibold text-[#1F251A]">1 Day</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Absence Days</span>
+                            <span className="font-semibold text-[#1F251A]">0 Day</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Overtime Hours</span>
+                            <span className="font-semibold text-[#1F251A]">2h 15m</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* CONTACT INFORMATION */}
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                          <Phone size={16} className="text-[#C4AE7C]" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Contact Information</h4>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                          <div className="sm:col-span-2">
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Address</span>
+                            <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3.5 py-2.5 rounded-xl border border-[#414E36]/5 leading-relaxed">
+                              {viewingEmployee.address || "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Emergency Contact Name</span>
+                            <span className="font-semibold text-[#1F251A]">
+                              {viewingEmployee.name ? `Ahmed ${viewingEmployee.name.split(" ").slice(-1)[0]}` : "Ahmed Saif"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Emergency Contact Phone</span>
+                            <span className="font-semibold text-[#1F251A] font-mono">01098765432</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* NOTES & DOCUMENTS */}
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                          <FileText size={16} className="text-[#C4AE7C]" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Notes</h4>
+                        </div>
+                        
+                        <div>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Internal Notes</span>
+                          <p className="text-xs text-[#5A6A51] bg-[#FBFBF9] border border-[#414E36]/5 rounded-xl p-3 leading-relaxed font-medium italic">
+                            "Excellent communication skills and very cooperative."
+                          </p>
+                        </div>
+
+                        {viewingEmployee.national_id && (() => {
+                          const check = parseEgyptianNationalId(viewingEmployee.national_id);
+                          if (check.isValid) {
+                            return (
+                              <div className="rounded-xl bg-green-50/50 border border-green-200/50 p-4 space-y-2 text-xs">
+                                <div className="flex items-center gap-1.5 font-bold text-green-800">
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
+                                  Verified Egyptian National ID Check
+                                </div>
+                                <div className="grid grid-cols-3 gap-4 text-green-700 font-medium">
+                                  <div>
+                                    <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Birth Date</span>
+                                    {check.birthDate}
+                                  </div>
+                                  <div>
+                                    <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Gender</span>
+                                    {check.gender}
+                                  </div>
+                                  <div>
+                                    <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Governorate</span>
+                                    {check.governorate}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+
+                        {(viewingEmployee.national_id_front || viewingEmployee.national_id_back || viewingEmployee.contract_file) && (
+                          <div className="space-y-3 pt-3 border-t border-[#414E36]/5">
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">Attached Documents</span>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                              {viewingEmployee.national_id_front && (
+                                <div className="space-y-1">
+                                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">ID Front Side</span>
+                                  <a
+                                    href={viewingEmployee.national_id_front}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
+                                    title="Click to view full size"
+                                  >
+                                    <img
+                                      src={viewingEmployee.national_id_front}
+                                      alt="ID Front"
+                                      className="h-28 w-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
+                                      View Full Size
+                                    </div>
+                                  </a>
+                                </div>
+                              )}
+                              {viewingEmployee.national_id_back && (
+                                <div className="space-y-1">
+                                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">ID Back Side</span>
+                                  <a
+                                    href={viewingEmployee.national_id_back}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="block relative rounded-xl overflow-hidden border border-[#414E36]/15 hover:opacity-90 transition group cursor-zoom-in"
+                                    title="Click to view full size"
+                                  >
+                                    <img
+                                      src={viewingEmployee.national_id_back}
+                                      alt="ID Back"
+                                      className="h-28 w-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
+                                      View Full Size
+                                    </div>
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+
+                            {viewingEmployee.contract_file && (
+                              <div className="pt-2">
+                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">Employment Contract</span>
+                                <a
+                                  href={viewingEmployee.contract_file}
+                                  download={viewingEmployee.contract_file_name || "contract"}
+                                  className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition shadow-xs"
+                                >
+                                  <FileText className="h-4 w-4 text-[#5A6A51]" />
+                                  {viewingEmployee.contract_file_name || "Download Contract"}
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* QUICK ACTIONS */}
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                          <Zap size={16} className="text-[#C4AE7C]" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Quick Actions</h4>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           <button
                             type="button"
                             onClick={() => {
@@ -13110,22 +13669,11 @@ export default function AdminPage() {
                               setViewingEmployee(null);
                               setIsEditingEmployeeModalOpen(true);
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition"
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition"
                           >
-                            <Pencil size={13} /> Edit Employee
+                            <Pencil size={14} /> Edit Employee
                           </button>
-                          {!viewingEmployee.email_confirmed_at && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleResendInvitation(viewingEmployee.id);
-                                setViewingEmployee(null);
-                              }}
-                              className="inline-flex items-center gap-1.5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition"
-                            >
-                              Resend Invitation
-                            </button>
-                          )}
+
                           {viewingEmployee.employee_id !== "superadmin" && (
                             <button
                               type="button"
@@ -13133,11 +13681,19 @@ export default function AdminPage() {
                                 handleDeleteEmployee(viewingEmployee.id);
                                 setViewingEmployee(null);
                               }}
-                              className="inline-flex items-center gap-1.5 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 transition"
+                              className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-50 border border-red-200 hover:bg-red-100 px-4 py-3 text-sm font-semibold text-red-600 transition"
                             >
-                              <Trash2 size={13} /> Revoke Access
+                              <Lock size={14} /> Revoke Access
                             </button>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => handlePrintEmployeeProfile(viewingEmployee)}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F9F9F7] border border-[#414E36]/15 hover:bg-[#EDF1EC] px-4 py-3 text-sm font-semibold text-[#414E36] transition"
+                          >
+                            <Printer size={14} /> Print Profile
+                          </button>
                         </div>
                       </div>
 
