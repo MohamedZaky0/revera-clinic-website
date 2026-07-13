@@ -32,6 +32,8 @@ import {
   CreditCard,
   DollarSign,
   Download,
+  Eye,
+  MoreVertical,
   FileText,
   Filter,
   Info,
@@ -67,6 +69,7 @@ import {
   Trophy,
   Truck,
   Undo,
+  RotateCcw,
   Upload,
   Users,
   Trash2,
@@ -751,6 +754,10 @@ export default function AdminPage() {
   const [loadingPerformance, setLoadingPerformance] = useState(false);
 
   const [selectedPayrollMonth, setSelectedPayrollMonth] = useState("2026-07");
+  const [payrollSearchQuery, setPayrollSearchQuery] = useState("");
+  const [payrollFilterDepartment, setPayrollFilterDepartment] = useState("All");
+  const [payrollFilterStatus, setPayrollFilterStatus] = useState("All");
+  const [payrollCurrentPage, setPayrollCurrentPage] = useState(1);
   const [newLeaveEmployeeId, setNewLeaveEmployeeId] = useState("");
   const [newLeaveType, setNewLeaveType] = useState("Sick");
   const [newLeaveStartDate, setNewLeaveStartDate] = useState("");
@@ -14873,171 +14880,439 @@ export default function AdminPage() {
               )}
 
               {/* Payroll Sub-tab */}
-              {hrActiveSubTab === "payroll" && (
-                <div className="space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-3xl border border-[#414E36]/10 bg-white shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <label className="text-sm font-bold text-[#1F251A]">Select Payroll Month:</label>
-                      <select
-                        value={selectedPayrollMonth}
-                        onChange={(e) => setSelectedPayrollMonth(e.target.value)}
-                        className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2 text-sm text-[#414E36] outline-none"
-                      >
-                        <option value="2026-05">May 2026</option>
-                        <option value="2026-06">June 2026</option>
-                        <option value="2026-07">July 2026</option>
-                        <option value="2026-08">August 2026</option>
-                      </select>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        try {
-                          const res = await fetch('/api/hr/payroll', {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              'Authorization': `Bearer ${session?.access_token}`
-                            },
-                            body: JSON.stringify({ month: selectedPayrollMonth })
-                          });
-                          if (res.ok) {
-                            alert("Payroll ran successfully!");
-                            fetchHrPayroll();
-                          } else {
-                            const err = await res.json();
-                            alert(err.error || "Failed to run payroll");
-                          }
-                        } catch (err) {
-                          alert("Failed to connect to API.");
-                        }
-                      }}
-                      className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2"
-                    >
-                      <Plus size={16} /> Run Payroll Sheet
-                    </button>
-                  </div>
+              {hrActiveSubTab === "payroll" && (() => {
+                // Filter payroll records
+                const filtered = payrollList.filter((pay: any) => {
+                  // 1. Search Query
+                  if (payrollSearchQuery.trim()) {
+                    const q = payrollSearchQuery.toLowerCase();
+                    const nameMatch = pay.employee_accounts?.name?.toLowerCase().includes(q);
+                    const emailMatch = pay.employee_accounts?.email?.toLowerCase().includes(q);
+                    const idMatch = pay.employee_accounts?.employee_id?.toLowerCase().includes(q);
+                    if (!nameMatch && !emailMatch && !idMatch) return false;
+                  }
 
-                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse text-left text-sm">
-                        <thead>
-                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
-                            <th className="px-6 py-4">Employee</th>
-                            <th className="px-6 py-4">Month</th>
-                            <th className="px-6 py-4">Basic Salary</th>
-                            <th className="px-6 py-4">Bonuses</th>
-                            <th className="px-6 py-4">Deductions</th>
-                            <th className="px-6 py-4">Net Salary</th>
-                            <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#414E36]/5">
-                          {payrollList.filter(p => p.month === selectedPayrollMonth).length === 0 ? (
-                            <tr>
-                              <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
-                                No payroll run exists for {selectedPayrollMonth}. Click "Run Payroll Sheet" to calculate.
-                              </td>
+                  // 2. Department
+                  if (payrollFilterDepartment !== "All") {
+                    if (pay.employee_accounts?.department !== payrollFilterDepartment) return false;
+                  }
+
+                  // 3. Month
+                  if (selectedPayrollMonth !== "All" && selectedPayrollMonth) {
+                    if (pay.month !== selectedPayrollMonth) return false;
+                  }
+
+                  // 4. Status
+                  if (payrollFilterStatus !== "All") {
+                    const status = pay.status || "Unpaid";
+                    if (payrollFilterStatus === "Paid" && status !== "Paid") return false;
+                    if (payrollFilterStatus === "Pending" && status === "Paid") return false;
+                    if (payrollFilterStatus === "Overdue" && status === "Paid") return false;
+                  }
+
+                  return true;
+                });
+
+                // Pagination calculations
+                const itemsPerPage = 10;
+                const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+                const activePage = Math.min(payrollCurrentPage, totalPages);
+                const startIndex = (activePage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const paged = filtered.slice(startIndex, endIndex);
+
+                const getPaymentDate = (monthStr: string) => {
+                  if (!monthStr) return "—";
+                  const parts = monthStr.split("-");
+                  if (parts.length < 2) return "—";
+                  const year = parts[0];
+                  const monthNum = parseInt(parts[1], 10);
+                  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                  const monthName = months[monthNum - 1] || "May";
+                  return `05 ${monthName} ${year}`;
+                };
+
+                return (
+                  <div className="space-y-6 animate-fadeIn">
+                    {/* Title & Action Buttons Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <div>
+                        <h2 className="text-4xl font-semibold text-[#1F251A]">Payroll</h2>
+                        <p className="mt-1 text-xs text-[#8A9A81] font-medium">Home &gt; Payroll</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={async () => {
+                            if (selectedPayrollMonth === "All") {
+                              alert("Please select a specific month to run payroll.");
+                              return;
+                            }
+                            try {
+                              const res = await fetch('/api/hr/payroll', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${session?.access_token}`
+                                },
+                                body: JSON.stringify({ month: selectedPayrollMonth })
+                              });
+                              if (res.ok) {
+                                alert("Payroll ran successfully!");
+                                fetchHrPayroll();
+                              } else {
+                                const err = await res.json();
+                                alert(err.error || "Failed to run payroll");
+                              }
+                            } catch (err) {
+                              alert("Failed to connect to API.");
+                            }
+                          }}
+                          className="rounded-xl bg-[#414E36] px-4 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-xs"
+                        >
+                          <Plus size={14} /> Add Payroll
+                        </button>
+                        <button
+                          onClick={() => window.print()}
+                          className="rounded-xl bg-white border border-[#414E36]/15 px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#EDF1EC]/20 transition flex items-center gap-2 shadow-xs"
+                        >
+                          <Download size={14} /> Export
+                        </button>
+                        <button
+                          className="rounded-xl bg-white border border-[#414E36]/15 px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#EDF1EC]/20 transition flex items-center gap-2 shadow-xs"
+                        >
+                          <Filter size={14} /> Filter
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Search & Filter Bar */}
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 rounded-3xl border border-[#414E36]/10 bg-white shadow-xs">
+                      <div className="relative md:col-span-1">
+                        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]/65" />
+                        <input
+                          type="text"
+                          placeholder="Search by employee name or phone..."
+                          value={payrollSearchQuery}
+                          onChange={(e) => {
+                            setPayrollSearchQuery(e.target.value);
+                            setPayrollCurrentPage(1);
+                          }}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] pl-10 pr-4 py-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition placeholder:text-gray-400"
+                        />
+                      </div>
+
+                      <div>
+                        <select
+                          value={payrollFilterDepartment}
+                          onChange={(e) => {
+                            setPayrollFilterDepartment(e.target.value);
+                            setPayrollCurrentPage(1);
+                          }}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                        >
+                          <option value="All">All Departments</option>
+                          <option value="Doctors">Doctors</option>
+                          <option value="Nursing">Nursing</option>
+                          <option value="Admin">Admin</option>
+                          <option value="Reception">Reception</option>
+                          <option value="Lab">Lab</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <select
+                          value={selectedPayrollMonth}
+                          onChange={(e) => {
+                            setSelectedPayrollMonth(e.target.value);
+                            setPayrollCurrentPage(1);
+                          }}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                        >
+                          <option value="All">All Months</option>
+                          <option value="2026-05">May 2026</option>
+                          <option value="2026-06">June 2026</option>
+                          <option value="2026-07">July 2026</option>
+                          <option value="2026-08">August 2026</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <select
+                          value={payrollFilterStatus}
+                          onChange={(e) => {
+                            setPayrollFilterStatus(e.target.value);
+                            setPayrollCurrentPage(1);
+                          }}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                        >
+                          <option value="All">All Status</option>
+                          <option value="Paid">Paid</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Overdue">Overdue</option>
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setPayrollSearchQuery("");
+                          setPayrollFilterDepartment("All");
+                          setSelectedPayrollMonth("2026-07");
+                          setPayrollFilterStatus("All");
+                          setPayrollCurrentPage(1);
+                        }}
+                        className="w-full rounded-xl bg-white border border-gray-250 hover:bg-gray-50 px-4 py-2.5 text-xs font-bold text-gray-700 transition flex items-center justify-center gap-1.5 shadow-xs"
+                      >
+                        <RotateCcw size={12} /> Clear
+                      </button>
+                    </div>
+
+                    {/* Main Table */}
+                    <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-left text-sm">
+                          <thead>
+                            <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                              <th className="px-6 py-4">Employee ID</th>
+                              <th className="px-6 py-4">Employee Name</th>
+                              <th className="px-6 py-4">Department</th>
+                              <th className="px-6 py-4">Role</th>
+                              <th className="px-6 py-4">Working Hours</th>
+                              <th className="px-6 py-4">Basic Salary</th>
+                              <th className="px-6 py-4">Bonuses</th>
+                              <th className="px-6 py-4">Deductions</th>
+                              <th className="px-6 py-4">Net Salary</th>
+                              <th className="px-6 py-4 text-center">Payment Status</th>
+                              <th className="px-6 py-4">Payment Date</th>
+                              <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
-                          ) : (
-                            payrollList
-                              .filter(p => p.month === selectedPayrollMonth)
-                              .map((pay: any) => (
-                                <tr key={pay.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
-                                  <td className="px-6 py-4">
-                                    <div className="font-semibold text-[#1F251A]">{pay.employee_accounts?.name || "—"}</div>
-                                    <div className="text-xs text-[#5A6A51]">{pay.employee_accounts?.email || "—"}</div>
-                                  </td>
-                                  <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{pay.month}</td>
-                                  <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
-                                    EGP {Number(pay.basic_salary).toLocaleString()}
-                                  </td>
-                                  <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
-                                    <input
-                                      type="number"
-                                      value={pay.bonuses}
-                                      disabled={pay.status === "Paid"}
-                                      onChange={async (e) => {
-                                        const val = Number(e.target.value);
-                                        setPayrollList(prev => prev.map(p => p.id === pay.id ? { ...p, bonuses: val, net_salary: p.basic_salary + val - p.deductions } : p));
-                                        await fetch('/api/hr/payroll', {
-                                          method: 'PATCH',
-                                          headers: {
-                                            'Content-Type': 'application/json',
-                                            'Authorization': `Bearer ${session?.access_token}`
-                                          },
-                                          body: JSON.stringify({ id: pay.id, bonuses: val })
-                                        });
-                                      }}
-                                      className="w-20 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] disabled:opacity-50"
-                                    />
-                                  </td>
-                                  <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
-                                    <input
-                                      type="number"
-                                      value={pay.deductions}
-                                      disabled={pay.status === "Paid"}
-                                      onChange={async (e) => {
-                                        const val = Number(e.target.value);
-                                        setPayrollList(prev => prev.map(p => p.id === pay.id ? { ...p, deductions: val, net_salary: p.basic_salary + p.bonuses - val } : p));
-                                        await fetch('/api/hr/payroll', {
-                                          method: 'PATCH',
-                                          headers: {
-                                            'Content-Type': 'application/json',
-                                            'Authorization': `Bearer ${session?.access_token}`
-                                          },
-                                          body: JSON.stringify({ id: pay.id, deductions: val })
-                                        });
-                                      }}
-                                      className="w-20 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] disabled:opacity-50"
-                                    />
-                                  </td>
-                                  <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
-                                    EGP {Number(pay.net_salary).toLocaleString()}
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
-                                      pay.status === 'Paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
-                                    }`}>
-                                      {pay.status}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 text-right">
-                                    {pay.status !== "Paid" && (
-                                      <button
-                                        onClick={async () => {
-                                          if (!confirm("Are you sure you want to mark this employee payroll as PAID?")) return;
-                                          try {
-                                            const res = await fetch('/api/hr/payroll', {
+                          </thead>
+                          <tbody className="divide-y divide-[#414E36]/5">
+                            {paged.length === 0 ? (
+                              <tr>
+                                <td colSpan={12} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                                  No payroll records match your filter criteria.
+                                </td>
+                              </tr>
+                            ) : (
+                              paged.map((pay: any) => {
+                                const empObj = pay.employee_accounts || {};
+                                const isPaid = pay.status === "Paid";
+                                const isPast = pay.month < "2026-07";
+                                const statusLabel = isPaid ? "Paid" : (isPast ? "Overdue" : "Pending");
+                                
+                                const initials = empObj.name ? empObj.name.split(" ").slice(0, 2).map((n: string) => n[0]).join("").toUpperCase() : "EM";
+
+                                return (
+                                  <tr key={pay.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                                    {/* Employee ID */}
+                                    <td className="px-6 py-4 text-xs font-mono font-bold text-[#5A6A51] uppercase">
+                                      {empObj.employee_id || `EMP-${pay.id?.slice(0, 3)}`}
+                                    </td>
+                                    {/* Employee Name (Avatar + Name + Email) */}
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                          {initials}
+                                        </div>
+                                        <div>
+                                          <div className="font-semibold text-[#1F251A] text-sm">{empObj.name || "—"}</div>
+                                          <div className="text-[10px] text-[#5A6A51]">{empObj.email || "—"}</div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    {/* Department */}
+                                    <td className="px-6 py-4">
+                                      <span className="inline-block rounded-xl bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold text-[#8B7544]">
+                                        {empObj.department || "Reception"}
+                                      </span>
+                                    </td>
+                                    {/* Role */}
+                                    <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
+                                      {empObj.role_name || "Staff"}
+                                    </td>
+                                    {/* Working Hours */}
+                                    <td className="px-6 py-4">
+                                      <div className="text-xs font-semibold text-[#1F251A]">Sun - Thu</div>
+                                      <div className="text-[10px] text-[#5A6A51]">
+                                        {empObj.shift === "Night" ? "05:00 PM - 01:00 AM" : "09:00 AM - 05:00 PM"}
+                                      </div>
+                                    </td>
+                                    {/* Basic Salary */}
+                                    <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                      EGP {Number(pay.basic_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    {/* Bonuses */}
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-1.5 bg-[#FBFBF9] border border-[#414E36]/15 rounded-lg px-2 py-1 w-24">
+                                        <span className="text-[10px] font-bold text-[#5A6A51]">EGP</span>
+                                        <input
+                                          type="number"
+                                          value={pay.bonuses}
+                                          disabled={isPaid}
+                                          onChange={async (e) => {
+                                            const val = Number(e.target.value);
+                                            setPayrollList(prev => prev.map(p => p.id === pay.id ? { ...p, bonuses: val, net_salary: p.basic_salary + val - p.deductions } : p));
+                                            await fetch('/api/hr/payroll', {
                                               method: 'PATCH',
                                               headers: {
                                                 'Content-Type': 'application/json',
                                                 'Authorization': `Bearer ${session?.access_token}`
                                               },
-                                              body: JSON.stringify({ id: pay.id, status: 'Paid' })
+                                              body: JSON.stringify({ id: pay.id, bonuses: val })
                                             });
-                                            if (res.ok) {
-                                              fetchHrPayroll();
+                                          }}
+                                          className="w-full bg-transparent text-right text-xs font-mono font-bold text-[#1F251A] outline-none disabled:opacity-60"
+                                        />
+                                      </div>
+                                    </td>
+                                    {/* Deductions */}
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-1.5 bg-[#FBFBF9] border border-[#414E36]/15 rounded-lg px-2 py-1 w-24">
+                                        <span className="text-[10px] font-bold text-[#5A6A51]">EGP</span>
+                                        <input
+                                          type="number"
+                                          value={pay.deductions}
+                                          disabled={isPaid}
+                                          onChange={async (e) => {
+                                            const val = Number(e.target.value);
+                                            setPayrollList(prev => prev.map(p => p.id === pay.id ? { ...p, deductions: val, net_salary: p.basic_salary + p.bonuses - val } : p));
+                                            await fetch('/api/hr/payroll', {
+                                              method: 'PATCH',
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': `Bearer ${session?.access_token}`
+                                              },
+                                              body: JSON.stringify({ id: pay.id, deductions: val })
+                                            });
+                                          }}
+                                          className="w-full bg-transparent text-right text-xs font-mono font-bold text-[#1F251A] outline-none disabled:opacity-60"
+                                        />
+                                      </div>
+                                    </td>
+                                    {/* Net Salary */}
+                                    <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                      EGP {Number(pay.net_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    {/* Payment Status (Badges with Dot) */}
+                                    <td className="px-6 py-4 text-center">
+                                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                                        statusLabel === "Paid"
+                                          ? "bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/15"
+                                          : statusLabel === "Overdue"
+                                          ? "bg-red-50 text-red-700 border border-red-100"
+                                          : "bg-[#EDE4C8] text-[#8B7544] border border-[#C4AE7C]/30"
+                                      }`}>
+                                        <span className={`h-1.5 w-1.5 rounded-full ${
+                                          statusLabel === "Paid" ? "bg-[#414E36]" : statusLabel === "Overdue" ? "bg-red-650" : "bg-[#C4AE7C]"
+                                        }`} />
+                                        {statusLabel}
+                                      </span>
+                                    </td>
+                                    {/* Payment Date */}
+                                    <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
+                                      {isPaid ? getPaymentDate(pay.month) : "—"}
+                                    </td>
+                                    {/* Actions */}
+                                    <td className="px-6 py-4 text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <button
+                                          onClick={() => {
+                                            if (empObj.id) {
+                                              setViewingEmployee(empObj);
                                             }
-                                          } catch (e) {
-                                            alert("Failed to pay payroll.");
-                                          }
-                                        }}
-                                        className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition"
-                                      >
-                                        Mark Paid
-                                      </button>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))
-                          )}
-                        </tbody>
-                      </table>
+                                          }}
+                                          title="View Details"
+                                          className="p-2 text-gray-500 hover:text-[#414E36] hover:bg-gray-100 rounded-xl transition"
+                                        >
+                                          <Eye size={14} />
+                                        </button>
+                                        
+                                        {!isPaid ? (
+                                          <button
+                                            onClick={async () => {
+                                              if (!confirm(`Are you sure you want to mark ${empObj.name || "this employee"}'s payroll as PAID?`)) return;
+                                              try {
+                                                const res = await fetch('/api/hr/payroll', {
+                                                  method: 'PATCH',
+                                                  headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'Authorization': `Bearer ${session?.access_token}`
+                                                  },
+                                                  body: JSON.stringify({ id: pay.id, status: 'Paid' })
+                                                });
+                                                if (res.ok) {
+                                                  fetchHrPayroll();
+                                                }
+                                              } catch (e) {
+                                                alert("Failed to pay payroll.");
+                                              }
+                                            }}
+                                            className="p-2 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition font-bold text-xs"
+                                          >
+                                            Pay
+                                          </button>
+                                        ) : (
+                                          <button
+                                            disabled
+                                            className="p-2 text-gray-300 cursor-not-allowed"
+                                          >
+                                            <MoreVertical size={14} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Pagination Footer */}
+                      {filtered.length > 0 && (
+                        <div className="p-6 border-t border-[#414E36]/10 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white">
+                          <span className="text-xs font-semibold text-[#5A6A51]">
+                            Showing {startIndex + 1} to {Math.min(endIndex, filtered.length)} of {filtered.length} results
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              disabled={activePage === 1}
+                              onClick={() => setPayrollCurrentPage(prev => Math.max(prev - 1, 1))}
+                              className="p-2 rounded-lg border border-gray-250 hover:bg-[#EDF1EC]/20 text-[#5A6A51] disabled:opacity-40 disabled:hover:bg-transparent transition text-xs font-bold"
+                            >
+                              &lt;
+                            </button>
+                            {Array.from({ length: totalPages }).map((_, i) => {
+                              const pNum = i + 1;
+                              return (
+                                <button
+                                  key={pNum}
+                                  onClick={() => setPayrollCurrentPage(pNum)}
+                                  className={`h-8 w-8 rounded-lg text-xs font-bold transition flex items-center justify-center ${
+                                    activePage === pNum
+                                      ? "bg-[#414E36] text-white"
+                                      : "border border-gray-250 text-[#5A6A51] hover:bg-[#EDF1EC]/20"
+                                  }`}
+                                >
+                                  {pNum}
+                                </button>
+                              );
+                            })}
+                            <button
+                              disabled={activePage === totalPages}
+                              onClick={() => setPayrollCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                              className="p-2 rounded-lg border border-gray-250 hover:bg-[#EDF1EC]/20 text-[#5A6A51] disabled:opacity-40 disabled:hover:bg-transparent transition text-xs font-bold"
+                            >
+                              &gt;
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Leaves Sub-tab */}
               {hrActiveSubTab === "leaves" && (
