@@ -25,6 +25,8 @@ import {
   Bell,
   Box,
   CalendarDays,
+  Calendar,
+  Printer,
   ChevronDown,
   ChevronRight,
   CreditCard,
@@ -868,6 +870,22 @@ export default function AdminPage() {
 
   // Customer Profile details drawer state
   const [viewingCustomerProfile, setViewingCustomerProfile] = useState<Customer | null>(null);
+  const [customerProfileTab, setCustomerProfileTab] = useState<"info" | "history" | "prescription">("info");
+  const [customerPrescriptions, setCustomerPrescriptions] = useState<any[]>([]);
+  const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
+  const [prescriptionEditMode, setPrescriptionEditMode] = useState(false);
+  const [editingPrescription, setEditingPrescription] = useState<any | null>(null);
+
+  // Prescription Form states
+  const [rxDiagnosis, setRxDiagnosis] = useState("");
+  const [rxMedications, setRxMedications] = useState<{ name: string; dosage: string; instructions: string }[]>([]);
+  const [rxMedInput, setRxMedInput] = useState("");
+  const [rxMedDropdown, setRxMedDropdown] = useState("");
+  const [rxGeneralNotes, setRxGeneralNotes] = useState("");
+  const [rxDocNotes, setRxDocNotes] = useState("");
+  const [rxFollowUpDate, setRxFollowUpDate] = useState("");
+  const [savingPrescription, setSavingPrescription] = useState(false);
+
   const [couponSearch, setCouponSearch] = useState("");
   const [couponDate, setCouponDate] = useState("");
   const [couponStatus, setCouponStatus] = useState("All");
@@ -1023,6 +1041,34 @@ export default function AdminPage() {
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
   const [calendarView, setCalendarView] = useState<"Calendar" | "List" | "Schedule">("Calendar");
+  // Fetch prescriptions when viewing customer profile changes or when prescriptions tab is active
+  useEffect(() => {
+    if (!viewingCustomerProfile?.id) {
+      setCustomerPrescriptions([]);
+      setCustomerProfileTab("info");
+      setPrescriptionEditMode(false);
+      setEditingPrescription(null);
+      return;
+    }
+
+    const fetchRx = async () => {
+      setLoadingPrescriptions(true);
+      try {
+        const res = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setCustomerPrescriptions(data);
+        }
+      } catch (err) {
+        console.error("Error fetching prescriptions:", err);
+      } finally {
+        setLoadingPrescriptions(false);
+      }
+    };
+
+    fetchRx();
+  }, [viewingCustomerProfile?.id]);
+
   useEffect(() => {
     if (adminRole === 'superadmin') return;
     if (adminPermissions.length > 0) {
@@ -4205,6 +4251,308 @@ export default function AdminPage() {
       .finally(() => {
         setSavingCustomer(false);
       });
+  }
+
+  function handleStartCreatePrescription() {
+    setEditingPrescription(null);
+    setRxDiagnosis("");
+    setRxMedications([]);
+    setRxMedInput("");
+    setRxMedDropdown("");
+    setRxGeneralNotes("");
+    setRxDocNotes("");
+    setRxFollowUpDate("");
+    setPrescriptionEditMode(true);
+  }
+
+  function handleStartEditPrescription(rx: any) {
+    setEditingPrescription(rx);
+    setRxDiagnosis(rx.diagnosis || "");
+    setRxMedications(rx.medications || []);
+    setRxMedInput("");
+    setRxMedDropdown("");
+    setRxGeneralNotes(rx.general_notes || "");
+    setRxDocNotes(rx.doctor_notes || "");
+    setRxFollowUpDate(rx.follow_up_date || "");
+    setPrescriptionEditMode(true);
+  }
+
+  function handleAddMedication() {
+    if (!rxMedInput.trim()) return;
+    setRxMedications(prev => [
+      ...prev,
+      {
+        name: rxMedInput.trim(),
+        dosage: "",
+        instructions: ""
+      }
+    ]);
+    setRxMedInput("");
+    setRxMedDropdown("");
+  }
+
+  function handleRemoveMedication(index: number) {
+    setRxMedications(prev => prev.filter((_, idx) => idx !== index));
+  }
+
+  async function handleSavePrescription() {
+    if (!viewingCustomerProfile?.id) return;
+    setSavingPrescription(true);
+
+    const payload = {
+      id: editingPrescription?.id || undefined,
+      customer_id: viewingCustomerProfile.id,
+      patient_name: viewingCustomerProfile.name,
+      date: new Date().toISOString().slice(0, 10),
+      diagnosis: rxDiagnosis.trim() || null,
+      medications: rxMedications,
+      general_notes: rxGeneralNotes.trim() || null,
+      doctor_notes: rxDocNotes.trim() || null,
+      follow_up_date: rxFollowUpDate || null
+    };
+
+    try {
+      const res = await fetch("/api/prescriptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to save prescription");
+      }
+
+      // Re-fetch prescriptions
+      const rxRes = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`);
+      if (rxRes.ok) {
+        const rxData = await rxRes.json();
+        setCustomerPrescriptions(rxData);
+      }
+
+      setPrescriptionEditMode(false);
+      setEditingPrescription(null);
+    } catch (err: any) {
+      console.error("handleSavePrescription error:", err);
+      alert(err.message || "An error occurred while saving the prescription.");
+    } finally {
+      setSavingPrescription(false);
+    }
+  }
+
+  async function handleDeletePrescription(id: string) {
+    if (!window.confirm("Are you sure you want to delete this prescription?")) return;
+    try {
+      const res = await fetch(`/api/prescriptions?id=${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to delete prescription");
+      }
+
+      // Re-fetch prescriptions
+      if (viewingCustomerProfile?.id) {
+        const rxRes = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`);
+        if (rxRes.ok) {
+          const rxData = await rxRes.json();
+          setCustomerPrescriptions(rxData);
+        }
+      }
+    } catch (err: any) {
+      console.error("handleDeletePrescription error:", err);
+      alert(err.message || "An error occurred while deleting the prescription.");
+    }
+  }
+
+  function handlePrintPrescription(rx: any) {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Please allow popups to print prescriptions.");
+      return;
+    }
+
+    const rxDate = new Date(rx.date).toLocaleDateString("en-US", {
+      year: "numeric", month: "long", day: "numeric"
+    });
+
+    const followUpDateStr = rx.follow_up_date
+      ? new Date(rx.follow_up_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      : "";
+
+    const medsHtml = rx.medications && rx.medications.length > 0
+      ? `<ol style="margin-left: 20px; font-size: 16px; line-height: 1.8;">
+          ${rx.medications.map((m: any) => `
+            <li style="margin-bottom: 12px;">
+              <strong>${m.name}</strong>
+              ${m.instructions ? `<br/><span style="color: #555; font-size: 14px; font-style: italic;">${m.instructions}</span>` : ""}
+            </li>
+          `).join("")}
+         </ol>`
+      : `<p style="color: #666; font-style: italic;">No medications prescribed.</p>`;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Prescription - ${rx.patient_name}</title>
+        <style>
+          body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #1F251A;
+            margin: 0;
+            padding: 40px;
+            background-color: #fff;
+          }
+          .letterhead {
+            text-align: center;
+            border-bottom: 2px solid #414E36;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .logo {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: #414E36;
+            margin: 0;
+            text-transform: uppercase;
+          }
+          .tagline {
+            font-size: 12px;
+            color: #8A9A81;
+            margin: 5px 0 0 0;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+          }
+          .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 40px;
+            font-size: 14px;
+            border-bottom: 1px solid #E6E9EB;
+            padding-bottom: 20px;
+          }
+          .meta-label {
+            font-weight: bold;
+            color: #5A6A51;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.1em;
+            margin-bottom: 5px;
+          }
+          .meta-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1F251A;
+          }
+          .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #414E36;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-bottom: 1px solid #F2EFE9;
+            padding-bottom: 8px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+          }
+          .content-block {
+            font-size: 15px;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 20px;
+          }
+          .footer {
+            margin-top: 80px;
+            border-top: 1px solid #E6E9EB;
+            padding-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          .signature-area {
+            text-align: center;
+            width: 200px;
+          }
+          .signature-line {
+            border-bottom: 1px solid #1F251A;
+            margin-bottom: 5px;
+            height: 40px;
+          }
+          .signature-label {
+            font-size: 12px;
+            color: #5A6A51;
+            font-weight: 500;
+          }
+          .clinic-info {
+            font-size: 11px;
+            color: #8A9A81;
+            line-height: 1.5;
+          }
+          @media print {
+            body { padding: 0; }
+            @page { margin: 20mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="letterhead">
+          <h1 class="logo">Revera Clinic</h1>
+          <p class="tagline">Aesthetic & Medical Center</p>
+        </div>
+
+        <div class="meta-grid">
+          <div>
+            <div class="meta-label">Patient Name</div>
+            <div class="meta-value">\${rx.patient_name}</div>
+          </div>
+          <div style="text-align: right;">
+            <div class="meta-label">Date</div>
+            <div class="meta-value">\${rxDate}</div>
+          </div>
+        </div>
+
+        \${rx.diagnosis ? \`
+          <div class="section-title">Diagnosis</div>
+          <div class="content-block" style="white-space: pre-wrap;">\${rx.diagnosis}</div>
+        \` : ''}
+
+        <div class="section-title" style="margin-top: 40px;">Rx (Prescribed Medications)</div>
+        <div class="content-block">\${medsHtml}</div>
+
+        \${rx.general_notes ? \`
+          <div class="section-title">General Notes</div>
+          <div class="content-block" style="white-space: pre-wrap;">\${rx.general_notes}</div>
+        \` : ''}
+
+        \${followUpDateStr ? \`
+          <div class="section-title">Next Follow-Up Date</div>
+          <div class="content-block" style="font-weight: 600; color: #414E36;">\${followUpDateStr}</div>
+        \` : ''}
+
+        <div class="footer">
+          <div class="clinic-info">
+            <strong>Revera Clinic Cairo</strong><br/>
+            El-Ghad St, Pyramids, Giza<br/>
+            Tel: +20 100 000 0000 | info@revera.com
+          </div>
+          <div class="signature-area">
+            <div class="signature-line"></div>
+            <div class="signature-label">Doctor's Signature / Stamp</div>
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.print();
+          }
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   }
 
   function handleDeleteCustomer(id: string) {
@@ -17682,168 +18030,531 @@ export default function AdminPage() {
               </button>
             </div>
 
+            {/* Drawer Tab Navigation */}
+            <div className="flex border-b border-[#414E36]/10 bg-[#F9F9F7] px-6 gap-6 shrink-0">
+              <button
+                onClick={() => setCustomerProfileTab("info")}
+                className={`pb-3.5 pt-2 text-sm font-semibold border-b-2 transition-all outline-none ${
+                  customerProfileTab === "info"
+                    ? "border-[#414E36] text-[#414E36] font-bold"
+                    : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                }`}
+              >
+                Personal Info
+              </button>
+              <button
+                onClick={() => setCustomerProfileTab("history")}
+                className={`pb-3.5 pt-2 text-sm font-semibold border-b-2 transition-all outline-none ${
+                  customerProfileTab === "history"
+                    ? "border-[#414E36] text-[#414E36] font-bold"
+                    : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                }`}
+              >
+                Booking History
+              </button>
+              <button
+                onClick={() => setCustomerProfileTab("prescription")}
+                className={`pb-3.5 pt-2 text-sm font-semibold border-b-2 transition-all outline-none ${
+                  customerProfileTab === "prescription"
+                    ? "border-[#414E36] text-[#414E36] font-bold"
+                    : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                }`}
+              >
+                Prescriptions & Records
+              </button>
+            </div>
+
             {/* Drawer Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-              {/* Profile Details Cards */}
-              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Personal Profile</h4>
-                  {hasPermission("customers.edit") && (
-                    <button
-                      onClick={() => {
-                        handleOpenEditCustomer(viewingCustomerProfile);
-                        setViewingCustomerProfile(null);
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
-                    >
-                      <Pencil size={12} /> Edit Profile
-                    </button>
-                  )}
-                </div>
+              {/* Tab 1: Info */}
+              {customerProfileTab === "info" && (
+                <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                  <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                    <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Personal Profile</h4>
+                    {hasPermission("customers.edit") && (
+                      <button
+                        onClick={() => {
+                          handleOpenEditCustomer(viewingCustomerProfile);
+                          setViewingCustomerProfile(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+                      >
+                        <Pencil size={12} /> Edit Profile
+                      </button>
+                    )}
+                  </div>
 
-                <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
-                    <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Age</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Gender</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
-                    <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Referral Source</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Profile Status</span>
-                    <span className={`inline-flex items-center gap-1 text-xs font-bold ${
-                      viewingCustomerProfile.active !== false ? "text-green-700" : "text-gray-400"
-                    }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-green-600" : "bg-gray-400"}`} />
-                      {viewingCustomerProfile.active !== false ? "Active Patient" : "Inactive"}
-                    </span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Address</span>
-                    <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
-                      {viewingCustomerProfile.address || [
-                        viewingCustomerProfile.building_no,
-                        viewingCustomerProfile.street_name,
-                        viewingCustomerProfile.floor_no,
-                        viewingCustomerProfile.area,
-                        viewingCustomerProfile.location_name
-                      ].filter(Boolean).join(", ") || "—"}
-                    </span>
-                  </div>
-                  {viewingCustomerProfile.note && (
-                    <div className="col-span-2">
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Notes & Observations</span>
-                      <p className="text-xs text-[#5A6A51] bg-amber-50/40 border border-amber-200/50 rounded-xl p-3 leading-relaxed">
-                        {viewingCustomerProfile.note}
-                      </p>
+                  <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                    <div>
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
+                      <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
                     </div>
-                  )}
+                    <div>
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
+                      <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Age</span>
+                      <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Gender</span>
+                      <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
+                      <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Referral Source</span>
+                      <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
+                      <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Profile Status</span>
+                      <span className={`inline-flex items-center gap-1 text-xs font-bold ${
+                        viewingCustomerProfile.active !== false ? "text-green-700" : "text-gray-400"
+                      }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-green-600" : "bg-gray-400"}`} />
+                        {viewingCustomerProfile.active !== false ? "Active Patient" : "Inactive"}
+                      </span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Address</span>
+                      <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
+                        {viewingCustomerProfile.address || [
+                          viewingCustomerProfile.building_no,
+                          viewingCustomerProfile.street_name,
+                          viewingCustomerProfile.floor_no,
+                          viewingCustomerProfile.area,
+                          viewingCustomerProfile.location_name
+                        ].filter(Boolean).join(", ") || "—"}
+                      </span>
+                    </div>
+                    {viewingCustomerProfile.note && (
+                      <div className="col-span-2">
+                        <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Notes & Observations</span>
+                        <p className="text-xs text-[#5A6A51] bg-amber-50/40 border border-amber-200/50 rounded-xl p-3 leading-relaxed">
+                          {viewingCustomerProfile.note}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Booking History Card */}
-              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-                <div className="border-b border-[#414E36]/10 pb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Booking History</h4>
-                  <span className="text-xs font-semibold bg-[#EDF1EC] text-[#414E36] px-2.5 py-1 rounded-md">
-                    Total: {
-                      allReservations.filter(
-                        (r) =>
-                          r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
-                          r.customerId === viewingCustomerProfile.id
-                      ).length
-                    }
-                  </span>
-                </div>
-
-                <div className="overflow-hidden rounded-xl border border-[#E6E9EB]">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] font-bold text-[#5A6A51] uppercase tracking-wider text-[10px]">
-                        <th className="px-4 py-3 text-left">Date / Slot</th>
-                        <th className="px-4 py-3 text-left">Service</th>
-                        <th className="px-4 py-3 text-left">Provider</th>
-                        <th className="px-4 py-3 text-right">Paid</th>
-                        <th className="px-4 py-3 text-right">Left</th>
-                        <th className="px-4 py-3 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
-                      {(() => {
-                        const history = allReservations.filter(
+              {/* Tab 2: History */}
+              {customerProfileTab === "history" && (
+                <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                  <div className="border-b border-[#414E36]/10 pb-3 flex items-center justify-between">
+                    <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Booking History</h4>
+                    <span className="text-xs font-semibold bg-[#EDF1EC] text-[#414E36] px-2.5 py-1 rounded-md">
+                      Total: {
+                        allReservations.filter(
                           (r) =>
                             r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
                             r.customerId === viewingCustomerProfile.id
-                        );
-                        if (history.length === 0) {
-                          return (
-                            <tr>
-                              <td colSpan={6} className="px-4 py-6 text-center text-gray-400 italic">
-                                No booking history records found for this patient.
-                              </td>
-                            </tr>
-                          );
-                        }
-                        return history.map((res) => {
-                          const resDt = new Date(res.date);
-                          const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-                          const serv = localServices.find(s => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
-                          const statusClass = getStatusBadgeClass(res.status);
+                        ).length
+                      }
+                    </span>
+                  </div>
 
-                          const pricesMap: Record<number, number> = {
-                            1: 400, 2: 500, 3: 450, 4: 600, 5: 800, 6: 700, 7: 1500,
-                            11: 600, 12: 500, 13: 800, 14: 1200, 15: 1500, 16: 1000, 17: 400,
-                            21: 300, 22: 350, 23: 300,
-                            31: 400, 32: 350, 33: 400, 34: 500
-                          };
-                          const serviceCost = localServices.find(s => s.id === res.serviceId)?.price ?? pricesMap[res.serviceId] ?? 500;
-                          const spent = res.amountPaid ?? 0;
-                          const left = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : Math.max(0, serviceCost - spent);
-
-                          return (
-                            <tr key={res.id} className="hover:bg-[#F9F9F7]">
-                              <td className="px-4 py-3">
-                                <span className="block font-semibold text-[#1F251A]">{formattedDate}</span>
-                                <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "—"}</span>
-                              </td>
-                              <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
-                              <td className="px-4 py-3">{res.doctorName || "—"}</td>
-                              <td className="px-4 py-3 text-right font-medium text-green-700">{spent} EGP</td>
-                              <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
-                              <td className="px-4 py-3 text-center">
-                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusClass}`}>
-                                  {res.status}
-                                </span>
-                              </td>
-                            </tr>
+                  <div className="overflow-hidden rounded-xl border border-[#E6E9EB]">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] font-bold text-[#5A6A51] uppercase tracking-wider text-[10px]">
+                          <th className="px-4 py-3 text-left">Date / Slot</th>
+                          <th className="px-4 py-3 text-left">Service</th>
+                          <th className="px-4 py-3 text-left">Provider</th>
+                          <th className="px-4 py-3 text-right">Paid</th>
+                          <th className="px-4 py-3 text-right">Left</th>
+                          <th className="px-4 py-3 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                        {(() => {
+                          const history = allReservations.filter(
+                            (r) =>
+                              r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
+                              r.customerId === viewingCustomerProfile.id
                           );
-                        });
-                      })()}
-                    </tbody>
-                  </table>
+                          if (history.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={6} className="px-4 py-6 text-center text-gray-400 italic">
+                                  No booking history records found for this patient.
+                                </td>
+                              </tr>
+                            );
+                          }
+                          return history.map((res) => {
+                            const resDt = new Date(res.date);
+                            const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                            const serv = localServices.find(s => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
+                            const statusClass = getStatusBadgeClass(res.status);
+
+                            const pricesMap: Record<number, number> = {
+                              1: 400, 2: 500, 3: 450, 4: 600, 5: 800, 6: 700, 7: 1500,
+                              11: 600, 12: 500, 13: 800, 14: 1200, 15: 1500, 16: 1000, 17: 400,
+                              21: 300, 22: 350, 23: 300,
+                              31: 400, 32: 350, 33: 400, 34: 500
+                            };
+                            const serviceCost = localServices.find(s => s.id === res.serviceId)?.price ?? pricesMap[res.serviceId] ?? 500;
+                            const spent = res.amountPaid ?? 0;
+                            const left = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : Math.max(0, serviceCost - spent);
+
+                            return (
+                              <tr key={res.id} className="hover:bg-[#F9F9F7]">
+                                <td className="px-4 py-3">
+                                  <span className="block font-semibold text-[#1F251A]">{formattedDate}</span>
+                                  <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "—"}</span>
+                                </td>
+                                <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
+                                <td className="px-4 py-3">{res.doctorName || "—"}</td>
+                                <td className="px-4 py-3 text-right font-medium text-green-700">{spent} EGP</td>
+                                <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
+                                <td className="px-4 py-3 text-center">
+                                  <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusClass}`}>
+                                    {res.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Tab 3: Prescriptions */}
+              {customerProfileTab === "prescription" && (
+                <div className="space-y-6">
+                  {/* Prescription Header */}
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">
+                      Medical Records & Prescriptions
+                    </h4>
+                    {!prescriptionEditMode && (adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor") && (
+                      <button
+                        onClick={handleStartCreatePrescription}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
+                      >
+                        <Plus size={14} /> Write Prescription
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Form Mode */}
+                  {prescriptionEditMode ? (
+                    <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                      <h5 className="text-sm font-bold text-[#1F251A] border-b border-[#414E36]/5 pb-2">
+                        {editingPrescription ? "Edit Prescription" : "New Visit Prescription"}
+                      </h5>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                            Patient Name (Auto-filled)
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={viewingCustomerProfile.name}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                            Date (Auto-filled)
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={new Date().toISOString().slice(0, 10)}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                          Diagnosis / Assessment
+                        </label>
+                        <textarea
+                          placeholder="Describe the medical assessment, skin conditions or main complaints..."
+                          value={rxDiagnosis}
+                          onChange={(e) => setRxDiagnosis(e.target.value)}
+                          rows={3}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                        />
+                      </div>
+
+                      {/* Medications Area */}
+                      <div className="border border-[#414E36]/10 rounded-xl p-4 bg-[#FBFBF9] space-y-3">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#414E36]">
+                          Prescribed Medications
+                        </label>
+
+                        <div className="flex gap-2">
+                          <div className="flex-1 space-y-2">
+                            <div className="flex gap-2">
+                              <select
+                                value={rxMedDropdown}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setRxMedDropdown(val);
+                                  if (val && val !== "Custom") {
+                                    setRxMedInput(val);
+                                  }
+                                }}
+                                className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                              >
+                                <option value="">-- Choose from Catalog --</option>
+                                {MOCK_MEDICINES.map((med) => (
+                                  <option key={med.id} value={med.name}>
+                                    {med.name}
+                                  </option>
+                                ))}
+                                <option value="Custom">Custom Medication...</option>
+                              </select>
+                              
+                              <input
+                                type="text"
+                                placeholder="Enter medication name or custom drug..."
+                                value={rxMedInput}
+                                onChange={(e) => setRxMedInput(e.target.value)}
+                                className="flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                              />
+                            </div>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            onClick={handleAddMedication}
+                            className="rounded-xl bg-[#414E36] px-4 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shrink-0"
+                          >
+                            Add
+                          </button>
+                        </div>
+
+                        {/* Active medications list */}
+                        {rxMedications.length > 0 ? (
+                          <div className="space-y-2 pt-2 border-t border-[#414E36]/5">
+                            {rxMedications.map((med, idx) => (
+                              <div key={idx} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-[#414E36]/10 text-sm">
+                                <div className="flex-1">
+                                  <span className="font-semibold text-[#1F251A]">{med.name}</span>
+                                  <input
+                                    type="text"
+                                    placeholder="Enter specific dosage directions (e.g. 1 tab daily, 7 days)"
+                                    value={med.instructions}
+                                    onChange={(e) => {
+                                      const newMeds = [...rxMedications];
+                                      newMeds[idx].instructions = e.target.value;
+                                      setRxMedications(newMeds);
+                                    }}
+                                    className="w-full mt-1 bg-transparent text-xs text-[#5A6A51] border-b border-transparent hover:border-[#414E36]/15 focus:border-[#C4AE7C] outline-none py-0.5"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveMedication(idx)}
+                                  className="text-red-500 hover:text-red-700 transition p-1 ml-2"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-[#8A9A81] italic text-center py-2">
+                            No medications added yet. Use the dropdown or type custom text above.
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                          General Notes (Optional)
+                        </label>
+                        <textarea
+                          placeholder="Any additional diet restrictions, lifestyle recommendations or patient advice..."
+                          value={rxGeneralNotes}
+                          onChange={(e) => setRxGeneralNotes(e.target.value)}
+                          rows={2}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1">
+                            <span>🔒 Doctor-Only Notes (Optional)</span>
+                          </label>
+                          <span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1.5 py-0.5 rounded">
+                            Hidden from print
+                          </span>
+                        </div>
+                        <textarea
+                          placeholder="Clinical details, private assessment, confidential doctor remarks..."
+                          value={rxDocNotes}
+                          onChange={(e) => setRxDocNotes(e.target.value)}
+                          rows={2}
+                          className="w-full rounded-xl border border-amber-300/40 bg-amber-50/20 px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-amber-400 transition"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                          Next Follow-Up Date (Optional)
+                        </label>
+                        <input
+                          type="date"
+                          value={rxFollowUpDate}
+                          onChange={(e) => setRxFollowUpDate(e.target.value)}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
+                        <button
+                          type="button"
+                          onClick={() => setPrescriptionEditMode(false)}
+                          className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSavePrescription}
+                          disabled={savingPrescription}
+                          className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60"
+                        >
+                          {savingPrescription ? "Saving..." : "Save Record"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Read List Mode */
+                    <div className="space-y-4">
+                      {loadingPrescriptions ? (
+                        <div className="text-center py-12 text-[#5A6A51] text-sm">
+                          Loading medical records...
+                        </div>
+                      ) : customerPrescriptions.length === 0 ? (
+                        <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto text-[#8A9A81]" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                          <p className="text-sm font-semibold text-[#1F251A]">No clinical prescriptions recorded yet</p>
+                          <p className="text-xs text-[#5A6A51]">Create a prescription or register clinic visit details for this patient.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {customerPrescriptions.map((rx) => {
+                            const rxDate = new Date(rx.date).toLocaleDateString("en-US", {
+                              year: "numeric", month: "long", day: "numeric"
+                            });
+                            
+                            const isDocUser = adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor";
+
+                            return (
+                              <div key={rx.id} className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 relative overflow-hidden">
+                                <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
+                                  <div>
+                                    <span className="font-bold text-[#1F251A] text-sm">{rxDate}</span>
+                                    <span className="text-xs text-[#8A9A81] block">Recorded by Revera Clinic Team</span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => handlePrintPrescription(rx)}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                                      title="Print Prescription"
+                                    >
+                                      <Printer size={13} /> Print
+                                    </button>
+                                    
+                                    {isDocUser && (
+                                      <>
+                                        <button
+                                          onClick={() => handleStartEditPrescription(rx)}
+                                          className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                                        >
+                                          <Pencil size={12} /> Edit
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeletePrescription(rx.id)}
+                                          className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition"
+                                          title="Delete Visit"
+                                        >
+                                          <Trash2 size={13} />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="space-y-3 text-sm">
+                                  {rx.diagnosis && (
+                                    <div>
+                                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Diagnosis</span>
+                                      <p className="text-[#1F251A] font-medium leading-relaxed">{rx.diagnosis}</p>
+                                    </div>
+                                  )}
+
+                                  {rx.medications && rx.medications.length > 0 && (
+                                    <div>
+                                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Medications Prescribed</span>
+                                      <ul className="space-y-2 bg-[#FBFBF9] rounded-xl border border-[#414E36]/5 p-3">
+                                        {rx.medications.map((m: any, idx: number) => (
+                                          <li key={idx} className="flex flex-col">
+                                            <span className="font-semibold text-[#1F251A]">{m.name}</span>
+                                            {m.instructions && (
+                                              <span className="text-xs text-[#5A6A51] italic">{m.instructions}</span>
+                                            )}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+
+                                  {rx.general_notes && (
+                                    <div>
+                                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">General Notes</span>
+                                      <p className="text-xs text-[#5A6A51] bg-[#FBFBF9] rounded-xl p-3 border border-[#414E36]/5 leading-relaxed">{rx.general_notes}</p>
+                                    </div>
+                                  )}
+
+                                  {rx.doctor_notes && isDocUser && (
+                                    <div className="border border-amber-300/40 bg-amber-50/20 rounded-xl p-3.5 space-y-1">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-bold text-amber-800">🔒 Doctor-Only Notes</span>
+                                        <span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1 py-0.5 rounded">Hidden from print</span>
+                                      </div>
+                                      <p className="text-xs text-amber-900 leading-relaxed">{rx.doctor_notes}</p>
+                                    </div>
+                                  )}
+
+                                  {rx.follow_up_date && (
+                                    <div className="flex items-center gap-1.5 text-xs text-[#414E36] font-semibold bg-[#EDF1EC]/60 px-3 py-2 rounded-xl w-fit">
+                                      <Calendar size={13} />
+                                      Next Follow-Up: {new Date(rx.follow_up_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Drawer Footer */}
