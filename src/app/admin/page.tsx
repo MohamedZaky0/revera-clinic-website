@@ -12822,7 +12822,7 @@ export default function AdminPage() {
                   <option value="Night">Night Shift</option>
                 </select>
                 <div className="flex items-center justify-end text-xs font-semibold text-[#5A6A51] px-2">
-                  {loadingRolesAndEmployees ? "Loading..." : `${employeesList.length} Total Employees`}
+                  {loadingRolesAndEmployees ? "Loading..." : `${employeesList.filter((emp: any) => emp.role_name !== 'superadmin' && emp.employee_id !== 'superadmin' && emp.email?.toLowerCase() !== 'saif@superadmin.com' && emp.email?.toLowerCase() !== 'superadmin@revera.com').length} Total Employees`}
                 </div>
               </div>
 
@@ -12853,6 +12853,12 @@ export default function AdminPage() {
                         </tr>
                       ) : (() => {
                         const filtered = employeesList.filter((emp: any) => {
+                          const isSuperadmin =
+                            emp.role_name === 'superadmin' ||
+                            emp.employee_id === 'superadmin' ||
+                            emp.email?.toLowerCase() === 'saif@superadmin.com' ||
+                            emp.email?.toLowerCase() === 'superadmin@revera.com';
+                          if (isSuperadmin) return false;
                           if (employeeFilterDepartment !== "All" && emp.department !== employeeFilterDepartment) return false;
                           if (employeeFilterShift !== "All") {
                             const empShift = (emp.shift || "").toLowerCase();
