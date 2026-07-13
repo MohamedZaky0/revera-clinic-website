@@ -14883,6 +14883,17 @@ export default function AdminPage() {
               {hrActiveSubTab === "payroll" && (() => {
                 // Filter payroll records
                 const filtered = payrollList.filter((pay: any) => {
+                  // 0. Exclude Superadmin accounts
+                  const email = pay.employee_accounts?.email;
+                  const roleName = pay.employee_accounts?.role_name;
+                  if (
+                    email === "saif@superadmin.com" ||
+                    email === "superadmin@revera.com" ||
+                    roleName === "superadmin"
+                  ) {
+                    return false;
+                  }
+
                   // 1. Search Query
                   if (payrollSearchQuery.trim()) {
                     const q = payrollSearchQuery.toLowerCase();
