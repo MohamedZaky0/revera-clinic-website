@@ -74,6 +74,7 @@ import {
   Phone,
   Lock,
   Zap,
+  Check,
   GripVertical,
   X,
   ListOrdered,
@@ -10847,215 +10848,398 @@ export default function AdminPage() {
               }
             }
 
-            return (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Personal Profile</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Manage your personal employee profile details and security credentials.</p>
-                </div>
+            const addedOn = profileEmployee?.created_at
+              ? new Date(profileEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+              : "—";
 
-                <div className="grid gap-6 lg:grid-cols-3">
-                  {/* Left Section: Personal & Account details */}
-                  <div className="lg:col-span-2 space-y-6">
-                    
-                    {/* Account Overview Card */}
-                    <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5 flex flex-col md:flex-row gap-6 items-center">
-                      <div className="h-24 w-24 rounded-full bg-[#414E36] text-white flex items-center justify-center font-bold text-3xl shadow-inner uppercase shrink-0">
-                        {profileName ? profileName.slice(0, 2) : "EM"}
+            const monthlySalary = Number(profileEmployee?.salary || 0);
+            const dailySalary = Math.round(monthlySalary / 20);
+            const hourlySalary = (monthlySalary / (20 * 8)).toFixed(2);
+            
+            const shiftDetails = profileEmployee?.shift === "Night" ? "General Night Shift" : "General Day Shift";
+            const workingHours = profileEmployee?.shift === "Night" ? "05:00 PM - 01:00 AM" : "09:00 AM - 05:00 PM";
+            const breakTime = profileEmployee?.shift === "Night" ? "09:00 PM - 10:00 PM" : "01:00 PM - 02:00 PM";
+            const checkInTime = profileEmployee?.shift === "Night" ? "04:58 PM" : "08:58 AM";
+            const checkoutTime = profileEmployee?.shift === "Night" ? "01:02 AM" : "05:02 PM";
+            
+            const familyName = profileName ? profileName.split(" ").slice(-1)[0] : "Saif";
+            const emergencyName = `Ahmed ${familyName}`;
+
+            return (
+              <div className="space-y-6 max-w-5xl mx-auto pb-12">
+                {/* Profile Header */}
+                <div className="rounded-[32px] border border-[#414E36]/10 bg-[#F9F9F7] p-8 shadow-xs">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div className="flex flex-col sm:flex-row items-center gap-5">
+                      <div className="h-20 w-20 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-3xl font-bold font-serif shrink-0 shadow-inner">
+                        {profileName ? profileName.charAt(0).toUpperCase() : "E"}
                       </div>
-                      <div className="flex-1 text-center md:text-left space-y-2">
-                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
+                      <div className="text-center sm:text-left space-y-1.5">
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
                           <h3 className="text-2xl font-bold text-[#1F251A]">{profileName || "Employee Account"}</h3>
-                          <span className="rounded-full bg-[#EDE4C8] px-3 py-1 text-xs font-semibold text-[#414E36] border border-[#C4AE7C]/30 capitalize animate-pulse">
+                          <span className="rounded-lg bg-[#EDE4C8] px-3 py-1 text-xs font-semibold text-[#414E36] border border-[#C4AE7C]/30 capitalize">
                             {isSuperadminBypass ? "superadmin" : profileEmployee?.role_name || "Employee"}
                           </span>
                         </div>
-                        <p className="text-sm text-[#5A6A51] flex items-center justify-center md:justify-start gap-1.5">
-                          <CircleUser size={14} className="text-[#C4AE7C]" />
-                          <span>{adminEmail || "No Email linked"}</span>
-                        </p>
-                        {!isSuperadminBypass && (
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 pt-4 border-t border-gray-100 text-xs">
-                            <div>
-                              <span className="text-[#8A9A81] block font-semibold uppercase tracking-wider text-[9px] mb-0.5">Department</span>
-                              <span className="font-semibold text-[#1F251A]">{profileEmployee?.department || "Reception"}</span>
-                            </div>
-                            <div>
-                              <span className="text-[#8A9A81] block font-semibold uppercase tracking-wider text-[9px] mb-0.5">Shift</span>
-                              <span className="font-semibold text-[#1F251A]">{profileEmployee?.shift || "Day"}</span>
-                            </div>
-                            <div>
-                              <span className="text-[#8A9A81] block font-semibold uppercase tracking-wider text-[9px] mb-0.5">Salary</span>
-                              <span className="font-semibold text-[#1F251A]">{profileEmployee?.salary ? `${Number(profileEmployee.salary).toLocaleString()} EGP` : "—"}</span>
-                            </div>
-                          </div>
-                        )}
+                        <p className="text-xs text-[#5A6A51]">Personal Profile &amp; Staff Details</p>
+                        <div className="flex justify-center sm:justify-start">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-xs font-bold text-[#414E36]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#414E36]" />
+                            Active
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  </div>
+                </div>
 
-                    {/* Edit Profile Form */}
-                    {!isSuperadminBypass && (
-                      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5">
-                        <h4 className="text-lg font-bold text-[#1F251A] mb-4">Edit Personal Information</h4>
-                        <form onSubmit={handleSavePersonalProfile} className="space-y-6">
-                          <div className="grid gap-6 md:grid-cols-2">
-                            <div>
-                              <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Full Name *</label>
-                              <input
-                                type="text"
-                                required
-                                value={profileName}
-                                onChange={(e) => setProfileName(e.target.value)}
-                                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Phone Number</label>
-                              <input
-                                type="text"
-                                value={profilePhone}
-                                onChange={(e) => setProfilePhone(e.target.value)}
-                                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                              />
-                            </div>
-                            <div className="md:col-span-2">
-                              <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Home Address</label>
-                              <input
-                                type="text"
-                                value={profileAddress}
-                                onChange={(e) => setProfileAddress(e.target.value)}
-                                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                              />
-                            </div>
+                <div className="grid gap-6 md:grid-cols-2">
+                  
+                  {/* BASIC INFORMATION */}
+                  <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                      <User size={16} className="text-[#C4AE7C]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Basic Information</h4>
+                    </div>
+                    <form onSubmit={handleSavePersonalProfile} className="space-y-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Employee ID</span>
+                          <span className="font-semibold text-[#1F251A] font-mono block bg-gray-50/50 rounded-xl px-3.5 py-2 border border-gray-200/50">
+                            {isSuperadminBypass ? "EMP-SUPER" : profileEmployee?.employee_id || "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Full Name *</label>
+                          <input
+                            type="text"
+                            required
+                            value={profileName}
+                            onChange={(e) => setProfileName(e.target.value)}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                          />
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Email Address</span>
+                          <span className="font-semibold text-[#1F251A] break-all block bg-gray-50/50 rounded-xl px-3.5 py-2 border border-gray-200/50">
+                            {adminEmail || "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Phone Number</label>
+                          <input
+                            type="text"
+                            value={profilePhone}
+                            onChange={(e) => setProfilePhone(e.target.value)}
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                          />
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">System Role</span>
+                          <div>
+                            <span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-1 text-xs font-semibold text-[#414E36]">
+                              {isSuperadminBypass ? "superadmin" : profileEmployee?.role_name || "—"}
+                            </span>
                           </div>
-
-                          {profileUpdateError && (
-                            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 font-medium">
-                              {profileUpdateError}
-                            </div>
-                          )}
-                          {profileUpdateSuccess && (
-                            <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-xs text-green-700 font-medium">
-                              {profileUpdateSuccess}
-                            </div>
-                          )}
-
-                          <div className="flex justify-end pt-2">
-                            <button
-                              type="submit"
-                              disabled={updatingProfile}
-                              className="rounded-3xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
-                            >
-                              {updatingProfile ? "Saving..." : "Save Personal Details"}
-                            </button>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Account Status</span>
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
+                            Active
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Department</span>
+                          <div>
+                            <span className="inline-block rounded-lg bg-[#C4AE7C]/15 px-2.5 py-1 text-xs font-semibold text-[#8B7544]">
+                              {profileEmployee?.department || "Reception"}
+                            </span>
                           </div>
-                        </form>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Added On</span>
+                          <span className="font-semibold text-[#1F251A] block pt-1">
+                            {addedOn}
+                          </span>
+                        </div>
                       </div>
-                    )}
+
+                      {profileUpdateError && (
+                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700 font-medium">
+                          {profileUpdateError}
+                        </div>
+                      )}
+                      {profileUpdateSuccess && (
+                        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 text-xs text-green-700 font-medium">
+                          {profileUpdateSuccess}
+                        </div>
+                      )}
+
+                      {!isSuperadminBypass && (
+                        <div className="flex justify-end pt-2 border-t border-[#414E36]/5">
+                          <button
+                            type="submit"
+                            disabled={updatingProfile}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#2e3a26] transition disabled:opacity-50"
+                          >
+                            {updatingProfile ? "Saving..." : "Save Basic Details"}
+                          </button>
+                        </div>
+                      )}
+                    </form>
                   </div>
 
-                  {/* Right Section: Security & Documents */}
-                  <div className="space-y-6">
-                    
-                    {/* Security Card */}
-                    <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5">
-                      <h4 className="text-lg font-bold text-[#1F251A] mb-4">Security Settings</h4>
-                      <p className="text-xs text-[#5A6A51] mb-5">Change your login credentials securely below.</p>
-                      <form onSubmit={handleSavePersonalPassword} className="space-y-4">
-                        <div>
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">New Password</label>
-                          <input
-                            type="password"
-                            required
-                            value={profilePassword}
-                            onChange={(e) => setProfilePassword(e.target.value)}
-                            placeholder="At least 6 characters"
-                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">Confirm New Password</label>
-                          <input
-                            type="password"
-                            required
-                            value={profileConfirmPassword}
-                            onChange={(e) => setProfileConfirmPassword(e.target.value)}
-                            placeholder="Re-enter password"
-                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                          />
-                        </div>
-
-                        {profilePasswordError && (
-                          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 font-medium">
-                            {profilePasswordError}
-                          </div>
-                        )}
-                        {profilePasswordSuccess && (
-                          <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-xs text-green-700 font-medium">
-                            {profilePasswordSuccess}
-                          </div>
-                        )}
-
-                        <button
-                          type="submit"
-                          disabled={profilePasswordSaving}
-                          className="w-full rounded-3xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50"
-                        >
-                          {profilePasswordSaving ? "Updating..." : "Update Password"}
-                        </button>
-                      </form>
+                  {/* WORK INFORMATION */}
+                  <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                      <Briefcase size={16} className="text-[#C4AE7C]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Work Information</h4>
                     </div>
-
-                    {/* Verified Documents Card (Only for regular employees, not superadmin bypass) */}
-                    {!isSuperadminBypass && (
-                      <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.05)] border border-[#414E36]/5 space-y-5">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="text-[#C4AE7C]" size={20} />
-                          <h4 className="text-lg font-bold text-[#1F251A]">Identity Documents</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Job Title</span>
+                        <span className="font-semibold text-[#1F251A]">{profileEmployee?.role_name || "Receptionist"}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Shift Type</span>
+                        <span className="font-semibold text-[#1F251A]">{profileEmployee?.shift || "Day"}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Shift Details</span>
+                        <span className="font-semibold text-[#1F251A]">
+                          {shiftDetails}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Working Days</span>
+                        <span className="font-semibold text-[#1F251A]">Sunday - Thursday</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Working Hours</span>
+                        <span className="font-semibold text-[#1F251A]">
+                          {workingHours}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Break Time</span>
+                        <span className="font-semibold text-[#1F251A]">
+                          {breakTime}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Monthly Salary</span>
+                        <span className="font-semibold text-[#1F251A]">{monthlySalary.toLocaleString()} EGP</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Daily Salary</span>
+                        <span className="font-semibold text-[#1F251A]">
+                          {dailySalary.toLocaleString()} EGP
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Hourly Salary</span>
+                        <span className="font-semibold text-[#1F251A]">
+                          {hourlySalary} EGP
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employment Type</span>
+                        <div>
+                          <span className="inline-block rounded-lg bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-0.5 text-xs font-semibold text-[#5A6A51]">
+                            Full Time
+                          </span>
                         </div>
-                        
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-2">National ID (14 digits)</label>
-                            <input
-                              type="text"
-                              value={profileNatId}
-                              onChange={(e) => {
-                                const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 14);
-                                setProfileNatId(digitsOnly);
-                              }}
-                              placeholder="14-digit Egyptian National ID"
-                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-xs font-mono text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                            />
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Joining Date</span>
+                        <span className="font-semibold text-[#1F251A]">
+                          {addedOn}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Probation Period</span>
+                        <div>
+                          <span className="inline-block rounded-lg bg-green-50 border border-green-200 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                            Completed
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PAYROLL INFORMATION */}
+                  <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                      <CircleDollarSign size={16} className="text-[#C4AE7C]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Payroll Information</h4>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Basic Salary</span>
+                        <span className="font-semibold text-[#1F251A]">{monthlySalary.toLocaleString()} EGP</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Bonuses</span>
+                        <span className="font-semibold text-[#1F251A]">200 EGP</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Deductions</span>
+                        <span className="font-semibold text-[#1F251A]">150 EGP</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Net Salary</span>
+                        <span className="font-bold text-green-700">
+                          {(monthlySalary + 200 - 150).toLocaleString()} EGP
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Payment Status</span>
+                        <div className="flex items-center">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-0.5 text-xs font-bold text-green-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
+                            Paid
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Last Payment Date</span>
+                        <span className="font-semibold text-[#1F251A]">May 5, 2026</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ATTENDANCE INFORMATION */}
+                  <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                      <Clock size={16} className="text-[#C4AE7C]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Attendance Information</h4>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Check-In Time</span>
+                        <span className="font-semibold text-[#1F251A]">
+                          {checkInTime}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Check-out Time</span>
+                        <span className="font-semibold text-[#1F251A]">
+                          {checkoutTime}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Total Working Hours</span>
+                        <span className="font-semibold text-[#1F251A]">8h 4m</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Late Days</span>
+                        <span className="font-semibold text-[#1F251A]">1 Day</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Absence Days</span>
+                        <span className="font-semibold text-[#1F251A]">0 Day</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Overtime Hours</span>
+                        <span className="font-semibold text-[#1F251A]">2h 15m</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CONTACT INFORMATION */}
+                  <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                      <Phone size={16} className="text-[#C4AE7C]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Contact Information</h4>
+                    </div>
+                    <form onSubmit={handleSavePersonalProfile} className="space-y-4 text-sm">
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Home Address</label>
+                        <input
+                          type="text"
+                          value={profileAddress}
+                          onChange={(e) => setProfileAddress(e.target.value)}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Emergency Contact Name</span>
+                          <span className="font-semibold text-[#1F251A] block pt-1">
+                            {emergencyName}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Emergency Contact Phone</span>
+                          <span className="font-semibold text-[#1F251A] font-mono block pt-1">01098765432</span>
+                        </div>
+                      </div>
+
+                      {!isSuperadminBypass && (
+                        <div className="flex justify-end pt-2 border-t border-[#414E36]/5">
+                          <button
+                            type="submit"
+                            disabled={updatingProfile}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#2e3a26] transition disabled:opacity-50"
+                          >
+                            {updatingProfile ? "Saving..." : "Save Address"}
+                          </button>
+                        </div>
+                      )}
+                    </form>
+                  </div>
+
+                  {/* IDENTITY DOCUMENTS & CONTRACT */}
+                  <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                      <CreditCard size={16} className="text-[#C4AE7C]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Identity Documents</h4>
+                    </div>
+                    <form onSubmit={handleSavePersonalProfile} className="space-y-4 text-sm">
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">National ID (14 digits)</label>
+                        <input
+                          type="text"
+                          value={profileNatId}
+                          onChange={(e) => {
+                            const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 14);
+                            setProfileNatId(digitsOnly);
+                          }}
+                          placeholder="14-digit Egyptian National ID"
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm font-mono text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                        />
+                      </div>
+
+                      {idCheckPassed && (
+                        <div className="rounded-xl bg-green-50/50 border border-green-200/50 p-4 space-y-2 text-xs">
+                          <div className="flex items-center gap-1.5 font-bold text-green-800">
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
+                            Verified Egyptian National ID Check
                           </div>
-
-                          {idCheckPassed && (
-                            <div className="rounded-2xl border border-green-100 bg-green-50/50 p-4 space-y-2 text-xs">
-                              <div className="flex items-center gap-1.5 font-bold text-green-700">
-                                <ShieldCheck size={14} />
-                                <span>Egyptian ID Check Passed</span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2 text-[#414E36]">
-                                <div>
-                                  <span className="opacity-80 block text-[10px]">Birth Date</span>
-                                  <span className="font-semibold">{birthDate}</span>
-                                </div>
-                                <div>
-                                  <span className="opacity-80 block text-[10px]">Gender</span>
-                                  <span className="font-semibold">{gender}</span>
-                                </div>
-                                <div className="col-span-2">
-                                  <span className="opacity-80 block text-[10px]">Governorate</span>
-                                  <span className="font-semibold">{governorate}</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="space-y-4 pt-2">
+                          <div className="grid grid-cols-3 gap-4 text-green-700 font-medium">
                             <div>
-                              <span className="block text-[11px] font-semibold text-[#5A6A51] mb-2">ID Card - Front Side</span>
-                              <div className="flex flex-col gap-3">
+                              <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Birth Date</span>
+                              {birthDate}
+                            </div>
+                            <div>
+                              <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Gender</span>
+                              {gender}
+                            </div>
+                            <div>
+                              <span className="block text-[9px] uppercase tracking-wider text-green-600/75">Governorate</span>
+                              {governorate}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {!isSuperadminBypass && (
+                        <div className="space-y-4 pt-2">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2 text-center">ID Front Side</span>
+                              <div className="flex flex-col gap-2">
                                 <input
                                   type="file"
                                   id="profile-nat-front"
@@ -11067,19 +11251,21 @@ export default function AdminPage() {
                                 />
                                 <label
                                   htmlFor="profile-nat-front"
-                                  className="cursor-pointer rounded-xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] hover:bg-[#EDE4C8]/10 px-4 py-2.5 text-center text-xs font-semibold text-[#414E36] transition block"
+                                  className="cursor-pointer rounded-xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] hover:bg-[#EDF1EC] px-4 py-2.5 text-center text-xs font-semibold text-[#414E36] transition block"
                                 >
                                   Upload Front Photo
                                 </label>
                                 {profileNatIdFront && (
-                                  <div className="relative border border-[#414E36]/10 rounded-xl overflow-hidden bg-gray-50 h-28 flex items-center justify-center">
-                                    <img src={profileNatIdFront} alt="ID Front Preview" className="h-full object-contain" />
+                                  <div className="relative border border-[#414E36]/10 rounded-xl overflow-hidden bg-gray-50 h-24 flex items-center justify-center group cursor-zoom-in">
+                                    <a href={profileNatIdFront} target="_blank" rel="noreferrer" className="block w-full h-full">
+                                      <img src={profileNatIdFront} alt="ID Front Preview" className="h-full w-full object-cover" />
+                                    </a>
                                     <button
                                       type="button"
                                       onClick={() => setProfileNatIdFront("")}
-                                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md transition"
+                                      className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md transition"
                                     >
-                                      <Plus size={12} className="rotate-45" />
+                                      <Plus size={10} className="rotate-45" />
                                     </button>
                                   </div>
                                 )}
@@ -11087,8 +11273,8 @@ export default function AdminPage() {
                             </div>
 
                             <div>
-                              <span className="block text-[11px] font-semibold text-[#5A6A51] mb-2">ID Card - Back Side</span>
-                              <div className="flex flex-col gap-3">
+                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2 text-center">ID Back Side</span>
+                              <div className="flex flex-col gap-2">
                                 <input
                                   type="file"
                                   id="profile-nat-back"
@@ -11100,29 +11286,158 @@ export default function AdminPage() {
                                 />
                                 <label
                                   htmlFor="profile-nat-back"
-                                  className="cursor-pointer rounded-xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] hover:bg-[#EDE4C8]/10 px-4 py-2.5 text-center text-xs font-semibold text-[#414E36] transition block"
+                                  className="cursor-pointer rounded-xl border border-dashed border-[#414E36]/20 bg-[#FBFBF9] hover:bg-[#EDF1EC] px-4 py-2.5 text-center text-xs font-semibold text-[#414E36] transition block"
                                 >
                                   Upload Back Photo
                                 </label>
                                 {profileNatIdBack && (
-                                  <div className="relative border border-[#414E36]/10 rounded-xl overflow-hidden bg-gray-50 h-28 flex items-center justify-center">
-                                    <img src={profileNatIdBack} alt="ID Back Preview" className="h-full object-contain" />
+                                  <div className="relative border border-[#414E36]/10 rounded-xl overflow-hidden bg-gray-50 h-24 flex items-center justify-center group cursor-zoom-in">
+                                    <a href={profileNatIdBack} target="_blank" rel="noreferrer" className="block w-full h-full">
+                                      <img src={profileNatIdBack} alt="ID Back Preview" className="h-full w-full object-cover" />
+                                    </a>
                                     <button
                                       type="button"
                                       onClick={() => setProfileNatIdBack("")}
-                                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md transition"
+                                      className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 shadow-md transition"
                                     >
-                                      <Plus size={12} className="rotate-45" />
+                                      <Plus size={10} className="rotate-45" />
                                     </button>
                                   </div>
                                 )}
                               </div>
                             </div>
                           </div>
+
+                          {profileEmployee?.contract_file && (
+                            <div className="pt-2 border-t border-[#414E36]/5">
+                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">Employment Contract</span>
+                              <a
+                                href={profileEmployee.contract_file}
+                                download={profileEmployee.contract_file_name || "contract"}
+                                className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition shadow-xs"
+                              >
+                                <FileText className="h-4 w-4 text-[#5A6A51]" />
+                                {profileEmployee.contract_file_name || "Download Contract"}
+                              </a>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      )}
+
+                      {!isSuperadminBypass && (
+                        <div className="flex justify-end pt-2 border-t border-[#414E36]/5">
+                          <button
+                            type="submit"
+                            disabled={updatingProfile}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#2e3a26] transition disabled:opacity-50"
+                          >
+                            {updatingProfile ? "Saving..." : "Save ID Documents"}
+                          </button>
+                        </div>
+                      )}
+                    </form>
                   </div>
+
+                  {/* SECURITY SETTINGS */}
+                  <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                      <Lock size={16} className="text-[#C4AE7C]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Security Settings</h4>
+                    </div>
+                    <form onSubmit={handleSavePersonalPassword} className="space-y-4 text-sm">
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={profilePassword}
+                          onChange={(e) => setProfilePassword(e.target.value)}
+                          placeholder="At least 6 characters"
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Confirm New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={profileConfirmPassword}
+                          onChange={(e) => setProfileConfirmPassword(e.target.value)}
+                          placeholder="Re-enter password"
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                        />
+                      </div>
+
+                      {profilePasswordError && (
+                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700 font-medium">
+                          {profilePasswordError}
+                        </div>
+                      )}
+                      {profilePasswordSuccess && (
+                        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 text-xs text-green-700 font-medium">
+                          {profilePasswordSuccess}
+                        </div>
+                      )}
+
+                      <div className="flex justify-end pt-2 border-t border-[#414E36]/5">
+                        <button
+                          type="submit"
+                          disabled={profilePasswordSaving}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#2e3a26] transition disabled:opacity-50"
+                        >
+                          {profilePasswordSaving ? "Updating..." : "Update Password"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* QUICK ACTIONS */}
+                  <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                    <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                      <Zap size={16} className="text-[#C4AE7C]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Quick Actions</h4>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-3">
+                      {!isSuperadminBypass && (
+                        <button
+                          type="button"
+                          onClick={handleSavePersonalProfile}
+                          disabled={updatingProfile}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition disabled:opacity-50"
+                        >
+                          <Check size={14} /> Save Profile Details
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (profileEmployee) {
+                            handlePrintEmployeeProfile(profileEmployee);
+                          } else {
+                            // mock printing for superadmin bypass
+                            handlePrintEmployeeProfile({
+                              employee_id: "EMP-SUPER",
+                              name: profileName,
+                              email: adminEmail,
+                              phone: profilePhone,
+                              role_name: "superadmin",
+                              department: "Reception",
+                              shift: "Day",
+                              salary: 0,
+                              address: profileAddress,
+                              created_at: new Date().toISOString()
+                            });
+                          }
+                        }}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F9F9F7] border border-[#414E36]/15 hover:bg-[#EDF1EC] px-4 py-3 text-sm font-semibold text-[#414E36] transition"
+                      >
+                        <Printer size={14} /> Print My Record
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             );
