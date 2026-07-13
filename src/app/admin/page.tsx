@@ -4712,7 +4712,7 @@ export default function AdminPage() {
   }
 
   async function handleDeletePrescription(id: string) {
-    if (!window.confirm("Are you sure you want to delete this prescription?")) return;
+    if (!(await showConfirm("Are you sure you want to delete this prescription?"))) return;
     try {
       const res = await fetch(`/api/prescriptions?id=${id}`, {
         method: "DELETE",
@@ -15230,7 +15230,7 @@ export default function AdminPage() {
                                         {!isPaid ? (
                                           <button
                                             onClick={async () => {
-                                              if (!confirm(`Are you sure you want to mark ${empObj.name || "this employee"}'s payroll as PAID?`)) return;
+                                              if (!(await showConfirm(`Are you sure you want to mark ${empObj.name || "this employee"}'s payroll as PAID?`))) return;
                                               try {
                                                 const res = await fetch('/api/hr/payroll', {
                                                   method: 'PATCH',
@@ -15541,7 +15541,7 @@ export default function AdminPage() {
                         <div key={rev.id} className="rounded-[32px] border border-[#414E36]/10 bg-white p-6 shadow-sm relative hover:border-[#414E36]/30 transition-all">
                           <button
                             onClick={async () => {
-                              if (!confirm("Delete this review?")) return;
+                              if (!(await showConfirm("Delete this review?"))) return;
                               await fetch(`/api/hr/performance?id=${rev.id}`, {
                                 method: 'DELETE',
                                 headers: { 'Authorization': `Bearer ${session?.access_token}` }
