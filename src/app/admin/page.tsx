@@ -682,11 +682,47 @@ export default function AdminPage() {
     const formattedEnd = formatTime12Hour(val);
     setNewEmployeeShift(`${formattedStart} to ${formattedEnd}`);
   };
+
+  // Helpers: serialize structured address to a single string, and parse it back
+  const buildAddress = (line1: string, line2: string, city: string, gov: string, postal: string, country: string) => {
+    return JSON.stringify({ line1, line2, city, governorate: gov, postalCode: postal, country });
+  };
+
+  const parseAddress = (raw: string) => {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && "line1" in parsed) return parsed;
+    } catch {}
+    // Legacy plain-text fallback
+    return { line1: raw, line2: "", city: "", governorate: "", postalCode: "", country: "Egypt" };
+  };
+
+  const applyAddressToState = (raw: string | null | undefined) => {
+    const p = parseAddress(raw || "");
+    setNewEmployeeAddressLine1(p.line1 || "");
+    setNewEmployeeAddressLine2(p.line2 || "");
+    setNewEmployeeCity(p.city || "");
+    setNewEmployeeGovernorateProp(p.governorate || "");
+    setNewEmployeePostalCode(p.postalCode || "");
+    setNewEmployeeCountry(p.country || "Egypt");
+    setNewEmployeeAddress(raw || "");
+  };
+
+  const commitAddressState = (line1: string, line2: string, city: string, gov: string, postal: string, country: string) => {
+    setNewEmployeeAddress(buildAddress(line1, line2, city, gov, postal, country));
+  };
+
   const [newEmployeeSalary, setNewEmployeeSalary] = useState("0");
   const [newEmployeeNationalId, setNewEmployeeNationalId] = useState("");
   const [newEmployeeNationalIdFront, setNewEmployeeNationalIdFront] = useState("");
   const [newEmployeeNationalIdBack, setNewEmployeeNationalIdBack] = useState("");
   const [newEmployeeAddress, setNewEmployeeAddress] = useState("");
+  const [newEmployeeAddressLine1, setNewEmployeeAddressLine1] = useState("");
+  const [newEmployeeAddressLine2, setNewEmployeeAddressLine2] = useState("");
+  const [newEmployeeCity, setNewEmployeeCity] = useState("");
+  const [newEmployeeGovernorateProp, setNewEmployeeGovernorateProp] = useState("");
+  const [newEmployeePostalCode, setNewEmployeePostalCode] = useState("");
+  const [newEmployeeCountry, setNewEmployeeCountry] = useState("Egypt");
   const [newEmployeeBranchId, setNewEmployeeBranchId] = useState("");
   const [activeInfoFeature, setActiveInfoFeature] = useState<{ title: string; description: string } | null>(null);
   const [newEmployeeContract, setNewEmployeeContract] = useState("");
@@ -11710,7 +11746,7 @@ export default function AdminPage() {
                     setNewEmployeeNationalId("");
                     setNewEmployeeNationalIdFront("");
                     setNewEmployeeNationalIdBack("");
-                    setNewEmployeeAddress("");
+                    applyAddressToState("");
                     setNewEmployeeBranchId("");
                     setNewEmployeeContract("");
                     setNewEmployeeContractName("");
@@ -11889,7 +11925,7 @@ export default function AdminPage() {
                                           setNewEmployeeNationalId(emp.national_id || "");
                                           setNewEmployeeNationalIdFront(emp.national_id_front || "");
                                           setNewEmployeeNationalIdBack(emp.national_id_back || "");
-                                          setNewEmployeeAddress(emp.address || "");
+                                          applyAddressToState(emp.address || "");
                                           setNewEmployeeBranchId(emp.branch_id || "");
                                           setNewEmployeeContract(emp.contract_file || "");
                                           setNewEmployeeContractName(emp.contract_file_name || "");
@@ -11973,7 +12009,7 @@ export default function AdminPage() {
                                 nationalId: newEmployeeNationalId.trim() || null,
                                 nationalIdFront: newEmployeeNationalIdFront || null,
                                 nationalIdBack: newEmployeeNationalIdBack || null,
-                                address: newEmployeeAddress.trim() || null,
+                                address: buildAddress(newEmployeeAddressLine1.trim(), newEmployeeAddressLine2.trim(), newEmployeeCity.trim(), newEmployeeGovernorateProp.trim(), newEmployeePostalCode.trim(), newEmployeeCountry.trim()) || null,
                                 branchId: newEmployeeBranchId || null,
                                 contractFile: newEmployeeContract || null,
                                 contractFileName: newEmployeeContractName || null,
@@ -12006,7 +12042,7 @@ export default function AdminPage() {
                                 nationalId: newEmployeeNationalId.trim() || null,
                                 nationalIdFront: newEmployeeNationalIdFront || null,
                                 nationalIdBack: newEmployeeNationalIdBack || null,
-                                address: newEmployeeAddress.trim() || null,
+                                address: buildAddress(newEmployeeAddressLine1.trim(), newEmployeeAddressLine2.trim(), newEmployeeCity.trim(), newEmployeeGovernorateProp.trim(), newEmployeePostalCode.trim(), newEmployeeCountry.trim()) || null,
                                 branchId: newEmployeeBranchId || null,
                                 contractFile: newEmployeeContract || null,
                                 contractFileName: newEmployeeContractName || null,
@@ -12173,15 +12209,99 @@ export default function AdminPage() {
                             />
                           </div>
 
-                          <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Home Address</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. 15 El-Ghad St, Pyramids, Giza"
-                              value={newEmployeeAddress}
-                              onChange={(e) => setNewEmployeeAddress(e.target.value)}
-                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                            />
+                          {/* Structured Address */}
+                          <div className="sm:col-span-2">
+                            <div className="rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 space-y-3">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] flex items-center gap-1.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                                Home Address
+                              </p>
+                              <div>
+                                <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Address Line 1 <span className="text-[#C4AE7C]">*</span></label>
+                                <input
+                                  type="text"
+                                  placeholder="Street number and name"
+                                  value={newEmployeeAddressLine1}
+                                  onChange={(e) => {
+                                    setNewEmployeeAddressLine1(e.target.value);
+                                    commitAddressState(e.target.value, newEmployeeAddressLine2, newEmployeeCity, newEmployeeGovernorateProp, newEmployeePostalCode, newEmployeeCountry);
+                                  }}
+                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Address Line 2 <span className="text-[#8A9A81] font-normal">(Optional)</span></label>
+                                <input
+                                  type="text"
+                                  placeholder="Apartment, floor, building, compound…"
+                                  value={newEmployeeAddressLine2}
+                                  onChange={(e) => {
+                                    setNewEmployeeAddressLine2(e.target.value);
+                                    commitAddressState(newEmployeeAddressLine1, e.target.value, newEmployeeCity, newEmployeeGovernorateProp, newEmployeePostalCode, newEmployeeCountry);
+                                  }}
+                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">City</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Cairo"
+                                    value={newEmployeeCity}
+                                    onChange={(e) => {
+                                      setNewEmployeeCity(e.target.value);
+                                      commitAddressState(newEmployeeAddressLine1, newEmployeeAddressLine2, e.target.value, newEmployeeGovernorateProp, newEmployeePostalCode, newEmployeeCountry);
+                                    }}
+                                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Governorate</label>
+                                  <select
+                                    value={newEmployeeGovernorateProp}
+                                    onChange={(e) => {
+                                      setNewEmployeeGovernorateProp(e.target.value);
+                                      commitAddressState(newEmployeeAddressLine1, newEmployeeAddressLine2, newEmployeeCity, e.target.value, newEmployeePostalCode, newEmployeeCountry);
+                                    }}
+                                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                                  >
+                                    <option value="">— Select —</option>
+                                    {["Cairo","Giza","Alexandria","Aswan","Asyut","Beheira","Beni Suef","Dakahlia","Damietta","Faiyum","Gharbia","Ismailia","Kafr el-Sheikh","Luxor","Matruh","Minya","Monufia","New Valley","North Sinai","Port Said","Qalyubia","Qena","Red Sea","Sharqia","Sohag","South Sinai","Suez"].map(g => (
+                                      <option key={g} value={g}>{g}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Postal Code</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. 11511"
+                                    value={newEmployeePostalCode}
+                                    onChange={(e) => {
+                                      setNewEmployeePostalCode(e.target.value);
+                                      commitAddressState(newEmployeeAddressLine1, newEmployeeAddressLine2, newEmployeeCity, newEmployeeGovernorateProp, e.target.value, newEmployeeCountry);
+                                    }}
+                                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Country</label>
+                                  <input
+                                    type="text"
+                                    placeholder="e.g. Egypt"
+                                    value={newEmployeeCountry}
+                                    onChange={(e) => {
+                                      setNewEmployeeCountry(e.target.value);
+                                      commitAddressState(newEmployeeAddressLine1, newEmployeeAddressLine2, newEmployeeCity, newEmployeeGovernorateProp, newEmployeePostalCode, e.target.value);
+                                    }}
+                                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                                  />
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
 
@@ -12438,7 +12558,7 @@ export default function AdminPage() {
                               setNewEmployeeNationalId(viewingEmployee.national_id || "");
                               setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
                               setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
-                              setNewEmployeeAddress(viewingEmployee.address || "");
+                              applyAddressToState(viewingEmployee.address || "");
                               setNewEmployeeContract(viewingEmployee.contract_file || "");
                               setNewEmployeeContractName(viewingEmployee.contract_file_name || "");
                               setViewingEmployee(null);
@@ -12505,10 +12625,20 @@ export default function AdminPage() {
                             </span>
                           </div>
                           <div className="col-span-2">
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Home Address</span>
-                            <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
-                              {viewingEmployee.address || "—"}
-                            </span>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Home Address</span>
+                            {viewingEmployee.address ? (() => {
+                              const a = parseAddress(viewingEmployee.address);
+                              return (
+                                <div className="rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] px-4 py-3 space-y-1.5 text-sm text-[#1F251A]">
+                                  {a.line1 && <p className="font-semibold">{a.line1}</p>}
+                                  {a.line2 && <p className="text-[#5A6A51]">{a.line2}</p>}
+                                  <p className="text-[#5A6A51]">
+                                    {[a.city, a.governorate, a.postalCode].filter(Boolean).join(", ")}
+                                  </p>
+                                  {a.country && <p className="text-xs font-bold text-[#8A9A81] uppercase tracking-wide">{a.country}</p>}
+                                </div>
+                              );
+                            })() : <span className="text-[#8A9A81] text-sm italic">No address on file</span>}
                           </div>
 
                           {/* ID Check Info Card */}
@@ -12626,7 +12756,7 @@ export default function AdminPage() {
                               setNewEmployeeNationalId(viewingEmployee.national_id || "");
                               setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
                               setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
-                              setNewEmployeeAddress(viewingEmployee.address || "");
+                              applyAddressToState(viewingEmployee.address || "");
                               setNewEmployeeContract(viewingEmployee.contract_file || "");
                               setNewEmployeeContractName(viewingEmployee.contract_file_name || "");
                               setViewingEmployee(null);
