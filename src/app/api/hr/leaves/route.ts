@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   try {
     const { data: leaves, error } = await supabaseServer
       .from('hr_leave_requests')
-      .select('*, employee_accounts(id, name, email, department, role_name)')
+      .select('*, employee_accounts:employee_accounts!hr_leave_requests_employee_id_fkey(id, name, email, department, role_name)')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
