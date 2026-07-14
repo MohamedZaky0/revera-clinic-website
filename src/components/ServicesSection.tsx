@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Category, ServiceItem } from "@/lib/services";
+import { Category, ServiceItem, getServicePriceDetails } from "@/lib/services";
 import { 
   getServiceToggles, 
   isServiceActive, 
@@ -192,18 +192,68 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
             </svg>
           </div>
         </div>
-        {service.price !== undefined && service.price !== null && Number(service.price) > 0 && (
-          <div style={{
-            fontFamily: "var(--font-sora), sans-serif",
-            fontSize: 16,
-            fontWeight: 650,
-            color: "#C4AE7C",
-            marginTop: -12,
-            marginBottom: -12,
-          }}>
-            {lang === "ar" ? `${Number(service.price).toLocaleString()} ج.م` : `${Number(service.price).toLocaleString()} EGP`}
-          </div>
-        )}
+        {(() => {
+          const priceDetails = getServicePriceDetails(service);
+          if (priceDetails.basePrice <= 0) return null;
+
+          return (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 8,
+              marginTop: -12,
+              marginBottom: -12,
+              fontFamily: "var(--font-sora), sans-serif",
+            }}>
+              {priceDetails.hasPromotion ? (
+                <>
+                  <span style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "#C4AE7C",
+                  }}>
+                    {lang === "ar" 
+                      ? `${priceDetails.discountedPrice.toLocaleString()} ج.م` 
+                      : `${priceDetails.discountedPrice.toLocaleString()} EGP`}
+                  </span>
+                  <span style={{
+                    fontSize: 13,
+                    fontWeight: 400,
+                    color: "rgba(90, 106, 81, 0.45)",
+                    textDecoration: "line-through",
+                  }}>
+                    {lang === "ar"
+                      ? `${priceDetails.basePrice.toLocaleString()} ج.م`
+                      : `${priceDetails.basePrice.toLocaleString()} EGP`}
+                  </span>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#FFFFFF",
+                    backgroundColor: "#C4AE7C",
+                    padding: "2px 6px",
+                    borderRadius: 6,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}>
+                    {lang === "ar" ? priceDetails.promotionTextAr : priceDetails.promotionText}
+                  </span>
+                </>
+              ) : (
+                <span style={{
+                  fontSize: 16,
+                  fontWeight: 650,
+                  color: "#C4AE7C",
+                }}>
+                  {lang === "ar" 
+                    ? `${priceDetails.basePrice.toLocaleString()} ج.م` 
+                    : `${priceDetails.basePrice.toLocaleString()} EGP`}
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         <p style={{
           margin: 0,
