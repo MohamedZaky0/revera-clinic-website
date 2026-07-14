@@ -233,9 +233,28 @@ export function getServicePriceDetails(
     );
   }
 
-  // Fallback to default branch pricing
+  // Fallback to default branch pricing or any branch with active promotion
   if (!bpItem && service.branchPricing && Array.isArray(service.branchPricing)) {
-    bpItem = service.branchPricing.find((bp) => bp && bp.isDefault);
+    const now = new Date();
+    const egyptTimeStr = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+    const todayStr = egyptTimeStr.slice(0, 10);
+
+    const activePromoBranch = service.branchPricing.find((bp) => {
+      if (bp && bp.promotion && bp.promotion.enabled) {
+        const promo = bp.promotion;
+        let isDateActive = true;
+        if (promo.startDate && todayStr < promo.startDate) isDateActive = false;
+        if (promo.endDate && todayStr > promo.endDate) isDateActive = false;
+        return isDateActive;
+      }
+      return false;
+    });
+
+    if (activePromoBranch) {
+      bpItem = activePromoBranch;
+    } else {
+      bpItem = service.branchPricing.find((bp) => bp && bp.isDefault);
+    }
   }
 
   const basePrice = bpItem ? Number(bpItem.price) : Number(service.price ?? 0);
