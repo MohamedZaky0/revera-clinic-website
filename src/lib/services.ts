@@ -85,6 +85,13 @@ export interface ServiceItem {
     visible: boolean;
     status: boolean;
     isDefault?: boolean;
+    promotion?: {
+      enabled: boolean;
+      type: "percentage" | "fixed";
+      value: number;
+      startDate?: string;
+      endDate?: string;
+    };
   }>;
 }
 
@@ -118,3 +125,69 @@ export const CATEGORY_LABELS: Record<Category, { en: string; ar: string }> = {
   physiotherapy: { en: "Physical Therapy", ar: "العلاج الطبيعي" },
   osteopathy: { en: "Osteopathy & Nutrition", ar: "تقويم العظام والتغذية" },
 };
+
+export function getEffectiveServicePrice(
+  service: { price?: number; branchPricing?: any[] | null } | null | undefined,
+  branchNameOrId?: string | number | null,
+  branchesList?: Array<{ id: number | string; name?: string; name_en?: string; name_ar?: string }> | null
+): number {
+  if (!service) return 0;
+
+  let targetBranchName: string | null = null;
+  if (branchNameOrId !== undefined && branchNameOrId !== null) {
+    if (typeof branchNameOrId === "string" && isNaN(Number(branchNameOrId))) {
+      targetBranchName = branchNameOrId;
+    } else if (branchesList && branchesList.length > 0) {
+      const bId = Number(branchNameOrId);
+      const bObj = branchesList.find((b) => Number(b.id) === bId);
+      if (bObj) {
+        targetBranchName = bObj.name || bObj.name_en || bObj.name_ar || null;
+      }
+    }
+  }
+
+  let bpItem: any = null;
+  if (targetBranchName && service.branchPricing && Array.isArray(service.branchPricing)) {
+    bpItem = service.branchPricing.find(
+      (bp) => bp && bp.name && bp.name.toLowerCase() === targetBranchName!.toLowerCase()
+    );
+  }
+
+  // Fallback to default branch pricing
+  if (!bpItem && service.branchPricing && Array.isArray(service.branchPricing)) {
+    bpItem = service.branchPricing.find((bp) => bp && bp.isDefault);
+  }
+
+  const basePrice = bpItem ? Number(bpItem.price) : Number(service.price ?? 0);
+
+  // Apply promotion if enabled
+  if (bpItem && bpItem.promotion && bpItem.promotion.enabled) {
+    const promo = bpItem.promotion;
+
+    // Compare date strings using Egypt local time
+    const now = new Date();
+    const egyptTimeStr = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+    const todayStr = egyptTimeStr.slice(0, 10); // YYYY-MM-DD
+
+    let isDateActive = true;
+    if (promo.startDate && todayStr < promo.startDate) {
+      isDateActive = false;
+    }
+    if (promo.endDate && todayStr > promo.endDate) {
+      isDateActive = false;
+    }
+
+    if (isDateActive) {
+      let finalPrice = basePrice;
+      const val = Number(promo.value) || 0;
+      if (promo.type === "percentage") {
+        finalPrice = basePrice * (1 - val / 100);
+      } else if (promo.type === "fixed") {
+        finalPrice = basePrice - val;
+      }
+      return Math.max(0, Math.round(finalPrice));
+    }
+  }
+
+  return basePrice;
+}

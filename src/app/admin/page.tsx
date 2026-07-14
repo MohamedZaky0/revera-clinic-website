@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
-import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
+import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot, getEffectiveServicePrice } from "@/lib/services";
 import { 
   getServiceToggles, 
   setServiceToggle, 
@@ -938,7 +938,7 @@ export default function AdminPage() {
   const [serviceIsShared, setServiceIsShared] = useState(false);
   const [serviceEnableReminder, setServiceEnableReminder] = useState(true);
   const [serviceImageUrl, setServiceImageUrl] = useState("");
-  const [serviceBranchPricing, setServiceBranchPricing] = useState<Array<{ name: string; price: number; visible: boolean; status: boolean; isDefault?: boolean }>>([
+  const [serviceBranchPricing, setServiceBranchPricing] = useState<Required<ServiceItem>['branchPricing']>([
     { name: "Zayed", price: 0, visible: true, status: true, isDefault: true }
   ]);
 
@@ -7079,6 +7079,145 @@ export default function AdminPage() {
                                   />
                                 </button>
                               </div>
+                            </div>
+
+                            {/* Promotion Section */}
+                            <div className="mt-4 pt-4 border-t border-[#414E36]/10 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-[#414E36] flex items-center gap-1.5">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#C4AE7C]">
+                                    <line x1="19" y1="5" x2="5" y2="19" />
+                                    <circle cx="6.5" cy="6.5" r="2.5" />
+                                    <circle cx="17.5" cy="17.5" r="2.5" />
+                                  </svg>
+                                  Branch Promotion / عروض الفرع
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = [...serviceBranchPricing];
+                                    const promo = updated[index].promotion || { enabled: false, type: "percentage", value: 0 };
+                                    updated[index].promotion = {
+                                      ...promo,
+                                      enabled: !promo.enabled
+                                    };
+                                    setServiceBranchPricing(updated);
+                                  }}
+                                  className="relative h-5 w-9 rounded-full focus:outline-none transition-colors duration-300"
+                                  style={{ backgroundColor: bp.promotion?.enabled ? "#414E36" : "#E2E8F0" }}
+                                >
+                                  <span
+                                    className="absolute top-[2px] h-4.5 w-4.5 rounded-full bg-white shadow-md transition-all duration-300"
+                                    style={{ left: bp.promotion?.enabled ? "18px" : "2px" }}
+                                  />
+                                </button>
+                              </div>
+
+                              {bp.promotion?.enabled && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#414E36]/5 p-3 rounded-xl border border-[#414E36]/10">
+                                  {/* Discount Type */}
+                                  <div>
+                                    <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">Discount Type</label>
+                                    <select
+                                      value={bp.promotion.type || "percentage"}
+                                      onChange={(e) => {
+                                        const updated = [...serviceBranchPricing];
+                                        if (updated[index].promotion) {
+                                          updated[index].promotion!.type = e.target.value as "percentage" | "fixed";
+                                        }
+                                        setServiceBranchPricing(updated);
+                                      }}
+                                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A] font-medium"
+                                    >
+                                      <option value="percentage">Percentage (%)</option>
+                                      <option value="fixed">Fixed Amount (EGP)</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Value */}
+                                  <div>
+                                    <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">Discount Value</label>
+                                    <input
+                                      type="number"
+                                      value={bp.promotion.value || 0}
+                                      onChange={(e) => {
+                                        const updated = [...serviceBranchPricing];
+                                        if (updated[index].promotion) {
+                                          updated[index].promotion!.value = Math.max(0, Number(e.target.value) || 0);
+                                        }
+                                        setServiceBranchPricing(updated);
+                                      }}
+                                      placeholder="0"
+                                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A] font-medium"
+                                    />
+                                  </div>
+
+                                  {/* Start Date */}
+                                  <div>
+                                    <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">Start Date (Optional)</label>
+                                    <input
+                                      type="date"
+                                      value={bp.promotion.startDate || ""}
+                                      onChange={(e) => {
+                                        const updated = [...serviceBranchPricing];
+                                        if (updated[index].promotion) {
+                                          updated[index].promotion!.startDate = e.target.value || undefined;
+                                        }
+                                        setServiceBranchPricing(updated);
+                                      }}
+                                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A] font-medium"
+                                    />
+                                  </div>
+
+                                  {/* End Date */}
+                                  <div>
+                                    <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">End Date (Optional)</label>
+                                    <input
+                                      type="date"
+                                      value={bp.promotion.endDate || ""}
+                                      onChange={(e) => {
+                                        const updated = [...serviceBranchPricing];
+                                        if (updated[index].promotion) {
+                                          updated[index].promotion!.endDate = e.target.value || undefined;
+                                        }
+                                        setServiceBranchPricing(updated);
+                                      }}
+                                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A] font-medium"
+                                    />
+                                  </div>
+
+                                  {/* Live Preview / Validation warning */}
+                                  {(() => {
+                                    const basePrice = bp.price || 0;
+                                    const val = bp.promotion.value || 0;
+                                    let calcPrice = basePrice;
+                                    if (bp.promotion.type === "percentage") {
+                                      calcPrice = basePrice * (1 - val / 100);
+                                    } else {
+                                      calcPrice = basePrice - val;
+                                    }
+
+                                    const isNegative = calcPrice < 0;
+                                    const finalDisplayPrice = Math.max(0, Math.round(calcPrice));
+
+                                    return (
+                                      <div className="col-span-1 sm:col-span-2 pt-2 border-t border-[#414E36]/5 space-y-1">
+                                        <div className="flex justify-between items-center text-[11px] font-bold text-[#414E36]">
+                                          <span>Promotional Selling Price:</span>
+                                          <span className={isNegative ? "text-red-500 font-extrabold" : "text-[#C4AE7C]"}>
+                                            {finalDisplayPrice} EGP
+                                          </span>
+                                        </div>
+                                        {isNegative && (
+                                          <p className="text-[10px] text-red-500 font-bold leading-tight">
+                                            ⚠️ Warning: Discount value exceeds the base price. Capped at 0 EGP.
+                                          </p>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
                             </div>
 
                           </div>
@@ -17099,7 +17238,7 @@ export default function AdminPage() {
           return {
             id,
             name: s ? s.en : `Service #${id}`,
-            price: s?.price ?? prices[id] ?? 500
+            price: s ? getEffectiveServicePrice(s, viewingBooking.branchId, branches) : (prices[id] ?? 500)
           };
         });
 
@@ -20225,7 +20364,7 @@ export default function AdminPage() {
             const s = localServices.find(srv => srv.id === id);
             return {
               name: s?.en || `Service #${id}`,
-              price: s?.price ?? 500
+              price: s ? getEffectiveServicePrice(s, checkoutBooking.branchId, branches) : 500
             };
           });
           const totalCost = bookingServicesList.reduce((sum: number, s: any) => sum + s.price, 0);
@@ -20453,7 +20592,7 @@ export default function AdminPage() {
             return {
               name: s?.en || `Service #${id}`,
               nameAr: s?.ar || `خدمة #${id}`,
-              price: s?.price ?? 500
+              price: s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500
             };
           });
           const totalCost = bookingServicesList.reduce((sum: number, s: any) => sum + s.price, 0);

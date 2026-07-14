@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { getDurationInMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot } from '@/lib/services';
+import { getDurationInMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot, getEffectiveServicePrice } from '@/lib/services';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -161,16 +161,33 @@ export async function POST(req: Request) {
       console.warn("Could not load service compatible rooms:", e);
     }
 
-    // Fetch service price
+    // Fetch service details for price calculation
     let servicePrice = 0;
     try {
       const { data: svc } = await supabaseServer
         .from('services')
-        .select('price')
+        .select('price, branch_pricing')
         .eq('id', Number(serviceId))
         .maybeSingle();
       if (svc) {
-        servicePrice = Number(svc.price) || 0;
+        let targetBranchName: string | null = null;
+        if (branchId) {
+          const { data: bObj } = await supabaseServer
+            .from('branches')
+            .select('name')
+            .eq('id', Number(branchId))
+            .maybeSingle();
+          if (bObj) {
+            targetBranchName = bObj.name;
+          }
+        }
+
+        const mappedService = {
+          price: svc.price !== null ? Number(svc.price) : 0,
+          branchPricing: svc.branch_pricing
+        };
+
+        servicePrice = getEffectiveServicePrice(mappedService, targetBranchName);
       }
     } catch (e) {
       console.error("Could not fetch service details for price calculation:", e);
