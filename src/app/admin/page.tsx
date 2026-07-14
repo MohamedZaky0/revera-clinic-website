@@ -513,6 +513,66 @@ function parseEgyptianNationalId(id: string) {
   };
 }
 
+const DEFAULT_HERO_SLIDES = [
+  {
+    welcome: "Welcome to Revera Clinics",
+    heading: "Transform Your Beauty Naturally!",
+    description: "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
+    bookBtn: "Book Appointment",
+    rating: "4.5",
+    reviewCount: "(1000+ review)",
+    image: "/images/hero/slide-1.jpg"
+  },
+  {
+    welcome: "Welcome to Revera Clinics",
+    heading: "Advanced Medical Care You Can Trust!",
+    description: "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and dental services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
+    bookBtn: "Book Appointment",
+    rating: "4.5",
+    reviewCount: "(1000+ review)",
+    image: "/images/hero/slide-2.jpg"
+  },
+  {
+    welcome: "Welcome to Revera Clinics",
+    heading: "Your Beauty & Health Journey Starts Here!",
+    description: "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and dental care for all ages.",
+    bookBtn: "Book Appointment",
+    rating: "4.5",
+    reviewCount: "(1000+ review)",
+    image: "/images/hero/slide-3.jpg"
+  }
+];
+
+const DEFAULT_HERO_SLIDES_AR = [
+  {
+    welcome: "مرحباً بكم في عيادات ريفيرا",
+    heading: "حوّل جمالك بشكل طبيعي!",
+    description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية مصممة لمساعدتك على تحقيق أهدافك في الجمال والصحة من خلال تقنيات طبية متقدمة.",
+    bookBtn: "احجز موعدًا",
+    rating: "4.5",
+    reviewCount: "(1000+ تقييم)",
+    image: "/images/hero/slide-1.jpg"
+  },
+  {
+    welcome: "مرحباً بكم في عيادات ريفيرا",
+    heading: "رعاية طبية متقدمة يمكنك الوثوق بها!",
+    description: "اكتشف خدمات شاملة في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان المصممة لاحتياجاتك الفريدة. مع أكثر من 15 عاماً من الخبرة المهنية، نحن هنا لإرشادك نحو الجمال الدائم والعافية.",
+    bookBtn: "احجز موعدًا",
+    rating: "4.5",
+    reviewCount: "(1000+ تقييم)",
+    image: "/images/hero/slide-2.jpg"
+  },
+  {
+    welcome: "مرحباً بكم في عيادات ريفيرا",
+    heading: "رحلتك نحو الجمال والصحة تبدأ هنا!",
+    description: "عيادات متخصصة تحت إشراف طبي كامل تقدم خدمات في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان لجميع الأعمار.",
+    bookBtn: "احجز موعدًا",
+    rating: "4.5",
+    reviewCount: "(1000+ تقييم)",
+    image: "/images/hero/slide-3.jpg"
+  }
+];
+
 export default function AdminPage() {
   const { showConfirm } = useAlertConfirm();
   const { isRTL } = useLanguage();
@@ -2710,64 +2770,8 @@ export default function AdminPage() {
   const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [pagesSettingsTab, setPagesSettingsTab] = useState<"Home" | "About Us" | "Services">("Home");
   const [termsText, setTermsText] = useState("");
-  const [homeHeroSlides, setHomeHeroSlides] = useState<any[]>([
-    {
-      welcome: "Welcome to Revera Clinics",
-      heading: "Transform Your Beauty Naturally!",
-      description: "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
-      bookBtn: "Book Appointment",
-      rating: "4.5",
-      reviewCount: "(1000+ review)",
-      image: "/images/hero/slide-1.jpg"
-    },
-    {
-      welcome: "Welcome to Revera Clinics",
-      heading: "Advanced Medical Care You Can Trust!",
-      description: "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and dental services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
-      bookBtn: "Book Appointment",
-      rating: "4.5",
-      reviewCount: "(1000+ review)",
-      image: "/images/hero/slide-2.jpg"
-    },
-    {
-      welcome: "Welcome to Revera Clinics",
-      heading: "Your Beauty & Health Journey Starts Here!",
-      description: "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and dental care for all ages.",
-      bookBtn: "Book Appointment",
-      rating: "4.5",
-      reviewCount: "(1000+ review)",
-      image: "/images/hero/slide-3.jpg"
-    }
-  ]);
-  const [homeHeroSlidesAr, setHomeHeroSlidesAr] = useState<any[]>([
-    {
-      welcome: "مرحباً بكم في عيادات كريستال روز",
-      heading: "حوّل جمالك بشكل طبيعي!",
-      description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية مصممة لمساعدتك على تحقيق أهدافك في الجمال والصحة من خلال تقنيات طبية متقدمة.",
-      bookBtn: "احجز موعدًا",
-      rating: "4.5",
-      reviewCount: "(1000+ تقييم)",
-      image: "/images/hero/slide-1.jpg"
-    },
-    {
-      welcome: "مرحباً بكم في عيادات كريستال روز",
-      heading: "رعاية طبية متقدمة يمكنك الوثوق بها!",
-      description: "اكتشف خدمات شاملة في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان المصممة لاحتياجاتك الفريدة. مع أكثر من 15 عامًا من الخبرة المهنية، نحن هنا لإرشادك نحو الجمال الدائم والعافية.",
-      bookBtn: "احجز موعدًا",
-      rating: "4.5",
-      reviewCount: "(1000+ تقييم)",
-      image: "/images/hero/slide-2.jpg"
-    },
-    {
-      welcome: "مرحباً بكم في عيادات كريستال روز",
-      heading: "رحلتك نحو الجمال والصحة تبدأ هنا!",
-      description: "عيادات متخصصة تحت إشراف طبي كامل تقدم خدمات في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان لجميع الأعمار.",
-      bookBtn: "احجز موعدًا",
-      rating: "4.5",
-      reviewCount: "(1000+ تقييم)",
-      image: "/images/hero/slide-3.jpg"
-    }
-  ]);
+  const [homeHeroSlides, setHomeHeroSlides] = useState<any[]>(DEFAULT_HERO_SLIDES);
+  const [homeHeroSlidesAr, setHomeHeroSlidesAr] = useState<any[]>(DEFAULT_HERO_SLIDES_AR);
   const [providers, setProviders] = useState<any[]>(PROVIDERS);
 
   const isDoctorAvailableAdmin = useCallback((
@@ -3784,8 +3788,16 @@ export default function AdminPage() {
     cachedFetch("/api/page-settings", 15000)
       .then((data) => {
         if (data) {
-          setHomeHeroSlides(data.hero?.slides || []);
-          setHomeHeroSlidesAr(data.hero?.slides_ar || []);
+          setHomeHeroSlides(
+            data.hero?.slides && data.hero.slides.length > 0
+              ? data.hero.slides
+              : DEFAULT_HERO_SLIDES
+          );
+          setHomeHeroSlidesAr(
+            data.hero?.slides_ar && data.hero.slides_ar.length > 0
+              ? data.hero.slides_ar
+              : DEFAULT_HERO_SLIDES_AR
+          );
           setAboutImage1(data.about?.image1 || "");
           setAboutImage2(data.about?.image2 || "");
           setAboutImage3(data.about?.image3 || "");
