@@ -2799,6 +2799,7 @@ export default function AdminPage() {
   const [faqImage2, setFaqImage2] = useState<string>("");
   const [faqs, setFaqs] = useState<Array<{ question: string; answer: string }>>([]);
   const [faqsAr, setFaqsAr] = useState<Array<{ question: string; answer: string }>>([]);
+  const [translatingField, setTranslatingField] = useState<string | null>(null);
 
   const [reportsCustomerSearch, setReportsCustomerSearch] = useState("");
   const [smsTemplateSearch, setSmsTemplateSearch] = useState("");
@@ -3897,6 +3898,32 @@ export default function AdminPage() {
     }
   }
 
+  async function handleAutoTranslate(
+    text: string,
+    from: "en" | "ar",
+    to: "en" | "ar",
+    setter: (val: any) => void,
+    fieldKey: string
+  ) {
+    if (!text || !text.trim()) return;
+    setTranslatingField(fieldKey);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, from, to }),
+      });
+      const data = await res.json();
+      if (data.translatedText) {
+        setter(data.translatedText);
+      }
+    } catch (err) {
+      console.error("Translation error:", err);
+    } finally {
+      setTranslatingField(null);
+    }
+  }
+
   async function savePageSettings(overrideData?: any) {
     setSavingPageSettings(true);
     
@@ -4142,6 +4169,103 @@ export default function AdminPage() {
         enList[index] = { ...enList[index], image: val };
         setHomeHeroSlides(enList);
       }
+    }
+  };
+
+  const handleTranslateSlideField = async (index: number, field: string, text: string, from: "en" | "ar", to: "en" | "ar") => {
+    if (!text || !text.trim()) return;
+    const fieldKey = `slide-${index}-${field}-${from}`;
+    setTranslatingField(fieldKey);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, from, to }),
+      });
+      const data = await res.json();
+      if (data.translatedText) {
+        if (to === "ar") {
+          const arList = [...homeHeroSlidesAr];
+          if (!arList[index]) arList[index] = {};
+          arList[index] = { ...arList[index], [field]: data.translatedText };
+          setHomeHeroSlidesAr(arList);
+        } else {
+          const enList = [...homeHeroSlides];
+          if (!enList[index]) enList[index] = {};
+          enList[index] = { ...enList[index], [field]: data.translatedText };
+          setHomeHeroSlides(enList);
+        }
+      }
+    } catch (err) {
+      console.error("Slide translation error:", err);
+    } finally {
+      setTranslatingField(null);
+    }
+  };
+
+  const handleTranslateChecklistItem = async (index: number, text: string, from: "en" | "ar", to: "en" | "ar") => {
+    if (!text || !text.trim()) return;
+    const fieldKey = `whatwedo-${index}-${from}`;
+    setTranslatingField(fieldKey);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, from, to }),
+      });
+      const data = await res.json();
+      if (data.translatedText) {
+        if (to === "ar") {
+          const newList = [...whatWeDoListAr];
+          newList[index] = data.translatedText;
+          setWhatWeDoListAr(newList);
+        } else {
+          const newList = [...whatWeDoList];
+          newList[index] = data.translatedText;
+          setWhatWeDoList(newList);
+        }
+      }
+    } catch (err) {
+      console.error("Checklist translation error:", err);
+    } finally {
+      setTranslatingField(null);
+    }
+  };
+
+  const handleTranslateFaqItem = async (
+    index: number,
+    field: "question" | "answer",
+    text: string,
+    from: "en" | "ar",
+    to: "en" | "ar"
+  ) => {
+    if (!text || !text.trim()) return;
+    const fieldKey = `faq-${index}-${field}-${from}`;
+    setTranslatingField(fieldKey);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, from, to }),
+      });
+      const data = await res.json();
+      if (data.translatedText) {
+        if (to === "ar") {
+          const newList = [...faqsAr];
+          if (!newList[index]) newList[index] = { question: "", answer: "" };
+          newList[index][field] = data.translatedText;
+          setFaqsAr(newList);
+        } else {
+          const newList = [...faqs];
+          if (!newList[index]) newList[index] = { question: "", answer: "" };
+          newList[index][field] = data.translatedText;
+          setFaqs(newList);
+        }
+      }
+    } catch (err) {
+      console.error("FAQ item translation error:", err);
+    } finally {
+      setTranslatingField(null);
     }
   };
 
@@ -9489,7 +9613,17 @@ export default function AdminPage() {
                                 {/* Right column: Slide texts fields */}
                                 <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div className="md:col-span-2">
-                                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1.5">Welcome Badge Text</label>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Welcome Badge Text</label>
+                                      <button
+                                        type="button"
+                                        disabled={translatingField === `slide-${index}-welcome-${pageSettingsLangTab}`}
+                                        onClick={() => handleTranslateSlideField(index, "welcome", slide.welcome || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
+                                        className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                                      >
+                                        {translatingField === `slide-${index}-welcome-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ➔`}
+                                      </button>
+                                    </div>
                                     <input
                                       type="text"
                                       value={slide.welcome || ""}
@@ -9500,7 +9634,17 @@ export default function AdminPage() {
                                   </div>
 
                                   <div className="md:col-span-2">
-                                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1.5">Heading Title</label>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Heading Title</label>
+                                      <button
+                                        type="button"
+                                        disabled={translatingField === `slide-${index}-heading-${pageSettingsLangTab}`}
+                                        onClick={() => handleTranslateSlideField(index, "heading", slide.heading || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
+                                        className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                                      >
+                                        {translatingField === `slide-${index}-heading-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ➔`}
+                                      </button>
+                                    </div>
                                     <input
                                       type="text"
                                       value={slide.heading || ""}
@@ -9511,7 +9655,17 @@ export default function AdminPage() {
                                   </div>
 
                                   <div className="md:col-span-2">
-                                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1.5">Slide Description</label>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Slide Description</label>
+                                      <button
+                                        type="button"
+                                        disabled={translatingField === `slide-${index}-description-${pageSettingsLangTab}`}
+                                        onClick={() => handleTranslateSlideField(index, "description", slide.description || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
+                                        className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                                      >
+                                        {translatingField === `slide-${index}-description-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ➔`}
+                                      </button>
+                                    </div>
                                     <textarea
                                       value={slide.description || ""}
                                       onChange={(e) => handleUpdateField(index, "description", e.target.value)}
@@ -9522,7 +9676,17 @@ export default function AdminPage() {
                                   </div>
 
                                   <div>
-                                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1.5">CTA Button Text</label>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">CTA Button Text</label>
+                                      <button
+                                        type="button"
+                                        disabled={translatingField === `slide-${index}-bookBtn-${pageSettingsLangTab}`}
+                                        onClick={() => handleTranslateSlideField(index, "bookBtn", slide.bookBtn || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
+                                        className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                                      >
+                                        {translatingField === `slide-${index}-bookBtn-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ➔`}
+                                      </button>
+                                    </div>
                                     <input
                                       type="text"
                                       value={slide.bookBtn || ""}
@@ -9544,7 +9708,17 @@ export default function AdminPage() {
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1.5">Review Count</label>
+                                      <div className="flex items-center justify-between mb-1.5">
+                                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Review Count</label>
+                                        <button
+                                          type="button"
+                                          disabled={translatingField === `slide-${index}-reviewCount-${pageSettingsLangTab}`}
+                                          onClick={() => handleTranslateSlideField(index, "reviewCount", slide.reviewCount || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
+                                          className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                                        >
+                                          {translatingField === `slide-${index}-reviewCount-${pageSettingsLangTab}` ? "Translating..." : `➔`}
+                                        </button>
+                                      </div>
                                       <input
                                         type="text"
                                         value={slide.reviewCount || ""}
@@ -10108,7 +10282,17 @@ export default function AdminPage() {
                       {whatWeDoList.map((item, index) => (
                         <div key={index} className="flex items-end gap-2">
                           <div className="flex-1 space-y-1">
-                            <label className="block text-xs font-semibold text-[#5A6A51]">Item {index + 1}</label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="block text-xs font-semibold text-[#5A6A51]">Item {index + 1}</label>
+                              <button
+                                type="button"
+                                disabled={translatingField === `whatwedo-${index}-en`}
+                                onClick={() => handleTranslateChecklistItem(index, item, "en", "ar")}
+                                className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                              >
+                                {translatingField === `whatwedo-${index}-en` ? "Translating..." : "Translate to Arabic ➔"}
+                              </button>
+                            </div>
                             <input
                               type="text"
                               value={item}
@@ -10153,7 +10337,17 @@ export default function AdminPage() {
                       {whatWeDoListAr.map((item, index) => (
                         <div key={index} className="flex items-end gap-2" dir="rtl">
                           <div className="flex-1 space-y-1">
-                            <label className="block text-xs font-semibold text-[#5A6A51] text-right">العنصر {index + 1}</label>
+                            <div className="flex items-center justify-between mb-1" dir="ltr">
+                              <button
+                                type="button"
+                                disabled={translatingField === `whatwedo-${index}-ar`}
+                                onClick={() => handleTranslateChecklistItem(index, item, "ar", "en")}
+                                className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                              >
+                                {translatingField === `whatwedo-${index}-ar` ? "Translating..." : "Translate to English ➔"}
+                              </button>
+                              <label className="block text-xs font-semibold text-[#5A6A51] text-right">العنصر {index + 1}</label>
+                            </div>
                             <input
                               type="text"
                               value={item}
@@ -10325,7 +10519,17 @@ export default function AdminPage() {
                         <h4 className="text-sm font-semibold text-[#1F251A]">English Content Info</h4>
                         
                         <div className="space-y-2">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">FAQ Tagline</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">FAQ Tagline</label>
+                            <button
+                              type="button"
+                              disabled={translatingField === "faqTag-en"}
+                              onClick={() => handleAutoTranslate(faqTag, "en", "ar", setFaqTagAr, "faqTag-en")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "faqTag-en" ? "Translating..." : "Translate to Arabic ➔"}
+                            </button>
+                          </div>
                           <input
                             type="text"
                             value={faqTag}
@@ -10336,7 +10540,17 @@ export default function AdminPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">FAQ Heading</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">FAQ Heading</label>
+                            <button
+                              type="button"
+                              disabled={translatingField === "faqHeading-en"}
+                              onClick={() => handleAutoTranslate(faqHeading, "en", "ar", setFaqHeadingAr, "faqHeading-en")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "faqHeading-en" ? "Translating..." : "Translate to Arabic ➔"}
+                            </button>
+                          </div>
                           <input
                             type="text"
                             value={faqHeading}
@@ -10352,7 +10566,17 @@ export default function AdminPage() {
                         <h4 className="text-sm font-semibold text-[#1F251A] text-right">المعلومات باللغة العربية</h4>
                         
                         <div className="space-y-2" dir="rtl">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الجانبي</label>
+                          <div className="flex items-center justify-between mb-1" dir="ltr">
+                            <button
+                              type="button"
+                              disabled={translatingField === "faqTag-ar"}
+                              onClick={() => handleAutoTranslate(faqTagAr, "ar", "en", setFaqTag, "faqTag-ar")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "faqTag-ar" ? "Translating..." : "Translate to English ➔"}
+                            </button>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الجانبي</label>
+                          </div>
                           <input
                             type="text"
                             value={faqTagAr}
@@ -10363,7 +10587,17 @@ export default function AdminPage() {
                         </div>
 
                         <div className="space-y-2" dir="rtl">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الرئيسي</label>
+                          <div className="flex items-center justify-between mb-1" dir="ltr">
+                            <button
+                              type="button"
+                              disabled={translatingField === "faqHeading-ar"}
+                              onClick={() => handleAutoTranslate(faqHeadingAr, "ar", "en", setFaqHeading, "faqHeading-ar")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "faqHeading-ar" ? "Translating..." : "Translate to English ➔"}
+                            </button>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الرئيسي</label>
+                          </div>
                           <input
                             type="text"
                             value={faqHeadingAr}
@@ -10406,7 +10640,17 @@ export default function AdminPage() {
                                 )}
                               </div>
                               <div className="space-y-1">
-                                <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase">Question</label>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase">Question</label>
+                                  <button
+                                    type="button"
+                                    disabled={translatingField === `faq-${index}-question-en`}
+                                    onClick={() => handleTranslateFaqItem(index, "question", faq.question, "en", "ar")}
+                                    className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                                  >
+                                    {translatingField === `faq-${index}-question-en` ? "Translating..." : "Translate to Arabic ➔"}
+                                  </button>
+                                </div>
                                 <input
                                   type="text"
                                   value={faq.question}
@@ -10420,7 +10664,17 @@ export default function AdminPage() {
                                 />
                               </div>
                               <div className="space-y-1">
-                                <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase">Answer</label>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase">Answer</label>
+                                  <button
+                                    type="button"
+                                    disabled={translatingField === `faq-${index}-answer-en`}
+                                    onClick={() => handleTranslateFaqItem(index, "answer", faq.answer, "en", "ar")}
+                                    className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                                  >
+                                    {translatingField === `faq-${index}-answer-en` ? "Translating..." : "Translate to Arabic ➔"}
+                                  </button>
+                                </div>
                                 <textarea
                                   rows={3}
                                   value={faq.answer}
@@ -10467,7 +10721,17 @@ export default function AdminPage() {
                                 )}
                               </div>
                               <div className="space-y-1">
-                                <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">السؤال</label>
+                                <div className="flex items-center justify-between mb-1" dir="ltr">
+                                  <button
+                                    type="button"
+                                    disabled={translatingField === `faq-${index}-question-ar`}
+                                    onClick={() => handleTranslateFaqItem(index, "question", faq.question, "ar", "en")}
+                                    className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                                  >
+                                    {translatingField === `faq-${index}-question-ar` ? "Translating..." : "Translate to English ➔"}
+                                  </button>
+                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">السؤال</label>
+                                </div>
                                 <input
                                   type="text"
                                   value={faq.question}
@@ -10481,7 +10745,17 @@ export default function AdminPage() {
                                 />
                               </div>
                               <div className="space-y-1">
-                                <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">الإجابة</label>
+                                <div className="flex items-center justify-between mb-1" dir="ltr">
+                                  <button
+                                    type="button"
+                                    disabled={translatingField === `faq-${index}-answer-ar`}
+                                    onClick={() => handleTranslateFaqItem(index, "answer", faq.answer, "ar", "en")}
+                                    className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                                  >
+                                    {translatingField === `faq-${index}-answer-ar` ? "Translating..." : "Translate to English ➔"}
+                                  </button>
+                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">الإجابة</label>
+                                </div>
                                 <textarea
                                   rows={3}
                                   value={faq.answer}
@@ -10530,7 +10804,17 @@ export default function AdminPage() {
                         <h4 className="text-sm font-semibold text-[#1F251A]">English Content</h4>
                         
                         <div className="space-y-2">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Heading</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Heading</label>
+                            <button
+                              type="button"
+                              disabled={translatingField === "howItWorksHeading-en"}
+                              onClick={() => handleAutoTranslate(howItWorksHeading, "en", "ar", setHowItWorksHeadingAr, "howItWorksHeading-en")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "howItWorksHeading-en" ? "Translating..." : "Translate to Arabic ➔"}
+                            </button>
+                          </div>
                           <input
                             type="text"
                             value={howItWorksHeading}
@@ -10541,7 +10825,17 @@ export default function AdminPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Description</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Description</label>
+                            <button
+                              type="button"
+                              disabled={translatingField === "howItWorksDescription-en"}
+                              onClick={() => handleAutoTranslate(howItWorksDescription, "en", "ar", setHowItWorksDescriptionAr, "howItWorksDescription-en")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "howItWorksDescription-en" ? "Translating..." : "Translate to Arabic ➔"}
+                            </button>
+                          </div>
                           <textarea
                             rows={5}
                             value={howItWorksDescription}
@@ -10557,7 +10851,17 @@ export default function AdminPage() {
                         <h4 className="text-sm font-semibold text-[#1F251A] text-right">المحتوى باللغة العربية</h4>
                         
                         <div className="space-y-2" dir="rtl">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان</label>
+                          <div className="flex items-center justify-between mb-1" dir="ltr">
+                            <button
+                              type="button"
+                              disabled={translatingField === "howItWorksHeading-ar"}
+                              onClick={() => handleAutoTranslate(howItWorksHeadingAr, "ar", "en", setHowItWorksHeading, "howItWorksHeading-ar")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "howItWorksHeading-ar" ? "Translating..." : "Translate to English ➔"}
+                            </button>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان</label>
+                          </div>
                           <input
                             type="text"
                             value={howItWorksHeadingAr}
@@ -10568,7 +10872,17 @@ export default function AdminPage() {
                         </div>
 
                         <div className="space-y-2" dir="rtl">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">الوصف</label>
+                          <div className="flex items-center justify-between mb-1" dir="ltr">
+                            <button
+                              type="button"
+                              disabled={translatingField === "howItWorksDescription-ar"}
+                              onClick={() => handleAutoTranslate(howItWorksDescriptionAr, "ar", "en", setHowItWorksDescription, "howItWorksDescription-ar")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "howItWorksDescription-ar" ? "Translating..." : "Translate to English ➔"}
+                            </button>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">الوصف</label>
+                          </div>
                           <textarea
                             rows={5}
                             value={howItWorksDescriptionAr}
@@ -10721,7 +11035,17 @@ export default function AdminPage() {
                         <h4 className="text-sm font-semibold text-[#1F251A]">English Content</h4>
                         
                         <div className="space-y-2">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Heading</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Heading</label>
+                            <button
+                              type="button"
+                              disabled={translatingField === "wcuHeading-en"}
+                              onClick={() => handleAutoTranslate(wcuHeading, "en", "ar", setWcuHeadingAr, "wcuHeading-en")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "wcuHeading-en" ? "Translating..." : "Translate to Arabic ➔"}
+                            </button>
+                          </div>
                           <input
                             type="text"
                             value={wcuHeading}
@@ -10732,7 +11056,17 @@ export default function AdminPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Experience Vertical Label</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Experience Vertical Label</label>
+                            <button
+                              type="button"
+                              disabled={translatingField === "wcuYearsLabel-en"}
+                              onClick={() => handleAutoTranslate(wcuYearsLabel, "en", "ar", setWcuYearsLabelAr, "wcuYearsLabel-en")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "wcuYearsLabel-en" ? "Translating..." : "Translate to Arabic ➔"}
+                            </button>
+                          </div>
                           <input
                             type="text"
                             value={wcuYearsLabel}
@@ -10743,7 +11077,17 @@ export default function AdminPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Quote</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Quote</label>
+                            <button
+                              type="button"
+                              disabled={translatingField === "wcuQuote-en"}
+                              onClick={() => handleAutoTranslate(wcuQuote, "en", "ar", setWcuQuoteAr, "wcuQuote-en")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "wcuQuote-en" ? "Translating..." : "Translate to Arabic ➔"}
+                            </button>
+                          </div>
                           <input
                             type="text"
                             value={wcuQuote}
@@ -10755,7 +11099,17 @@ export default function AdminPage() {
 
 
                         <div className="space-y-2">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Description</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Description</label>
+                            <button
+                              type="button"
+                              disabled={translatingField === "wcuDescription-en"}
+                              onClick={() => handleAutoTranslate(wcuDescription, "en", "ar", setWcuDescriptionAr, "wcuDescription-en")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "wcuDescription-en" ? "Translating..." : "Translate to Arabic ➔"}
+                            </button>
+                          </div>
                           <textarea
                             rows={5}
                             value={wcuDescription}
@@ -10771,7 +11125,17 @@ export default function AdminPage() {
                         <h4 className="text-sm font-semibold text-[#1F251A] text-right">المحتوى باللغة العربية</h4>
                         
                         <div className="space-y-2" dir="rtl">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان</label>
+                          <div className="flex items-center justify-between mb-1" dir="ltr">
+                            <button
+                              type="button"
+                              disabled={translatingField === "wcuHeading-ar"}
+                              onClick={() => handleAutoTranslate(wcuHeadingAr, "ar", "en", setWcuHeading, "wcuHeading-ar")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "wcuHeading-ar" ? "Translating..." : "Translate to English ➔"}
+                            </button>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان</label>
+                          </div>
                           <input
                             type="text"
                             value={wcuHeadingAr}
@@ -10782,7 +11146,17 @@ export default function AdminPage() {
                         </div>
 
                         <div className="space-y-2" dir="rtl">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">عبارة التميز (رأسية)</label>
+                          <div className="flex items-center justify-between mb-1" dir="ltr">
+                            <button
+                              type="button"
+                              disabled={translatingField === "wcuYearsLabel-ar"}
+                              onClick={() => handleAutoTranslate(wcuYearsLabelAr, "ar", "en", setWcuYearsLabel, "wcuYearsLabel-ar")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "wcuYearsLabel-ar" ? "Translating..." : "Translate to English ➔"}
+                            </button>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">عبارة التميز (رأسية)</label>
+                          </div>
                           <input
                             type="text"
                             value={wcuYearsLabelAr}
@@ -10793,7 +11167,17 @@ export default function AdminPage() {
                         </div>
 
                         <div className="space-y-2" dir="rtl">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">اقتباس الثقة</label>
+                          <div className="flex items-center justify-between mb-1" dir="ltr">
+                            <button
+                              type="button"
+                              disabled={translatingField === "wcuQuote-ar"}
+                              onClick={() => handleAutoTranslate(wcuQuoteAr, "ar", "en", setWcuQuote, "wcuQuote-ar")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "wcuQuote-ar" ? "Translating..." : "Translate to English ➔"}
+                            </button>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">اقتباس الثقة</label>
+                          </div>
                           <input
                             type="text"
                             value={wcuQuoteAr}
@@ -10805,7 +11189,17 @@ export default function AdminPage() {
 
 
                         <div className="space-y-2" dir="rtl">
-                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">الوصف</label>
+                          <div className="flex items-center justify-between mb-1" dir="ltr">
+                            <button
+                              type="button"
+                              disabled={translatingField === "wcuDescription-ar"}
+                              onClick={() => handleAutoTranslate(wcuDescriptionAr, "ar", "en", setWcuDescription, "wcuDescription-ar")}
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
+                            >
+                              {translatingField === "wcuDescription-ar" ? "Translating..." : "Translate to English ➔"}
+                            </button>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">الوصف</label>
+                          </div>
                           <textarea
                             rows={5}
                             value={wcuDescriptionAr}
