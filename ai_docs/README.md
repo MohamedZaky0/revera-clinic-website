@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-07-09
+> **Last Updated:** 2026-07-14
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 
@@ -64,7 +64,7 @@ After that, check task-specific files:
 
 ---
 
-## Project Status Snapshot (as of 2026-07-09)
+## Project Status Snapshot (as of 2026-07-14)
 
 ### What Is Actually Built and Working
 - Public website (homepage, about, services, contact, blog stub)
@@ -77,9 +77,15 @@ After that, check task-specific files:
 - Branch management CRUD
 - Website CMS — hero slides (EN/AR) editable via admin
 - Provider records (doctors) — basic CRUD
+- Prescriptions & Visit Records (backed by real Supabase `prescriptions` table, with local file fallback)
+- Employee Details redone drawer (Egypt National ID birth/gender/gov checks, daily/hourly salary calculations, quick printing letterhead)
+- Personal Profile Settings redone page (Egypt National ID check, salary calculations, quick printing letterhead)
+- HR Payroll redesigned tab (search, filters, paid/pending/overdue status tags, dynamic pagination)
+- Auto-Translation settings (API route integrations using Google Translate)
+- Branch-specific promotions page (with multi-service select checklists, percentage/fixed value configurations, and timezone-compliant status resolution)
 
 ### What Is Mock UI Only (hardcoded data, not Supabase)
-- All clinical: consultation notes, prescriptions, treatment plans, before/after photos
+- Treatment plans, before/after photos
 - Billing metrics: overall billing analytics reports are mock (but individual customer ledgers are real)
 - All marketing: WhatsApp is external `wa.me` links only; no campaigns or templates
 - Notification templates

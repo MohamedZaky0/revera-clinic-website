@@ -1,6 +1,6 @@
 # DB_SCHEMA.md — Revera Clinics Database Schema
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-07-14
 > **Database:** Supabase (PostgreSQL)
 > **Audited from:** live API routes + TypeScript types (no migration files exist in the repo)
 > **Previous content was for a different project — discarded entirely**
@@ -34,6 +34,10 @@ providers
 
 page_settings
   (key/value CMS store — key='home' for homepage content)
+
+customers
+  └──< prescriptions (customer_id FK)
+  └──< reservations (customer_id FK)
 ```
 
 ---
@@ -93,6 +97,24 @@ files exist in the repository.
 | `occupation` | text | Job title/occupation, nullable |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
+
+---
+
+### `prescriptions`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid | Primary key, default gen_random_uuid() |
+| `customer_id` | uuid | FK → customers.id, on delete cascade |
+| `patient_name` | text | Patient name |
+| `date` | date | Date of prescription, default CURRENT_DATE |
+| `diagnosis` | text | Diagnosis text, nullable |
+| `medications` | JSONB | Array of `{ name, dosage, instructions }`, default '[]' |
+| `general_notes` | text | Public general notes, nullable |
+| `doctor_notes` | text | Doctor-confidential notes, nullable |
+| `follow_up_date` | date | Follow-up appointment date, nullable |
+| `created_at` | timestamptz | default now() |
+| `updated_at` | timestamptz | default now() |
 
 ---
 

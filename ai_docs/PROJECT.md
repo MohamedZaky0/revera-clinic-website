@@ -1,6 +1,6 @@
 # PROJECT.md — Revera Clinics Website & Admin System
 
-> **Last Updated:** 2026-06-27
+> **Last Updated:** 2026-07-14
 > **Audited from:** live source code (no trust placed in stub files)
 
 ---
@@ -10,7 +10,7 @@
 A Next.js (App Router) web application serving two purposes:
 
 1. **Public Website** — Revera Clinics' patient-facing marketing site: hero slider, services catalog, about, contact, blog stub, booking modal, and patient auth modal.
-2. **Admin Panel** — Internal management interface at `/admin` for the clinic owner/receptionist: bookings management, service/category CRUD, branch management, provider records, and website CMS (page content editing).
+2. **Admin Panel** — Internal management interface at `/admin` for the clinic owner/receptionist: bookings management, service/category CRUD, branch management, provider records, prescriptions/records, promotions, HR/attendance trackers, payroll, and website CMS (page content editing).
 
 ---
 
@@ -18,9 +18,10 @@ A Next.js (App Router) web application serving two purposes:
 
 | Role | Access | What They Do |
 |---|---|---|
-| Clinic owner / admin | `/admin` (no auth gate currently) | Manage bookings, services, providers, branches, page content |
+| Clinic owner / admin | `/admin` (no auth gate currently) | Manage bookings, services, providers, branches, page content, payroll, promotions |
 | Receptionist | `/admin` | Approve/reject/create bookings, view customer list |
-| Patients / website visitors | Public pages | Browse services, read about clinic, submit booking request |
+| Doctors / Providers | `/admin` | Manage patient records, diagnoses, check prescriptions timeline, update follow-ups |
+| Patients / website visitors | Public pages | Browse services, read about clinic, submit booking request, view wallet balance |
 
 ---
 
@@ -28,7 +29,7 @@ A Next.js (App Router) web application serving two purposes:
 
 - **Single-tenant:** One Supabase project, one deployment — exclusively for Revera Clinics.
 - **Hosted on Vercel** (Next.js, App Router).
-- **Database:** Supabase (PostgreSQL) — tables: `reservations`, `services`, `categories`, `branches`, `providers`, `page_settings`.
+- **Database:** Supabase (PostgreSQL) — tables: `reservations`, `services`, `categories`, `branches`, `providers`, `page_settings`, `prescriptions`, `customers`.
 - **No multi-tenancy.** No org/tenant layer in the schema.
 
 ---
@@ -80,6 +81,8 @@ src/
       branches/           — Branch CRUD
       providers/          — Provider CRUD (Supabase + JSON fallback)
       page-settings/      — CMS content CRUD (Supabase + JSON fallback)
+      prescriptions/      — Prescriptions CRUD (Supabase + JSON fallback)
+      translate/          — Auto-translate helper (using Google Translate)
       health/supabase/    — Env/connection health check
   components/             — All public website components
   lib/
@@ -95,6 +98,7 @@ src/
 data/
   providers.json          — JSON fallback for providers
   page_settings.json      — JSON fallback for page settings
+  prescriptions.json      — JSON fallback for prescriptions
 public/images/            — Static images (logo, heroes, services, doctors)
 ai_docs/                  — This documentation folder
 scratch/                  — Dev scripts (DB seed, test queries)
@@ -106,6 +110,6 @@ scratch/                  — Dev scripts (DB seed, test queries)
 
 - Admin auth is **client-side only** — `/api/` routes have no token validation; the session gate exists only in the browser. (RISK-002 partially resolved)
 - Patient OTP auth is **simulated** (setTimeout) — no real SMS gateway wired. (RISK-003)
-- Many admin sections (Prescriptions, Finance, Payroll, Inventory, POS) are **mock UI only** — backed by hardcoded constant arrays, not Supabase.
+- Some minor clinical: treatment plans and before/after photos are mock UI. (Prescriptions/notes are Supabase-backed)
 - localStorage is used as primary storage for services/categories on the admin side (Supabase is secondary/fallback in several places).
 - `customers` and `reservations` are **unlinked** — no FK; booking name/phone is not auto-matched to a customer record.

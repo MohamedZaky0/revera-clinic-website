@@ -1,6 +1,6 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-07-14
 > **Base:** Next.js App Router API routes under `/app/api/`
 > **Auth:** None — all routes use the Supabase service role key server-side; no user auth on API layer
 > **Previous content was for a different project — discarded entirely**
@@ -251,3 +251,39 @@ Required: `name`, `mobile`. If `id` is present, updates the existing customer. O
 Deletes a customer profile record. Nullifies references in `reservations` to prevent foreign key violations, and deletes the linked account in Supabase Auth if applicable.
 
 **Response:** `{ message: "Customer deleted successfully" }`
+
+---
+
+## GET /api/prescriptions?customerId={id}
+
+Returns all prescriptions associated with a customer. Falls back to a local JSON file (`data/prescriptions.json`) if the Supabase database table does not exist or fails.
+
+**Response:** `Prescription[]`
+
+---
+
+## POST /api/prescriptions
+
+Creates or updates a prescription. Automatically generates patient name and current date if missing.
+
+**Body:** `{ id?, customer_id, patient_name?, date?, diagnosis?, medications?, general_notes?, doctor_notes?, follow_up_date? }`
+
+**Response:** Created or updated `Prescription` object
+
+---
+
+## DELETE /api/prescriptions?id={id}
+
+Deletes a prescription by ID.
+
+**Response:** `{ success: true, message: "Prescription deleted successfully" }`
+
+---
+
+## POST /api/translate
+
+Translates text between English and Arabic using the Google Translate API.
+
+**Body:** `{ text, from?, to? }` (detects source language automatically if `from` is omitted)
+
+**Response:** `{ translatedText }`
