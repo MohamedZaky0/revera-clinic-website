@@ -143,6 +143,7 @@ const SIDEBAR_ITEMS = [
   { label: "Customers", icon: Users },
   { label: "Providers", icon: ShieldCheck },
   { label: "Services", icon: Layers },
+  { label: "Promotions", icon: Tag },
   { label: "Employees", icon: CircleUser },
   { label: "HR", icon: ClipboardList },
   { label: "Settings", icon: Settings, submenu: true },
@@ -938,9 +939,30 @@ export default function AdminPage() {
   const [serviceIsShared, setServiceIsShared] = useState(false);
   const [serviceEnableReminder, setServiceEnableReminder] = useState(true);
   const [serviceImageUrl, setServiceImageUrl] = useState("");
+  const [servicePrice, setServicePrice] = useState<number>(0);
   const [serviceBranchPricing, setServiceBranchPricing] = useState<Required<ServiceItem>['branchPricing']>([
     { name: "Zayed", price: 0, visible: true, status: true, isDefault: true }
   ]);
+
+  // Promotions management states
+  const [showAddPromoModal, setShowAddPromoModal] = useState(false);
+  const [editingPromo, setEditingPromo] = useState<{
+    serviceId: number;
+    branchName: string;
+    type: "percentage" | "fixed";
+    value: number;
+    startDate?: string;
+    endDate?: string;
+  } | null>(null);
+  const [promoServiceId, setPromoServiceId] = useState<number | "">("");
+  const [promoBranchName, setPromoBranchName] = useState<string>("");
+  const [promoType, setPromoType] = useState<"percentage" | "fixed">("percentage");
+  const [promoValue, setPromoValue] = useState<number>(0);
+  const [promoStartDate, setPromoStartDate] = useState<string>("");
+  const [promoEndDate, setPromoEndDate] = useState<string>("");
+  const [promoSearchQuery, setPromoSearchQuery] = useState<string>("");
+  const [promoFilterBranch, setPromoFilterBranch] = useState<string>("All");
+  const [promoFilterStatus, setPromoFilterStatus] = useState<string>("All");
 
   // Drag and drop sorting states
   const [draggedServiceId, setDraggedServiceId] = useState<number | null>(null);
@@ -960,6 +982,7 @@ export default function AdminPage() {
     setServiceIsShared(svc.isShared ?? false);
     setServiceEnableReminder(svc.enableReminder ?? true);
     setServiceImageUrl(svc.img || "");
+    setServicePrice(svc.price ?? 0);
     
     if (svc.branchPricing && svc.branchPricing.length > 0) {
       setServiceBranchPricing(svc.branchPricing);
@@ -971,6 +994,154 @@ export default function AdminPage() {
     }
     
     setShowAddServiceModal(true);
+  };
+
+  // Promotions action handlers
+  const promotionsList = useMemo(() => {
+    const list: Array<{
+      serviceId: number;
+      serviceNameEn: string;
+      serviceNameAr: string;
+      branchName: string;
+      basePrice: number;
+      promotion: {
+        enabled: boolean;
+        type: "percentage" | "fixed";
+        value: number;
+        startDate?: string;
+        endDate?: string;
+      };
+    }> = [];
+
+    localServices.forEach(service => {
+      if (service.branchPricing) {
+        service.branchPricing.forEach(bp => {
+          if (bp.promotion) {
+            list.push({
+              serviceId: service.id,
+              serviceNameEn: service.en,
+              serviceNameAr: service.ar || "",
+              branchName: bp.name,
+              basePrice: bp.price,
+              promotion: bp.promotion
+            });
+          }
+        });
+      }
+    });
+
+    return list;
+  }, [localServices]);
+
+  const getPromotionStatus = (promo: any) => {
+    if (!promo || !promo.enabled) return "disabled";
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
+    if (promo.startDate && todayStr < promo.startDate) return "scheduled";
+    if (promo.endDate && todayStr > promo.endDate) return "expired";
+    return "active";
+  };
+
+  const handleSavePromotion = () => {
+    if (!promoServiceId || !promoBranchName) return;
+
+    const updatedServices = localServices.map(svc => {
+      if (svc.id === Number(promoServiceId)) {
+        const updatedBranchPricing = (svc.branchPricing || []).map(bp => {
+          if (bp.name.toLowerCase() === promoBranchName.toLowerCase()) {
+            return {
+              ...bp,
+              promotion: {
+                enabled: true,
+                type: promoType,
+                value: promoValue,
+                startDate: promoStartDate || undefined,
+                endDate: promoEndDate || undefined
+              }
+            };
+          }
+          return bp;
+        });
+        return {
+          ...svc,
+          branchPricing: updatedBranchPricing
+        };
+      }
+      return svc;
+    });
+
+    setLocalServices(updatedServices);
+    saveDynamicServices(updatedServices);
+    setShowAddPromoModal(false);
+
+    // Reset form states
+    setPromoServiceId("");
+    setPromoBranchName("");
+    setPromoType("percentage");
+    setPromoValue(0);
+    setPromoStartDate("");
+    setPromoEndDate("");
+    setEditingPromo(null);
+  };
+
+  const handleDeletePromotion = (serviceId: number, branchName: string) => {
+    const updatedServices = localServices.map(svc => {
+      if (svc.id === serviceId) {
+        const updatedBranchPricing = (svc.branchPricing || []).map(bp => {
+          if (bp.name.toLowerCase() === branchName.toLowerCase()) {
+            const { promotion, ...rest } = bp;
+            return rest;
+          }
+          return bp;
+        });
+        return {
+          ...svc,
+          branchPricing: updatedBranchPricing
+        };
+      }
+      return svc;
+    });
+
+    setLocalServices(updatedServices);
+    saveDynamicServices(updatedServices);
+  };
+
+  const handleTogglePromotion = (serviceId: number, branchName: string, currentEnabled: boolean) => {
+    const updatedServices = localServices.map(svc => {
+      if (svc.id === serviceId) {
+        const updatedBranchPricing = (svc.branchPricing || []).map(bp => {
+          if (bp.name.toLowerCase() === branchName.toLowerCase() && bp.promotion) {
+            return {
+              ...bp,
+              promotion: {
+                ...bp.promotion,
+                enabled: !currentEnabled
+              }
+            };
+          }
+          return bp;
+        });
+        return {
+          ...svc,
+          branchPricing: updatedBranchPricing
+        };
+      }
+      return svc;
+    });
+
+    setLocalServices(updatedServices);
+    saveDynamicServices(updatedServices);
+  };
+
+  const handleOpenEditPromo = (promo: any) => {
+    setEditingPromo(promo);
+    setPromoServiceId(promo.serviceId);
+    setPromoBranchName(promo.branchName);
+    setPromoType(promo.promotion.type);
+    setPromoValue(promo.promotion.value);
+    setPromoStartDate(promo.promotion.startDate || "");
+    setPromoEndDate(promo.promotion.endDate || "");
+    setShowAddPromoModal(true);
   };
 
   const handleReorderServices = (draggedId: number, targetId: number) => {
@@ -2406,6 +2577,7 @@ export default function AdminPage() {
       "Customers": "customers",
       "Providers": "providers",
       "Services": "services",
+      "Promotions": "services",
       "Settings": "settings"
     };
     
@@ -6371,6 +6543,7 @@ export default function AdminPage() {
                               setServiceIsShared(false);
                               setServiceEnableReminder(true);
                               setServiceImageUrl("");
+                              setServicePrice(0);
                               setServiceBranchPricing([{ name: "Zayed", price: 0, visible: true, status: true, isDefault: true }]);
                               setEditingService(null);
                               setShowAddServiceModal(true);
@@ -6913,6 +7086,24 @@ export default function AdminPage() {
                             className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                           />
                         </div>
+
+                        {/* Price */}
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
+                            Price (EGP) <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative flex rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] overflow-hidden text-sm">
+                            <span className="bg-[#F2EFE9] border-r border-[#414E36]/15 px-3.5 py-2.5 text-[#5A6A51] font-semibold">EGP</span>
+                            <input
+                              type="number"
+                              value={servicePrice}
+                              onChange={(e) => setServicePrice(Number(e.target.value) || 0)}
+                              placeholder="0"
+                              className="w-full px-4 py-2.5 outline-none bg-transparent text-[#1F251A] font-medium"
+                            />
+                          </div>
+                        </div>
+
                       </div>
 
                       {/* Toggles */}
@@ -6953,291 +7144,6 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Branch Pricing Header */}
-                      <div className="border-t border-[#414E36]/10 pt-4">
-                        <h4 className="text-sm font-bold text-[#1F251A]">Branch Pricing</h4>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">Configure pricing for different branch locations</p>
-                      </div>
-
-                      {/* Branch Cards */}
-                      <div className="space-y-3">
-                        {serviceBranchPricing.map((bp, index) => (
-                          <div key={index} className="rounded-xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 relative">
-                            
-                            {/* Zayed default badge or Delete Branch button */}
-                            <div className="flex items-center justify-between gap-4 mb-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Branch</span>
-                                {bp.isDefault ? (
-                                  <span className="rounded bg-[#414E36] px-1.5 py-0.5 text-[9px] font-bold text-[#FBFBF9]">Default</span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const updated = serviceBranchPricing.filter((_, i) => i !== index);
-                                      setServiceBranchPricing(updated);
-                                    }}
-                                    className="text-[10px] text-red-500 font-semibold hover:underline"
-                                  >
-                                    Delete Branch
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              {/* Branch name input/select */}
-                              <div>
-                                <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">Branch Name</label>
-                                {bp.isDefault ? (
-                                  <select
-                                    value={bp.name}
-                                    onChange={(e) => {
-                                      const updated = [...serviceBranchPricing];
-                                      updated[index].name = e.target.value;
-                                      setServiceBranchPricing(updated);
-                                    }}
-                                    className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-xs outline-none transition focus:border-[#C4AE7C] text-[#1F251A]"
-                                  >
-                                    <option value="Zayed">Zayed</option>
-                                    <option value="Zamalek">Zamalek</option>
-                                    <option value="Maadi">Maadi</option>
-                                  </select>
-                                ) : (
-                                  <input
-                                    type="text"
-                                    value={bp.name}
-                                    onChange={(e) => {
-                                      const updated = [...serviceBranchPricing];
-                                      updated[index].name = e.target.value;
-                                      setServiceBranchPricing(updated);
-                                    }}
-                                    placeholder="Branch Name"
-                                    className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-xs outline-none transition focus:border-[#C4AE7C] text-[#1F251A]"
-                                  />
-                                )}
-                              </div>
-
-                              {/* Price input */}
-                              <div>
-                                <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">Price</label>
-                                <div className="relative flex rounded-lg border border-[#414E36]/15 bg-white overflow-hidden text-xs">
-                                  <span className="bg-[#F2EFE9] border-r border-[#414E36]/15 px-2.5 py-2 text-[#5A6A51] font-semibold">EGP</span>
-                                  <input
-                                    type="number"
-                                    value={bp.price}
-                                    onChange={(e) => {
-                                      const updated = [...serviceBranchPricing];
-                                      updated[index].price = Number(e.target.value) || 0;
-                                      setServiceBranchPricing(updated);
-                                    }}
-                                    placeholder="0"
-                                    className="w-full px-3 py-2 outline-none text-[#1F251A] font-medium"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Toggles inside branch card */}
-                            <div className="flex items-center gap-6 mt-4">
-                              {/* Visible Toggle */}
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-semibold text-[#5A6A51]">Visible</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = [...serviceBranchPricing];
-                                    updated[index].visible = !updated[index].visible;
-                                    setServiceBranchPricing(updated);
-                                  }}
-                                  className="relative h-5 w-9 rounded-full focus:outline-none transition-colors duration-300"
-                                  style={{ backgroundColor: bp.visible ? "#414E36" : "#E2E8F0" }}
-                                >
-                                  <span
-                                    className="absolute top-[2px] h-4.5 w-4.5 rounded-full bg-white shadow-md transition-all duration-300"
-                                    style={{ left: bp.visible ? "18px" : "2px" }}
-                                  />
-                                </button>
-                              </div>
-
-                              {/* Status Toggle */}
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-semibold text-[#5A6A51]">Status</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = [...serviceBranchPricing];
-                                    updated[index].status = !updated[index].status;
-                                    setServiceBranchPricing(updated);
-                                  }}
-                                  className="relative h-5 w-9 rounded-full focus:outline-none transition-colors duration-300"
-                                  style={{ backgroundColor: bp.status ? "#414E36" : "#E2E8F0" }}
-                                >
-                                  <span
-                                    className="absolute top-[2px] h-4.5 w-4.5 rounded-full bg-white shadow-md transition-all duration-300"
-                                    style={{ left: bp.status ? "18px" : "2px" }}
-                                  />
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Promotion Section */}
-                            <div className="mt-4 pt-4 border-t border-[#414E36]/10 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-[#414E36] flex items-center gap-1.5">
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#C4AE7C]">
-                                    <line x1="19" y1="5" x2="5" y2="19" />
-                                    <circle cx="6.5" cy="6.5" r="2.5" />
-                                    <circle cx="17.5" cy="17.5" r="2.5" />
-                                  </svg>
-                                  Branch Promotion / عروض الفرع
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = [...serviceBranchPricing];
-                                    const promo = updated[index].promotion || { enabled: false, type: "percentage", value: 0 };
-                                    updated[index].promotion = {
-                                      ...promo,
-                                      enabled: !promo.enabled
-                                    };
-                                    setServiceBranchPricing(updated);
-                                  }}
-                                  className="relative h-5 w-9 rounded-full focus:outline-none transition-colors duration-300"
-                                  style={{ backgroundColor: bp.promotion?.enabled ? "#414E36" : "#E2E8F0" }}
-                                >
-                                  <span
-                                    className="absolute top-[2px] h-4.5 w-4.5 rounded-full bg-white shadow-md transition-all duration-300"
-                                    style={{ left: bp.promotion?.enabled ? "18px" : "2px" }}
-                                  />
-                                </button>
-                              </div>
-
-                              {bp.promotion?.enabled && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#414E36]/5 p-3 rounded-xl border border-[#414E36]/10">
-                                  {/* Discount Type */}
-                                  <div>
-                                    <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">Discount Type</label>
-                                    <select
-                                      value={bp.promotion.type || "percentage"}
-                                      onChange={(e) => {
-                                        const updated = [...serviceBranchPricing];
-                                        if (updated[index].promotion) {
-                                          updated[index].promotion!.type = e.target.value as "percentage" | "fixed";
-                                        }
-                                        setServiceBranchPricing(updated);
-                                      }}
-                                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A] font-medium"
-                                    >
-                                      <option value="percentage">Percentage (%)</option>
-                                      <option value="fixed">Fixed Amount (EGP)</option>
-                                    </select>
-                                  </div>
-
-                                  {/* Value */}
-                                  <div>
-                                    <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">Discount Value</label>
-                                    <input
-                                      type="number"
-                                      value={bp.promotion.value || 0}
-                                      onChange={(e) => {
-                                        const updated = [...serviceBranchPricing];
-                                        if (updated[index].promotion) {
-                                          updated[index].promotion!.value = Math.max(0, Number(e.target.value) || 0);
-                                        }
-                                        setServiceBranchPricing(updated);
-                                      }}
-                                      placeholder="0"
-                                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A] font-medium"
-                                    />
-                                  </div>
-
-                                  {/* Start Date */}
-                                  <div>
-                                    <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">Start Date (Optional)</label>
-                                    <input
-                                      type="date"
-                                      value={bp.promotion.startDate || ""}
-                                      onChange={(e) => {
-                                        const updated = [...serviceBranchPricing];
-                                        if (updated[index].promotion) {
-                                          updated[index].promotion!.startDate = e.target.value || undefined;
-                                        }
-                                        setServiceBranchPricing(updated);
-                                      }}
-                                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A] font-medium"
-                                    />
-                                  </div>
-
-                                  {/* End Date */}
-                                  <div>
-                                    <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">End Date (Optional)</label>
-                                    <input
-                                      type="date"
-                                      value={bp.promotion.endDate || ""}
-                                      onChange={(e) => {
-                                        const updated = [...serviceBranchPricing];
-                                        if (updated[index].promotion) {
-                                          updated[index].promotion!.endDate = e.target.value || undefined;
-                                        }
-                                        setServiceBranchPricing(updated);
-                                      }}
-                                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A] font-medium"
-                                    />
-                                  </div>
-
-                                  {/* Live Preview / Validation warning */}
-                                  {(() => {
-                                    const basePrice = bp.price || 0;
-                                    const val = bp.promotion.value || 0;
-                                    let calcPrice = basePrice;
-                                    if (bp.promotion.type === "percentage") {
-                                      calcPrice = basePrice * (1 - val / 100);
-                                    } else {
-                                      calcPrice = basePrice - val;
-                                    }
-
-                                    const isNegative = calcPrice < 0;
-                                    const finalDisplayPrice = Math.max(0, Math.round(calcPrice));
-
-                                    return (
-                                      <div className="col-span-1 sm:col-span-2 pt-2 border-t border-[#414E36]/5 space-y-1">
-                                        <div className="flex justify-between items-center text-[11px] font-bold text-[#414E36]">
-                                          <span>Promotional Selling Price:</span>
-                                          <span className={isNegative ? "text-red-500 font-extrabold" : "text-[#C4AE7C]"}>
-                                            {finalDisplayPrice} EGP
-                                          </span>
-                                        </div>
-                                        {isNegative && (
-                                          <p className="text-[10px] text-red-500 font-bold leading-tight">
-                                            ⚠️ Warning: Discount value exceeds the base price. Capped at 0 EGP.
-                                          </p>
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              )}
-                            </div>
-
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Add Branch Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setServiceBranchPricing([
-                            ...serviceBranchPricing,
-                            { name: "New Branch", price: 0, visible: true, status: true, isDefault: false }
-                          ]);
-                        }}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#C4AE7C] hover:text-[#b59e6c] mt-2 transition"
-                      >
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#C4AE7C]/10 text-[#C4AE7C]">+</span> Add Branch
-                      </button>
-
                     </div>
                     
                     {/* Modal Footer */}
@@ -7264,7 +7170,7 @@ export default function AdminPage() {
                                   ar: serviceNameAr.trim(),
                                   cat: serviceCategory,
                                   unit: serviceUnitType.toLowerCase(),
-                                  price: serviceBranchPricing.find(b => b.isDefault)?.price ?? 0,
+                                  price: servicePrice,
                                   duration: serviceDuration,
                                   descriptionEn: serviceDescEn.trim(),
                                   descriptionAr: serviceDescAr.trim(),
@@ -7272,7 +7178,7 @@ export default function AdminPage() {
                                   isShared: serviceIsShared,
                                   enableReminder: serviceEnableReminder,
                                   img: serviceImageUrl,
-                                  branchPricing: serviceBranchPricing,
+                                  branchPricing: serviceBranchPricing.map(bp => ({ ...bp, price: servicePrice })),
                                 };
                               }
                               return s;
@@ -7299,7 +7205,7 @@ export default function AdminPage() {
                               ar: serviceNameAr.trim(),
                               cat: serviceCategory,
                               unit: serviceUnitType.toLowerCase(),
-                              price: serviceBranchPricing.find(b => b.isDefault)?.price ?? 0,
+                              price: servicePrice,
                               duration: serviceDuration,
                               descriptionEn: serviceDescEn.trim(),
                               descriptionAr: serviceDescAr.trim(),
@@ -7307,7 +7213,7 @@ export default function AdminPage() {
                               isShared: serviceIsShared,
                               enableReminder: serviceEnableReminder,
                               img: serviceImageUrl,
-                              branchPricing: serviceBranchPricing,
+                              branchPricing: serviceBranchPricing.map(bp => ({ ...bp, price: servicePrice })),
                               createdAt: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + " " + new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true }),
                             };
 
@@ -7338,6 +7244,425 @@ export default function AdminPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── PROMOTIONS VIEW ── */}
+          {activeNav === "Promotions" && (
+            <div>
+              {/* Header */}
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-semibold text-[#1F251A]">Promotions & Discounts / عروض وخصومات الفروع</h2>
+                  <p className="text-xs text-[#5A6A51] mt-1">Manage special pricing, percentage discounts, and fixed discounts across branches</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingPromo(null);
+                      setPromoServiceId("");
+                      setPromoBranchName("");
+                      setPromoType("percentage");
+                      setPromoValue(0);
+                      setPromoStartDate("");
+                      setPromoEndDate("");
+                      setShowAddPromoModal(true);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#C4AE7C] px-4 py-2 text-sm font-semibold text-[#414E36] shadow-sm transition hover:bg-[#b59e6c]"
+                  >
+                    <Plus size={14} /> Add Promotion
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters & Search */}
+              <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-4 rounded-xl border border-[#414E36]/10">
+                {/* Search query */}
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                  <input
+                    type="text"
+                    value={promoSearchQuery}
+                    onChange={(e) => setPromoSearchQuery(e.target.value)}
+                    placeholder="Search by service..."
+                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] pl-9 pr-4 py-2 text-xs outline-none transition focus:border-[#C4AE7C] text-[#1F251A]"
+                  />
+                </div>
+
+                {/* Filter branch */}
+                <div>
+                  <select
+                    value={promoFilterBranch}
+                    onChange={(e) => setPromoFilterBranch(e.target.value)}
+                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A]"
+                  >
+                    <option value="All">All Branches</option>
+                    {Array.from(new Set(promotionsList.map(p => p.branchName))).map(branch => (
+                      <option key={branch} value={branch}>{branch}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Filter status */}
+                <div>
+                  <select
+                    value={promoFilterStatus}
+                    onChange={(e) => setPromoFilterStatus(e.target.value)}
+                    className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A]"
+                  >
+                    <option value="All">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="expired">Expired</option>
+                    <option value="disabled">Disabled</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Grid List */}
+              {(() => {
+                const filtered = promotionsList.filter(item => {
+                  // Search query match
+                  const matchesSearch = item.serviceNameEn.toLowerCase().includes(promoSearchQuery.toLowerCase()) ||
+                    item.serviceNameAr.toLowerCase().includes(promoSearchQuery.toLowerCase());
+                  
+                  // Branch match
+                  const matchesBranch = promoFilterBranch === "All" || item.branchName === promoFilterBranch;
+
+                  // Status match
+                  const status = getPromotionStatus(item.promotion);
+                  const matchesStatus = promoFilterStatus === "All" || status === promoFilterStatus;
+
+                  return matchesSearch && matchesBranch && matchesStatus;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-[#414E36]/10 text-center">
+                      <div className="h-12 w-12 rounded-full bg-[#414E36]/5 flex items-center justify-center text-[#C4AE7C] mb-4">
+                        <Tag size={20} />
+                      </div>
+                      <h3 className="text-base font-bold text-[#1F251A]">No promotions found</h3>
+                      <p className="text-xs text-[#5A6A51] max-w-sm mt-1">
+                        Get started by adding branch specific discount rules for your clinic's services.
+                      </p>
+                      <button
+                        onClick={() => setShowAddPromoModal(true)}
+                        className="mt-4 rounded-lg bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                      >
+                        Create Your First Promotion
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filtered.map((item, index) => {
+                      const status = getPromotionStatus(item.promotion);
+                      const promoVal = item.promotion.value || 0;
+                      const basePrice = item.basePrice || 0;
+                      let finalPrice = basePrice;
+                      if (item.promotion.type === "percentage") {
+                        finalPrice = basePrice * (1 - promoVal / 100);
+                      } else {
+                        finalPrice = basePrice - promoVal;
+                      }
+                      finalPrice = Math.max(0, Math.round(finalPrice));
+
+                      return (
+                        <div key={index} className="bg-white rounded-2xl border border-[#414E36]/10 p-5 shadow-sm transition hover:shadow-md relative overflow-hidden flex flex-col justify-between">
+                          {/* Accent status border */}
+                          <div className={`absolute top-0 left-0 right-0 h-1.5 ${
+                            status === "active" ? "bg-emerald-500" :
+                            status === "scheduled" ? "bg-blue-400" :
+                            status === "expired" ? "bg-amber-400" : "bg-gray-300"
+                          }`} />
+
+                          <div>
+                            {/* Top badge line */}
+                            <div className="flex justify-between items-start gap-2 mb-3 pt-2">
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-[#414E36]/5 text-[#414E36] px-2 py-0.5 rounded-md">
+                                {item.branchName} Branch
+                              </span>
+                              
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${
+                                status === "active" ? "bg-emerald-50 text-emerald-700" :
+                                status === "scheduled" ? "bg-blue-50 text-blue-700" :
+                                status === "expired" ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-600"
+                              }`}>
+                                {status}
+                              </span>
+                            </div>
+
+                            {/* Service names */}
+                            <h3 className="font-bold text-[#1F251A] text-sm leading-snug line-clamp-1">{item.serviceNameEn}</h3>
+                            <h4 className="text-xs text-[#5A6A51] font-medium mt-0.5 dir-rtl text-right">{item.serviceNameAr}</h4>
+
+                            {/* Pricing summary */}
+                            <div className="mt-4 bg-[#FBFBF9] p-3 rounded-xl border border-[#414E36]/5 flex items-center justify-between">
+                              <div>
+                                <span className="text-[10px] text-[#5A6A51] block font-semibold">Base Price</span>
+                                <span className="text-xs font-semibold text-[#5A6A51]/80 line-through">{basePrice} EGP</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[10px] text-[#C4AE7C] block font-bold">Offer Price</span>
+                                <span className="text-sm font-extrabold text-[#414E36]">{finalPrice} EGP</span>
+                              </div>
+                            </div>
+
+                            {/* Promo value details */}
+                            <div className="mt-3 flex items-center gap-2 text-xs">
+                              <span className="bg-[#C4AE7C]/10 text-[#C4AE7C] font-bold px-2 py-0.5 rounded text-[10px]">
+                                {item.promotion.type === "percentage" ? `${promoVal}% OFF` : `-${promoVal} EGP`}
+                              </span>
+                              <span className="text-[#5A6A51] text-[10px] font-medium">
+                                {item.promotion.startDate || item.promotion.endDate ? (
+                                  <>
+                                    {item.promotion.startDate ? item.promotion.startDate : "Start"} to {item.promotion.endDate ? item.promotion.endDate : "End"}
+                                  </>
+                                ) : (
+                                  "Always active"
+                                )}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Footer action bar */}
+                          <div className="mt-5 pt-4 border-t border-[#414E36]/5 flex items-center justify-between gap-4">
+                            {/* Toggle switch */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold text-[#5A6A51]">Enabled</span>
+                              <button
+                                onClick={() => handleTogglePromotion(item.serviceId, item.branchName, item.promotion.enabled)}
+                                className="relative h-5 w-9 rounded-full focus:outline-none transition-colors duration-300"
+                                style={{ backgroundColor: item.promotion.enabled ? "#414E36" : "#E2E8F0" }}
+                              >
+                                <span
+                                  className="absolute top-[2px] h-4.5 w-4.5 rounded-full bg-white shadow-md transition-all duration-300"
+                                  style={{ left: item.promotion.enabled ? "18px" : "2px" }}
+                                />
+                              </button>
+                            </div>
+
+                            {/* Action icons */}
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleOpenEditPromo(item)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
+                                title="Edit Promotion"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                              <button
+                                onClick={() => handleDeletePromotion(item.serviceId, item.branchName)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
+                                title="Delete Promotion"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              {/* Add/Edit Promotion Modal */}
+              {showAddPromoModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-fadeIn">
+                  <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-[#414E36]/10 animate-slideUp flex flex-col">
+                    
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between border-b border-[#414E36]/10 px-6 py-4">
+                      <h3 className="text-base font-bold text-[#1F251A]">
+                        {editingPromo ? "Edit Promotion / تعديل العرض" : "Add Promotion / إضافة عرض"}
+                      </h3>
+                      <button
+                        onClick={() => setShowAddPromoModal(false)}
+                        className="flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#FBFBF9]"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Modal Form */}
+                    <div className="p-6 space-y-4">
+                      
+                      {/* Service Select */}
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">
+                          Select Service <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          disabled={!!editingPromo}
+                          value={promoServiceId}
+                          onChange={(e) => {
+                            setPromoServiceId(Number(e.target.value) || "");
+                            setPromoBranchName(""); // Reset branch when service changes
+                          }}
+                          className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs outline-none transition focus:border-[#C4AE7C] text-[#1F251A] font-medium"
+                        >
+                          <option value="">-- Select Service --</option>
+                          {localServices.map(svc => (
+                            <option key={svc.id} value={svc.id}>
+                              {svc.en} / {svc.ar || ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Branch Select */}
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">
+                          Select Branch <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          disabled={!!editingPromo || !promoServiceId}
+                          value={promoBranchName}
+                          onChange={(e) => setPromoBranchName(e.target.value)}
+                          className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs outline-none transition focus:border-[#C4AE7C] text-[#1F251A] font-medium"
+                        >
+                          <option value="">-- Select Branch --</option>
+                          {(() => {
+                            const selectedSvc = localServices.find(s => s.id === Number(promoServiceId));
+                            if (!selectedSvc) return null;
+                            const configuredBranches = selectedSvc.branchPricing || [];
+                            return configuredBranches.map(bp => (
+                              <option key={bp.name} value={bp.name}>{bp.name}</option>
+                            ));
+                          })()}
+                        </select>
+                      </div>
+
+                      {/* Discount Type */}
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Discount Type</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPromoType("percentage")}
+                            className={`py-2 px-3 text-xs font-bold rounded-lg border transition ${
+                              promoType === "percentage"
+                                ? "bg-[#414E36] border-[#414E36] text-white"
+                                : "bg-white border-[#414E36]/15 text-[#5A6A51] hover:bg-[#414E36]/5"
+                            }`}
+                          >
+                            Percentage (%)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPromoType("fixed")}
+                            className={`py-2 px-3 text-xs font-bold rounded-lg border transition ${
+                              promoType === "fixed"
+                                ? "bg-[#414E36] border-[#414E36] text-white"
+                                : "bg-white border-[#414E36]/15 text-[#5A6A51] hover:bg-[#414E36]/5"
+                            }`}
+                          >
+                            Fixed Amount (EGP)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Discount Value */}
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">
+                          Discount Value ({promoType === "percentage" ? "%" : "EGP"}) <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={promoValue}
+                          onChange={(e) => setPromoValue(Math.max(0, Number(e.target.value) || 0))}
+                          placeholder="0"
+                          className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs outline-none transition focus:border-[#C4AE7C] text-[#1F251A] font-medium"
+                        />
+                      </div>
+
+                      {/* Start/End Date */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">Start Date (Optional)</label>
+                          <input
+                            type="date"
+                            value={promoStartDate}
+                            onChange={(e) => setPromoStartDate(e.target.value)}
+                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-2 py-1.5 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A]"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[10px] font-semibold text-[#5A6A51]">End Date (Optional)</label>
+                          <input
+                            type="date"
+                            value={promoEndDate}
+                            onChange={(e) => setPromoEndDate(e.target.value)}
+                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-2 py-1.5 text-xs outline-none focus:border-[#C4AE7C] text-[#1F251A]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Live Price Calculator & Validation Warning */}
+                      {(() => {
+                        const selectedSvc = localServices.find(s => s.id === Number(promoServiceId));
+                        if (!selectedSvc) return null;
+                        const selectedBp = (selectedSvc.branchPricing || []).find(bp => bp.name.toLowerCase() === promoBranchName.toLowerCase());
+                        const basePrice = selectedBp ? selectedBp.price : (selectedSvc.price || 0);
+
+                        let calcPrice = basePrice;
+                        if (promoType === "percentage") {
+                          calcPrice = basePrice * (1 - promoValue / 100);
+                        } else {
+                          calcPrice = basePrice - promoValue;
+                        }
+
+                        const isNegative = calcPrice < 0;
+                        const finalDisplayPrice = Math.max(0, Math.round(calcPrice));
+
+                        return (
+                          <div className="pt-3 border-t border-[#414E36]/10 space-y-1">
+                            <div className="flex justify-between items-center text-xs font-bold text-[#414E36]">
+                              <span>Selling Price:</span>
+                              <span className={isNegative ? "text-red-500 font-extrabold" : "text-[#C4AE7C]"}>
+                                {finalDisplayPrice} EGP
+                              </span>
+                            </div>
+                            {isNegative && (
+                              <p className="text-[10px] text-red-500 font-bold leading-tight">
+                                ⚠️ Warning: Discount value exceeds base price of {basePrice} EGP. Capped at 0 EGP.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div className="border-t border-[#414E36]/10 px-6 py-4 flex items-center justify-end gap-3 bg-[#FBFBF9] rounded-b-2xl">
+                      <button
+                        onClick={() => setShowAddPromoModal(false)}
+                        className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-xs font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled={!promoServiceId || !promoBranchName}
+                        onClick={handleSavePromotion}
+                        className={`rounded-lg px-5 py-2 text-xs font-semibold text-[#FBFBF9] transition ${
+                          !promoServiceId || !promoBranchName
+                            ? "bg-[#414E36]/50 cursor-not-allowed"
+                            : "bg-[#414E36] hover:bg-[#2e3a26]"
+                        }`}
+                      >
+                        Save Promotion
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
 
