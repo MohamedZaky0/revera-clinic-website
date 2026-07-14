@@ -954,7 +954,8 @@ export default function AdminPage() {
     startDate?: string;
     endDate?: string;
   } | null>(null);
-  const [promoServiceId, setPromoServiceId] = useState<number | "">("");
+  const [promoServiceIds, setPromoServiceIds] = useState<number[]>([]);
+  const [promoServiceSearch, setPromoServiceSearch] = useState<string>("");
   const [promoBranchName, setPromoBranchName] = useState<string>("");
   const [promoType, setPromoType] = useState<"percentage" | "fixed">("percentage");
   const [promoValue, setPromoValue] = useState<number>(0);
@@ -1043,29 +1044,39 @@ export default function AdminPage() {
   };
 
   const handleSavePromotion = () => {
-    if (!promoServiceId || !promoBranchName) return;
+    if ((promoServiceIds.length === 0 && !editingPromo) || !promoBranchName) return;
+
+    const promoObj = {
+      enabled: true,
+      type: promoType,
+      value: promoValue,
+      startDate: promoStartDate || undefined,
+      endDate: promoEndDate || undefined
+    };
+
+    const serviceIdsToUpdate = editingPromo
+      ? [editingPromo.serviceId]
+      : promoServiceIds;
 
     const updatedServices = localServices.map(svc => {
-      if (svc.id === Number(promoServiceId)) {
-        const updatedBranchPricing = (svc.branchPricing || []).map(bp => {
+      if (serviceIdsToUpdate.includes(svc.id)) {
+        // Build branchPricing: use existing or create entry from global branches
+        let bpArray = svc.branchPricing && svc.branchPricing.length > 0
+          ? [...svc.branchPricing]
+          : branches.map(b => ({ name: b.name_en, price: svc.price ?? 0, visible: true, status: true, isDefault: false }));
+
+        const branchExists = bpArray.some(bp => bp.name.toLowerCase() === promoBranchName.toLowerCase());
+        if (!branchExists) {
+          bpArray.push({ name: promoBranchName, price: svc.price ?? 0, visible: true, status: true, isDefault: false });
+        }
+
+        const updatedBranchPricing = bpArray.map(bp => {
           if (bp.name.toLowerCase() === promoBranchName.toLowerCase()) {
-            return {
-              ...bp,
-              promotion: {
-                enabled: true,
-                type: promoType,
-                value: promoValue,
-                startDate: promoStartDate || undefined,
-                endDate: promoEndDate || undefined
-              }
-            };
+            return { ...bp, promotion: promoObj };
           }
           return bp;
         });
-        return {
-          ...svc,
-          branchPricing: updatedBranchPricing
-        };
+        return { ...svc, branchPricing: updatedBranchPricing };
       }
       return svc;
     });
@@ -1075,7 +1086,8 @@ export default function AdminPage() {
     setShowAddPromoModal(false);
 
     // Reset form states
-    setPromoServiceId("");
+    setPromoServiceIds([]);
+    setPromoServiceSearch("");
     setPromoBranchName("");
     setPromoType("percentage");
     setPromoValue(0);
@@ -1135,7 +1147,8 @@ export default function AdminPage() {
 
   const handleOpenEditPromo = (promo: any) => {
     setEditingPromo(promo);
-    setPromoServiceId(promo.serviceId);
+    setPromoServiceIds([promo.serviceId]);
+    setPromoServiceSearch("");
     setPromoBranchName(promo.branchName);
     setPromoType(promo.promotion.type);
     setPromoValue(promo.promotion.value);
@@ -7260,7 +7273,8 @@ export default function AdminPage() {
                   <button
                     onClick={() => {
                       setEditingPromo(null);
-                      setPromoServiceId("");
+                      setPromoServiceIds([]);
+                      setPromoServiceSearch("");
                       setPromoBranchName("");
                       setPromoType("percentage");
                       setPromoValue(0);
@@ -7489,52 +7503,120 @@ export default function AdminPage() {
                     </div>
 
                     {/* Modal Form */}
-                    <div className="p-6 space-y-4">
-                      
-                      {/* Service Select */}
+                    <div className="p-6 space-y-4 overflow-y-auto max-h-[65vh]">
+
+                      {/* Services Multi-Select */}
                       <div>
                         <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">
-                          Select Service <span className="text-red-500">*</span>
+                          Select Services <span className="text-red-500">*</span>
+                          {!editingPromo && promoServiceIds.length > 0 && (
+                            <span className="ml-2 text-[10px] font-bold text-[#C4AE7C] bg-[#C4AE7C]/10 px-1.5 py-0.5 rounded-full">
+                              {promoServiceIds.length} selected
+                            </span>
+                          )}
                         </label>
-                        <select
-                          disabled={!!editingPromo}
-                          value={promoServiceId}
-                          onChange={(e) => {
-                            setPromoServiceId(Number(e.target.value) || "");
-                            setPromoBranchName(""); // Reset branch when service changes
-                          }}
-                          className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs outline-none transition focus:border-[#C4AE7C] text-[#1F251A] font-medium"
-                        >
-                          <option value="">-- Select Service --</option>
-                          {localServices.map(svc => (
-                            <option key={svc.id} value={svc.id}>
-                              {svc.en} / {svc.ar || ""}
-                            </option>
-                          ))}
-                        </select>
+                        {editingPromo ? (
+                          <div className="rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] font-medium">
+                            {localServices.find(s => s.id === editingPromo.serviceId)?.en || "—"}
+                          </div>
+                        ) : (
+                          <div className="rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] overflow-hidden">
+                            {/* Search inside list */}
+                            <div className="relative border-b border-[#414E36]/10">
+                              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                              <input
+                                type="text"
+                                value={promoServiceSearch}
+                                onChange={e => setPromoServiceSearch(e.target.value)}
+                                placeholder="Search services..."
+                                className="w-full bg-transparent pl-8 pr-3 py-2 text-xs outline-none text-[#1F251A] placeholder-[#5A6A51]/60"
+                              />
+                            </div>
+                            {/* Select All / Clear row */}
+                            <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#414E36]/10 bg-[#F5F4F0]">
+                              <button
+                                type="button"
+                                onClick={() => setPromoServiceIds(localServices.filter(s => s.en.toLowerCase().includes(promoServiceSearch.toLowerCase()) || (s.ar || "").toLowerCase().includes(promoServiceSearch.toLowerCase())).map(s => s.id))}
+                                className="text-[10px] font-bold text-[#414E36] hover:underline"
+                              >Select All</button>
+                              <button
+                                type="button"
+                                onClick={() => setPromoServiceIds([])}
+                                className="text-[10px] font-bold text-red-500 hover:underline"
+                              >Clear</button>
+                            </div>
+                            {/* Service list */}
+                            <div className="max-h-44 overflow-y-auto">
+                              {localServices
+                                .filter(s => s.en.toLowerCase().includes(promoServiceSearch.toLowerCase()) || (s.ar || "").toLowerCase().includes(promoServiceSearch.toLowerCase()))
+                                .map(svc => {
+                                  const checked = promoServiceIds.includes(svc.id);
+                                  return (
+                                    <label
+                                      key={svc.id}
+                                      className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition ${
+                                        checked ? "bg-[#414E36]/5" : "hover:bg-[#414E36]/3"
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => {
+                                          setPromoServiceIds(prev =>
+                                            checked ? prev.filter(id => id !== svc.id) : [...prev, svc.id]
+                                          );
+                                          setPromoBranchName(""); // reset branch on change
+                                        }}
+                                        className="accent-[#414E36] h-3.5 w-3.5 rounded"
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <span className="text-xs font-medium text-[#1F251A] block truncate">{svc.en}</span>
+                                        {svc.ar && <span className="text-[10px] text-[#5A6A51] block truncate">{svc.ar}</span>}
+                                      </div>
+                                    </label>
+                                  );
+                                })
+                              }
+                              {localServices.filter(s => s.en.toLowerCase().includes(promoServiceSearch.toLowerCase()) || (s.ar || "").toLowerCase().includes(promoServiceSearch.toLowerCase())).length === 0 && (
+                                <div className="py-4 text-center text-xs text-[#5A6A51]">No services found</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Branch Select */}
+                      {/* Branch Select — uses global branches, falls back gracefully */}
                       <div>
                         <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">
                           Select Branch <span className="text-red-500">*</span>
                         </label>
                         <select
-                          disabled={!!editingPromo || !promoServiceId}
                           value={promoBranchName}
                           onChange={(e) => setPromoBranchName(e.target.value)}
                           className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs outline-none transition focus:border-[#C4AE7C] text-[#1F251A] font-medium"
                         >
                           <option value="">-- Select Branch --</option>
                           {(() => {
-                            const selectedSvc = localServices.find(s => s.id === Number(promoServiceId));
-                            if (!selectedSvc) return null;
-                            const configuredBranches = selectedSvc.branchPricing || [];
-                            return configuredBranches.map(bp => (
-                              <option key={bp.name} value={bp.name}>{bp.name}</option>
+                            // Use global branches list (from Supabase) as primary source
+                            if (branches.length > 0) {
+                              return branches.map(b => (
+                                <option key={b.id} value={b.name_en}>{b.name_en}</option>
+                              ));
+                            }
+                            // Fallback: derive unique branch names from selected services' branchPricing
+                            const names = new Set<string>();
+                            promoServiceIds.forEach(id => {
+                              const svc = localServices.find(s => s.id === id);
+                              (svc?.branchPricing || []).forEach(bp => names.add(bp.name));
+                            });
+                            return Array.from(names).map(name => (
+                              <option key={name} value={name}>{name}</option>
                             ));
                           })()}
                         </select>
+                        {branches.length === 0 && (
+                          <p className="mt-1 text-[10px] text-amber-600 font-medium">⚠ No branches found. Configure branches in Settings → Branches first.</p>
+                        )}
                       </div>
 
                       {/* Discount Type */}
@@ -7602,39 +7684,41 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Live Price Calculator & Validation Warning */}
-                      {(() => {
-                        const selectedSvc = localServices.find(s => s.id === Number(promoServiceId));
+                      {/* Live Price note — shows for single-service selection only */}
+                      {promoServiceIds.length === 1 && promoBranchName && (() => {
+                        const selectedSvc = localServices.find(s => s.id === promoServiceIds[0]);
                         if (!selectedSvc) return null;
                         const selectedBp = (selectedSvc.branchPricing || []).find(bp => bp.name.toLowerCase() === promoBranchName.toLowerCase());
                         const basePrice = selectedBp ? selectedBp.price : (selectedSvc.price || 0);
-
-                        let calcPrice = basePrice;
-                        if (promoType === "percentage") {
-                          calcPrice = basePrice * (1 - promoValue / 100);
-                        } else {
-                          calcPrice = basePrice - promoValue;
-                        }
-
+                        let calcPrice = promoType === "percentage"
+                          ? basePrice * (1 - promoValue / 100)
+                          : basePrice - promoValue;
                         const isNegative = calcPrice < 0;
                         const finalDisplayPrice = Math.max(0, Math.round(calcPrice));
-
                         return (
                           <div className="pt-3 border-t border-[#414E36]/10 space-y-1">
                             <div className="flex justify-between items-center text-xs font-bold text-[#414E36]">
-                              <span>Selling Price:</span>
+                              <span>Preview Selling Price:</span>
                               <span className={isNegative ? "text-red-500 font-extrabold" : "text-[#C4AE7C]"}>
                                 {finalDisplayPrice} EGP
                               </span>
                             </div>
                             {isNegative && (
                               <p className="text-[10px] text-red-500 font-bold leading-tight">
-                                ⚠️ Warning: Discount value exceeds base price of {basePrice} EGP. Capped at 0 EGP.
+                                ⚠️ Discount exceeds base price ({basePrice} EGP). Will be capped at 0.
                               </p>
                             )}
                           </div>
                         );
                       })()}
+
+                      {promoServiceIds.length > 1 && (
+                        <div className="pt-3 border-t border-[#414E36]/10">
+                          <p className="text-[10px] text-[#5A6A51] font-medium">
+                            ℹ This promotion will apply to all <strong>{promoServiceIds.length} selected services</strong> on the <strong>{promoBranchName || "selected"}</strong> branch.
+                          </p>
+                        </div>
+                      )}
 
                     </div>
 
@@ -7647,15 +7731,15 @@ export default function AdminPage() {
                         Cancel
                       </button>
                       <button
-                        disabled={!promoServiceId || !promoBranchName}
+                        disabled={(editingPromo ? false : promoServiceIds.length === 0) || !promoBranchName}
                         onClick={handleSavePromotion}
                         className={`rounded-lg px-5 py-2 text-xs font-semibold text-[#FBFBF9] transition ${
-                          !promoServiceId || !promoBranchName
+                          (editingPromo ? false : promoServiceIds.length === 0) || !promoBranchName
                             ? "bg-[#414E36]/50 cursor-not-allowed"
                             : "bg-[#414E36] hover:bg-[#2e3a26]"
                         }`}
                       >
-                        Save Promotion
+                        {editingPromo ? "Save Changes" : promoServiceIds.length > 1 ? `Apply to ${promoServiceIds.length} Services` : "Save Promotion"}
                       </button>
                     </div>
 
