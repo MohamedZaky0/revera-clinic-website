@@ -192,6 +192,18 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
             </svg>
           </div>
         </div>
+        {service.price !== undefined && service.price !== null && Number(service.price) > 0 && (
+          <div style={{
+            fontFamily: "var(--font-sora), sans-serif",
+            fontSize: 16,
+            fontWeight: 650,
+            color: "#C4AE7C",
+            marginTop: -12,
+            marginBottom: -12,
+          }}>
+            {lang === "ar" ? `${Number(service.price).toLocaleString()} ج.م` : `${Number(service.price).toLocaleString()} EGP`}
+          </div>
+        )}
 
         <p style={{
           margin: 0,
