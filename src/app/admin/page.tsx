@@ -19041,38 +19041,22 @@ export default function AdminPage() {
                   {/* Provider */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Provider</p>
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-[#C4AE7C]/20 flex items-center justify-center text-[#414E36] font-bold">
-                        {(viewingBooking.doctorName || "Dr. Sara El Gamel").split(' ').map(n => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()}
+                        {(viewingBooking.doctorName || "—").split(' ').map((n: string) => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div className="flex items-center gap-1 text-[#C4AE7C]">
-                          {"★".repeat(5)}
-                          <span className="text-xs text-[#5A6A51] ml-1">(5.0)</span>
-                        </div>
+                        <p className="font-bold text-[#1F251A] text-sm">
+                          {viewingBooking.doctorName || "No Doctor Assigned"}
+                        </p>
+                        {viewingBooking.doctorName && (
+                          <div className="flex items-center gap-1 text-[#C4AE7C] mt-0.5">
+                            {"★".repeat(5)}
+                            <span className="text-xs text-[#5A6A51] ml-1">(5.0)</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <select
-                      value={viewingBooking.doctorName || "Dr. Sara El Gamel"}
-                      disabled={!hasPermission("bookings.edit")}
-                      onChange={async (e) => {
-                        const newDoc = e.target.value;
-                        await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ doctorName: newDoc })
-                        });
-                        setViewingBooking(prev => prev ? { ...prev, doctorName: newDoc } : null);
-                        fetchAllReservations();
-                      }}
-                      className="w-full rounded-xl border border-[#414E36]/10 bg-[#FBFBF9] px-3 py-2 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {providers.map((p) => (
-                        <option key={p.id || p.name} value={p.name}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
                   </div>
 
                   {/* Assigned Room or Compatible Rooms */}
