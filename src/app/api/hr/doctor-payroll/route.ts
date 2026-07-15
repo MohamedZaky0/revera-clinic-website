@@ -77,15 +77,33 @@ export async function GET(req: Request) {
         return sum + price;
       }, 0);
 
+      const fixedSalary = Number(pay.fixed_salary || 0);
+      const commissionType = pay.commission_type || 'none';
+      const commissionValue = Number(pay.commission_value || 0);
+
+      let calculatedCommission = 0;
+      docReservations.forEach((res: any) => {
+        if (commissionType === 'fixed') {
+          calculatedCommission += commissionValue;
+        } else if (commissionType === 'percentage') {
+          const resPrice = Number(res.amount_paid || 0) + Number(res.amount_left || 0) || Number(res.services?.price || 0);
+          calculatedCommission += resPrice * (commissionValue / 100);
+        }
+      });
+
+      calculatedCommission = Math.round(calculatedCommission * 100) / 100;
+      const netSalary = Math.round((fixedSalary + calculatedCommission) * 100) / 100;
+
       return {
         ...pay,
         providers: doc,
         doctor: doc,
-        fixed_salary_snapshot: pay.fixed_salary,
-        commission_type_snapshot: pay.commission_type,
-        commission_value_snapshot: pay.commission_value,
-        reservations_count: pay.completed_services_count,
-        calculated_commission: pay.total_commission_earned,
+        fixed_salary_snapshot: fixedSalary,
+        commission_type_snapshot: commissionType,
+        commission_value_snapshot: commissionValue,
+        reservations_count: docReservations.length,
+        calculated_commission: calculatedCommission,
+        net_salary: netSalary,
         total_reservations_value: totalBookingValue
       };
     });
@@ -230,11 +248,65 @@ export async function PATCH(req: Request) {
       }
     }
 
-    const finalFixed = fixed_salary !== undefined ? Number(fixed_salary) : Number(current.fixed_salary);
-    const finalComm = total_commission_earned !== undefined ? Number(total_commission_earned) : Number(current.total_commission_earned);
+    let finalFixed = fixed_salary !== undefined ? Number(fixed_salary) : Number(current.fixed_salary);
+    let finalComm = total_commission_earned !== undefined ? Number(total_commission_earned) : Number(current.total_commission_earned);
 
     if (fixed_salary !== undefined) updates.fixed_salary = finalFixed;
     if (total_commission_earned !== undefined) updates.total_commission_earned = finalComm;
+
+    // Dynamically calculate and lock in real counts/commission/net if not explicitly supplied
+    try {
+      const { data: prov } = await supabaseServer
+        .from('providers')
+        .select('name')
+        .eq('id', current.provider_id)
+        .maybeSingle();
+
+      if (prov) {
+        const [resResult, servicesResult] = await Promise.all([
+          supabaseServer
+            .from('reservations')
+            .select('doctor_name, status, date, amount_paid, amount_left, service_id')
+            .like('date', `${current.month}-%`),
+          supabaseServer
+            .from('services').select('id, price')
+        ]);
+
+        if (resResult.data && !resResult.error) {
+          const servicesMap = new Map((servicesResult.data || []).map((s: any) => [s.id, s.price]));
+          const activeRes = resResult.data.filter((r: any) => {
+            const isApprovedOrCompleted = r.status === 'approved' || r.status === 'completed';
+            const isDocMatch = r.doctor_name && r.doctor_name.trim().toLowerCase() === prov.name.trim().toLowerCase();
+            return isApprovedOrCompleted && isDocMatch;
+          });
+
+          const completedCount = activeRes.length;
+          let totalCommission = 0;
+
+          activeRes.forEach((res: any) => {
+            const commType = current.commission_type;
+            const commVal = Number(current.commission_value || 0);
+
+            if (commType === 'fixed') {
+              totalCommission += commVal;
+            } else if (commType === 'percentage') {
+              const resPrice = Number(res.amount_paid || 0) + Number(res.amount_left || 0) || Number(servicesMap.get(res.service_id) || 0);
+              totalCommission += resPrice * (commVal / 100);
+            }
+          });
+
+          totalCommission = Math.round(totalCommission * 100) / 100;
+          
+          updates.completed_services_count = completedCount;
+          if (total_commission_earned === undefined) {
+            updates.total_commission_earned = totalCommission;
+            finalComm = totalCommission;
+          }
+        }
+      }
+    } catch (calcErr) {
+      console.warn("Could not dynamically calculate payroll figures in PATCH:", calcErr);
+    }
 
     if (net_salary !== undefined) {
       updates.net_salary = Number(net_salary);
