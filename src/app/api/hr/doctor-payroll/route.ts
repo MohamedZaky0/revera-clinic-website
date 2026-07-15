@@ -34,16 +34,24 @@ export async function GET(req: Request) {
     const months = Array.from(new Set((payroll || []).map((p: any) => p.month)));
     let allReservations: any[] = [];
     if (months.length > 0) {
-      const { data: resData, error: resErr } = await supabaseServer
-        .from('reservations')
-        .select('doctor_name, status, date, amount_paid, amount_left, services(price)');
-      if (!resErr && resData) {
-        allReservations = resData.filter((r: any) => {
-          const isApprovedOrCompleted = r.status === 'approved' || r.status === 'completed';
-          if (!isApprovedOrCompleted || !r.date) return false;
-          const rMonth = r.date.slice(0, 7);
-          return months.includes(rMonth);
-        });
+      const [resResult, servicesResult] = await Promise.all([
+        supabaseServer.from('reservations').select('doctor_name, status, date, amount_paid, amount_left, service_id'),
+        supabaseServer.from('services').select('id, price')
+      ]);
+
+      if (!resResult.error && resResult.data) {
+        const servicesMap = new Map((servicesResult.data || []).map((s: any) => [s.id, s.price]));
+        allReservations = resResult.data
+          .filter((r: any) => {
+            const isApprovedOrCompleted = r.status === 'approved' || r.status === 'completed';
+            if (!isApprovedOrCompleted || !r.date) return false;
+            const rMonth = r.date.slice(0, 7);
+            return months.includes(rMonth);
+          })
+          .map((r: any) => ({
+            ...r,
+            services: r.service_id ? { price: servicesMap.get(r.service_id) || 0 } : null
+          }));
       }
     }
 
@@ -111,20 +119,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No doctors found to run payroll.' }, { status: 400 });
     }
 
-    // 2. Fetch all reservations for the targeted month
-    // Note: Join with services to get price fallback if needed
-    const { data: reservations, error: resErr } = await supabaseServer
-      .from('reservations')
-      .select('doctor_name, status, date, amount_paid, amount_left, services(price)')
-      .like('date', `${month}-%`);
+    // 2. Fetch all reservations for the targeted month and services
+    const [resResult, servicesResult] = await Promise.all([
+      supabaseServer
+        .from('reservations')
+        .select('doctor_name, status, date, amount_paid, amount_left, service_id')
+        .like('date', `${month}-%`),
+      supabaseServer
+        .from('services').select('id, price')
+    ]);
 
-    if (resErr) {
-      console.warn("Could not fetch reservations for doctor payroll calculations:", resErr.message);
+    if (resResult.error) {
+      console.warn("Could not fetch reservations for doctor payroll calculations:", resResult.error.message);
     }
 
-    const activeReservations = (reservations || []).filter((r: any) => {
-      return r.status === 'approved' || r.status === 'completed';
-    });
+    const servicesMap = new Map((servicesResult.data || []).map((s: any) => [s.id, s.price]));
+    const activeReservations = (resResult.data || [])
+      .filter((r: any) => {
+        return r.status === 'approved' || r.status === 'completed';
+      })
+      .map((r: any) => ({
+        ...r,
+        services: r.service_id ? { price: servicesMap.get(r.service_id) || 0 } : null
+      }));
 
     // 3. Calculate completed services and commissions per doctor
     const inserts = providers.map((prov: any) => {
