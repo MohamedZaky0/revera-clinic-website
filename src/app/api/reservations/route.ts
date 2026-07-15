@@ -57,7 +57,7 @@ export async function GET(req: Request) {
   try {
     let q = supabaseServer
       .from('reservations')
-      .select('*, services(price)')
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (status) {
@@ -75,10 +75,23 @@ export async function GET(req: Request) {
     // Include bookings that match this branch OR have no branch set (website bookings without branch)
     if (branchId) q = q.or(`branch_id.eq.${branchId},branch_id.is.null`);
 
-    const { data: rows, error } = await q;
+    const [resResult, servicesResult] = await Promise.all([
+      q,
+      supabaseServer.from('services').select('id, price')
+    ]);
 
-    if (error) throw error;
-    return NextResponse.json(rows ? rows.map(mapRow) : []);
+    if (resResult.error) throw resResult.error;
+    if (servicesResult.error) {
+      console.warn("Could not fetch services for reservations mapping:", servicesResult.error.message);
+    }
+
+    const servicesMap = new Map((servicesResult.data || []).map((s: any) => [s.id, s.price]));
+    const mappedRows = (resResult.data || []).map((r: any) => ({
+      ...r,
+      services: r.service_id ? { price: servicesMap.get(r.service_id) || 0 } : null
+    }));
+
+    return NextResponse.json(mappedRows.map(mapRow));
   } catch (err) {
     console.error('GET /api/reservations error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
