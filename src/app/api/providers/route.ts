@@ -9,11 +9,11 @@ const JSON_FILE_PATH = path.join(process.cwd(), 'data', 'providers.json');
 
 const DEFAULT_PROVIDERS: any[] = [];
 
-function mapProvider(p: Record<string, any>) {
+function mapProvider(p: Record<string, any>, bookingsCount: number = 0) {
   return {
     id: p.id,
     name: p.name,
-    bookings: p.bookings_count ?? 0,
+    bookings: bookingsCount,
     services: p.services ?? [],
     more: p.more_count ?? 0,
     rating: Number(p.rating || 0),
@@ -31,19 +31,38 @@ function mapProvider(p: Record<string, any>) {
     commissionValue: p.commission_value ? Number(p.commission_value) : 0,
   };
 }
-
+ 
 export async function GET() {
   try {
-    const { data, error } = await supabaseServer
-      .from('providers')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (!error && data && data.length > 0 && ('working_days_hours' in data[0])) {
-      return NextResponse.json(data.map(mapProvider));
+    const [providersRes, reservationsRes] = await Promise.all([
+      supabaseServer
+        .from('providers')
+        .select('*')
+        .order('name', { ascending: true }),
+      supabaseServer
+        .from('reservations')
+        .select('doctor_name, status')
+        .neq('status', 'rejected')
+    ]);
+ 
+    if (!providersRes.error && providersRes.data && providersRes.data.length > 0 && ('working_days_hours' in providersRes.data[0])) {
+      const counts = new Map<string, number>();
+      (reservationsRes.data || []).forEach((r: any) => {
+        if (r.doctor_name) {
+          const nameKey = r.doctor_name.trim().toLowerCase();
+          counts.set(nameKey, (counts.get(nameKey) || 0) + 1);
+        }
+      });
+ 
+      const mapped = providersRes.data.map((p: any) => {
+        const key = p.name ? p.name.trim().toLowerCase() : "";
+        const bookingsCount = counts.get(key) || 0;
+        return mapProvider(p, bookingsCount);
+      });
+      return NextResponse.json(mapped);
     } else {
-      if (error) {
-        console.warn("Supabase providers query error, falling back to JSON:", error);
+      if (providersRes.error) {
+        console.warn("Supabase providers query error, falling back to JSON:", providersRes.error);
       } else {
         console.warn("Supabase providers missing columns (schema not migrated), falling back to JSON");
       }
@@ -51,16 +70,33 @@ export async function GET() {
   } catch (dbErr) {
     console.error("Database providers load error, falling back to JSON:", dbErr);
   }
-
+ 
   // Fallback to local JSON file
   try {
+    const reservationsRes = await supabaseServer.from('reservations').select('doctor_name, status').neq('status', 'rejected');
+    const counts = new Map<string, number>();
+    (reservationsRes.data || []).forEach((r: any) => {
+      if (r.doctor_name) {
+        const nameKey = r.doctor_name.trim().toLowerCase();
+        counts.set(nameKey, (counts.get(nameKey) || 0) + 1);
+      }
+    });
+ 
     if (!fs.existsSync(JSON_FILE_PATH)) {
       fs.mkdirSync(path.dirname(JSON_FILE_PATH), { recursive: true });
-      fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(DEFAULT_PROVIDERS.map((p, i) => ({ ...mapProvider(p), id: `local-${i}` })), null, 2));
-      return NextResponse.json(DEFAULT_PROVIDERS.map((p, i) => ({ ...mapProvider(p), id: `local-${i}` })));
+      fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(DEFAULT_PROVIDERS.map((p, i) => ({ ...mapProvider(p, counts.get(p.name ? p.name.trim().toLowerCase() : "") || 0), id: `local-${i}` })), null, 2));
+      return NextResponse.json(DEFAULT_PROVIDERS.map((p, i) => ({ ...mapProvider(p, counts.get(p.name ? p.name.trim().toLowerCase() : "") || 0), id: `local-${i}` })));
     }
     const fileContent = fs.readFileSync(JSON_FILE_PATH, 'utf-8');
-    return NextResponse.json(JSON.parse(fileContent));
+    const localProviders = JSON.parse(fileContent);
+    const mappedLocal = localProviders.map((p: any) => {
+      const key = p.name ? p.name.trim().toLowerCase() : "";
+      return {
+        ...p,
+        bookings: counts.get(key) || 0
+      };
+    });
+    return NextResponse.json(mappedLocal);
   } catch (err) {
     console.error("JSON fallback load error:", err);
     return NextResponse.json([]);
