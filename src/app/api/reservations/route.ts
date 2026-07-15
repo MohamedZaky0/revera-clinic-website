@@ -60,7 +60,13 @@ export async function GET(req: Request) {
       .select('*, services(price)')
       .order('created_at', { ascending: false });
 
-    if (status) q = q.eq('status', status);
+    if (status) {
+      if (status === 'pending') {
+        q = q.in('status', ['pending', 'pending_deposit']);
+      } else {
+        q = q.eq('status', status);
+      }
+    }
     if (serviceId) q = q.eq('service_id', Number(serviceId));
     if (date) q = q.eq('date', date);
     if (phone) q = q.eq('phone', phone);

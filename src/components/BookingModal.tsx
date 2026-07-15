@@ -394,7 +394,13 @@ export function BookingModal() {
 
       // Check working days & hours
       if (doc.workingDaysHours) {
-        const dayConfig = doc.workingDaysHours[weekdayName];
+        let dayConfig = doc.workingDaysHours[weekdayName];
+        if (!dayConfig) {
+          const typeKey = sessionType === 'online' ? 'online' : 'in_person';
+          dayConfig = doc.workingDaysHours[typeKey]?.[weekdayName] || 
+                      doc.workingDaysHours.in_person?.[weekdayName] || 
+                      doc.workingDaysHours.online?.[weekdayName];
+        }
         if (dayConfig && dayConfig.isOpen) {
           const [sh, sm] = dayConfig.start.split(":").map(Number);
           const [eh, em] = dayConfig.end.split(":").map(Number);
@@ -453,7 +459,13 @@ export function BookingModal() {
       }
 
       if (doctor.workingDaysHours) {
-        const dayConfig = doctor.workingDaysHours[weekdayName];
+        let dayConfig = doctor.workingDaysHours[weekdayName];
+        if (!dayConfig) {
+          const typeKey = sessionType === 'online' ? 'online' : 'in_person';
+          dayConfig = doctor.workingDaysHours[typeKey]?.[weekdayName] || 
+                      doctor.workingDaysHours.in_person?.[weekdayName] || 
+                      doctor.workingDaysHours.online?.[weekdayName];
+        }
         if (!dayConfig || !dayConfig.isOpen) {
           return false;
         }
@@ -462,7 +474,7 @@ export function BookingModal() {
         const [eh, em] = dayConfig.end.split(":").map(Number);
         const shiftStart = sh * 60 + sm;
         const shiftEnd = eh * 60 + em;
-
+ 
         if (startNew < shiftStart || endNew > shiftEnd) {
           return false;
         }

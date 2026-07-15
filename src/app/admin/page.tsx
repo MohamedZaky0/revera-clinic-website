@@ -2857,7 +2857,8 @@ export default function AdminPage() {
     branchId: string | null,
     dateStr: string | null,
     timeSlotStr: string | null,
-    serviceId: number | null
+    serviceId: number | null,
+    sessionType?: string | null
   ): boolean => {
     if (!dateStr || !timeSlotStr || !serviceId) return true;
 
@@ -2890,7 +2891,15 @@ export default function AdminPage() {
       if (!isNaN(dateObj.getTime())) {
         const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
         const weekdayName = weekdays[dateObj.getDay()];
-        const dayConfig = doctor.workingDaysHours[weekdayName];
+        
+        let dayConfig = doctor.workingDaysHours[weekdayName];
+        if (!dayConfig) {
+          const typeKey = sessionType === 'online' ? 'online' : 'in_person';
+          dayConfig = doctor.workingDaysHours[typeKey]?.[weekdayName] || 
+                      doctor.workingDaysHours.in_person?.[weekdayName] || 
+                      doctor.workingDaysHours.online?.[weekdayName];
+        }
+
         if (!dayConfig || !dayConfig.isOpen) {
           return false;
         }
@@ -2925,8 +2934,13 @@ export default function AdminPage() {
   }, [localServices, allReservations]);
 
   const availableDoctorsNewPatient = useMemo(() => {
-    return providers.filter(p => isDoctorAvailableAdmin(p, newPatientBranch, newPatientDate, newPatientTimeSlot, newPatientService));
-  }, [providers, newPatientBranch, newPatientDate, newPatientTimeSlot, newPatientService, isDoctorAvailableAdmin]);
+    return providers.filter(p => isDoctorAvailableAdmin(p, newPatientBranch, newPatientDate, newPatientTimeSlot, newPatientService, newPatientSessionType));
+  }, [providers, newPatientBranch, newPatientDate, newPatientTimeSlot, newPatientService, newPatientSessionType, isDoctorAvailableAdmin]);
+
+  const availableDoctorsApprove = useMemo(() => {
+    if (!selected) return [];
+    return providers.filter(p => isDoctorAvailableAdmin(p, selected.branchId ?? null, selected.date, slot, selected.serviceId, selected.sessionType));
+  }, [providers, selected, slot, isDoctorAvailableAdmin]);
 
   useEffect(() => {
     if (availableDoctorsNewPatient.length > 0) {
@@ -2937,11 +2951,6 @@ export default function AdminPage() {
       setNewPatientDoctor("");
     }
   }, [availableDoctorsNewPatient, newPatientDoctor]);
-
-  const availableDoctorsApprove = useMemo(() => {
-    if (!selected) return [];
-    return providers.filter(p => isDoctorAvailableAdmin(p, selected.branchId ?? null, selected.date, slot, selected.serviceId));
-  }, [providers, selected, slot, isDoctorAvailableAdmin]);
 
   useEffect(() => {
     if (selected && availableDoctorsApprove.length > 0) {
@@ -3200,7 +3209,13 @@ export default function AdminPage() {
 
       // Check working days & hours
       if (doc.workingDaysHours) {
-        const dayConfig = doc.workingDaysHours[weekdayName];
+        let dayConfig = doc.workingDaysHours[weekdayName];
+        if (!dayConfig) {
+          const typeKey = newPatientSessionType === 'online' ? 'online' : 'in_person';
+          dayConfig = doc.workingDaysHours[typeKey]?.[weekdayName] || 
+                      doc.workingDaysHours.in_person?.[weekdayName] || 
+                      doc.workingDaysHours.online?.[weekdayName];
+        }
         if (dayConfig && dayConfig.isOpen) {
           const [sh, sm] = dayConfig.start.split(":").map(Number);
           const [eh, em] = dayConfig.end.split(":").map(Number);
@@ -3235,7 +3250,7 @@ export default function AdminPage() {
       start: formatMins(minStart),
       end: formatMins(maxEnd)
     };
-  }, [providers, newPatientBranch, newPatientService, localServices, serviceHours, branches]);
+  }, [providers, newPatientBranch, newPatientService, newPatientSessionType, localServices, serviceHours, branches]);
 
   const getDayOperatingHoursApprove = useCallback((selectedReq: Req | null) => {
     if (!selectedReq) return { start: "09:00", end: "20:00" };
@@ -3292,7 +3307,13 @@ export default function AdminPage() {
 
       // Check working days & hours
       if (doc.workingDaysHours) {
-        const dayConfig = doc.workingDaysHours[weekdayName];
+        let dayConfig = doc.workingDaysHours[weekdayName];
+        if (!dayConfig) {
+          const typeKey = selectedReq.sessionType === 'online' ? 'online' : 'in_person';
+          dayConfig = doc.workingDaysHours[typeKey]?.[weekdayName] || 
+                      doc.workingDaysHours.in_person?.[weekdayName] || 
+                      doc.workingDaysHours.online?.[weekdayName];
+        }
         if (dayConfig && dayConfig.isOpen) {
           const [sh, sm] = dayConfig.start.split(":").map(Number);
           const [eh, em] = dayConfig.end.split(":").map(Number);
