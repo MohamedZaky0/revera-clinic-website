@@ -30,15 +30,55 @@ export async function GET(req: Request) {
       providerMap.set(p.id, p);
     });
 
+    // Fetch all reservations for the months present in the payroll
+    const months = Array.from(new Set((payroll || []).map((p: any) => p.month)));
+    let allReservations: any[] = [];
+    if (months.length > 0) {
+      const { data: resData, error: resErr } = await supabaseServer
+        .from('reservations')
+        .select('doctor_name, status, date, amount_paid, amount_left, services(price)');
+      if (!resErr && resData) {
+        allReservations = resData.filter((r: any) => {
+          const isApprovedOrCompleted = r.status === 'approved' || r.status === 'completed';
+          if (!isApprovedOrCompleted || !r.date) return false;
+          const rMonth = r.date.slice(0, 7);
+          return months.includes(rMonth);
+        });
+      }
+    }
+
     const mapped = (payroll || []).map((pay: any) => {
       const prov = providerMap.get(pay.provider_id) || {};
+      const doc = {
+        id: prov.id || pay.provider_id,
+        name: prov.name || 'Unknown Doctor',
+        specialty: prov.specialty || 'N/A',
+        specialization: prov.specialty || 'N/A',
+        employee_id: prov.id ? `DR-${prov.id.slice(0, 4).toUpperCase()}` : `DR-${pay.provider_id?.slice(0, 4).toUpperCase()}`
+      };
+
+      // Filter reservations for this doctor and month
+      const docReservations = allReservations.filter((r: any) => {
+        const isDocMatch = r.doctor_name && r.doctor_name.trim().toLowerCase() === doc.name.trim().toLowerCase();
+        const isMonthMatch = r.date && r.date.startsWith(pay.month);
+        return isDocMatch && isMonthMatch;
+      });
+
+      const totalBookingValue = docReservations.reduce((sum: number, r: any) => {
+        const price = Number(r.amount_paid || 0) + Number(r.amount_left || 0) || Number(r.services?.price || 0);
+        return sum + price;
+      }, 0);
+
       return {
         ...pay,
-        providers: {
-          id: prov.id || pay.provider_id,
-          name: prov.name || 'Unknown Doctor',
-          specialty: prov.specialty || 'N/A'
-        }
+        providers: doc,
+        doctor: doc,
+        fixed_salary_snapshot: pay.fixed_salary,
+        commission_type_snapshot: pay.commission_type,
+        commission_value_snapshot: pay.commission_value,
+        reservations_count: pay.completed_services_count,
+        calculated_commission: pay.total_commission_earned,
+        total_reservations_value: totalBookingValue
       };
     });
 
