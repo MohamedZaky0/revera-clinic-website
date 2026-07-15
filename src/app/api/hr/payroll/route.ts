@@ -34,10 +34,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Valid month (YYYY-MM) is required.' }, { status: 400 });
     }
 
-    // 1. Fetch all active employees
+    // 1. Fetch all active employees including target configurations
     const { data: employees, error: empErr } = await supabaseServer
       .from('employee_accounts')
-      .select('id, salary')
+      .select('id, salary, required_target_amount, bonus_percentage')
       .not('email', 'eq', 'superadmin@revera.com'); // skip owner
 
     if (empErr) throw empErr;
@@ -45,21 +45,55 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No employee accounts found to run payroll.' }, { status: 400 });
     }
 
-    // 2. Prepare bulk inserts
+    // 2. Fetch all reservations with employee credit for the target month
+    const { data: monthReservations, error: resErr } = await supabaseServer
+      .from('reservations')
+      .select('created_by_employee_id, amount_paid, amount_left, status, date, services(price)')
+      .not('created_by_employee_id', 'is', null)
+      .like('date', `${month}-%`);
+
+    if (resErr) {
+      console.warn("Could not fetch month reservations for payroll target calculation:", resErr.message);
+    }
+
+    // Calculate achieved revenue per employee
+    const employeeRevenueMap = new Map<string, number>();
+    (monthReservations || []).forEach((res: any) => {
+      if (res.status === 'approved' || res.status === 'completed') {
+        const price = Number(res.amount_paid || 0) + Number(res.amount_left || 0) || Number(res.services?.price || 0);
+        const empId = res.created_by_employee_id;
+        employeeRevenueMap.set(empId, (employeeRevenueMap.get(empId) || 0) + price);
+      }
+    });
+
+    // 3. Prepare bulk inserts with target and bonus calculations
     const inserts = employees.map((emp: any) => {
       const basic = Number(emp.salary || 0);
+      const target = Number(emp.required_target_amount || 0);
+      const bonusPct = Number(emp.bonus_percentage || 0);
+      const achieved = employeeRevenueMap.get(emp.id) || 0;
+
+      let calculatedBonus = 0;
+      if (target > 0 && achieved >= target) {
+        calculatedBonus = Math.round(achieved * (bonusPct / 100));
+      }
+
       return {
         employee_id: emp.id,
         month,
         basic_salary: basic,
-        bonuses: 0,
+        bonuses: calculatedBonus,
         deductions: 0,
-        net_salary: basic,
-        status: 'Draft'
+        net_salary: basic + calculatedBonus,
+        status: 'Draft',
+        target_amount_snapshot: target,
+        bonus_percentage_snapshot: bonusPct,
+        achieved_revenue: achieved,
+        calculated_bonus: calculatedBonus
       };
     });
 
-    // 3. Upsert payroll records (ignore duplicates if already ran, or overwrite)
+    // 4. Upsert payroll records (ignore duplicates if already ran, or overwrite)
     const { data, error } = await supabaseServer
       .from('hr_payroll')
       .upsert(inserts, { onConflict: 'employee_id, month' })

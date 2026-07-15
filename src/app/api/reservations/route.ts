@@ -38,6 +38,8 @@ function mapRow(r: Record<string, any>) {
     amountLeft: r.amount_left ?? null,
     roomId: r.room_id ?? null,
     rooms: r.rooms || [],
+    createdByEmployeeId: r.created_by_employee_id ?? null,
+    services: r.services || null,
   };
 }
 
@@ -50,11 +52,12 @@ export async function GET(req: Request) {
   const branchId = params.get('branchId');
   const phone = params.get('phone');
   const customerId = params.get('customerId');
+  const createdByEmployeeId = params.get('createdByEmployeeId');
 
   try {
     let q = supabaseServer
       .from('reservations')
-      .select('*')
+      .select('*, services(price)')
       .order('created_at', { ascending: false });
 
     if (status) q = q.eq('status', status);
@@ -62,6 +65,7 @@ export async function GET(req: Request) {
     if (date) q = q.eq('date', date);
     if (phone) q = q.eq('phone', phone);
     if (customerId) q = q.eq('customer_id', customerId);
+    if (createdByEmployeeId) q = q.eq('created_by_employee_id', createdByEmployeeId);
     // Include bookings that match this branch OR have no branch set (website bookings without branch)
     if (branchId) q = q.or(`branch_id.eq.${branchId},branch_id.is.null`);
 
@@ -78,7 +82,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId, doctorName } = body;
+    const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId, doctorName, createdByEmployeeId } = body;
 
     if (!serviceId || !date || !name || !email || !phone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -238,6 +242,7 @@ export async function POST(req: Request) {
       doctor_name: doctorName || null,
       is_manual: isManualBooking,
       rooms: compRoomIds,
+      created_by_employee_id: createdByEmployeeId || null,
     };
 
     let { data, error } = await supabaseServer
@@ -297,7 +302,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal } = body;
+    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId } = body;
 
     const { data: target, error: findError } = await supabaseServer
       .from('reservations')
@@ -503,7 +508,7 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined) {
+    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (notes !== undefined) updates.notes = notes;
@@ -518,6 +523,7 @@ export async function PATCH(req: Request) {
           updates.service_id = Number(serviceIds[0]);
         }
       }
+      if (createdByEmployeeId !== undefined) updates.created_by_employee_id = createdByEmployeeId || null;
 
       const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')

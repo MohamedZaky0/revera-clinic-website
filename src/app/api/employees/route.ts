@@ -26,6 +26,8 @@ export async function GET() {
 
     const enrichedEmployees = (employees || []).map((emp: any) => ({
       ...emp,
+      requiredTargetAmount: emp.required_target_amount !== null ? Number(emp.required_target_amount) : 0,
+      bonusPercentage: emp.bonus_percentage !== null ? Number(emp.bonus_percentage) : 0,
       email_confirmed_at: emp.auth_user_id ? confirmedMap.get(emp.auth_user_id) : null
     }));
 
@@ -39,7 +41,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName } = body;
+    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage } = body;
 
     if (!email || !name || !roleName) {
       return NextResponse.json(
@@ -138,6 +140,8 @@ export async function POST(req: Request) {
         branch_id: branchId || null,
         contract_file: contractFile || null,
         contract_file_name: contractFileName || null,
+        required_target_amount: requiredTargetAmount ? Number(requiredTargetAmount) : 0,
+        bonus_percentage: bonusPercentage ? Number(bonusPercentage) : 0,
       })
       .select()
       .single();
@@ -147,7 +151,13 @@ export async function POST(req: Request) {
       throw insertError;
     }
 
-    return NextResponse.json(newEmployee, { status: 201 });
+    const mapped = newEmployee ? {
+      ...newEmployee,
+      requiredTargetAmount: newEmployee.required_target_amount !== null ? Number(newEmployee.required_target_amount) : 0,
+      bonusPercentage: newEmployee.bonus_percentage !== null ? Number(newEmployee.bonus_percentage) : 0
+    } : null;
+
+    return NextResponse.json(mapped, { status: 201 });
   } catch (err: any) {
     console.error('POST /api/employees error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
@@ -157,7 +167,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, resendInvite } = body;
+    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, resendInvite } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Employee ID is required.' }, { status: 400 });
@@ -174,7 +184,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
     }
 
-    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchId !== undefined)) {
+    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchId !== undefined || requiredTargetAmount !== undefined || bonusPercentage !== undefined)) {
       const updates: Record<string, any> = {};
       if (roleName) {
         if (employee.employee_id === 'superadmin') {
@@ -205,6 +215,8 @@ export async function PATCH(req: Request) {
       if (branchId !== undefined) updates.branch_id = branchId || null;
       if (contractFile !== undefined) updates.contract_file = contractFile;
       if (contractFileName !== undefined) updates.contract_file_name = contractFileName;
+      if (requiredTargetAmount !== undefined) updates.required_target_amount = Number(requiredTargetAmount);
+      if (bonusPercentage !== undefined) updates.bonus_percentage = Number(bonusPercentage);
 
       const { data: updatedEmp, error: updateError } = await supabaseServer
         .from('employee_accounts')
@@ -224,7 +236,13 @@ export async function PATCH(req: Request) {
         });
       }
 
-      return NextResponse.json(updatedEmp);
+      const mapped = updatedEmp ? {
+        ...updatedEmp,
+        requiredTargetAmount: updatedEmp.required_target_amount !== null ? Number(updatedEmp.required_target_amount) : 0,
+        bonusPercentage: updatedEmp.bonus_percentage !== null ? Number(updatedEmp.bonus_percentage) : 0
+      } : null;
+
+      return NextResponse.json(mapped);
     }
 
     // 2. Resend invitation to an employee whose invite expired (fallback if roleName not provided)

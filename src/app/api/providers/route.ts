@@ -26,6 +26,9 @@ function mapProvider(p: Record<string, any>) {
     workingDaysHours: p.working_days_hours || null,
     branchId: p.branch_id || null,
     startDate: p.start_date || null,
+    fixedSalary: p.fixed_salary ? Number(p.fixed_salary) : 0,
+    commissionType: p.commission_type || 'none',
+    commissionValue: p.commission_value ? Number(p.commission_value) : 0,
   };
 }
 
@@ -72,7 +75,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate } = body;
+  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue } = body;
   const newProvider = {
     name,
     services: services || [],
@@ -87,7 +90,10 @@ export async function POST(req: Request) {
     national_id: nationalId || null,
     working_days_hours: workingDaysHours || null,
     branch_id: branchId || null,
-    start_date: startDate || null
+    start_date: startDate || null,
+    fixed_salary: fixedSalary ? Number(fixedSalary) : 0,
+    commission_type: commissionType || 'none',
+    commission_value: commissionValue ? Number(commissionValue) : 0,
   };
 
   const authHeader = req.headers.get('Authorization') || '';
@@ -157,7 +163,10 @@ export async function POST(req: Request) {
       nationalId: nationalId || null,
       workingDaysHours: workingDaysHours || null,
       branchId: branchId || null,
-      startDate: startDate || null
+      startDate: startDate || null,
+      fixedSalary: fixedSalary ? Number(fixedSalary) : 0,
+      commissionType: commissionType || 'none',
+      commissionValue: commissionValue ? Number(commissionValue) : 0
     };
     list.push(localNew);
     fs.mkdirSync(path.dirname(JSON_FILE_PATH), { recursive: true });
@@ -181,7 +190,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate } = body;
+  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue } = body;
   const updates: Record<string, any> = {};
   if (name !== undefined) updates.name = name;
   if (services !== undefined) updates.services = services;
@@ -196,6 +205,9 @@ export async function PATCH(req: Request) {
   if (workingDaysHours !== undefined) updates.working_days_hours = workingDaysHours;
   if (branchId !== undefined) updates.branch_id = branchId;
   if (startDate !== undefined) updates.start_date = startDate;
+  if (fixedSalary !== undefined) updates.fixed_salary = Number(fixedSalary || 0);
+  if (commissionType !== undefined) updates.commission_type = commissionType;
+  if (commissionValue !== undefined) updates.commission_value = Number(commissionValue || 0);
 
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace('Bearer ', '').trim();
@@ -274,6 +286,9 @@ export async function PATCH(req: Request) {
           workingDaysHours: updates.working_days_hours !== undefined ? updates.working_days_hours : list[index].workingDaysHours,
           branchId: updates.branch_id !== undefined ? updates.branch_id : list[index].branchId,
           startDate: updates.start_date !== undefined ? updates.start_date : list[index].startDate,
+          fixedSalary: updates.fixed_salary !== undefined ? updates.fixed_salary : list[index].fixedSalary,
+          commissionType: updates.commission_type !== undefined ? updates.commission_type : list[index].commissionType,
+          commissionValue: updates.commission_value !== undefined ? updates.commission_value : list[index].commissionValue,
         };
 
         list[index] = {

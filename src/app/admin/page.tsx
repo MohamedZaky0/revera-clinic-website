@@ -77,6 +77,7 @@ import {
   Phone,
   Lock,
   Zap,
+  Target,
   Check,
   GripVertical,
   X,
@@ -804,6 +805,48 @@ export default function AdminPage() {
   const [viewingEmployee, setViewingEmployee] = useState<any | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<any | null>(null);
   const [isEditingEmployeeModalOpen, setIsEditingEmployeeModalOpen] = useState(false);
+  const [newEmployeeRequiredTargetAmount, setNewEmployeeRequiredTargetAmount] = useState("0");
+  const [newEmployeeBonusPercentage, setNewEmployeeBonusPercentage] = useState("0");
+  const [viewingEmployeeNotes, setViewingEmployeeNotes] = useState<any[]>([]);
+  const [loadingEmployeeNotes, setLoadingEmployeeNotes] = useState(false);
+  const [viewingEmployeeBookings, setViewingEmployeeBookings] = useState<any[]>([]);
+  const [loadingEmployeeBookings, setLoadingEmployeeBookings] = useState(false);
+  const [newEmployeeNoteText, setNewEmployeeNoteText] = useState("");
+
+  useEffect(() => {
+    if (!viewingEmployee) {
+      setViewingEmployeeNotes([]);
+      setViewingEmployeeBookings([]);
+      return;
+    }
+
+    const loadRefData = async () => {
+      setLoadingEmployeeNotes(true);
+      setLoadingEmployeeBookings(true);
+      try {
+        const [notesRes, bookingsRes] = await Promise.all([
+          fetch(`/api/employees/notes?employeeId=${viewingEmployee.id}`),
+          fetch(`/api/reservations?createdByEmployeeId=${viewingEmployee.id}`)
+        ]);
+
+        if (notesRes.ok) {
+          const notes = await notesRes.json();
+          setViewingEmployeeNotes(notes || []);
+        }
+        if (bookingsRes.ok) {
+          const bookings = await bookingsRes.json();
+          setViewingEmployeeBookings(bookings || []);
+        }
+      } catch (err) {
+        console.error("Failed to load employee profile data:", err);
+      } finally {
+        setLoadingEmployeeNotes(false);
+        setLoadingEmployeeBookings(false);
+      }
+    };
+
+    loadRefData();
+  }, [viewingEmployee]);
 
   // HR Module states
   const [hrActiveSubTab, setHrActiveSubTab] = useState("overview");
@@ -813,6 +856,14 @@ export default function AdminPage() {
   const [loadingLeaves, setLoadingLeaves] = useState(false);
   const [performanceReviews, setPerformanceReviews] = useState<any[]>([]);
   const [loadingPerformance, setLoadingPerformance] = useState(false);
+
+  // Doctor payroll states
+  const [doctorPayrollList, setDoctorPayrollList] = useState<any[]>([]);
+  const [loadingDoctorPayroll, setLoadingDoctorPayroll] = useState(false);
+  const [selectedDoctorPayrollMonth, setSelectedDoctorPayrollMonth] = useState("2026-07");
+  const [doctorPayrollSearchQuery, setDoctorPayrollSearchQuery] = useState("");
+  const [doctorPayrollFilterStatus, setDoctorPayrollFilterStatus] = useState("All");
+  const [doctorPayrollCurrentPage, setDoctorPayrollCurrentPage] = useState(1);
 
   const [selectedPayrollMonth, setSelectedPayrollMonth] = useState("2026-07");
   const [payrollSearchQuery, setPayrollSearchQuery] = useState("");
@@ -1371,8 +1422,15 @@ export default function AdminPage() {
   const [newPatientNotes, setNewPatientNotes] = useState("");
   const [newPatientStatus, setNewPatientStatus] = useState("approved");
   const [newPatientBranch, setNewPatientBranch] = useState("");
+  const [newPatientCreatedByEmployeeId, setNewPatientCreatedByEmployeeId] = useState("");
   const [approveUnavailableSlots, setApproveUnavailableSlots] = useState<string[]>([]);
   const [manualUnavailableSlots, setManualUnavailableSlots] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (showAddBookingModal && adminDbId) {
+      setNewPatientCreatedByEmployeeId(adminDbId);
+    }
+  }, [showAddBookingModal, adminDbId]);
   const filteredReservations = useMemo(() => {
     return allReservations.filter((r) => {
       const matchStatus = statusFilter === "All" || r.status === statusFilter;
@@ -1767,6 +1825,25 @@ export default function AdminPage() {
     }
   }
 
+  async function fetchDoctorPayroll() {
+    if (!session?.access_token) return;
+    setLoadingDoctorPayroll(true);
+    try {
+      const res = await fetch('/api/hr/doctor-payroll', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDoctorPayrollList(data);
+      }
+    } catch (err) {
+      console.error("Error loading doctor payroll:", err);
+    } finally {
+      setLoadingDoctorPayroll(false);
+    }
+  }
+
   async function fetchHrLeaves() {
     if (!session?.access_token) return;
     setLoadingLeaves(true);
@@ -1861,6 +1938,7 @@ export default function AdminPage() {
   const fetchHrData = useCallback(async () => {
     await Promise.all([
       fetchHrPayroll(),
+      fetchDoctorPayroll(),
       fetchHrLeaves(),
       fetchHrPerformance(),
       fetchHrAttendance(),
@@ -2883,6 +2961,9 @@ export default function AdminPage() {
   const [providerFormName, setProviderFormName] = useState("");
   const [providerFormRating, setProviderFormRating] = useState(5);
   const [providerFormMore, setProviderFormMore] = useState(0);
+  const [providerFormFixedSalary, setProviderFormFixedSalary] = useState("0");
+  const [providerFormCommissionType, setProviderFormCommissionType] = useState("none");
+  const [providerFormCommissionValue, setProviderFormCommissionValue] = useState("0");
   const [providerFormSelectedServices, setProviderFormSelectedServices] = useState<string[]>([]);
   const [providerFormImage, setProviderFormImage] = useState("");
   const [providerFormPhone, setProviderFormPhone] = useState("");
@@ -3604,6 +3685,9 @@ export default function AdminPage() {
     setProviderFormName("");
     setProviderFormRating(5);
     setProviderFormMore(0);
+    setProviderFormFixedSalary("0");
+    setProviderFormCommissionType("none");
+    setProviderFormCommissionValue("0");
     setProviderFormSelectedServices([]);
     setProviderFormImage("");
     setProviderFormPhone("");
@@ -3650,6 +3734,9 @@ export default function AdminPage() {
     setProviderFormNationalId(provider.nationalId || "");
     setProviderFormBranchId(provider.branchId || "");
     setProviderFormStartDate(provider.startDate || "");
+    setProviderFormFixedSalary(String(provider.fixedSalary || 0));
+    setProviderFormCommissionType(provider.commissionType || "none");
+    setProviderFormCommissionValue(String(provider.commissionValue || 0));
 
     const rawSched = provider.workingDaysHours || {};
     let inClinicSched = {
@@ -3727,7 +3814,10 @@ export default function AdminPage() {
         online: providerFormOnlineWorkingDaysHours
       },
       branchId: providerFormBranchId || null,
-      startDate: providerFormStartDate || null
+      startDate: providerFormStartDate || null,
+      fixedSalary: Number(providerFormFixedSalary || 0),
+      commissionType: providerFormCommissionType,
+      commissionValue: Number(providerFormCommissionValue || 0)
     };
 
     const isEdit = providerModalMode === "edit";
@@ -5438,6 +5528,7 @@ export default function AdminPage() {
       doctorName: newPatientStatus === 'approved' ? newPatientDoctor : null,
       branchId: newPatientBranch || null,
       isManual: true,
+      createdByEmployeeId: newPatientCreatedByEmployeeId || adminDbId || null,
     };
 
     const res = await fetch("/api/reservations", {
@@ -5479,6 +5570,7 @@ export default function AdminPage() {
       setNewPatientDoctor("Dr. Sara El Gamel");
       setNewPatientNotes("");
       setNewPatientStatus("approved");
+      setNewPatientCreatedByEmployeeId(adminDbId || "");
 
       setShowAddBookingModal(false);
       clearFetchCache();
@@ -13737,6 +13829,8 @@ export default function AdminPage() {
                     setNewEmployeeBranchId("");
                     setNewEmployeeContract("");
                     setNewEmployeeContractName("");
+                    setNewEmployeeRequiredTargetAmount("0");
+                    setNewEmployeeBonusPercentage("0");
                     setIsEditingEmployeeModalOpen(true);
                   }}
                   className="rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-md shrink-0"
@@ -13922,6 +14016,8 @@ export default function AdminPage() {
                                           setNewEmployeeBranchId(emp.branch_id || "");
                                           setNewEmployeeContract(emp.contract_file || "");
                                           setNewEmployeeContractName(emp.contract_file_name || "");
+                                          setNewEmployeeRequiredTargetAmount(String(emp.requiredTargetAmount || 0));
+                                          setNewEmployeeBonusPercentage(String(emp.bonusPercentage || 0));
                                           setIsEditingEmployeeModalOpen(true);
                                         }}
                                         className="text-[#C4AE7C] hover:text-[#a38f61] transition"
@@ -14006,6 +14102,8 @@ export default function AdminPage() {
                                 branchId: newEmployeeBranchId || null,
                                 contractFile: newEmployeeContract || null,
                                 contractFileName: newEmployeeContractName || null,
+                                requiredTargetAmount: Number(newEmployeeRequiredTargetAmount),
+                                bonusPercentage: Number(newEmployeeBonusPercentage),
                               }),
                             });
                             if (res.ok) {
@@ -14039,6 +14137,8 @@ export default function AdminPage() {
                                 branchId: newEmployeeBranchId || null,
                                 contractFile: newEmployeeContract || null,
                                 contractFileName: newEmployeeContractName || null,
+                                requiredTargetAmount: Number(newEmployeeRequiredTargetAmount),
+                                bonusPercentage: Number(newEmployeeBonusPercentage),
                               }),
                             });
                             if (res.ok) {
@@ -14179,6 +14279,37 @@ export default function AdminPage() {
                               className="bg-transparent text-sm text-[#1F251A] outline-none w-full pr-6 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                             />
                             <Clock size={14} className="text-[#5A6A51] absolute right-3.5 pointer-events-none" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Target & Bonus Configuration */}
+                      <div className="border-t border-[#414E36]/10 pt-4 space-y-4">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Target &amp; Performance Bonus</h4>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Required Target Amount (EGP)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={newEmployeeRequiredTargetAmount}
+                              onChange={(e) => setNewEmployeeRequiredTargetAmount(e.target.value)}
+                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Bonus Percentage (%)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={newEmployeeBonusPercentage}
+                              onChange={(e) => {
+                                const val = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                setNewEmployeeBonusPercentage(String(val));
+                              }}
+                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                            />
                           </div>
                         </div>
                       </div>
@@ -14555,6 +14686,8 @@ export default function AdminPage() {
                               applyAddressToState(viewingEmployee.address || "");
                               setNewEmployeeContract(viewingEmployee.contract_file || "");
                               setNewEmployeeContractName(viewingEmployee.contract_file_name || "");
+                              setNewEmployeeRequiredTargetAmount(String(viewingEmployee.requiredTargetAmount || 0));
+                              setNewEmployeeBonusPercentage(String(viewingEmployee.bonusPercentage || 0));
                               setViewingEmployee(null);
                               setIsEditingEmployeeModalOpen(true);
                             }}
@@ -14750,6 +14883,86 @@ export default function AdminPage() {
                         </div>
                       </div>
 
+                      {/* TARGET & PERFORMANCE BONUS */}
+                      {(() => {
+                        const currentMonthStr = new Date().toISOString().slice(0, 7);
+                        const currentMonthBookings = (viewingEmployeeBookings || []).filter((b) => {
+                          const isApprovedOrCompleted = b.status === "approved" || b.status === "completed";
+                          return isApprovedOrCompleted && b.date && b.date.startsWith(currentMonthStr);
+                        });
+                        const achievedRevenue = currentMonthBookings.reduce((sum, b) => {
+                          const price = Number(b.amountPaid || 0) + Number(b.amountLeft || 0) || Number(b.services?.price || 0);
+                          return sum + price;
+                        }, 0);
+                        const targetAmount = Number(viewingEmployee.requiredTargetAmount || 0);
+                        const bonusPct = Number(viewingEmployee.bonusPercentage || 0);
+                        
+                        const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((achievedRevenue / targetAmount) * 100)) : 0;
+                        const hasAchievedTarget = targetAmount > 0 && achievedRevenue >= targetAmount;
+                        const potentialBonus = hasAchievedTarget ? Math.round(achievedRevenue * (bonusPct / 100)) : 0;
+
+                        return (
+                          <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                            <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
+                              <div className="flex items-center gap-2">
+                                <Target size={16} className="text-[#C4AE7C]" />
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Target &amp; Performance Bonus</h4>
+                              </div>
+                              {hasAchievedTarget && (
+                                <span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200">
+                                  Target Met ✓
+                                </span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Required Target</span>
+                                <span className="font-semibold text-[#1F251A]">{targetAmount.toLocaleString()} EGP</span>
+                              </div>
+                              <div>
+                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Bonus Percentage</span>
+                                <span className="font-semibold text-[#1F251A]">{bonusPct}%</span>
+                              </div>
+                              <div>
+                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Achieved Revenue (Current Month)</span>
+                                <span className="font-semibold text-[#1F251A]">
+                                  {loadingEmployeeBookings ? (
+                                    <span className="text-xs text-[#5A6A51] italic">Loading...</span>
+                                  ) : (
+                                    achievedRevenue.toLocaleString() + " EGP"
+                                  )}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Estimated Bonus</span>
+                                <span className={`font-bold ${hasAchievedTarget ? "text-green-700" : "text-[#5A6A51]"}`}>
+                                  {loadingEmployeeBookings ? (
+                                    <span className="text-xs text-[#5A6A51] italic">Loading...</span>
+                                  ) : (
+                                    potentialBonus.toLocaleString() + " EGP"
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            {targetAmount > 0 && !loadingEmployeeBookings && (
+                              <div className="space-y-1.5 pt-2">
+                                <div className="flex items-center justify-between text-xs font-semibold text-[#5A6A51]">
+                                  <span>Monthly Target Progress</span>
+                                  <span>{progressPercent}%</span>
+                                </div>
+                                <div className="w-full bg-gray-150 h-2.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full transition-all duration-500 rounded-full ${hasAchievedTarget ? "bg-green-600" : "bg-[#C4AE7C]"}`}
+                                    style={{ width: `${progressPercent}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
                       {/* ATTENDANCE INFORMATION */}
                       <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
                         <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
@@ -14816,16 +15029,97 @@ export default function AdminPage() {
 
                       {/* NOTES & DOCUMENTS */}
                       <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
-                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
-                          <FileText size={16} className="text-[#C4AE7C]" />
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Notes</h4>
+                        <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
+                          <div className="flex items-center gap-2">
+                            <FileText size={16} className="text-[#C4AE7C]" />
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Internal Notes &amp; Reminders</h4>
+                          </div>
+                          <span className="text-[10px] font-bold text-[#5A6A51] bg-[#F9F9F7] px-2 py-0.5 rounded-full border border-[#414E36]/10">
+                            {viewingEmployeeNotes.length} Notes
+                          </span>
                         </div>
                         
-                        <div>
-                          <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Internal Notes</span>
-                          <p className="text-xs text-[#5A6A51] bg-[#FBFBF9] border border-[#414E36]/5 rounded-xl p-3 leading-relaxed font-medium italic">
-                            "Excellent communication skills and very cooperative."
-                          </p>
+                        {/* Notes List */}
+                        <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                          {loadingEmployeeNotes ? (
+                            <p className="text-xs text-[#5A6A51] italic py-2">Loading notes...</p>
+                          ) : viewingEmployeeNotes.length === 0 ? (
+                            <p className="text-xs text-[#5A6A51]/70 italic py-2 text-center">No internal notes or reminders yet for this employee.</p>
+                          ) : (
+                            viewingEmployeeNotes.map((note) => (
+                              <div key={note.id} className="text-xs bg-[#FBFBF9] border border-[#414E36]/5 rounded-xl p-3.5 space-y-1.5 relative group transition hover:border-[#C4AE7C]/30">
+                                <p className="text-[#1F251A] font-medium leading-relaxed break-words whitespace-pre-wrap">{note.note}</p>
+                                <div className="flex items-center justify-between text-[9px] text-[#5A6A51]/80 font-semibold pt-1 border-t border-[#414E36]/5">
+                                  <span>
+                                    Added by {note.creator?.name || "Staff Member"} on {new Date(note.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (confirm("Are you sure you want to delete this note?")) {
+                                        try {
+                                          const res = await fetch(`/api/employees/notes?id=${note.id}`, { method: "DELETE" });
+                                          if (res.ok) {
+                                            setViewingEmployeeNotes(prev => prev.filter(n => n.id !== note.id));
+                                          } else {
+                                            alert("Failed to delete note.");
+                                          }
+                                        } catch (e) {
+                                          console.error("Delete note error:", e);
+                                        }
+                                      }
+                                    }}
+                                    className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition duration-200"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Note Input */}
+                        <div className="pt-2 border-t border-[#414E36]/5 space-y-2">
+                          <textarea
+                            placeholder="Add a new internal note or reminder..."
+                            value={newEmployeeNoteText}
+                            onChange={(e) => setNewEmployeeNoteText(e.target.value)}
+                            rows={2}
+                            className="w-full text-xs rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-[#1F251A] placeholder-[#5A6A51]/50 outline-none focus:border-[#C4AE7C] resize-none font-medium leading-relaxed"
+                          />
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!newEmployeeNoteText.trim()) return;
+                                try {
+                                  const res = await fetch("/api/employees/notes", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      employeeId: viewingEmployee.id,
+                                      note: newEmployeeNoteText.trim(),
+                                      createdBy: adminDbId
+                                    })
+                                  });
+                                  if (res.ok) {
+                                    const created = await res.json();
+                                    setViewingEmployeeNotes(prev => [created, ...prev]);
+                                    setNewEmployeeNoteText("");
+                                  } else {
+                                    alert("Failed to add note.");
+                                  }
+                                } catch (e) {
+                                  console.error("Add note error:", e);
+                                }
+                              }}
+                              disabled={!newEmployeeNoteText.trim()}
+                              className="rounded-xl bg-[#414E36] hover:bg-[#2e3a26] disabled:bg-gray-200 text-white disabled:text-gray-400 px-4 py-2 text-[11px] font-bold transition shadow-xs"
+                            >
+                              Add Note
+                            </button>
+                          </div>
                         </div>
 
                         {viewingEmployee.national_id && (() => {
@@ -14948,6 +15242,8 @@ export default function AdminPage() {
                               applyAddressToState(viewingEmployee.address || "");
                               setNewEmployeeContract(viewingEmployee.contract_file || "");
                               setNewEmployeeContractName(viewingEmployee.contract_file_name || "");
+                              setNewEmployeeRequiredTargetAmount(String(viewingEmployee.requiredTargetAmount || 0));
+                              setNewEmployeeBonusPercentage(String(viewingEmployee.bonusPercentage || 0));
                               setViewingEmployee(null);
                               setIsEditingEmployeeModalOpen(true);
                             }}
@@ -15727,7 +16023,7 @@ export default function AdminPage() {
 
               {/* Sub-navigation Tabs */}
               <div className="flex border-b border-[#414E36]/10 gap-6">
-                {(["overview", "payroll", "leaves", "performance", "attendance"] as const).map((tab) => (
+                {(["overview", "payroll", "doctor-payroll", "leaves", "performance", "attendance"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setHrActiveSubTab(tab)}
@@ -15737,7 +16033,7 @@ export default function AdminPage() {
                         : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
                     }`}
                   >
-                    {tab}
+                    {tab === "doctor-payroll" ? "Doctor Payroll" : tab}
                   </button>
                 ))}
               </div>
@@ -16043,6 +16339,8 @@ export default function AdminPage() {
                               <th className="px-6 py-4">Role</th>
                               <th className="px-6 py-4">Working Hours</th>
                               <th className="px-6 py-4">Basic Salary</th>
+                              <th className="px-6 py-4">Target Progress</th>
+                              <th className="px-6 py-4">Perf. Bonus</th>
                               <th className="px-6 py-4">Bonuses</th>
                               <th className="px-6 py-4">Deductions</th>
                               <th className="px-6 py-4">Net Salary</th>
@@ -16054,7 +16352,7 @@ export default function AdminPage() {
                           <tbody className="divide-y divide-[#414E36]/5">
                             {paged.length === 0 ? (
                               <tr>
-                                <td colSpan={12} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                                <td colSpan={14} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
                                   No payroll records match your filter criteria.
                                 </td>
                               </tr>
@@ -16152,6 +16450,32 @@ export default function AdminPage() {
                                           }}
                                           className="w-full bg-transparent text-right text-xs font-mono font-bold text-[#1F251A] outline-none disabled:opacity-60"
                                         />
+                                      </div>
+                                    </td>
+                                    {/* Target Progress */}
+                                    <td className="px-6 py-4">
+                                      {pay.target_amount_snapshot > 0 ? (
+                                        <div className="text-xs">
+                                          <div className="font-semibold text-[#1F251A]">
+                                            EGP {Number(pay.achieved_revenue || 0).toLocaleString()}
+                                          </div>
+                                          <div className="text-[10px] text-[#5A6A51] font-medium">
+                                            of EGP {Number(pay.target_amount_snapshot).toLocaleString()}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span className="text-xs text-[#5A6A51]/60 font-semibold">—</span>
+                                      )}
+                                    </td>
+                                    {/* Performance Bonus */}
+                                    <td className="px-6 py-4">
+                                      <div className="text-xs font-semibold text-[#1F251A]">
+                                        EGP {Number(pay.calculated_bonus || 0).toLocaleString()}
+                                        {Number(pay.calculated_bonus || 0) > 0 && (
+                                          <div className="text-[9px] font-bold text-green-700">
+                                            ({pay.bonus_percentage_snapshot}%)
+                                          </div>
+                                        )}
                                       </div>
                                     </td>
                                     {/* Net Salary */}
@@ -16267,6 +16591,340 @@ export default function AdminPage() {
                             <button
                               disabled={activePage === totalPages}
                               onClick={() => setPayrollCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                              className="p-2 rounded-lg border border-gray-250 hover:bg-[#EDF1EC]/20 text-[#5A6A51] disabled:opacity-40 disabled:hover:bg-transparent transition text-xs font-bold"
+                            >
+                              &gt;
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Doctor Payroll Sub-tab */}
+              {hrActiveSubTab === "doctor-payroll" && (() => {
+                // Filter doctor payroll records
+                const filtered = doctorPayrollList.filter((pay: any) => {
+                  // Search Query
+                  if (doctorPayrollSearchQuery.trim()) {
+                    const q = doctorPayrollSearchQuery.toLowerCase();
+                    const nameMatch = pay.doctor?.name?.toLowerCase().includes(q);
+                    const emailMatch = pay.doctor?.email?.toLowerCase().includes(q);
+                    const idMatch = pay.doctor?.employee_id?.toLowerCase().includes(q);
+                    if (!nameMatch && !emailMatch && !idMatch) return false;
+                  }
+
+                  // Month
+                  if (selectedDoctorPayrollMonth !== "All" && selectedDoctorPayrollMonth) {
+                    if (pay.month !== selectedDoctorPayrollMonth) return false;
+                  }
+
+                  // Status
+                  if (doctorPayrollFilterStatus !== "All") {
+                    const status = pay.status || "Unpaid";
+                    if (doctorPayrollFilterStatus === "Paid" && status !== "Paid") return false;
+                    if (doctorPayrollFilterStatus === "Pending" && status === "Paid") return false;
+                  }
+
+                  return true;
+                });
+
+                // Pagination calculations
+                const itemsPerPage = 10;
+                const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+                const activePage = Math.min(doctorPayrollCurrentPage, totalPages);
+                const startIndex = (activePage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const paged = filtered.slice(startIndex, endIndex);
+
+                const getPaymentDate = (monthStr: string) => {
+                  if (!monthStr) return "—";
+                  const parts = monthStr.split("-");
+                  if (parts.length < 2) return "—";
+                  const year = parts[0];
+                  const monthNum = parseInt(parts[1], 10);
+                  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                  const monthName = months[monthNum - 1] || "May";
+                  return `05 ${monthName} ${year}`;
+                };
+
+                return (
+                  <div className="space-y-6 animate-fadeIn">
+                    {/* Title & Action Buttons Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <div>
+                        <h2 className="text-4xl font-semibold text-[#1F251A]">Doctor Payroll</h2>
+                        <p className="mt-1 text-xs text-[#8A9A81] font-medium">Home &gt; Doctor Payroll</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={async () => {
+                            if (selectedDoctorPayrollMonth === "All") {
+                              alert("Please select a specific month to run doctor payroll.");
+                              return;
+                            }
+                            try {
+                              const res = await fetch('/api/hr/doctor-payroll', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${session?.access_token}`
+                                },
+                                body: JSON.stringify({ month: selectedDoctorPayrollMonth })
+                              });
+                              if (res.ok) {
+                                alert("Doctor payroll ran successfully!");
+                                fetchDoctorPayroll();
+                              } else {
+                                const err = await res.json();
+                                alert(err.error || "Failed to run doctor payroll");
+                              }
+                            } catch (err) {
+                              alert("Failed to connect to API.");
+                            }
+                          }}
+                          className="rounded-xl bg-[#414E36] px-4 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-xs"
+                        >
+                          <Plus size={14} /> Add Doctor Payroll
+                        </button>
+                        <button
+                          onClick={() => window.print()}
+                          className="rounded-xl bg-white border border-[#414E36]/15 px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#EDF1EC]/20 transition flex items-center gap-2 shadow-xs"
+                        >
+                          <Download size={14} /> Export
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Search & Filter Bar */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-4 rounded-3xl border border-[#414E36]/10 bg-white shadow-xs">
+                      <div className="relative md:col-span-1">
+                        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]/65" />
+                        <input
+                          type="text"
+                          placeholder="Search by doctor name..."
+                          value={doctorPayrollSearchQuery}
+                          onChange={(e) => {
+                            setDoctorPayrollSearchQuery(e.target.value);
+                            setDoctorPayrollCurrentPage(1);
+                          }}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] pl-10 pr-4 py-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition placeholder:text-gray-400"
+                        />
+                      </div>
+
+                      <div>
+                        <select
+                          value={selectedDoctorPayrollMonth}
+                          onChange={(e) => {
+                            setSelectedDoctorPayrollMonth(e.target.value);
+                            setDoctorPayrollCurrentPage(1);
+                          }}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                        >
+                          <option value="All">All Months</option>
+                          <option value="2026-05">May 2026</option>
+                          <option value="2026-06">June 2026</option>
+                          <option value="2026-07">July 2026</option>
+                          <option value="2026-08">August 2026</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <select
+                          value={doctorPayrollFilterStatus}
+                          onChange={(e) => {
+                            setDoctorPayrollFilterStatus(e.target.value);
+                            setDoctorPayrollCurrentPage(1);
+                          }}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                        >
+                          <option value="All">All Status</option>
+                          <option value="Paid">Paid</option>
+                          <option value="Pending">Pending</option>
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setDoctorPayrollSearchQuery("");
+                          setSelectedDoctorPayrollMonth("2026-07");
+                          setDoctorPayrollFilterStatus("All");
+                          setDoctorPayrollCurrentPage(1);
+                        }}
+                        className="w-full rounded-xl bg-white border border-gray-250 hover:bg-gray-50 px-4 py-2.5 text-xs font-bold text-gray-700 transition flex items-center justify-center gap-1.5 shadow-xs"
+                      >
+                        <RotateCcw size={12} /> Clear
+                      </button>
+                    </div>
+
+                    {/* Main Table */}
+                    <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-left text-sm">
+                          <thead>
+                            <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                              <th className="px-6 py-4">Doctor ID</th>
+                              <th className="px-6 py-4">Doctor Name</th>
+                              <th className="px-6 py-4">Month</th>
+                              <th className="px-6 py-4">Fixed Salary</th>
+                              <th className="px-6 py-4">Bookings Count</th>
+                              <th className="px-6 py-4">Total Booking Value</th>
+                              <th className="px-6 py-4">Commission</th>
+                              <th className="px-6 py-4">Net Salary</th>
+                              <th className="px-6 py-4 text-center">Payment Status</th>
+                              <th className="px-6 py-4">Payment Date</th>
+                              <th className="px-6 py-4 text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#414E36]/5">
+                            {paged.length === 0 ? (
+                              <tr>
+                                <td colSpan={11} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                                  No doctor payroll records match your filter criteria.
+                                </td>
+                              </tr>
+                            ) : (
+                              paged.map((pay: any) => {
+                                const docObj = pay.doctor || {};
+                                const isPaid = pay.status === "Paid";
+                                const statusLabel = isPaid ? "Paid" : "Pending";
+                                const initials = docObj.name ? docObj.name.split(" ").slice(0, 2).map((n: string) => n[0]).join("").toUpperCase() : "DR";
+
+                                return (
+                                  <tr key={pay.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                                    <td className="px-6 py-4 text-xs font-mono font-bold text-[#5A6A51] uppercase">
+                                      {docObj.employee_id || `DR-${pay.id?.slice(0, 3)}`}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                          {initials}
+                                        </div>
+                                        <div>
+                                          <div className="font-semibold text-[#1F251A] text-sm">{docObj.name || "—"}</div>
+                                          <div className="text-[10px] text-[#5A6A51]">{docObj.specialization || docObj.role_name || "Doctor"}</div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
+                                      {pay.month}
+                                    </td>
+                                    <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                      EGP {Number(pay.fixed_salary_snapshot || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
+                                      {pay.reservations_count || 0}
+                                    </td>
+                                    <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                      EGP {Number(pay.total_reservations_value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      <div className="text-xs font-semibold text-[#1F251A]">
+                                        EGP {Number(pay.calculated_commission || 0).toLocaleString()}
+                                        {pay.commission_type_snapshot !== "none" && (
+                                          <div className="text-[9px] font-bold text-[#8B7544]">
+                                            ({pay.commission_type_snapshot === "percentage" ? `${pay.commission_value_snapshot}%` : `EGP ${pay.commission_value_snapshot} each`})
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                      EGP {Number(pay.net_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                                        isPaid
+                                          ? "bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/15"
+                                          : "bg-[#EDE4C8] text-[#8B7544] border border-[#C4AE7C]/30"
+                                      }`}>
+                                        <span className={`h-1.5 w-1.5 rounded-full ${
+                                          isPaid ? "bg-[#414E36]" : "bg-[#C4AE7C]"
+                                        }`} />
+                                        {statusLabel}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
+                                      {isPaid ? getPaymentDate(pay.month) : "—"}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        {!isPaid ? (
+                                          <button
+                                            onClick={async () => {
+                                              if (!(await showConfirm(`Are you sure you want to mark Dr. ${docObj.name || "this doctor"}'s payroll as PAID?`))) return;
+                                              try {
+                                                const res = await fetch('/api/hr/doctor-payroll', {
+                                                  method: 'PATCH',
+                                                  headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'Authorization': `Bearer ${session?.access_token}`
+                                                  },
+                                                  body: JSON.stringify({ id: pay.id, status: 'Paid' })
+                                                });
+                                                if (res.ok) {
+                                                  fetchDoctorPayroll();
+                                                }
+                                              } catch (e) {
+                                                alert("Failed to pay doctor payroll.");
+                                              }
+                                            }}
+                                            className="rounded-lg bg-[#414E36] hover:bg-[#2e3a26] text-[#FBFBF9] px-3.5 py-1.5 text-xs font-bold transition shadow-xs"
+                                          >
+                                            Pay
+                                          </button>
+                                        ) : (
+                                          <button
+                                            disabled
+                                            className="p-2 text-gray-300 cursor-not-allowed"
+                                          >
+                                            <MoreVertical size={14} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Pagination Footer */}
+                      {filtered.length > 0 && (
+                        <div className="p-6 border-t border-[#414E36]/10 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white">
+                          <span className="text-xs font-semibold text-[#5A6A51]">
+                            Showing {startIndex + 1} to {Math.min(endIndex, filtered.length)} of {filtered.length} results
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              disabled={activePage === 1}
+                              onClick={() => setDoctorPayrollCurrentPage(prev => Math.max(prev - 1, 1))}
+                              className="p-2 rounded-lg border border-gray-250 hover:bg-[#EDF1EC]/20 text-[#5A6A51] disabled:opacity-40 disabled:hover:bg-transparent transition text-xs font-bold"
+                            >
+                              &lt;
+                            </button>
+                            {Array.from({ length: totalPages }).map((_, i) => {
+                              const pNum = i + 1;
+                              return (
+                                <button
+                                  key={pNum}
+                                  onClick={() => setDoctorPayrollCurrentPage(pNum)}
+                                  className={`h-8 w-8 rounded-lg text-xs font-bold transition flex items-center justify-center ${
+                                    activePage === pNum
+                                      ? "bg-[#414E36] text-white"
+                                      : "border border-gray-250 text-[#5A6A51] hover:bg-[#EDF1EC]/20"
+                                  }`}
+                                >
+                                  {pNum}
+                                </button>
+                              );
+                            })}
+                            <button
+                              disabled={activePage === totalPages}
+                              onClick={() => setDoctorPayrollCurrentPage(prev => Math.min(prev + 1, totalPages))}
                               className="p-2 rounded-lg border border-gray-250 hover:bg-[#EDF1EC]/20 text-[#5A6A51] disabled:opacity-40 disabled:hover:bg-transparent transition text-xs font-bold"
                             >
                               &gt;
@@ -18988,6 +19646,23 @@ export default function AdminPage() {
                 </div>
               )}
 
+              {/* Created By Employee Selector */}
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Created By (Employee Credit) *</label>
+                <select
+                  value={newPatientCreatedByEmployeeId}
+                  onChange={(e) => setNewPatientCreatedByEmployeeId(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                >
+                  <option value="">Select Employee...</option>
+                  {(employeesList || []).map((emp: any) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.role_name || "Staff"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* 7. Notes */}
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Notes (Optional)</label>
@@ -19297,6 +19972,55 @@ export default function AdminPage() {
                       </label>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Payroll & Commission Settings */}
+              <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#414E36] border-b border-[#414E36]/10 pb-2">
+                  Payroll & Commission Settings
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
+                      Fixed Salary (EGP)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 5000"
+                      value={providerFormFixedSalary}
+                      onChange={(e) => setProviderFormFixedSalary(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
+                      Commission Type
+                    </label>
+                    <select
+                      value={providerFormCommissionType}
+                      onChange={(e) => setProviderFormCommissionType(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    >
+                      <option value="none">None</option>
+                      <option value="fixed">Fixed Amount per Service</option>
+                      <option value="percentage">Percentage of Service Price</option>
+                    </select>
+                  </div>
+                  {providerFormCommissionType !== "none" && (
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
+                        {providerFormCommissionType === "fixed" ? "Fixed Amount (EGP)" : "Percentage (%)"}
+                      </label>
+                      <input
+                        type="number"
+                        placeholder={providerFormCommissionType === "fixed" ? "e.g. 150" : "e.g. 10"}
+                        value={providerFormCommissionValue}
+                        onChange={(e) => setProviderFormCommissionValue(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
