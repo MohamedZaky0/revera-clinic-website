@@ -40,6 +40,7 @@ function mapRow(r: Record<string, any>) {
     rooms: r.rooms || [],
     createdByEmployeeId: r.created_by_employee_id ?? null,
     services: r.services || null,
+    doctorName: r.doctor_name ?? null,
   };
 }
 
