@@ -18576,7 +18576,7 @@ export default function AdminPage() {
                 <div className="space-y-6">
                   
                   {/* Service & Date & Session Type */}
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="grid gap-4 sm:grid-cols-3">
                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICE</p>
                       <p className="mt-1 text-base font-semibold text-[#1F251A]">{serviceNames}</p>
@@ -18591,7 +18591,7 @@ export default function AdminPage() {
                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-1">SESSION TYPE</p>
                        <select
                          value={viewingBooking.sessionType || "in_person"}
-                         disabled={!hasPermission("bookings.edit")}
+                         disabled={!hasPermission("bookings.edit") || viewingBooking.status === 'completed'}
                          onChange={async (e) => {
                            const newType = e.target.value;
                            await fetch(`/api/reservations?id=${viewingBooking.id}`, {
@@ -18608,18 +18608,7 @@ export default function AdminPage() {
                          <option value="online">Online / أونلاين</option>
                        </select>
                      </div>
-                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 flex flex-col justify-between">
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-1">BOOKED BY</p>
-                        <p className="mt-1.5 text-base font-semibold text-[#1F251A] truncate">
-                          {(() => {
-                            const creator = employeesList.find(emp => emp.id === viewingBooking.createdByEmployeeId);
-                            if (creator) {
-                              return creator.name;
-                            }
-                            return viewingBooking.isManual ? "Employee" : "Website (Patient)";
-                          })()}
-                        </p>
-                      </div>
+                     
                   </div>
 
                   {/* Price Details */}
@@ -18650,7 +18639,7 @@ export default function AdminPage() {
                       {!isEditingService && (
                         <button
                           onClick={() => setIsEditingService(true)}
-                          disabled={!hasPermission("bookings.edit")}
+                          disabled={!hasPermission("bookings.edit") || viewingBooking.status === 'completed'}
                           className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Add Service
@@ -18663,7 +18652,7 @@ export default function AdminPage() {
                         <div key={`${bs.id}-${index}`} className="flex items-center gap-2 bg-[#EDF1EC] rounded-xl px-3 py-1.5 text-sm font-semibold text-[#1F251A] shadow-sm">
                           <span>{bs.name}</span>
                           <span className="text-xs font-medium text-[#5A6A51]">({bs.price} EGP)</span>
-                          {bookingServices.length > 1 && hasPermission("bookings.edit") && (
+                          {bookingServices.length > 1 && hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
                             <button
                               onClick={async () => {
                                 const updatedIds = selectedServiceIds.filter((_, i) => i !== index);
@@ -18904,7 +18893,7 @@ export default function AdminPage() {
                       <>
                         <div className="flex items-center justify-between mb-4">
                           <p className="text-sm font-bold text-[#1F251A]">Notes</p>
-                          {hasPermission("bookings.edit") && (
+                          {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
                             <button
                               onClick={() => {
                                 setNotesDraft(viewingBooking.notes || "");
@@ -18926,7 +18915,7 @@ export default function AdminPage() {
                               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                             </svg>
                             <p className="text-xs font-semibold">no notes yet</p>
-                            {hasPermission("bookings.edit") && (
+                            {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
                               <button
                                 onClick={() => {
                                   setNotesDraft("");
@@ -19299,7 +19288,41 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  {/* Service Status */}
+                  {/* Booked By */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Booked By</p>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-[#C4AE7C]/20 flex items-center justify-center text-[#414E36] font-bold">
+                        {(() => {
+                          const creator = employeesList.find(emp => emp.id === viewingBooking.createdByEmployeeId);
+                          const name = creator ? creator.name : (viewingBooking.isManual ? "Employee" : "Website (Patient)");
+                          return name.split(' ').map((n: string) => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase();
+                        })()}
+                      </div>
+                      <div>
+                        <p className="font-bold text-[#1F251A] text-sm">
+                          {(() => {
+                            const creator = employeesList.find(emp => emp.id === viewingBooking.createdByEmployeeId);
+                            if (creator) {
+                              return creator.name;
+                            }
+                            return viewingBooking.isManual ? "Employee" : "Website (Patient)";
+                          })()}
+                        </p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">
+                          {(() => {
+                            const creator = employeesList.find(emp => emp.id === viewingBooking.createdByEmployeeId);
+                            if (creator) {
+                              return creator.role;
+                            }
+                            return viewingBooking.isManual ? "Clinic Staff" : "Online Patient";
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                                    {/* Service Status */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 text-sm">
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Service status</p>
                     <p className="text-[#5A6A51] italic font-semibold">No reviews</p>
