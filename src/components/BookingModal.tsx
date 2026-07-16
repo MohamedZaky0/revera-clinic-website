@@ -385,21 +385,34 @@ export function BookingModal() {
 
     doctors.forEach((doc) => {
       // Check branch
-      if (branchId && doc.branchId && doc.branchId !== branchId) return;
+      if (branchId) {
+        const wdh = doc.workingDaysHours;
+        if (wdh && typeof wdh === 'object' && Array.isArray(wdh.branch_ids)) {
+          if (!wdh.branch_ids.includes(branchId)) return;
+        } else if (doc.branchId && doc.branchId !== branchId) {
+          return;
+        }
+      }
       
       // Check service
       if (doc.services && doc.services.length > 0) {
         if (!doc.services.includes(selectedService.en)) return;
       }
-
+ 
       // Check working days & hours
       if (doc.workingDaysHours) {
-        let dayConfig = doc.workingDaysHours[weekdayName];
+        const wdh = doc.workingDaysHours;
+        let config = wdh;
+        if (wdh.branch_schedules && branchId && wdh.branch_schedules[branchId]) {
+          config = wdh.branch_schedules[branchId];
+        }
+
+        let dayConfig = config[weekdayName];
         if (!dayConfig) {
           const typeKey = sessionType === 'online' ? 'online' : 'in_person';
-          dayConfig = doc.workingDaysHours[typeKey]?.[weekdayName] || 
-                      doc.workingDaysHours.in_person?.[weekdayName] || 
-                      doc.workingDaysHours.online?.[weekdayName];
+          dayConfig = config[typeKey]?.[weekdayName] || 
+                      config.in_person?.[weekdayName] || 
+                      config.online?.[weekdayName];
         }
         if (dayConfig && dayConfig.isOpen) {
           const [sh, sm] = dayConfig.start.split(":").map(Number);
@@ -448,23 +461,36 @@ export function BookingModal() {
     const weekdayName = weekdays[selectedDate.getDay()];
 
     return doctors.filter((doctor) => {
-      if (branchId && doctor.branchId && doctor.branchId !== branchId) {
-        return false;
+      if (branchId) {
+        const wdh = doctor.workingDaysHours;
+        if (wdh && typeof wdh === 'object' && Array.isArray(wdh.branch_ids)) {
+          if (!wdh.branch_ids.includes(branchId)) {
+            return false;
+          }
+        } else if (doctor.branchId && doctor.branchId !== branchId) {
+          return false;
+        }
       }
-
+ 
       if (doctor.services && doctor.services.length > 0) {
         if (!doctor.services.includes(selectedService.en)) {
           return false;
         }
       }
-
+ 
       if (doctor.workingDaysHours) {
-        let dayConfig = doctor.workingDaysHours[weekdayName];
+        const wdh = doctor.workingDaysHours;
+        let config = wdh;
+        if (wdh.branch_schedules && branchId && wdh.branch_schedules[branchId]) {
+          config = wdh.branch_schedules[branchId];
+        }
+
+        let dayConfig = config[weekdayName];
         if (!dayConfig) {
           const typeKey = sessionType === 'online' ? 'online' : 'in_person';
-          dayConfig = doctor.workingDaysHours[typeKey]?.[weekdayName] || 
-                      doctor.workingDaysHours.in_person?.[weekdayName] || 
-                      doctor.workingDaysHours.online?.[weekdayName];
+          dayConfig = config[typeKey]?.[weekdayName] || 
+                      config.in_person?.[weekdayName] || 
+                      config.online?.[weekdayName];
         }
         if (!dayConfig || !dayConfig.isOpen) {
           return false;

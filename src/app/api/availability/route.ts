@@ -189,8 +189,15 @@ export async function GET(req: Request) {
     // Filter compatible providers
     const activeCompProviders = (rawProviders || []).filter((provider: any) => {
       // Branch check
-      if (branchId && provider.branch_id && provider.branch_id !== branchId) {
-        return false;
+      if (branchId) {
+        const wdh = provider.working_days_hours;
+        if (wdh && typeof wdh === 'object' && Array.isArray(wdh.branch_ids)) {
+          if (!wdh.branch_ids.includes(branchId)) {
+            return false;
+          }
+        } else if (provider.branch_id && provider.branch_id !== branchId) {
+          return false;
+        }
       }
       // Service compatibility check
       if (selectedServiceNameEn && provider.services && provider.services.length > 0) {
@@ -245,7 +252,11 @@ export async function GET(req: Request) {
     // Helper to get doctor schedule config on weekday
     const getDoctorDayConfig = (provider: any, weekday: string) => {
       if (!provider.working_days_hours) return null;
-      const config = provider.working_days_hours;
+      const wdh = provider.working_days_hours;
+      let config = wdh;
+      if (wdh.branch_schedules && branchId && wdh.branch_schedules[branchId]) {
+        config = wdh.branch_schedules[branchId];
+      }
       if (config[sessionType]) {
         return config[sessionType][weekday] || null;
       }

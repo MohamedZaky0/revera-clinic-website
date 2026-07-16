@@ -112,6 +112,15 @@ export async function POST(req: Request) {
   }
 
   const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue } = body;
+  
+  let finalBranchId = branchId || null;
+  if (workingDaysHours && typeof workingDaysHours === 'object') {
+    const wdh = workingDaysHours as any;
+    if (Array.isArray(wdh.branch_ids) && wdh.branch_ids.length > 0) {
+      finalBranchId = wdh.branch_ids[0];
+    }
+  }
+
   const newProvider = {
     name,
     services: services || [],
@@ -125,7 +134,7 @@ export async function POST(req: Request) {
     specialty: specialty || null,
     national_id: nationalId || null,
     working_days_hours: workingDaysHours || null,
-    branch_id: branchId || null,
+    branch_id: finalBranchId,
     start_date: startDate || null,
     fixed_salary: fixedSalary ? Number(fixedSalary) : 0,
     commission_type: commissionType || 'none',
@@ -238,8 +247,21 @@ export async function PATCH(req: Request) {
   if (age !== undefined) updates.age = age ? Number(age) : null;
   if (specialty !== undefined) updates.specialty = specialty;
   if (nationalId !== undefined) updates.national_id = nationalId;
-  if (workingDaysHours !== undefined) updates.working_days_hours = workingDaysHours;
-  if (branchId !== undefined) updates.branch_id = branchId;
+  if (workingDaysHours !== undefined) {
+    updates.working_days_hours = workingDaysHours;
+    if (workingDaysHours && typeof workingDaysHours === 'object') {
+      const wdh = workingDaysHours as any;
+      if (Array.isArray(wdh.branch_ids) && wdh.branch_ids.length > 0) {
+        updates.branch_id = wdh.branch_ids[0];
+      } else {
+        updates.branch_id = null;
+      }
+    } else {
+      updates.branch_id = null;
+    }
+  } else if (branchId !== undefined) {
+    updates.branch_id = branchId;
+  }
   if (startDate !== undefined) updates.start_date = startDate;
   if (fixedSalary !== undefined) updates.fixed_salary = Number(fixedSalary || 0);
   if (commissionType !== undefined) updates.commission_type = commissionType;

@@ -2861,11 +2861,18 @@ export default function AdminPage() {
     sessionType?: string | null
   ): boolean => {
     if (!dateStr || !timeSlotStr || !serviceId) return true;
-
-    if (branchId && doctor.branchId && doctor.branchId !== branchId) {
-      return false;
+ 
+    if (branchId) {
+      const wdh = doctor.workingDaysHours;
+      if (wdh && typeof wdh === 'object' && Array.isArray(wdh.branch_ids)) {
+        if (!wdh.branch_ids.includes(branchId)) {
+          return false;
+        }
+      } else if (doctor.branchId && doctor.branchId !== branchId) {
+        return false;
+      }
     }
-
+ 
     const targetService = localServices.find(s => s.id === serviceId);
     if (targetService) {
       if (doctor.services && doctor.services.length > 0) {
@@ -2874,32 +2881,38 @@ export default function AdminPage() {
         }
       }
     }
-
+ 
     const timeToMinutes = (timeStr: string): number => {
       const norm = normaliseTo24hSlot(timeStr);
       if (!norm) return 0;
       const [hh, mm] = norm.split(":").map(Number);
       return hh * 60 + mm;
     };
-
+ 
     const startNew = timeToMinutes(timeSlotStr);
     const durationNew = targetService ? getDurationInMinutes(targetService.duration) : 30;
     const endNew = startNew + durationNew;
-
+ 
     if (doctor.workingDaysHours) {
       const dateObj = new Date(dateStr);
       if (!isNaN(dateObj.getTime())) {
         const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
         const weekdayName = weekdays[dateObj.getDay()];
         
-        let dayConfig = doctor.workingDaysHours[weekdayName];
-        if (!dayConfig) {
-          const typeKey = sessionType === 'online' ? 'online' : 'in_person';
-          dayConfig = doctor.workingDaysHours[typeKey]?.[weekdayName] || 
-                      doctor.workingDaysHours.in_person?.[weekdayName] || 
-                      doctor.workingDaysHours.online?.[weekdayName];
+        const wdh = doctor.workingDaysHours;
+        let config = wdh;
+        if (wdh.branch_schedules && branchId && wdh.branch_schedules[branchId]) {
+          config = wdh.branch_schedules[branchId];
         }
 
+        let dayConfig = config[weekdayName];
+        if (!dayConfig) {
+          const typeKey = sessionType === 'online' ? 'online' : 'in_person';
+          dayConfig = config[typeKey]?.[weekdayName] || 
+                      config.in_person?.[weekdayName] || 
+                      config.online?.[weekdayName];
+        }
+ 
         if (!dayConfig || !dayConfig.isOpen) {
           return false;
         }
@@ -2907,7 +2920,7 @@ export default function AdminPage() {
         const [eh, em] = dayConfig.end.split(":").map(Number);
         const shiftStart = sh * 60 + sm;
         const shiftEnd = eh * 60 + em;
-
+ 
         if (startNew < shiftStart || endNew > shiftEnd) {
           return false;
         }
@@ -2981,6 +2994,9 @@ export default function AdminPage() {
   const [providerFormSpecialty, setProviderFormSpecialty] = useState("");
   const [providerFormNationalId, setProviderFormNationalId] = useState("");
   const [providerFormBranchId, setProviderFormBranchId] = useState("");
+  const [providerFormBranchIds, setProviderFormBranchIds] = useState<string[]>([]);
+  const [providerFormBranchSchedules, setProviderFormBranchSchedules] = useState<Record<string, { in_person: any; online: any }>>({});
+  const [providerFormSelectedScheduleBranchId, setProviderFormSelectedScheduleBranchId] = useState<string>("");
   const [providerFormStartDate, setProviderFormStartDate] = useState("");
   const [providerFormWorkingDaysHours, setProviderFormWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string }>>({
     Sunday: { isOpen: false, start: "10:00", end: "20:00" },
@@ -3200,21 +3216,34 @@ export default function AdminPage() {
 
     providers.forEach((doc) => {
       // Check branch
-      if (newPatientBranch && doc.branchId && doc.branchId !== newPatientBranch) return;
+      if (newPatientBranch) {
+        const wdh = doc.workingDaysHours;
+        if (wdh && typeof wdh === 'object' && Array.isArray(wdh.branch_ids)) {
+          if (!wdh.branch_ids.includes(newPatientBranch)) return;
+        } else if (doc.branchId && doc.branchId !== newPatientBranch) {
+          return;
+        }
+      }
       
       // Check service
       if (doc.services && doc.services.length > 0) {
         if (!doc.services.includes(targetService.en)) return;
       }
-
+ 
       // Check working days & hours
       if (doc.workingDaysHours) {
-        let dayConfig = doc.workingDaysHours[weekdayName];
+        const wdh = doc.workingDaysHours;
+        let config = wdh;
+        if (wdh.branch_schedules && newPatientBranch && wdh.branch_schedules[newPatientBranch]) {
+          config = wdh.branch_schedules[newPatientBranch];
+        }
+
+        let dayConfig = config[weekdayName];
         if (!dayConfig) {
           const typeKey = newPatientSessionType === 'online' ? 'online' : 'in_person';
-          dayConfig = doc.workingDaysHours[typeKey]?.[weekdayName] || 
-                      doc.workingDaysHours.in_person?.[weekdayName] || 
-                      doc.workingDaysHours.online?.[weekdayName];
+          dayConfig = config[typeKey]?.[weekdayName] || 
+                      config.in_person?.[weekdayName] || 
+                      config.online?.[weekdayName];
         }
         if (dayConfig && dayConfig.isOpen) {
           const [sh, sm] = dayConfig.start.split(":").map(Number);
@@ -3298,21 +3327,34 @@ export default function AdminPage() {
 
     providers.forEach((doc) => {
       // Check branch
-      if (selectedReq.branchId && doc.branchId && doc.branchId !== selectedReq.branchId) return;
+      if (selectedReq.branchId) {
+        const wdh = doc.workingDaysHours;
+        if (wdh && typeof wdh === 'object' && Array.isArray(wdh.branch_ids)) {
+          if (!wdh.branch_ids.includes(selectedReq.branchId)) return;
+        } else if (doc.branchId && doc.branchId !== selectedReq.branchId) {
+          return;
+        }
+      }
       
       // Check service
       if (doc.services && doc.services.length > 0) {
         if (!doc.services.includes(targetService.en)) return;
       }
-
+ 
       // Check working days & hours
       if (doc.workingDaysHours) {
-        let dayConfig = doc.workingDaysHours[weekdayName];
+        const wdh = doc.workingDaysHours;
+        let config = wdh;
+        if (wdh.branch_schedules && selectedReq.branchId && wdh.branch_schedules[selectedReq.branchId]) {
+          config = wdh.branch_schedules[selectedReq.branchId];
+        }
+
+        let dayConfig = config[weekdayName];
         if (!dayConfig) {
           const typeKey = selectedReq.sessionType === 'online' ? 'online' : 'in_person';
-          dayConfig = doc.workingDaysHours[typeKey]?.[weekdayName] || 
-                      doc.workingDaysHours.in_person?.[weekdayName] || 
-                      doc.workingDaysHours.online?.[weekdayName];
+          dayConfig = config[typeKey]?.[weekdayName] || 
+                      config.in_person?.[weekdayName] || 
+                      config.online?.[weekdayName];
         }
         if (dayConfig && dayConfig.isOpen) {
           const [sh, sm] = dayConfig.start.split(":").map(Number);
@@ -3700,6 +3742,44 @@ export default function AdminPage() {
     }
   }, [providerTab, attendanceDate, fetchAttendance]);
 
+  const handleScheduleBranchChange = (nextBranchId: string) => {
+    const prevBranchId = providerFormSelectedScheduleBranchId;
+    if (!prevBranchId) {
+      setProviderFormSelectedScheduleBranchId(nextBranchId);
+      return;
+    }
+    
+    // Save current schedule configuration to the prev branch ID
+    const updatedSchedules = {
+      ...providerFormBranchSchedules,
+      [prevBranchId]: {
+        in_person: providerFormWorkingDaysHours,
+        online: providerFormOnlineWorkingDaysHours
+      }
+    };
+    setProviderFormBranchSchedules(updatedSchedules);
+    setProviderFormSelectedScheduleBranchId(nextBranchId);
+
+    // Load next branch schedule
+    const nextSched = updatedSchedules[nextBranchId] || {};
+    let inClinicSched = {
+      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
+      Monday: { isOpen: false, start: "09:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
+      Friday: { isOpen: false, start: "09:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
+    };
+    let onlineSched = { ...inClinicSched };
+
+    if (nextSched.in_person) inClinicSched = { ...inClinicSched, ...nextSched.in_person };
+    if (nextSched.online) onlineSched = { ...onlineSched, ...nextSched.online };
+
+    setProviderFormWorkingDaysHours(inClinicSched);
+    setProviderFormOnlineWorkingDaysHours(onlineSched);
+  };
+
   function openAddProviderModal() {
     setProviderModalMode("add");
     setProviderEditingId(null);
@@ -3716,7 +3796,16 @@ export default function AdminPage() {
     setProviderFormAge("");
     setProviderFormSpecialty("");
     setProviderFormNationalId("");
-    setProviderFormBranchId(branches.length > 0 ? branches[0].id : "");
+    
+    // Multi-branch initial state
+    const defaultBranchIds = branches.length > 0 ? [branches[0].id] : [];
+    setProviderFormBranchIds(defaultBranchIds);
+    setProviderFormBranchSchedules({});
+    
+    const activeBranchId = defaultBranchIds.length > 0 ? defaultBranchIds[0] : "";
+    setProviderFormSelectedScheduleBranchId(activeBranchId);
+    setProviderFormBranchId(activeBranchId); // Backwards compatibility for legacy branchId state
+    
     setProviderFormStartDate("");
     setProviderFormWorkingDaysHours({
       Sunday: { isOpen: false, start: "09:00", end: "20:00" },
@@ -3753,13 +3842,44 @@ export default function AdminPage() {
     setProviderFormAge(provider.age ? String(provider.age) : "");
     setProviderFormSpecialty(provider.specialty || "");
     setProviderFormNationalId(provider.nationalId || "");
-    setProviderFormBranchId(provider.branchId || "");
     setProviderFormStartDate(provider.startDate || "");
     setProviderFormFixedSalary(String(provider.fixedSalary || 0));
     setProviderFormCommissionType(provider.commissionType || "none");
     setProviderFormCommissionValue(String(provider.commissionValue || 0));
 
     const rawSched = provider.workingDaysHours || {};
+    
+    // Parse branch IDs
+    let initialBranchIds: string[] = [];
+    if (rawSched && typeof rawSched === 'object' && Array.isArray(rawSched.branch_ids)) {
+      initialBranchIds = rawSched.branch_ids;
+    } else if (provider.branchId) {
+      initialBranchIds = [provider.branchId];
+    } else if (branches.length > 0) {
+      initialBranchIds = [branches[0].id];
+    }
+    setProviderFormBranchIds(initialBranchIds);
+
+    // Parse branch schedules
+    let initialBranchSchedules: Record<string, any> = {};
+    if (rawSched && typeof rawSched === 'object' && rawSched.branch_schedules) {
+      initialBranchSchedules = rawSched.branch_schedules;
+    } else if (provider.branchId) {
+      initialBranchSchedules = {
+        [provider.branchId]: {
+          in_person: rawSched.in_person || rawSched,
+          online: rawSched.online || rawSched
+        }
+      };
+    }
+    setProviderFormBranchSchedules(initialBranchSchedules);
+
+    // Set selected schedule branch
+    const activeBranchId = initialBranchIds.length > 0 ? initialBranchIds[0] : (branches.length > 0 ? branches[0].id : "");
+    setProviderFormSelectedScheduleBranchId(activeBranchId);
+    setProviderFormBranchId(activeBranchId); // Backwards compatibility
+
+    // Load active branch schedule
     let inClinicSched = {
       Sunday: { isOpen: false, start: "09:00", end: "20:00" },
       Monday: { isOpen: false, start: "09:00", end: "20:00" },
@@ -3771,16 +3891,12 @@ export default function AdminPage() {
     };
     let onlineSched = { ...inClinicSched };
 
-    if (rawSched.in_person) {
-      inClinicSched = { ...inClinicSched, ...rawSched.in_person };
-    } else {
-      inClinicSched = { ...inClinicSched, ...rawSched };
+    const activeBranchSched = initialBranchSchedules[activeBranchId] || {};
+    if (activeBranchSched.in_person) {
+      inClinicSched = { ...inClinicSched, ...activeBranchSched.in_person };
     }
-
-    if (rawSched.online) {
-      onlineSched = { ...onlineSched, ...rawSched.online };
-    } else if (!rawSched.in_person) {
-      onlineSched = { ...onlineSched, ...rawSched };
+    if (activeBranchSched.online) {
+      onlineSched = { ...onlineSched, ...activeBranchSched.online };
     }
 
     setProviderFormWorkingDaysHours(inClinicSched);
@@ -3795,24 +3911,72 @@ export default function AdminPage() {
       return;
     }
 
-    // Overlap validation between In-Clinic and Online schedules
-    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    for (const day of weekdays) {
-      const inClinic = providerFormWorkingDaysHours[day];
-      const online = providerFormOnlineWorkingDaysHours[day];
-      if (inClinic && online && inClinic.isOpen && online.isOpen) {
-        const timeToMins = (tStr: string) => {
-          const [h, m] = tStr.split(":").map(Number);
-          return h * 60 + m;
-        };
-        const start1 = timeToMins(inClinic.start);
-        const end1 = timeToMins(inClinic.end);
-        const start2 = timeToMins(online.start);
-        const end2 = timeToMins(online.end);
+    if (providerFormBranchIds.length === 0) {
+      alert("Please select at least one branch for the provider.");
+      return;
+    }
 
-        if (start1 < end2 && start2 < end1) {
-          alert(`Schedule overlap detected on ${day}! In-Clinic hours (${inClinic.start} - ${inClinic.end}) and Online hours (${online.start} - ${online.end}) cannot overlap.`);
-          return;
+    // Capture the current working schedule to the active branch configuration
+    const finalSchedules = {
+      ...providerFormBranchSchedules,
+      ...(providerFormSelectedScheduleBranchId ? {
+        [providerFormSelectedScheduleBranchId]: {
+          in_person: providerFormWorkingDaysHours,
+          online: providerFormOnlineWorkingDaysHours
+        }
+      } : {})
+    };
+
+    // Auto-populate default closed schedules for any assigned branches that haven't been configured yet
+    providerFormBranchIds.forEach((bId) => {
+      if (!finalSchedules[bId]) {
+        finalSchedules[bId] = {
+          in_person: {
+            Sunday: { isOpen: false, start: "09:00", end: "20:00" },
+            Monday: { isOpen: false, start: "09:00", end: "20:00" },
+            Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
+            Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
+            Thursday: { isOpen: false, start: "09:00", end: "20:00" },
+            Friday: { isOpen: false, start: "09:00", end: "20:00" },
+            Saturday: { isOpen: false, start: "09:00", end: "20:00" }
+          },
+          online: {
+            Sunday: { isOpen: false, start: "09:00", end: "20:00" },
+            Monday: { isOpen: false, start: "09:00", end: "20:00" },
+            Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
+            Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
+            Thursday: { isOpen: false, start: "09:00", end: "20:00" },
+            Friday: { isOpen: false, start: "09:00", end: "20:00" },
+            Saturday: { isOpen: false, start: "09:00", end: "20:00" }
+          }
+        };
+      }
+    });
+
+    // Overlap validation between In-Clinic and Online schedules across all assigned branches
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    for (const bId of providerFormBranchIds) {
+      const sched = finalSchedules[bId];
+      if (!sched) continue;
+      const branchName = branches.find((b) => b.id === bId)?.name_en || bId;
+
+      for (const day of weekdays) {
+        const inClinic = sched.in_person?.[day];
+        const online = sched.online?.[day];
+        if (inClinic && online && inClinic.isOpen && online.isOpen) {
+          const timeToMins = (tStr: string) => {
+            const [h, m] = tStr.split(":").map(Number);
+            return h * 60 + m;
+          };
+          const start1 = timeToMins(inClinic.start);
+          const end1 = timeToMins(inClinic.end);
+          const start2 = timeToMins(online.start);
+          const end2 = timeToMins(online.end);
+
+          if (start1 < end2 && start2 < end1) {
+            alert(`Schedule overlap detected on ${day} for branch "${branchName}"! In-Clinic hours (${inClinic.start} - ${inClinic.end}) and Online hours (${online.start} - ${online.end}) cannot overlap.`);
+            return;
+          }
         }
       }
     }
@@ -3831,10 +3995,10 @@ export default function AdminPage() {
       specialty: providerFormSpecialty || null,
       nationalId: providerFormNationalId || null,
       workingDaysHours: {
-        in_person: providerFormWorkingDaysHours,
-        online: providerFormOnlineWorkingDaysHours
+        branch_ids: providerFormBranchIds,
+        branch_schedules: finalSchedules
       },
-      branchId: providerFormBranchId || null,
+      branchId: providerFormBranchIds[0] || null, // Keep legacy branchId column in sync with first branch
       startDate: providerFormStartDate || null,
       fixedSalary: Number(providerFormFixedSalary || 0),
       commissionType: providerFormCommissionType,
@@ -19898,19 +20062,44 @@ export default function AdminPage() {
               {/* Row 4: Branch & Start Date */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branch</label>
-                  <select
-                    value={providerFormBranchId}
-                    onChange={(e) => setProviderFormBranchId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  >
-                    <option value="">Default/All Branches</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name_en} ({b.name_ar})
-                      </option>
-                    ))}
-                  </select>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branches (Select one or more)</label>
+                  <div className="flex flex-wrap gap-2 p-2 rounded-2xl border border-[#414E36]/15 bg-white min-h-[42px] items-center">
+                    {branches.map((b) => {
+                      const isSelected = providerFormBranchIds.includes(b.id);
+                      return (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              if (providerFormBranchIds.length <= 1) {
+                                alert("A doctor must be assigned to at least one branch.");
+                                return;
+                              }
+                              const nextIds = providerFormBranchIds.filter((id) => id !== b.id);
+                              setProviderFormBranchIds(nextIds);
+                              if (providerFormSelectedScheduleBranchId === b.id) {
+                                handleScheduleBranchChange(nextIds[0]);
+                              }
+                            } else {
+                              const nextIds = [...providerFormBranchIds, b.id];
+                              setProviderFormBranchIds(nextIds);
+                              if (!providerFormSelectedScheduleBranchId) {
+                                setProviderFormSelectedScheduleBranchId(b.id);
+                              }
+                            }
+                          }}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                            isSelected
+                              ? "bg-[#414E36] text-white border-[#414E36]"
+                              : "bg-[#414E36]/5 text-[#414E36] border-transparent hover:bg-[#414E36]/10"
+                          }`}
+                        >
+                          {b.name_en} {isSelected ? "✓" : "+"}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
@@ -20031,9 +20220,30 @@ export default function AdminPage() {
 
               {/* Weekly Working Schedule */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Weekly Working Days & Hours</label>
-                  <div className="flex rounded-lg border border-[#414E36]/15 p-0.5 bg-gray-50 text-[10px] font-bold">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Weekly Working Days & Hours</label>
+                    {providerFormBranchIds.length > 1 && (
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <span className="text-xs text-[#5A6A51]">Configure branch schedule:</span>
+                        <select
+                          value={providerFormSelectedScheduleBranchId}
+                          onChange={(e) => handleScheduleBranchChange(e.target.value)}
+                          className="rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-xs text-[#1F251A] font-semibold outline-none focus:border-[#C4AE7C] shadow-sm cursor-pointer"
+                        >
+                          {providerFormBranchIds.map((bId) => {
+                            const br = branches.find((b) => b.id === bId);
+                            return (
+                              <option key={bId} value={bId}>
+                                {br ? br.name_en : bId}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex rounded-lg border border-[#414E36]/15 p-0.5 bg-gray-50 text-[10px] font-bold self-start sm:self-auto shrink-0">
                     <button
                       type="button"
                       onClick={() => setProviderFormScheduleTab("in_person")}
