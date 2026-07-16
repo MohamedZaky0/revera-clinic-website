@@ -858,6 +858,11 @@ export default function AdminPage() {
   const [performanceReviews, setPerformanceReviews] = useState<any[]>([]);
   const [loadingPerformance, setLoadingPerformance] = useState(false);
 
+  // Targets sub-tab states
+  const [editingTargetEmployee, setEditingTargetEmployee] = useState<any | null>(null);
+  const [targetAmountInput, setTargetAmountInput] = useState("");
+  const [bonusPercentageInput, setBonusPercentageInput] = useState("");
+
   // Doctor payroll states
   const [doctorPayrollList, setDoctorPayrollList] = useState<any[]>([]);
   const [loadingDoctorPayroll, setLoadingDoctorPayroll] = useState(false);
@@ -16225,7 +16230,7 @@ export default function AdminPage() {
 
               {/* Sub-navigation Tabs */}
               <div className="flex border-b border-[#414E36]/10 gap-6">
-                {(["overview", "payroll", "doctor-payroll", "leaves", "performance", "attendance"] as const).map((tab) => (
+                {(["overview", "payroll", "doctor-payroll", "leaves", "performance", "attendance", "targets"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setHrActiveSubTab(tab)}
@@ -16235,7 +16240,7 @@ export default function AdminPage() {
                         : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
                     }`}
                   >
-                    {tab === "doctor-payroll" ? "Doctor Payroll" : tab}
+                    {tab === "doctor-payroll" ? "Doctor Payroll" : tab === "targets" ? "Targets" : tab}
                   </button>
                 ))}
               </div>
@@ -17650,6 +17655,109 @@ export default function AdminPage() {
                               </tr>
                             ))
                           )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {hrActiveSubTab === "targets" && (
+                <div className="space-y-6 animate-fadeIn">
+                  {/* Title & Info */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <h2 className="text-4xl font-semibold text-[#1F251A]">Employee Targets</h2>
+                      <p className="mt-1 text-xs text-[#8A9A81] font-medium">Home &gt; Employee Targets</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
+                    <div className="p-6 border-b border-[#414E36]/10">
+                      <h3 className="text-lg font-bold text-[#1F251A]">Targets &amp; Performance</h3>
+                      <p className="mt-1 text-xs text-[#5A6A51]">Set monthly target goals and calculate employee progress in real-time based on completed bookings.</p>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
+                            <th className="px-6 py-4">Employee Info</th>
+                            <th className="px-6 py-4">Monthly Target</th>
+                            <th className="px-6 py-4">Bonus %</th>
+                            <th className="px-6 py-4">Achieved (Current Month)</th>
+                            <th className="px-6 py-4">Progress</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#414E36]/5">
+                          {employeesList.map((emp: any) => {
+                            const currentMonthStr = new Date().toISOString().slice(0, 7);
+                            const currentMonthBookings = allReservations.filter((b) => {
+                              const isApprovedOrCompleted = b.status === "approved" || b.status === "completed";
+                              return b.createdByEmployeeId === emp.id && isApprovedOrCompleted && b.date && b.date.startsWith(currentMonthStr);
+                            });
+                            const achievedRevenue = currentMonthBookings.reduce((sum, b) => {
+                              const price = Number(b.amountPaid || 0) + Number(b.amountLeft || 0) || (() => {
+                                const sId = Array.isArray(b.serviceIds) ? b.serviceIds[0] : b.serviceId;
+                                const svc = localServices.find(item => item.id === Number(sId));
+                                return svc ? getEffectiveServicePrice(svc, b.branchId, branches) : 500;
+                              })();
+                              return sum + price;
+                            }, 0);
+
+                            const targetAmount = Number(emp.requiredTargetAmount || 0);
+                            const bonusPct = Number(emp.bonusPercentage || 0);
+                            const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((achievedRevenue / targetAmount) * 100)) : 0;
+                            const hasAchievedTarget = targetAmount > 0 && achievedRevenue >= targetAmount;
+
+                            return (
+                              <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="font-semibold text-[#1F251A]">{emp.name}</div>
+                                  <div className="text-xs text-[#5A6A51]">{emp.email} • {emp.role_name || "Staff"}</div>
+                                </td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
+                                  {targetAmount > 0 ? `${targetAmount.toLocaleString()} EGP` : "No Target"}
+                                </td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
+                                  {bonusPct > 0 ? `${bonusPct}%` : "No Bonus"}
+                                </td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
+                                  {achievedRevenue.toLocaleString()} EGP
+                                </td>
+                                <td className="px-6 py-4 text-xs">
+                                  {targetAmount > 0 ? (
+                                    <div className="space-y-1 w-44">
+                                      <div className="flex items-center justify-between font-semibold text-[#5A6A51] text-[10px]">
+                                        <span>{progressPercent}%</span>
+                                        {hasAchievedTarget && <span className="text-green-700 font-bold">Met ✓</span>}
+                                      </div>
+                                      <div className="w-full bg-gray-150 h-2 rounded-full overflow-hidden">
+                                        <div 
+                                          className={`h-full transition-all duration-500 rounded-full ${hasAchievedTarget ? "bg-green-600" : "bg-[#C4AE7C]"}`}
+                                          style={{ width: `${progressPercent}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[#5A6A51] italic text-xs">N/A</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <button
+                                    onClick={() => {
+                                      setEditingTargetEmployee(emp);
+                                      setTargetAmountInput(String(emp.requiredTargetAmount || 0));
+                                      setBonusPercentageInput(String(emp.bonusPercentage || 0));
+                                    }}
+                                    className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#EDF1EC] transition shadow-xs"
+                                  >
+                                    Edit Target
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -22157,6 +22265,95 @@ export default function AdminPage() {
             </div>
           );
         })()
+      )}
+
+      {editingTargetEmployee && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Set Monthly Target</p>
+                <h3 className="text-xl font-bold text-[#1F251A] mt-1">{editingTargetEmployee.name}</h3>
+              </div>
+              <button
+                onClick={() => setEditingTargetEmployee(null)}
+                className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  const res = await fetch('/api/employees', {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': 'Bearer ' + (session?.access_token || '')
+                    },
+                    body: JSON.stringify({
+                      id: editingTargetEmployee.id,
+                      requiredTargetAmount: Number(targetAmountInput),
+                      bonusPercentage: Number(bonusPercentageInput)
+                    })
+                  });
+                  if (res.ok) {
+                    alert("Employee target updated successfully!");
+                    setEditingTargetEmployee(null);
+                    clearFetchCache();
+                    await fetchRolesAndEmployees();
+                  } else {
+                    const err = await res.json();
+                    alert(err.error || "Failed to update target");
+                  }
+                } catch (err) {
+                  alert("Error updating target");
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Required Monthly Target (EGP)</label>
+                <input
+                  type="number"
+                  value={targetAmountInput}
+                  onChange={(e) => setTargetAmountInput(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                  min="0"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Performance Bonus Percentage (%)</label>
+                <input
+                  type="number"
+                  value={bonusPercentageInput}
+                  onChange={(e) => setBonusPercentageInput(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                  min="0"
+                  max="100"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTargetEmployee(null)}
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
+                >
+                  Save Target
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {activeInfoFeature && (
