@@ -15097,16 +15097,14 @@ export default function AdminPage() {
                           const isApprovedOrCompleted = b.status === "approved" || b.status === "completed";
                           return isApprovedOrCompleted && b.date && b.date.startsWith(currentMonthStr);
                         });
-                        const achievedRevenue = currentMonthBookings.reduce((sum, b) => {
-                          const price = Number(b.amountPaid || 0) + Number(b.amountLeft || 0) || Number(b.services?.price || 0);
-                          return sum + price;
-                        }, 0);
+                        const achievedCount = currentMonthBookings.length;
                         const targetAmount = Number(viewingEmployee.requiredTargetAmount || 0);
                         const bonusPct = Number(viewingEmployee.bonusPercentage || 0);
+                        const baseSalary = Number(viewingEmployee.salary || 0);
                         
-                        const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((achievedRevenue / targetAmount) * 100)) : 0;
-                        const hasAchievedTarget = targetAmount > 0 && achievedRevenue >= targetAmount;
-                        const potentialBonus = hasAchievedTarget ? Math.round(achievedRevenue * (bonusPct / 100)) : 0;
+                        const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((achievedCount / targetAmount) * 100)) : 0;
+                        const hasAchievedTarget = targetAmount > 0 && achievedCount >= targetAmount;
+                        const potentialBonus = hasAchievedTarget ? Math.round(baseSalary * (bonusPct / 100)) : 0;
 
                         return (
                           <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
@@ -15124,19 +15122,19 @@ export default function AdminPage() {
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
                                 <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Required Target</span>
-                                <span className="font-semibold text-[#1F251A]">{targetAmount.toLocaleString()} EGP</span>
+                                <span className="font-semibold text-[#1F251A]">{targetAmount} reservations</span>
                               </div>
                               <div>
                                 <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Bonus Percentage</span>
-                                <span className="font-semibold text-[#1F251A]">{bonusPct}%</span>
+                                <span className="font-semibold text-[#1F251A]">{bonusPct}% of salary</span>
                               </div>
                               <div>
-                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Achieved Revenue (Current Month)</span>
+                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Achieved (Current Month)</span>
                                 <span className="font-semibold text-[#1F251A]">
                                   {loadingEmployeeBookings ? (
                                     <span className="text-xs text-[#5A6A51] italic">Loading...</span>
                                   ) : (
-                                    achievedRevenue.toLocaleString() + " EGP"
+                                    achievedCount + " reservations"
                                   )}
                                 </span>
                               </div>
@@ -17682,8 +17680,8 @@ export default function AdminPage() {
                         <thead>
                           <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
                             <th className="px-6 py-4">Employee Info</th>
-                            <th className="px-6 py-4">Monthly Target</th>
-                            <th className="px-6 py-4">Bonus %</th>
+                            <th className="px-6 py-4">Monthly Target (Reservations)</th>
+                            <th className="px-6 py-4">Bonus % of Salary</th>
                             <th className="px-6 py-4">Achieved (Current Month)</th>
                             <th className="px-6 py-4">Progress</th>
                             <th className="px-6 py-4 text-right">Actions</th>
@@ -17696,19 +17694,14 @@ export default function AdminPage() {
                               const isApprovedOrCompleted = b.status === "approved" || b.status === "completed";
                               return b.createdByEmployeeId === emp.id && isApprovedOrCompleted && b.date && b.date.startsWith(currentMonthStr);
                             });
-                            const achievedRevenue = currentMonthBookings.reduce((sum, b) => {
-                              const price = Number(b.amountPaid || 0) + Number(b.amountLeft || 0) || (() => {
-                                const sId = Array.isArray(b.serviceIds) ? b.serviceIds[0] : b.serviceId;
-                                const svc = localServices.find(item => item.id === Number(sId));
-                                return svc ? getEffectiveServicePrice(svc, b.branchId, branches) : 500;
-                              })();
-                              return sum + price;
-                            }, 0);
+                            const achievedCount = currentMonthBookings.length;
 
                             const targetAmount = Number(emp.requiredTargetAmount || 0);
                             const bonusPct = Number(emp.bonusPercentage || 0);
-                            const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((achievedRevenue / targetAmount) * 100)) : 0;
-                            const hasAchievedTarget = targetAmount > 0 && achievedRevenue >= targetAmount;
+                            const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((achievedCount / targetAmount) * 100)) : 0;
+                            const hasAchievedTarget = targetAmount > 0 && achievedCount >= targetAmount;
+                            const salary = Number(emp.salary || 0);
+                            const estimatedBonus = hasAchievedTarget ? Math.round(salary * (bonusPct / 100)) : 0;
 
                             return (
                               <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
@@ -17717,13 +17710,13 @@ export default function AdminPage() {
                                   <div className="text-xs text-[#5A6A51]">{emp.email} • {emp.role_name || "Staff"}</div>
                                 </td>
                                 <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
-                                  {targetAmount > 0 ? `${targetAmount.toLocaleString()} EGP` : "No Target"}
+                                  {targetAmount > 0 ? `${targetAmount} reservations` : "No Target"}
                                 </td>
                                 <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
-                                  {bonusPct > 0 ? `${bonusPct}%` : "No Bonus"}
+                                  {bonusPct > 0 ? `${bonusPct}% of salary` : "No Bonus"}
                                 </td>
                                 <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
-                                  {achievedRevenue.toLocaleString()} EGP
+                                  {achievedCount} reservations
                                 </td>
                                 <td className="px-6 py-4 text-xs">
                                   {targetAmount > 0 ? (
@@ -22314,7 +22307,7 @@ export default function AdminPage() {
               className="space-y-4"
             >
               <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Required Monthly Target (EGP)</label>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Required Monthly Target (Reservations)</label>
                 <input
                   type="number"
                   value={targetAmountInput}
@@ -22325,7 +22318,7 @@ export default function AdminPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Performance Bonus Percentage (%)</label>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Performance Bonus (% of Basic Salary)</label>
                 <input
                   type="number"
                   value={bonusPercentageInput}
