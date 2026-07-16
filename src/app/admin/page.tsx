@@ -18609,30 +18609,17 @@ export default function AdminPage() {
                        </select>
                      </div>
                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 flex flex-col justify-between">
-                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-1">ACCOUNTED TO</p>
-                       <select
-                         value={viewingBooking.createdByEmployeeId || ""}
-                         disabled={!hasPermission("bookings.edit")}
-                         onChange={async (e) => {
-                           const newEmpId = e.target.value || null;
-                           await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                             method: "PATCH",
-                             headers: { "Content-Type": "application/json" },
-                             body: JSON.stringify({ createdByEmployeeId: newEmpId })
-                           });
-                           setViewingBooking(prev => prev ? { ...prev, createdByEmployeeId: newEmpId } : null);
-                           fetchAllReservations();
-                         }}
-                         className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                       >
-                         <option value="">None (Website/Other)</option>
-                         {employeesList.map((emp) => (
-                           <option key={emp.id} value={emp.id}>
-                             {emp.name} ({emp.role})
-                           </option>
-                         ))}
-                       </select>
-                     </div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-1">BOOKED BY</p>
+                        <p className="mt-1.5 text-base font-semibold text-[#1F251A] truncate">
+                          {(() => {
+                            const creator = employeesList.find(emp => emp.id === viewingBooking.createdByEmployeeId);
+                            if (creator) {
+                              return creator.name;
+                            }
+                            return viewingBooking.isManual ? "Employee" : "Website (Patient)";
+                          })()}
+                        </p>
+                      </div>
                   </div>
 
                   {/* Price Details */}
