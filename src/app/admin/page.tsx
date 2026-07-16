@@ -111,6 +111,7 @@ type Req = {
   amountLeft?: number | null;
   roomId?: string | null;
   rooms?: string[];
+  createdByEmployeeId?: string | null;
 };
 
 function getStatusBadgeClass(status: string): string {
@@ -1783,10 +1784,10 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    if (activeNav === "Profile" || ((activeNav === "Role Management" || activeNav === "Employees") && adminRole === "superadmin")) {
+    if (session && (employeesList.length === 0 || activeNav === "Profile" || activeNav === "Employees" || activeNav === "Role Management")) {
       fetchRolesAndEmployees();
     }
-  }, [activeNav, adminRole]);
+  }, [session, activeNav, employeesList.length]);
 
   useEffect(() => {
     if (!adminEmail || employeesList.length === 0) return;
@@ -18575,7 +18576,7 @@ export default function AdminPage() {
                 <div className="space-y-6">
                   
                   {/* Service & Date & Session Type */}
-                  <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICE</p>
                       <p className="mt-1 text-base font-semibold text-[#1F251A]">{serviceNames}</p>
@@ -18605,6 +18606,31 @@ export default function AdminPage() {
                        >
                          <option value="in_person">In Person / في العيادة</option>
                          <option value="online">Online / أونلاين</option>
+                       </select>
+                     </div>
+                     <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 flex flex-col justify-between">
+                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-1">ACCOUNTED TO</p>
+                       <select
+                         value={viewingBooking.createdByEmployeeId || ""}
+                         disabled={!hasPermission("bookings.edit")}
+                         onChange={async (e) => {
+                           const newEmpId = e.target.value || null;
+                           await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                             method: "PATCH",
+                             headers: { "Content-Type": "application/json" },
+                             body: JSON.stringify({ createdByEmployeeId: newEmpId })
+                           });
+                           setViewingBooking(prev => prev ? { ...prev, createdByEmployeeId: newEmpId } : null);
+                           fetchAllReservations();
+                         }}
+                         className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                       >
+                         <option value="">None (Website/Other)</option>
+                         {employeesList.map((emp) => (
+                           <option key={emp.id} value={emp.id}>
+                             {emp.name} ({emp.role})
+                           </option>
+                         ))}
                        </select>
                      </div>
                   </div>
