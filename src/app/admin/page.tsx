@@ -1043,7 +1043,7 @@ export default function AdminPage() {
   const [serviceNameAr, setServiceNameAr] = useState("");
   const [serviceCategory, setServiceCategory] = useState("");
   const [serviceDuration, setServiceDuration] = useState("1:00 Hours");
-  const [serviceUnitType, setServiceUnitType] = useState("Session");
+  const [serviceUnitType, setServiceUnitType] = useState("both");
   const [serviceDescEn, setServiceDescEn] = useState("");
   const [serviceDescAr, setServiceDescAr] = useState("");
   const [serviceSortOrder, setServiceSortOrder] = useState(0);
@@ -1087,7 +1087,11 @@ export default function AdminPage() {
     setServiceNameEn(svc.en);
     setServiceNameAr(svc.ar || "");
     setServiceDuration(svc.duration || "1:00 Hours");
-    setServiceUnitType(svc.unit ? (svc.unit.charAt(0).toUpperCase() + svc.unit.slice(1)) : "Session");
+    let unitTypeVal = svc.unit || "both";
+    if (unitTypeVal !== "in_clinic" && unitTypeVal !== "online" && unitTypeVal !== "both") {
+      unitTypeVal = "both";
+    }
+    setServiceUnitType(unitTypeVal);
     setServiceDescEn(svc.descriptionEn || "");
     setServiceDescAr(svc.descriptionAr || "");
     setServiceSortOrder(svc.sortOrder ?? 0);
@@ -1431,6 +1435,19 @@ export default function AdminPage() {
       setNewPatientCreatedByEmployeeId(adminDbId);
     }
   }, [showAddBookingModal, adminDbId]);
+
+  // Synchronize manual booking service selection and session type
+  useEffect(() => {
+    const selectedSvc = localServices.find(s => s.id === newPatientService);
+    if (selectedSvc) {
+      const allowedType = selectedSvc.unit?.toLowerCase() || "both";
+      if (allowedType === "in_clinic") {
+        setNewPatientSessionType("in_person");
+      } else if (allowedType === "online") {
+        setNewPatientSessionType("online");
+      }
+    }
+  }, [newPatientService, localServices]);
   const filteredReservations = useMemo(() => {
     return allReservations.filter((r) => {
       const matchStatus = statusFilter === "All" || r.status === statusFilter;
@@ -6838,7 +6855,7 @@ export default function AdminPage() {
                               setServiceNameEn("");
                               setServiceNameAr("");
                               setServiceDuration("1:00 Hours");
-                              setServiceUnitType("Session");
+                              setServiceUnitType("both");
                               setServiceDescEn("");
                               setServiceDescAr("");
                               setServiceSortOrder(0);
@@ -7307,20 +7324,19 @@ export default function AdminPage() {
                           </select>
                         </div>
 
-                        {/* Unit Type */}
+                        {/* Session Type */}
                         <div>
                           <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                            Unit Type <span className="text-red-500">*</span>
+                            Session Type <span className="text-red-500">*</span>
                           </label>
                           <select
                             value={serviceUnitType}
                             onChange={(e) => setServiceUnitType(e.target.value)}
                             className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                           >
-                            <option value="Session">Session</option>
-                            <option value="Hour">Hour</option>
-                            <option value="Treatment">Treatment</option>
-                            <option value="Package">Package</option>
+                            <option value="in_clinic">In-Clinic Only</option>
+                            <option value="online">Online Only</option>
+                            <option value="both">Both (In-Clinic & Online)</option>
                           </select>
                         </div>
 
@@ -19762,8 +19778,18 @@ export default function AdminPage() {
                     onChange={(e) => setNewPatientSessionType(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
                   >
-                    <option value="in_person">In Person / في العيادة</option>
-                    <option value="online">Online / أونلاين</option>
+                    {(() => {
+                      const selectedSvc = localServices.find(s => s.id === newPatientService);
+                      const allowedType = selectedSvc?.unit?.toLowerCase() || "both";
+                      const showInClinic = allowedType === "both" || allowedType === "in_clinic";
+                      const showOnline = allowedType === "both" || allowedType === "online";
+                      return (
+                        <>
+                          {showInClinic && <option value="in_person">In Person / في العيادة</option>}
+                          {showOnline && <option value="online">Online / أونلاين</option>}
+                        </>
+                      );
+                    })()}
                   </select>
                 </div>
               </div>

@@ -159,6 +159,14 @@ export function BookingModal() {
         const selected = svcs.find((service) => service.id === id);
         const cats = getDynamicCategories();
         setSelectedCategory(selected?.cat ?? cats[0]?.key ?? "dermatology");
+        if (selected) {
+          const allowedType = selected.unit?.toLowerCase() || "both";
+          if (allowedType === "in_clinic") {
+            setSessionType("in_person");
+          } else if (allowedType === "online") {
+            setSessionType("online");
+          }
+        }
       } else {
         const cats = getDynamicCategories();
         setSelectedCategory(cats[0]?.key ?? "dermatology");
@@ -192,6 +200,22 @@ export function BookingModal() {
 
   // Derived from dynamicServices — must be declared before useEffects that depend on it
   const selectedService = serviceId ? dynamicServices.find((service) => service.id === serviceId) : undefined;
+
+  // Clear serviceId if it doesn't support the selected sessionType
+  useEffect(() => {
+    if (serviceId !== null) {
+      const selected = dynamicServices.find(s => s.id === serviceId);
+      if (selected) {
+        const allowedType = selected.unit?.toLowerCase() || "both";
+        const isValidForSession = sessionType === "online" 
+          ? (allowedType === "online" || allowedType === "both")
+          : (allowedType === "in_clinic" || allowedType === "both");
+        if (!isValidForSession) {
+          setServiceId(null);
+        }
+      }
+    }
+  }, [sessionType, serviceId, dynamicServices]);
 
   useEffect(() => {
     setServiceToggles(getServiceToggles());
@@ -622,7 +646,15 @@ Attached is my payment transaction receipt photo.`;
 
   // Filter out services that admin marked as inactive or hidden
   const activeServices = dynamicServices.filter(s => isServiceActive(s.id, serviceToggles));
-  const servicesForCategory = activeServices.filter((service) => service.cat === selectedCategory);
+  const servicesForCategory = activeServices.filter((service) => {
+    if (service.cat !== selectedCategory) return false;
+    const serviceType = service.unit?.toLowerCase() || "both";
+    if (sessionType === "online") {
+      return serviceType === "online" || serviceType === "both";
+    } else {
+      return serviceType === "in_clinic" || serviceType === "both";
+    }
+  });
 
   const canNext =
     (step === 1 && serviceId !== null && (branches.length === 0 || branchId !== null)) ||
