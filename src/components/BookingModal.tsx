@@ -86,6 +86,14 @@ export function BookingModal() {
   const [notes, setNotes] = useState("");
   const [isWhatsappSame, setIsWhatsappSame] = useState(true);
   const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [serviceHours, setServiceHours] = useState<any[]>([]);
+
+  // Update serviceHours when translations load
+  useEffect(() => {
+    if (t.footer?.serviceHours) {
+      setServiceHours(t.footer.serviceHours);
+    }
+  }, [t]);
   const [sessionType, setSessionType] = useState<"in_person" | "online">("in_person");
   const [confirmed, setConfirmed] = useState(false);
   const [disabledDates, setDisabledDates] = useState<Record<string, number>>({});
@@ -277,6 +285,9 @@ export function BookingModal() {
         if (data && data.booking && data.booking.termsText) {
           setTermsText(data.booking.termsText);
         }
+        if (data && data.footer && Array.isArray(data.footer.serviceHours)) {
+          setServiceHours(data.footer.serviceHours);
+        }
       })
       .catch(() => {});
   }, []);
@@ -386,7 +397,7 @@ export function BookingModal() {
     const selectedBranch = branches.find(b => b.id === branchId);
     const activeHours = selectedBranch && Array.isArray(selectedBranch.service_hours) && selectedBranch.service_hours.length > 0
       ? selectedBranch.service_hours
-      : (t.footer?.serviceHours || []);
+      : (serviceHours.length > 0 ? serviceHours : (t.footer?.serviceHours || []));
 
     const clinicDay = activeHours.find(
       (sh: any) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
@@ -954,7 +965,9 @@ Attached is my payment transaction receipt photo.`;
                     const isSelected =
                       selectedDate?.toDateString() === day.toDateString();
                     const key = toLocalDateStr(day);
-                    const isDisabled = (disabledDates[key] ?? 0) >= 8;
+                    const hours = getDayOperatingHours(day);
+                    const isClosed = hours.start === "23:59" && hours.end === "23:59";
+                    const isDisabled = ((disabledDates[key] ?? 0) >= 8) || isClosed;
                     return (
                       <button
                         key={i}
