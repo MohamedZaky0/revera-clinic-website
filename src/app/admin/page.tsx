@@ -1425,6 +1425,8 @@ export default function AdminPage() {
   const [newPatientEmail, setNewPatientEmail] = useState("");
   const [newPatientPhone, setNewPatientPhone] = useState("");
   const [newPatientDate, setNewPatientDate] = useState("");
+  const [isManualWhatsappSame, setIsManualWhatsappSame] = useState(true);
+  const [newPatientWhatsapp, setNewPatientWhatsapp] = useState("");
   const [newPatientTimeSlot, setNewPatientTimeSlot] = useState("12:00");
   const [newPatientService, setNewPatientService] = useState<number>(1);
   const [newPatientSessionType, setNewPatientSessionType] = useState("in_person");
@@ -5726,6 +5728,17 @@ export default function AdminPage() {
       alert("Please enter a valid Egyptian mobile number (must be 11 digits and start with 010, 011, 012, or 015).");
       return;
     }
+    if (!isManualWhatsappSame) {
+      const cleanedWA = newPatientWhatsapp.trim();
+      if (!/^01[0125]\d{8}$/.test(cleanedWA)) {
+        alert("Please enter a valid Egyptian mobile number for WhatsApp (must be 11 digits and start with 010, 011, 012, or 015).");
+        return;
+      }
+    }
+
+    const finalNotes = isManualWhatsappSame 
+      ? newPatientNotes 
+      : `${newPatientNotes ? newPatientNotes + "\n" : ""}[WhatsApp: ${newPatientWhatsapp}]`;
 
     const payload = {
       serviceId: Number(newPatientService),
@@ -5734,7 +5747,7 @@ export default function AdminPage() {
       name: newPatientName,
       email: newPatientEmail,
       phone: newPatientPhone,
-      notes: newPatientNotes,
+      notes: finalNotes,
       sessionType: newPatientSessionType,
       status: newPatientStatus,
       timeSlot: newPatientStatus === 'approved' ? newPatientTimeSlot : null,
@@ -5783,6 +5796,8 @@ export default function AdminPage() {
       setNewPatientDoctor("Dr. Sara El Gamel");
       setNewPatientNotes("");
       setNewPatientStatus("approved");
+      setIsManualWhatsappSame(true);
+      setNewPatientWhatsapp("");
       setNewPatientCreatedByEmployeeId(adminDbId || "");
 
       setShowAddBookingModal(false);
@@ -19855,8 +19870,33 @@ export default function AdminPage() {
                   placeholder="Enter phone (e.g. 01012345678)"
                   value={newPatientPhone}
                   onChange={(e) => handleManualPhoneChange(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] mb-2"
                 />
+                
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#414E36]">
+                    <input
+                      type="checkbox"
+                      checked={isManualWhatsappSame}
+                      onChange={(e) => setIsManualWhatsappSame(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36]"
+                    />
+                    <span>This phone number is also their WhatsApp number</span>
+                  </label>
+                  {!isManualWhatsappSame && (
+                    <div className="animate-fadeIn">
+                      <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">WhatsApp Number *</label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="Enter WhatsApp number"
+                        value={newPatientWhatsapp}
+                        onChange={(e) => setNewPatientWhatsapp(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#fff] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* 2. Patient Name and Email side-by-side */}

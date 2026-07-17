@@ -84,6 +84,8 @@ export function BookingModal() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState("");
+  const [isWhatsappSame, setIsWhatsappSame] = useState(true);
+  const [whatsappNumber, setWhatsappNumber] = useState("");
   const [sessionType, setSessionType] = useState<"in_person" | "online">("in_person");
   const [confirmed, setConfirmed] = useState(false);
   const [disabledDates, setDisabledDates] = useState<Record<string, number>>({});
@@ -558,11 +560,14 @@ export function BookingModal() {
 
   function handleConfirm() {
     if (!serviceId || !selectedDate || !selectedTime || !name || !email || !phone) return;
+    const finalNotes = isWhatsappSame 
+      ? notes 
+      : `${notes ? notes + "\n" : ""}[WhatsApp: ${whatsappNumber}]`;
     const payload = {
       serviceId,
       date: toLocalDateStr(selectedDate),
       requestedTime: selectedTime,
-      name, email, phone, notes,
+      name, email, phone, notes: finalNotes,
       sessionType,
       branchId,
       doctorName: selectedDoctor || null,
@@ -611,7 +616,7 @@ export function BookingModal() {
 
 I have paid the reservation deposit for my booking:
 • Patient: ${name}
-• Phone: ${phone}
+• Phone: ${phone}${isWhatsappSame ? "" : ` (WhatsApp: ${whatsappNumber})`}
 • Service: ${svcName}
 • Date: ${formattedDate} at ${selectedTime}
 • Deposit Amount: EGP ${depAmount}
@@ -1104,7 +1109,33 @@ Attached is my payment transaction receipt photo.`;
                 <label className="block mb-1 text-xs font-semibold">Email</label>
                 <input className="cr-input mb-2" value={email} onChange={(e)=>setEmail(e.target.value)} />
                 <label className="block mb-1 text-xs font-semibold">Phone</label>
-                <input className="cr-input mb-4" value={phone} onChange={(e)=>setPhone(e.target.value)} />
+                <input className="cr-input mb-2" value={phone} onChange={(e)=>setPhone(e.target.value)} />
+
+                <div className="mb-4 space-y-2 text-left">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-[#414E36]">
+                    <input 
+                      type="checkbox" 
+                      checked={isWhatsappSame} 
+                      onChange={(e) => setIsWhatsappSame(e.target.checked)} 
+                      className="h-4 w-4 rounded accent-[#414E36]"
+                    />
+                    <span>{isRTL ? "هذا الرقم هو رقم الواتساب الخاص بي أيضاً" : "This number is also my WhatsApp number"}</span>
+                  </label>
+
+                  {!isWhatsappSame && (
+                    <div className="animate-fadeIn mt-2">
+                      <label className="block mb-1 text-xs font-semibold">{isRTL ? "رقم الواتساب" : "WhatsApp Number"}</label>
+                      <input 
+                        type="tel" 
+                        required 
+                        placeholder={isRTL ? "أدخل رقم الواتساب" : "Enter WhatsApp number"} 
+                        className="cr-input" 
+                        value={whatsappNumber} 
+                        onChange={(e) => setWhatsappNumber(e.target.value)} 
+                      />
+                    </div>
+                  )}
+                </div>
 
                 {/* Terms & Conditions Gate */}
                 {termsText.trim() && depositPercentage === 0 && (
