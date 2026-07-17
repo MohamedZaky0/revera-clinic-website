@@ -1752,8 +1752,9 @@ export default function AdminPage() {
       setSetupError("Passwords do not match.");
       return;
     }
-    if (setupPassword.length < 6) {
-      setSetupError("Password must be at least 6 characters.");
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])[A-Za-z\d[^A-Za-z0-9]]{8,}$/;
+    if (!strongPasswordRegex.test(setupPassword)) {
+      setSetupError("Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g. @$!%*?&#).");
       return;
     }
 
@@ -4288,8 +4289,9 @@ export default function AdminPage() {
       setProfilePasswordError("Passwords do not match.");
       return;
     }
-    if (profilePassword.length < 6) {
-      setProfilePasswordError("Password must be at least 6 characters.");
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])[A-Za-z\d[^A-Za-z0-9]]{8,}$/;
+    if (!strongPasswordRegex.test(profilePassword)) {
+      setProfilePasswordError("Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g. @$!%*?&#).");
       return;
     }
 
@@ -12612,9 +12614,33 @@ export default function AdminPage() {
                           required
                           value={profilePassword}
                           onChange={(e) => setProfilePassword(e.target.value)}
-                          placeholder="At least 6 characters"
+                          placeholder="At least 8 characters"
                           className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
                         />
+                        {profilePassword && (
+                  <div className="mt-2 text-xs space-y-1 font-semibold text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                      <span className={profilePassword.length >= 8 ? "text-green-600" : ""}>
+                        {profilePassword.length >= 8 ? "✓" : "○"} At least 8 characters
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/[A-Z]/.test(profilePassword) && /[a-z]/.test(profilePassword) ? "text-green-600" : ""}>
+                        {/[A-Z]/.test(profilePassword) && /[a-z]/.test(profilePassword) ? "✓" : "○"} Uppercase & lowercase letters
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/\d/.test(profilePassword) ? "text-green-600" : ""}>
+                        {/\d/.test(profilePassword) ? "✓" : "○"} At least one number
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/[^A-Za-z0-9]/.test(profilePassword) ? "text-green-600" : ""}>
+                        {/[^A-Za-z0-9]/.test(profilePassword) ? "✓" : "○"} At least one special character (e.g. @$!%*?&#)
+                      </span>
+                    </div>
+                  </div>
+                )}
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Confirm New Password</label>
@@ -21830,11 +21856,35 @@ export default function AdminPage() {
                       type="password"
                       value={setupPassword}
                       onChange={(e) => setSetupPassword(e.target.value)}
-                      placeholder="At least 6 characters"
+                      placeholder="At least 8 characters"
                       className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
                       disabled={setupLoading}
                       autoFocus
                     />
+                    {setupPassword && (
+                  <div className="mt-2 text-xs space-y-1 font-semibold text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                      <span className={setupPassword.length >= 8 ? "text-green-600" : ""}>
+                        {setupPassword.length >= 8 ? "✓" : "○"} At least 8 characters
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "text-green-600" : ""}>
+                        {/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "✓" : "○"} Uppercase & lowercase letters
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/\d/.test(setupPassword) ? "text-green-600" : ""}>
+                        {/\d/.test(setupPassword) ? "✓" : "○"} At least one number
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/[^A-Za-z0-9]/.test(setupPassword) ? "text-green-600" : ""}>
+                        {/[^A-Za-z0-9]/.test(setupPassword) ? "✓" : "○"} At least one special character (e.g. @$!%*?&#)
+                      </span>
+                    </div>
+                  </div>
+                )}
                   </div>
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-2">

@@ -90,8 +90,9 @@ function SetupContent() {
       setError("Passwords do not match.");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])[A-Za-z\d[^A-Za-z0-9]]{8,}$/;
+    if (!strongPasswordRegex.test(password)) {
+      setError("Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g. @$!%*?&#).");
       return;
     }
 
@@ -213,11 +214,35 @@ function SetupContent() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 characters"
                   className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-3 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
                   disabled={loading}
                   autoFocus
                 />
+                {password && (
+                  <div className="mt-2 text-xs space-y-1 font-semibold text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                      <span className={password.length >= 8 ? "text-green-600" : ""}>
+                        {password.length >= 8 ? "✓" : "○"} At least 8 characters
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/[A-Z]/.test(password) && /[a-z]/.test(password) ? "text-green-600" : ""}>
+                        {/[A-Z]/.test(password) && /[a-z]/.test(password) ? "✓" : "○"} Uppercase & lowercase letters
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/\d/.test(password) ? "text-green-600" : ""}>
+                        {/\d/.test(password) ? "✓" : "○"} At least one number
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/[^A-Za-z0-9]/.test(password) ? "text-green-600" : ""}>
+                        {/[^A-Za-z0-9]/.test(password) ? "✓" : "○"} At least one special character (e.g. @$!%*?&#)
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
