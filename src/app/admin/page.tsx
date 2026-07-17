@@ -1446,7 +1446,10 @@ export default function AdminPage() {
   useEffect(() => {
     const selectedSvc = localServices.find(s => s.id === newPatientService);
     if (selectedSvc) {
-      const allowedType = selectedSvc.unit?.toLowerCase() || "both";
+      let allowedType = selectedSvc.unit?.toLowerCase() || "both";
+      if (allowedType !== "both" && allowedType !== "in_clinic" && allowedType !== "online") {
+        allowedType = "both";
+      }
       if (allowedType === "in_clinic") {
         setNewPatientSessionType("in_person");
       } else if (allowedType === "online") {
@@ -19943,7 +19946,10 @@ export default function AdminPage() {
                   >
                     {(() => {
                       const selectedSvc = localServices.find(s => s.id === newPatientService);
-                      const allowedType = selectedSvc?.unit?.toLowerCase() || "both";
+                      let allowedType = selectedSvc?.unit?.toLowerCase() || "both";
+                      if (allowedType !== "both" && allowedType !== "in_clinic" && allowedType !== "online") {
+                        allowedType = "both";
+                      }
                       const showInClinic = allowedType === "both" || allowedType === "in_clinic";
                       const showOnline = allowedType === "both" || allowedType === "online";
                       return (

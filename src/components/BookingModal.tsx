@@ -160,7 +160,10 @@ export function BookingModal() {
         const cats = getDynamicCategories();
         setSelectedCategory(selected?.cat ?? cats[0]?.key ?? "dermatology");
         if (selected) {
-          const allowedType = selected.unit?.toLowerCase() || "both";
+          let allowedType = selected.unit?.toLowerCase() || "both";
+          if (allowedType !== "both" && allowedType !== "in_clinic" && allowedType !== "online") {
+            allowedType = "both";
+          }
           if (allowedType === "in_clinic") {
             setSessionType("in_person");
           } else if (allowedType === "online") {
@@ -206,7 +209,10 @@ export function BookingModal() {
     if (serviceId !== null) {
       const selected = dynamicServices.find(s => s.id === serviceId);
       if (selected) {
-        const allowedType = selected.unit?.toLowerCase() || "both";
+        let allowedType = selected.unit?.toLowerCase() || "both";
+        if (allowedType !== "both" && allowedType !== "in_clinic" && allowedType !== "online") {
+          allowedType = "both";
+        }
         const isValidForSession = sessionType === "online" 
           ? (allowedType === "online" || allowedType === "both")
           : (allowedType === "in_clinic" || allowedType === "both");
@@ -648,7 +654,10 @@ Attached is my payment transaction receipt photo.`;
   const activeServices = dynamicServices.filter(s => isServiceActive(s.id, serviceToggles));
   const servicesForCategory = activeServices.filter((service) => {
     if (service.cat !== selectedCategory) return false;
-    const serviceType = service.unit?.toLowerCase() || "both";
+    let serviceType = service.unit?.toLowerCase() || "both";
+    if (serviceType !== "both" && serviceType !== "in_clinic" && serviceType !== "online") {
+      serviceType = "both";
+    }
     if (sessionType === "online") {
       return serviceType === "online" || serviceType === "both";
     } else {
