@@ -17,6 +17,7 @@ import {
 import { compressImage } from "@/lib/image";
 import { Branch } from "@/types";
 import {
+  AlarmClock,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
@@ -37,6 +38,7 @@ import {
   FileText,
   Filter,
   Info,
+  Hourglass,
   Layers,
   LogOut,
   MessageSquare,
@@ -580,6 +582,10 @@ export default function AdminPage() {
   const { isRTL } = useLanguage();
   // Auth state
   const [session, setSession] = useState<any>(null);
+  // Inactivity Settings State
+  const [inactivityThreshold, setInactivityThreshold] = useState<number>(30);
+  const [inactivityCountdown, setInactivityCountdown] = useState<number>(10);
+  const [savingInactivitySettings, setSavingInactivitySettings] = useState(false);
   // Rooms state
   const [rooms, setRooms] = useState<any[]>([]);
 
@@ -805,6 +811,7 @@ export default function AdminPage() {
   const [employeeFilterShift, setEmployeeFilterShift] = useState("All");
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const [viewingEmployee, setViewingEmployee] = useState<any | null>(null);
+  const [employeeProfileActiveTab, setEmployeeProfileActiveTab] = useState<string>("basic");
   const [editingEmployee, setEditingEmployee] = useState<any | null>(null);
   const [isEditingEmployeeModalOpen, setIsEditingEmployeeModalOpen] = useState(false);
   const [newEmployeeRequiredTargetAmount, setNewEmployeeRequiredTargetAmount] = useState("0");
@@ -1076,7 +1083,7 @@ export default function AdminPage() {
   } | null>(null);
   const [promoServiceIds, setPromoServiceIds] = useState<number[]>([]);
   const [promoServiceSearch, setPromoServiceSearch] = useState<string>("");
-  const [promoBranchName, setPromoBranchName] = useState<string>("");
+  const [promoBranchNames, setPromoBranchNames] = useState<string[]>([]);
   const [promoType, setPromoType] = useState<"percentage" | "fixed">("percentage");
   const [promoValue, setPromoValue] = useState<number>(0);
   const [promoStartDate, setPromoStartDate] = useState<string>("");
@@ -1168,7 +1175,7 @@ export default function AdminPage() {
   };
 
   const handleSavePromotion = () => {
-    if ((promoServiceIds.length === 0 && !editingPromo) || !promoBranchName) return;
+    if ((promoServiceIds.length === 0 && !editingPromo) || promoBranchNames.length === 0) return;
 
     const promoObj = {
       enabled: true,
@@ -1182,6 +1189,9 @@ export default function AdminPage() {
       ? [editingPromo.serviceId]
       : promoServiceIds;
 
+    // Apply promotion to ALL selected branches
+    const branchesToApply = promoBranchNames;
+
     const updatedServices = localServices.map(svc => {
       if (serviceIdsToUpdate.includes(svc.id)) {
         // Build branchPricing: use existing or create entry from global branches
@@ -1189,13 +1199,16 @@ export default function AdminPage() {
           ? [...svc.branchPricing]
           : branches.map(b => ({ name: b.name_en, price: svc.price ?? 0, visible: true, status: true, isDefault: false }));
 
-        const branchExists = bpArray.some(bp => bp.name.toLowerCase() === promoBranchName.toLowerCase());
-        if (!branchExists) {
-          bpArray.push({ name: promoBranchName, price: svc.price ?? 0, visible: true, status: true, isDefault: false });
-        }
+        // Ensure all selected branches exist in bpArray
+        branchesToApply.forEach(branchName => {
+          const branchExists = bpArray.some(bp => bp.name.toLowerCase() === branchName.toLowerCase());
+          if (!branchExists) {
+            bpArray.push({ name: branchName, price: svc.price ?? 0, visible: true, status: true, isDefault: false });
+          }
+        });
 
         const updatedBranchPricing = bpArray.map(bp => {
-          if (bp.name.toLowerCase() === promoBranchName.toLowerCase()) {
+          if (branchesToApply.some(b => b.toLowerCase() === bp.name.toLowerCase())) {
             return { ...bp, promotion: promoObj };
           }
           return bp;
@@ -1212,7 +1225,7 @@ export default function AdminPage() {
     // Reset form states
     setPromoServiceIds([]);
     setPromoServiceSearch("");
-    setPromoBranchName("");
+    setPromoBranchNames([]);
     setPromoType("percentage");
     setPromoValue(0);
     setPromoStartDate("");
@@ -1273,7 +1286,7 @@ export default function AdminPage() {
     setEditingPromo(promo);
     setPromoServiceIds([promo.serviceId]);
     setPromoServiceSearch("");
-    setPromoBranchName(promo.branchName);
+    setPromoBranchNames([promo.branchName]);
     setPromoType(promo.promotion.type);
     setPromoValue(promo.promotion.value);
     setPromoStartDate(promo.promotion.startDate || "");
@@ -1684,6 +1697,7 @@ export default function AdminPage() {
           "Branches": "settings.branches",
           "Booking Settings": "settings.booking_settings",
           "Deposit Settings": "settings.booking_settings",
+          "Inactivity Settings": "settings.booking_settings",
           "Notification Settings": "settings.notification",
           "Queue Settings": "settings.queue",
           "Pages Settings": "settings.pages",
@@ -2063,7 +2077,7 @@ export default function AdminPage() {
     );
   }, [adminEmail, session, adminRole, adminDbId]);
 
-  // 30-minute Presence Monitor for standard staff
+  // Inactivity Presence Monitor for standard staff
   useEffect(() => {
     if (!session || !adminRole) return;
     // Only for standard employees (not superadmin, admin, or HR)
@@ -2073,15 +2087,19 @@ export default function AdminPage() {
     if (!profileEmployee) return;
 
     const isTestMode = typeof window !== "undefined" && window.location.search.includes("test_presence=true");
-    const intervalMs = isTestMode ? 15000 : 30 * 60 * 1000;
+    const thresholdMs = isTestMode ? 15000 : inactivityThreshold * 60 * 1000;
+    const checkIntervalMs = isTestMode ? 1000 : 5000;
 
     const interval = setInterval(() => {
-      setPresenceCountdown(10);
-      setPresenceModalOpen(true);
-    }, intervalMs);
+      const elapsed = Date.now() - lastActivityRef.current;
+      if (elapsed >= thresholdMs && !presenceModalOpen) {
+        setPresenceCountdown(inactivityCountdown);
+        setPresenceModalOpen(true);
+      }
+    }, checkIntervalMs);
 
     return () => clearInterval(interval);
-  }, [session, adminRole, adminEmail, employeesList]);
+  }, [session, adminRole, adminEmail, employeesList, inactivityThreshold, inactivityCountdown, presenceModalOpen]);
 
   // Presence countdown timer logic
   useEffect(() => {
@@ -2746,6 +2764,7 @@ export default function AdminPage() {
       "Branches": "settings.branches",
       "Booking Settings": "settings.booking_settings",
       "Deposit Settings": "settings.booking_settings",
+      "Inactivity Settings": "settings.booking_settings",
       "Notification Settings": "settings.notification",
       "Queue Settings": "settings.queue",
       "Pages Settings": "settings.pages",
@@ -3158,6 +3177,8 @@ export default function AdminPage() {
   const [instapayAddress, setInstapayAddress] = useState("name@instapay");
   const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
   const [savingDepositSettings, setSavingDepositSettings] = useState(false);
+
+
 
   // ── Notification Settings State ──
   const [notifSmsOtp, setNotifSmsOtp] = useState(true);
@@ -4231,6 +4252,11 @@ export default function AdminPage() {
           if (data.booking) {
             setTermsText(data.booking.termsText || "");
           }
+
+          if (data.inactivity) {
+            setInactivityThreshold(data.inactivity.threshold ?? 30);
+            setInactivityCountdown(data.inactivity.countdown ?? 10);
+          }
         }
       })
       .catch((err) => console.error("fetchPageSettings error:", err))
@@ -4386,6 +4412,34 @@ export default function AdminPage() {
       alert("Error saving deposit settings.");
     } finally {
       setSavingDepositSettings(false);
+    }
+  }
+
+  async function handleSaveInactivitySettings() {
+    setSavingInactivitySettings(true);
+    try {
+      const res = await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inactivity: {
+            threshold: Number(inactivityThreshold),
+            countdown: Number(inactivityCountdown)
+          }
+        }),
+      });
+      if (res.ok) {
+        alert("Inactivity settings saved successfully!");
+        clearFetchCache();
+        fetchPageSettings();
+      } else {
+        alert("Failed to save inactivity settings.");
+      }
+    } catch (err) {
+      console.error("handleSaveInactivitySettings error:", err);
+      alert("Error saving inactivity settings.");
+    } finally {
+      setSavingInactivitySettings(false);
     }
   }
 
@@ -6321,6 +6375,7 @@ export default function AdminPage() {
                           { label: "Rooms", icon: DoorOpen, perm: "settings.rooms" },
                           { label: "Booking Settings", icon: CalendarDays, perm: "settings.booking_settings" },
                           { label: "Deposit Settings", icon: CreditCard, perm: "settings.booking_settings" },
+                          { label: "Inactivity Settings", icon: Hourglass, perm: "settings.booking_settings" },
                           { label: "Notification Settings", icon: Bell, perm: "settings.notification" },
                           { label: "Queue Settings", icon: ListOrdered, perm: "settings.queue" },
                           { label: "Pages Settings", icon: FileText, perm: "settings.pages" },
@@ -7684,7 +7739,7 @@ export default function AdminPage() {
                       setEditingPromo(null);
                       setPromoServiceIds([]);
                       setPromoServiceSearch("");
-                      setPromoBranchName("");
+                      setPromoBranchNames([]);
                       setPromoType("percentage");
                       setPromoValue(0);
                       setPromoStartDate("");
@@ -7974,7 +8029,7 @@ export default function AdminPage() {
                                           setPromoServiceIds(prev =>
                                             checked ? prev.filter(id => id !== svc.id) : [...prev, svc.id]
                                           );
-                                          setPromoBranchName(""); // reset branch on change
+                                          setPromoBranchNames([]); // reset branches on change
                                         }}
                                         className="accent-[#414E36] h-3.5 w-3.5 rounded"
                                       />
@@ -7994,37 +8049,65 @@ export default function AdminPage() {
                         )}
                       </div>
 
-                      {/* Branch Select — uses global branches, falls back gracefully */}
+                      {/* Multi-Branch Checkbox List */}
                       <div>
-                        <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">
-                          Select Branch <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          value={promoBranchName}
-                          onChange={(e) => setPromoBranchName(e.target.value)}
-                          className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs outline-none transition focus:border-[#C4AE7C] text-[#1F251A] font-medium"
-                        >
-                          <option value="">-- Select Branch --</option>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-xs font-semibold text-[#5A6A51]">
+                            Select Branches <span className="text-red-500">*</span>
+                          </label>
+                          {branches.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (promoBranchNames.length === branches.length) {
+                                  setPromoBranchNames([]);
+                                } else {
+                                  setPromoBranchNames(branches.map(b => b.name_en));
+                                }
+                              }}
+                              className="text-[10px] font-bold text-[#414E36] underline hover:text-[#C4AE7C] transition"
+                            >
+                              {promoBranchNames.length === branches.length ? 'Deselect All' : 'Select All'}
+                            </button>
+                          )}
+                        </div>
+                        <div className="rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] divide-y divide-[#414E36]/10 max-h-40 overflow-y-auto custom-scrollbar">
                           {(() => {
-                            // Use global branches list (from Supabase) as primary source
-                            if (branches.length > 0) {
-                              return branches.map(b => (
-                                <option key={b.id} value={b.name_en}>{b.name_en}</option>
-                              ));
+                            const branchList = branches.length > 0
+                              ? branches.map(b => b.name_en)
+                              : (() => {
+                                  const names = new Set<string>();
+                                  promoServiceIds.forEach(id => {
+                                    const svc = localServices.find(s => s.id === id);
+                                    (svc?.branchPricing || []).forEach(bp => names.add(bp.name));
+                                  });
+                                  return Array.from(names);
+                                })();
+                            if (branchList.length === 0) {
+                              return <p className="px-3 py-2 text-[10px] text-amber-600 font-medium">⚠ No branches found. Configure branches in Settings → Branches first.</p>;
                             }
-                            // Fallback: derive unique branch names from selected services' branchPricing
-                            const names = new Set<string>();
-                            promoServiceIds.forEach(id => {
-                              const svc = localServices.find(s => s.id === id);
-                              (svc?.branchPricing || []).forEach(bp => names.add(bp.name));
+                            return branchList.map(name => {
+                              const checked = promoBranchNames.includes(name);
+                              return (
+                                <label key={name} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-[#EDF1EC]/60 transition">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => {
+                                      setPromoBranchNames(prev =>
+                                        checked ? prev.filter(n => n !== name) : [...prev, name]
+                                      );
+                                    }}
+                                    className="h-3.5 w-3.5 rounded accent-[#414E36]"
+                                  />
+                                  <span className="text-xs font-medium text-[#1F251A]">{name}</span>
+                                </label>
+                              );
                             });
-                            return Array.from(names).map(name => (
-                              <option key={name} value={name}>{name}</option>
-                            ));
                           })()}
-                        </select>
-                        {branches.length === 0 && (
-                          <p className="mt-1 text-[10px] text-amber-600 font-medium">⚠ No branches found. Configure branches in Settings → Branches first.</p>
+                        </div>
+                        {promoBranchNames.length > 0 && (
+                          <p className="mt-1 text-[10px] text-[#5A6A51] font-medium">{promoBranchNames.length} branch{promoBranchNames.length > 1 ? 'es' : ''} selected</p>
                         )}
                       </div>
 
@@ -8094,37 +8177,45 @@ export default function AdminPage() {
                       </div>
 
                       {/* Live Price note — shows for single-service selection only */}
-                      {promoServiceIds.length === 1 && promoBranchName && (() => {
+                      {promoServiceIds.length === 1 && promoBranchNames.length > 0 && (() => {
                         const selectedSvc = localServices.find(s => s.id === promoServiceIds[0]);
                         if (!selectedSvc) return null;
-                        const selectedBp = (selectedSvc.branchPricing || []).find(bp => bp.name.toLowerCase() === promoBranchName.toLowerCase());
-                        const basePrice = selectedBp ? selectedBp.price : (selectedSvc.price || 0);
-                        let calcPrice = promoType === "percentage"
-                          ? basePrice * (1 - promoValue / 100)
-                          : basePrice - promoValue;
-                        const isNegative = calcPrice < 0;
-                        const finalDisplayPrice = Math.max(0, Math.round(calcPrice));
+                        const branchesToPreview = promoBranchNames.includes("All")
+                          ? branches.map(b => b.name_en)
+                          : promoBranchNames;
                         return (
-                          <div className="pt-3 border-t border-[#414E36]/10 space-y-1">
-                            <div className="flex justify-between items-center text-xs font-bold text-[#414E36]">
-                              <span>Preview Selling Price:</span>
-                              <span className={isNegative ? "text-red-500 font-extrabold" : "text-[#C4AE7C]"}>
-                                {finalDisplayPrice} EGP
-                              </span>
+                          <div className="pt-3 border-t border-[#414E36]/10 space-y-1.5">
+                            <div className="text-xs font-bold text-[#414E36] mb-1">Preview Selling Price by Branch / معاينة السعر حسب الفرع:</div>
+                            <div className="max-h-24 overflow-y-auto space-y-1.5 pr-1">
+                              {branchesToPreview.map(branchName => {
+                                const selectedBp = (selectedSvc.branchPricing || []).find(bp => bp.name.toLowerCase() === branchName.toLowerCase());
+                                const basePrice = selectedBp ? selectedBp.price : (selectedSvc.price || 0);
+                                const calcPrice = promoType === "percentage"
+                                  ? basePrice * (1 - promoValue / 100)
+                                  : basePrice - promoValue;
+                                const isNegative = calcPrice < 0;
+                                const finalDisplayPrice = Math.max(0, Math.round(calcPrice));
+                                return (
+                                  <div key={branchName} className="flex justify-between items-center text-xs text-[#1F251A] bg-[#FBFBF9] p-1.5 rounded border border-[#414E36]/5">
+                                    <span className="font-medium text-[#414E36]">{branchName}</span>
+                                    <div className="text-right">
+                                      <span className={isNegative ? "text-red-500 font-extrabold" : "text-[#C4AE7C] font-bold"}>
+                                        {finalDisplayPrice} EGP
+                                      </span>
+                                      <span className="text-[10px] text-[#5A6A51] ml-1.5">(Base: {basePrice} EGP)</span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                            {isNegative && (
-                              <p className="text-[10px] text-red-500 font-bold leading-tight">
-                                ⚠️ Discount exceeds base price ({basePrice} EGP). Will be capped at 0.
-                              </p>
-                            )}
                           </div>
                         );
                       })()}
 
-                      {promoServiceIds.length > 1 && (
+                      {(promoServiceIds.length > 1 || promoBranchNames.length > 1) && (
                         <div className="pt-3 border-t border-[#414E36]/10">
                           <p className="text-[10px] text-[#5A6A51] font-medium">
-                            ℹ This promotion will apply to all <strong>{promoServiceIds.length} selected services</strong> on the <strong>{promoBranchName || "selected"}</strong> branch.
+                            ℹ This promotion will apply to <strong>{editingPromo ? 1 : promoServiceIds.length} service{(!editingPromo && promoServiceIds.length > 1) ? 's' : ''}</strong> across <strong>{promoBranchNames.length > 0 ? promoBranchNames.join(', ') : 'selected'}</strong> branch{promoBranchNames.length > 1 ? 'es' : ''}.
                           </p>
                         </div>
                       )}
@@ -8140,10 +8231,10 @@ export default function AdminPage() {
                         Cancel
                       </button>
                       <button
-                        disabled={(editingPromo ? false : promoServiceIds.length === 0) || !promoBranchName}
+                        disabled={(editingPromo ? false : promoServiceIds.length === 0) || promoBranchNames.length === 0}
                         onClick={handleSavePromotion}
                         className={`rounded-lg px-5 py-2 text-xs font-semibold text-[#FBFBF9] transition ${
-                          (editingPromo ? false : promoServiceIds.length === 0) || !promoBranchName
+                          (editingPromo ? false : promoServiceIds.length === 0) || promoBranchNames.length === 0
                             ? "bg-[#414E36]/50 cursor-not-allowed"
                             : "bg-[#414E36] hover:bg-[#2e3a26]"
                         }`}
@@ -13502,6 +13593,163 @@ export default function AdminPage() {
             </div>
           )}
 
+          {activeNav === "Inactivity Settings" && (
+            <div className="space-y-6">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Inactivity Alert Settings</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Configure when the inactivity warning appears and how long the countdown lasts before an alert is sent.</p>
+                </div>
+                <button
+                  onClick={handleSaveInactivitySettings}
+                  disabled={savingInactivitySettings}
+                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+                >
+                  {savingInactivitySettings ? "Saving..." : "Save Inactivity Settings"}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                {/* Inactivity Threshold */}
+                <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                  <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+                    <div className="h-10 w-10 flex items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+                      <Hourglass size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-[#1F251A]">Inactivity Duration</h3>
+                      <p className="text-xs text-[#5A6A51]">Time of no activity before the alert appears</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">
+                      Alert Threshold (Minutes)
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="range"
+                        min={5}
+                        max={120}
+                        step={5}
+                        value={inactivityThreshold}
+                        onChange={(e) => setInactivityThreshold(Number(e.target.value))}
+                        className="flex-1 accent-[#414E36] h-2 rounded-full cursor-pointer"
+                      />
+                      <div className="w-20 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-center text-sm font-bold text-[#1F251A]">
+                        {inactivityThreshold} min
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-[#8A9A81] mt-2">
+                      If the employee does not move their mouse, type, or interact for <strong>{inactivityThreshold} minutes</strong>, the inactivity warning will appear.
+                    </p>
+                    <div className="mt-4 grid grid-cols-4 gap-2">
+                      {[10, 15, 30, 60].map(val => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setInactivityThreshold(val)}
+                          className={`rounded-xl py-2 text-xs font-semibold transition border ${inactivityThreshold === val ? 'bg-[#414E36] text-white border-[#414E36]' : 'bg-[#F5F5F0] text-[#5A6A51] border-transparent hover:border-[#414E36]/30'}`}
+                        >
+                          {val} min
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Alert Countdown Duration */}
+                <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                  <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+                    <div className="h-10 w-10 flex items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-100">
+                      <Clock size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-[#1F251A]">Alert Countdown Duration</h3>
+                      <p className="text-xs text-[#5A6A51]">How long the employee has to confirm presence</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">
+                      Countdown Duration (Seconds)
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="range"
+                        min={5}
+                        max={60}
+                        step={5}
+                        value={inactivityCountdown}
+                        onChange={(e) => setInactivityCountdown(Number(e.target.value))}
+                        className="flex-1 accent-[#414E36] h-2 rounded-full cursor-pointer"
+                      />
+                      <div className="w-20 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-center text-sm font-bold text-[#1F251A]">
+                        {inactivityCountdown}s
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-[#8A9A81] mt-2">
+                      When the alert appears, the employee has <strong>{inactivityCountdown} seconds</strong> to click &quot;I am Present&quot; before an alert is sent to the administrator.
+                    </p>
+                    <div className="mt-4 grid grid-cols-4 gap-2">
+                      {[5, 10, 30, 60].map(val => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setInactivityCountdown(val)}
+                          className={`rounded-xl py-2 text-xs font-semibold transition border ${inactivityCountdown === val ? 'bg-[#414E36] text-white border-[#414E36]' : 'bg-[#F5F5F0] text-[#5A6A51] border-transparent hover:border-[#414E36]/30'}`}
+                        >
+                          {val}s
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview Card */}
+              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+                <h3 className="text-lg font-bold text-[#1F251A] border-b border-gray-100 pb-4 mb-6">Alert Preview</h3>
+                <div className="flex flex-col md:flex-row gap-8 items-start">
+                  <div className="flex-1 bg-[#FBFBF9] rounded-3xl p-6 border border-[#414E36]/10">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-[#5A6A51] mb-3">How the alert will look to the employee</p>
+                    <div className="rounded-[24px] bg-white border border-[#414E36]/10 p-6 text-center space-y-4 shadow-md max-w-xs mx-auto">
+                      <div className="h-12 w-12 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+                        <Clock size={24} />
+                      </div>
+                      <h4 className="text-lg font-bold text-[#1F251A]">Activity Verification</h4>
+                      <p className="text-xs text-[#5A6A51]">Please verify that you are active at your workstation.</p>
+                      <div className="text-4xl font-bold text-[#414E36]">{inactivityCountdown}s</div>
+                      <p className="text-[10px] text-[#8A9A81]">An inactivity alert will be sent to the administrator.</p>
+                      <div className="rounded-2xl bg-[#414E36] py-2 px-4 text-xs font-bold text-white">✓ I am Present &amp; Working</div>
+                    </div>
+                  </div>
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-start gap-3 rounded-2xl bg-amber-50 border border-amber-100 p-4">
+                      <Hourglass size={16} className="mt-0.5 text-amber-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-[#1F251A]">Alert triggers after {inactivityThreshold} minutes</p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">Mouse movement, keyboard input, clicks, and scrolling all reset the inactivity timer.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 rounded-2xl bg-rose-50 border border-rose-100 p-4">
+                      <Clock size={16} className="mt-0.5 text-rose-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-[#1F251A]">Employee has {inactivityCountdown} seconds to respond</p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">If they do not click &quot;I am Present&quot;, an alert is automatically sent to the administrator.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+                      <Check size={16} className="mt-0.5 text-emerald-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-[#1F251A]">Applies to standard employees only</p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">Admins, HR, and superadmins are exempt from the inactivity monitor.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeNav === "Notification Settings" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -14226,7 +14474,9 @@ export default function AdminPage() {
           {/* ===================== EMPLOYEES SECTION ===================== */}
           {activeNav === "Employees" && adminRole === "superadmin" && (
             <div className="space-y-6 animate-fadeIn">
-              {/* Header */}
+              {!viewingEmployee && !isEditingEmployeeModalOpen && (
+                <>
+                  {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <h2 className="text-4xl font-semibold text-[#1F251A]">Staff &amp; Employees</h2>
@@ -14492,18 +14742,25 @@ export default function AdminPage() {
                   </table>
                 </div>
               </div>
+              </>
+              )}
 
               {/* Add / Edit Employee Modal */}
               {isEditingEmployeeModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-                  <div className="w-full max-w-lg rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.15)] border border-[#414E36]/10 relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <div className="space-y-6 animate-fadeIn">
+                  <div>
                     <button
                       type="button"
-                      onClick={() => setIsEditingEmployeeModalOpen(false)}
-                      className="absolute right-6 top-6 h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition font-bold text-lg"
+                      onClick={() => {
+                        setIsEditingEmployeeModalOpen(false);
+                        setEditingEmployee(null);
+                      }}
+                      className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
                     >
-                      &times;
+                      <ArrowLeft size={14} /> Back to Employees
                     </button>
+                  </div>
+                  <div className="w-full bg-white rounded-3xl border border-[#414E36]/10 p-8 shadow-sm">
                     <h3 className="text-2xl font-bold text-[#1F251A] mb-1">
                       {editingEmployee ? "Edit Employee" : "Add New Employee"}
                     </h3>
@@ -15129,102 +15386,140 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* View Employee Details — Slide-Over Drawer */}
+              {/* View Employee Details — Inline View */}
               {viewingEmployee && (
-                <div
-                  className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-xs transition-opacity duration-300"
-                  onClick={() => setViewingEmployee(null)}
-                >
-                  <div
-                    className="w-full max-w-3xl bg-[#FBFBF9] h-full shadow-2xl flex flex-col animate-slideOver overflow-hidden"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {/* Drawer Header */}
-                    <div className="px-8 pt-6 pb-5 border-b border-[#414E36]/10 bg-[#F9F9F7] shrink-0">
-                      <button
-                        onClick={() => setViewingEmployee(null)}
-                        className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] mb-5 outline-none transition uppercase tracking-wider"
-                      >
-                        <ArrowLeft size={14} /> Back to Employees
-                      </button>
+                <div className="space-y-6 animate-fadeIn">
+                  {/* Back button */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => setViewingEmployee(null)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
+                    >
+                      <ArrowLeft size={14} /> Back to Employees
+                    </button>
+                  </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="h-16 w-16 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl font-bold font-serif shrink-0">
-                            {viewingEmployee.name ? viewingEmployee.name.charAt(0).toUpperCase() : "E"}
-                          </div>
-                          <div>
-                            <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingEmployee.name || "Staff Member"}</h3>
-                            <p className="text-xs text-[#5A6A51] mt-0.5">Employee Profile &amp; Staff Details</p>
-                            <div className="mt-2">
-                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                                viewingEmployee.email_confirmed_at ? "bg-[#EDF1EC] text-[#414E36]" : "bg-amber-50 text-amber-700"
-                              }`}>
-                                <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-[#414E36]" : "bg-amber-500"}`} />
-                                {viewingEmployee.email_confirmed_at ? "Active" : "Pending Invitation"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingEmployee(viewingEmployee);
-                              setNewEmployeeName(viewingEmployee.name || "");
-                              setNewEmployeeEmail(viewingEmployee.email || "");
-                              setNewEmployeeRole(viewingEmployee.role_name || "");
-                              setNewEmployeePhone(viewingEmployee.phone || "");
-                              setNewEmployeeDepartment(viewingEmployee.department || "Reception");
-                              updateShiftState(viewingEmployee.shift || "Day");
-                              setNewEmployeeSalary(String(viewingEmployee.salary || 0));
-                              setNewEmployeeNationalId(viewingEmployee.national_id || "");
-                              setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
-                              setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
-                              applyAddressToState(viewingEmployee.address || "");
-                              const rawContract = viewingEmployee.contract_file || "";
-                              let contractUrl = "";
-                              let additionalList: any[] = [];
-                              try {
-                                if (rawContract.startsWith('{')) {
-                                  const parsed = JSON.parse(rawContract);
-                                  contractUrl = parsed.contract || "";
-                                  additionalList = parsed.additional || [];
-                                } else {
-                                  contractUrl = rawContract;
-                                }
-                              } catch (e) {
-                                contractUrl = rawContract;
-                              }
-                              setNewEmployeeContract(contractUrl);
-                              setNewEmployeeContractName(viewingEmployee.contract_file_name || "");
-                              setNewEmployeeAdditionalFiles(additionalList);
-                              setNewEmployeeRequiredTargetAmount(String(viewingEmployee.requiredTargetAmount || 0));
-                              setNewEmployeeBonusPercentage(String(viewingEmployee.bonusPercentage || 0));
-                              setViewingEmployee(null);
-                              setIsEditingEmployeeModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] transition hover:bg-[#EDF1EC] shadow-sm"
-                          >
-                            <Pencil size={12} /> Edit Profile
-                          </button>
-                          <button className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] bg-white shadow-sm">
-                            <span className="font-bold text-lg">⋮</span>
-                          </button>
+                  {/* Profile Header Banner */}
+                  <div className="bg-white rounded-3xl border border-[#414E36]/10 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div className="h-16 w-16 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl font-bold font-serif shrink-0">
+                        {viewingEmployee.name ? viewingEmployee.name.charAt(0).toUpperCase() : "E"}
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingEmployee.name || "Staff Member"}</h3>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">{viewingEmployee.role_name || "Employee"} • Staff ID: <span className="font-mono">{viewingEmployee.employee_id || "—"}</span></p>
+                        <div className="mt-2">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                            viewingEmployee.email_confirmed_at ? "bg-[#EDF1EC] text-[#414E36]" : "bg-amber-50 text-amber-700"
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-[#414E36]" : "bg-amber-500"}`} />
+                            {viewingEmployee.email_confirmed_at ? "Active" : "Pending Invitation"}
+                          </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Drawer Content */}
-                    <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingEmployee(viewingEmployee);
+                          setNewEmployeeName(viewingEmployee.name || "");
+                          setNewEmployeeEmail(viewingEmployee.email || "");
+                          setNewEmployeeRole(viewingEmployee.role_name || "");
+                          setNewEmployeePhone(viewingEmployee.phone || "");
+                          setNewEmployeeDepartment(viewingEmployee.department || "Reception");
+                          updateShiftState(viewingEmployee.shift || "Day");
+                          setNewEmployeeSalary(String(viewingEmployee.salary || 0));
+                          setNewEmployeeNationalId(viewingEmployee.national_id || "");
+                          setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
+                          setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
+                          applyAddressToState(viewingEmployee.address || "");
+                          const rawContract = viewingEmployee.contract_file || "";
+                          let contractUrl = "";
+                          let additionalList: any[] = [];
+                          try {
+                            if (rawContract.startsWith('{')) {
+                              const parsed = JSON.parse(rawContract);
+                              contractUrl = parsed.contract || "";
+                              additionalList = parsed.additional || [];
+                            } else {
+                              contractUrl = rawContract;
+                            }
+                          } catch (e) {
+                            contractUrl = rawContract;
+                          }
+                          setNewEmployeeContract(contractUrl);
+                          setNewEmployeeContractName(viewingEmployee.contract_file_name || "");
+                          setNewEmployeeAdditionalFiles(additionalList);
+                          setNewEmployeeRequiredTargetAmount(String(viewingEmployee.requiredTargetAmount || 0));
+                          setNewEmployeeBonusPercentage(String(viewingEmployee.bonusPercentage || 0));
+                          setViewingEmployee(null);
+                          setIsEditingEmployeeModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] transition hover:bg-[#EDF1EC] shadow-sm"
+                      >
+                        <Pencil size={12} /> Edit Profile
+                      </button>
+                      
+                      {viewingEmployee.employee_id !== "superadmin" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm("Are you sure you want to revoke access?")) {
+                              handleDeleteEmployee(viewingEmployee.id);
+                              setViewingEmployee(null);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-xs font-bold text-red-600 transition hover:bg-red-50 shadow-sm"
+                        >
+                          <Lock size={12} /> Revoke Access
+                        </button>
+                      )}
 
-                      {/* BASIC INFORMATION */}
-                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintEmployeeProfile(viewingEmployee)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] transition hover:bg-[#EDF1EC] shadow-sm"
+                      >
+                        <Printer size={12} /> Print Profile
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Profile Sub-navigation Tabs */}
+                  <div className="flex border-b border-[#414E36]/10 gap-6 overflow-x-auto pb-px scrollbar-none shrink-0">
+                    {([
+                      { id: "basic", label: "Basic Info" },
+                      { id: "work", label: "Work Details" },
+                      { id: "payroll", label: "Payroll" },
+                      { id: "performance", label: "Target & Performance" },
+                      { id: "attendance", label: "Attendance" },
+                      { id: "contact", label: "Contact Details" },
+                      { id: "documents", label: "Notes & Documents" }
+                    ] as const).map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setEmployeeProfileActiveTab(tab.id)}
+                        className={`pb-3 text-sm font-bold capitalize transition-all border-b-2 -mb-[2px] outline-none whitespace-nowrap ${
+                          employeeProfileActiveTab === tab.id
+                            ? "border-[#414E36] text-[#414E36]"
+                            : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Tab Contents Container */}
+                  <div className="bg-white rounded-3xl border border-[#414E36]/10 p-6 shadow-sm">
+                    {employeeProfileActiveTab === "basic" && (
+                      <div className="space-y-4">
                         <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
                           <User size={16} className="text-[#C4AE7C]" />
                           <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Basic Information</h4>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employee ID</span>
                             <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.employee_id || "—"}</span>
@@ -15233,7 +15528,7 @@ export default function AdminPage() {
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Full Name</span>
                             <span className="font-semibold text-[#1F251A]">{viewingEmployee.name || "—"}</span>
                           </div>
-                          <div className="col-span-2 sm:col-span-1">
+                          <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
                             <span className="font-semibold text-[#1F251A] break-all">{viewingEmployee.email || "—"}</span>
                           </div>
@@ -15250,19 +15545,19 @@ export default function AdminPage() {
                             </div>
                           </div>
                           <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Account Status</span>
-                            <span className={`inline-flex items-center gap-1 text-xs font-bold ${viewingEmployee.email_confirmed_at ? "text-green-700" : "text-amber-700"}`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-green-600" : "bg-amber-500"}`} />
-                              {viewingEmployee.email_confirmed_at ? "Active" : "Pending Invitation"}
-                            </span>
-                          </div>
-                          <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Department</span>
                             <div>
                               <span className="inline-block rounded-lg bg-[#C4AE7C]/15 px-2.5 py-0.5 text-xs font-semibold text-[#8B7544]">
                                 {viewingEmployee.department || "Reception"}
                               </span>
                             </div>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Account Status</span>
+                            <span className={`inline-flex items-center gap-1 text-xs font-bold ${viewingEmployee.email_confirmed_at ? "text-green-700" : "text-amber-700"}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-green-600" : "bg-amber-500"}`} />
+                              {viewingEmployee.email_confirmed_at ? "Active" : "Pending Invitation"}
+                            </span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Added On</span>
@@ -15274,14 +15569,15 @@ export default function AdminPage() {
                           </div>
                         </div>
                       </div>
+                    )}
 
-                      {/* WORK INFORMATION */}
-                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                    {employeeProfileActiveTab === "work" && (
+                      <div className="space-y-4">
                         <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
                           <Briefcase size={16} className="text-[#C4AE7C]" />
                           <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Work Information</h4>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Job Title</span>
                             <span className="font-semibold text-[#1F251A]">{viewingEmployee.role_name || "Receptionist"}</span>
@@ -15297,10 +15593,6 @@ export default function AdminPage() {
                             </span>
                           </div>
                           <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Working Days</span>
-                            <span className="font-semibold text-[#1F251A]">Sunday - Thursday</span>
-                          </div>
-                          <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Working Hours</span>
                             <span className="font-semibold text-[#1F251A]">
                               {viewingEmployee.shift === "Night" ? "05:00 PM - 01:00 AM" : "09:00 AM - 05:00 PM"}
@@ -15312,6 +15604,25 @@ export default function AdminPage() {
                               {viewingEmployee.shift === "Night" ? "09:00 PM - 10:00 PM" : "01:00 PM - 02:00 PM"}
                             </span>
                           </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employment Type</span>
+                            <div>
+                              <span className="inline-block rounded-lg bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-0.5 text-xs font-semibold text-[#5A6A51]">
+                                Full Time
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {employeeProfileActiveTab === "payroll" && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
+                          <CircleDollarSign size={16} className="text-[#C4AE7C]" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Payroll &amp; Compensation</h4>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Monthly Salary</span>
                             <span className="font-semibold text-[#1F251A]">{Number(viewingEmployee.salary || 0).toLocaleString()} EGP</span>
@@ -15329,44 +15640,6 @@ export default function AdminPage() {
                             </span>
                           </div>
                           <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employment Type</span>
-                            <div>
-                              <span className="inline-block rounded-lg bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-0.5 text-xs font-semibold text-[#5A6A51]">
-                                Full Time
-                              </span>
-                            </div>
-                          </div>
-                          <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Joining Date</span>
-                            <span className="font-semibold text-[#1F251A]">
-                              {viewingEmployee.created_at
-                                ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-                                : "—"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Probation Period</span>
-                            <div>
-                              <span className="inline-block rounded-lg bg-green-50 border border-green-200 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                                Completed
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* PAYROLL INFORMATION */}
-                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
-                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
-                          <CircleDollarSign size={16} className="text-[#C4AE7C]" />
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Payroll Information</h4>
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
-                          <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Basic Salary</span>
-                            <span className="font-semibold text-[#1F251A]">{Number(viewingEmployee.salary || 0).toLocaleString()} EGP</span>
-                          </div>
-                          <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Bonuses</span>
                             <span className="font-semibold text-[#1F251A]">200 EGP</span>
                           </div>
@@ -15375,112 +15648,101 @@ export default function AdminPage() {
                             <span className="font-semibold text-[#1F251A]">150 EGP</span>
                           </div>
                           <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Net Salary</span>
-                            <span className="font-bold text-green-700">
-                              {(Number(viewingEmployee.salary || 0) + 200 - 150).toLocaleString()} EGP
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Payment Status</span>
-                            <div className="flex items-center">
-                              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-0.5 text-xs font-bold text-green-700">
-                                <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
-                                Paid
-                              </span>
-                            </div>
-                          </div>
-                          <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Last Payment Date</span>
                             <span className="font-semibold text-[#1F251A]">May 5, 2026</span>
                           </div>
                         </div>
                       </div>
+                    )}
 
-                      {/* TARGET & PERFORMANCE BONUS */}
-                      {(() => {
-                        const currentMonthStr = new Date().toISOString().slice(0, 7);
-                        const currentMonthBookings = (viewingEmployeeBookings || []).filter((b) => {
-                          const isApprovedOrCompleted = b.status === "approved" || b.status === "completed";
-                          return isApprovedOrCompleted && b.date && b.date.startsWith(currentMonthStr);
-                        });
-                        const achievedCount = currentMonthBookings.length;
-                        const targetAmount = Number(viewingEmployee.requiredTargetAmount || 0);
-                        const bonusPct = Number(viewingEmployee.bonusPercentage || 0);
-                        const baseSalary = Number(viewingEmployee.salary || 0);
-                        
-                        const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((achievedCount / targetAmount) * 100)) : 0;
-                        const hasAchievedTarget = targetAmount > 0 && achievedCount >= targetAmount;
-                        const potentialBonus = hasAchievedTarget ? Math.round(baseSalary * (bonusPct / 100)) : 0;
+                    {employeeProfileActiveTab === "performance" && (
+                      <div className="space-y-4">
+                        {(() => {
+                          const currentMonthStr = new Date().toISOString().slice(0, 7);
+                          const currentMonthBookings = (viewingEmployeeBookings || []).filter((b) => {
+                            const isApprovedOrCompleted = b.status === "approved" || b.status === "completed";
+                            return isApprovedOrCompleted && b.date && b.date.startsWith(currentMonthStr);
+                          });
+                          const achievedCount = currentMonthBookings.length;
+                          const targetAmount = Number(viewingEmployee.requiredTargetAmount || 0);
+                          const bonusPct = Number(viewingEmployee.bonusPercentage || 0);
+                          const baseSalary = Number(viewingEmployee.salary || 0);
+                          
+                          const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((achievedCount / targetAmount) * 100)) : 0;
+                          const hasAchievedTarget = targetAmount > 0 && achievedCount >= targetAmount;
+                          const potentialBonus = hasAchievedTarget ? Math.round(baseSalary * (bonusPct / 100)) : 0;
 
-                        return (
-                          <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
-                            <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
-                              <div className="flex items-center gap-2">
-                                <Target size={16} className="text-[#C4AE7C]" />
-                                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Target &amp; Performance Bonus</h4>
+                          return (
+                            <div className="space-y-6">
+                              <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
+                                <div className="flex items-center gap-2">
+                                  <Target size={16} className="text-[#C4AE7C]" />
+                                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Target &amp; Performance Bonus</h4>
+                                </div>
+                                {hasAchievedTarget && (
+                                  <span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200">
+                                    Target Met ✓
+                                  </span>
+                                )}
                               </div>
-                              {hasAchievedTarget && (
-                                <span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200">
-                                  Target Met ✓
-                                </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+                                <div>
+                                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Required Target</span>
+                                  <span className="font-semibold text-[#1F251A]">{targetAmount} reservations</span>
+                                </div>
+                                <div>
+                                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Bonus Percentage</span>
+                                  <span className="font-semibold text-[#1F251A]">{bonusPct}% of salary</span>
+                                </div>
+                                <div>
+                                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Achieved (Current Month)</span>
+                                  <span className="font-semibold text-[#1F251A]">
+                                    {loadingEmployeeBookings ? (
+                                      <span className="text-xs text-[#5A6A51] italic">Loading...</span>
+                                    ) : (
+                                      achievedCount + " reservations"
+                                    )}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Estimated Bonus</span>
+                                  <span className={`font-bold ${hasAchievedTarget ? "text-green-700" : "text-[#5A6A51]"}`}>
+                                    {loadingEmployeeBookings ? (
+                                      <span className="text-xs text-[#5A6A51] italic">Loading...</span>
+                                    ) : (
+                                      potentialBonus.toLocaleString() + " EGP"
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {targetAmount > 0 && !loadingEmployeeBookings && (
+                                <div className="space-y-1.5 pt-2 max-w-xl">
+                                  <div className="flex items-center justify-between text-xs font-semibold text-[#5A6A51]">
+                                    <span>Monthly Target Progress</span>
+                                    <span>{progressPercent}%</span>
+                                  </div>
+                                  <div className="w-full bg-gray-150 h-2.5 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full transition-all duration-500 rounded-full ${hasAchievedTarget ? "bg-green-600" : "bg-[#C4AE7C]"}`}
+                                      style={{ width: `${progressPercent}%` }}
+                                    />
+                                  </div>
+                                </div>
                               )}
                             </div>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Required Target</span>
-                                <span className="font-semibold text-[#1F251A]">{targetAmount} reservations</span>
-                              </div>
-                              <div>
-                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Bonus Percentage</span>
-                                <span className="font-semibold text-[#1F251A]">{bonusPct}% of salary</span>
-                              </div>
-                              <div>
-                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Achieved (Current Month)</span>
-                                <span className="font-semibold text-[#1F251A]">
-                                  {loadingEmployeeBookings ? (
-                                    <span className="text-xs text-[#5A6A51] italic">Loading...</span>
-                                  ) : (
-                                    achievedCount + " reservations"
-                                  )}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Estimated Bonus</span>
-                                <span className={`font-bold ${hasAchievedTarget ? "text-green-700" : "text-[#5A6A51]"}`}>
-                                  {loadingEmployeeBookings ? (
-                                    <span className="text-xs text-[#5A6A51] italic">Loading...</span>
-                                  ) : (
-                                    potentialBonus.toLocaleString() + " EGP"
-                                  )}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            {targetAmount > 0 && !loadingEmployeeBookings && (
-                              <div className="space-y-1.5 pt-2">
-                                <div className="flex items-center justify-between text-xs font-semibold text-[#5A6A51]">
-                                  <span>Monthly Target Progress</span>
-                                  <span>{progressPercent}%</span>
-                                </div>
-                                <div className="w-full bg-gray-150 h-2.5 rounded-full overflow-hidden">
-                                  <div 
-                                    className={`h-full transition-all duration-500 rounded-full ${hasAchievedTarget ? "bg-green-600" : "bg-[#C4AE7C]"}`}
-                                    style={{ width: `${progressPercent}%` }}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
+                          );
+                        })()}
+                      </div>
+                    )}
 
-                      {/* ATTENDANCE INFORMATION */}
-                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                    {employeeProfileActiveTab === "attendance" && (
+                      <div className="space-y-4">
                         <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
                           <Clock size={16} className="text-[#C4AE7C]" />
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Attendance Information</h4>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Attendance Records</h4>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Check-In Time</span>
                             <span className="font-semibold text-[#1F251A]">
@@ -15511,24 +15773,25 @@ export default function AdminPage() {
                           </div>
                         </div>
                       </div>
+                    )}
 
-                      {/* CONTACT INFORMATION */}
-                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
+                    {employeeProfileActiveTab === "contact" && (
+                      <div className="space-y-4">
                         <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
                           <Phone size={16} className="text-[#C4AE7C]" />
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Contact Information</h4>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Contact Details</h4>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-6 text-sm">
-                          <div className="sm:col-span-2">
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Address</span>
-                            <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3.5 py-2.5 rounded-xl border border-[#414E36]/5 leading-relaxed">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                          <div className="md:col-span-2">
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Home Address</span>
+                            <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3.5 py-2.5 rounded-xl border border-[#414E36]/5 leading-relaxed max-w-xl">
                               {viewingEmployee.address || "—"}
                             </span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Emergency Contact Name</span>
                             <span className="font-semibold text-[#1F251A]">
-                              {viewingEmployee.name ? `Ahmed ${viewingEmployee.name.split(" ").slice(-1)[0]}` : "Ahmed Saif"}
+                              {viewingEmployee.name ? `Ahmed ${viewingEmployee.name.split(" ").slice(-1)[0]}` : "Ahmed Ahmed"}
                             </span>
                           </div>
                           <div>
@@ -15537,107 +15800,112 @@ export default function AdminPage() {
                           </div>
                         </div>
                       </div>
+                    )}
 
-                      {/* NOTES & DOCUMENTS */}
-                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
-                        <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
-                          <div className="flex items-center gap-2">
-                            <FileText size={16} className="text-[#C4AE7C]" />
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Internal Notes &amp; Reminders</h4>
+                    {employeeProfileActiveTab === "documents" && (
+                      <div className="space-y-6">
+                        {/* Notes Section */}
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
+                            <div className="flex items-center gap-2">
+                              <FileText size={16} className="text-[#C4AE7C]" />
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Internal Notes &amp; Reminders</h4>
+                            </div>
+                            <span className="text-[10px] font-bold text-[#5A6A51] bg-[#F9F9F7] px-2 py-0.5 rounded-full border border-[#414E36]/10">
+                              {viewingEmployeeNotes.length} Notes
+                            </span>
                           </div>
-                          <span className="text-[10px] font-bold text-[#5A6A51] bg-[#F9F9F7] px-2 py-0.5 rounded-full border border-[#414E36]/10">
-                            {viewingEmployeeNotes.length} Notes
-                          </span>
-                        </div>
-                        
-                        {/* Notes List */}
-                        <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-                          {loadingEmployeeNotes ? (
-                            <p className="text-xs text-[#5A6A51] italic py-2">Loading notes...</p>
-                          ) : viewingEmployeeNotes.length === 0 ? (
-                            <p className="text-xs text-[#5A6A51]/70 italic py-2 text-center">No internal notes or reminders yet for this employee.</p>
-                          ) : (
-                            viewingEmployeeNotes.map((note) => (
-                              <div key={note.id} className="text-xs bg-[#FBFBF9] border border-[#414E36]/5 rounded-xl p-3.5 space-y-1.5 relative group transition hover:border-[#C4AE7C]/30">
-                                <p className="text-[#1F251A] font-medium leading-relaxed break-words whitespace-pre-wrap">{note.note}</p>
-                                <div className="flex items-center justify-between text-[9px] text-[#5A6A51]/80 font-semibold pt-1 border-t border-[#414E36]/5">
-                                  <span>
-                                    Added by {note.creator?.name || "Staff Member"} on {new Date(note.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      if (confirm("Are you sure you want to delete this note?")) {
-                                        try {
-                                          const res = await fetch(`/api/employees/notes?id=${note.id}`, { method: "DELETE" });
-                                          if (res.ok) {
-                                            setViewingEmployeeNotes(prev => prev.filter(n => n.id !== note.id));
-                                          } else {
-                                            alert("Failed to delete note.");
+                          
+                          {/* Notes List */}
+                          <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                            {loadingEmployeeNotes ? (
+                              <p className="text-xs text-[#5A6A51] italic py-2">Loading notes...</p>
+                            ) : viewingEmployeeNotes.length === 0 ? (
+                              <p className="text-xs text-[#5A6A51]/70 italic py-2 text-center">No internal notes or reminders yet for this employee.</p>
+                            ) : (
+                              viewingEmployeeNotes.map((note) => (
+                                <div key={note.id} className="text-xs bg-[#FBFBF9] border border-[#414E36]/5 rounded-xl p-3.5 space-y-1.5 relative group transition hover:border-[#C4AE7C]/30">
+                                  <p className="text-[#1F251A] font-medium leading-relaxed break-words whitespace-pre-wrap">{note.note}</p>
+                                  <div className="flex items-center justify-between text-[9px] text-[#5A6A51]/80 font-semibold pt-1 border-t border-[#414E36]/5">
+                                    <span>
+                                      Added by {note.creator?.name || "Staff Member"} on {new Date(note.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (confirm("Are you sure you want to delete this note?")) {
+                                          try {
+                                            const res = await fetch(`/api/employees/notes?id=${note.id}`, { method: "DELETE" });
+                                            if (res.ok) {
+                                              setViewingEmployeeNotes(prev => prev.filter(n => n.id !== note.id));
+                                            } else {
+                                              alert("Failed to delete note.");
+                                            }
+                                          } catch (e) {
+                                            console.error("Delete note error:", e);
                                           }
-                                        } catch (e) {
-                                          console.error("Delete note error:", e);
                                         }
-                                      }
-                                    }}
-                                    className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition duration-200"
-                                  >
-                                    Delete
-                                  </button>
+                                      }}
+                                      className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition duration-200"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
+                              ))
+                            )}
+                          </div>
 
-                        {/* Note Input */}
-                        <div className="pt-2 border-t border-[#414E36]/5 space-y-2">
-                          <textarea
-                            placeholder="Add a new internal note or reminder..."
-                            value={newEmployeeNoteText}
-                            onChange={(e) => setNewEmployeeNoteText(e.target.value)}
-                            rows={2}
-                            className="w-full text-xs rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-[#1F251A] placeholder-[#5A6A51]/50 outline-none focus:border-[#C4AE7C] resize-none font-medium leading-relaxed"
-                          />
-                          <div className="flex justify-end">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (!newEmployeeNoteText.trim()) return;
-                                try {
-                                  const res = await fetch("/api/employees/notes", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                      employeeId: viewingEmployee.id,
-                                      note: newEmployeeNoteText.trim(),
-                                      createdBy: adminDbId
-                                    })
-                                  });
-                                  if (res.ok) {
-                                    const created = await res.json();
-                                    setViewingEmployeeNotes(prev => [created, ...prev]);
-                                    setNewEmployeeNoteText("");
-                                  } else {
-                                    alert("Failed to add note.");
+                          {/* Note Input */}
+                          <div className="pt-2 border-t border-[#414E36]/5 space-y-2 max-w-xl">
+                            <textarea
+                              placeholder="Add a new internal note or reminder..."
+                              value={newEmployeeNoteText}
+                              onChange={(e) => setNewEmployeeNoteText(e.target.value)}
+                              rows={2}
+                              className="w-full text-xs rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2.5 text-[#1F251A] placeholder-[#5A6A51]/50 outline-none focus:border-[#C4AE7C] resize-none font-medium leading-relaxed"
+                            />
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!newEmployeeNoteText.trim()) return;
+                                  try {
+                                    const res = await fetch("/api/employees/notes", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        employeeId: viewingEmployee.id,
+                                        note: newEmployeeNoteText.trim(),
+                                        createdBy: adminDbId
+                                      })
+                                    });
+                                    if (res.ok) {
+                                      const created = await res.json();
+                                      setViewingEmployeeNotes(prev => [created, ...prev]);
+                                      setNewEmployeeNoteText("");
+                                    } else {
+                                      alert("Failed to add note.");
+                                    }
+                                  } catch (e) {
+                                    console.error("Add note error:", e);
                                   }
-                                } catch (e) {
-                                  console.error("Add note error:", e);
-                                }
-                              }}
-                              disabled={!newEmployeeNoteText.trim()}
-                              className="rounded-xl bg-[#414E36] hover:bg-[#2e3a26] disabled:bg-gray-200 text-white disabled:text-gray-400 px-4 py-2 text-[11px] font-bold transition shadow-xs"
-                            >
-                              Add Note
-                            </button>
+                                }}
+                                disabled={!newEmployeeNoteText.trim()}
+                                className="rounded-xl bg-[#414E36] hover:bg-[#2e3a26] disabled:bg-gray-200 text-white disabled:text-gray-400 px-4 py-2 text-[11px] font-bold transition shadow-xs"
+                              >
+                                Add Note
+                              </button>
+                            </div>
                           </div>
                         </div>
 
+                        {/* National ID Check */}
                         {viewingEmployee.national_id && (() => {
                           const check = parseEgyptianNationalId(viewingEmployee.national_id);
                           if (check.isValid) {
                             return (
-                              <div className="rounded-xl bg-green-50/50 border border-green-200/50 p-4 space-y-2 text-xs">
+                              <div className="rounded-xl bg-green-50/50 border border-green-200/50 p-4 space-y-2 text-xs max-w-xl">
                                 <div className="flex items-center gap-1.5 font-bold text-green-800">
                                   <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
                                   Verified Egyptian National ID Check
@@ -15656,17 +15924,18 @@ export default function AdminPage() {
                                     {check.governorate}
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
+                             </div>
+                             );
+                           }
+                           return null;
+                         })()}
 
+                        {/* Attachments */}
                         {(viewingEmployee.national_id_front || viewingEmployee.national_id_back || viewingEmployee.contract_file) && (
-                          <div className="space-y-3 pt-3 border-t border-[#414E36]/5">
+                          <div className="space-y-3 pt-3 border-t border-[#414E36]/5 max-w-2xl">
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">Attached Documents</span>
-                            
-                            <div className="grid grid-cols-2 gap-4">
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               {viewingEmployee.national_id_front && (
                                 <div className="space-y-1">
                                   <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider text-center">ID Front Side</span>
@@ -15680,7 +15949,7 @@ export default function AdminPage() {
                                     <img
                                       src={viewingEmployee.national_id_front}
                                       alt="ID Front"
-                                      className="h-28 w-full object-cover"
+                                      className="h-32 w-full object-cover"
                                     />
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
                                       View Full Size
@@ -15701,7 +15970,7 @@ export default function AdminPage() {
                                     <img
                                       src={viewingEmployee.national_id_back}
                                       alt="ID Back"
-                                      className="h-28 w-full object-cover"
+                                      className="h-32 w-full object-cover"
                                     />
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold uppercase tracking-wider">
                                       View Full Size
@@ -15716,7 +15985,7 @@ export default function AdminPage() {
                               let contractUrl = "";
                               let additionalList: any[] = [];
                               try {
-                                if (raw.startsWith('{')) {
+                                if (raw.startsWith("{")) {
                                   const parsed = JSON.parse(raw);
                                   contractUrl = parsed.contract || "";
                                   additionalList = parsed.additional || [];
@@ -15726,7 +15995,6 @@ export default function AdminPage() {
                               } catch (e) {
                                 contractUrl = raw;
                               }
-                              
                               return (
                                 <div className="space-y-3 pt-2">
                                   {contractUrl && (
@@ -15742,7 +16010,6 @@ export default function AdminPage() {
                                       </a>
                                     </div>
                                   )}
-                                  
                                   {additionalList.length > 0 && (
                                     <div>
                                       <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">Additional Files</span>
@@ -15767,81 +16034,7 @@ export default function AdminPage() {
                           </div>
                         )}
                       </div>
-
-                      {/* QUICK ACTIONS */}
-                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 shadow-xs">
-                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
-                          <Zap size={16} className="text-[#C4AE7C]" />
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Quick Actions</h4>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingEmployee(viewingEmployee);
-                              setNewEmployeeName(viewingEmployee.name || "");
-                              setNewEmployeeEmail(viewingEmployee.email || "");
-                              setNewEmployeeRole(viewingEmployee.role_name || "");
-                              setNewEmployeePhone(viewingEmployee.phone || "");
-                              setNewEmployeeDepartment(viewingEmployee.department || "Reception");
-                              updateShiftState(viewingEmployee.shift || "Day");
-                              setNewEmployeeSalary(String(viewingEmployee.salary || 0));
-                              setNewEmployeeNationalId(viewingEmployee.national_id || "");
-                              setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
-                              setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
-                              applyAddressToState(viewingEmployee.address || "");
-                              const rawContract = viewingEmployee.contract_file || "";
-                              let contractUrl = "";
-                              let additionalList: any[] = [];
-                              try {
-                                if (rawContract.startsWith('{')) {
-                                  const parsed = JSON.parse(rawContract);
-                                  contractUrl = parsed.contract || "";
-                                  additionalList = parsed.additional || [];
-                                } else {
-                                  contractUrl = rawContract;
-                                }
-                              } catch (e) {
-                                contractUrl = rawContract;
-                              }
-                              setNewEmployeeContract(contractUrl);
-                              setNewEmployeeContractName(viewingEmployee.contract_file_name || "");
-                              setNewEmployeeAdditionalFiles(additionalList);
-                              setNewEmployeeRequiredTargetAmount(String(viewingEmployee.requiredTargetAmount || 0));
-                              setNewEmployeeBonusPercentage(String(viewingEmployee.bonusPercentage || 0));
-                              setViewingEmployee(null);
-                              setIsEditingEmployeeModalOpen(true);
-                            }}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition"
-                          >
-                            <Pencil size={14} /> Edit Employee
-                          </button>
-
-                          {viewingEmployee.employee_id !== "superadmin" && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleDeleteEmployee(viewingEmployee.id);
-                                setViewingEmployee(null);
-                              }}
-                              className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-50 border border-red-200 hover:bg-red-100 px-4 py-3 text-sm font-semibold text-red-600 transition"
-                            >
-                              <Lock size={14} /> Revoke Access
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handlePrintEmployeeProfile(viewingEmployee)}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F9F9F7] border border-[#414E36]/15 hover:bg-[#EDF1EC] px-4 py-3 text-sm font-semibold text-[#414E36] transition"
-                          >
-                            <Printer size={14} /> Print Profile
-                          </button>
-                        </div>
-                      </div>
-
-                    </div>
+                    )}
                   </div>
                 </div>
               )}
