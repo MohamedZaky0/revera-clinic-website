@@ -13451,10 +13451,9 @@ export default function AdminPage() {
                         type="text"
                         value={instapayAddress}
                         onChange={(e) => setInstapayAddress(e.target.value)}
-                        placeholder="e.g. name@instapay"
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                        placeholder="name@instapay"
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] placeholder:text-[#B0BCA7] outline-none focus:border-[#414E36] transition"
                       />
-                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Your clinic's official InstaPay username/address (e.g. username@instapay).</span>
                     </div>
 
                     <div>
