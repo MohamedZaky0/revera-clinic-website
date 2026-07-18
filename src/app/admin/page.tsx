@@ -990,6 +990,8 @@ export default function AdminPage() {
   const [custBuilding, setCustBuilding] = useState("");
   const [custFloor, setCustFloor] = useState("");
   const [custNote, setCustNote] = useState("");
+  const [isCustomerWhatsappSame, setIsCustomerWhatsappSame] = useState(true);
+  const [customerWhatsapp, setCustomerWhatsapp] = useState("");
 
   // New Customer Profile fields
   const [custAge, setCustAge] = useState("");
@@ -4950,6 +4952,8 @@ export default function AdminPage() {
     setCustReferral("");
     setCustOccupation("");
     setCustomerFormError("");
+    setIsCustomerWhatsappSame(true);
+    setCustomerWhatsapp("");
     setSelectedCustomerForEdit(null);
     setShowCustomerFormModal(true);
   }
@@ -4968,7 +4972,17 @@ export default function AdminPage() {
     setCustStreet(c.street_name || "");
     setCustBuilding(c.building_no || "");
     setCustFloor(c.floor_no || "");
-    setCustNote(c.note || "");
+    const rawNote = c.note || "";
+    const waMatch = rawNote.match(/\[WhatsApp:\s*([^\]]+)\]/);
+    if (waMatch) {
+      setIsCustomerWhatsappSame(false);
+      setCustomerWhatsapp(waMatch[1].trim());
+      setCustNote(rawNote.replace(/\[WhatsApp:\s*([^\]]+)\]\n?/, "").trim());
+    } else {
+      setIsCustomerWhatsappSame(true);
+      setCustomerWhatsapp("");
+      setCustNote(rawNote);
+    }
     setCustAge(c.age !== undefined && c.age !== null ? String(c.age) : "");
     setCustNationalId(c.national_id || "");
     setCustAddress(c.address || "");
@@ -5197,9 +5211,25 @@ export default function AdminPage() {
       setCustomerFormError("Please enter a valid Egyptian mobile number (11 digits, starting with 010, 011, 012, or 015).");
       return;
     }
+    if (!isCustomerWhatsappSame) {
+      let cleanedWA = customerWhatsapp.trim();
+      if (cleanedWA.startsWith("+20")) {
+        cleanedWA = "0" + cleanedWA.slice(3);
+      } else if (cleanedWA.startsWith("0020")) {
+        cleanedWA = "0" + cleanedWA.slice(4);
+      }
+      if (!/^01[0125]\d{8}$/.test(cleanedWA)) {
+        setCustomerFormError("Please enter a valid Egyptian mobile number for WhatsApp (11 digits, starting with 010, 011, 012, or 015).");
+        return;
+      }
+    }
 
     setSavingCustomer(true);
     setCustomerFormError("");
+
+    const finalNote = isCustomerWhatsappSame
+      ? custNote.trim()
+      : `[WhatsApp: ${customerWhatsapp.trim()}]${custNote.trim() ? "\n" : ""}${custNote.trim()}`;
 
     const payload = {
       id: selectedCustomerForEdit?.id || undefined,
@@ -5216,7 +5246,7 @@ export default function AdminPage() {
       street_name: custStreet.trim() || null,
       building_no: custBuilding.trim() || null,
       floor_no: custFloor.trim() || null,
-      note: custNote.trim() || null,
+      note: finalNote || null,
       // new demographic fields
       age: custAge ? parseInt(custAge) : null,
       national_id: custNationalId.trim() || null,
@@ -19881,7 +19911,7 @@ export default function AdminPage() {
                       onChange={(e) => setIsManualWhatsappSame(e.target.checked)}
                       className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36]"
                     />
-                    <span>This phone number is also their WhatsApp number</span>
+                    <span>This mobile number is identical to the WhatsApp contact number</span>
                   </label>
                   {!isManualWhatsappSame && (
                     <div className="animate-fadeIn">
@@ -21058,9 +21088,35 @@ export default function AdminPage() {
                       value={custMobile}
                       onChange={(e) => setCustMobile(e.target.value)}
                       placeholder="e.g. 01012345678"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] mb-2"
                       required
                     />
+                  </div>
+                  <div className="col-span-1 sm:col-span-2 space-y-2">
+                    <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#414E36]">
+                      <input
+                        type="checkbox"
+                        checked={isCustomerWhatsappSame}
+                        onChange={(e) => setIsCustomerWhatsappSame(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36]"
+                      />
+                      <span>This mobile number is identical to the WhatsApp contact number</span>
+                    </label>
+                    {!isCustomerWhatsappSame && (
+                      <div className="animate-fadeIn mt-2">
+                        <label className="block text-xs font-semibold text-[#5A6A51] mb-1">
+                          WhatsApp Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={customerWhatsapp}
+                          onChange={(e) => setCustomerWhatsapp(e.target.value)}
+                          placeholder="e.g. 01012345678"
+                          className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
+                          required
+                        />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Email Address</label>
