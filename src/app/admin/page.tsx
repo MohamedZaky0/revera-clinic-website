@@ -19911,7 +19911,7 @@ export default function AdminPage() {
                       onChange={(e) => setIsManualWhatsappSame(e.target.checked)}
                       className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36]"
                     />
-                    <span>This mobile number is identical to the WhatsApp contact number</span>
+                    <span>This is the WhatsApp number too</span>
                   </label>
                   {!isManualWhatsappSame && (
                     <div className="animate-fadeIn">
@@ -21100,7 +21100,7 @@ export default function AdminPage() {
                         onChange={(e) => setIsCustomerWhatsappSame(e.target.checked)}
                         className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36]"
                       />
-                      <span>This mobile number is identical to the WhatsApp contact number</span>
+                      <span>This is the WhatsApp number too</span>
                     </label>
                     {!isCustomerWhatsappSame && (
                       <div className="animate-fadeIn mt-2">

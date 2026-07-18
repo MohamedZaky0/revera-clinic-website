@@ -1132,7 +1132,7 @@ Attached is my payment transaction receipt photo.`;
                       onChange={(e) => setIsWhatsappSame(e.target.checked)} 
                       className="h-4 w-4 rounded accent-[#414E36]"
                     />
-                    <span>{isRTL ? "رقم الهاتف المحمول مطابِق لرقم الواتساب الخاص بالعميل" : "This mobile number is identical to the WhatsApp contact number"}</span>
+                    <span>{isRTL ? "هذا الرقم هو رقم الواتساب أيضاً" : "This is the WhatsApp number too"}</span>
                   </label>
 
                   {!isWhatsappSame && (
