@@ -87,6 +87,9 @@ export function BookingModal() {
   const [isWhatsappSame, setIsWhatsappSame] = useState(true);
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [serviceHours, setServiceHours] = useState<any[]>([]);
+  const [instapayAddress, setInstapayAddress] = useState("name@instapay");
+  const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
+  const [zoomQr, setZoomQr] = useState(false);
 
   // Update serviceHours when translations load
   useEffect(() => {
@@ -104,7 +107,6 @@ export function BookingModal() {
   const [depositPercentage, setDepositPercentage] = useState(20);
   const [isPaying, setIsPaying] = useState(false);
   const [createdReservation, setCreatedReservation] = useState<any>(null);
-  const [instapayAddress, setInstapayAddress] = useState("");
   const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [termsText, setTermsText] = useState("");
@@ -276,7 +278,17 @@ export function BookingModal() {
     fetch("/api/page-settings")
       .then((r) => r.json())
       .then((data) => {
-        if (data && data.booking && data.booking.depositPercentage !== undefined) {
+        if (data && data.deposit) {
+          if (data.deposit.depositPercentage !== undefined) {
+            setDepositPercentage(Number(data.deposit.depositPercentage));
+          }
+          if (data.deposit.instapayAddress) {
+            setInstapayAddress(data.deposit.instapayAddress);
+          }
+          if (data.deposit.instapayLink) {
+            setInstapayLink(data.deposit.instapayLink);
+          }
+        } else if (data && data.booking && data.booking.depositPercentage !== undefined) {
           setDepositPercentage(Number(data.booking.depositPercentage));
         }
         if (data && data.clinic && data.clinic.whatsapp) {
@@ -685,6 +697,10 @@ Attached is my payment transaction receipt photo.`;
     (step === 1 && serviceId !== null && (branches.length === 0 || branchId !== null)) ||
     (step === 2 && selectedDate !== null) ||
     (step === 3 && selectedTime !== null);
+
+  const qrCodeUrl = instapayLink && instapayLink !== "https://www.instapay.eg" 
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(instapayLink)}` 
+    : "/images/instapay_qr.png";
 
   return (
     <div
@@ -1238,12 +1254,12 @@ Attached is my payment transaction receipt photo.`;
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "عنوان إنستاباي الخاص بالعيادة" : "CLINIC INSTAPAY ADDRESS"}</p>
-                      <p className="text-xs font-bold text-[#1F251A] mt-0.5">name@instapay</p>
+                      <p className="text-xs font-bold text-[#1F251A] mt-0.5">{instapayAddress}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard.writeText("name@instapay");
+                        navigator.clipboard.writeText(instapayAddress);
                         setCopiedAddress(true);
                         setTimeout(() => setCopiedAddress(false), 2000);
                       }}
@@ -1256,7 +1272,7 @@ Attached is my payment transaction receipt photo.`;
                   <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
                     <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط تحويل إنستاباي" : "INSTAPAY QUICK LINK"}</span>
                     <a 
-                      href="https://www.instapay.eg" 
+                      href={instapayLink} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-xs font-bold text-[#C4AE7C] hover:underline"
@@ -1267,10 +1283,14 @@ Attached is my payment transaction receipt photo.`;
 
                   {/* InstaPay QR Code */}
                   <div className="pt-2 text-center">
-                    <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{isRTL ? "امسح رمز الاستجابة السريعة (QR)" : "SCAN QR CODE TO PAY"}</p>
-                    <div className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm">
+                    <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{isRTL ? "امسح رمز الاستجابة السريعة (QR) [انقر للتكبير]" : "SCAN QR CODE TO PAY [Click to Zoom]"}</p>
+                    <div 
+                      onClick={() => setZoomQr(true)}
+                      className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm hover:border-[#C4AE7C] hover:scale-105 transition duration-200 cursor-pointer"
+                      title={isRTL ? "انقر لتكبير رمز الاستجابة السريعة" : "Click to zoom QR Code"}
+                    >
                       <img 
-                        src="/images/instapay_qr.png" 
+                        src={qrCodeUrl} 
                         alt="InstaPay QR Code" 
                         className="w-32 h-32 object-contain"
                       />
@@ -1380,6 +1400,43 @@ Attached is my payment transaction receipt photo.`;
           </>
         )}
       </div>
+
+      {/* Zoomed QR Overlay */}
+      {zoomQr && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm transition-all cursor-pointer"
+          onClick={() => setZoomQr(false)}
+        >
+          <div className="relative max-w-sm w-full bg-white rounded-3xl p-6 shadow-2xl flex flex-col items-center border border-[#414E36]/10 animate-scaleIn cursor-default" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setZoomQr(false)}
+              className="absolute right-6 top-6 h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition font-bold text-lg cursor-pointer"
+            >
+              &times;
+            </button>
+            <p className="text-sm font-bold text-[#414E36] mb-4 uppercase tracking-wider text-center">
+              {isRTL ? "رمز الاستجابة السريعة (QR)" : "SCAN TO PAY"}
+            </p>
+            <div className="bg-white p-3 rounded-2xl border border-[#C4AE7C]/20 shadow-inner">
+              <img 
+                src={qrCodeUrl} 
+                alt="InstaPay QR Code Zoomed" 
+                className="w-64 h-64 object-contain"
+              />
+            </div>
+            {instapayLink && (
+              <a 
+                href={instapayLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 text-xs font-bold text-[#C4AE7C] hover:underline"
+              >
+                {isRTL ? "فتح الرابط المباشر" : "Open Link Directly"} &rarr;
+              </a>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

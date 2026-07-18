@@ -800,6 +800,7 @@ export default function AdminPage() {
   const [activeInfoFeature, setActiveInfoFeature] = useState<{ title: string; description: string } | null>(null);
   const [newEmployeeContract, setNewEmployeeContract] = useState("");
   const [newEmployeeContractName, setNewEmployeeContractName] = useState("");
+  const [newEmployeeAdditionalFiles, setNewEmployeeAdditionalFiles] = useState<Array<{ file: string, name: string }>>([]);
   const [employeeFilterDepartment, setEmployeeFilterDepartment] = useState("All");
   const [employeeFilterShift, setEmployeeFilterShift] = useState("All");
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
@@ -1682,6 +1683,7 @@ export default function AdminPage() {
           "Service Hours": "settings.service_hours",
           "Branches": "settings.branches",
           "Booking Settings": "settings.booking_settings",
+          "Deposit Settings": "settings.booking_settings",
           "Notification Settings": "settings.notification",
           "Queue Settings": "settings.queue",
           "Pages Settings": "settings.pages",
@@ -2743,6 +2745,7 @@ export default function AdminPage() {
       "Service Hours": "settings.service_hours",
       "Branches": "settings.branches",
       "Booking Settings": "settings.booking_settings",
+      "Deposit Settings": "settings.booking_settings",
       "Notification Settings": "settings.notification",
       "Queue Settings": "settings.queue",
       "Pages Settings": "settings.pages",
@@ -3150,6 +3153,11 @@ export default function AdminPage() {
   const [bookingShowDoctorNotes, setBookingShowDoctorNotes] = useState(true);
   const [bookingDepositPercentage, setBookingDepositPercentage] = useState(20);
   const [savingBookingSettings, setSavingBookingSettings] = useState(false);
+  
+  // Deposit Settings State
+  const [instapayAddress, setInstapayAddress] = useState("name@instapay");
+  const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
+  const [savingDepositSettings, setSavingDepositSettings] = useState(false);
 
   // ── Notification Settings State ──
   const [notifSmsOtp, setNotifSmsOtp] = useState(true);
@@ -4205,6 +4213,16 @@ export default function AdminPage() {
             setBookingShowDoctorNotes(data.booking.showDoctorNotes ?? true);
             setBookingDepositPercentage(data.booking.depositPercentage ?? 20);
           }
+          if (data.deposit) {
+            setInstapayAddress(data.deposit.instapayAddress || "name@instapay");
+            setInstapayLink(data.deposit.instapayLink || "https://www.instapay.eg");
+            if (data.deposit.depositPercentage !== undefined) {
+              setBookingDepositPercentage(Number(data.deposit.depositPercentage));
+            }
+          } else {
+            setInstapayAddress("name@instapay");
+            setInstapayLink("https://www.instapay.eg");
+          }
 
           if (data.footer && data.footer.serviceHours) {
             setServiceHours(data.footer.serviceHours);
@@ -4339,6 +4357,35 @@ export default function AdminPage() {
       console.error("handleSaveClinicProfile error:", err);
     } finally {
       setSavingClinicProfile(false);
+    }
+  }
+
+  async function handleSaveDepositSettings() {
+    setSavingDepositSettings(true);
+    try {
+      const res = await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deposit: {
+            instapayAddress: instapayAddress.trim(),
+            instapayLink: instapayLink.trim(),
+            depositPercentage: bookingDepositPercentage
+          }
+        }),
+      });
+      if (res.ok) {
+        alert("Deposit & InstaPay settings saved successfully!");
+        clearFetchCache();
+        fetchPageSettings();
+      } else {
+        alert("Failed to save deposit settings.");
+      }
+    } catch (err) {
+      console.error("handleSaveDepositSettings error:", err);
+      alert("Error saving deposit settings.");
+    } finally {
+      setSavingDepositSettings(false);
     }
   }
 
@@ -6273,6 +6320,7 @@ export default function AdminPage() {
                           { label: "Branches", icon: MapIcon, perm: "settings.branches" },
                           { label: "Rooms", icon: DoorOpen, perm: "settings.rooms" },
                           { label: "Booking Settings", icon: CalendarDays, perm: "settings.booking_settings" },
+                          { label: "Deposit Settings", icon: CreditCard, perm: "settings.booking_settings" },
                           { label: "Notification Settings", icon: Bell, perm: "settings.notification" },
                           { label: "Queue Settings", icon: ListOrdered, perm: "settings.queue" },
                           { label: "Pages Settings", icon: FileText, perm: "settings.pages" },
@@ -9658,13 +9706,14 @@ export default function AdminPage() {
                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Email</th>
                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Created At</th>
                       <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Bookings</th>
+                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Active</th>
                       <th className="px-4 py-3"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#414E36]/8">
                     {filteredCustomers.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-5 py-8 text-center text-[#5A6A51]">
+                        <td colSpan={7} className="px-5 py-8 text-center text-[#5A6A51]">
                           No customers found.
                         </td>
                       </tr>
@@ -9686,6 +9735,11 @@ export default function AdminPage() {
                             <span className="text-xs">{timeStr}</span>
                           </td>
                           <td className="px-5 py-4 text-center text-[#1F251A]">{c.bookings}</td>
+                          <td className="px-5 py-4 text-center">
+                            <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${c.active !== false ? "bg-green-50 text-green-700 border-green-200/50" : "bg-red-50 text-red-700 border-red-200/50"}`}>
+                              {c.active !== false ? "Active" : "Inactive"}
+                            </span>
+                          </td>
                           <td className="px-4 py-4 text-center">
                             <div className="flex items-center justify-center gap-1.5">
                               <button
@@ -9702,15 +9756,6 @@ export default function AdminPage() {
                                   title="Edit Customer"
                                 >
                                   <Pencil size={12} />
-                                </button>
-                              )}
-                              {hasPermission("customers.delete") && (
-                                <button
-                                  onClick={() => setDeleteCustomerTarget(c)}
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50"
-                                  title="Delete Customer"
-                                >
-                                  <Trash2 size={14} />
                                 </button>
                               )}
                             </div>
@@ -12618,19 +12663,59 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          {profileEmployee?.contract_file && (
-                            <div className="pt-2 border-t border-[#414E36]/5">
-                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">Employment Contract</span>
-                              <a
-                                href={profileEmployee.contract_file}
-                                download={profileEmployee.contract_file_name || "contract"}
-                                className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition shadow-xs"
-                              >
-                                <FileText className="h-4 w-4 text-[#5A6A51]" />
-                                {profileEmployee.contract_file_name || "Download Contract"}
-                              </a>
-                            </div>
-                          )}
+                          {profileEmployee?.contract_file && (() => {
+                            const raw = profileEmployee.contract_file;
+                            let contractUrl = "";
+                            let additionalList: any[] = [];
+                            try {
+                              if (raw.startsWith('{')) {
+                                const parsed = JSON.parse(raw);
+                                contractUrl = parsed.contract || "";
+                                additionalList = parsed.additional || [];
+                              } else {
+                                contractUrl = raw;
+                              }
+                            } catch (e) {
+                              contractUrl = raw;
+                            }
+                            
+                            return (
+                              <div className="space-y-3 pt-2 border-t border-[#414E36]/5">
+                                {contractUrl && (
+                                  <div>
+                                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">Employment Contract</span>
+                                    <a
+                                      href={contractUrl}
+                                      download={profileEmployee.contract_file_name || "contract"}
+                                      className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition shadow-xs"
+                                    >
+                                      <FileText className="h-4 w-4 text-[#5A6A51]" />
+                                      {profileEmployee.contract_file_name || "Download Contract"}
+                                    </a>
+                                  </div>
+                                )}
+                                
+                                {additionalList.length > 0 && (
+                                  <div>
+                                    <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">Additional Files</span>
+                                    <div className="flex flex-wrap gap-2">
+                                      {additionalList.map((fileItem, idx) => (
+                                        <a
+                                          key={idx}
+                                          href={fileItem.file}
+                                          download={fileItem.name}
+                                          className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-semibold text-[#414E36] hover:bg-gray-50 transition shadow-xs"
+                                        >
+                                          <FileText className="h-3.5 w-3.5 text-[#5A6A51]" />
+                                          {fileItem.name}
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
 
@@ -13232,31 +13317,7 @@ export default function AdminPage() {
                       <span className="text-[11px] text-[#8A9A81] mt-1 block">Maximum concurrent appointments per time slot.</span>
                     </div>
 
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Reservation Deposit (%)</label>
-                        <button
-                          type="button"
-                          onClick={() => setActiveInfoFeature({
-                            title: "Reservation Deposit (%)",
-                            description: "This setting sets a required prepayment percentage of the service cost to secure an appointment. For example, if set to 20%, a patient must pay 20% of the service fee via InstaPay or bank transfer before their reservation is confirmed. Set this to 0% to allow booking without any prepayment."
-                          })}
-                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                          title="Click for info"
-                        >
-                          <Info size={13} />
-                        </button>
-                      </div>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={bookingDepositPercentage}
-                        onChange={(e) => setBookingDepositPercentage(Math.max(0, Math.min(100, Number(e.target.value))))}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
-                      />
-                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Percentage of service price to secure a booking. Set to 0 to disable.</span>
-                    </div>
+
                   </div>
 
                   <div className="border-t border-[#F2EFE9] pt-6 space-y-4">
@@ -13357,6 +13418,86 @@ export default function AdminPage() {
                       This text is displayed on Step 4 of the reservation modal. If empty, the checkbox gate will be hidden.
                     </p>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeNav === "Deposit Settings" && (
+            <div className="space-y-6">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Deposit & InstaPay Settings</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Configure prepayment rules, InstaPay address, quick payment links, and dynamic QR codes.</p>
+                </div>
+                <button
+                  onClick={handleSaveDepositSettings}
+                  disabled={savingDepositSettings}
+                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
+                >
+                  {savingDepositSettings ? "Saving..." : "Save Deposit Settings"}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Left Column: Form Settings */}
+                <div className="lg:col-span-7 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                  <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">InstaPay Details</h3>
+                  
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">InstaPay Address</label>
+                      <input
+                        type="text"
+                        value={instapayAddress}
+                        onChange={(e) => setInstapayAddress(e.target.value)}
+                        placeholder="e.g. name@instapay"
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
+                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Your clinic's official InstaPay username/address (e.g. username@instapay).</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">InstaPay Quick Link</label>
+                      <input
+                        type="text"
+                        value={instapayLink}
+                        onChange={(e) => setInstapayLink(e.target.value)}
+                        placeholder="e.g. https://www.instapay.eg or deep link"
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
+                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Quick payment URL or deep link to open the InstaPay app.</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Reservation Deposit (%)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={bookingDepositPercentage}
+                        onChange={(e) => setBookingDepositPercentage(Math.max(0, Math.min(100, Number(e.target.value))))}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      />
+                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Percentage of service price to secure a booking. Set to 0 to disable prepayment requirement.</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Live QR Preview */}
+                <div className="lg:col-span-5 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] text-center flex flex-col items-center">
+                  <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3 w-full mb-6">Live QR Preview</h3>
+                  <div className="bg-white p-4 rounded-3xl border border-[#C4AE7C]/20 shadow-md inline-block mb-4">
+                    <img
+                      src={instapayLink && instapayLink !== "https://www.instapay.eg" 
+                        ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(instapayLink)}` 
+                        : "/images/instapay_qr.png"}
+                      alt="InstaPay QR Preview"
+                      className="w-48 h-48 object-contain"
+                    />
+                  </div>
+                  <p className="text-xs text-[#5A6A51] font-semibold uppercase tracking-wider mb-2">Generated QR Code</p>
+                  <p className="text-[10px] text-[#8A9A81] max-w-xs">This QR code is generated dynamically from the InstaPay Quick Link above and will be displayed to patients during checkout.</p>
                 </div>
               </div>
             </div>
@@ -14110,6 +14251,7 @@ export default function AdminPage() {
                     setNewEmployeeBranchId("");
                     setNewEmployeeContract("");
                     setNewEmployeeContractName("");
+                    setNewEmployeeAdditionalFiles([]);
                     setNewEmployeeRequiredTargetAmount("0");
                     setNewEmployeeBonusPercentage("0");
                     setIsEditingEmployeeModalOpen(true);
@@ -14295,8 +14437,23 @@ export default function AdminPage() {
                                           setNewEmployeeNationalIdBack(emp.national_id_back || "");
                                           applyAddressToState(emp.address || "");
                                           setNewEmployeeBranchId(emp.branch_id || "");
-                                          setNewEmployeeContract(emp.contract_file || "");
+                                          const rawContract = emp.contract_file || "";
+                                          let contractUrl = "";
+                                          let additionalList: any[] = [];
+                                          try {
+                                            if (rawContract.startsWith('{')) {
+                                              const parsed = JSON.parse(rawContract);
+                                              contractUrl = parsed.contract || "";
+                                              additionalList = parsed.additional || [];
+                                            } else {
+                                              contractUrl = rawContract;
+                                            }
+                                          } catch (e) {
+                                            contractUrl = rawContract;
+                                          }
+                                          setNewEmployeeContract(contractUrl);
                                           setNewEmployeeContractName(emp.contract_file_name || "");
+                                          setNewEmployeeAdditionalFiles(additionalList);
                                           setNewEmployeeRequiredTargetAmount(String(emp.requiredTargetAmount || 0));
                                           setNewEmployeeBonusPercentage(String(emp.bonusPercentage || 0));
                                           setIsEditingEmployeeModalOpen(true);
@@ -14381,7 +14538,9 @@ export default function AdminPage() {
                                 nationalIdBack: newEmployeeNationalIdBack || null,
                                 address: buildAddress(newEmployeeAddressLine1.trim(), newEmployeeAddressLine2.trim(), newEmployeeCity.trim(), newEmployeeGovernorateProp.trim(), newEmployeePostalCode.trim(), newEmployeeCountry.trim()) || null,
                                 branchId: newEmployeeBranchId || null,
-                                contractFile: newEmployeeContract || null,
+                                contractFile: newEmployeeAdditionalFiles.length > 0 
+                                  ? JSON.stringify({ contract: newEmployeeContract || "", additional: newEmployeeAdditionalFiles }) 
+                                  : (newEmployeeContract || null),
                                 contractFileName: newEmployeeContractName || null,
                                 requiredTargetAmount: Number(newEmployeeRequiredTargetAmount),
                                 bonusPercentage: Number(newEmployeeBonusPercentage),
@@ -14416,7 +14575,9 @@ export default function AdminPage() {
                                 nationalIdBack: newEmployeeNationalIdBack || null,
                                 address: buildAddress(newEmployeeAddressLine1.trim(), newEmployeeAddressLine2.trim(), newEmployeeCity.trim(), newEmployeeGovernorateProp.trim(), newEmployeePostalCode.trim(), newEmployeeCountry.trim()) || null,
                                 branchId: newEmployeeBranchId || null,
-                                contractFile: newEmployeeContract || null,
+                                contractFile: newEmployeeAdditionalFiles.length > 0 
+                                  ? JSON.stringify({ contract: newEmployeeContract || "", additional: newEmployeeAdditionalFiles }) 
+                                  : (newEmployeeContract || null),
                                 contractFileName: newEmployeeContractName || null,
                                 requiredTargetAmount: Number(newEmployeeRequiredTargetAmount),
                                 bonusPercentage: Number(newEmployeeBonusPercentage),
@@ -14892,6 +15053,63 @@ export default function AdminPage() {
                         </div>
                       </div>
 
+                      {/* Additional Files Upload */}
+                      <div className="border border-[#414E36]/10 rounded-2xl bg-[#F7F7F5] p-4 mt-4">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">Additional Files</label>
+                        
+                        {/* List existing/added additional files */}
+                        {newEmployeeAdditionalFiles.length > 0 && (
+                          <div className="space-y-2 mb-3">
+                            {newEmployeeAdditionalFiles.map((fileItem, idx) => (
+                              <div key={idx} className="flex items-center justify-between gap-2 p-3 bg-white border border-[#414E36]/10 rounded-2xl">
+                                <div className="flex items-center gap-2 overflow-hidden col-span-1">
+                                  <FileText className="h-5 w-5 text-[#5A6A51] shrink-0" />
+                                  <span className="text-xs font-semibold text-[#414E36] truncate">{fileItem.name}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNewEmployeeAdditionalFiles(prev => prev.filter((_, i) => i !== idx));
+                                  }}
+                                  className="bg-red-500 text-white hover:bg-red-600 transition rounded-full h-5 w-5 shrink-0 flex items-center justify-center font-bold text-xs"
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="rounded-2xl border border-dashed border-[#414E36]/20 bg-white overflow-hidden">
+                          <label className="flex flex-col items-center justify-center cursor-pointer py-5 w-full">
+                            <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
+                            <span className="text-[11px] font-semibold text-[#414E36]">Upload Additional Files</span>
+                            <span className="text-[9px] text-gray-400 mt-0.5">Select one or more files (PDF, Word, or Image)</span>
+                            <input
+                              type="file"
+                              multiple
+                              accept=".pdf,.doc,.docx,image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const files = e.target.files;
+                                if (files && files.length > 0) {
+                                  Array.from(files).forEach(file => {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                      setNewEmployeeAdditionalFiles(prev => [
+                                        ...prev,
+                                        { file: reader.result as string, name: file.name }
+                                      ]);
+                                    };
+                                    reader.readAsDataURL(file);
+                                  });
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+
                       <div className="flex justify-end gap-3 pt-2">
                         <button
                           type="button"
@@ -14965,8 +15183,23 @@ export default function AdminPage() {
                               setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
                               setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
                               applyAddressToState(viewingEmployee.address || "");
-                              setNewEmployeeContract(viewingEmployee.contract_file || "");
+                              const rawContract = viewingEmployee.contract_file || "";
+                              let contractUrl = "";
+                              let additionalList: any[] = [];
+                              try {
+                                if (rawContract.startsWith('{')) {
+                                  const parsed = JSON.parse(rawContract);
+                                  contractUrl = parsed.contract || "";
+                                  additionalList = parsed.additional || [];
+                                } else {
+                                  contractUrl = rawContract;
+                                }
+                              } catch (e) {
+                                contractUrl = rawContract;
+                              }
+                              setNewEmployeeContract(contractUrl);
                               setNewEmployeeContractName(viewingEmployee.contract_file_name || "");
+                              setNewEmployeeAdditionalFiles(additionalList);
                               setNewEmployeeRequiredTargetAmount(String(viewingEmployee.requiredTargetAmount || 0));
                               setNewEmployeeBonusPercentage(String(viewingEmployee.bonusPercentage || 0));
                               setViewingEmployee(null);
@@ -15479,19 +15712,59 @@ export default function AdminPage() {
                               )}
                             </div>
 
-                            {viewingEmployee.contract_file && (
-                              <div className="pt-2">
-                                <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">Employment Contract</span>
-                                <a
-                                  href={viewingEmployee.contract_file}
-                                  download={viewingEmployee.contract_file_name || "contract"}
-                                  className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition shadow-xs"
-                                >
-                                  <FileText className="h-4 w-4 text-[#5A6A51]" />
-                                  {viewingEmployee.contract_file_name || "Download Contract"}
-                                </a>
-                              </div>
-                            )}
+                            {viewingEmployee.contract_file && (() => {
+                              const raw = viewingEmployee.contract_file;
+                              let contractUrl = "";
+                              let additionalList: any[] = [];
+                              try {
+                                if (raw.startsWith('{')) {
+                                  const parsed = JSON.parse(raw);
+                                  contractUrl = parsed.contract || "";
+                                  additionalList = parsed.additional || [];
+                                } else {
+                                  contractUrl = raw;
+                                }
+                              } catch (e) {
+                                contractUrl = raw;
+                              }
+                              
+                              return (
+                                <div className="space-y-3 pt-2">
+                                  {contractUrl && (
+                                    <div>
+                                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">Employment Contract</span>
+                                      <a
+                                        href={contractUrl}
+                                        download={viewingEmployee.contract_file_name || "contract"}
+                                        className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-[#EDF1EC] px-4 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#d9e0d3] transition shadow-xs"
+                                      >
+                                        <FileText className="h-4 w-4 text-[#5A6A51]" />
+                                        {viewingEmployee.contract_file_name || "Download Contract"}
+                                      </a>
+                                    </div>
+                                  )}
+                                  
+                                  {additionalList.length > 0 && (
+                                    <div>
+                                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">Additional Files</span>
+                                      <div className="flex flex-wrap gap-2">
+                                        {additionalList.map((fileItem, idx) => (
+                                          <a
+                                            key={idx}
+                                            href={fileItem.file}
+                                            download={fileItem.name}
+                                            className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-semibold text-[#414E36] hover:bg-gray-50 transition shadow-xs"
+                                          >
+                                            <FileText className="h-3.5 w-3.5 text-[#5A6A51]" />
+                                            {fileItem.name}
+                                          </a>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
@@ -15519,8 +15792,23 @@ export default function AdminPage() {
                               setNewEmployeeNationalIdFront(viewingEmployee.national_id_front || "");
                               setNewEmployeeNationalIdBack(viewingEmployee.national_id_back || "");
                               applyAddressToState(viewingEmployee.address || "");
-                              setNewEmployeeContract(viewingEmployee.contract_file || "");
+                              const rawContract = viewingEmployee.contract_file || "";
+                              let contractUrl = "";
+                              let additionalList: any[] = [];
+                              try {
+                                if (rawContract.startsWith('{')) {
+                                  const parsed = JSON.parse(rawContract);
+                                  contractUrl = parsed.contract || "";
+                                  additionalList = parsed.additional || [];
+                                } else {
+                                  contractUrl = rawContract;
+                                }
+                              } catch (e) {
+                                contractUrl = rawContract;
+                              }
+                              setNewEmployeeContract(contractUrl);
                               setNewEmployeeContractName(viewingEmployee.contract_file_name || "");
+                              setNewEmployeeAdditionalFiles(additionalList);
                               setNewEmployeeRequiredTargetAmount(String(viewingEmployee.requiredTargetAmount || 0));
                               setNewEmployeeBonusPercentage(String(viewingEmployee.bonusPercentage || 0));
                               setViewingEmployee(null);
@@ -21162,13 +21450,21 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Referral Source</label>
-                    <input
-                      type="text"
+                    <select
                       value={custReferral}
                       onChange={(e) => setCustReferral(e.target.value)}
-                      placeholder="e.g. Facebook page, Friend"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
+                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer"
+                    >
+                      <option value="">Select Referral Source...</option>
+                      <option value="Facebook">Facebook</option>
+                      <option value="Instagram">Instagram</option>
+                      <option value="TikTok">TikTok</option>
+                      <option value="Google Search">Google Search</option>
+                      <option value="Friend / Word of Mouth">Friend / Word of Mouth</option>
+                      <option value="Walk-in">Walk-in</option>
+                      <option value="Website">Website</option>
+                      <option value="Other">Other</option>
+                    </select>
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Occupation</label>
