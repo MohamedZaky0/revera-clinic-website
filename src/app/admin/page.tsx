@@ -21571,18 +21571,7 @@ export default function AdminPage() {
 
             {/* Footer */}
             <div className="flex items-center justify-between px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
-              <div>
-                {selectedCustomerForEdit && (
-                  <button
-                    type="button"
-                    onClick={() => setDeleteCustomerTarget(selectedCustomerForEdit)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm transition hover:bg-red-50 hover:border-red-300"
-                  >
-                    <Trash2 size={14} />
-                    Delete Customer
-                  </button>
-                )}
-              </div>
+              <div></div>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
