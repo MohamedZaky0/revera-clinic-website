@@ -96,6 +96,7 @@ Browser → /admin/page.tsx (client component)
   then synced to Supabase on save via `/api/services` and `/api/categories`
 - Branch data: `GET /api/branches`
 - Page settings: `GET|POST /api/page-settings`
+- Admin UX now includes inline side-by-side customer details and an HR-style employee details panel within `src/app/admin/page.tsx`.
 
 ---
 

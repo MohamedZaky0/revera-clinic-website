@@ -76,6 +76,7 @@ import {
 type Req = {
   id: string;
   serviceId: number;
+  service?: string;
   date: string;
   requestedTime?: string | null;
   name: string;
@@ -597,6 +598,7 @@ export default function AdminPage() {
 
   // Customer Profile details drawer state
   const [viewingCustomerProfile, setViewingCustomerProfile] = useState<Customer | null>(null);
+  const [viewingEmployeeProfile, setViewingEmployeeProfile] = useState<any | null>(null);
   const [couponSearch, setCouponSearch] = useState("");
   const [couponDate, setCouponDate] = useState("");
   const [couponStatus, setCouponStatus] = useState("All");
@@ -1699,125 +1701,7 @@ export default function AdminPage() {
       setDoctorName("");
     }
   }, [availableDoctorsApprove, doctorName, selected]);
-  
-  const getDayOperatingHoursAdmin = useCallback((dateStr: string | null) => {
-    if (!dateStr || !newPatientService) return { start: "09:00", end: "20:00" };
-    const dateObj = new Date(dateStr);
-    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
 
-    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const weekdayName = weekdays[dateObj.getDay()];
-    
-    const targetService = localServices.find(s => s.id === newPatientService);
-    if (!targetService) return { start: "09:00", end: "20:00" };
-
-    let minStart = 24 * 60; // in minutes
-    let maxEnd = 0; // in minutes
-    let found = false;
-
-    providers.forEach((doc) => {
-      // Check branch
-      if (newPatientBranch && doc.branchId && doc.branchId !== newPatientBranch) return;
-      
-      // Check service
-      if (doc.services && doc.services.length > 0) {
-        if (!doc.services.includes(targetService.en)) return;
-      }
-
-      // Check working days & hours
-      if (doc.workingDaysHours) {
-        const dayConfig = doc.workingDaysHours[weekdayName];
-        if (dayConfig && dayConfig.isOpen) {
-          const [sh, sm] = dayConfig.start.split(":").map(Number);
-          const [eh, em] = dayConfig.end.split(":").map(Number);
-          const startMins = sh * 60 + sm;
-          const endMins = eh * 60 + em;
-          if (startMins < minStart) minStart = startMins;
-          if (endMins > maxEnd) maxEnd = endMins;
-          found = true;
-        }
-      } else {
-        if (9 * 60 < minStart) minStart = 9 * 60;
-        if (20 * 60 > maxEnd) maxEnd = 20 * 60;
-        found = true;
-      }
-    });
-
-    if (!found) {
-      return { start: "09:00", end: "20:00" };
-    }
-
-    const formatMins = (totalMins: number) => {
-      const h = Math.floor(totalMins / 60);
-      const m = totalMins % 60;
-      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    };
-
-    return {
-      start: formatMins(minStart),
-      end: formatMins(maxEnd)
-    };
-  }, [providers, newPatientBranch, newPatientService, localServices]);
-
-  const getDayOperatingHoursApprove = useCallback((selectedReq: Req | null) => {
-    if (!selectedReq) return { start: "09:00", end: "20:00" };
-    const dateStr = selectedReq.date;
-    const dateObj = new Date(dateStr);
-    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
-
-    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const weekdayName = weekdays[dateObj.getDay()];
-    
-    const targetService = localServices.find(s => s.id === selectedReq.serviceId);
-    if (!targetService) return { start: "09:00", end: "20:00" };
-
-    let minStart = 24 * 60; // in minutes
-    let maxEnd = 0; // in minutes
-    let found = false;
-
-    providers.forEach((doc) => {
-      // Check branch
-      if (selectedReq.branchId && doc.branchId && doc.branchId !== selectedReq.branchId) return;
-      
-      // Check service
-      if (doc.services && doc.services.length > 0) {
-        if (!doc.services.includes(targetService.en)) return;
-      }
-
-      // Check working days & hours
-      if (doc.workingDaysHours) {
-        const dayConfig = doc.workingDaysHours[weekdayName];
-        if (dayConfig && dayConfig.isOpen) {
-          const [sh, sm] = dayConfig.start.split(":").map(Number);
-          const [eh, em] = dayConfig.end.split(":").map(Number);
-          const startMins = sh * 60 + sm;
-          const endMins = eh * 60 + em;
-          if (startMins < minStart) minStart = startMins;
-          if (endMins > maxEnd) maxEnd = endMins;
-          found = true;
-        }
-      } else {
-        if (9 * 60 < minStart) minStart = 9 * 60;
-        if (20 * 60 > maxEnd) maxEnd = 20 * 60;
-        found = true;
-      }
-    });
-
-    if (!found) {
-      return { start: "09:00", end: "20:00" };
-    }
-
-    const formatMins = (totalMins: number) => {
-      const h = Math.floor(totalMins / 60);
-      const m = totalMins % 60;
-      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    };
-
-    return {
-      start: formatMins(minStart),
-      end: formatMins(maxEnd)
-    };
-  }, [providers, localServices]);
 
   // Custom provider modal states
   const [showProviderModal, setShowProviderModal] = useState(false);
@@ -1870,13 +1754,13 @@ export default function AdminPage() {
   const [savingBranch, setSavingBranch] = useState(false);
   const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
   const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
-    { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "10:00", closeTime: "20:00" },
-    { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "10:00", closeTime: "20:00" },
-    { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "10:00", closeTime: "20:00" },
+    { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+    { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
   ]);  const [pageSettingsLangTab, setPageSettingsLangTab] = useState<"en" | "ar">("en");
   const [aboutImage1, setAboutImage1] = useState<string>("");
   const [aboutImage2, setAboutImage2] = useState<string>("");
@@ -1991,6 +1875,180 @@ export default function AdminPage() {
       [id]: { ...prev[id], [field]: !prev[id][field] },
     }));
   }
+
+  const getDayOperatingHoursAdmin = useCallback((dateStr: string | null) => {
+    if (!dateStr || !newPatientService) return { start: "09:00", end: "20:00" };
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
+
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[dateObj.getDay()];
+
+    const clinicDay = serviceHours.find(
+      (sh) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
+    );
+
+    let clinicStartMins = 9 * 60; // 09:00 default
+    let clinicEndMins = 20 * 60;  // 20:00 default
+    let clinicClosed = false;
+
+    if (clinicDay) {
+      if (!clinicDay.isOpen) {
+        clinicClosed = true;
+      } else {
+        const [csh, csm] = clinicDay.openTime.split(":").map(Number);
+        const [ceh, cem] = clinicDay.closeTime.split(":").map(Number);
+        clinicStartMins = csh * 60 + csm;
+        clinicEndMins = ceh * 60 + cem;
+      }
+    }
+
+    if (clinicClosed) {
+      return { start: "23:59", end: "23:59" };
+    }
+    
+    const targetService = localServices.find(s => s.id === newPatientService);
+    if (!targetService) return { start: "09:00", end: "20:00" };
+
+    let minStart = 24 * 60; // in minutes
+    let maxEnd = 0; // in minutes
+    let found = false;
+
+    providers.forEach((doc) => {
+      // Check branch
+      if (newPatientBranch && doc.branchId && doc.branchId !== newPatientBranch) return;
+      
+      // Check service
+      if (doc.services && doc.services.length > 0) {
+        if (!doc.services.includes(targetService.en)) return;
+      }
+
+      // Check working days & hours
+      if (doc.workingDaysHours) {
+        const dayConfig = doc.workingDaysHours[weekdayName];
+        if (dayConfig && dayConfig.isOpen) {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          if (startMins < minStart) minStart = startMins;
+          if (endMins > maxEnd) maxEnd = endMins;
+          found = true;
+        }
+      } else {
+        if (clinicStartMins < minStart) minStart = clinicStartMins;
+        if (clinicEndMins > maxEnd) maxEnd = clinicEndMins;
+        found = true;
+      }
+    });
+
+    if (found) {
+      if (minStart < clinicStartMins) minStart = clinicStartMins;
+      if (maxEnd > clinicEndMins) maxEnd = clinicEndMins;
+    } else {
+      minStart = clinicStartMins;
+      maxEnd = clinicEndMins;
+    }
+
+    const formatMins = (totalMins: number) => {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    return {
+      start: formatMins(minStart),
+      end: formatMins(maxEnd)
+    };
+  }, [providers, newPatientBranch, newPatientService, localServices, serviceHours]);
+
+  const getDayOperatingHoursApprove = useCallback((selectedReq: Req | null) => {
+    if (!selectedReq) return { start: "09:00", end: "20:00" };
+    const dateStr = selectedReq.date;
+    const dateObj = new Date(dateStr);
+    if (isNaN(dateObj.getTime())) return { start: "09:00", end: "20:00" };
+
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayName = weekdays[dateObj.getDay()];
+
+    const clinicDay = serviceHours.find(
+      (sh) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
+    );
+
+    let clinicStartMins = 9 * 60; // 09:00 default
+    let clinicEndMins = 20 * 60;  // 20:00 default
+    let clinicClosed = false;
+
+    if (clinicDay) {
+      if (!clinicDay.isOpen) {
+        clinicClosed = true;
+      } else {
+        const [csh, csm] = clinicDay.openTime.split(":").map(Number);
+        const [ceh, cem] = clinicDay.closeTime.split(":").map(Number);
+        clinicStartMins = csh * 60 + csm;
+        clinicEndMins = ceh * 60 + cem;
+      }
+    }
+
+    if (clinicClosed) {
+      return { start: "23:59", end: "23:59" };
+    }
+    
+    const targetService = localServices.find(s => s.id === selectedReq.serviceId);
+    if (!targetService) return { start: "09:00", end: "20:00" };
+
+    let minStart = 24 * 60; // in minutes
+    let maxEnd = 0; // in minutes
+    let found = false;
+
+    providers.forEach((doc) => {
+      // Check branch
+      if (selectedReq.branchId && doc.branchId && doc.branchId !== selectedReq.branchId) return;
+      
+      // Check service
+      if (doc.services && doc.services.length > 0) {
+        if (!doc.services.includes(targetService.en)) return;
+      }
+
+      // Check working days & hours
+      if (doc.workingDaysHours) {
+        const dayConfig = doc.workingDaysHours[weekdayName];
+        if (dayConfig && dayConfig.isOpen) {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const startMins = sh * 60 + sm;
+          const endMins = eh * 60 + em;
+          if (startMins < minStart) minStart = startMins;
+          if (endMins > maxEnd) maxEnd = endMins;
+          found = true;
+        }
+      } else {
+        if (clinicStartMins < minStart) minStart = clinicStartMins;
+        if (clinicEndMins > maxEnd) maxEnd = clinicEndMins;
+        found = true;
+      }
+    });
+
+    if (found) {
+      if (minStart < clinicStartMins) minStart = clinicStartMins;
+      if (maxEnd > clinicEndMins) maxEnd = clinicEndMins;
+    } else {
+      minStart = clinicStartMins;
+      maxEnd = clinicEndMins;
+    }
+
+    const formatMins = (totalMins: number) => {
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    return {
+      start: formatMins(minStart),
+      end: formatMins(maxEnd)
+    };
+  }, [providers, localServices, serviceHours]);
+
 
   // Derive unique customers from database
   const customers = useMemo<Customer[]>(() => {
@@ -2183,10 +2241,10 @@ export default function AdminPage() {
       .then(r => r.json())
       .then(list => {
         if (Array.isArray(list)) {
-          const unavailable = getUnavailableSlots(list, Number(newPatientService));
+          const { start, end } = getDayOperatingHoursAdmin(newPatientDate);
+          const unavailable = getUnavailableSlots(list, Number(newPatientService), end);
           setManualUnavailableSlots(unavailable);
           // Auto-select first available slot if current is unavailable, empty, or outside operating hours
-          const { start, end } = getDayOperatingHoursAdmin(newPatientDate);
           const filteredSlots = SLOTS.filter((s) => {
             const norm = normaliseTo24hSlot(s) ?? "";
             return norm >= start && norm < end;
@@ -2287,13 +2345,13 @@ export default function AdminPage() {
     setProviderFormBranchId(branches.length > 0 ? branches[0].id : "");
     setProviderFormStartDate("");
     setProviderFormWorkingDaysHours({
-      Sunday: { isOpen: false, start: "10:00", end: "20:00" },
-      Monday: { isOpen: false, start: "10:00", end: "20:00" },
-      Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
-      Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
-      Thursday: { isOpen: false, start: "10:00", end: "20:00" },
-      Friday: { isOpen: false, start: "10:00", end: "20:00" },
-      Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
+      Monday: { isOpen: false, start: "09:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
+      Friday: { isOpen: false, start: "09:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
     });
     setShowProviderModal(true);
   }
@@ -2314,13 +2372,13 @@ export default function AdminPage() {
     setProviderFormBranchId(provider.branchId || "");
     setProviderFormStartDate(provider.startDate || "");
     setProviderFormWorkingDaysHours(provider.workingDaysHours || {
-      Sunday: { isOpen: false, start: "10:00", end: "20:00" },
-      Monday: { isOpen: false, start: "10:00", end: "20:00" },
-      Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
-      Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
-      Thursday: { isOpen: false, start: "10:00", end: "20:00" },
-      Friday: { isOpen: false, start: "10:00", end: "20:00" },
-      Saturday: { isOpen: false, start: "10:00", end: "20:00" }
+      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
+      Monday: { isOpen: false, start: "09:00", end: "20:00" },
+      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
+      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
+      Friday: { isOpen: false, start: "09:00", end: "20:00" },
+      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
     });
     setShowProviderModal(true);
   }
@@ -3311,7 +3369,7 @@ export default function AdminPage() {
     }
   }
 
-  function getUnavailableSlots(approvedBookings: Req[], targetServiceId: number): string[] {
+  function getUnavailableSlots(approvedBookings: Req[], targetServiceId: number, end?: string): string[] {
     const svc = localServices.find(s => s.id === targetServiceId);
     const targetDuration = getDurationInMinutes(svc?.duration);
     const targetSlotsNeeded = Math.ceil(targetDuration / 15);
@@ -3338,7 +3396,12 @@ export default function AdminPage() {
     for (let i = 0; i < ALL_15MIN_SLOTS.length; i++) {
       let fit = true;
       for (let k = 0; k < targetSlotsNeeded; k++) {
-        if (i + k >= occupied.length || occupied[i + k]) {
+        const slotIdx = i + k;
+        if (slotIdx >= occupied.length || occupied[slotIdx]) {
+          fit = false;
+          break;
+        }
+        if (end && ALL_15MIN_SLOTS[slotIdx] >= end) {
           fit = false;
           break;
         }
@@ -3354,9 +3417,9 @@ export default function AdminPage() {
     setSelected(r);
     const qs = `serviceId=${r.serviceId}&date=${r.date}&status=approved`;
     const taken = await fetch("/api/reservations?" + qs).then((res) => res.json());
-    const unavailable = getUnavailableSlots(Array.isArray(taken) ? taken : [], r.serviceId);
-    setApproveUnavailableSlots(unavailable);
     const { start, end } = getDayOperatingHoursApprove(r);
+    const unavailable = getUnavailableSlots(Array.isArray(taken) ? taken : [], r.serviceId, end);
+    setApproveUnavailableSlots(unavailable);
     const filteredSlots = SLOTS.filter((s) => {
       const norm = normaliseTo24hSlot(s) ?? "";
       return norm >= start && norm < end;
@@ -6800,78 +6863,179 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* Table */}
-              <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white shadow-sm">
-                <table className="w-full min-w-[700px] text-sm">
-                  <thead>
-                    <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Customer</th>
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Phone</th>
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Email</th>
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Created At</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Bookings</th>
-                      <th className="px-4 py-3"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#414E36]/8">
-                    {filteredCustomers.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="px-5 py-8 text-center text-[#5A6A51]">
-                          No customers found.
-                        </td>
+              <div className="grid gap-6 xl:grid-cols-[1.85fr_1fr]">
+                <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white shadow-sm">
+                  <table className="w-full min-w-[700px] text-sm">
+                    <thead>
+                      <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
+                        <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Customer</th>
+                        <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Phone</th>
+                        <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Email</th>
+                        <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Created At</th>
+                        <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Bookings</th>
+                        <th className="px-4 py-3"></th>
                       </tr>
-                    )}
-                    {filteredCustomers.map((c) => {
-                      const dt = new Date(c.createdAt);
-                      const dateStr = dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-                      const timeStr = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
-                      const uniqueKey = c.id || c.email || c.phone;
-                      const displayPhone = c.mobile || c.phone || "—";
-                      const displayEmail = c.email || "—";
-                      return (
-                        <tr key={uniqueKey} className="transition hover:bg-[#F9F9F7]">
-                          <td className="px-5 py-4 font-semibold text-[#1F251A]">{c.name}</td>
-                          <td className="px-5 py-4 text-[#1F251A]">{displayPhone}</td>
-                          <td className="px-5 py-4 text-[#5A6A51]">{displayEmail}</td>
-                          <td className="px-5 py-4 text-[#5A6A51]">
-                            <span className="block font-medium text-[#1F251A]">{dateStr}</span>
-                            <span className="text-xs">{timeStr}</span>
-                          </td>
-                          <td className="px-5 py-4 text-center text-[#1F251A]">{c.bookings}</td>
-                          <td className="px-4 py-4 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button
-                                onClick={() => setViewingCustomerProfile(c)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                title="View Customer Profile & Booking History"
-                              >
-                                <Info size={14} />
-                              </button>
-                              {hasPermission("customers.edit") && (
-                                <button
-                                  onClick={() => handleOpenEditCustomer(c)}
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                  title="Edit Customer"
-                                >
-                                  <Pencil size={12} />
-                                </button>
-                              )}
-                              {hasPermission("customers.delete") && (
-                                <button
-                                  onClick={() => setDeleteCustomerTarget(c)}
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50"
-                                  title="Delete Customer"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </div>
+                    </thead>
+                    <tbody className="divide-y divide-[#414E36]/8">
+                      {filteredCustomers.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="px-5 py-8 text-center text-[#5A6A51]">
+                            No customers found.
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      )}
+                      {filteredCustomers.map((c) => {
+                        const dt = new Date(c.createdAt);
+                        const dateStr = dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                        const timeStr = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
+                        const uniqueKey = c.id || c.email || c.phone;
+                        const displayPhone = c.mobile || c.phone || "—";
+                        const displayEmail = c.email || "—";
+                        return (
+                          <tr key={uniqueKey} className="transition hover:bg-[#F9F9F7]">
+                            <td className="px-5 py-4 font-semibold text-[#1F251A]">{c.name}</td>
+                            <td className="px-5 py-4 text-[#1F251A]">{displayPhone}</td>
+                            <td className="px-5 py-4 text-[#5A6A51]">{displayEmail}</td>
+                            <td className="px-5 py-4 text-[#5A6A51]">
+                              <span className="block font-medium text-[#1F251A]">{dateStr}</span>
+                              <span className="text-xs">{timeStr}</span>
+                            </td>
+                            <td className="px-5 py-4 text-center text-[#1F251A]">{c.bookings}</td>
+                            <td className="px-4 py-4 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => setViewingCustomerProfile(c)}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                  title="View Customer Profile & Booking History"
+                                >
+                                  <Info size={14} />
+                                </button>
+                                {hasPermission("customers.edit") && (
+                                  <button
+                                    onClick={() => handleOpenEditCustomer(c)}
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                    title="Edit Customer"
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
+                                )}
+                                {hasPermission("customers.delete") && (
+                                  <button
+                                    onClick={() => setDeleteCustomerTarget(c)}
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50"
+                                    title="Delete Customer"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <aside className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between gap-3 mb-5">
+                    <div>
+                      <h4 className="text-lg font-bold text-[#1F251A]">Patient Details</h4>
+                      <p className="text-xs text-[#5A6A51]">Select a patient to preview their profile and bookings.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setViewingCustomerProfile(null)}
+                      className="rounded-full border border-[#414E36]/15 bg-white p-2 text-[#5A6A51] transition hover:bg-[#F9F9F7]"
+                      title="Close Details"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  {!viewingCustomerProfile ? (
+                    <div className="rounded-3xl border border-dashed border-[#D6D7DA] bg-[#FBFBF9] p-6 text-sm text-[#5A6A51] text-center">
+                      Select a patient to display their profile details and recent bookings.
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="rounded-3xl bg-[#F9F9F7] p-5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#414E36] text-white text-xl font-bold">{(viewingCustomerProfile.name || "").slice(0,1)}</div>
+                          <div>
+                            <p className="text-sm font-semibold text-[#1F251A]">{viewingCustomerProfile.name}</p>
+                            <p className="text-xs text-[#5A6A51]">Patient since {viewingCustomerProfile.createdAt ? new Date(viewingCustomerProfile.createdAt).toLocaleDateString('en-GB') : 'unknown'}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="rounded-3xl border border-[#E6E9EB] bg-white p-4">
+                          <p className="text-[10px] uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Contact</p>
+                          <p className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || '—'}</p>
+                          <p className="text-xs text-[#414E36]/80 break-all">{viewingCustomerProfile.email || '—'}</p>
+                        </div>
+                        <div className="rounded-3xl border border-[#E6E9EB] bg-white p-4">
+                          <p className="text-[10px] uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Profile</p>
+                          <p className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || '—'} years old</p>
+                          <p className="text-xs text-[#414E36]/80">{viewingCustomerProfile.gender || '—'}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="rounded-3xl border border-[#E6E9EB] bg-white p-4">
+                          <p className="text-[10px] uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Location</p>
+                          <p className="font-semibold text-[#1F251A]">{viewingCustomerProfile.location_name || '—'}</p>
+                          <p className="text-xs text-[#414E36]/80">{[viewingCustomerProfile.building_no, viewingCustomerProfile.street_name, viewingCustomerProfile.floor_no, viewingCustomerProfile.area].filter(Boolean).join(', ') || viewingCustomerProfile.address || '—'}</p>
+                        </div>
+                        <div className="rounded-3xl border border-[#E6E9EB] bg-white p-4">
+                          <p className="text-[10px] uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Status</p>
+                          <span className="inline-flex items-center gap-2 rounded-full bg-[#EDF1EC] px-3 py-1 text-sm font-semibold text-[#414E36]">
+                            <span className={`h-2.5 w-2.5 rounded-full ${viewingCustomerProfile.active !== false ? 'bg-green-600' : 'bg-gray-400'}`}></span>
+                            {viewingCustomerProfile.active !== false ? 'Active Patient' : 'Inactive'}
+                          </span>
+                          <p className="text-xs text-[#414E36]/80 mt-2">Bookings: {viewingCustomerProfile.bookings || 0}</p>
+                        </div>
+                      </div>
+
+                      {viewingCustomerProfile.note && (
+                        <div className="rounded-3xl border border-[#E6E9EB] bg-white p-4">
+                          <p className="text-[10px] uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Clinical Notes</p>
+                          <p className="text-sm text-[#414E36] leading-relaxed">{viewingCustomerProfile.note}</p>
+                        </div>
+                      )}
+
+                      <div className="rounded-3xl border border-[#E6E9EB] bg-white p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-[10px] uppercase tracking-[0.25em] text-[#5A6A51]">Recent bookings</p>
+                          <span className="text-[10px] font-semibold text-[#414E36]">{allReservations.filter((r) => r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) || r.customerId === viewingCustomerProfile.id).length} records</span>
+                        </div>
+                        <div className="space-y-3">
+                          {(() => {
+                            const history = allReservations.filter((r) => r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) || r.customerId === viewingCustomerProfile.id).slice(0, 5);
+                            if (!history.length) {
+                              return <p className="text-xs text-[#5A6A51]">No recent bookings recorded.</p>;
+                            }
+                            return history.map((res) => {
+                              const resDt = new Date(res.date);
+                              const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                              return (
+                                <div key={res.id} className="rounded-2xl bg-[#F9F9F7] p-3">
+                                  <div className="flex items-center justify-between gap-2 text-xs text-[#414E36]">
+                                    <span>{formattedDate}</span>
+                                    <span>{res.timeSlot || res.requestedTime || '—'}</span>
+                                  </div>
+                                  <p className="font-semibold text-[#1F251A]">{localServices.find(s => s.id === res.serviceId)?.en || res.service || `Service #${res.serviceId}`}</p>
+                                  <p className="text-[11px] text-[#5A6A51]">{res.doctorName || 'No provider assigned'} • {res.status}</p>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </aside>
               </div>
             </div>
           )}
@@ -9885,85 +10049,190 @@ export default function AdminPage() {
                     </button>
                   </form>
 
-                  {/* Employees Table */}
-                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                          <th className="px-6 py-4 text-left">Full Name</th>
-                          <th className="px-6 py-4 text-left">Assigned Role</th>
-                          <th className="px-6 py-4 text-left">Login Email</th>
-                          <th className="px-6 py-4 text-center">Status</th>
-                          <th className="px-6 py-4 text-center">Actions</th>
-                        </tr>
+                  {/* Employees Table + Employee Details */}
+                  <div className="grid gap-6 xl:grid-cols-[2.2fr_1fr]">
+                    <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                            <th className="px-6 py-4 text-left">Full Name</th>
+                            <th className="px-6 py-4 text-left">Assigned Role</th>
+                            <th className="px-6 py-4 text-left">Login Email</th>
+                            <th className="px-6 py-4 text-center">Status</th>
+                            <th className="px-6 py-4 text-center">Actions</th>
+                          </tr>
 
-                      </thead>
-                      <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
-                        {loadingRolesAndEmployees ? (
-                          <tr>
-                            <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">Loading accounts...</td>
-                          </tr>
-                        ) : employeesList.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">No employee accounts provisioned yet. Use the form above to send an invitation.</td>
-                          </tr>
-                        ) : employeesList.map((emp) => (
-                          <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
-                            <td className="px-6 py-4 font-semibold text-[#1F251A]">{emp.name || emp.employee_id || '—'}</td>
-                            <td className="px-6 py-4 text-xs font-semibold text-[#414E36]">
-                              {adminRole === "superadmin" && emp.employee_id !== "superadmin" ? (
-                                <select
-                                  value={emp.role_name}
-                                  onChange={(e) => handleUpdateEmployeeRole(emp.id, e.target.value)}
-                                  className="rounded-lg border border-[#E6E9EB] bg-[#FBFBF9] px-2 py-1 text-xs font-semibold text-[#414E36] focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36] outline-none"
-                                >
-                                  {rolesList.map((r) => (
-                                    <option key={r.id} value={r.name}>
-                                      {r.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <span className="capitalize">{emp.role_name}</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">{emp.email}</td>
-                            <td className="px-6 py-4 text-center">
-                              {emp.email_confirmed_at ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">✓ Active</span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">⏳ Invite Pending</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              {emp.employee_id !== 'superadmin' ? (
-                                <div className="flex items-center justify-center gap-2">
-                                  {!emp.email_confirmed_at && (
+                        </thead>
+                        <tbody className="divide-y divide-[#E6E9EB] text-[#414E36] font-medium">
+                          {loadingRolesAndEmployees ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">Loading accounts...</td>
+                            </tr>
+                          ) : employeesList.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-5 text-center text-xs text-gray-400">No employee accounts provisioned yet. Use the form above to send an invitation.</td>
+                            </tr>
+                          ) : employeesList.map((emp) => (
+                            <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
+                              <td className="px-6 py-4 font-semibold text-[#1F251A]">{emp.name || emp.employee_id || '—'}</td>
+                              <td className="px-6 py-4 text-xs font-semibold text-[#414E36]">
+                                {adminRole === "superadmin" && emp.employee_id !== "superadmin" ? (
+                                  <select
+                                    value={emp.role_name}
+                                    onChange={(e) => handleUpdateEmployeeRole(emp.id, e.target.value)}
+                                    className="rounded-lg border border-[#E6E9EB] bg-[#FBFBF9] px-2 py-1 text-xs font-semibold text-[#414E36] focus:border-[#414E36] focus:ring-1 focus:ring-[#414E36] outline-none"
+                                  >
+                                    {rolesList.map((r) => (
+                                      <option key={r.id} value={r.name}>
+                                        {r.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span className="capitalize">{emp.role_name}</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">{emp.email}</td>
+                              <td className="px-6 py-4 text-center">
+                                {emp.email_confirmed_at ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">✓ Active</span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">⏳ Invite Pending</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                {emp.employee_id !== 'superadmin' ? (
+                                  <div className="flex flex-wrap items-center justify-center gap-2">
                                     <button
                                       type="button"
-                                      onClick={() => handleResendInvitation(emp.id)}
-                                      className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100"
-                                      title="Resend Invitation Email"
+                                      onClick={() => setViewingEmployeeProfile(emp)}
+                                      className="inline-flex h-8 items-center gap-1 rounded-full border border-[#414E36]/15 bg-white px-3 py-1 text-[11px] font-semibold text-[#414E36] transition hover:bg-[#F9F9F7]"
+                                      title="View Employee Details"
                                     >
-                                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9z"/></svg>
-                                      Resend
+                                      <Info size={14} /> View
                                     </button>
+                                    {!emp.email_confirmed_at && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleResendInvitation(emp.id)}
+                                        className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 transition hover:bg-amber-100"
+                                        title="Resend Invitation Email"
+                                      >
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9z"/></svg>
+                                        Resend
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteEmployee(emp.id)}
+                                      className="text-red-600 hover:text-red-800 transition"
+                                      title="Revoke Access"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                ) : <span className="text-xs text-gray-400 font-semibold italic">System Owner</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <aside className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm">
+                      <div className="flex items-start justify-between gap-3 mb-5">
+                        <div>
+                          <h4 className="text-lg font-bold text-[#1F251A]">Employee Details</h4>
+                          <p className="text-xs text-[#5A6A51]">Select any employee to inspect their account, role, and invite status.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setViewingEmployeeProfile(null)}
+                          className="rounded-full border border-[#414E36]/15 bg-white p-2 text-[#5A6A51] transition hover:bg-[#F9F9F7]"
+                          title="Close Details"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      {!viewingEmployeeProfile ? (
+                        <div className="rounded-3xl border border-dashed border-[#D6D7DA] bg-[#FBFBF9] p-6 text-sm text-[#5A6A51] text-center">
+                          Select an employee to preview their profile and credential details.
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          <div className="rounded-3xl bg-[#F9F9F7] p-5">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#414E36] text-white text-xl font-bold">{(viewingEmployeeProfile.name || '').slice(0, 1)}</div>
+                              <div>
+                                <p className="text-sm font-semibold text-[#1F251A]">{viewingEmployeeProfile.name || 'Unknown'}</p>
+                                <p className="text-xs text-[#5A6A51]">{viewingEmployeeProfile.role_name ? `${viewingEmployeeProfile.role_name} role` : 'No role assigned'}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 text-sm sm:grid-cols-2">
+                            <div className="rounded-3xl border border-[#E6E9EB] bg-white p-4">
+                              <p className="text-[10px] uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Email</p>
+                              <p className="font-semibold text-[#1F251A] break-all">{viewingEmployeeProfile.email || '—'}</p>
+                            </div>
+                            <div className="rounded-3xl border border-[#E6E9EB] bg-white p-4">
+                              <p className="text-[10px] uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Employee ID</p>
+                              <p className="font-semibold text-[#1F251A] font-mono">{viewingEmployeeProfile.employee_id || '—'}</p>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 text-sm sm:grid-cols-2">
+                            <div className="rounded-3xl border border-[#E6E9EB] bg-white p-4">
+                              <p className="text-[10px] uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Invite Status</p>
+                              <p className="font-semibold text-[#1F251A]">{viewingEmployeeProfile.email_confirmed_at ? 'Active' : 'Pending Invitation'}</p>
+                              <p className="text-xs text-[#414E36]/80 mt-2">{viewingEmployeeProfile.email_confirmed_at ? `Confirmed at ${new Date(viewingEmployeeProfile.email_confirmed_at).toLocaleDateString('en-GB')}` : 'Invitation email has not been accepted yet.'}</p>
+                            </div>
+                            <div className="rounded-3xl border border-[#E6E9EB] bg-white p-4">
+                              <p className="text-[10px] uppercase tracking-[0.25em] text-[#5A6A51] mb-2">Role Permissions</p>
+                              {rolesList.find((r) => r.name === viewingEmployeeProfile.role_name)?.permissions.length ? (
+                                <div className="space-y-2">
+                                  {rolesList.find((r) => r.name === viewingEmployeeProfile.role_name)?.permissions.slice(0, 4).map((perm: string) => (
+                                    <span key={perm} className="block rounded-full bg-[#EDF1EC] px-2.5 py-1 text-xs text-[#414E36]">{perm}</span>
+                                  ))}
+                                  {rolesList.find((r) => r.name === viewingEmployeeProfile.role_name)?.permissions.length > 4 && (
+                                    <span className="text-[10px] text-[#8A9A81]">+ more permissions available</span>
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteEmployee(emp.id)}
-                                    className="text-red-600 hover:text-red-800 transition"
-                                    title="Revoke Access"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
                                 </div>
-                              ) : <span className="text-xs text-gray-400 font-semibold italic">System Owner</span>}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                              ) : (
+                                <p className="text-xs text-[#5A6A51]">No permission details available for this role.</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="rounded-3xl border border-[#E6E9EB] bg-white p-4 text-sm">
+                            <div className="flex items-center justify-between mb-3">
+                              <p className="text-[10px] uppercase tracking-[0.25em] text-[#5A6A51]">Account Actions</p>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                              {!viewingEmployeeProfile.email_confirmed_at && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleResendInvitation(viewingEmployeeProfile.id)}
+                                  className="rounded-2xl bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                                >
+                                  Resend Invitation
+                                </button>
+                              )}
+                              {viewingEmployeeProfile.employee_id !== 'superadmin' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteEmployee(viewingEmployeeProfile.id)}
+                                  className="rounded-2xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                                >
+                                  Revoke Access
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </aside>
                   </div>
                 </div>
               </div>
@@ -13262,213 +13531,6 @@ export default function AdminPage() {
                 className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {deletingCustomer ? "Deleting..." : "Yes, Delete Customer"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── CUSTOMER PROFILE & BOOKING HISTORY DRAWER ── */}
-      {viewingCustomerProfile && (
-        <div
-          className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-xs transition-opacity duration-300"
-          onClick={() => setViewingCustomerProfile(null)}
-        >
-          <div
-            className="w-full max-w-2xl bg-[#FBFBF9] h-full shadow-2xl flex flex-col animate-slideOver overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10">
-                  <User size={20} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-[#1F251A]">{viewingCustomerProfile.name}</h3>
-                  <p className="text-xs text-[#5A6A51]">Patient Profile & Clinic Engagement History</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setViewingCustomerProfile(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Drawer Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-              {/* Profile Details Cards */}
-              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Personal Profile</h4>
-                  {hasPermission("customers.edit") && (
-                    <button
-                      onClick={() => {
-                        handleOpenEditCustomer(viewingCustomerProfile);
-                        setViewingCustomerProfile(null);
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
-                    >
-                      <Pencil size={12} /> Edit Profile
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
-                    <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Age</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Gender</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
-                    <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Referral Source</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
-                    <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Profile Status</span>
-                    <span className={`inline-flex items-center gap-1 text-xs font-bold ${
-                      viewingCustomerProfile.active !== false ? "text-green-700" : "text-gray-400"
-                    }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-green-600" : "bg-gray-400"}`} />
-                      {viewingCustomerProfile.active !== false ? "Active Patient" : "Inactive"}
-                    </span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Address</span>
-                    <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
-                      {viewingCustomerProfile.address || [
-                        viewingCustomerProfile.building_no,
-                        viewingCustomerProfile.street_name,
-                        viewingCustomerProfile.floor_no,
-                        viewingCustomerProfile.area,
-                        viewingCustomerProfile.location_name
-                      ].filter(Boolean).join(", ") || "—"}
-                    </span>
-                  </div>
-                  {viewingCustomerProfile.note && (
-                    <div className="col-span-2">
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Notes & Observations</span>
-                      <p className="text-xs text-[#5A6A51] bg-amber-50/40 border border-amber-200/50 rounded-xl p-3 leading-relaxed">
-                        {viewingCustomerProfile.note}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Booking History Card */}
-              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-                <div className="border-b border-[#414E36]/10 pb-3 flex items-center justify-between">
-                  <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Booking History</h4>
-                  <span className="text-xs font-semibold bg-[#EDF1EC] text-[#414E36] px-2.5 py-1 rounded-md">
-                    Total: {
-                      allReservations.filter(
-                        (r) =>
-                          r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
-                          r.customerId === viewingCustomerProfile.id
-                      ).length
-                    }
-                  </span>
-                </div>
-
-                <div className="overflow-hidden rounded-xl border border-[#E6E9EB]">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] font-bold text-[#5A6A51] uppercase tracking-wider text-[10px]">
-                        <th className="px-4 py-3 text-left">Date / Slot</th>
-                        <th className="px-4 py-3 text-left">Service</th>
-                        <th className="px-4 py-3 text-left">Provider</th>
-                        <th className="px-4 py-3 text-right">Paid</th>
-                        <th className="px-4 py-3 text-right">Left</th>
-                        <th className="px-4 py-3 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
-                      {(() => {
-                        const history = allReservations.filter(
-                          (r) =>
-                            r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
-                            r.customerId === viewingCustomerProfile.id
-                        );
-                        if (history.length === 0) {
-                          return (
-                            <tr>
-                              <td colSpan={6} className="px-4 py-6 text-center text-gray-400 italic">
-                                No booking history records found for this patient.
-                              </td>
-                            </tr>
-                          );
-                        }
-                        return history.map((res) => {
-                          const resDt = new Date(res.date);
-                          const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-                          const serv = localServices.find(s => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
-                          const statusClass = getStatusBadgeClass(res.status);
-
-                          const pricesMap: Record<number, number> = {
-                            1: 400, 2: 500, 3: 450, 4: 600, 5: 800, 6: 700, 7: 1500,
-                            11: 600, 12: 500, 13: 800, 14: 1200, 15: 1500, 16: 1000, 17: 400,
-                            21: 300, 22: 350, 23: 300,
-                            31: 400, 32: 350, 33: 400, 34: 500
-                          };
-                          const serviceCost = localServices.find(s => s.id === res.serviceId)?.price ?? pricesMap[res.serviceId] ?? 500;
-                          const spent = res.amountPaid ?? 0;
-                          const left = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : Math.max(0, serviceCost - spent);
-
-                          return (
-                            <tr key={res.id} className="hover:bg-[#F9F9F7]">
-                              <td className="px-4 py-3">
-                                <span className="block font-semibold text-[#1F251A]">{formattedDate}</span>
-                                <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "—"}</span>
-                              </td>
-                              <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
-                              <td className="px-4 py-3">{res.doctorName || "—"}</td>
-                              <td className="px-4 py-3 text-right font-medium text-green-700">{spent} EGP</td>
-                              <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
-                              <td className="px-4 py-3 text-center">
-                                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusClass}`}>
-                                  {res.status}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        });
-                      })()}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* Drawer Footer */}
-            <div className="flex items-center justify-end px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
-              <button
-                type="button"
-                onClick={() => setViewingCustomerProfile(null)}
-                className="rounded-lg border border-[#414E36]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
-              >
-                Close Profile
               </button>
             </div>
           </div>
