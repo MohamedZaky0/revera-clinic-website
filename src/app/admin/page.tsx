@@ -7897,9 +7897,14 @@ export default function AdminPage() {
                       finalPrice = Math.max(0, Math.round(finalPrice));
 
                       return (
-                        <div key={index} className={`bg-white rounded-2xl border border-[#414E36]/10 p-5 shadow-sm transition hover:shadow-md relative overflow-hidden flex flex-col justify-between ${
-                          status === "disabled" ? "grayscale opacity-60" : ""
-                        }`}>
+                        <div
+                          key={index}
+                          className="bg-white rounded-2xl border border-[#414E36]/10 p-5 shadow-sm transition hover:shadow-md relative overflow-hidden flex flex-col justify-between"
+                          style={{
+                            filter: status === "disabled" ? "grayscale(100%)" : "none",
+                            opacity: status === "disabled" ? 0.6 : 1
+                          }}
+                        >
                           {/* Accent status border */}
                           <div className={`absolute top-0 left-0 right-0 h-1.5 ${
                             status === "active" ? "bg-emerald-500" :
