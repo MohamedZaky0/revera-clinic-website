@@ -28,6 +28,8 @@ export async function GET() {
       ...emp,
       requiredTargetAmount: emp.required_target_amount !== null ? Number(emp.required_target_amount) : 0,
       bonusPercentage: emp.bonus_percentage !== null ? Number(emp.bonus_percentage) : 0,
+      targetType: emp.target_type || 'reservations',
+      bonusType: emp.bonus_type || 'percentage',
       email_confirmed_at: emp.auth_user_id ? confirmedMap.get(emp.auth_user_id) : null
     }));
 
@@ -41,7 +43,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage } = body;
+    const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType } = body;
 
     if (!email || !name || !roleName) {
       return NextResponse.json(
@@ -142,6 +144,8 @@ export async function POST(req: Request) {
         contract_file_name: contractFileName || null,
         required_target_amount: requiredTargetAmount ? Number(requiredTargetAmount) : 0,
         bonus_percentage: bonusPercentage ? Number(bonusPercentage) : 0,
+        target_type: targetType || 'reservations',
+        bonus_type: bonusType || 'percentage',
       })
       .select()
       .single();
@@ -154,7 +158,9 @@ export async function POST(req: Request) {
     const mapped = newEmployee ? {
       ...newEmployee,
       requiredTargetAmount: newEmployee.required_target_amount !== null ? Number(newEmployee.required_target_amount) : 0,
-      bonusPercentage: newEmployee.bonus_percentage !== null ? Number(newEmployee.bonus_percentage) : 0
+      bonusPercentage: newEmployee.bonus_percentage !== null ? Number(newEmployee.bonus_percentage) : 0,
+      targetType: newEmployee.target_type || 'reservations',
+      bonusType: newEmployee.bonus_type || 'percentage'
     } : null;
 
     return NextResponse.json(mapped, { status: 201 });
@@ -167,7 +173,7 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, resendInvite } = body;
+    const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType, resendInvite } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Employee ID is required.' }, { status: 400 });
@@ -184,7 +190,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Employee account not found.' }, { status: 404 });
     }
 
-    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchId !== undefined || requiredTargetAmount !== undefined || bonusPercentage !== undefined)) {
+    if (!resendInvite && (roleName || name !== undefined || phone !== undefined || department !== undefined || shift !== undefined || salary !== undefined || nationalId !== undefined || nationalIdFront !== undefined || nationalIdBack !== undefined || address !== undefined || branchId !== undefined || requiredTargetAmount !== undefined || bonusPercentage !== undefined || targetType !== undefined || bonusType !== undefined)) {
       const updates: Record<string, any> = {};
       if (roleName) {
         if (employee.employee_id === 'superadmin') {
@@ -217,6 +223,8 @@ export async function PATCH(req: Request) {
       if (contractFileName !== undefined) updates.contract_file_name = contractFileName;
       if (requiredTargetAmount !== undefined) updates.required_target_amount = Number(requiredTargetAmount);
       if (bonusPercentage !== undefined) updates.bonus_percentage = Number(bonusPercentage);
+      if (targetType !== undefined) updates.target_type = targetType;
+      if (bonusType !== undefined) updates.bonus_type = bonusType;
 
       const { data: updatedEmp, error: updateError } = await supabaseServer
         .from('employee_accounts')
@@ -239,7 +247,9 @@ export async function PATCH(req: Request) {
       const mapped = updatedEmp ? {
         ...updatedEmp,
         requiredTargetAmount: updatedEmp.required_target_amount !== null ? Number(updatedEmp.required_target_amount) : 0,
-        bonusPercentage: updatedEmp.bonus_percentage !== null ? Number(updatedEmp.bonus_percentage) : 0
+        bonusPercentage: updatedEmp.bonus_percentage !== null ? Number(updatedEmp.bonus_percentage) : 0,
+        targetType: updatedEmp.target_type || 'reservations',
+        bonusType: updatedEmp.bonus_type || 'percentage'
       } : null;
 
       return NextResponse.json(mapped);

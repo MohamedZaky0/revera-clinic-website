@@ -29,7 +29,7 @@ A Next.js (App Router) web application serving two purposes:
 
 - **Single-tenant:** One Supabase project, one deployment — exclusively for Revera Clinics.
 - **Hosted on Vercel** (Next.js, App Router).
-- **Database:** Supabase (PostgreSQL) — tables: `reservations`, `services`, `categories`, `branches`, `providers`, `page_settings`, `prescriptions`, `customers`.
+- **Database:** Supabase (PostgreSQL) — tables: `reservations`, `services`, `categories`, `branches`, `providers` (Doctors), `page_settings`, `prescriptions`, `customers`, `employee_accounts`, `employee_notes`, `hr_payroll`, `hr_attendance`, `hr_leave_requests`, `hr_performance_reviews`, `hr_missing_alerts`, `provider_schedule_audit_logs`.
 - **No multi-tenancy.** No org/tenant layer in the schema.
 
 ---
@@ -68,7 +68,7 @@ src/
   app/
     page.tsx              — Homepage
     layout.tsx            — Root layout + metadata
-    admin/page.tsx        — Full admin panel (single file, ~550KB)
+    admin/page.tsx        — Full admin panel (single file, ~1.2MB)
     about/page.tsx
     services/page.tsx
     blog/page.tsx
@@ -79,7 +79,9 @@ src/
       services/           — Service catalog CRUD
       categories/         — Category CRUD
       branches/           — Branch CRUD
-      providers/          — Provider CRUD (Supabase + JSON fallback)
+      providers/          — Doctor (Provider) CRUD (Supabase + JSON fallback)
+      employees/          — Employee profile, credentials, target/bonus configurations CRUD
+      hr/                 — Payroll, Leaves, Attendance, Performance endpoints
       page-settings/      — CMS content CRUD (Supabase + JSON fallback)
       prescriptions/      — Prescriptions CRUD (Supabase + JSON fallback)
       translate/          — Auto-translate helper (using Google Translate)

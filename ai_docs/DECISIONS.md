@@ -137,3 +137,56 @@ Admin notes were previously updated via browser-default `window.prompt()` popup 
 **Reason:**
 - Provides a clean, modern, and unified admin aesthetic.
 - Prevents jarring native browser dialog interruptions.
+
+---
+
+## DEC-007: Renaming Providers to Doctors and Multi-Shift Schedules
+
+**Date:** 2026-07-18
+**Status:** Decided — active
+
+**Context:**
+The clinic has medical professionals. We decided to rename the label "Providers" to "Doctors" across all admin/public labels. Additionally, doctor calendars must support multiple shifts per day rather than a single start/end time.
+
+**Reason:**
+- "Doctors" is more natural and patient-centric than "Providers" for a clinic.
+- Doctors frequently work split shifts (e.g. morning and evening slots) on a single day.
+
+---
+
+## DEC-008: Real Database-Backed HR Modules
+
+**Date:** 2026-07-18
+**Status:** Decided — active
+
+**Context:**
+All HR features (Payroll, Leaves, Attendance, Performance Reviews, Targets) were previously mock sections using static frontend constants. We implemented real PostgreSQL tables and Next.js backend routes to persist and run HR processes.
+
+**Reason:**
+- Moves the application from a mock clone to a production-ready internal CRM system.
+
+---
+
+## DEC-009: Customer Profile Inline Full-Page Navigation
+
+**Date:** 2026-07-18
+**Status:** Decided — active
+
+**Context:**
+The customer details view and customer creation forms were previously rendered inside a fixed modal/drawer overlay. We refactored them to render inline within the main admin panel layout using back-navigation.
+
+**Reason:**
+- Enhances visual space for editing and viewing deep patient medical profiles and history.
+
+---
+
+## DEC-010: Custom Target Metrics and Bonus Calculations
+
+**Date:** 2026-07-19
+**Status:** Decided — active
+
+**Context:**
+Target goals for employees were limited to a count of reservations, and bonuses were fixed at a percentage of basic salary. We introduced customizable target metrics (`reservations` or `revenue` in EGP) and bonus calculations (`percentage` of basic salary or a `fixed` money reward).
+
+**Reason:**
+- Fits varying compensation strategies for receptionists vs medical staff.

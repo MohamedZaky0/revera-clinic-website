@@ -870,6 +870,8 @@ export default function AdminPage() {
   const [editingTargetEmployee, setEditingTargetEmployee] = useState<any | null>(null);
   const [targetAmountInput, setTargetAmountInput] = useState("");
   const [bonusPercentageInput, setBonusPercentageInput] = useState("");
+  const [targetTypeInput, setTargetTypeInput] = useState<"reservations" | "revenue">("reservations");
+  const [bonusTypeInput, setBonusTypeInput] = useState<"percentage" | "fixed">("percentage");
 
   // Doctor payroll states
   const [doctorPayrollList, setDoctorPayrollList] = useState<any[]>([]);
@@ -18289,8 +18291,9 @@ export default function AdminPage() {
                         <thead>
                           <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
                             <th className="px-6 py-4">Employee Info</th>
-                            <th className="px-6 py-4">Monthly Target (Reservations)</th>
-                            <th className="px-6 py-4">Bonus % of Salary</th>
+                            <th className="px-6 py-4">Monthly Target</th>
+                            <th className="px-6 py-4">Target Type</th>
+                            <th className="px-6 py-4">Bonus Target</th>
                             <th className="px-6 py-4">Achieved (Current Month)</th>
                             <th className="px-6 py-4">Progress</th>
                             <th className="px-6 py-4 text-right">Actions</th>
@@ -18298,19 +18301,26 @@ export default function AdminPage() {
                         </thead>
                         <tbody className="divide-y divide-[#414E36]/5">
                           {employeesList.map((emp: any) => {
+                            const targetType = emp.targetType || "reservations";
+                            const bonusType = emp.bonusType || "percentage";
+                            const targetAmount = Number(emp.requiredTargetAmount || 0);
+                            const bonusVal = Number(emp.bonusPercentage || 0);
+
                             const currentMonthStr = new Date().toISOString().slice(0, 7);
                             const currentMonthBookings = allReservations.filter((b) => {
                               const isApprovedOrCompleted = b.status === "approved" || b.status === "completed";
                               return b.createdByEmployeeId === emp.id && isApprovedOrCompleted && b.date && b.date.startsWith(currentMonthStr);
                             });
                             const achievedCount = currentMonthBookings.length;
+                            const achievedRevenue = currentMonthBookings.reduce((sum, b) => {
+                              const svc = localServices.find(s => s.id === b.serviceId);
+                              const price = Number(b.amountPaid || 0) + Number(b.amountLeft || 0) || Number(svc?.price || 0);
+                              return sum + price;
+                            }, 0);
 
-                            const targetAmount = Number(emp.requiredTargetAmount || 0);
-                            const bonusPct = Number(emp.bonusPercentage || 0);
-                            const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((achievedCount / targetAmount) * 100)) : 0;
-                            const hasAchievedTarget = targetAmount > 0 && achievedCount >= targetAmount;
-                            const salary = Number(emp.salary || 0);
-                            const estimatedBonus = hasAchievedTarget ? Math.round(salary * (bonusPct / 100)) : 0;
+                            const achievedVal = targetType === "revenue" ? achievedRevenue : achievedCount;
+                            const progressPercent = targetAmount > 0 ? Math.min(100, Math.round((achievedVal / targetAmount) * 100)) : 0;
+                            const hasAchievedTarget = targetAmount > 0 && achievedVal >= targetAmount;
 
                             return (
                               <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
@@ -18319,13 +18329,20 @@ export default function AdminPage() {
                                   <div className="text-xs text-[#5A6A51]">{emp.email} • {emp.role_name || "Staff"}</div>
                                 </td>
                                 <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
-                                  {targetAmount > 0 ? `${targetAmount} reservations` : "No Target"}
+                                  {targetAmount > 0 ? (
+                                    targetType === "revenue" ? `EGP ${targetAmount.toLocaleString()}` : `${targetAmount} reservations`
+                                  ) : "No Target"}
+                                </td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A] capitalize">
+                                  {targetType}
                                 </td>
                                 <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
-                                  {bonusPct > 0 ? `${bonusPct}% of salary` : "No Bonus"}
+                                  {bonusVal > 0 ? (
+                                    bonusType === "fixed" ? `EGP ${bonusVal.toLocaleString()}` : `${bonusVal}% of salary`
+                                  ) : "No Bonus"}
                                 </td>
                                 <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
-                                  {achievedCount} reservations
+                                  {targetType === "revenue" ? `EGP ${achievedRevenue.toLocaleString()}` : `${achievedCount} reservations`}
                                 </td>
                                 <td className="px-6 py-4 text-xs">
                                   {targetAmount > 0 ? (
@@ -18351,6 +18368,8 @@ export default function AdminPage() {
                                       setEditingTargetEmployee(emp);
                                       setTargetAmountInput(String(emp.requiredTargetAmount || 0));
                                       setBonusPercentageInput(String(emp.bonusPercentage || 0));
+                                      setTargetTypeInput(emp.targetType || "reservations");
+                                      setBonusTypeInput(emp.bonusType || "percentage");
                                     }}
                                     className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#EDF1EC] transition shadow-xs"
                                   >
@@ -23002,7 +23021,7 @@ export default function AdminPage() {
 
       {editingTargetEmployee && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+          <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10 animate-in fade-in zoom-in-95 duration-200">
             <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Set Monthly Target</p>
@@ -23028,7 +23047,9 @@ export default function AdminPage() {
                     body: JSON.stringify({
                       id: editingTargetEmployee.id,
                       requiredTargetAmount: Number(targetAmountInput),
-                      bonusPercentage: Number(bonusPercentageInput)
+                      bonusPercentage: Number(bonusPercentageInput),
+                      targetType: targetTypeInput,
+                      bonusType: bonusTypeInput
                     })
                   });
                   if (res.ok) {
@@ -23047,7 +23068,37 @@ export default function AdminPage() {
               className="space-y-4"
             >
               <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Required Monthly Target (Reservations)</label>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Target Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTargetTypeInput("reservations")}
+                    className={`rounded-2xl py-2.5 text-xs font-bold transition border ${
+                      targetTypeInput === "reservations"
+                        ? "bg-[#414E36] text-[#FBFBF9] border-[#414E36]"
+                        : "bg-white text-[#5A6A51] border-[#414E36]/15 hover:bg-[#EDF1EC]"
+                    }`}
+                  >
+                    Reservations
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTargetTypeInput("revenue")}
+                    className={`rounded-2xl py-2.5 text-xs font-bold transition border ${
+                      targetTypeInput === "revenue"
+                        ? "bg-[#414E36] text-[#FBFBF9] border-[#414E36]"
+                        : "bg-white text-[#5A6A51] border-[#414E36]/15 hover:bg-[#EDF1EC]"
+                    }`}
+                  >
+                    Revenue (EGP)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">
+                  {targetTypeInput === "revenue" ? "Required Monthly Revenue (EGP)" : "Required Monthly Target (Reservations)"}
+                </label>
                 <input
                   type="number"
                   value={targetAmountInput}
@@ -23057,15 +23108,46 @@ export default function AdminPage() {
                   required
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Performance Bonus (% of Basic Salary)</label>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">Bonus Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBonusTypeInput("percentage")}
+                    className={`rounded-2xl py-2.5 text-xs font-bold transition border ${
+                      bonusTypeInput === "percentage"
+                        ? "bg-[#414E36] text-[#FBFBF9] border-[#414E36]"
+                        : "bg-white text-[#5A6A51] border-[#414E36]/15 hover:bg-[#EDF1EC]"
+                    }`}
+                  >
+                    Percentage (%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBonusTypeInput("fixed")}
+                    className={`rounded-2xl py-2.5 text-xs font-bold transition border ${
+                      bonusTypeInput === "fixed"
+                        ? "bg-[#414E36] text-[#FBFBF9] border-[#414E36]"
+                        : "bg-white text-[#5A6A51] border-[#414E36]/15 hover:bg-[#EDF1EC]"
+                    }`}
+                  >
+                    Fixed Amount (EGP)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1.5">
+                  {bonusTypeInput === "fixed" ? "Performance Bonus (EGP)" : "Performance Bonus (% of Basic Salary)"}
+                </label>
                 <input
                   type="number"
                   value={bonusPercentageInput}
                   onChange={(e) => setBonusPercentageInput(e.target.value)}
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
                   min="0"
-                  max="100"
+                  {...(bonusTypeInput === "percentage" ? { max: "100" } : {})}
                   required
                 />
               </div>

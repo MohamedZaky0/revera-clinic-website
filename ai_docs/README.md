@@ -110,7 +110,7 @@ Next.js 15 (App Router) + TypeScript on Vercel. Single app serving both the publ
 1. **Do not add raw hex colors** (`#414E36`, `#C4AE7C`) to components. Use `var(--cr-primary)` and `var(--cr-accent)` from `globals.css`.
 2. **Do not hardcode "Revera"** in component strings, metadata, or alt text. It goes in `src/lib/translations.ts` or will move to `src/config/client.ts` after PROPOSAL-001 is approved.
 3. **Do not hardcode phone numbers or WhatsApp links** inline. See PROPOSAL-001 in `PROPOSALS.md`.
-4. **Do not treat mock UI sections as real features.** Finance, Payroll, Prescriptions, Inventory, POS are backed by hardcoded arrays. Adding real backend to them is a separate task.
+4. **Do not treat mock UI sections as real features.** Finance, Inventory, POS are backed by hardcoded arrays. Payroll, Prescriptions, Leaves, Performance, Attendance, and Targets have real database backends (fully implemented).
 5. **`branch` is the topmost scoping unit.** There is no `org_id` or `tenant_id`. Do not introduce one without a decision logged in `DECISIONS.md`.
 6. **Do not add localStorage writes** for admin data. The existing `serviceStore.ts` pattern (localStorage as primary, Supabase as secondary) is a known risk (RISK-004) — do not extend it.
 7. **Before any refactor touching hardcoded values**, read `PROPOSALS.md` first — a centralization plan already exists.

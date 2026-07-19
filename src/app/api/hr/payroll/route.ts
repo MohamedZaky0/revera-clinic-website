@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     // 1. Fetch all active employees including target configurations
     const { data: employees, error: empErr } = await supabaseServer
       .from('employee_accounts')
-      .select('id, salary, required_target_amount, bonus_percentage')
+      .select('id, salary, required_target_amount, bonus_percentage, target_type, bonus_type')
       .not('email', 'eq', 'superadmin@revera.com'); // skip owner
 
     if (empErr) throw empErr;
@@ -56,13 +56,15 @@ export async function POST(req: Request) {
       console.warn("Could not fetch month reservations for payroll target calculation:", resErr.message);
     }
 
-    // Calculate achieved revenue per employee
+    // Calculate achieved revenue and reservation counts per employee
     const employeeRevenueMap = new Map<string, number>();
+    const employeeCountMap = new Map<string, number>();
     (monthReservations || []).forEach((res: any) => {
       if (res.status === 'approved' || res.status === 'completed') {
         const price = Number(res.amount_paid || 0) + Number(res.amount_left || 0) || Number(res.services?.price || 0);
         const empId = res.created_by_employee_id;
         employeeRevenueMap.set(empId, (employeeRevenueMap.get(empId) || 0) + price);
+        employeeCountMap.set(empId, (employeeCountMap.get(empId) || 0) + 1);
       }
     });
 
@@ -70,12 +72,30 @@ export async function POST(req: Request) {
     const inserts = employees.map((emp: any) => {
       const basic = Number(emp.salary || 0);
       const target = Number(emp.required_target_amount || 0);
-      const bonusPct = Number(emp.bonus_percentage || 0);
-      const achieved = employeeRevenueMap.get(emp.id) || 0;
+      const bonusVal = Number(emp.bonus_percentage || 0);
+      const targetType = emp.target_type || 'reservations';
+      const bonusType = emp.bonus_type || 'percentage';
+
+      const achievedRev = employeeRevenueMap.get(emp.id) || 0;
+      const achievedCount = employeeCountMap.get(emp.id) || 0;
+
+      // Check achievement
+      let hasAchieved = false;
+      if (target > 0) {
+        if (targetType === 'revenue') {
+          hasAchieved = achievedRev >= target;
+        } else {
+          hasAchieved = achievedCount >= target;
+        }
+      }
 
       let calculatedBonus = 0;
-      if (target > 0 && achieved >= target) {
-        calculatedBonus = Math.round(achieved * (bonusPct / 100));
+      if (hasAchieved) {
+        if (bonusType === 'fixed') {
+          calculatedBonus = Math.round(bonusVal);
+        } else {
+          calculatedBonus = Math.round(basic * (bonusVal / 100));
+        }
       }
 
       return {
@@ -87,9 +107,11 @@ export async function POST(req: Request) {
         net_salary: basic + calculatedBonus,
         status: 'Draft',
         target_amount_snapshot: target,
-        bonus_percentage_snapshot: bonusPct,
-        achieved_revenue: achieved,
-        calculated_bonus: calculatedBonus
+        bonus_percentage_snapshot: bonusVal,
+        achieved_revenue: targetType === 'revenue' ? achievedRev : achievedCount,
+        calculated_bonus: calculatedBonus,
+        target_type_snapshot: targetType,
+        bonus_type_snapshot: bonusType
       };
     });
 

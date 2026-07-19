@@ -137,16 +137,17 @@ browser or clears localStorage, they lose unsaved changes. The Supabase copy may
 
 ---
 
-## RISK-005: Single 550KB Admin Page File
+## RISK-005: Single 1.2MB Admin Page File
 
-**Severity:** Low (current scale) → Medium (as features grow)
+**Severity:** Medium
 **Type:** Maintainability
 
 **Description:**
-`src/app/admin/page.tsx` is a single ~550KB client component containing 40+ admin sections,
-hardcoded mock data arrays, all state variables, and all UI. Many sections (Prescriptions,
-Finance, Payroll, Inventory, POS, Refunds, Shipping) are mock UI backed by hardcoded
-constant arrays — not Supabase.
+`src/app/admin/page.tsx` is a single ~1.2MB client component containing 40+ admin sections,
+all state variables, and all UI. Many sections (Payroll, Prescriptions, Leaves, Performance,
+Attendance, and Targets) have been refactored to have full database backends, while other
+finance/POS sections (Finance, Inventory, POS, Refunds, Shipping) are still mock UI backed by
+hardcoded constant arrays — not Supabase.
 
 ---
 
