@@ -108,8 +108,8 @@ scratch/                  — Dev scripts (DB seed, test queries)
 
 ## Critical Known Gaps
 
-- Admin auth is **client-side only** — `/api/` routes have no token validation; the session gate exists only in the browser. (RISK-002 partially resolved)
 - Patient OTP auth is **simulated** (setTimeout) — no real SMS gateway wired. (RISK-003)
 - Some minor clinical: treatment plans and before/after photos are mock UI. (Prescriptions/notes are Supabase-backed)
 - localStorage is used as primary storage for services/categories on the admin side (Supabase is secondary/fallback in several places).
-- `customers` and `reservations` are **unlinked** — no FK; booking name/phone is not auto-matched to a customer record.
+- The `customers` table is connected to `reservations` via `customer_id` for profile engagement mapping.
+

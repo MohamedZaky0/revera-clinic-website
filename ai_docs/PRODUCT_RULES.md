@@ -117,6 +117,34 @@ When completing a reservation, the receptionist processes a payment settlement. 
 
 ---
 
+## Doctor Multi-Shift Scheduling Rules
+**Enforced in:** `src/components/BookingModal.tsx` & `src/app/admin/page.tsx`
+
+Doctors can define daily schedules containing either legacy single-shift bounds (`start` & `end` strings) or a multi-shift array of objects `shifts: { start, end }[]`.
+- **Availability Search:** The availability check validates whether a requested slot's start and end times fall completely within at least one of the shifts configured for that day.
+- **Min/Max Boundary Expansion:** The calendar grid bounds expand to dynamically encapsulate the lowest starting hour and highest ending hour among all configured shifts.
+
+---
+
+## Presence Inactivity Timer Rules
+**Enforced in:** `src/app/admin/page.tsx`
+
+- **Alert Trigger:** Standard staff employees are prompted with a presence confirmation modal after 30 minutes of continuous inactivity (configurable in Settings).
+- **Countdown Timeout:** The employee has 10 seconds to respond. Failure to respond submits an automatic alert to the supervisor/administrator.
+- **Activity Reset Events:** Any keyboard/mouse movements (`mousemove`, `keydown`, `click`, `scroll`, `touchstart`) immediately reset the inactivity check clock and automatically dismiss/close the presence modal.
+
+---
+
+## Settings Navigation Sidebar Highlights
+- **Settings Hover Highlighting:** The Settings sidebar link remains highlighted/active when sub-panels `"Deposit Settings"` or `"Inactivity Settings"` are open (`activeNav`).
+
+---
+
+## Promotions Rules
+- **Disabled Gray Card Styling:** Promotion cards are styled with `grayscale opacity-60` when their status is `disabled` to visualy highlight inactive rules.
+
+---
+
 ## What Is NOT Enforced (But May Be Assumed)
 
 The following are **not currently enforced in code**:
@@ -125,3 +153,4 @@ The following are **not currently enforced in code**:
 - Package/session tracking (not built)
 - External Payment Gateway processing (payments are logged as cash/card settlements in the admin dashboard ledger only)
 - Automated reminders (enable_reminder flag exists on services but no sending logic found)
+
