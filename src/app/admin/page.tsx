@@ -145,7 +145,7 @@ const SLOTS = ALL_15MIN_SLOTS;
 const SIDEBAR_ITEMS = [
   { label: "Bookings", icon: CalendarDays },
   { label: "Customers", icon: Users },
-  { label: "Providers", icon: ShieldCheck },
+  { label: "Doctors", icon: ShieldCheck },
   { label: "Services", icon: Layers },
   { label: "Promotions", icon: Tag },
   { label: "Employees", icon: CircleUser },
@@ -625,7 +625,7 @@ export default function AdminPage() {
     const parentScreenMap: Record<string, string> = {
       "bookings": "Bookings",
       "customers": "Customers",
-      "providers": "Providers",
+      "providers": "Doctors",
       "services": "Services",
       "settings": "Settings"
     };
@@ -649,7 +649,7 @@ export default function AdminPage() {
       const parentScreenMap: Record<string, string> = {
         "Bookings": "bookings",
         "Customers": "customers",
-        "Providers": "providers",
+        "Doctors": "providers",
         "Services": "services",
         "Employees": "employees",
         "Settings": "settings"
@@ -943,7 +943,7 @@ export default function AdminPage() {
   const [slot, setSlot] = useState<string>("12:00");
   const [activeNav, setActiveNav] = useState("Bookings");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [providerTab, setProviderTab] = useState<"Providers" | "Attendance">("Providers");
+  const [providerTab, setProviderTab] = useState<"Doctors" | "Attendance">("Doctors");
   const [branch, setBranch] = useState<string>(""); // branch id; empty = all branches
   const [lang, setLang] = useState<"EN" | "AR">("EN");
   const [showQuickActionMenu, setShowQuickActionMenu] = useState(false);
@@ -1709,7 +1709,7 @@ export default function AdminPage() {
           const parentScreenMap: Record<string, string> = {
             "Bookings": "bookings",
             "Customers": "customers",
-            "Providers": "providers",
+            "Doctors": "providers",
             "Services": "services",
             "Settings": "settings"
           };
@@ -1754,13 +1754,13 @@ export default function AdminPage() {
       }
     }
 
-    if (activeNav === "Providers") {
+    if (activeNav === "Doctors") {
       const hasView = hasPermission("providers.view");
       const hasAttendance = hasPermission("providers.attendance");
-      if (hasAttendance && !hasView && providerTab === "Providers") {
+      if (hasAttendance && !hasView && providerTab === "Doctors") {
         setProviderTab("Attendance");
       } else if (hasView && !hasAttendance && providerTab === "Attendance") {
-        setProviderTab("Providers");
+        setProviderTab("Doctors");
       }
     }
   }, [activeNav, adminRole, adminPermissions, hasPermission, calendarView, providerTab]);
@@ -2779,7 +2779,7 @@ export default function AdminPage() {
     const parentScreenMap: Record<string, string> = {
       "Bookings": "bookings",
       "Customers": "customers",
-      "Providers": "providers",
+      "Doctors": "providers",
       "Services": "services",
       "Promotions": "services",
       "Settings": "settings"
@@ -6692,12 +6692,12 @@ export default function AdminPage() {
               <>
 
           {/* ── PROVIDERS VIEW ── */}
-          {activeNav === "Providers" && (
+          {activeNav === "Doctors" && (
             <section className="space-y-6">
               <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
                 <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                   <div>
-                    <h1 className="text-4xl font-semibold text-[#1F251A]">Providers</h1>
+                    <h1 className="text-4xl font-semibold text-[#1F251A]">Doctors</h1>
 
                   </div>
 
@@ -21507,10 +21507,10 @@ export default function AdminPage() {
       {/* ── ADD/EDIT CUSTOMER MODAL ── */}
       {showCustomerFormModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowCustomerFormModal(false); }}
+          className=""
+
         >
-          <div className="w-full max-w-2xl rounded-2xl bg-[#FBFBF9] shadow-2xl border border-[#414E36]/10 overflow-hidden my-8">
+          <div className="w-full rounded-2xl bg-[#FBFBF9] shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#414E36]/10 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
               <div className="flex items-center gap-3">
@@ -21828,12 +21828,11 @@ export default function AdminPage() {
       {/* ── CUSTOMER PROFILE & BOOKING HISTORY DRAWER ── */}
       {viewingCustomerProfile && (
         <div
-          className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-xs transition-opacity duration-300"
-          onClick={() => setViewingCustomerProfile(null)}
+          className=""
+          style={{}}
         >
           <div
-            className="w-full max-w-2xl bg-[#FBFBF9] h-full shadow-2xl flex flex-col animate-slideOver overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+            className="w-full rounded-2xl bg-[#FBFBF9] shadow-[0_30px_80px_rgba(47,61,41,0.07)] flex flex-col overflow-hidden"
           >
             {/* Drawer Header */}
             <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
@@ -21889,7 +21888,7 @@ export default function AdminPage() {
             </div>
 
             {/* Drawer Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            <div className="p-6 space-y-6">
               {/* Tab 1: Info */}
               {customerProfileTab === "info" && (
                 <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
@@ -22388,7 +22387,7 @@ export default function AdminPage() {
                 onClick={() => setViewingCustomerProfile(null)}
                 className="rounded-lg border border-[#414E36]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
               >
-                Close Profile
+                ← Back to Customers
               </button>
             </div>
           </div>
