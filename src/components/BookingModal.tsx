@@ -470,13 +470,27 @@ export function BookingModal() {
                       config.online?.[weekdayName];
         }
         if (dayConfig && dayConfig.isOpen) {
-          const [sh, sm] = dayConfig.start.split(":").map(Number);
-          const [eh, em] = dayConfig.end.split(":").map(Number);
-          const startMins = sh * 60 + sm;
-          const endMins = eh * 60 + em;
-          if (startMins < minStart) minStart = startMins;
-          if (endMins > maxEnd) maxEnd = endMins;
-          found = true;
+          if (dayConfig.shifts && Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
+            dayConfig.shifts.forEach((shft: any) => {
+              if (shft.start && shft.end) {
+                const [sh, sm] = shft.start.split(":").map(Number);
+                const [eh, em] = shft.end.split(":").map(Number);
+                const startMins = sh * 60 + sm;
+                const endMins = eh * 60 + em;
+                if (startMins < minStart) minStart = startMins;
+                if (endMins > maxEnd) maxEnd = endMins;
+                found = true;
+              }
+            });
+          } else {
+            const [sh, sm] = dayConfig.start.split(":").map(Number);
+            const [eh, em] = dayConfig.end.split(":").map(Number);
+            const startMins = sh * 60 + sm;
+            const endMins = eh * 60 + em;
+            if (startMins < minStart) minStart = startMins;
+            if (endMins > maxEnd) maxEnd = endMins;
+            found = true;
+          }
         }
       } else {
         if (clinicStartMins < minStart) minStart = clinicStartMins;
@@ -551,13 +565,25 @@ export function BookingModal() {
           return false;
         }
         
-        const [sh, sm] = dayConfig.start.split(":").map(Number);
-        const [eh, em] = dayConfig.end.split(":").map(Number);
-        const shiftStart = sh * 60 + sm;
-        const shiftEnd = eh * 60 + em;
- 
-        if (startNew < shiftStart || endNew > shiftEnd) {
-          return false;
+        if (dayConfig.shifts && Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
+          const slotFitsAnyShift = dayConfig.shifts.some((shft: any) => {
+            if (!shft.start || !shft.end) return false;
+            const [sh, sm] = shft.start.split(":").map(Number);
+            const [eh, em] = shft.end.split(":").map(Number);
+            const shiftStart = sh * 60 + sm;
+            const shiftEnd = eh * 60 + em;
+            return startNew >= shiftStart && endNew <= shiftEnd;
+          });
+          if (!slotFitsAnyShift) return false;
+        } else {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const shiftStart = sh * 60 + sm;
+          const shiftEnd = eh * 60 + em;
+   
+          if (startNew < shiftStart || endNew > shiftEnd) {
+            return false;
+          }
         }
       }
 

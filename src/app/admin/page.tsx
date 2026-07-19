@@ -406,14 +406,14 @@ const PERMISSION_STRUCTURE = [
     ]
   },
   {
-    category: "Provider (Doctor) Management",
+    category: "Doctor Management",
     prefix: "providers",
     items: [
-      { key: "providers.view", label: "View Provider Profiles" },
-      { key: "providers.create", label: "Add New Providers" },
+      { key: "providers.view", label: "View Doctor Profiles" },
+      { key: "providers.create", label: "Add New Doctors" },
       { key: "providers.edit", label: "Edit Provider Details" },
-      { key: "providers.delete", label: "Delete Providers" },
-      { key: "providers.attendance", label: "Manage Provider Attendance" }
+      { key: "providers.delete", label: "Delete Doctors" },
+      { key: "providers.attendance", label: "Manage Doctor Attendance" }
     ]
   },
   {
@@ -1652,6 +1652,10 @@ export default function AdminPage() {
 
     const resetTimer = () => {
       lastActivityRef.current = Date.now();
+      setPresenceModalOpen(prev => {
+        if (prev) return false;
+        return prev;
+      });
     };
 
     const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
@@ -2969,13 +2973,27 @@ export default function AdminPage() {
         if (!dayConfig || !dayConfig.isOpen) {
           return false;
         }
-        const [sh, sm] = dayConfig.start.split(":").map(Number);
-        const [eh, em] = dayConfig.end.split(":").map(Number);
-        const shiftStart = sh * 60 + sm;
-        const shiftEnd = eh * 60 + em;
- 
-        if (startNew < shiftStart || endNew > shiftEnd) {
-          return false;
+        if (dayConfig.shifts && Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
+          const slotFitsAnyShift = dayConfig.shifts.some((shft: any) => {
+            if (!shft.start || !shft.end) return false;
+            const [sh, sm] = shft.start.split(":").map(Number);
+            const [eh, em] = shft.end.split(":").map(Number);
+            const shiftStart = sh * 60 + sm;
+            const shiftEnd = eh * 60 + em;
+            return startNew >= shiftStart && endNew <= shiftEnd;
+          });
+          if (!slotFitsAnyShift) {
+            return false;
+          }
+        } else {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const shiftStart = sh * 60 + sm;
+          const shiftEnd = eh * 60 + em;
+   
+          if (startNew < shiftStart || endNew > shiftEnd) {
+            return false;
+          }
         }
       }
     }
@@ -3051,7 +3069,7 @@ export default function AdminPage() {
   const [providerFormBranchSchedules, setProviderFormBranchSchedules] = useState<Record<string, { in_person: any; online: any }>>({});
   const [providerFormSelectedScheduleBranchId, setProviderFormSelectedScheduleBranchId] = useState<string>("");
   const [providerFormStartDate, setProviderFormStartDate] = useState("");
-  const [providerFormWorkingDaysHours, setProviderFormWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string }>>({
+  const [providerFormWorkingDaysHours, setProviderFormWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; shifts?: { start: string; end: string }[] }>>({
     Sunday: { isOpen: false, start: "10:00", end: "20:00" },
     Monday: { isOpen: false, start: "10:00", end: "20:00" },
     Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
@@ -3060,7 +3078,7 @@ export default function AdminPage() {
     Friday: { isOpen: false, start: "10:00", end: "20:00" },
     Saturday: { isOpen: false, start: "10:00", end: "20:00" }
   });
-  const [providerFormOnlineWorkingDaysHours, setProviderFormOnlineWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string }>>({
+  const [providerFormOnlineWorkingDaysHours, setProviderFormOnlineWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; shifts?: { start: string; end: string }[] }>>({
     Sunday: { isOpen: false, start: "10:00", end: "20:00" },
     Monday: { isOpen: false, start: "10:00", end: "20:00" },
     Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
@@ -3306,13 +3324,27 @@ export default function AdminPage() {
                       config.online?.[weekdayName];
         }
         if (dayConfig && dayConfig.isOpen) {
-          const [sh, sm] = dayConfig.start.split(":").map(Number);
-          const [eh, em] = dayConfig.end.split(":").map(Number);
-          const startMins = sh * 60 + sm;
-          const endMins = eh * 60 + em;
-          if (startMins < minStart) minStart = startMins;
-          if (endMins > maxEnd) maxEnd = endMins;
-          found = true;
+          if (dayConfig.shifts && Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
+            dayConfig.shifts.forEach((shft: any) => {
+              if (shft.start && shft.end) {
+                const [sh, sm] = shft.start.split(":").map(Number);
+                const [eh, em] = shft.end.split(":").map(Number);
+                const startMins = sh * 60 + sm;
+                const endMins = eh * 60 + em;
+                if (startMins < minStart) minStart = startMins;
+                if (endMins > maxEnd) maxEnd = endMins;
+                found = true;
+              }
+            });
+          } else {
+            const [sh, sm] = dayConfig.start.split(":").map(Number);
+            const [eh, em] = dayConfig.end.split(":").map(Number);
+            const startMins = sh * 60 + sm;
+            const endMins = eh * 60 + em;
+            if (startMins < minStart) minStart = startMins;
+            if (endMins > maxEnd) maxEnd = endMins;
+            found = true;
+          }
         }
       } else {
         if (clinicStartMins < minStart) minStart = clinicStartMins;
@@ -3417,13 +3449,27 @@ export default function AdminPage() {
                       config.online?.[weekdayName];
         }
         if (dayConfig && dayConfig.isOpen) {
-          const [sh, sm] = dayConfig.start.split(":").map(Number);
-          const [eh, em] = dayConfig.end.split(":").map(Number);
-          const startMins = sh * 60 + sm;
-          const endMins = eh * 60 + em;
-          if (startMins < minStart) minStart = startMins;
-          if (endMins > maxEnd) maxEnd = endMins;
-          found = true;
+          if (dayConfig.shifts && Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
+            dayConfig.shifts.forEach((shft: any) => {
+              if (shft.start && shft.end) {
+                const [sh, sm] = shft.start.split(":").map(Number);
+                const [eh, em] = shft.end.split(":").map(Number);
+                const startMins = sh * 60 + sm;
+                const endMins = eh * 60 + em;
+                if (startMins < minStart) minStart = startMins;
+                if (endMins > maxEnd) maxEnd = endMins;
+                found = true;
+              }
+            });
+          } else {
+            const [sh, sm] = dayConfig.start.split(":").map(Number);
+            const [eh, em] = dayConfig.end.split(":").map(Number);
+            const startMins = sh * 60 + sm;
+            const endMins = eh * 60 + em;
+            if (startMins < minStart) minStart = startMins;
+            if (endMins > maxEnd) maxEnd = endMins;
+            found = true;
+          }
         }
       } else {
         if (clinicStartMins < minStart) minStart = clinicStartMins;
@@ -6333,7 +6379,9 @@ export default function AdminPage() {
                   "Notification Settings",
                   "Queue Settings",
                   "Pages Settings",
-                  "Role Management"
+                  "Role Management",
+                  "Deposit Settings",
+                  "Inactivity Settings"
                 ].includes(activeNav);
                 return (
                   <div key={item.label} className="space-y-1">
@@ -7849,7 +7897,9 @@ export default function AdminPage() {
                       finalPrice = Math.max(0, Math.round(finalPrice));
 
                       return (
-                        <div key={index} className="bg-white rounded-2xl border border-[#414E36]/10 p-5 shadow-sm transition hover:shadow-md relative overflow-hidden flex flex-col justify-between">
+                        <div key={index} className={`bg-white rounded-2xl border border-[#414E36]/10 p-5 shadow-sm transition hover:shadow-md relative overflow-hidden flex flex-col justify-between ${
+                          status === "disabled" ? "grayscale opacity-60" : ""
+                        }`}>
                           {/* Accent status border */}
                           <div className={`absolute top-0 left-0 right-0 h-1.5 ${
                             status === "active" ? "bg-emerald-500" :
@@ -9313,7 +9363,7 @@ export default function AdminPage() {
                 <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm">
                   <div className="mb-5 flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Top Providers</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Top Doctors</p>
                       <h3 className="mt-3 text-2xl font-semibold text-[#1F251A]">Provider performance</h3>
                     </div>
                     <span className="rounded-full bg-[#F7F7F9] px-3 py-2 text-xs font-semibold text-[#5A6A51]">
@@ -18575,7 +18625,7 @@ export default function AdminPage() {
                 <table className="w-full min-w-[1000px] text-sm">
                   <thead>
                     <tr className="border-b border-[#414E36]/10 bg-[#EDF1EC]">
-                      {["Reference ID","Services","Providers","Customer","Status","Address","Payment","Date","Discount","Total","Paid"].map(col => (
+                      {["Reference ID","Services","Doctors","Customer","Status","Address","Payment","Date","Discount","Total","Paid"].map(col => (
                         <th key={col} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.25em] text-[#5A6A51]/80 whitespace-nowrap">
                           {col}
                         </th>
@@ -21039,30 +21089,87 @@ export default function AdminPage() {
                           </label>
 
                           {sched.isOpen ? (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="time"
-                                value={sched.start}
-                                onChange={(e) => {
+                            <div className="flex flex-col gap-2 w-full sm:w-auto">
+                              {/* Shifts list */}
+                              {((sched.shifts && sched.shifts.length > 0) ? sched.shifts : [{ start: sched.start || "09:00", end: sched.end || "17:00" }]).map((shft, shiftIdx) => (
+                                <div key={shiftIdx} className="flex items-center gap-2">
+                                  <input
+                                    type="time"
+                                    value={shft.start}
+                                    onChange={(e) => {
+                                      const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                      currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], start: e.target.value };
+                                      setActiveSched({
+                                        ...activeSched,
+                                        [day]: {
+                                          ...sched,
+                                          start: currentShifts[0].start,
+                                          end: currentShifts[0].end,
+                                          shifts: currentShifts
+                                        }
+                                      });
+                                    }}
+                                    className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                                  />
+                                  <span className="text-xs text-[#5A6A51]">to</span>
+                                  <input
+                                    type="time"
+                                    value={shft.end}
+                                    onChange={(e) => {
+                                      const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                      currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], end: e.target.value };
+                                      setActiveSched({
+                                        ...activeSched,
+                                        [day]: {
+                                          ...sched,
+                                          start: currentShifts[0].start,
+                                          end: currentShifts[0].end,
+                                          shifts: currentShifts
+                                        }
+                                      });
+                                    }}
+                                    className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                                  />
+                                  {shiftIdx > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                        const filteredShifts = currentShifts.filter((_, i) => i !== shiftIdx);
+                                        setActiveSched({
+                                          ...activeSched,
+                                          [day]: {
+                                            ...sched,
+                                            start: filteredShifts[0].start,
+                                            end: filteredShifts[0].end,
+                                            shifts: filteredShifts
+                                          }
+                                        });
+                                      }}
+                                      className="text-red-500 hover:text-red-700 transition"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                  const newShifts = [...currentShifts, { start: "09:00", end: "17:00" }];
                                   setActiveSched({
                                     ...activeSched,
-                                    [day]: { ...sched, start: e.target.value }
+                                    [day]: {
+                                      ...sched,
+                                      shifts: newShifts
+                                    }
                                   });
                                 }}
-                                className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
-                              />
-                              <span className="text-xs text-[#5A6A51]">to</span>
-                              <input
-                                type="time"
-                                value={sched.end}
-                                onChange={(e) => {
-                                  setActiveSched({
-                                    ...activeSched,
-                                    [day]: { ...sched, end: e.target.value }
-                                  });
-                                }}
-                                className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
-                              />
+                                className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] transition flex items-center gap-1 mt-1"
+                              >
+                                <Plus size={12} /> Add Shift
+                              </button>
                             </div>
                           ) : (
                             <span className="text-xs text-gray-400 italic">Off / Closed</span>
