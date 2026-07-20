@@ -148,6 +148,12 @@ hardcoded mock data arrays, all state variables, and all UI. Many sections (Pres
 Finance, Payroll, Inventory, POS, Refunds, Shipping) are mock UI backed by hardcoded
 constant arrays — not Supabase.
 
+**Naming collision to be aware of:** "Finance" here refers to the pre-existing `Finances Dashboard`
+panel (`activeNav === "Finances Dashboard"`), which has no reachable sidebar trigger (the
+`financesExpanded` state that would expand it is never wired to a nav item). This is unrelated
+to the disabled `Finance` sidebar stub added in DEC-011 (`comingSoon: true`, superadmin-only,
+no page behind it at all). Do not conflate the two when working on either.
+
 ---
 
 ## RISK-006: GPS-Based Attendance Can Be Spoofed
@@ -156,11 +162,11 @@ constant arrays — not Supabase.
 **Type:** Security / Trust
 
 **Description:**
-Provider attendance check-in uses browser geolocation captured client-side and compared to branch coordinates. The comparison and rejection logic are visible in the browser; an employee can bypass the geofence by spoofing location, using the admin/superadmin bypass, or calling the API directly.
+The distance-vs-800m check in `POST /api/hr/attendance` is already computed server-side (`getDistanceInMeters` in the route itself) — that part is not client-bypassable by tampering with browser JS. The actual weak point is the **input**: `latitude`/`longitude` are read from `navigator.geolocation` in the browser and sent as plain, unsigned values in the request body. An employee can spoof these (devtools, a location-spoofing browser extension, a rooted/jailbroken device, or calling the API directly with fabricated coordinates) and the server has no way to tell real GPS from a faked value.
 
 **Mitigation:**
-- Move distance validation to the server (`/api/provider-attendance`).
-- Require a tamper-resistant check-in token or device binding.
+- Require a tamper-resistant/signed check-in token or device attestation, since server-side distance math alone can't detect spoofed input coordinates.
+- Consider IP/network-based corroboration as a secondary signal (not a full fix, but raises the spoofing bar).
 
 ---
 
@@ -188,6 +194,20 @@ Invoices are printed via `window.print()` on a hidden/visible DOM section. Outpu
 **Mitigation:**
 - Move the bypass email to `src/config/client.ts` after PROPOSAL-001.
 - Or require every admin to have an `employee_accounts` row with the superadmin role.
+
+---
+
+## RISK-009: Schedule Grid Can Silently Clip Overlapping Bookings
+
+**Severity:** Medium
+**Type:** Data visibility / UX
+
+**Description:**
+The Bookings → Schedule view (`calendarView === "Schedule"`, `src/app/admin/page.tsx`, see DEC-012) fixes every cell to a hard `84px` height with `overflow-hidden` on the inner content wrapper, so that booked cells render at the same height as empty ones. If more than a couple of bookings ever land on the same doctor/slot (whether from a real double-booking, a manual admin entry, or a data edge case — overlap-prevention exists in `api/availability` and `api/reservations` but was not exhaustively re-audited here), the extra booking cards are visually clipped and invisible in this view — not deleted, just not shown here. Staff relying solely on the Schedule tab could miss a booking that exists and is visible in the List/Calendar views.
+
+**Mitigation:**
+- Add an overflow indicator (e.g. "+2 more") when a cell's content exceeds the fixed height, similar to calendar-app patterns, rather than silent clipping.
+- Confirm all booking-creation paths (website + admin manual entry) enforce the same overlap check, so this display limitation stays a rare edge case rather than a routine occurrence.
 
 ---
 

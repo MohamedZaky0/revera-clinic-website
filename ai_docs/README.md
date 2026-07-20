@@ -71,6 +71,7 @@ After that, check task-specific files:
 - Patient Profile (`/profile`) — persistent customer profile details, wallet ledgers, and visit logs history
 - Booking modal → `reservations` table (real Supabase writes with customer_id links)
 - Admin booking management — calendar, list, approve/reject, full lifecycle stages, inline notes editor
+- Admin Bookings "Schedule" view — single-day grid, doctors as rows, 15-min time slots as columns
 - Booking lifecycle stages: `pending → approved → confirmed → started → completed`
 - Customer Wallet Ledgers — real writes updating spent_amount, outstanding, and wallet_balance during checkout
 - Payment settlement drawer inside admin booking details
@@ -85,6 +86,12 @@ After that, check task-specific files:
 - Superadmin/admin bypass for daily GPS check-in
 - WhatsApp confirmation step for website bookings (English only)
 - Booking origin badges (website vs other sources)
+
+### Disabled Placeholder Nav Items (Coming Soon, superadmin-only)
+- Sidebar entries: Marketing, Customer Support, Reports, Finance
+- No page/functionality behind any of them — `disabled`, greyed out, "Coming Soon" tooltip
+- Only visible to `adminRole === 'superadmin'`; filtered out for every other role
+- Not the same as the mock-UI "Finances Dashboard" below — see RISK-005 for the naming collision
 
 ### What Is Mock UI Only (hardcoded data, not Supabase)
 - All clinical: consultation notes, prescriptions, treatment plans, before/after photos

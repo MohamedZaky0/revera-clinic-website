@@ -324,21 +324,60 @@ Deletes a role by ID.
 
 ---
 
-## GET /api/provider-attendance?providerId={id}&date={YYYY-MM-DD}
+## GET /api/provider-attendance?date={YYYY-MM-DD}
 
-Returns attendance records for a provider on a date.
+Returns all provider attendance records for a date. No geolocation involved — this is an
+admin-set manual status/time entry per provider, distinct from `/api/hr/attendance` below.
 
-**Response:** `ProviderAttendance[]`
+**Response:** `provider_attendance[]`
 
 ---
 
 ## POST /api/provider-attendance
 
-Records a provider check-in or check-out with optional geolocation.
+Upserts a manual attendance status for a provider (admin-entered, no geolocation check).
 
-**Body:** `{ provider_id, branch_id, date, type: 'check_in' | 'check_out', location?, status?, notes? }`
+**Body:** `{ providerId, date, status, checkIn?, checkOut?, notes? }`
 
-**Response:** Created/updated attendance record
+**Response:** Upserted `provider_attendance` row
+
+---
+
+## GET /api/hr/attendance
+
+Returns all employee attendance records, joined with `employee_accounts` (id, name, email,
+department, role_name). Requires HR access (`verifyHrAccess`).
+
+**Headers:** `Authorization: Bearer <supabase-jwt>`
+
+**Response:** `hr_attendance[]`
+
+---
+
+## POST /api/hr/attendance
+
+Employee self check-in with GPS geofence enforcement (see `PRODUCT_RULES.md` — "Provider
+attendance geofence" and `DECISIONS.md` DEC-009). Requires the employee's branch to have
+resolvable coordinates. Rejects with `not_in_location` (400, includes `distance` in meters)
+if the employee is > 800m from the branch. Bypassed entirely for `superadmin@revera.com`.
+
+**Headers:** `Authorization: Bearer <supabase-jwt>` (any authenticated employee)
+
+**Body:** `{ employeeId, latitude, longitude }`
+
+**Response:** Upserted `hr_attendance` row, or `400` with `{ error, message, distance? }` on rejection
+
+---
+
+## PATCH /api/hr/attendance
+
+Employee self check-out — records `check_out_time` for the employee's attendance row for today.
+
+**Headers:** `Authorization: Bearer <supabase-jwt>`
+
+**Body:** `{ employeeId }`
+
+**Response:** Updated `hr_attendance` row
 
 ---
 

@@ -190,7 +190,7 @@ Providers/employees need to check in/out from branches. The system must verify t
 - Capture employee browser geolocation on check-in.
 - Compare with branch coordinates resolved from Google Maps `maps_link`.
 - Reject check-in if distance > 800m.
-- Allow `superadmin` and `admin` roles to bypass the check (enforced client-side).
+- Two bypasses: client-side skips the check-in call for global superadmins with no `branch_id`; server-side (`/api/hr/attendance`) always allows `superadmin@revera.com` regardless of role/branch. See `PRODUCT_RULES.md` for exact logic.
 
 **Trade-offs:**
 - Geolocation can be spoofed; no server-side verification.
@@ -216,3 +216,42 @@ The admin panel was publicly accessible. A login gate was needed without buildin
 **Trade-offs:**
 - `/api/*` routes do not validate tokens server-side; gate is browser-only.
 - Hardcoded superadmin email must be removed/parameterized when forking.
+
+---
+
+## DEC-011: Disabled "Coming Soon" Sidebar Placeholders, Superadmin-Only
+
+**Date:** 2026-07-20
+**Status:** Decided — active
+
+**Context:**
+Product wants to signal upcoming admin sections (Marketing, Customer Support, Reports, Finance) without building them yet, and without exposing that roadmap to non-superadmin staff.
+
+**Chosen Option:**
+- Add 4 entries to `SIDEBAR_ITEMS` in `src/app/admin/page.tsx` with a `comingSoon: true` flag.
+- Rendered `disabled`, greyed out (50% opacity), with `title="Coming Soon"` tooltip and the same `ChevronRight` chevron used by the Settings submenu indicator — no "Soon" badge.
+- `permittedSidebarItems` explicitly excludes `comingSoon` items for every role except `superadmin` (which already receives the unfiltered `SIDEBAR_ITEMS` list).
+- These are **not** related to the pre-existing mock-UI "Finances Dashboard" (`activeNav === "Finances Dashboard"`, gated by unused `financesExpanded` state) — that is a separate, older, hardcoded-data panel. See note in `RISKS.md` RISK-005.
+
+**Trade-offs:**
+- No actual navigation target exists yet for any of the 4 items — purely visual placeholders.
+- Two different "Finance" concepts now exist in the codebase (the new disabled sidebar stub vs. the old mock `Finances Dashboard`) — a naming collision future work should resolve by either wiring the new stub to the old dashboard or removing the old one.
+
+---
+
+## DEC-012: Bookings Schedule Grid — Doctors as Rows, Time Slots as Columns
+
+**Date:** 2026-07-20
+**Status:** Decided — active
+
+**Context:**
+The Bookings → Schedule view (`calendarView === "Schedule"` in `src/app/admin/page.tsx`) originally rendered time-of-day (15-min increments, 9:00–20:00) as table rows and doctors as columns, with only hourly rows labeled. This was flipped to match a reference layout: doctors as rows (sticky left column), time slots as columns (every column labeled, sticky header row).
+
+**Chosen Option:**
+- Same single-day view, same `bookingMap`/`normaliseSlot`/filter logic — only the row/column axes and merge direction (`colSpan={4}` instead of `rowSpan={4}` for the assumed 1-hour booking block) changed.
+- Booking cells show patient name + status dot, phone number, and service name + status.
+- Both empty and booked cells are height-capped (`84px` with `overflow-hidden` on the inner content wrapper) so a booking's cell never grows taller than an empty one — the cell's inline `height` style is only a CSS minimum in table layout, so this required an explicit fixed-height, overflow-hidden inner wrapper rather than relying on the `<td>` style alone.
+
+**Trade-offs:**
+- Multiple simultaneous bookings for the same doctor/slot (double-booking) can visually clip inside the fixed-height cell rather than expanding the row.
+- Still single-day only; no multi-day/week view was requested or built.

@@ -117,6 +117,7 @@ scratch/                  — Dev scripts (DB seed, test queries)
 - Admin auth is **client-side login gate only** — browser login form exists, but `/api/*` routes still don't validate tokens/middleware. (RISK-002 partially resolved)
 - Patient OTP auth is **simulated** (setTimeout) — no real SMS gateway wired. (RISK-003)
 - Many admin sections (Prescriptions, Finance, Payroll, Inventory, POS) are **mock UI only** — backed by hardcoded constant arrays, not Supabase.
+- Separately, 4 sidebar items (Marketing, Customer Support, Reports, Finance) are **disabled placeholders** with no page behind them at all — superadmin-only, see DECISIONS.md DEC-011. Note the "Finance" name collision with the mock-UI `Finances Dashboard` above; they are unrelated.
 - localStorage is used as primary storage for services/categories on the admin side (Supabase is secondary/fallback in several places).
 - `customers` and `reservations` are **unlinked** — no FK; booking name/phone is not auto-matched to a customer record.
 - Employee attendance relies on browser geolocation — GPS spoofing is not mitigated.

@@ -128,12 +128,24 @@ Deletes all rows from the reservations table. No soft-delete. No confirmation be
 ---
 
 ### Provider attendance geofence
-**Enforced in:** `POST /api/provider-attendance`
+**Enforced in:** `POST /api/hr/attendance` (client trigger: `src/app/admin/page.tsx` geolocation check-in effect)
 
-- Requires branch coordinates (`lat`, `lng`) configured on the branch.
+- Requires branch coordinates (`lat`, `lng`) configured on the branch (resolved from `maps_link` when present).
 - Calculates distance between employee GPS location and branch coordinates.
-- If distance > 800m, check-in is rejected.
-- Superadmin and admin roles bypass the distance check (enforced client-side in `/admin`).
+- If distance > 800m, check-in is rejected and logged with status `Out of Location`.
+- Two separate bypasses exist:
+  - **Client-side:** the browser skips calling the check-in API entirely when `adminRole === 'superadmin'` AND the logged-in employee has no `branch_id` assigned (global superadmins with no branch).
+  - **Server-side:** the route itself always allows check-in (no distance check) when the employee's email is exactly `superadmin@revera.com`, regardless of role or branch.
+- Note: `POST /api/provider-attendance` is a separate, unrelated route — it just upserts an admin-set manual status/check-in-out time for a provider, with no geolocation logic at all.
+
+---
+
+### Coming-soon sidebar sections are superadmin-only
+**Enforced in:** `src/app/admin/page.tsx` (`SIDEBAR_ITEMS`, `permittedSidebarItems`)
+
+- Marketing, Customer Support, Reports, and Finance are placeholder sidebar entries (`comingSoon: true`) with no page behind them.
+- Rendered disabled, greyed out, unclickable, with a "Coming Soon" hover tooltip.
+- Filtered out of `permittedSidebarItems` for every role except `superadmin`.
 
 ---
 
