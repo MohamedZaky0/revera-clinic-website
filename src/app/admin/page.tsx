@@ -15896,7 +15896,7 @@ export default function AdminPage() {
                   <p className="mt-2 text-sm text-[#5A6A51]">Manage clinic devices, track pulse counts, configure maintenance alerts, and monitor stock.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {inventorySubTab === "devices" ? (
+                  {inventorySubTab === "devices" && (
                     <button
                       type="button"
                       onClick={() => {
@@ -15915,17 +15915,6 @@ export default function AdminPage() {
                       className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
                     >
                       <Plus size={16} /> Add Device
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        resetProductForm();
-                        setShowAddProductModal(true);
-                      }}
-                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
-                    >
-                      <Plus size={16} /> Add Product
                     </button>
                   )}
                 </div>
