@@ -22665,61 +22665,55 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* ── schedule table ── */}
+              {/* ── schedule table (doctors as rows, time slots as columns) ── */}
               <div className="overflow-auto rounded-[24px] border border-[#414E36]/08" style={{ maxHeight: '600px' }}>
-                <table className="w-full border-collapse" style={{ minWidth: `${72 + visibleDoctors.length * 220}px` }}>
-                  <thead className="sticky top-0 z-10">
+                <table className="border-collapse" style={{ minWidth: `${180 + RAW_SLOTS.length * 140}px` }}>
+                  <thead className="sticky top-0 z-20">
                     <tr>
-                      <th className="w-[72px] border-b border-r border-[#414E36]/08 bg-[#EDF1EC] px-3 py-3" />
-                      {visibleDoctors.map(doc => (
-                        <th key={doc} className="border-b border-l border-[#414E36]/08 bg-[#EDF1EC] px-4 py-3 text-center">
-                          <span className="inline-block rounded-full bg-[#414E36]/10 px-4 py-1.5 text-sm font-semibold text-[#414E36]">{doc}</span>
+                      <th className="sticky left-0 z-30 w-[180px] border-b border-r border-[#414E36]/08 bg-[#EDF1EC] px-3 py-3" />
+                      {RAW_SLOTS.map(raw => (
+                        <th key={raw} className="w-[140px] border-b border-l border-[#414E36]/08 bg-[#EDF1EC] px-2 py-3 text-center">
+                          <span className="text-[11px] font-semibold text-[#5A6A51]/80">{toLabel(raw)}</span>
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {(() => {
-                      // Track which (slotIndex, doctor) cells are consumed by a rowspan
+                      // Track which (doctor, slotIndex) cells are consumed by an earlier colspan
                       const blocked = new Set<string>();
-                      return RAW_SLOTS.map((raw, si) => {
-                        const label = toLabel(raw);
-                        // Only show label on the hour (minutes === "00")
-                        const showLabel = raw.endsWith(':00');
-                        return (
-                          <tr key={raw}>
-                            {/* time label */}
-                            <td
-                              className={`w-[72px] border-r border-[#414E36]/08 px-3 text-right align-top ${si > 0 ? 'border-t border-[#414E36]/06' : ''}`}
-                              style={{ height: 36 }}
-                            >
-                              <span className={showLabel ? 'text-[11px] font-semibold text-[#5A6A51]/80' : 'text-[9px] font-medium text-[#5A6A51]/40'}>
-                                {label}
-                              </span>
-                            </td>
-                            {/* doctor cells */}
-                            {visibleDoctors.map(doc => {
-                              const cellKey = `${si}-${doc}`;
-                              // Skip — this cell is consumed by an earlier rowspan
-                              if (blocked.has(cellKey)) return null;
+                      return visibleDoctors.map((doc, di) => (
+                        <tr key={doc}>
+                          {/* doctor name */}
+                          <td
+                            className={`sticky left-0 z-10 w-[180px] border-r border-[#414E36]/08 bg-[#FBFBF9] px-3 py-3 align-top ${di > 0 ? 'border-t border-[#414E36]/06' : ''}`}
+                          >
+                            <span className="inline-block rounded-full bg-[#414E36]/10 px-4 py-1.5 text-sm font-semibold text-[#414E36]">{doc}</span>
+                          </td>
+                          {/* time-slot cells */}
+                          {RAW_SLOTS.map((raw, si) => {
+                            const cellKey = `${doc}-${si}`;
+                            // Skip — this cell is consumed by an earlier colspan
+                            if (blocked.has(cellKey)) return null;
 
-                              const cells = bookingMap[raw]?.[doc] ?? [];
-                              const hasBooking = cells.length > 0;
+                            const cells = bookingMap[raw]?.[doc] ?? [];
+                            const hasBooking = cells.length > 0;
 
-                              if (hasBooking) {
-                                // Block the next 3 slots (= remaining 45 min of the 1-hour session)
-                                for (let offset = 1; offset <= 3; offset++) {
-                                  if (si + offset < RAW_SLOTS.length) {
-                                    blocked.add(`${si + offset}-${doc}`);
-                                  }
+                            if (hasBooking) {
+                              // Block the next 3 slots (= remaining 45 min of the 1-hour session)
+                              for (let offset = 1; offset <= 3; offset++) {
+                                if (si + offset < RAW_SLOTS.length) {
+                                  blocked.add(`${doc}-${si + offset}`);
                                 }
-                                return (
-                                  <td
-                                    key={doc}
-                                    rowSpan={4}
-                                    className={`border-l border-[#414E36]/08 p-1.5 align-top ${si > 0 ? 'border-t border-[#414E36]/06' : ''}`}
-                                    style={{ height: 36 * 4 }}
-                                  >
+                              }
+                              return (
+                                <td
+                                  key={raw}
+                                  colSpan={4}
+                                  className={`border-l border-[#414E36]/08 p-1.5 align-top ${di > 0 ? 'border-t border-[#414E36]/06' : ''}`}
+                                  style={{ width: 140 * 4, height: 64 }}
+                                >
+                                  <div className="flex h-full flex-wrap gap-1.5">
                                     {cells.map(b => {
                                       const svc = localServices.find(s => s.id === b.serviceId);
                                       const svcName = svc ? svc.en : b.sessionType || 'Consultation';
@@ -22727,33 +22721,33 @@ export default function AdminPage() {
                                         <div
                                           key={b.id}
                                           title={`${b.name} — ${svcName} (${b.status})`}
-                                          className="flex h-full flex-col justify-center gap-1 rounded-2xl bg-[#414E36]/10 px-3 py-2 ring-1 ring-[#414E36]/20"
+                                          className="flex min-w-[130px] flex-1 flex-col justify-center gap-1 rounded-2xl bg-[#414E36]/10 px-3 py-2 ring-1 ring-[#414E36]/20"
                                         >
                                           <div className="flex items-center gap-1.5">
                                             <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot[b.status?.toLowerCase()] ?? 'bg-[#5A6A51]'}`} />
                                             <p className="truncate text-xs font-semibold text-[#1F251A]">{b.name}</p>
                                           </div>
-                                          <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]">{svcName}</p>
-                                          <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]/60 capitalize">{b.status}</p>
+                                          <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]">{b.phone}</p>
+                                          <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]/60 capitalize">{svcName} · {b.status}</p>
                                         </div>
                                       );
                                     })}
-                                  </td>
-                                );
-                              }
-
-                              // Empty cell
-                              return (
-                                <td
-                                  key={doc}
-                                  className={`border-l border-[#414E36]/08 ${si > 0 ? 'border-t border-[#414E36]/06' : ''}`}
-                                  style={{ height: 36 }}
-                                />
+                                  </div>
+                                </td>
                               );
-                            })}
-                          </tr>
-                        );
-                      });
+                            }
+
+                            // Empty cell
+                            return (
+                              <td
+                                key={raw}
+                                className={`border-l border-[#414E36]/08 ${di > 0 ? 'border-t border-[#414E36]/06' : ''}`}
+                                style={{ width: 140, height: 64 }}
+                              />
+                            );
+                          })}
+                        </tr>
+                      ));
                     })()}
                   </tbody>
                 </table>
