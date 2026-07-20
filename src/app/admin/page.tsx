@@ -4013,7 +4013,8 @@ export default function AdminPage() {
     setProviderFormWorkingDaysHours(inClinicSched);
     setProviderFormOnlineWorkingDaysHours(onlineSched);
     setProviderFormScheduleTab("in_person");
-    setShowProviderModal(true);
+    setEditingDoctorInline(provider);
+    setShowProviderModal(false);
   }
 
   function handleSaveProvider() {
@@ -4133,6 +4134,7 @@ export default function AdminPage() {
         if (data && data.name) {
           fetchProviders();
           setShowProviderModal(false);
+          setEditingDoctorInline(null);
           alert(isEdit ? "Provider updated successfully!" : "Provider added successfully!");
         } else {
           alert(data.error || "Failed to save provider.");
@@ -6769,48 +6771,301 @@ export default function AdminPage() {
           {/* ── PROVIDERS VIEW ── */}
           {activeNav === "Doctors" && (
             <section className="space-y-6">
-              <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-                <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                  <div>
-                    <h1 className="text-4xl font-semibold text-[#1F251A]">Doctors</h1>
-
+              {editingDoctorInline ? (
+                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                  <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
+                    <div>
+                      <button
+                        onClick={() => setEditingDoctorInline(null)}
+                        className="mb-2 inline-flex items-center gap-2 rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#414E36] shadow-sm transition hover:bg-[#F2EFE9]"
+                      >
+                        <ArrowLeft size={14} /> Back to Doctors
+                      </button>
+                      <h1 className="text-3xl font-bold text-[#1F251A]">Edit Doctor: {providerFormName || editingDoctorInline.name}</h1>
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      onClick={() => setShowProviderFilterPanel(prev => !prev)}
-                      className={`inline-flex items-center gap-2 rounded-3xl border px-4 py-3 text-sm font-semibold transition ${
-                        showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()
-                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
-                          : "border-[#E6E9EB] bg-white text-[#414E36] hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]"
-                      }`}
-                    >
-                      <Filter size={16} /> Filter
-                      {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()) && (
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#414E36] text-[10px] font-bold text-white">!</span>
-                      )}
-                    </button>
+                  <div className="space-y-6">
+                    {/* Row 1: Name & Specialty */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Dr. Jane Doe"
+                          value={providerFormName}
+                          onChange={(e) => setProviderFormName(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Specialty</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Dermatologist"
+                          value={providerFormSpecialty}
+                          onChange={(e) => setProviderFormSpecialty(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
 
-                    <button
-                      onClick={() => {
-                        fetchAuditLogs();
-                        setShowAuditLogsModal(true);
-                      }}
-                      className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/30 bg-white px-5 py-3 text-sm font-semibold text-[#414E36] hover:bg-[#F2EFE9] transition shadow-sm"
-                    >
-                      <ClipboardList size={16} /> Audit Logs
-                    </button>
+                    {/* Row 2: Phone & National ID */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 01012345678"
+                          value={providerFormPhone}
+                          onChange={(e) => setProviderFormPhone(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">National ID</label>
+                        <input
+                          type="text"
+                          placeholder="14-digit National ID"
+                          value={providerFormNationalId}
+                          onChange={(e) => setProviderFormNationalId(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
 
-                    {hasPermission("providers.create") && (
+                    {/* Row 3: Gender & Age */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Gender</label>
+                        <select
+                          value={providerFormGender}
+                          onChange={(e) => setProviderFormGender(e.target.value as "Male" | "Female" | "")}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Age</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 35"
+                          value={providerFormAge}
+                          onChange={(e) => setProviderFormAge(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 4: Branches & Start Date */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branches (Select one or more)</label>
+                        <div className="flex flex-wrap gap-2 p-2 rounded-2xl border border-[#414E36]/15 bg-white min-h-[42px] items-center">
+                          {branches.map((b) => {
+                            const isSelected = providerFormBranchIds.includes(b.id);
+                            return (
+                              <button
+                                key={b.id}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    if (providerFormBranchIds.length <= 1) {
+                                      alert("A doctor must be assigned to at least one branch.");
+                                      return;
+                                    }
+                                    const nextIds = providerFormBranchIds.filter((id) => id !== b.id);
+                                    setProviderFormBranchIds(nextIds);
+                                    if (providerFormSelectedScheduleBranchId === b.id) {
+                                      handleScheduleBranchChange(nextIds[0]);
+                                    }
+                                  } else {
+                                    const nextIds = [...providerFormBranchIds, b.id];
+                                    setProviderFormBranchIds(nextIds);
+                                    if (!providerFormSelectedScheduleBranchId) {
+                                      setProviderFormSelectedScheduleBranchId(b.id);
+                                    }
+                                  }
+                                }}
+                                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                                  isSelected
+                                    ? "bg-[#414E36] text-white border-[#414E36]"
+                                    : "bg-[#414E36]/5 text-[#414E36] border-transparent hover:bg-[#414E36]/10"
+                                }`}
+                              >
+                                {b.name_en} {isSelected ? "✓" : "+"}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
+                        <input
+                          type="date"
+                          value={providerFormStartDate}
+                          onChange={(e) => setProviderFormStartDate(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 5: Rating & Image */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="md:col-span-1">
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Rating (1-5)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="5"
+                          step="0.1"
+                          placeholder="e.g. 5"
+                          value={providerFormRating}
+                          onChange={(e) => setProviderFormRating(Number(e.target.value))}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Image URL or Base64</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. /images/doctors/dr-doe.jpg"
+                          value={providerFormImage}
+                          onChange={(e) => setProviderFormImage(e.target.value)}
+                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Services Offered */}
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Select Services Offered</label>
+                      <div className="max-h-[220px] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2">
+                        {allServicesList.map((svc) => {
+                          const isChecked = providerFormSelectedServices.includes(svc.en);
+                          return (
+                            <label key={svc.id} className="flex items-center gap-3 cursor-pointer select-none py-1 hover:bg-gray-50 rounded px-1">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setProviderFormSelectedServices([...providerFormSelectedServices, svc.en]);
+                                  } else {
+                                    setProviderFormSelectedServices(providerFormSelectedServices.filter(s => s !== svc.en));
+                                  }
+                                }}
+                                className="h-4.5 w-4.5 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                              />
+                              <div className="text-sm text-[#1F251A]">
+                                <span className="font-medium">{svc.en}</span>
+                                {svc.ar && <span className="text-gray-400 text-xs ml-1.5">({svc.ar})</span>}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Payroll & Commission */}
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#414E36] border-b border-[#414E36]/10 pb-2">
+                        Payroll &amp; Commission Settings
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Fixed Salary (EGP)</label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 5000"
+                            value={providerFormFixedSalary}
+                            onChange={(e) => setProviderFormFixedSalary(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Commission Type</label>
+                          <select
+                            value={providerFormCommissionType}
+                            onChange={(e) => setProviderFormCommissionType(e.target.value)}
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          >
+                            <option value="none">None</option>
+                            <option value="fixed">Fixed Amount per Service</option>
+                            <option value="percentage">Percentage of Service Price</option>
+                          </select>
+                        </div>
+                        {providerFormCommissionType !== "none" && (
+                          <div>
+                            <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
+                              {providerFormCommissionType === "fixed" ? "Fixed Amount (EGP)" : "Percentage (%)"}
+                            </label>
+                            <input
+                              type="number"
+                              placeholder={providerFormCommissionType === "fixed" ? "e.g. 150" : "e.g. 10"}
+                              value={providerFormCommissionValue}
+                              onChange={(e) => setProviderFormCommissionValue(e.target.value)}
+                              className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-3 pt-4 border-t border-[#E6E9EB]">
                       <button
-                        onClick={openAddProviderModal}
-                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                        onClick={handleSaveProvider}
+                        disabled={savingProvider}
+                        className="rounded-2xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-50"
                       >
-                        <Plus size={16} /> Add
+                        {savingProvider ? "Saving..." : "Save Changes"}
                       </button>
-                    )}
+                      <button
+                        onClick={() => setEditingDoctorInline(null)}
+                        className="rounded-2xl border border-[#E6E9EB] bg-white px-6 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 </div>
+              ) : (
+                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+                  <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div>
+                      <h1 className="text-4xl font-semibold text-[#1F251A]">Doctors</h1>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={() => setShowProviderFilterPanel(prev => !prev)}
+                        className={`inline-flex items-center gap-2 rounded-3xl border px-4 py-3 text-sm font-semibold transition ${
+                          showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()
+                            ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                            : "border-[#E6E9EB] bg-white text-[#414E36] hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]"
+                        }`}
+                      >
+                        <Filter size={16} /> Filter
+                        {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()) && (
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#414E36] text-[10px] font-bold text-white">!</span>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          fetchAuditLogs();
+                          setShowAuditLogsModal(true);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/30 bg-white px-5 py-3 text-sm font-semibold text-[#414E36] hover:bg-[#F2EFE9] transition shadow-sm"
+                      >
+                        <ClipboardList size={16} /> Audit Logs
+                      </button>
+                    </div>
+                  </div>
 
                 {/* Dynamic Filters Drawer */}
                 {showProviderFilterPanel && (
@@ -6951,7 +7206,8 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-              </div>
+                </div>
+              )}
             </section>
           )}
 
