@@ -106,6 +106,7 @@ export function BookingModal() {
   const [reservationsForDate, setReservationsForDate] = useState<any[]>([]);
   const [depositPercentage, setDepositPercentage] = useState(20);
   const [isPaying, setIsPaying] = useState(false);
+  const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   const [createdReservation, setCreatedReservation] = useState<any>(null);
   const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
   const [copiedAddress, setCopiedAddress] = useState(false);
@@ -609,6 +610,7 @@ export function BookingModal() {
 
   function handleConfirm() {
     if (!serviceId || !selectedDate || !selectedTime || !name || !email || !phone) return;
+    setIsCreatingReservation(true);
     const finalNotes = isWhatsappSame 
       ? notes 
       : `${notes ? notes + "\n" : ""}[WhatsApp: ${whatsappNumber}]`;
@@ -622,11 +624,15 @@ export function BookingModal() {
       doctorName: selectedDoctor || null,
     };
     fetch('/api/reservations', { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } })
-      .then(r => {
-        if (!r.ok) throw new Error("Failed to create reservation");
-        return r.json();
+      .then(async r => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok) {
+          throw new Error((data && data.error) || "Failed to create reservation");
+        }
+        return data;
       })
       .then((data) => {
+        setIsCreatingReservation(false);
         if (data && (data.status === 'pending_deposit' || data.requiresDeposit || depositPercentage > 0)) {
           setCreatedReservation(data);
           setStep(5);
@@ -635,8 +641,9 @@ export function BookingModal() {
         }
       })
       .catch((err) => {
+        setIsCreatingReservation(false);
         console.error("Failed to create reservation:", err);
-        setConfirmed(true);
+        alert(err.message || (isRTL ? "حدث خطأ أثناء إنشاء الحجز، يرجى المحاولة مرة أخرى." : "Failed to create reservation. Please try again."));
       });
   }
 
@@ -1216,13 +1223,19 @@ Attached is my payment transaction receipt photo.`;
 
                 <button
                   onClick={handleConfirm}
-                  disabled={depositPercentage === 0 && termsText.trim() !== "" && !acceptedTerms}
-                  className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isCreatingReservation || (depositPercentage === 0 && termsText.trim() !== "" && !acceptedTerms)}
+                  className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  {depositPercentage > 0 
-                    ? (isRTL ? "الذهاب للدفع" : "Proceed to Payment")
-                    : t.booking.confirmBtn
-                  }
+                  {isCreatingReservation ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      {isRTL ? "جاري الحفظ..." : "Creating Reservation..."}
+                    </>
+                  ) : depositPercentage > 0 ? (
+                    isRTL ? "الذهاب للدفع" : "Proceed to Payment"
+                  ) : (
+                    t.booking.confirmBtn
+                  )}
                 </button>
               </div>
             )}

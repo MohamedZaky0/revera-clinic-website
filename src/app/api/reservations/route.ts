@@ -267,43 +267,41 @@ export async function POST(req: Request) {
 
     let { data, error } = await supabaseServer
       .from('reservations')
-      .insert(insertPayload)
+      .insert({ ...insertPayload })
       .select()
       .single();
 
     if (error) {
-      let retried = false;
-      if (error.code === '42703') {
-        console.warn("Column 'is_manual' does not exist in the database. Retrying insert without it.");
-        delete insertPayload.is_manual;
-        retried = true;
+      console.warn("Primary reservation insert failed, attempting clean fallback:", error.message, error.code);
+      const fallbackPayload = { ...insertPayload };
+      if (fallbackPayload.status === 'pending_deposit') {
+        fallbackPayload.status = 'pending';
       }
-      if (error.code === '23514' && insertPayload.status === 'pending_deposit') {
-        console.warn("Status constraint check failed for 'pending_deposit'. Retrying with 'pending'.");
-        insertPayload.status = 'pending';
-        retried = true;
-      }
-      if (retried) {
-        const retryResult = await supabaseServer
+      delete fallbackPayload.is_manual;
+      delete fallbackPayload.created_by_employee_id;
+
+      const retry1 = await supabaseServer
+        .from('reservations')
+        .insert(fallbackPayload)
+        .select()
+        .single();
+
+      data = retry1.data;
+      error = retry1.error;
+
+      if (error) {
+        console.warn("Retry 1 reservation insert failed, trying minimal payload:", error.message, error.code);
+        delete fallbackPayload.rooms;
+        delete fallbackPayload.doctor_name;
+
+        const retry2 = await supabaseServer
           .from('reservations')
-          .insert(insertPayload)
+          .insert(fallbackPayload)
           .select()
           .single();
-        data = retryResult.data;
-        error = retryResult.error;
 
-        // Double fallback if it fails on the other code
-        if (error && error.code === '23514' && insertPayload.status === 'pending_deposit') {
-          console.warn("Status constraint check failed for 'pending_deposit' on retry. Falling back to 'pending'.");
-          insertPayload.status = 'pending';
-          const finalResult = await supabaseServer
-            .from('reservations')
-            .insert(insertPayload)
-            .select()
-            .single();
-          data = finalResult.data;
-          error = finalResult.error;
-        }
+        data = retry2.data;
+        error = retry2.error;
       }
     }
 
