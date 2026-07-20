@@ -731,7 +731,7 @@ export default function AdminPage() {
   const [employeeCreateSuccess, setEmployeeCreateSuccess] = useState("");
 
   const [newEmployeePhone, setNewEmployeePhone] = useState("");
-  const [newEmployeeDepartment, setNewEmployeeDepartment] = useState("Reception");
+  const [newEmployeeDepartment, setNewEmployeeDepartment] = useState("Receptionist");
   const [newEmployeeShift, setNewEmployeeShift] = useState("Day");
   const [newEmployeeShiftStart, setNewEmployeeShiftStart] = useState("09:00");
   const [newEmployeeShiftEnd, setNewEmployeeShiftEnd] = useState("17:00");
@@ -3268,7 +3268,7 @@ export default function AdminPage() {
 
   // Custom provider inline & modal states
   const [editingDoctorInline, setEditingDoctorInline] = useState<any | null>(null);
-  const [departmentsList, setDepartmentsList] = useState<string[]>(["Doctors", "Receptionist"]);
+  const [departmentsList, setDepartmentsList] = useState<string[]>(["Receptionist", "Doctors"]);
   const [newDeptInput, setNewDeptInput] = useState("");
   const [showProviderModal, setShowProviderModal] = useState(false);
   const [providerModalMode, setProviderModalMode] = useState<"add" | "edit">("add");
@@ -4533,7 +4533,7 @@ export default function AdminPage() {
           if (data.departments && Array.isArray(data.departments) && data.departments.length > 0) {
             setDepartmentsList(data.departments);
           } else {
-            setDepartmentsList(["Doctors", "Receptionist"]);
+            setDepartmentsList(["Receptionist", "Doctors"]);
           }
         }
       })
