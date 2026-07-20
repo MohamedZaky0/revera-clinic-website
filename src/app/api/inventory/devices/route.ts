@@ -97,7 +97,7 @@ const DEFAULT_HISTORY = [
 
 async function getStoredInventoryData() {
   try {
-    // 1. Try querying native Supabase inventory_devices table
+    // 1. Try querying native Supabase inventory_devices table if it has rows
     const { data: dbDevices, error: dbErr } = await supabaseServer
       .from('inventory_devices')
       .select('*')
@@ -108,7 +108,7 @@ async function getStoredInventoryData() {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!dbErr && dbDevices) {
+    if (!dbErr && dbDevices && dbDevices.length > 0) {
       return { devices: dbDevices, history: dbHistory || [] };
     }
 
@@ -119,8 +119,8 @@ async function getStoredInventoryData() {
       .eq('key', 'inventory_devices')
       .maybeSingle();
 
-    if (error || !data || !data.value) {
-      const payload = { devices: [], history: [] };
+    if (error || !data || !data.value || !Array.isArray(data.value.devices)) {
+      const payload = { devices: DEFAULT_DEVICES, history: DEFAULT_HISTORY };
       await supabaseServer
         .from('page_settings')
         .upsert({ key: 'inventory_devices', value: payload, updated_at: new Date().toISOString() });
@@ -129,7 +129,7 @@ async function getStoredInventoryData() {
     return data.value;
   } catch (err) {
     console.error('Error fetching inventory devices settings:', err);
-    return { devices: [], history: [] };
+    return { devices: DEFAULT_DEVICES, history: DEFAULT_HISTORY };
   }
 }
 
@@ -144,6 +144,15 @@ async function saveInventoryData(payload: any) {
     .select();
 
   if (error) throw error;
+
+  try {
+    if (payload.devices && payload.devices.length > 0) {
+      await supabaseServer.from('inventory_devices').upsert(payload.devices);
+    }
+  } catch (e) {
+    // Ignore direct table sync failure
+  }
+
   return data;
 }
 
