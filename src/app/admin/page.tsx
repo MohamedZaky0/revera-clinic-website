@@ -78,6 +78,7 @@ import {
   Briefcase,
   Phone,
   Lock,
+  AlertTriangle,
   Zap,
   Target,
   Check,
@@ -842,6 +843,159 @@ export default function AdminPage() {
     Friday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
     Saturday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] }
   });
+  const [newEmployeeBranchSchedules, setNewEmployeeBranchSchedules] = useState<Record<string, { in_person: any; online: any }>>({});
+  const [newEmployeeSelectedScheduleBranchId, setNewEmployeeSelectedScheduleBranchId] = useState<string>("");
+
+  function checkShiftOverlaps(
+    branchIds: string[],
+    branchSchedules: Record<string, { in_person: any; online: any }>,
+    currentActiveBranchId: string,
+    currentInPerson: any,
+    currentOnline: any,
+    branchList: any[]
+  ): { hasOverlap: boolean; message?: string } {
+    const fullBranchSchedules: Record<string, { in_person: any; online: any }> = { ...branchSchedules };
+    if (currentActiveBranchId) {
+      fullBranchSchedules[currentActiveBranchId] = {
+        in_person: currentInPerson,
+        online: currentOnline
+      };
+    }
+
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    function timeToMin(tStr: string): number {
+      if (!tStr) return 0;
+      const [h, m] = tStr.split(":").map(Number);
+      return (h || 0) * 60 + (m || 0);
+    }
+
+    for (const day of days) {
+      const allActiveShifts: Array<{
+        branchId: string;
+        branchName: string;
+        type: "In-Clinic" | "Online Consultations";
+        startMin: number;
+        endMin: number;
+        startStr: string;
+        endStr: string;
+      }> = [];
+
+      for (const bId of branchIds) {
+        const bSched = fullBranchSchedules[bId];
+        if (!bSched) continue;
+        const bObj = branchList.find((b) => b.id === bId);
+        const bName = bObj ? (bObj.name_en || bObj.name || bId) : "Branch";
+
+        // 1. In-Clinic shifts
+        const inPersonDay = bSched.in_person?.[day];
+        if (inPersonDay && inPersonDay.isOpen) {
+          const shifts = (inPersonDay.shifts && inPersonDay.shifts.length > 0)
+            ? inPersonDay.shifts
+            : [{ start: inPersonDay.start || "09:00", end: inPersonDay.end || "17:00" }];
+
+          for (const s of shifts) {
+            const sMin = timeToMin(s.start);
+            const eMin = timeToMin(s.end);
+            if (eMin <= sMin) {
+              return {
+                hasOverlap: true,
+                message: `Invalid shift duration on ${day} at ${bName} (In-Clinic): End time (${s.end}) must be after start time (${s.start}).`
+              };
+            }
+            allActiveShifts.push({
+              branchId: bId,
+              branchName: bName,
+              type: "In-Clinic",
+              startMin: sMin,
+              endMin: eMin,
+              startStr: s.start,
+              endStr: s.end
+            });
+          }
+        }
+
+        // 2. Online Consultations shifts
+        const onlineDay = bSched.online?.[day];
+        if (onlineDay && onlineDay.isOpen) {
+          const shifts = (onlineDay.shifts && onlineDay.shifts.length > 0)
+            ? onlineDay.shifts
+            : [{ start: onlineDay.start || "09:00", end: onlineDay.end || "17:00" }];
+
+          for (const s of shifts) {
+            const sMin = timeToMin(s.start);
+            const eMin = timeToMin(s.end);
+            if (eMin <= sMin) {
+              return {
+                hasOverlap: true,
+                message: `Invalid shift duration on ${day} at ${bName} (Online Consultations): End time (${s.end}) must be after start time (${s.start}).`
+              };
+            }
+            allActiveShifts.push({
+              branchId: bId,
+              branchName: bName,
+              type: "Online Consultations",
+              startMin: sMin,
+              endMin: eMin,
+              startStr: s.start,
+              endStr: s.end
+            });
+          }
+        }
+      }
+
+      // Check pairwise overlaps on this day
+      for (let i = 0; i < allActiveShifts.length; i++) {
+        for (let j = i + 1; j < allActiveShifts.length; j++) {
+          const s1 = allActiveShifts[i];
+          const s2 = allActiveShifts[j];
+
+          if (s1.startMin < s2.endMin && s1.endMin > s2.startMin) {
+            return {
+              hasOverlap: true,
+              message: `Shift Overlap Detected on ${day}: ${s1.branchName} (${s1.type}: ${s1.startStr} - ${s1.endStr}) overlaps with ${s2.branchName} (${s2.type}: ${s2.startStr} - ${s2.endStr}).`
+            };
+          }
+        }
+      }
+    }
+
+    return { hasOverlap: false };
+  }
+
+  function handleEmployeeBranchScheduleTabChange(targetBranchId: string) {
+    if (!targetBranchId || targetBranchId === (newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0])) return;
+    const currentBranchId = newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0];
+
+    const updatedSchedules = {
+      ...newEmployeeBranchSchedules,
+      [currentBranchId]: {
+        in_person: newEmployeeWorkingDaysHours,
+        online: newEmployeeOnlineWorkingDaysHours
+      }
+    };
+    setNewEmployeeBranchSchedules(updatedSchedules);
+
+    const defaultDaySched = {
+      Sunday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+      Monday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+      Tuesday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+      Wednesday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+      Thursday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+      Friday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+      Saturday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] }
+    };
+
+    const targetSched = updatedSchedules[targetBranchId] || {
+      in_person: defaultDaySched,
+      online: defaultDaySched
+    };
+
+    setNewEmployeeWorkingDaysHours(targetSched.in_person || defaultDaySched);
+    setNewEmployeeOnlineWorkingDaysHours(targetSched.online || defaultDaySched);
+    setNewEmployeeSelectedScheduleBranchId(targetBranchId);
+  }
+
   const [viewingEmployeeNotes, setViewingEmployeeNotes] = useState<any[]>([]);
   const [loadingEmployeeNotes, setLoadingEmployeeNotes] = useState(false);
   const [viewingEmployeeBookings, setViewingEmployeeBookings] = useState<any[]>([]);
@@ -15241,6 +15395,43 @@ export default function AdminPage() {
                           return;
                         }
                         try {
+                          const activeBranchId = newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0] || newEmployeeBranchId;
+
+                          // 1. Validate Shift Overlaps across all branches and shift types
+                          if (newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc")) {
+                            const overlapCheck = checkShiftOverlaps(
+                              newEmployeeBranchIds,
+                              newEmployeeBranchSchedules,
+                              activeBranchId,
+                              newEmployeeWorkingDaysHours,
+                              newEmployeeOnlineWorkingDaysHours,
+                              branches
+                            );
+
+                            if (overlapCheck.hasOverlap) {
+                              alert(overlapCheck.message);
+                              return;
+                            }
+                          }
+
+                          // 2. Compile schedules for all assigned branches
+                          const compiledBranchSchedules: Record<string, { in_person: any; online: any }> = {
+                            ...newEmployeeBranchSchedules,
+                            [activeBranchId]: {
+                              in_person: newEmployeeWorkingDaysHours,
+                              online: newEmployeeOnlineWorkingDaysHours
+                            }
+                          };
+
+                          for (const bId of newEmployeeBranchIds) {
+                            if (!compiledBranchSchedules[bId]) {
+                              compiledBranchSchedules[bId] = {
+                                in_person: newEmployeeWorkingDaysHours,
+                                online: newEmployeeOnlineWorkingDaysHours
+                              };
+                            }
+                          }
+
                           if (editingEmployee) {
                             const res = await fetch("/api/employees", {
                               method: "PATCH",
@@ -15271,12 +15462,7 @@ export default function AdminPage() {
                                 commission_value: Number(newEmployeeCommissionValue || 0),
                                 workingDaysHours: {
                                   branch_ids: newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId],
-                                  branch_schedules: {
-                                    [newEmployeeBranchIds[0] || newEmployeeBranchId]: {
-                                      in_person: newEmployeeWorkingDaysHours,
-                                      online: newEmployeeOnlineWorkingDaysHours
-                                    }
-                                  }
+                                  branch_schedules: compiledBranchSchedules
                                 }
                               }),
                             });
@@ -15323,12 +15509,7 @@ export default function AdminPage() {
                                 commission_value: Number(newEmployeeCommissionValue || 0),
                                 workingDaysHours: {
                                   branch_ids: newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId],
-                                  branch_schedules: {
-                                    [newEmployeeBranchIds[0] || newEmployeeBranchId]: {
-                                      in_person: newEmployeeWorkingDaysHours,
-                                      online: newEmployeeOnlineWorkingDaysHours
-                                    }
-                                  }
+                                  branch_schedules: compiledBranchSchedules
                                 }
                               }),
                             });
@@ -15558,15 +15739,20 @@ export default function AdminPage() {
                                     key={b.id}
                                     type="button"
                                     onClick={() => {
+                                      let nextIds: string[];
                                       if (isSelected) {
                                         if (newEmployeeBranchIds.length <= 1) return;
-                                        const next = newEmployeeBranchIds.filter((id) => id !== b.id);
-                                        setNewEmployeeBranchIds(next);
-                                        setNewEmployeeBranchId(next[0]);
+                                        nextIds = newEmployeeBranchIds.filter((id) => id !== b.id);
                                       } else {
-                                        const next = [...newEmployeeBranchIds, b.id];
-                                        setNewEmployeeBranchIds(next);
-                                        setNewEmployeeBranchId(next[0]);
+                                        nextIds = [...newEmployeeBranchIds, b.id];
+                                      }
+                                      setNewEmployeeBranchIds(nextIds);
+                                      setNewEmployeeBranchId(nextIds[0]);
+
+                                      // If current active schedule branch is removed, switch active branch schedule tab
+                                      const activeId = newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0];
+                                      if (!nextIds.includes(activeId)) {
+                                        handleEmployeeBranchScheduleTabChange(nextIds[0]);
                                       }
                                     }}
                                     className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
@@ -15582,36 +15768,72 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          {/* Row 4: Doctor Schedule Grid with In-Clinic vs Online tabs & Multi-shift per day */}
+                          {/* Row 4: Doctor Schedule Grid with Branch Selector, In-Clinic vs Online Consultations tabs & Multi-shift per day */}
                           <div>
+                            {/* Branch Selector Bar when doctor is assigned to multiple branches */}
+                            {newEmployeeBranchIds.length > 1 && (
+                              <div className="mb-3 p-3 rounded-2xl bg-[#414E36]/5 border border-[#414E36]/15 space-y-1.5">
+                                <span className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                                  Configure Schedule For Specific Branch:
+                                </span>
+                                <div className="flex flex-wrap gap-2">
+                                  {newEmployeeBranchIds.map((bId) => {
+                                    const bObj = branches.find((b) => b.id === bId);
+                                    const bName = bObj ? bObj.name_en : bId;
+                                    const isCurrentActive = bId === (newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0]);
+
+                                    return (
+                                      <button
+                                        key={bId}
+                                        type="button"
+                                        onClick={() => handleEmployeeBranchScheduleTabChange(bId)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                          isCurrentActive
+                                            ? "bg-[#C4AE7C] text-white shadow-sm"
+                                            : "bg-white text-[#414E36] border border-[#414E36]/15 hover:bg-gray-50"
+                                        }`}
+                                      >
+                                        <span>{bName}</span>
+                                        {isCurrentActive && <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md">Active</span>}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                               <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
-                                Doctor Weekly Shifts &amp; Working Days Schedule
+                                {newEmployeeBranchIds.length > 1 ? (
+                                  <>Doctor Weekly Shifts ({branches.find(b => b.id === (newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0]))?.name_en || "Active Branch"})</>
+                                ) : (
+                                  <>Doctor Weekly Shifts &amp; Working Days Schedule</>
+                                )}
                               </label>
 
-                              {/* Tab Selector: In-Clinic / In-Person vs Online */}
-                              <div className="inline-flex rounded-xl bg-white border border-[#414E36]/15 p-0.5">
+                              {/* Tab Selector: In-Clinic vs Online Consultations */}
+                              <div className="inline-flex rounded-xl bg-white border border-[#414E36]/15 p-0.5 shadow-sm">
                                 <button
                                   type="button"
                                   onClick={() => setNewEmployeeScheduleTab("in_person")}
-                                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                  className={`px-3.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                                     newEmployeeScheduleTab === "in_person"
-                                      ? "bg-[#414E36] text-white"
+                                      ? "bg-[#414E36] text-white shadow-xs"
                                       : "text-[#5A6A51] hover:text-[#1F251A]"
                                   }`}
                                 >
-                                  In-Clinic / In-Person
+                                  In-Clinic
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setNewEmployeeScheduleTab("online")}
-                                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                  className={`px-3.5 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                                     newEmployeeScheduleTab === "online"
-                                      ? "bg-[#414E36] text-white"
+                                      ? "bg-[#414E36] text-white shadow-xs"
                                       : "text-[#5A6A51] hover:text-[#1F251A]"
                                   }`}
                                 >
-                                  Online Consultation
+                                  Online Consultations
                                 </button>
                               </div>
                             </div>
@@ -15733,6 +15955,30 @@ export default function AdminPage() {
                                 });
                               })()}
                             </div>
+
+                            {/* Live Shift Overlap Warning Banner */}
+                            {(() => {
+                              const overlap = checkShiftOverlaps(
+                                newEmployeeBranchIds,
+                                newEmployeeBranchSchedules,
+                                newEmployeeSelectedScheduleBranchId || newEmployeeBranchIds[0],
+                                newEmployeeWorkingDaysHours,
+                                newEmployeeOnlineWorkingDaysHours,
+                                branches
+                              );
+                              if (overlap.hasOverlap) {
+                                return (
+                                  <div className="mt-3 flex items-start gap-2 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium animate-fadeIn">
+                                    <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                                    <div>
+                                      <span className="font-bold block text-amber-900 mb-0.5">⚠️ Shift Overlap Warning:</span>
+                                      {overlap.message}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
 
                           {/* Row 5: Select Services Offered */}
