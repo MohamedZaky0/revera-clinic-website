@@ -3833,8 +3833,13 @@ export default function AdminPage() {
   const [savingBookingSettings, setSavingBookingSettings] = useState(false);
   
   // Deposit Settings State
-  const [instapayAddress, setInstapayAddress] = useState("name@instapay");
+  const [instapayName, setInstapayName] = useState("Revera Clinic");
+  const [instapayAddress, setInstapayAddress] = useState("revera@instapay");
   const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
+  const [walletEnabled, setWalletEnabled] = useState(true);
+  const [walletName, setWalletName] = useState("Revera Clinics Cash");
+  const [walletNumber, setWalletNumber] = useState("01012345678");
+  const [walletLink, setWalletLink] = useState("");
   const [savingDepositSettings, setSavingDepositSettings] = useState(false);
 
 
@@ -4926,14 +4931,24 @@ export default function AdminPage() {
             setBookingDepositPercentage(data.booking.depositPercentage ?? 20);
           }
           if (data.deposit) {
-            setInstapayAddress(data.deposit.instapayAddress || "name@instapay");
+            setInstapayName(data.deposit.instapayName || "Revera Clinic");
+            setInstapayAddress(data.deposit.instapayAddress || "revera@instapay");
             setInstapayLink(data.deposit.instapayLink || "https://www.instapay.eg");
+            setWalletEnabled(data.deposit.walletEnabled ?? true);
+            setWalletName(data.deposit.walletName || "Revera Clinics Cash");
+            setWalletNumber(data.deposit.walletNumber || "01012345678");
+            setWalletLink(data.deposit.walletLink || "");
             if (data.deposit.depositPercentage !== undefined) {
               setBookingDepositPercentage(Number(data.deposit.depositPercentage));
             }
           } else {
-            setInstapayAddress("name@instapay");
+            setInstapayName("Revera Clinic");
+            setInstapayAddress("revera@instapay");
             setInstapayLink("https://www.instapay.eg");
+            setWalletEnabled(true);
+            setWalletName("Revera Clinics Cash");
+            setWalletNumber("01012345678");
+            setWalletLink("");
           }
 
           if (data.footer && data.footer.serviceHours) {
@@ -5107,8 +5122,13 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           deposit: {
+            instapayName: instapayName.trim(),
             instapayAddress: instapayAddress.trim(),
             instapayLink: instapayLink.trim(),
+            walletEnabled,
+            walletName: walletName.trim(),
+            walletNumber: walletNumber.trim(),
+            walletLink: walletLink.trim(),
             depositPercentage: bookingDepositPercentage
           }
         }),

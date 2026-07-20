@@ -87,8 +87,15 @@ export function BookingModal() {
   const [isWhatsappSame, setIsWhatsappSame] = useState(true);
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [serviceHours, setServiceHours] = useState<any[]>([]);
-  const [instapayAddress, setInstapayAddress] = useState("name@instapay");
+  const [instapayName, setInstapayName] = useState("Revera Clinics");
+  const [instapayAddress, setInstapayAddress] = useState("revera@instapay");
   const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
+  const [walletEnabled, setWalletEnabled] = useState(false);
+  const [walletName, setWalletName] = useState("");
+  const [walletNumber, setWalletNumber] = useState("");
+  const [walletLink, setWalletLink] = useState("");
+  const [selectedDepositMethod, setSelectedDepositMethod] = useState<"instapay" | "wallet">("instapay");
+  const [customerPaymentSender, setCustomerPaymentSender] = useState("");
   const [zoomQr, setZoomQr] = useState(false);
 
   // Update serviceHours when translations load
@@ -283,11 +290,26 @@ export function BookingModal() {
           if (data.deposit.depositPercentage !== undefined) {
             setDepositPercentage(Number(data.deposit.depositPercentage));
           }
+          if (data.deposit.instapayName) {
+            setInstapayName(data.deposit.instapayName);
+          }
           if (data.deposit.instapayAddress) {
             setInstapayAddress(data.deposit.instapayAddress);
           }
           if (data.deposit.instapayLink) {
             setInstapayLink(data.deposit.instapayLink);
+          }
+          if (data.deposit.walletEnabled !== undefined) {
+            setWalletEnabled(Boolean(data.deposit.walletEnabled));
+          }
+          if (data.deposit.walletName) {
+            setWalletName(data.deposit.walletName);
+          }
+          if (data.deposit.walletNumber) {
+            setWalletNumber(data.deposit.walletNumber);
+          }
+          if (data.deposit.walletLink) {
+            setWalletLink(data.deposit.walletLink);
           }
         } else if (data && data.booking && data.booking.depositPercentage !== undefined) {
           setDepositPercentage(Number(data.booking.depositPercentage));
@@ -653,8 +675,10 @@ export function BookingModal() {
       alert(isRTL ? "يرجى الموافقة على الشروط والأحكام أولاً" : "Please agree to the Terms & Conditions first");
       return;
     }
-    if (!instapayAddress.trim()) {
-      alert(isRTL ? "يرجى إدخال عنوان إنستاباي الخاص بك" : "Please enter your InstaPay address");
+    if (!customerPaymentSender.trim()) {
+      alert(isRTL 
+        ? (selectedDepositMethod === 'wallet' ? "يرجى إدخال رقم المحفظة الإلكترونية التي قمت بالتحويل منها" : "يرجى إدخال عنوان إنستاباي الخاص بك") 
+        : (selectedDepositMethod === 'wallet' ? "Please enter your Mobile Wallet number sent from" : "Please enter your InstaPay address"));
       return;
     }
     
@@ -664,9 +688,10 @@ export function BookingModal() {
     const depAmount = Math.round(svcPrice * (depositPercentage / 100));
     const remBalance = svcPrice - depAmount;
     
+    const methodLabel = selectedDepositMethod === 'wallet' ? `Mobile Wallet (${walletName || 'Wallet'})` : 'InstaPay';
     const updatedNotes = notes 
-      ? `${notes}\n[InstaPay Address: ${instapayAddress}]`
-      : `[InstaPay Address: ${instapayAddress}]`;
+      ? `${notes}\n[${methodLabel} Sent From: ${customerPaymentSender}]`
+      : `[${methodLabel} Sent From: ${customerPaymentSender}]`;
 
     const formattedDate = selectedDate ? formatDate(selectedDate) : "";
     const svcName = isRTL ? selectedService.ar : selectedService.en;
@@ -679,11 +704,13 @@ I have paid the reservation deposit for my booking:
 • Service: ${svcName}
 • Date: ${formattedDate} at ${selectedTime}
 • Deposit Amount: EGP ${depAmount}
-• My InstaPay Address: ${instapayAddress}
+• Payment Method: ${methodLabel}
+• Sent From: ${customerPaymentSender}
 
 Attached is my payment transaction receipt photo.`;
 
-    const whatsappLink = `http://wa.me/+201035595691?text=${encodeURIComponent(textMessage)}`;
+    const cleanWhatsapp = clinicWhatsapp.replace(/[^0-9]/g, "");
+    const whatsappLink = `https://wa.me/${cleanWhatsapp || "201035595691"}?text=${encodeURIComponent(textMessage)}`;
 
     setTimeout(() => {
       fetch(`/api/reservations?id=${createdReservation.id}`, {
@@ -1291,70 +1318,141 @@ Attached is my payment transaction receipt photo.`;
                   </div>
                 </div>
 
-                {/* Clinic InstaPay Info Box */}
-                <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "عنوان إنستاباي الخاص بالعيادة" : "CLINIC INSTAPAY ADDRESS"}</p>
-                      <p className="text-xs font-bold text-[#1F251A] mt-0.5">{instapayAddress}</p>
-                    </div>
+                {walletEnabled && (
+                  <div className="flex rounded-xl bg-[#EDF1EC] p-1 border border-[#414E36]/10 mb-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(instapayAddress);
-                        setCopiedAddress(true);
-                        setTimeout(() => setCopiedAddress(false), 2000);
-                      }}
-                      className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                      onClick={() => setSelectedDepositMethod("instapay")}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
+                        selectedDepositMethod === "instapay"
+                          ? "bg-white text-[#414E36] shadow-sm"
+                          : "text-[#5A6A51] hover:text-[#1F251A]"
+                      }`}
                     >
-                      {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
+                      {isRTL ? "إنستاباي (InstaPay)" : "InstaPay"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDepositMethod("wallet")}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
+                        selectedDepositMethod === "wallet"
+                          ? "bg-white text-[#414E36] shadow-sm"
+                          : "text-[#5A6A51] hover:text-[#1F251A]"
+                      }`}
+                    >
+                      {walletName ? (isRTL ? `محفظة ${walletName}` : `${walletName} Wallet`) : (isRTL ? "محفظة إلكترونية" : "Mobile Wallet")}
                     </button>
                   </div>
+                )}
 
-                  <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط تحويل إنستاباي" : "INSTAPAY QUICK LINK"}</span>
-                    <a 
-                      href={instapayLink} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-xs font-bold text-[#C4AE7C] hover:underline"
-                    >
-                      {isRTL ? "فتح تطبيق إنستاباي" : "Open InstaPay"} &rarr;
-                    </a>
-                  </div>
+                {selectedDepositMethod === "instapay" ? (
+                  /* Clinic InstaPay Info Box */
+                  <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "عنوان إنستاباي الخاص بالعيادة" : "CLINIC INSTAPAY ADDRESS"}</p>
+                        <p className="text-xs font-bold text-[#1F251A] mt-0.5">{instapayAddress}</p>
+                        {instapayName && <p className="text-[10px] font-bold text-[#5A6A51] mt-0.5">{instapayName}</p>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(instapayAddress);
+                          setCopiedAddress(true);
+                          setTimeout(() => setCopiedAddress(false), 2000);
+                        }}
+                        className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                      >
+                        {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
+                      </button>
+                    </div>
 
-                  {/* InstaPay QR Code */}
-                  <div className="pt-2 text-center">
-                    <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{isRTL ? "امسح رمز الاستجابة السريعة (QR) [انقر للتكبير]" : "SCAN QR CODE TO PAY [Click to Zoom]"}</p>
-                    <div 
-                      onClick={() => setZoomQr(true)}
-                      className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm hover:border-[#C4AE7C] hover:scale-105 transition duration-200 cursor-pointer"
-                      title={isRTL ? "انقر لتكبير رمز الاستجابة السريعة" : "Click to zoom QR Code"}
-                    >
-                      <img 
-                        src={qrCodeUrl} 
-                        alt="InstaPay QR Code" 
-                        className="w-32 h-32 object-contain"
-                      />
+                    {instapayLink && (
+                      <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط تحويل إنستاباي" : "INSTAPAY QUICK LINK"}</span>
+                        <a 
+                          href={instapayLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs font-bold text-[#C4AE7C] hover:underline"
+                        >
+                          {isRTL ? "فتح تطبيق إنستاباي" : "Open InstaPay"} &rarr;
+                        </a>
+                      </div>
+                    )}
+
+                    {/* InstaPay QR Code */}
+                    <div className="pt-2 text-center">
+                      <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{isRTL ? "امسح رمز الاستجابة السريعة (QR) [انقر للتكبير]" : "SCAN QR CODE TO PAY [Click to Zoom]"}</p>
+                      <div 
+                        onClick={() => setZoomQr(true)}
+                        className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm hover:border-[#C4AE7C] hover:scale-105 transition duration-200 cursor-pointer"
+                        title={isRTL ? "انقر لتكبير رمز الاستجابة السريعة" : "Click to zoom QR Code"}
+                      >
+                        <img 
+                          src={qrCodeUrl} 
+                          alt="InstaPay QR Code" 
+                          className="w-32 h-32 object-contain"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  /* Clinic Wallet Info Box */
+                  <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{walletName ? (isRTL ? `رقم محفظة ${walletName}` : `CLINIC ${walletName.toUpperCase()} NUMBER`) : (isRTL ? "رقم المحفظة الإلكترونية للعيادة" : "CLINIC WALLET NUMBER")}</p>
+                        <p className="text-sm font-extrabold text-[#1F251A] mt-0.5 tracking-wider">{walletNumber}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(walletNumber);
+                          setCopiedAddress(true);
+                          setTimeout(() => setCopiedAddress(false), 2000);
+                        }}
+                        className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                      >
+                        {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
+                      </button>
+                    </div>
 
-                {/* Patient's InstaPay Account Name Input */}
+                    {walletLink && (
+                      <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط المحفظة الإلكترونية" : "WALLET QUICK LINK"}</span>
+                        <a 
+                          href={walletLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs font-bold text-[#C4AE7C] hover:underline"
+                        >
+                          {isRTL ? "فتح رابط المحفظة" : "Open Wallet"} &rarr;
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Patient's Account / Phone Input */}
                 <div className="space-y-1.5">
                   <label className="block text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider">
-                    {isRTL ? "عنوان إنستاباي الخاص بك (الذي قمت بالتحويل منه)" : "Your InstaPay Address (Sent From)"}
+                    {selectedDepositMethod === "wallet"
+                      ? (isRTL ? "رقم المحفظة الإلكترونية الخاص بك (الذي قمت بالتحويل منه)" : "Your Wallet Mobile Number (Sent From)")
+                      : (isRTL ? "عنوان إنستاباي الخاص بك (الذي قمت بالتحويل منه)" : "Your InstaPay Address (Sent From)")}
                   </label>
                   <input 
                     type="text" 
-                    placeholder="name@instapay" 
-                    value={instapayAddress}
-                    onChange={(e) => setInstapayAddress(e.target.value)}
+                    placeholder={selectedDepositMethod === "wallet" ? "010xxxxxxxx" : "name@instapay"} 
+                    value={customerPaymentSender}
+                    onChange={(e) => setCustomerPaymentSender(e.target.value)}
                     disabled={isPaying}
                     className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36] font-medium"
                   />
                   <span className="text-[10px] text-[#8A9A81] block">
-                    {isRTL ? "مثال: name@instapay أو رقم الهاتف المسجل بإنستاباي" : "Example: name@instapay or phone number registered on InstaPay"}
+                    {selectedDepositMethod === "wallet"
+                      ? (isRTL ? "مثال: 01012345678" : "Example: 01012345678")
+                      : (isRTL ? "مثال: name@instapay أو رقم الهاتف المسجل بإنستاباي" : "Example: name@instapay or phone number registered on InstaPay")}
                   </span>
                 </div>
 
