@@ -199,15 +199,16 @@ Invoices are printed via `window.print()` on a hidden/visible DOM section. Outpu
 
 ## RISK-009: Schedule Grid Can Silently Clip Overlapping Bookings
 
-**Severity:** Medium
+**Severity:** Low (mitigated 2026-07-20)
 **Type:** Data visibility / UX
 
 **Description:**
-The Bookings → Schedule view (`calendarView === "Schedule"`, `src/app/admin/page.tsx`, see DEC-012) fixes every cell to a hard `84px` height with `overflow-hidden` on the inner content wrapper, so that booked cells render at the same height as empty ones. If more than a couple of bookings ever land on the same doctor/slot (whether from a real double-booking, a manual admin entry, or a data edge case — overlap-prevention exists in `api/availability` and `api/reservations` but was not exhaustively re-audited here), the extra booking cards are visually clipped and invisible in this view — not deleted, just not shown here. Staff relying solely on the Schedule tab could miss a booking that exists and is visible in the List/Calendar views.
+The Bookings → Schedule view (`calendarView === "Schedule"`, `src/app/admin/page.tsx`, see DEC-012) fixes every cell to a hard `84px` height with `overflow-hidden` on the inner content wrapper, so that booked cells render at the same height as empty ones. If more than a couple of bookings ever land on the same doctor/slot (whether from a real double-booking, a manual admin entry, or a data edge case — overlap-prevention exists in `api/availability` and `api/reservations` but was not exhaustively re-audited here), the extra booking cards could visually clip and become invisible in this view.
 
-**Mitigation:**
-- Add an overflow indicator (e.g. "+2 more") when a cell's content exceeds the fixed height, similar to calendar-app patterns, rather than silent clipping.
-- Confirm all booking-creation paths (website + admin manual entry) enforce the same overlap check, so this display limitation stays a rare edge case rather than a routine occurrence.
+**Mitigation (applied):**
+- Cell now shows at most `MAX_VISIBLE_BOOKINGS = 3` cards; any beyond that render as a `+N more` pill instead of clipping silently.
+- Clicking `+N more` sets `docFilter` to that cell's doctor, resets `statusFilter`/`typeFilter` to `"All"`, and switches `calendarView` to `"List"` — so the hidden bookings are one click away instead of invisible.
+- Residual gap: the List view has no date filter, so the jump narrows by doctor only, not by the specific day/slot — acceptable since the doctor filter is the highest-value narrowing already wired into `filteredReservations`.
 
 ---
 

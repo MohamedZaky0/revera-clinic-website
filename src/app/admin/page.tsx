@@ -22706,6 +22706,12 @@ export default function AdminPage() {
                                   blocked.add(`${doc}-${si + offset}`);
                                 }
                               }
+                              // Cap visible cards so the row never overflows the fixed cell
+                              // height; anything past this shows as a "+N more" pill instead
+                              // of silently clipping (RISK-009).
+                              const MAX_VISIBLE_BOOKINGS = 3;
+                              const visibleCells = cells.slice(0, MAX_VISIBLE_BOOKINGS);
+                              const hiddenCount = cells.length - visibleCells.length;
                               return (
                                 <td
                                   key={raw}
@@ -22714,7 +22720,7 @@ export default function AdminPage() {
                                   style={{ width: 140 * 4, height: 84, maxHeight: 84 }}
                                 >
                                   <div className="flex flex-wrap gap-1.5 overflow-hidden" style={{ height: 72, maxHeight: 72 }}>
-                                    {cells.map(b => {
+                                    {visibleCells.map(b => {
                                       const svc = localServices.find(s => s.id === b.serviceId);
                                       const svcName = svc ? svc.en : b.sessionType || 'Consultation';
                                       return (
@@ -22732,6 +22738,21 @@ export default function AdminPage() {
                                         </div>
                                       );
                                     })}
+                                    {hiddenCount > 0 && (
+                                      <button
+                                        type="button"
+                                        title={`${hiddenCount} more booking${hiddenCount > 1 ? 's' : ''} for ${doc} — view in list`}
+                                        onClick={() => {
+                                          setDocFilter(doc);
+                                          setStatusFilter("All");
+                                          setTypeFilter("All");
+                                          setCalendarView("List");
+                                        }}
+                                        className="flex min-w-[56px] flex-1 items-center justify-center rounded-2xl bg-[#414E36]/20 px-3 py-2 text-xs font-semibold text-[#414E36] ring-1 ring-[#414E36]/30 transition hover:bg-[#414E36]/30"
+                                      >
+                                        +{hiddenCount} more
+                                      </button>
+                                    )}
                                   </div>
                                 </td>
                               );
