@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-07-14
+> **Last Updated:** 2026-07-20
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 
@@ -64,35 +64,37 @@ After that, check task-specific files:
 
 ---
 
-## Project Status Snapshot (as of 2026-07-14)
+## Project Status Snapshot (as of 2026-07-20)
 
 ### What Is Actually Built and Working
 - Public website (homepage, about, services, contact, blog stub)
-- Patient Profile (`/profile`) -> Persistent customer profile details, wallet ledgers, and visit logs history
+- Patient Profile (`/profile`) — persistent customer profile details, wallet ledgers, and visit logs history
 - Booking modal → `reservations` table (real Supabase writes with customer_id links)
-- Admin booking management (calendar, list, approve/reject, status changes, inline notes editor)
-- Customer Wallet Ledgers (real writes updating spent_amount, outstanding, and wallet_balance during checkout)
+- Admin booking management — calendar, list, approve/reject, full lifecycle stages, inline notes editor
+- Booking lifecycle stages: `pending → approved → confirmed → started → completed`
+- Customer Wallet Ledgers — real writes updating spent_amount, outstanding, and wallet_balance during checkout
+- Payment settlement drawer inside admin booking details
+- Booking invoice popup + PDF printing inside admin
 - Branch-specific service hours (separate schedules for Sheikh Zayed / New Cairo stored in database and enforced in booking availability)
 - Service catalog CRUD (with drag-sort, bilingual names, branch pricing)
 - Branch management CRUD
 - Website CMS — hero slides (EN/AR) editable via admin
 - Provider records (doctors) — basic CRUD
-- Prescriptions & Visit Records (backed by real Supabase `prescriptions` table, with local file fallback)
-- Employee Details redone drawer (Egypt National ID birth/gender/gov checks, daily/hourly salary calculations, quick printing letterhead)
-- Personal Profile Settings redone page (Egypt National ID check, salary calculations, quick printing letterhead)
-- HR Payroll redesigned tab (search, filters, paid/pending/overdue status tags, dynamic pagination)
-- Auto-Translation settings (API route integrations using Google Translate)
-- Branch-specific promotions page (with multi-service select checklists, percentage/fixed value configurations, and timezone-compliant status resolution)
+- Employee attendance with GPS geofence check-in (500m radius, widened to 800m on Jul 8)
+- Employee accounts and roles (`employee_accounts` + `roles` tables) with `/api/auth/me` permission lookup
+- Superadmin/admin bypass for daily GPS check-in
+- WhatsApp confirmation step for website bookings (English only)
+- Booking origin badges (website vs other sources)
 
 ### What Is Mock UI Only (hardcoded data, not Supabase)
-- Treatment plans, before/after photos
+- All clinical: consultation notes, prescriptions, treatment plans, before/after photos
 - Billing metrics: overall billing analytics reports are mock (but individual customer ledgers are real)
 - All marketing: WhatsApp is external `wa.me` links only; no campaigns or templates
 - Notification templates
-- RBAC / roles and permissions
+- Full RBAC enforcement on API routes (browser login gate exists, but `/api/*` routes don't validate tokens)
 
 ### Critical Gaps (do not assume these work)
-- **Admin has no authentication** — `/admin` is publicly accessible (RISK-002)
+- **API routes have no auth validation** — browser login gate exists, but direct HTTP calls to `/api/*` are unprotected (RISK-002 partially resolved)
 - **Patient OTP auth is simulated** — no SMS sent, no user created (RISK-003)
 - Doctor shifts and availability — not built; derived only from existing bookings
 - Waitlist — not built
@@ -110,7 +112,7 @@ Next.js 15 (App Router) + TypeScript on Vercel. Single app serving both the publ
 1. **Do not add raw hex colors** (`#414E36`, `#C4AE7C`) to components. Use `var(--cr-primary)` and `var(--cr-accent)` from `globals.css`.
 2. **Do not hardcode "Revera"** in component strings, metadata, or alt text. It goes in `src/lib/translations.ts` or will move to `src/config/client.ts` after PROPOSAL-001 is approved.
 3. **Do not hardcode phone numbers or WhatsApp links** inline. See PROPOSAL-001 in `PROPOSALS.md`.
-4. **Do not treat mock UI sections as real features.** Finance, Inventory, POS are backed by hardcoded arrays. Payroll, Prescriptions, Leaves, Performance, Attendance, and Targets have real database backends (fully implemented).
+4. **Do not treat mock UI sections as real features.** Finance, Payroll, Prescriptions, Inventory, POS are backed by hardcoded arrays. Adding real backend to them is a separate task.
 5. **`branch` is the topmost scoping unit.** There is no `org_id` or `tenant_id`. Do not introduce one without a decision logged in `DECISIONS.md`.
 6. **Do not add localStorage writes** for admin data. The existing `serviceStore.ts` pattern (localStorage as primary, Supabase as secondary) is a known risk (RISK-004) — do not extend it.
 7. **Before any refactor touching hardcoded values**, read `PROPOSALS.md` first — a centralization plan already exists.
