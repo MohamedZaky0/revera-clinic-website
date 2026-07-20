@@ -3049,7 +3049,10 @@ export default function AdminPage() {
   }, [availableDoctorsApprove, doctorName, selected]);
 
 
-  // Custom provider modal states
+  // Custom provider inline & modal states
+  const [editingDoctorInline, setEditingDoctorInline] = useState<any | null>(null);
+  const [departmentsList, setDepartmentsList] = useState<string[]>(["Doctors", "Receptionist"]);
+  const [newDeptInput, setNewDeptInput] = useState("");
   const [showProviderModal, setShowProviderModal] = useState(false);
   const [providerModalMode, setProviderModalMode] = useState<"add" | "edit">("add");
   const [providerEditingId, setProviderEditingId] = useState<string | null>(null);
@@ -4305,10 +4308,32 @@ export default function AdminPage() {
             setInactivityThreshold(data.inactivity.threshold ?? 30);
             setInactivityCountdown(data.inactivity.countdown ?? 10);
           }
+
+          if (data.departments && Array.isArray(data.departments) && data.departments.length > 0) {
+            setDepartmentsList(data.departments);
+          } else {
+            setDepartmentsList(["Doctors", "Receptionist"]);
+          }
         }
       })
       .catch((err) => console.error("fetchPageSettings error:", err))
       .finally(() => setLoadingPageSettings(false));
+  }
+
+  async function handleSaveDepartments(newList: string[]) {
+    setDepartmentsList(newList);
+    try {
+      const res = await fetch("/api/page-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ departments: newList }),
+      });
+      if (res.ok) {
+        clearFetchCache();
+      }
+    } catch (err) {
+      console.error("handleSaveDepartments error:", err);
+    }
   }
 
   const handleProfileImageUpload = async (file: File, side: 'front' | 'back') => {
@@ -14524,6 +14549,63 @@ export default function AdminPage() {
                     </table>
                   </div>
                 </div>
+
+                {/* 3. Department Management Card */}
+                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
+                  <h3 className="text-xl font-bold text-[#1F251A] mb-1">Department Management</h3>
+                  <p className="text-xs text-[#5A6A51] mb-5">Add or remove organizational departments used for employee categorization.</p>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const val = newDeptInput.trim();
+                      if (!val) return;
+                      if (departmentsList.map(d => d.toLowerCase()).includes(val.toLowerCase())) {
+                        alert("Department already exists!");
+                        return;
+                      }
+                      handleSaveDepartments([...departmentsList, val]);
+                      setNewDeptInput("");
+                    }}
+                    className="flex flex-wrap gap-3 mb-6"
+                  >
+                    <input
+                      type="text"
+                      placeholder="e.g. Receptionist, Nursing, Medical..."
+                      value={newDeptInput}
+                      onChange={(e) => setNewDeptInput(e.target.value)}
+                      className="w-full max-w-md rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#2e3a26] transition flex items-center gap-1.5"
+                    >
+                      <Plus size={14} /> Add Department
+                    </button>
+                  </form>
+
+                  <div className="flex flex-wrap gap-2.5">
+                    {departmentsList.map((dept) => (
+                      <div key={dept} className="flex items-center gap-2 rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2 text-xs font-bold text-[#1F251A] shadow-sm">
+                        <span>{dept}</span>
+                        {dept !== "Doctors" && dept !== "Receptionist" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to remove the '${dept}' department?`)) {
+                                handleSaveDepartments(departmentsList.filter(d => d !== dept));
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-700 ml-1 transition"
+                            title="Remove Department"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -14589,12 +14671,9 @@ export default function AdminPage() {
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs font-semibold text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                 >
                   <option value="All">All Departments</option>
-                  <option value="Medical">Medical</option>
-                  <option value="Reception">Reception</option>
-                  <option value="Nursing">Nursing</option>
-                  <option value="Administration">Administration</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Other">Other</option>
+                  {departmentsList.map((dept) => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
                 </select>
                 <select
                   value={employeeFilterShift}
@@ -14986,12 +15065,9 @@ export default function AdminPage() {
                             onChange={(e) => setNewEmployeeDepartment(e.target.value)}
                             className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                           >
-                            <option value="Medical">Medical</option>
-                            <option value="Reception">Reception</option>
-                            <option value="Nursing">Nursing</option>
-                            <option value="Administration">Administration</option>
-                            <option value="Finance">Finance</option>
-                            <option value="Other">Other</option>
+                            {departmentsList.map((dept) => (
+                              <option key={dept} value={dept}>{dept}</option>
+                            ))}
                           </select>
                         </div>
 
