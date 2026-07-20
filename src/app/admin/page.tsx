@@ -22710,10 +22710,10 @@ export default function AdminPage() {
                                 <td
                                   key={raw}
                                   colSpan={4}
-                                  className={`border-l border-[#414E36]/08 p-1.5 align-top ${di > 0 ? 'border-t border-[#414E36]/06' : ''}`}
-                                  style={{ width: 140 * 4, height: 64 }}
+                                  className={`overflow-hidden border-l border-[#414E36]/08 p-1.5 align-top ${di > 0 ? 'border-t border-[#414E36]/06' : ''}`}
+                                  style={{ width: 140 * 4, height: 84, maxHeight: 84 }}
                                 >
-                                  <div className="flex h-full flex-wrap gap-1.5">
+                                  <div className="flex flex-wrap gap-1.5 overflow-hidden" style={{ height: 72, maxHeight: 72 }}>
                                     {cells.map(b => {
                                       const svc = localServices.find(s => s.id === b.serviceId);
                                       const svcName = svc ? svc.en : b.sessionType || 'Consultation';
@@ -22742,7 +22742,7 @@ export default function AdminPage() {
                               <td
                                 key={raw}
                                 className={`border-l border-[#414E36]/08 ${di > 0 ? 'border-t border-[#414E36]/06' : ''}`}
-                                style={{ width: 140, height: 64 }}
+                                style={{ width: 140, height: 84, maxHeight: 84 }}
                               />
                             );
                           })}
