@@ -627,14 +627,17 @@ export function BookingModal() {
         return r.json();
       })
       .then((data) => {
-        if (data && data.status === 'pending_deposit') {
+        if (data && (data.status === 'pending_deposit' || data.requiresDeposit || depositPercentage > 0)) {
           setCreatedReservation(data);
           setStep(5);
         } else {
           setConfirmed(true);
         }
       })
-      .catch(() => setConfirmed(true));
+      .catch((err) => {
+        console.error("Failed to create reservation:", err);
+        setConfirmed(true);
+      });
   }
 
   function handlePayDeposit() {

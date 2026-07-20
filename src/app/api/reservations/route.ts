@@ -308,7 +308,13 @@ export async function POST(req: Request) {
     }
 
     if (error) throw error;
-    return NextResponse.json(mapRow(data), { status: 201 });
+    const mapped = mapRow(data);
+    const requiresDeposit = !isManualBooking && depositPercentage > 0;
+    return NextResponse.json({
+      ...mapped,
+      requiresDeposit,
+      status: requiresDeposit ? 'pending_deposit' : mapped.status,
+    }, { status: 201 });
   } catch (err) {
     console.error('POST /api/reservations error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });

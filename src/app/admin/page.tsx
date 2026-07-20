@@ -1696,7 +1696,10 @@ export default function AdminPage() {
   }, [newPatientService, localServices]);
   const filteredReservations = useMemo(() => {
     return allReservations.filter((r) => {
-      const matchStatus = statusFilter === "All" || r.status === statusFilter;
+      const matchStatus = statusFilter === "All" 
+        || r.status === statusFilter 
+        || (statusFilter === "pending" && (r.status === "pending" || r.status === "pending_deposit"))
+        || (statusFilter === "pending_deposit" && (r.status === "pending" || r.status === "pending_deposit"));
       const matchType = typeFilter === "All" || r.sessionType === typeFilter;
       const matchDoc = docFilter === "All" || (r.doctorName || "Dr. Sara El Gamel") === docFilter;
       return matchStatus && matchType && matchDoc;
