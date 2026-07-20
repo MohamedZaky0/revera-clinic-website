@@ -820,6 +820,16 @@ export default function AdminPage() {
   const [newEmployeeSpecialty, setNewEmployeeSpecialty] = useState("");
   const [newEmployeeSelectedServices, setNewEmployeeSelectedServices] = useState<string[]>([]);
   const [newEmployeeRating, setNewEmployeeRating] = useState("5");
+  const [newEmployeeBranchIds, setNewEmployeeBranchIds] = useState<string[]>([]);
+  const [newEmployeeWorkingDaysHours, setNewEmployeeWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string }>>({
+    Sunday: { isOpen: true, start: "09:00", end: "17:00" },
+    Monday: { isOpen: true, start: "09:00", end: "17:00" },
+    Tuesday: { isOpen: true, start: "09:00", end: "17:00" },
+    Wednesday: { isOpen: true, start: "09:00", end: "17:00" },
+    Thursday: { isOpen: true, start: "09:00", end: "17:00" },
+    Friday: { isOpen: false, start: "09:00", end: "17:00" },
+    Saturday: { isOpen: true, start: "09:00", end: "17:00" }
+  });
   const [viewingEmployeeNotes, setViewingEmployeeNotes] = useState<any[]>([]);
   const [loadingEmployeeNotes, setLoadingEmployeeNotes] = useState(false);
   const [viewingEmployeeBookings, setViewingEmployeeBookings] = useState<any[]>([]);
@@ -14905,6 +14915,16 @@ export default function AdminPage() {
                     setNewEmployeeSpecialty("");
                     setNewEmployeeSelectedServices([]);
                     setNewEmployeeRating("5");
+                    setNewEmployeeBranchIds(branches.length > 0 ? [branches[0].id] : []);
+                    setNewEmployeeWorkingDaysHours({
+                      Sunday: { isOpen: true, start: "09:00", end: "17:00" },
+                      Monday: { isOpen: true, start: "09:00", end: "17:00" },
+                      Tuesday: { isOpen: true, start: "09:00", end: "17:00" },
+                      Wednesday: { isOpen: true, start: "09:00", end: "17:00" },
+                      Thursday: { isOpen: true, start: "09:00", end: "17:00" },
+                      Friday: { isOpen: false, start: "09:00", end: "17:00" },
+                      Saturday: { isOpen: true, start: "09:00", end: "17:00" }
+                    });
                     setIsEditingEmployeeModalOpen(true);
                   }}
                   className="rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-md shrink-0"
@@ -15108,6 +15128,28 @@ export default function AdminPage() {
                                           setNewEmployeeSpecialty(matchProv?.specialty || "");
                                           setNewEmployeeSelectedServices(matchProv?.services || []);
                                           setNewEmployeeRating(String(matchProv?.rating || 5));
+                                          let bIds: string[] = [];
+                                          if (matchProv?.workingDaysHours?.branch_ids && Array.isArray(matchProv.workingDaysHours.branch_ids)) {
+                                            bIds = matchProv.workingDaysHours.branch_ids;
+                                          } else if (emp.branch_id) {
+                                            bIds = [emp.branch_id];
+                                          } else if (branches.length > 0) {
+                                            bIds = [branches[0].id];
+                                          }
+                                          setNewEmployeeBranchIds(bIds);
+                                          let sched = matchProv?.workingDaysHours?.branch_schedules?.[bIds[0]]?.in_person || matchProv?.workingDaysHours?.in_person || matchProv?.workingDaysHours;
+                                          if (!sched || typeof sched !== 'object') {
+                                            sched = {
+                                              Sunday: { isOpen: true, start: "09:00", end: "17:00" },
+                                              Monday: { isOpen: true, start: "09:00", end: "17:00" },
+                                              Tuesday: { isOpen: true, start: "09:00", end: "17:00" },
+                                              Wednesday: { isOpen: true, start: "09:00", end: "17:00" },
+                                              Thursday: { isOpen: true, start: "09:00", end: "17:00" },
+                                              Friday: { isOpen: false, start: "09:00", end: "17:00" },
+                                              Saturday: { isOpen: true, start: "09:00", end: "17:00" }
+                                            };
+                                          }
+                                          setNewEmployeeWorkingDaysHours(sched);
                                           setIsEditingEmployeeModalOpen(true);
                                         }}
                                         className="text-[#C4AE7C] hover:text-[#a38f61] transition"
@@ -15206,6 +15248,15 @@ export default function AdminPage() {
                                 specialty: newEmployeeSpecialty,
                                 services: newEmployeeSelectedServices,
                                 rating: Number(newEmployeeRating || 5),
+                                workingDaysHours: {
+                                  branch_ids: newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId],
+                                  branch_schedules: {
+                                    [newEmployeeBranchIds[0] || newEmployeeBranchId]: {
+                                      in_person: newEmployeeWorkingDaysHours,
+                                      online: newEmployeeWorkingDaysHours
+                                    }
+                                  }
+                                }
                               }),
                             });
                             if (res.ok) {
@@ -15237,7 +15288,7 @@ export default function AdminPage() {
                                 nationalIdFront: newEmployeeNationalIdFront || null,
                                 nationalIdBack: newEmployeeNationalIdBack || null,
                                 address: buildAddress(newEmployeeAddressLine1.trim(), newEmployeeAddressLine2.trim(), newEmployeeCity.trim(), newEmployeeGovernorateProp.trim(), newEmployeePostalCode.trim(), newEmployeeCountry.trim()) || null,
-                                branchId: newEmployeeBranchId || null,
+                                branchId: newEmployeeBranchIds[0] || newEmployeeBranchId || null,
                                 contractFile: newEmployeeAdditionalFiles.length > 0 
                                   ? JSON.stringify({ contract: newEmployeeContract || "", additional: newEmployeeAdditionalFiles }) 
                                   : (newEmployeeContract || null),
@@ -15247,6 +15298,15 @@ export default function AdminPage() {
                                 specialty: newEmployeeSpecialty,
                                 services: newEmployeeSelectedServices,
                                 rating: Number(newEmployeeRating || 5),
+                                workingDaysHours: {
+                                  branch_ids: newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId],
+                                  branch_schedules: {
+                                    [newEmployeeBranchIds[0] || newEmployeeBranchId]: {
+                                      in_person: newEmployeeWorkingDaysHours,
+                                      online: newEmployeeWorkingDaysHours
+                                    }
+                                  }
+                                }
                               }),
                             });
                             if (res.ok) {
@@ -15307,7 +15367,13 @@ export default function AdminPage() {
                           <select
                             required
                             value={newEmployeeRole}
-                            onChange={(e) => setNewEmployeeRole(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setNewEmployeeRole(val);
+                              if (val.toLowerCase().includes("doc")) {
+                                setNewEmployeeDepartment("Doctors");
+                              }
+                            }}
                             className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                           >
                             <option value="" disabled>Select Role</option>
@@ -15337,7 +15403,14 @@ export default function AdminPage() {
                           <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Department</label>
                           <select
                             value={newEmployeeDepartment}
-                            onChange={(e) => setNewEmployeeDepartment(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setNewEmployeeDepartment(val);
+                              if (val.toLowerCase().includes("doc") && !newEmployeeRole.toLowerCase().includes("doc")) {
+                                const docRole = rolesList.find((r: any) => r.name.toLowerCase().includes("doc"));
+                                if (docRole) setNewEmployeeRole(docRole.name);
+                              }
+                            }}
                             className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#414E36] outline-none focus:border-[#C4AE7C] cursor-pointer"
                           >
                             {departmentsList.map((dept) => (
@@ -15393,6 +15466,102 @@ export default function AdminPage() {
                                 onChange={(e) => setNewEmployeeRating(e.target.value)}
                                 className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                               />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                              Assigned Branches (Select one or more for Doctor)
+                            </label>
+                            <div className="flex flex-wrap gap-2 p-2 rounded-2xl border border-[#414E36]/15 bg-white min-h-[42px] items-center">
+                              {branches.map((b) => {
+                                const isSelected = newEmployeeBranchIds.includes(b.id);
+                                return (
+                                  <button
+                                    key={b.id}
+                                    type="button"
+                                    onClick={() => {
+                                      if (isSelected) {
+                                        if (newEmployeeBranchIds.length <= 1) return;
+                                        const next = newEmployeeBranchIds.filter((id) => id !== b.id);
+                                        setNewEmployeeBranchIds(next);
+                                        setNewEmployeeBranchId(next[0]);
+                                      } else {
+                                        const next = [...newEmployeeBranchIds, b.id];
+                                        setNewEmployeeBranchIds(next);
+                                        setNewEmployeeBranchId(next[0]);
+                                      }
+                                    }}
+                                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+                                      isSelected
+                                        ? "bg-[#414E36] text-white border-[#414E36]"
+                                        : "bg-gray-50 text-[#414E36] border-[#414E36]/15 hover:bg-[#414E36]/10"
+                                    }`}
+                                  >
+                                    {b.name_en} {isSelected ? "✓" : "+"}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                              Doctor Weekly Shifts &amp; Working Days Schedule
+                            </label>
+                            <div className="rounded-2xl border border-[#414E36]/10 bg-white p-3 space-y-2.5">
+                              {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => {
+                                const daySched = newEmployeeWorkingDaysHours[day] || { isOpen: false, start: "09:00", end: "17:00" };
+                                return (
+                                  <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/5 pb-2 last:border-0 last:pb-0">
+                                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={daySched.isOpen}
+                                        onChange={(e) => {
+                                          setNewEmployeeWorkingDaysHours({
+                                            ...newEmployeeWorkingDaysHours,
+                                            [day]: { ...daySched, isOpen: e.target.checked }
+                                          });
+                                        }}
+                                        className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                                      />
+                                      <span className={`text-xs font-semibold ${daySched.isOpen ? "text-[#1F251A]" : "text-gray-400"}`}>
+                                        {day}
+                                      </span>
+                                    </label>
+                                    {daySched.isOpen ? (
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="time"
+                                          value={daySched.start}
+                                          onChange={(e) => {
+                                            setNewEmployeeWorkingDaysHours({
+                                              ...newEmployeeWorkingDaysHours,
+                                              [day]: { ...daySched, start: e.target.value }
+                                            });
+                                          }}
+                                          className="rounded-xl border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                        />
+                                        <span className="text-xs text-gray-400">to</span>
+                                        <input
+                                          type="time"
+                                          value={daySched.end}
+                                          onChange={(e) => {
+                                            setNewEmployeeWorkingDaysHours({
+                                              ...newEmployeeWorkingDaysHours,
+                                              [day]: { ...daySched, end: e.target.value }
+                                            });
+                                          }}
+                                          className="rounded-xl border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] uppercase font-bold text-gray-400">Off / Closed</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
 

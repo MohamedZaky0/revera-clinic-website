@@ -176,6 +176,7 @@ export async function POST(req: Request) {
           national_id: nationalId || null,
           branch_id: branchId || null,
           fixed_salary: salary ? Number(salary) : 0,
+          working_days_hours: body.workingDaysHours || null,
           bookings_count: 0,
           more_count: Math.max(0, (body.services || []).length - 2)
         };
@@ -309,6 +310,7 @@ export async function PATCH(req: Request) {
             ...(body.services !== undefined ? { services: body.services } : {}),
             ...(body.specialty !== undefined ? { specialty: body.specialty } : {}),
             ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
+            ...(body.workingDaysHours !== undefined ? { working_days_hours: body.workingDaysHours } : {}),
             ...(docPhone !== undefined ? { phone: docPhone } : {}),
             ...(docNationalId !== undefined ? { national_id: docNationalId } : {}),
             ...(docBranchId !== undefined ? { branch_id: docBranchId || null } : {}),
