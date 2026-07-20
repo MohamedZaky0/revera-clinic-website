@@ -3389,6 +3389,150 @@ export default function AdminPage() {
       console.error("Error deleting product:", err);
     }
   };
+
+  // Sell Product State
+  const [productSubTab, setProductSubTab] = useState<"catalog" | "sales_history">("catalog");
+  const [productSalesHistory, setProductSalesHistory] = useState<any[]>([]);
+  const [productSalesLoading, setProductSalesLoading] = useState(false);
+
+  const [showSellProductModal, setShowSellProductModal] = useState(false);
+  const [selectedSellProduct, setSelectedSellProduct] = useState<any | null>(null);
+  const [sellCustomerId, setSellCustomerId] = useState("");
+  const [sellPaymentMethod, setSellPaymentMethod] = useState("Cash");
+  const [sellNotes, setSellNotes] = useState("");
+  const [sellQuantity, setSellQuantity] = useState<number>(1);
+  const [sellPatientPhone, setSellPatientPhone] = useState("");
+  const [searchedPatient, setSearchedPatient] = useState<any | null>(null);
+  const [searchPatientAttempted, setSearchPatientAttempted] = useState(false);
+  const [submittingSellProduct, setSubmittingSellProduct] = useState(false);
+
+  const fetchProductSalesHistory = useCallback(async () => {
+    try {
+      setProductSalesLoading(true);
+      const res = await fetch("/api/inventory/products/sales");
+      if (res.ok) {
+        const data = await res.json();
+        setProductSalesHistory(data.sales || []);
+      }
+    } catch (err) {
+      console.error("Error fetching product sales history:", err);
+    } finally {
+      setProductSalesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeNav === "Inventory" || activeNav === "Products") {
+      fetchProductSalesHistory();
+    }
+  }, [activeNav, fetchProductSalesHistory]);
+
+  const handleOpenSellProductModal = (prod: any) => {
+    setSelectedSellProduct(prod);
+    setSellQuantity(1);
+    setSellPatientPhone("");
+    setSearchedPatient(null);
+    setSearchPatientAttempted(false);
+    setShowSellProductModal(true);
+  };
+
+  const handleSearchPatientByPhone = (phone: string) => {
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (!cleanPhone) {
+      setSearchedPatient(null);
+      setSearchPatientAttempted(true);
+      return;
+    }
+    const found = customers.find((c) => {
+      const cMobile = (c.mobile || c.phone || "").replace(/\D/g, "");
+      return cMobile && (cMobile.includes(cleanPhone) || cleanPhone.includes(cMobile));
+    });
+    setSearchedPatient(found || null);
+    setSearchPatientAttempted(true);
+  };
+
+  const handleConfirmSellProduct = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const targetPatient = searchedPatient || customers.find((c) => c.id === sellCustomerId);
+    if (!selectedSellProduct || !targetPatient || sellQuantity <= 0) {
+      alert("Please select a valid patient and product quantity.");
+      return;
+    }
+    if (sellQuantity > selectedSellProduct.stock_quantity) {
+      alert(`Cannot sell ${sellQuantity} items. Only ${selectedSellProduct.stock_quantity} available in stock.`);
+      return;
+    }
+
+    try {
+      setSubmittingSellProduct(true);
+      const unitPrice = selectedSellProduct.selling_price || 0;
+      const totalAmount = unitPrice * sellQuantity;
+
+      // 1. Post to product sales endpoint
+      const saleRes = await fetch("/api/inventory/products/sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: selectedSellProduct.id,
+          product_name: selectedSellProduct.name,
+          product_sku: selectedSellProduct.sku || "",
+          customer_id: targetPatient.id,
+          customer_name: targetPatient.name,
+          customer_mobile: targetPatient.mobile || targetPatient.phone || "",
+          quantity: sellQuantity,
+          unit_price: unitPrice,
+          total_amount: totalAmount,
+          sold_by: "Admin/Receptionist"
+        })
+      });
+
+      if (!saleRes.ok) {
+        const errorData = await saleRes.json();
+        throw new Error(errorData.error || "Failed to record sale.");
+      }
+
+      // 2. Update Product Stock Quantity
+      const newStock = Math.max(0, selectedSellProduct.stock_quantity - sellQuantity);
+      const newStatus = newStock === 0 ? "Out of Stock" : selectedSellProduct.status;
+      const updatedProducts = inventoryProducts.map((p) =>
+        p.id === selectedSellProduct.id
+          ? { ...p, stock_quantity: newStock, status: newStatus }
+          : p
+      );
+
+      await fetch("/api/inventory/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ products: updatedProducts })
+      });
+      setInventoryProducts(updatedProducts);
+
+      // 3. Update Customer spent_amount
+      const newSpentAmount = (Number(targetPatient.spent_amount) || 0) + totalAmount;
+      const { error: customerErr } = await supabase
+        .from("customers")
+        .update({ spent_amount: newSpentAmount, updated_at: new Date().toISOString() })
+        .eq("id", targetPatient.id);
+
+      if (customerErr) {
+        console.error("Error updating customer spent amount:", customerErr);
+      } else {
+        setDbCustomers((prev) =>
+          prev.map((c) => (c.id === targetPatient.id ? { ...c, spent_amount: newSpentAmount } : c))
+        );
+      }
+
+      // 4. Refresh sales history & close modal
+      await fetchProductSalesHistory();
+      setShowSellProductModal(false);
+      alert(`Sale confirmed! ${sellQuantity} x ${selectedSellProduct.name} recorded for ${targetPatient.name}.`);
+    } catch (err: any) {
+      console.error("Error completing product sale:", err);
+      alert(err.message || "An error occurred while confirming the sale.");
+    } finally {
+      setSubmittingSellProduct(false);
+    }
+  };
   const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [pagesSettingsTab, setPagesSettingsTab] = useState<"Home" | "About Us" | "Services">("Home");
   const [termsText, setTermsText] = useState("");
@@ -16321,175 +16465,284 @@ export default function AdminPage() {
 
                   {/* Main Container */}
                   <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB] space-y-6">
-                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-[#1F251A]">Medical Consumables &amp; Products</h3>
-                        <p className="text-xs text-[#5A6A51]">Manage injectable stock, skincare supplies, cost price, selling price, and reorder levels.</p>
-                      </div>
-
-                      {/* Search & Filter controls */}
-                      <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                        <div className="relative flex-1 md:w-64">
-                          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
-                          <input
-                            type="text"
-                            placeholder="Search by name, SKU..."
-                            value={productSearchQuery}
-                            onChange={(e) => setProductSearchQuery(e.target.value)}
-                            className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 pl-9 pr-4 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
-                          />
-                        </div>
-
-                        <select
-                          value={productCategoryFilter}
-                          onChange={(e) => setProductCategoryFilter(e.target.value)}
-                          className="rounded-2xl border border-[#E6E9EB] bg-white py-2 px-3 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
-                        >
-                          <option value="All">All Categories</option>
-                          <option value="Injectables">Injectables</option>
-                          <option value="Skincare">Skincare</option>
-                          <option value="Supplies">Supplies</option>
-                          <option value="Equipment">Equipment</option>
-                          <option value="General">General</option>
-                        </select>
-
-                        <select
-                          value={productStatusFilter}
-                          onChange={(e) => setProductStatusFilter(e.target.value)}
-                          className="rounded-2xl border border-[#E6E9EB] bg-white py-2 px-3 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
-                        >
-                          <option value="All">All Statuses</option>
-                          <option value="Active">Active</option>
-                          <option value="Inactive">Inactive</option>
-                          <option value="Out of Stock">Out of Stock</option>
-                          <option value="Discontinued">Discontinued</option>
-                        </select>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            resetProductForm();
-                            setShowAddProductModal(true);
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]"
-                        >
-                          <Plus size={14} /> Add Item
-                        </button>
-                      </div>
+                    {/* Sub-tabs for Catalog vs Sales History */}
+                    <div className="flex items-center gap-4 border-b border-[#E6E9EB] pb-3 mb-6">
+                      <button
+                        type="button"
+                        onClick={() => setProductSubTab("catalog")}
+                        className={`text-xs font-bold transition pb-2 border-b-2 ${
+                          productSubTab === "catalog"
+                            ? "border-[#414E36] text-[#414E36]"
+                            : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
+                        }`}
+                      >
+                        Products Catalog ({filteredInventoryProducts.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProductSubTab("sales_history")}
+                        className={`text-xs font-bold transition pb-2 border-b-2 flex items-center gap-1.5 ${
+                          productSubTab === "sales_history"
+                            ? "border-[#414E36] text-[#414E36]"
+                            : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
+                        }`}
+                      >
+                        <Receipt size={14} /> Product Sales History ({productSalesHistory.length})
+                      </button>
                     </div>
 
-                    {/* Table View */}
-                    <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                      <table className="w-full min-w-[900px] text-sm">
-                        <thead>
-                          <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                            <th className="px-6 py-4 text-left">Product Item &amp; SKU</th>
-                            <th className="px-6 py-4 text-left">Category &amp; Unit</th>
-                            <th className="px-6 py-4 text-right">Cost Price</th>
-                            <th className="px-6 py-4 text-right">Selling Price</th>
-                            <th className="px-6 py-4 text-center">Stock Level</th>
-                            <th className="px-6 py-4 text-left">Status</th>
-                            <th className="px-6 py-4 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
-                          {filteredInventoryProducts.length === 0 ? (
-                            <tr>
-                              <td colSpan={7} className="px-6 py-12 text-center text-[#5A6A51]">
-                                <div className="flex flex-col items-center justify-center gap-2">
-                                  <ShoppingBag size={32} className="text-[#A3B19B]" />
-                                  <p className="font-semibold text-[#1F251A]">No products found</p>
-                                  <p className="text-xs text-[#5A6A51]">Try adjusting your search query or filter settings.</p>
-                                </div>
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredInventoryProducts.map((prod) => {
-                              const isLowStock = prod.stock_quantity <= prod.min_reorder_quantity;
-                              return (
-                                <tr key={prod.id} className="transition hover:bg-[#F9F9F7]">
-                                  <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EBF0E6] text-[#414E36] font-bold">
-                                        <ShoppingBag size={18} />
-                                      </div>
-                                      <div>
-                                        <p className="font-semibold text-[#1F251A]">{prod.name}</p>
-                                        {prod.name_ar && (
-                                          <p className="text-xs text-[#5A6A51] dir-rtl font-sans">{prod.name_ar}</p>
-                                        )}
-                                        {prod.sku && (
-                                          <span className="inline-block mt-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-600">
-                                            SKU: {prod.sku}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <span className="inline-flex items-center rounded-full bg-[#EBF0E6] px-2.5 py-0.5 text-xs font-medium text-[#414E36]">
-                                      {prod.category}
-                                    </span>
-                                    <p className="text-xs text-[#5A6A51] mt-1 font-mono">Unit: {prod.unit}</p>
-                                  </td>
-                                  <td className="px-6 py-4 text-right font-mono font-semibold text-[#1F251A]">
-                                    EGP {prod.purchase_price.toFixed(2)}
-                                  </td>
-                                  <td className="px-6 py-4 text-right font-mono font-semibold text-[#414E36]">
-                                    EGP {prod.selling_price.toFixed(2)}
-                                  </td>
-                                  <td className="px-6 py-4 text-center">
-                                    <div className="inline-flex flex-col items-center">
-                                      <span className={`font-mono font-bold ${isLowStock ? "text-amber-700" : "text-[#1F251A]"}`}>
-                                        {prod.stock_quantity} {prod.unit}s
-                                      </span>
-                                      {isLowStock && (
-                                        <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">
-                                          <AlertTriangle size={10} /> Reorder (Min {prod.min_reorder_quantity})
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <span
-                                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                        prod.status === "Active"
-                                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                          : prod.status === "Out of Stock"
-                                          ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                          : "bg-gray-100 text-gray-600 border border-gray-200"
-                                      }`}
-                                    >
-                                      {prod.status}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => openEditProductModal(prod)}
-                                        className="rounded-xl border border-[#E6E9EB] p-2 text-[#5A6A51] transition hover:bg-[#EBF0E6] hover:text-[#414E36]"
-                                        title="Edit Product"
-                                      >
-                                        <Pencil size={15} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                                        className="rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
-                                        title="Delete Product"
-                                      >
-                                        <Trash2 size={15} />
-                                      </button>
+                    {productSubTab === "catalog" ? (
+                      <>
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                          <div>
+                            <h3 className="text-xl font-bold text-[#1F251A]">Medical Consumables &amp; Products</h3>
+                            <p className="text-xs text-[#5A6A51]">Manage injectable stock, skincare supplies, cost price, selling price, and sell products directly to patients.</p>
+                          </div>
+
+                          {/* Search & Filter controls */}
+                          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <div className="relative flex-1 md:w-64">
+                              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                              <input
+                                type="text"
+                                placeholder="Search by name, SKU..."
+                                value={productSearchQuery}
+                                onChange={(e) => setProductSearchQuery(e.target.value)}
+                                className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 pl-9 pr-4 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
+                              />
+                            </div>
+
+                            <select
+                              value={productCategoryFilter}
+                              onChange={(e) => setProductCategoryFilter(e.target.value)}
+                              className="rounded-2xl border border-[#E6E9EB] bg-white py-2 px-3 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
+                            >
+                              <option value="All">All Categories</option>
+                              <option value="Injectables">Injectables</option>
+                              <option value="Skincare">Skincare</option>
+                              <option value="Supplies">Supplies</option>
+                              <option value="Equipment">Equipment</option>
+                              <option value="General">General</option>
+                            </select>
+
+                            <select
+                              value={productStatusFilter}
+                              onChange={(e) => setProductStatusFilter(e.target.value)}
+                              className="rounded-2xl border border-[#E6E9EB] bg-white py-2 px-3 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
+                            >
+                              <option value="All">All Statuses</option>
+                              <option value="Active">Active</option>
+                              <option value="Inactive">Inactive</option>
+                              <option value="Out of Stock">Out of Stock</option>
+                              <option value="Discontinued">Discontinued</option>
+                            </select>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                resetProductForm();
+                                setShowAddProductModal(true);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]"
+                            >
+                              <Plus size={14} /> Add Item
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Table View */}
+                        <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                          <table className="w-full min-w-[900px] text-sm">
+                            <thead>
+                              <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                                <th className="px-6 py-4 text-left">Product Item &amp; SKU</th>
+                                <th className="px-6 py-4 text-left">Category &amp; Unit</th>
+                                <th className="px-6 py-4 text-right">Cost Price</th>
+                                <th className="px-6 py-4 text-right">Selling Price</th>
+                                <th className="px-6 py-4 text-center">Stock Level</th>
+                                <th className="px-6 py-4 text-left">Status</th>
+                                <th className="px-6 py-4 text-right">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                              {filteredInventoryProducts.length === 0 ? (
+                                <tr>
+                                  <td colSpan={7} className="px-6 py-12 text-center text-[#5A6A51]">
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                      <ShoppingBag size={32} className="text-[#A3B19B]" />
+                                      <p className="font-semibold text-[#1F251A]">No products found</p>
+                                      <p className="text-xs text-[#5A6A51]">Try adjusting your search query or filter settings.</p>
                                     </div>
                                   </td>
                                 </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                              ) : (
+                                filteredInventoryProducts.map((prod) => {
+                                  const isLowStock = prod.stock_quantity <= prod.min_reorder_quantity;
+                                  return (
+                                    <tr key={prod.id} className="transition hover:bg-[#F9F9F7]">
+                                      <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EBF0E6] text-[#414E36] font-bold">
+                                            <ShoppingBag size={18} />
+                                          </div>
+                                          <div>
+                                            <p className="font-semibold text-[#1F251A]">{prod.name}</p>
+                                            {prod.name_ar && (
+                                              <p className="text-xs text-[#5A6A51] dir-rtl font-sans">{prod.name_ar}</p>
+                                            )}
+                                            {prod.sku && (
+                                              <span className="inline-block mt-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-600">
+                                                SKU: {prod.sku}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="px-6 py-4">
+                                        <span className="inline-flex items-center rounded-full bg-[#EBF0E6] px-2.5 py-0.5 text-xs font-medium text-[#414E36]">
+                                          {prod.category}
+                                        </span>
+                                        <p className="text-xs text-[#5A6A51] mt-1 font-mono">Unit: {prod.unit}</p>
+                                      </td>
+                                      <td className="px-6 py-4 text-right font-mono font-semibold text-[#1F251A]">
+                                        EGP {prod.purchase_price.toFixed(2)}
+                                      </td>
+                                      <td className="px-6 py-4 text-right font-mono font-semibold text-[#414E36]">
+                                        EGP {prod.selling_price.toFixed(2)}
+                                      </td>
+                                      <td className="px-6 py-4 text-center">
+                                        <div className="inline-flex flex-col items-center">
+                                          <span className={`font-mono font-bold ${isLowStock ? "text-amber-700" : "text-[#1F251A]"}`}>
+                                            {prod.stock_quantity} {prod.unit}s
+                                          </span>
+                                          {isLowStock && (
+                                            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">
+                                              <AlertTriangle size={10} /> Reorder (Min {prod.min_reorder_quantity})
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="px-6 py-4">
+                                        <span
+                                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                            prod.status === "Active"
+                                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                              : prod.status === "Out of Stock"
+                                              ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                              : "bg-gray-100 text-gray-600 border border-gray-200"
+                                          }`}
+                                        >
+                                          {prod.status}
+                                        </span>
+                                      </td>
+                                      <td className="px-6 py-4 text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleOpenSellProductModal(prod)}
+                                            disabled={prod.stock_quantity <= 0}
+                                            className="inline-flex items-center gap-1 rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 disabled:cursor-not-allowed"
+                                            title={prod.stock_quantity <= 0 ? "Out of Stock" : "Sell Product"}
+                                          >
+                                            <Tag size={13} /> Sell Product
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => openEditProductModal(prod)}
+                                            className="rounded-xl border border-[#E6E9EB] p-2 text-[#5A6A51] transition hover:bg-[#EBF0E6] hover:text-[#414E36]"
+                                            title="Edit Product"
+                                          >
+                                            <Pencil size={15} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteProduct(prod.id, prod.name)}
+                                            className="rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
+                                            title="Delete Product"
+                                          >
+                                            <Trash2 size={15} />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    ) : (
+                      /* PRODUCT SALES HISTORY TAB */
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-xl font-bold text-[#1F251A]">Product Sales History</h3>
+                            <p className="text-xs text-[#5A6A51]">Complete log of all products sold to clinic patients.</p>
+                          </div>
+                        </div>
+
+                        <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                          <table className="w-full min-w-[800px] text-sm">
+                            <thead>
+                              <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                                <th className="px-6 py-4 text-left">Date &amp; Time</th>
+                                <th className="px-6 py-4 text-left">Product</th>
+                                <th className="px-6 py-4 text-left">Patient Details</th>
+                                <th className="px-6 py-4 text-center">Qty</th>
+                                <th className="px-6 py-4 text-right">Unit Price</th>
+                                <th className="px-6 py-4 text-right">Total Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                              {productSalesHistory.length === 0 ? (
+                                <tr>
+                                  <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                      <Receipt size={32} className="text-[#A3B19B]" />
+                                      <p className="font-semibold text-[#1F251A]">No sales recorded yet</p>
+                                      <p className="text-xs text-[#5A6A51]">Products sold to patients will appear here automatically.</p>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ) : (
+                                productSalesHistory.map((sale) => (
+                                  <tr key={sale.id} className="transition hover:bg-[#F9F9F7]">
+                                    <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">
+                                      {new Date(sale.created_at).toLocaleString(undefined, {
+                                        dateStyle: "medium",
+                                        timeStyle: "short"
+                                      })}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      <p className="font-semibold text-[#1F251A]">{sale.product_name}</p>
+                                      {sale.product_sku && (
+                                        <span className="inline-block mt-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-600">
+                                          SKU: {sale.product_sku}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      <p className="font-semibold text-[#1F251A]">{sale.customer_name}</p>
+                                      <p className="text-xs text-[#5A6A51] font-mono">{sale.customer_mobile}</p>
+                                    </td>
+                                    <td className="px-6 py-4 text-center font-bold font-mono text-[#1F251A]">
+                                      {sale.quantity}
+                                    </td>
+                                    <td className="px-6 py-4 text-right font-mono text-xs text-[#5A6A51]">
+                                      EGP {(sale.unit_price || 0).toFixed(2)}
+                                    </td>
+                                    <td className="px-6 py-4 text-right font-mono font-bold text-[#414E36]">
+                                      EGP {(sale.total_amount || 0).toFixed(2)}
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -16901,6 +17154,128 @@ export default function AdminPage() {
                       className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm"
                     >
                       {editingProduct ? "Save Changes" : "Create Product"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ── MODAL: SELL PRODUCT TO PATIENT ── */}
+          {showSellProductModal && selectedSellProduct && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
+              <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
+                <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-[#1F251A]">Sell Product to Patient</h3>
+                    <p className="text-xs text-[#5A6A51] mt-1">{selectedSellProduct.name} — Stock: {selectedSellProduct.stock_quantity} {selectedSellProduct.unit}s</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSellProductModal(false);
+                      setSelectedSellProduct(null);
+                    }}
+                    className="rounded-full p-2 text-[#5A6A51] hover:bg-gray-100 transition"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleConfirmSellProduct} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Select Patient *</label>
+                    <select
+                      required
+                      value={sellCustomerId}
+                      onChange={(e) => setSellCustomerId(e.target.value)}
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    >
+                      <option value="">-- Choose Patient --</option>
+                      {customers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.mobile ? `(${c.mobile})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#1F251A] mb-1">Unit Selling Price</label>
+                      <input
+                        type="text"
+                        disabled
+                        value={`EGP ${selectedSellProduct.selling_price.toFixed(2)}`}
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-gray-50 px-3.5 py-2.5 text-sm font-mono font-bold text-[#414E36]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#1F251A] mb-1">Quantity *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={selectedSellProduct.stock_quantity}
+                        required
+                        value={sellQuantity}
+                        onChange={(e) => setSellQuantity(Math.max(1, Number(e.target.value)))}
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono font-bold text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#F7F7F9] p-4 border border-[#E6E9EB] flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-[#5A6A51]">Total Amount Due</p>
+                      <p className="text-xs font-medium text-[#1F251A]">{sellQuantity} x EGP {selectedSellProduct.selling_price.toFixed(2)}</p>
+                    </div>
+                    <p className="text-xl font-bold font-mono text-[#414E36]">
+                      EGP {(sellQuantity * selectedSellProduct.selling_price).toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Payment Method</label>
+                    <select
+                      value={sellPaymentMethod}
+                      onChange={(e) => setSellPaymentMethod(e.target.value)}
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    >
+                      <option value="Cash">Cash</option>
+                      <option value="Visa / Card">Visa / Card</option>
+                      <option value="InstaPay">InstaPay</option>
+                      <option value="Vodafone Cash">Vodafone Cash</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Notes / Instructions</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Recommended usage twice daily after cleansing"
+                      value={sellNotes}
+                      onChange={(e) => setSellNotes(e.target.value)}
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E6E9EB]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowSellProductModal(false);
+                        setSelectedSellProduct(null);
+                      }}
+                      className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingSellProduct}
+                      className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm disabled:opacity-50"
+                    >
+                      {submittingSellProduct ? "Recording Sale..." : "Confirm & Sell"}
                     </button>
                   </div>
                 </form>
