@@ -767,9 +767,16 @@ Attached is my payment transaction receipt photo.`;
     (step === 2 && selectedDate !== null) ||
     (step === 3 && selectedTime !== null);
 
-  const qrCodeUrl = instapayLink && instapayLink !== "https://www.instapay.eg" 
+  const instapayQrUrl = instapayLink && instapayLink !== "https://www.instapay.eg" 
     ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(instapayLink)}` 
     : "/images/instapay_qr.png";
+
+  const walletQrUrl = walletLink 
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(walletLink)}`
+    : `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(walletNumber || "01035595691")}`;
+
+  const currentQrUrl = selectedDepositMethod === "wallet" ? walletQrUrl : instapayQrUrl;
+  const currentPaymentLink = selectedDepositMethod === "wallet" ? (walletLink || `tel:${walletNumber || "01035595691"}`) : instapayLink;
 
   return (
     <div
@@ -1437,19 +1444,35 @@ Attached is my payment transaction receipt photo.`;
                       </button>
                     </div>
 
-                    {walletLink && (
-                      <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط المحفظة الإلكترونية" : "WALLET QUICK LINK"}</span>
-                        <a 
-                          href={walletLink} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-xs font-bold text-[#C4AE7C] hover:underline"
-                        >
-                          {isRTL ? "فتح رابط المحفظة" : "Open Wallet"} &rarr;
-                        </a>
+                    <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط المحفظة الإلكترونية" : "WALLET QUICK LINK"}</span>
+                      <a 
+                        href={currentPaymentLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-xs font-bold text-[#C4AE7C] hover:underline"
+                      >
+                        {walletLink ? (isRTL ? "فتح رابط المحفظة" : "Open Wallet") : (isRTL ? "اتصال بالرقم" : "Dial Number")} &rarr;
+                      </a>
+                    </div>
+
+                    {/* Wallet QR Code */}
+                    <div className="pt-2 text-center">
+                      <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">
+                        {isRTL ? "امسح رمز الاستجابة السريعة للمحفظة (QR) [انقر للتكبير]" : "SCAN WALLET QR CODE TO PAY [Click to Zoom]"}
+                      </p>
+                      <div 
+                        onClick={() => setZoomQr(true)}
+                        className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm hover:border-[#C4AE7C] hover:scale-105 transition duration-200 cursor-pointer"
+                        title={isRTL ? "انقر لتكبير رمز الاستجابة السريعة" : "Click to zoom QR Code"}
+                      >
+                        <img 
+                          src={currentQrUrl} 
+                          alt="Wallet QR Code" 
+                          className="w-32 h-32 object-contain"
+                        />
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
 
@@ -1574,25 +1597,34 @@ Attached is my payment transaction receipt photo.`;
               &times;
             </button>
             <p className="text-sm font-bold text-[#414E36] mb-4 uppercase tracking-wider text-center">
-              {isRTL ? "رمز الاستجابة السريعة (QR)" : "SCAN TO PAY"}
+              {selectedDepositMethod === "wallet"
+                ? (isRTL ? `رمز الاستجابة السريعة للمحفظة` : `SCAN WALLET QR CODE`)
+                : (isRTL ? "رمز الاستجابة السريعة (InstaPay)" : "SCAN INSTAPAY QR CODE")
+              }
             </p>
             <div className="bg-white p-3 rounded-2xl border border-[#C4AE7C]/20 shadow-inner">
               <img 
-                src={qrCodeUrl} 
-                alt="InstaPay QR Code Zoomed" 
+                src={currentQrUrl} 
+                alt="QR Code Zoomed" 
                 className="w-64 h-64 object-contain"
               />
             </div>
-            {instapayLink && (
+            {currentPaymentLink && (
               <a 
-                href={instapayLink}
+                href={currentPaymentLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 text-xs font-bold text-[#C4AE7C] hover:underline"
+                className="mt-4 rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white hover:bg-[#2e3a26] transition shadow"
               >
-                {isRTL ? "فتح الرابط المباشر" : "Open Link Directly"} &rarr;
+                {selectedDepositMethod === "wallet"
+                  ? (walletLink ? (isRTL ? "فتح رابط المحفظة" : "Open Wallet App") : (isRTL ? "اتصال بالرقم" : "Dial Number"))
+                  : (isRTL ? "فتح تطبيق إنستاباي" : "Open InstaPay App")
+                }
               </a>
             )}
+            <p className="text-[11px] text-[#8A9A81] mt-3 text-center">
+              {isRTL ? "انقر في أي مكان للإغلاق" : "Click anywhere outside to close"}
+            </p>
           </div>
         </div>
       )}
