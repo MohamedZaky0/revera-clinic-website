@@ -86,6 +86,7 @@ import {
   ListOrdered,
   DoorOpen,
   MapPin,
+  Stethoscope,
 } from "lucide-react";
 import RoomsManagerView from "@/components/RoomsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
