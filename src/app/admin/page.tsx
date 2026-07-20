@@ -448,12 +448,12 @@ const PERMISSION_STRUCTURE = [
 
 function parseEgyptianNationalId(id: string) {
   if (!id || id.length !== 14 || !/^\d{14}$/.test(id)) {
-    return { isValid: false, reason: "National ID must be exactly 14 digits." };
+    return { isValid: false, reason: "National ID must be exactly 14 digits.", age: null, dobIso: null, dobFormatted: null, gender: null, governorate: null };
   }
 
   const centuryDigit = parseInt(id.charAt(0));
   if (centuryDigit !== 2 && centuryDigit !== 3) {
-    return { isValid: false, reason: "Invalid first digit (must start with 2 or 3)." };
+    return { isValid: false, reason: "Invalid first digit (must start with 2 or 3).", age: null, dobIso: null, dobFormatted: null, gender: null, governorate: null };
   }
 
   const yearPart = id.substring(1, 3);
@@ -471,7 +471,7 @@ function parseEgyptianNationalId(id: string) {
     birthDate.getMonth() !== month - 1 ||
     birthDate.getDate() !== day
   ) {
-    return { isValid: false, reason: "Invalid birth date encoded in ID." };
+    return { isValid: false, reason: "Invalid birth date encoded in ID.", age: null, dobIso: null, dobFormatted: null, gender: null, governorate: null };
   }
 
   const govCode = id.substring(7, 9);
@@ -511,12 +511,49 @@ function parseEgyptianNationalId(id: string) {
   const genderDigit = parseInt(id.charAt(12));
   const gender = genderDigit % 2 === 0 ? "Female" : "Male";
 
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const monthDiff = today.getMonth() - (month - 1);
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < day)) {
+    age--;
+  }
+
+  const dobIso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const dobFormatted = birthDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
   return {
     isValid: true,
     birthDate: birthDate.toLocaleDateString("en-US", { dateStyle: "long" }),
+    dobFormatted,
+    dobIso,
+    age,
     governorate,
     gender
   };
+}
+
+function getDoctorFirstReservationDate(docName: string, resList: any[]): string | null {
+  if (!docName || !Array.isArray(resList) || resList.length === 0) return null;
+  const cleanDoc = docName.trim().toLowerCase();
+  if (!cleanDoc) return null;
+  
+  const doctorBookings = resList.filter((r: any) => {
+    if (!r || r.status === 'rejected' || r.status === 'cancelled') return false;
+    const rName = (r.doctorName || r.doctor_name || '').trim().toLowerCase();
+    if (!rName) return false;
+    return rName.includes(cleanDoc) || cleanDoc.includes(rName);
+  });
+
+  if (doctorBookings.length === 0) return null;
+
+  doctorBookings.sort((a, b) => {
+    const da = String(a.date || '').slice(0, 10);
+    const db = String(b.date || '').slice(0, 10);
+    return da.localeCompare(db);
+  });
+
+  const firstDate = String(doctorBookings[0].date || '').slice(0, 10);
+  return firstDate && /^\d{4}-\d{2}-\d{2}$/.test(firstDate) ? firstDate : null;
 }
 
 const DEFAULT_HERO_SLIDES = [
@@ -7016,7 +7053,7 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* Row 3: Gender & Age */}
+                    {/* Row 3: Gender & Auto-calculated Age/DOB */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Gender</label>
@@ -7031,14 +7068,23 @@ export default function AdminPage() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Age</label>
-                        <input
-                          type="number"
-                          placeholder="e.g. 35"
-                          value={providerFormAge}
-                          onChange={(e) => setProviderFormAge(e.target.value)}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Age &amp; Date of Birth</label>
+                        {(() => {
+                          const check = parseEgyptianNationalId(providerFormNationalId);
+                          if (check.isValid) {
+                            return (
+                              <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/70 px-4 py-2 text-xs text-[#1F251A] font-semibold flex items-center justify-between min-h-[42px]">
+                                <span>{check.age} yrs • DOB: {check.dobFormatted}</span>
+                                <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">✓ National ID</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="w-full rounded-2xl border border-[#414E36]/15 bg-gray-50 px-4 py-2.5 text-xs text-[#5A6A51] italic min-h-[42px] flex items-center">
+                              Auto-calculated from National ID
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -7085,10 +7131,23 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Start Date</label>
+                          {(() => {
+                            const autoDate = getDoctorFirstReservationDate(providerFormName, allReservations);
+                            if (autoDate) {
+                              return (
+                                <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2 py-0.5 rounded-full border border-[#414E36]/15">
+                                  ⚡ Auto-set: {autoDate}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
                         <input
                           type="date"
-                          value={providerFormStartDate}
+                          value={providerFormStartDate || getDoctorFirstReservationDate(providerFormName, allReservations) || ""}
                           onChange={(e) => setProviderFormStartDate(e.target.value)}
                           className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                         />
@@ -16620,6 +16679,24 @@ export default function AdminPage() {
                             </div>
                           </div>
                           <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
+                            <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.national_id || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Date of Birth &amp; Age</span>
+                            {(() => {
+                              const check = parseEgyptianNationalId(viewingEmployee.national_id || "");
+                              if (check.isValid) {
+                                return (
+                                  <span className="font-semibold text-[#1F251A]">
+                                    {check.dobFormatted} ({check.age} yrs)
+                                  </span>
+                                );
+                              }
+                              return <span className="font-semibold text-[#5A6A51] italic text-xs">Auto-extracted when 14-digit National ID is provided</span>;
+                            })()}
+                          </div>
+                          <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Account Status</span>
                             <span className={`inline-flex items-center gap-1 text-xs font-bold ${viewingEmployee.email_confirmed_at ? "text-green-700" : "text-amber-700"}`}>
                               <span className={`h-1.5 w-1.5 rounded-full ${viewingEmployee.email_confirmed_at ? "bg-green-600" : "bg-amber-500"}`} />
@@ -16648,6 +16725,23 @@ export default function AdminPage() {
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Job Title</span>
                             <span className="font-semibold text-[#1F251A]">{viewingEmployee.role_name || "Receptionist"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Start Date</span>
+                            {(() => {
+                              const autoDate = getDoctorFirstReservationDate(viewingEmployee.name, allReservations);
+                              if (autoDate) {
+                                return (
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-[#1F251A]">{autoDate}</span>
+                                    <span className="text-[10px] text-[#414E36] font-bold bg-[#EDF1EC] px-2 py-0.5 rounded-full border border-[#414E36]/10 w-max mt-0.5">
+                                      ⚡ Auto-set (1st Booking)
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              return <span className="font-semibold text-[#1F251A]">{viewingEmployee.start_date || "—"}</span>;
+                            })()}
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Shift Type</span>
@@ -21862,7 +21956,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Row 3: Gender & Age */}
+              {/* Row 3: Gender & Auto-calculated Age/DOB */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Gender</label>
@@ -21877,14 +21971,23 @@ export default function AdminPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Age</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 35"
-                    value={providerFormAge}
-                    onChange={(e) => setProviderFormAge(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  />
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Age &amp; Date of Birth</label>
+                  {(() => {
+                    const check = parseEgyptianNationalId(providerFormNationalId);
+                    if (check.isValid) {
+                      return (
+                        <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/70 px-4 py-2 text-xs text-[#1F251A] font-semibold flex items-center justify-between min-h-[42px]">
+                          <span>{check.age} yrs • DOB: {check.dobFormatted}</span>
+                          <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">✓ National ID</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="w-full rounded-2xl border border-[#414E36]/15 bg-gray-50 px-4 py-2.5 text-xs text-[#5A6A51] italic min-h-[42px] flex items-center">
+                        Auto-calculated from National ID
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -21931,10 +22034,23 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Start Date</label>
+                    {(() => {
+                      const autoDate = getDoctorFirstReservationDate(providerFormName, allReservations);
+                      if (autoDate) {
+                        return (
+                          <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2 py-0.5 rounded-full border border-[#414E36]/15">
+                            ⚡ Auto-set: {autoDate}
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                   <input
                     type="date"
-                    value={providerFormStartDate}
+                    value={providerFormStartDate || getDoctorFirstReservationDate(providerFormName, allReservations) || ""}
                     onChange={(e) => setProviderFormStartDate(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                   />
