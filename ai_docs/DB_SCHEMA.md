@@ -1,6 +1,6 @@
 # DB_SCHEMA.md — Revera Clinics Database Schema
 
-> **Last Updated:** 2026-07-14
+> **Last Updated:** 2026-07-20
 > **Database:** Supabase (PostgreSQL)
 > **Audited from:** live API routes + TypeScript types (no migration files exist in the repo)
 > **Previous content was for a different project — discarded entirely**
@@ -22,6 +22,8 @@ implemented. The current deployment is single-tenant (Revera only).
 branches
   └──< reservations (branch_id FK, nullable)
   └──< services (via branch_pricing JSON field, not a FK)
+  └──< employee_accounts (branch_id FK, nullable)
+  └──< provider_attendance (branch_id FK)
 
 services
   └──< reservations (service_id FK)
@@ -31,13 +33,17 @@ categories
 
 providers
   (no FK to branches — global, but services[] JSON array references service names)
+  └──< provider_attendance (provider_id FK)
 
 page_settings
   (key/value CMS store — key='home' for homepage content)
 
-customers
-  └──< prescriptions (customer_id FK)
-  └──< reservations (customer_id FK)
+employee_accounts
+  └──> roles (role_id FK)
+  └──> branches (branch_id FK, nullable)
+
+roles
+  (permission array; referenced by employee_accounts.role_id)
 ```
 
 ---
@@ -100,24 +106,6 @@ files exist in the repository.
 
 ---
 
-### `prescriptions`
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | uuid | Primary key, default gen_random_uuid() |
-| `customer_id` | uuid | FK → customers.id, on delete cascade |
-| `patient_name` | text | Patient name |
-| `date` | date | Date of prescription, default CURRENT_DATE |
-| `diagnosis` | text | Diagnosis text, nullable |
-| `medications` | JSONB | Array of `{ name, dosage, instructions }`, default '[]' |
-| `general_notes` | text | Public general notes, nullable |
-| `doctor_notes` | text | Doctor-confidential notes, nullable |
-| `follow_up_date` | date | Follow-up appointment date, nullable |
-| `created_at` | timestamptz | default now() |
-| `updated_at` | timestamptz | default now() |
-
----
-
 ### `reservations`
 
 | Column | Type | Notes |
@@ -130,9 +118,11 @@ files exist in the repository.
 | `email` | text | Patient email |
 | `phone` | text | Patient phone |
 | `notes` | text | Patient notes |
-| `status` | text | 'pending', 'approved', 'rejected' |
+| `status` | text | 'pending', 'approved', 'rejected', 'confirmed', 'started', 'completed', 'cancelled' |
 | `time_slot` | text | Assigned 15-min slot (e.g., '09:00'), nullable — set on approve |
 | `session_type` | text | 'in_person' or 'online' |
+| `origin` | text | Booking source, e.g., 'website' — displayed as badge |
+| `cancelled_reason` | text | Reason for cancellation, nullable |
 | `doctor_name` | text | Assigned doctor name, nullable |
 | `branch_id` | UUID | FK → branches.id, nullable |
 | `customer_id` | UUID | FK → customers.id, nullable |
@@ -183,156 +173,12 @@ files exist in the repository.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | UUID | Primary key |
+| `id` | UUID or text | Primary key |
 | `name` | text | Doctor name |
-| `phone` | text | Contact phone, nullable |
-| `gender` | text | 'Male' or 'Female', nullable |
-| `age` | integer | Age, nullable |
-| `specialty` | text | Medical specialty, nullable |
-| `national_id` | text | National ID card number, nullable |
-| `working_days_hours` | JSONB | Weekly schedule with optional multi-shifts array: `shifts?: { start, end }[]` |
-| `online_working_days_hours` | JSONB | Weekly schedule for online video appointments |
-| `branch_id` | UUID | FK → branches.id, default branch |
-| `branch_ids` | JSONB | Array of branch UUIDs the doctor works at |
-| `branch_schedules` | JSONB | Branch-specific override schedules |
-| `fixed_salary` | numeric | Monthly salary component |
-| `commission_type` | text | 'none', 'percentage', or 'fixed' |
-| `commission_value` | numeric | Commission rate or flat amount |
-| `services` | JSONB | Array of service names they perform |
-| `rating` | numeric | Rating score (1-5) |
-| `image` | text | Profile image URL, nullable |
-| `start_date` | date | Hiring date, nullable |
-
----
-
-### `employee_accounts`
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `email` | text | Login email, unique |
-| `name` | text | Full name |
-| `phone` | text | Phone, nullable |
-| `role` | text | 'admin', 'HR', 'Receptionist', etc. |
-| `department` | text | 'Reception', 'Nursing', 'Administration', etc. |
-| `shift` | text | 'Day', 'Night', or custom ranges |
-| `salary` | numeric | Monthly basic salary |
-| `national_id` | text | National ID number, nullable |
-| `national_id_front` | text | Base64 or URL to ID front photo |
-| `national_id_back` | text | Base64 or URL to ID back photo |
-| `address` | text | Street address details |
-| `contract_file` | text | File URL or Base64 binary representing contract document / files JSON |
-| `contract_file_name` | text | Name of contract file |
-| `required_target_amount` | numeric | Monthly target value to achieve |
-| `bonus_percentage` | numeric | Achieved target reward value |
-| `target_type` | text | Target type: 'reservations' or 'revenue' |
-| `bonus_type` | text | Bonus type: 'percentage' or 'fixed' |
-| `created_at` | timestamptz | |
-| `updated_at` | timestamptz | |
-
----
-
-### `employee_notes`
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `employee_id` | UUID | FK → employee_accounts.id |
-| `note` | text | Content of administrative note |
-| `created_by` | UUID | FK → employee_accounts.id |
-| `created_at` | timestamptz | |
-
----
-
-### `hr_payroll`
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `employee_id` | UUID | FK → employee_accounts.id |
-| `month` | text | Month string (e.g. '2026-07') |
-| `basic_salary` | numeric | Monthly base |
-| `bonuses` | numeric | Achieved target bonuses or manually input |
-| `deductions` | numeric | Salary deductions |
-| `net_salary` | numeric | Calculated net salary |
-| `status` | text | 'Draft' or 'Paid' |
-| `payment_date` | timestamptz | Date of payment, nullable |
-| `target_amount_snapshot` | numeric | Target configuration copy for that month |
-| `bonus_percentage_snapshot` | numeric | Bonus configuration copy for that month |
-| `target_type_snapshot` | text | Target type snapshot ('reservations' or 'revenue') for that month |
-| `bonus_type_snapshot` | text | Bonus type snapshot ('percentage' or 'fixed') for that month |
-| `achieved_revenue` | numeric | Logged revenue generated by employee bookings (or count of reservations depending on target_type) |
-| `calculated_bonus` | numeric | Target reward payout calculated |
-
----
-
-### `hr_attendance`
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `employee_id` | UUID | FK → employee_accounts.id |
-| `date` | date | Attendance date |
-| `check_in_time` | timestamptz | Clock in timestamp |
-| `latitude` | numeric | GPS latitude coordinates |
-| `longitude` | numeric | GPS longitude coordinates |
-| `status` | text | 'Present', 'Late', or 'Absent' |
-
----
-
-### `hr_leave_requests`
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `employee_id` | UUID | FK → employee_accounts.id |
-| `leave_type` | text | 'Sick', 'Annual', 'Casual', 'Unpaid' |
-| `start_date` | date | Start of leave |
-| `end_date` | date | End of leave |
-| `days_count` | integer | Total count of calendar days |
-| `reason` | text | Reason context |
-| `status` | text | 'Pending', 'Approved', 'Rejected' |
-| `approved_by` | UUID | FK → employee_accounts.id |
-
----
-
-### `hr_performance_reviews`
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `employee_id` | UUID | FK → employee_accounts.id |
-| `reviewer_id` | UUID | FK → employee_accounts.id |
-| `review_date` | date | Date of review |
-| `rating` | integer | 1 to 5 stars rating |
-| `comments` | text | Detailed comments |
-| `goals` | text | Performance goals set |
-
----
-
-### `hr_missing_alerts`
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `employee_id` | UUID | FK → employee_accounts.id |
-| `timestamp` | timestamptz | Time missing alert was generated |
-| `resolved` | boolean | Is the alert resolved by admin |
-
----
-
-### `provider_schedule_audit_logs`
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | UUID | Primary key |
-| `provider_id` | UUID | FK → providers.id |
-| `provider_name` | text | Logged doctor name |
-| `changed_by` | text | Admin email who changed it |
-| `action` | text | Update actions context |
-| `previous_schedule` | JSONB | Previous calendar state |
-| `new_schedule` | JSONB | Applied calendar state |
-| `created_at` | timestamptz | Log creation time |
+| `bookings_count` | integer | Total booking count |
+| `services` | JSONB | Array of service name strings |
+| `more_count` | integer | Additional services count |
+| `rating` | numeric | |
 
 ---
 
@@ -340,8 +186,64 @@ files exist in the repository.
 
 | Column | Type | Notes |
 |---|---|---|
-| `key` | text | Primary key; only 'home' and settings keys used |
-| `value` | JSONB | Full page content or configurations store |
+| `key` | text | Primary key; only 'home' used currently |
+| `value` | JSONB | Full page content tree (hero slides EN+AR, about, results, etc.) |
+| `updated_at` | timestamptz | |
+
+**Structure of `value` for key='home':**
+```json
+{
+  "hero": {
+    "slides": [ { "welcome", "heading", "description", "bookBtn", "rating", "reviewCount", "image" } ],
+    "slides_ar": [ { same fields in Arabic } ]
+  }
+}
+```
+The full page content structure mirrors the `Translation` type in `src/types/index.ts`.
+
+---
+
+### `employee_accounts`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key; mirrors Supabase Auth user ID |
+| `email` | text | Supabase Auth email |
+| `name` | text | Display name |
+| `role_id` | UUID | FK → roles.id |
+| `branch_id` | UUID | FK → branches.id, nullable |
+| `active` | boolean | Default true |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
+
+---
+
+### `roles`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `name` | text | Role name, e.g., 'superadmin', 'admin', 'receptionist' |
+| `permissions` | JSONB | Array of permission strings |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
+
+---
+
+### `provider_attendance`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `provider_id` | UUID/text | FK → providers.id |
+| `branch_id` | UUID | FK → branches.id |
+| `date` | date | Attendance date |
+| `check_in` | timestamptz | Nullable |
+| `check_out` | timestamptz | Nullable |
+| `location` | JSONB | `{ lat, lng, distance_meters }` captured at check-in |
+| `status` | text | e.g., 'checked_in', 'checked_out', 'absent' |
+| `notes` | text | Nullable |
+| `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
 ---
@@ -349,6 +251,7 @@ files exist in the repository.
 ## Notes on Schema Gaps
 
 - Persistent patient records are stored in the `customers` table, and connected to `reservations` via `customer_id`.
-- The `providers` table is used to store Doctor profiles and working shifts schedules (both in-clinic and online).
-- No RLS (Row Level Security) policies are currently enforced on admin API queries, since the Next.js API routes use the Supabase service role key.
-
+- No `staff` table. Providers are stored with minimal fields (name, services list, rating).
+- No `shifts` or `availability` table. Availability is calculated by scanning reservations.
+- No RLS (Row Level Security) policies confirmed — Supabase service role key is used server-side for all operations, bypassing RLS.
+- `reservations.branch_id` is nullable — reservations without a branch are treated as "no branch" and are filtered separately.
