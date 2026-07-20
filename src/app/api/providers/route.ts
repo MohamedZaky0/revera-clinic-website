@@ -55,8 +55,8 @@ export async function GET() {
     if (docEmployeesRes.data && docEmployeesRes.data.length > 0) {
       for (const emp of docEmployeesRes.data) {
         const exists = providersData.some(
-          p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) ||
-               (p.phone && emp.phone && p.phone === emp.phone)
+          (p: any) => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) ||
+                      (p.phone && emp.phone && p.phone === emp.phone)
         );
         if (!exists && emp.name) {
           const newProvPayload = {
