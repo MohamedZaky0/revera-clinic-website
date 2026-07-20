@@ -165,7 +165,7 @@ const SIDEBAR_ITEMS = [
   { label: "Marketing", icon: Megaphone, comingSoon: true },
   { label: "Customer Support", icon: MessageSquare, comingSoon: true },
   { label: "Reports", icon: BarChart3, comingSoon: true },
-  { label: "Accounting/Finance", icon: CircleDollarSign, comingSoon: true },
+  { label: "Finance", icon: CircleDollarSign, comingSoon: true },
   { label: "Settings", icon: Settings, submenu: true },
   { label: "Logout", icon: LogOut },
 ];
@@ -696,7 +696,7 @@ export default function AdminPage() {
     if (adminRole === 'superadmin') return SIDEBAR_ITEMS;
     return SIDEBAR_ITEMS.filter(item => {
       if (item.label === 'Logout') return true;
-      if ((item as any).comingSoon) return true;
+      if ((item as any).comingSoon) return false;
       if ((item.label === 'HR' || item.label === 'Inventory') && (adminRole === 'admin' || adminRole === 'HR')) return true;
       if (adminPermissions.includes(item.label)) return true;
       
@@ -7165,11 +7165,7 @@ export default function AdminPage() {
                     </span>
                     <span>{item.label}</span>
                   </div>
-                  {isComingSoon ? (
-                    <span className="rounded-full bg-[#FBFBF9]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#FBFBF9]/50">
-                      Soon
-                    </span>
-                  ) : item.submenu ? (
+                  {isComingSoon || item.submenu ? (
                     <ChevronRight size={18} className="text-[#FBFBF9]/60" />
                   ) : null}
                 </button>
