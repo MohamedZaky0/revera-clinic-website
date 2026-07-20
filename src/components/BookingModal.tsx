@@ -90,9 +90,9 @@ export function BookingModal() {
   const [instapayName, setInstapayName] = useState("Revera Clinics");
   const [instapayAddress, setInstapayAddress] = useState("revera@instapay");
   const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
-  const [walletEnabled, setWalletEnabled] = useState(false);
-  const [walletName, setWalletName] = useState("");
-  const [walletNumber, setWalletNumber] = useState("");
+  const [walletEnabled, setWalletEnabled] = useState(true);
+  const [walletName, setWalletName] = useState("Vodafone Cash / Mobile Wallet");
+  const [walletNumber, setWalletNumber] = useState("01035595691");
   const [walletLink, setWalletLink] = useState("");
   const [selectedDepositMethod, setSelectedDepositMethod] = useState<"instapay" | "wallet">("instapay");
   const [customerPaymentSender, setCustomerPaymentSender] = useState("");
@@ -301,12 +301,18 @@ export function BookingModal() {
           }
           if (data.deposit.walletEnabled !== undefined) {
             setWalletEnabled(Boolean(data.deposit.walletEnabled));
+          } else {
+            setWalletEnabled(true);
           }
           if (data.deposit.walletName) {
             setWalletName(data.deposit.walletName);
+          } else {
+            setWalletName("Vodafone Cash / Mobile Wallet");
           }
           if (data.deposit.walletNumber) {
             setWalletNumber(data.deposit.walletNumber);
+          } else {
+            setWalletNumber("01035595691");
           }
           if (data.deposit.walletLink) {
             setWalletLink(data.deposit.walletLink);
@@ -1271,14 +1277,54 @@ Attached is my payment transaction receipt photo.`;
             {step === 5 && (
               <div className="space-y-4">
                 <p className="text-sm font-bold text-[#1F251A]">
-                  {isRTL ? "دفع عربون الحجز عبر إنستاباي" : "Reservation Deposit via InstaPay"}
-                </p>
-                <p className="text-xs text-[#5A6A51] leading-relaxed">
-                  {isRTL 
-                    ? "لتأكيد حجزك، يرجى تحويل عربون الحجز المقدر بـ 20% عبر تطبيق إنستاباي، ثم أدخل اسم حسابك وأرسل صورة التحويل عبر الواتساب." 
-                    : "To secure your reservation, please pay the required deposit (default 20%) via InstaPay, then input your account name below and send the transaction confirmation screenshot on WhatsApp."
+                  {selectedDepositMethod === "wallet"
+                    ? (isRTL ? "دفع عربون الحجز عبر المحفظة الإلكترونية" : "Reservation Deposit via Mobile Wallet")
+                    : (isRTL ? "دفع عربون الحجز عبر إنستاباي" : "Reservation Deposit via InstaPay")
                   }
                 </p>
+                <p className="text-xs text-[#5A6A51] leading-relaxed">
+                  {selectedDepositMethod === "wallet"
+                    ? (isRTL 
+                        ? `لتأكيد حجزك، يرجى تحويل عربون الحجز المطلـوب (${depositPercentage}%) إلى رقم المحفظة أدناه، ثم أدخل رقم الهاتف وأرسل صورة التحويل عبر الواتساب.` 
+                        : `To secure your reservation, please pay the required deposit (${depositPercentage}%) to the wallet number below, enter your mobile number, and send the transaction screenshot on WhatsApp.`)
+                    : (isRTL 
+                        ? `لتأكيد حجزك، يرجى تحويل عربون الحجز المطلـوب (${depositPercentage}%) عبر تطبيق إنستاباي، ثم أدخل اسم حسابك وأرسل صورة التحويل عبر الواتساب.` 
+                        : `To secure your reservation, please pay the required deposit (${depositPercentage}%) via InstaPay, then input your account name below and send the transaction screenshot on WhatsApp.`)
+                  }
+                </p>
+
+                {/* Payment Method Selector Tab */}
+                <div className="space-y-1.5 pt-1">
+                  <label className="block text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider">
+                    {isRTL ? "اختر طريقة دفع العربون" : "Select Payment Method"}
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-[#EDF1EC] border border-[#414E36]/15">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDepositMethod("instapay")}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                        selectedDepositMethod === "instapay"
+                          ? "bg-white text-[#414E36] shadow-sm border border-[#414E36]/10"
+                          : "text-[#5A6A51] hover:text-[#1F251A]"
+                      }`}
+                    >
+                      <span className={`h-2 w-2 rounded-full ${selectedDepositMethod === "instapay" ? "bg-[#C4AE7C]" : "bg-gray-400"}`}></span>
+                      {isRTL ? "إنستاباي (InstaPay)" : "InstaPay"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDepositMethod("wallet")}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                        selectedDepositMethod === "wallet"
+                          ? "bg-white text-[#414E36] shadow-sm border border-[#414E36]/10"
+                          : "text-[#5A6A51] hover:text-[#1F251A]"
+                      }`}
+                    >
+                      <span className={`h-2 w-2 rounded-full ${selectedDepositMethod === "wallet" ? "bg-emerald-600" : "bg-gray-400"}`}></span>
+                      {walletName ? (isRTL ? `محفظة ${walletName}` : `${walletName} Wallet`) : (isRTL ? "محفظة إلكترونية" : "Mobile Wallet")}
+                    </button>
+                  </div>
+                </div>
 
                 {/* Deposit Awareness Banner */}
                 {depositPercentage > 0 && (
@@ -1294,8 +1340,8 @@ Attached is my payment transaction receipt photo.`;
                       </p>
                       <p className="opacity-90">
                         {isRTL 
-                          ? `يرجى العلم أن حجزك لا يعتبر مؤكداً حتى يتم سداد عربون الحجز (20%). سيبقى الحجز معلقاً لحين إتمام التحويل وإرسال الصورة.` 
-                          : `Please note that your booking is not confirmed until the required 20% reservation deposit is paid. It will remain pending deposit until the transfer is made and receipt screenshot is received.`
+                          ? `يرجى العلم أن حجزك لا يعتبر مؤكداً حتى يتم سداد عربون الحجز (${depositPercentage}%). سيبقى الحجز معلقاً لحين إتمام التحويل وإرسال الصورة.` 
+                          : `Please note that your booking is not confirmed until the required ${depositPercentage}% reservation deposit is paid. It will remain pending deposit until the transfer is made and receipt screenshot is received.`
                         }
                       </p>
                     </div>
@@ -1317,33 +1363,6 @@ Attached is my payment transaction receipt photo.`;
                     <span>EGP {(selectedService?.price || 0) - Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
                   </div>
                 </div>
-
-                {walletEnabled && (
-                  <div className="flex rounded-xl bg-[#EDF1EC] p-1 border border-[#414E36]/10 mb-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDepositMethod("instapay")}
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
-                        selectedDepositMethod === "instapay"
-                          ? "bg-white text-[#414E36] shadow-sm"
-                          : "text-[#5A6A51] hover:text-[#1F251A]"
-                      }`}
-                    >
-                      {isRTL ? "إنستاباي (InstaPay)" : "InstaPay"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedDepositMethod("wallet")}
-                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
-                        selectedDepositMethod === "wallet"
-                          ? "bg-white text-[#414E36] shadow-sm"
-                          : "text-[#5A6A51] hover:text-[#1F251A]"
-                      }`}
-                    >
-                      {walletName ? (isRTL ? `محفظة ${walletName}` : `${walletName} Wallet`) : (isRTL ? "محفظة إلكترونية" : "Mobile Wallet")}
-                    </button>
-                  </div>
-                )}
 
                 {selectedDepositMethod === "instapay" ? (
                   /* Clinic InstaPay Info Box */
