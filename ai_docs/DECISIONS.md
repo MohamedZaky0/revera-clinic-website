@@ -251,8 +251,8 @@ The Bookings → Schedule view (`calendarView === "Schedule"` in `src/app/admin/
 - Same single-day view, same `bookingMap`/`normaliseSlot`/filter logic — only the row/column axes and merge direction (`colSpan={4}` instead of `rowSpan={4}` for the assumed 1-hour booking block) changed.
 - Booking cells show patient name + status dot, phone number, and service name + status.
 - Both empty and booked cells are height-capped (`84px` with `overflow-hidden` on the inner content wrapper) so a booking's cell never grows taller than an empty one — the cell's inline `height` style is only a CSS minimum in table layout, so this required an explicit fixed-height, overflow-hidden inner wrapper rather than relying on the `<td>` style alone.
-- To avoid silently clipping bookings beyond what fits (RISK-009), each cell shows at most 3 booking cards; the rest collapse into a `+N more` button that sets `docFilter` to that doctor, resets status/type filters, and switches to the List view.
+- To avoid silently clipping bookings beyond what fits (RISK-009), each cell shows at most 3 booking cards; the rest collapse into a `+N more` button that sets `docFilter` + `dateFilter` to that doctor/day, resets status/type filters, and switches to the List view.
+- Added a `dateFilter` state (List/Calendar previously had no date filter at all) wired into `filteredReservations`, with UI in the existing Filter modal (date input + clear) and an active-filter chip row in the List view header so the jump's filtered state is visible and reversible.
 
 **Trade-offs:**
-- The `+N more` jump narrows by doctor only (List view has no date filter), not by the specific day/slot.
-- Still single-day only; no multi-day/week view was requested or built.
+- Still single-day only in the Schedule view itself; no multi-day/week view was requested or built.

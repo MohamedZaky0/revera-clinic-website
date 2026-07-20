@@ -207,7 +207,8 @@ The Bookings → Schedule view (`calendarView === "Schedule"`, `src/app/admin/pa
 
 **Mitigation (applied):**
 - Cell now shows at most `MAX_VISIBLE_BOOKINGS = 3` cards; any beyond that render as a `+N more` pill instead of clipping silently.
-- Clicking `+N more` sets `docFilter` to that cell's doctor, resets `statusFilter`/`typeFilter` to `"All"`, and switches `calendarView` to `"List"` — so the hidden bookings are one click away instead of invisible.
+- Clicking `+N more` sets `docFilter` to that cell's doctor, `dateFilter` to that day (`YYYY-MM-DD`), resets `statusFilter`/`typeFilter` to `"All"`, and switches `calendarView` to `"List"` — narrowing to exactly that doctor's bookings on that day.
+- A `dateFilter` state was added to `filteredReservations` (previously List/Calendar had no date filter at all) with a date input + clear button in the existing Filter modal, and an active-filter chip row with a "Clear all" button in the List view header — so the filtered state from a `+N more` jump is visible and easy to back out of, not a hidden/stuck state.
 - Residual gap: the List view has no date filter, so the jump narrows by doctor only, not by the specific day/slot — acceptable since the doctor filter is the highest-value narrowing already wired into `filteredReservations`.
 
 ---

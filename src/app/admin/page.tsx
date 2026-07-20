@@ -1701,6 +1701,7 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState<string>("All"); // All, approved, pending, rejected
   const [typeFilter, setTypeFilter] = useState<string>("All");     // All, in_person, online
   const [docFilter, setDocFilter] = useState<string>("All");       // All, Dr...
+  const [dateFilter, setDateFilter] = useState<string>("All");     // All, or "YYYY-MM-DD"
 
   // Form states for manual booking creation
   const [newPatientName, setNewPatientName] = useState("");
@@ -1743,15 +1744,16 @@ export default function AdminPage() {
   }, [newPatientService, localServices]);
   const filteredReservations = useMemo(() => {
     return allReservations.filter((r) => {
-      const matchStatus = statusFilter === "All" 
-        || r.status === statusFilter 
+      const matchStatus = statusFilter === "All"
+        || r.status === statusFilter
         || (statusFilter === "pending" && (r.status === "pending" || r.status === "pending_deposit"))
         || (statusFilter === "pending_deposit" && (r.status === "pending" || r.status === "pending_deposit"));
       const matchType = typeFilter === "All" || r.sessionType === typeFilter;
       const matchDoc = docFilter === "All" || (r.doctorName || "Dr. Sara El Gamel") === docFilter;
-      return matchStatus && matchType && matchDoc;
+      const matchDate = dateFilter === "All" || (r.date && String(r.date).slice(0, 10) === dateFilter);
+      return matchStatus && matchType && matchDoc && matchDate;
     });
-  }, [allReservations, statusFilter, typeFilter, docFilter]);
+  }, [allReservations, statusFilter, typeFilter, docFilter, dateFilter]);
 
   const bookingCountsByDay = useMemo(() => {
     const counts = new Map<string, number>();
@@ -22434,6 +22436,37 @@ export default function AdminPage() {
                 {filteredReservations.filter(r => ['approved', 'confirmed', 'started', 'completed'].includes(r.status)).length} active
               </span>
             </div>
+            {(docFilter !== "All" || dateFilter !== "All" || statusFilter !== "All" || typeFilter !== "All") && (
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]/70">Filtered:</span>
+                {docFilter !== "All" && (
+                  <span className="rounded-full bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">{docFilter}</span>
+                )}
+                {dateFilter !== "All" && (
+                  <span className="rounded-full bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">
+                    {new Date(dateFilter + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  </span>
+                )}
+                {statusFilter !== "All" && (
+                  <span className="rounded-full bg-[#414E36]/10 px-3 py-1 text-xs font-semibold capitalize text-[#414E36]">{statusFilter}</span>
+                )}
+                {typeFilter !== "All" && (
+                  <span className="rounded-full bg-[#414E36]/10 px-3 py-1 text-xs font-semibold capitalize text-[#414E36]">{typeFilter}</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter('All');
+                    setTypeFilter('All');
+                    setDocFilter('All');
+                    setDateFilter('All');
+                  }}
+                  className="rounded-full border border-[#414E36]/20 px-3 py-1 text-xs font-semibold text-[#5A6A51] transition hover:bg-[#EDF1EC]"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
             {filteredReservations.length === 0 ? (
               <p className="rounded-3xl border border-[#414E36]/10 bg-[#EDF1EC] p-6 text-[#5A6A51]">No bookings match the current filters.</p>
             ) : (
@@ -22741,9 +22774,10 @@ export default function AdminPage() {
                                     {hiddenCount > 0 && (
                                       <button
                                         type="button"
-                                        title={`${hiddenCount} more booking${hiddenCount > 1 ? 's' : ''} for ${doc} — view in list`}
+                                        title={`${hiddenCount} more booking${hiddenCount > 1 ? 's' : ''} for ${doc} on ${scheduleDateLabel} — view in list`}
                                         onClick={() => {
                                           setDocFilter(doc);
+                                          setDateFilter(scheduleDateStr);
                                           setStatusFilter("All");
                                           setTypeFilter("All");
                                           setCalendarView("List");
@@ -24142,6 +24176,26 @@ export default function AdminPage() {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Date</label>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={dateFilter === "All" ? "" : dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value || "All")}
+                    className="flex-1 rounded-2xl border border-[#414E36]/15 bg-white px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C] font-semibold"
+                  />
+                  {dateFilter !== "All" && (
+                    <button
+                      onClick={() => setDateFilter('All')}
+                      className="rounded-2xl border border-[#414E36]/15 bg-white px-4 py-3 text-xs font-bold text-[#5A6A51] transition hover:bg-[#f7f6f2]"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="border-t border-[#414E36]/10 pt-4 flex gap-3">
                 <button
                   onClick={() => setShowFilterModal(false)}
@@ -24154,6 +24208,7 @@ export default function AdminPage() {
                     setStatusFilter('All');
                     setTypeFilter('All');
                     setDocFilter('All');
+                    setDateFilter('All');
                     setShowFilterModal(false);
                   }}
                   className="flex-1 rounded-3xl border border-[#414E36]/20 bg-white py-3 text-sm font-bold text-[#414E36] hover:bg-[#f7f6f2] transition text-center"
