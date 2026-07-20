@@ -3163,9 +3163,69 @@ export default function AdminPage() {
   const [transactionSearch, setTransactionSearch] = useState("");
   const [expenseSearchQuery, setExpenseSearchQuery] = useState("");
   const [payrollSearch, setPayrollSearch] = useState("");
-  const [reportsExpanded, setReportsExpanded] = useState(false);
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
-  const [smsExpanded, setSMSExpanded] = useState(false);
+
+  // Inventory Devices State
+  const [inventorySubTab, setInventorySubTab] = useState<"devices" | "products">("devices");
+  const [inventoryDevices, setInventoryDevices] = useState<any[]>([]);
+  const [inventoryHistory, setInventoryHistory] = useState<any[]>([]);
+  const [inventoryDevicesLoading, setInventoryDevicesLoading] = useState(false);
+  const [deviceSearchQuery, setDeviceSearchQuery] = useState("");
+  const [deviceBranchFilter, setDeviceBranchFilter] = useState("all");
+  const [deviceStatusFilter, setDeviceStatusFilter] = useState("all");
+
+  // Modals state for Inventory Devices
+  const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<any | null>(null);
+
+  // Add / Edit Device Form fields
+  const [deviceName, setDeviceName] = useState("");
+  const [deviceModel, setDeviceModel] = useState("");
+  const [deviceSerial, setDeviceSerial] = useState("");
+  const [deviceCategory, setDeviceCategory] = useState("Laser Hair Removal");
+  const [deviceBranchId, setDeviceBranchId] = useState("");
+  const [deviceInitialPulses, setDeviceInitialPulses] = useState("0");
+  const [deviceWarningThreshold1, setDeviceWarningThreshold1] = useState("80000");
+  const [deviceMaintenanceThreshold2, setDeviceMaintenanceThreshold2] = useState("100000");
+  const [deviceNotes, setDeviceNotes] = useState("");
+
+  // Update Pulse Count Modal state
+  const [selectedDeviceForPulses, setSelectedDeviceForPulses] = useState<any | null>(null);
+  const [newPulseCountInput, setNewPulseCountInput] = useState("");
+  const [showUpdatePulsesModal, setShowUpdatePulsesModal] = useState(false);
+
+  // Reset Pulses Counter Modal state
+  const [selectedDeviceForReset, setSelectedDeviceForReset] = useState<any | null>(null);
+  const [resetReason, setResetReason] = useState("Routine Maintenance");
+  const [resetPerformedBy, setResetPerformedBy] = useState("");
+  const [resetNotes, setResetNotes] = useState("");
+  const [showResetPulsesModal, setShowResetPulsesModal] = useState(false);
+
+  // History Drawer state
+  const [selectedDeviceForHistory, setSelectedDeviceForHistory] = useState<any | null>(null);
+  const [showDeviceHistoryModal, setShowDeviceHistoryModal] = useState(false);
+
+  const fetchInventoryDevices = useCallback(async () => {
+    try {
+      setInventoryDevicesLoading(true);
+      const res = await fetch("/api/inventory/devices");
+      if (res.ok) {
+        const data = await res.json();
+        setInventoryDevices(data.devices || []);
+        setInventoryHistory(data.history || []);
+      }
+    } catch (err) {
+      console.error("Error fetching inventory devices:", err);
+    } finally {
+      setInventoryDevicesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeNav === "Inventory") {
+      fetchInventoryDevices();
+    }
+  }, [activeNav, fetchInventoryDevices]);
   const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [pagesSettingsTab, setPagesSettingsTab] = useState<"Home" | "About Us" | "Services">("Home");
   const [termsText, setTermsText] = useState("");
@@ -15666,62 +15726,984 @@ export default function AdminPage() {
           {/* ── INVENTORY VIEW ── */}
           {activeNav === "Inventory" && (
             <div className="space-y-6 animate-fadeIn">
+              {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Inventory Management</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Track clinic supplies, medical stock, products, and reorder levels.</p>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Inventory &amp; Clinic Equipment</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Manage clinic devices, track pulse counts, configure maintenance alerts, and monitor stock.</p>
                 </div>
+                <div className="flex items-center gap-3">
+                  {inventorySubTab === "devices" ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingDevice(null);
+                        setDeviceName("");
+                        setDeviceModel("");
+                        setDeviceSerial("");
+                        setDeviceCategory("Laser Hair Removal");
+                        setDeviceBranchId(branches.length > 0 ? branches[0].id : "");
+                        setDeviceInitialPulses("0");
+                        setDeviceWarningThreshold1("80000");
+                        setDeviceMaintenanceThreshold2("100000");
+                        setDeviceNotes("");
+                        setShowAddDeviceModal(true);
+                      }}
+                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
+                    >
+                      <Plus size={16} /> Add Device
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => alert("Inventory product creation form is drafted for future stock items.")}
+                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                    >
+                      <Plus size={16} /> Add Product Stock
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Sub-Navigation Tabs */}
+              <div className="flex items-center border-b border-[#E6E9EB] gap-8">
                 <button
                   type="button"
-                  onClick={() => showConfirm("Inventory item creation form will be available here.")}
-                  className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                  onClick={() => setInventorySubTab("devices")}
+                  className={`flex items-center gap-2 py-3 text-sm font-semibold border-b-2 transition ${
+                    inventorySubTab === "devices"
+                      ? "border-[#414E36] text-[#414E36]"
+                      : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
+                  }`}
                 >
-                  <Plus size={16} /> Add Inventory Item
+                  <Gauge size={16} /> Clinic Devices &amp; Pulse Track
+                  <span className="ml-1.5 rounded-full bg-[#EBF0E6] px-2 py-0.5 text-xs text-[#414E36] font-bold">
+                    {inventoryDevices.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInventorySubTab("products")}
+                  className={`flex items-center gap-2 py-3 text-sm font-semibold border-b-2 transition ${
+                    inventorySubTab === "products"
+                      ? "border-[#414E36] text-[#414E36]"
+                      : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
+                  }`}
+                >
+                  <ShoppingBag size={16} /> Products &amp; Supplies (Draft)
                 </button>
               </div>
 
-              <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
-                <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                  <table className="w-full min-w-[800px] text-sm">
-                    <thead>
-                      <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                        <th className="px-6 py-4 text-left">Item Name</th>
-                        <th className="px-6 py-4 text-left">Category</th>
-                        <th className="px-6 py-4 text-center">Stock Level</th>
-                        <th className="px-6 py-4 text-left">Status</th>
-                        <th className="px-6 py-4 text-right">Unit Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
-                      <tr className="transition hover:bg-[#F9F9F7]">
-                        <td className="px-6 py-5 font-semibold text-[#1F251A]">Botox Type A (100U)</td>
-                        <td className="px-6 py-5 text-[#5A6A51]">Injectables</td>
-                        <td className="px-6 py-5 text-center font-mono font-bold text-[#1F251A]">42 units</td>
-                        <td className="px-6 py-5">
-                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 border border-emerald-200">In Stock</span>
-                        </td>
-                        <td className="px-6 py-5 text-right font-mono font-semibold">$250.00</td>
-                      </tr>
-                      <tr className="transition hover:bg-[#F9F9F7]">
-                        <td className="px-6 py-5 font-semibold text-[#1F251A]">Hyaluronic Acid Filler (1ml)</td>
-                        <td className="px-6 py-5 text-[#5A6A51]">Injectables</td>
-                        <td className="px-6 py-5 text-center font-mono font-bold text-[#1F251A]">15 units</td>
-                        <td className="px-6 py-5">
-                          <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 border border-amber-200">Low Stock</span>
-                        </td>
-                        <td className="px-6 py-5 text-right font-mono font-semibold">$180.00</td>
-                      </tr>
-                      <tr className="transition hover:bg-[#F9F9F7]">
-                        <td className="px-6 py-5 font-semibold text-[#1F251A]">Sterile Surgical Gloves (M)</td>
-                        <td className="px-6 py-5 text-[#5A6A51]">Disposables</td>
-                        <td className="px-6 py-5 text-center font-mono font-bold text-[#1F251A]">350 pairs</td>
-                        <td className="px-6 py-5">
-                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 border border-emerald-200">In Stock</span>
-                        </td>
-                        <td className="px-6 py-5 text-right font-mono font-semibold">$1.50</td>
-                      </tr>
-                    </tbody>
-                  </table>
+              {/* TAB 1: CLINIC DEVICES */}
+              {inventorySubTab === "devices" && (
+                <div className="space-y-6">
+                  {/* Stats Summary Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="rounded-[28px] bg-white p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EBF0E6] text-[#414E36]">
+                        <Gauge size={22} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Total Devices</p>
+                        <p className="text-2xl font-bold text-[#1F251A] mt-0.5">{inventoryDevices.length}</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[28px] bg-white p-5 border border-emerald-100 shadow-sm flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                        <CheckCircle size={22} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Optimal Status</p>
+                        <p className="text-2xl font-bold text-emerald-900 mt-0.5">
+                          {inventoryDevices.filter((d) => d.status === "Optimal").length}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[28px] bg-white p-5 border border-amber-100 shadow-sm flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                        <AlertTriangle size={22} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">1st Warning Reached</p>
+                        <p className="text-2xl font-bold text-amber-900 mt-0.5">
+                          {inventoryDevices.filter((d) => d.status === "Warning").length}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-[28px] bg-white p-5 border border-red-100 shadow-sm flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600 animate-pulse">
+                        <Wrench size={22} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-red-700">Maintenance Due</p>
+                        <p className="text-2xl font-bold text-red-900 mt-0.5">
+                          {inventoryDevices.filter((d) => d.status === "Maintenance Due").length}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filters & Search */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-[#FBFBF9] p-4 rounded-[28px] border border-[#E6E9EB]">
+                    <div className="relative flex-1">
+                      <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8C9A84]" />
+                      <input
+                        type="text"
+                        placeholder="Search devices by name, model, or serial number..."
+                        value={deviceSearchQuery}
+                        onChange={(e) => setDeviceSearchQuery(e.target.value)}
+                        className="w-full rounded-2xl border border-[#E6E9EB] bg-white pl-10 pr-4 py-2.5 text-sm text-[#1F251A] placeholder-[#8C9A84] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={deviceBranchFilter}
+                        onChange={(e) => setDeviceBranchFilter(e.target.value)}
+                        className="rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-medium text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      >
+                        <option value="all">All Branches</option>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name_en}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={deviceStatusFilter}
+                        onChange={(e) => setDeviceStatusFilter(e.target.value)}
+                        className="rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-medium text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      >
+                        <option value="all">All Statuses</option>
+                        <option value="Optimal">Optimal</option>
+                        <option value="Warning">1st Warning Reached</option>
+                        <option value="Maintenance Due">Maintenance Due</option>
+                        <option value="Out of Service">Out of Service</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Devices Table */}
+                  <div className="rounded-[36px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
+                    <div className="overflow-x-auto rounded-[28px] border border-[#E6E9EB] bg-white">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.15em] text-[#5A6A51]">
+                            <th className="px-6 py-4 text-left">Device &amp; Details</th>
+                            <th className="px-6 py-4 text-left">Category &amp; Branch</th>
+                            <th className="px-6 py-4 text-left">Pulse Counter &amp; Thresholds</th>
+                            <th className="px-6 py-4 text-center">Status</th>
+                            <th className="px-6 py-4 text-center">Last Service</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                          {inventoryDevicesLoading ? (
+                            <tr>
+                              <td colSpan={6} className="px-6 py-12 text-center text-sm text-[#5A6A51]">
+                                <Loader2 className="inline-block animate-spin mr-2" size={18} /> Loading devices...
+                              </td>
+                            </tr>
+                          ) : inventoryDevices.filter((dev) => {
+                              if (deviceSearchQuery) {
+                                const q = deviceSearchQuery.toLowerCase();
+                                const matchName = dev.name?.toLowerCase().includes(q);
+                                const matchModel = dev.model?.toLowerCase().includes(q);
+                                const matchSerial = dev.serial_number?.toLowerCase().includes(q);
+                                if (!matchName && !matchModel && !matchSerial) return false;
+                              }
+                              if (deviceBranchFilter !== "all" && dev.branch_id !== deviceBranchFilter) return false;
+                              if (deviceStatusFilter !== "all" && dev.status !== deviceStatusFilter) return false;
+                              return true;
+                            }).length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="px-6 py-12 text-center text-sm text-[#5A6A51]">
+                                No clinic devices found. Click <span className="font-semibold text-[#1F251A]">Add Device</span> to register a new machine.
+                              </td>
+                            </tr>
+                          ) : (
+                            inventoryDevices
+                              .filter((dev) => {
+                                if (deviceSearchQuery) {
+                                  const q = deviceSearchQuery.toLowerCase();
+                                  const matchName = dev.name?.toLowerCase().includes(q);
+                                  const matchModel = dev.model?.toLowerCase().includes(q);
+                                  const matchSerial = dev.serial_number?.toLowerCase().includes(q);
+                                  if (!matchName && !matchModel && !matchSerial) return false;
+                                }
+                                if (deviceBranchFilter !== "all" && dev.branch_id !== deviceBranchFilter) return false;
+                                if (deviceStatusFilter !== "all" && dev.status !== deviceStatusFilter) return false;
+                                return true;
+                              })
+                              .map((dev) => {
+                                const current = Number(dev.current_pulse_count) || 0;
+                                const t1 = Number(dev.warning_threshold_1) || 80000;
+                                const t2 = Number(dev.maintenance_threshold_2) || 100000;
+                                const percent = Math.min(100, Math.round((current / t2) * 100));
+
+                                const branchObj = branches.find((b) => b.id === dev.branch_id);
+
+                                return (
+                                  <tr key={dev.id} className="transition hover:bg-[#F9F9F7]">
+                                    {/* Device Name & Serial */}
+                                    <td className="px-6 py-5">
+                                      <div className="font-bold text-[#1F251A] text-base">{dev.name}</div>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs font-mono text-[#5A6A51] bg-[#F4F6F4] px-2 py-0.5 rounded-md border border-[#E6E9EB]">
+                                          Model: {dev.model || "N/A"}
+                                        </span>
+                                        <span className="text-xs font-mono text-[#5A6A51] bg-[#F4F6F4] px-2 py-0.5 rounded-md border border-[#E6E9EB]">
+                                          S/N: {dev.serial_number || "N/A"}
+                                        </span>
+                                      </div>
+                                    </td>
+
+                                    {/* Category & Branch */}
+                                    <td className="px-6 py-5">
+                                      <div className="text-sm font-semibold text-[#1F251A]">{dev.category}</div>
+                                      <div className="text-xs text-[#5A6A51] mt-0.5">
+                                        {branchObj ? branchObj.name_en : "All Branches"}
+                                      </div>
+                                    </td>
+
+                                    {/* Pulse Counter Progress */}
+                                    <td className="px-6 py-5 min-w-[220px]">
+                                      <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
+                                        <span className="font-mono text-sm text-[#1F251A] font-bold">
+                                          {current.toLocaleString()} <span className="text-xs text-[#5A6A51] font-normal">pulses</span>
+                                        </span>
+                                        <span className="text-[11px] text-[#5A6A51] font-mono">
+                                          Max: {t2.toLocaleString()}
+                                        </span>
+                                      </div>
+                                      {/* Progress Bar */}
+                                      <div className="w-full bg-[#EBF0E6] h-2.5 rounded-full overflow-hidden flex">
+                                        <div
+                                          className={`h-full transition-all duration-300 ${
+                                            dev.status === "Maintenance Due"
+                                              ? "bg-red-500"
+                                              : dev.status === "Warning"
+                                              ? "bg-amber-500"
+                                              : "bg-[#414E36]"
+                                          }`}
+                                          style={{ width: `${percent}%` }}
+                                        />
+                                      </div>
+                                      <div className="flex items-center justify-between text-[10px] text-[#8C9A84] mt-1 font-mono">
+                                        <span>1st Warn @ {t1.toLocaleString()}</span>
+                                        <span>Limit @ {t2.toLocaleString()}</span>
+                                      </div>
+                                    </td>
+
+                                    {/* Status Badge */}
+                                    <td className="px-6 py-5 text-center">
+                                      {dev.status === "Maintenance Due" && (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 border border-red-200 animate-pulse">
+                                          <Wrench size={13} /> Maintenance Due!
+                                        </span>
+                                      )}
+                                      {dev.status === "Warning" && (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 border border-amber-200">
+                                          <AlertTriangle size={13} /> 1st Warning
+                                        </span>
+                                      )}
+                                      {dev.status === "Optimal" && (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                                          <CheckCircle size={13} /> Optimal
+                                        </span>
+                                      )}
+                                      {dev.status === "Out of Service" && (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 border border-gray-200">
+                                          Out of Service
+                                        </span>
+                                      )}
+                                    </td>
+
+                                    {/* Last Maintenance Date */}
+                                    <td className="px-6 py-5 text-center text-xs font-medium text-[#5A6A51]">
+                                      {dev.last_maintenance_date
+                                        ? new Date(dev.last_maintenance_date).toLocaleDateString("en-US", {
+                                            month: "short",
+                                            day: "numeric",
+                                            year: "numeric"
+                                          })
+                                        : "N/A"}
+                                    </td>
+
+                                    {/* Actions */}
+                                    <td className="px-6 py-5 text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <button
+                                          type="button"
+                                          title="Update Current Pulse Count"
+                                          onClick={() => {
+                                            setSelectedDeviceForPulses(dev);
+                                            setNewPulseCountInput(String(dev.current_pulse_count || 0));
+                                            setShowUpdatePulsesModal(true);
+                                          }}
+                                          className="inline-flex items-center gap-1 rounded-xl bg-[#EBF0E6] px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#dce5d4] transition"
+                                        >
+                                          <Gauge size={13} /> Update Pulses
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          title="Reset Pulse Counter & Record Maintenance"
+                                          onClick={() => {
+                                            setSelectedDeviceForReset(dev);
+                                            setResetReason("Routine Maintenance");
+                                            setResetPerformedBy("");
+                                            setResetNotes("");
+                                            setShowResetPulsesModal(true);
+                                          }}
+                                          className="inline-flex items-center gap-1 rounded-xl bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition"
+                                        >
+                                          <RotateCcw size={13} /> Reset Counter
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          title="View Maintenance History"
+                                          onClick={() => {
+                                            setSelectedDeviceForHistory(dev);
+                                            setShowDeviceHistoryModal(true);
+                                          }}
+                                          className="p-1.5 rounded-xl border border-[#E6E9EB] text-[#5A6A51] hover:bg-[#F4F6F4] transition"
+                                        >
+                                          <History size={14} />
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          title="Edit Device Configuration"
+                                          onClick={() => {
+                                            setEditingDevice(dev);
+                                            setDeviceName(dev.name || "");
+                                            setDeviceModel(dev.model || "");
+                                            setDeviceSerial(dev.serial_number || "");
+                                            setDeviceCategory(dev.category || "Laser Hair Removal");
+                                            setDeviceBranchId(dev.branch_id || "");
+                                            setDeviceInitialPulses(String(dev.initial_pulse_count || 0));
+                                            setDeviceWarningThreshold1(String(dev.warning_threshold_1 || 80000));
+                                            setDeviceMaintenanceThreshold2(String(dev.maintenance_threshold_2 || 100000));
+                                            setDeviceNotes(dev.notes || "");
+                                            setShowAddDeviceModal(true);
+                                          }}
+                                          className="p-1.5 rounded-xl border border-[#E6E9EB] text-[#5A6A51] hover:bg-[#F4F6F4] transition"
+                                        >
+                                          <Pencil size={14} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: PRODUCTS & STOCK (DRAFT) */}
+              {inventorySubTab === "products" && (
+                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB] space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-bold text-[#1F251A]">Medical Consumables &amp; Products</h3>
+                      <p className="text-xs text-[#5A6A51]">Track injectables, skincare supplies, and reorder levels.</p>
+                    </div>
+                  </div>
+                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                    <table className="w-full min-w-[800px] text-sm">
+                      <thead>
+                        <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                          <th className="px-6 py-4 text-left">Item Name</th>
+                          <th className="px-6 py-4 text-left">Category</th>
+                          <th className="px-6 py-4 text-center">Stock Level</th>
+                          <th className="px-6 py-4 text-left">Status</th>
+                          <th className="px-6 py-4 text-right">Unit Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                        <tr className="transition hover:bg-[#F9F9F7]">
+                          <td className="px-6 py-5 font-semibold text-[#1F251A]">Botox Type A (100U)</td>
+                          <td className="px-6 py-5 text-[#5A6A51]">Injectables</td>
+                          <td className="px-6 py-5 text-center font-mono font-bold text-[#1F251A]">42 units</td>
+                          <td className="px-6 py-5">
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 border border-emerald-200">In Stock</span>
+                          </td>
+                          <td className="px-6 py-5 text-right font-mono font-semibold">$250.00</td>
+                        </tr>
+                        <tr className="transition hover:bg-[#F9F9F7]">
+                          <td className="px-6 py-5 font-semibold text-[#1F251A]">Hyaluronic Acid Filler (1ml)</td>
+                          <td className="px-6 py-5 text-[#5A6A51]">Injectables</td>
+                          <td className="px-6 py-5 text-center font-mono font-bold text-[#1F251A]">15 units</td>
+                          <td className="px-6 py-5">
+                            <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 border border-amber-200">Low Stock</span>
+                          </td>
+                          <td className="px-6 py-5 text-right font-mono font-semibold">$180.00</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── MODAL: ADD / EDIT CLINIC DEVICE ── */}
+          {showAddDeviceModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
+              <div className="w-full max-w-2xl rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
+                  <div>
+                    <h3 className="text-2xl font-bold text-[#1F251A]">
+                      {editingDevice ? "Edit Clinic Device" : "Add New Clinic Device"}
+                    </h3>
+                    <p className="text-xs text-[#5A6A51] mt-1">
+                      Configure device specifications, initial pulse count, and maintenance alert thresholds.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddDeviceModal(false)}
+                    className="rounded-full p-2 text-[#5A6A51] hover:bg-gray-100 transition"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!deviceName.trim()) {
+                      alert("Device Name is required.");
+                      return;
+                    }
+                    try {
+                      const payload = {
+                        id: editingDevice?.id,
+                        name: deviceName.trim(),
+                        model: deviceModel.trim(),
+                        serial_number: deviceSerial.trim(),
+                        category: deviceCategory.trim(),
+                        branch_id: deviceBranchId || null,
+                        initial_pulse_count: Number(deviceInitialPulses) || 0,
+                        warning_threshold_1: Number(deviceWarningThreshold1) || 80000,
+                        maintenance_threshold_2: Number(deviceMaintenanceThreshold2) || 100000,
+                        notes: deviceNotes.trim()
+                      };
+
+                      const method = editingDevice ? "PUT" : "POST";
+                      const res = await fetch("/api/inventory/devices", {
+                        method,
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                      });
+
+                      if (res.ok) {
+                        setShowAddDeviceModal(false);
+                        fetchInventoryDevices();
+                        alert(editingDevice ? "Device updated successfully!" : "Device registered successfully!");
+                      } else {
+                        const err = await res.json();
+                        alert(err.error || "Failed to save device.");
+                      }
+                    } catch (err) {
+                      console.error("Save device error:", err);
+                      alert("Error saving device.");
+                    }
+                  }}
+                  className="space-y-5"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#1F251A] mb-1">Device Name *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Candela GentleMax Pro"
+                        value={deviceName}
+                        onChange={(e) => setDeviceName(e.target.value)}
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#1F251A] mb-1">Model</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. PRO-2026"
+                        value={deviceModel}
+                        onChange={(e) => setDeviceModel(e.target.value)}
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#1F251A] mb-1">Serial Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. CN-892410"
+                        value={deviceSerial}
+                        onChange={(e) => setDeviceSerial(e.target.value)}
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#1F251A] mb-1">Category</label>
+                      <select
+                        value={deviceCategory}
+                        onChange={(e) => setDeviceCategory(e.target.value)}
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      >
+                        <option value="Laser Hair Removal">Laser Hair Removal</option>
+                        <option value="Facial & Skincare">Facial &amp; Skincare</option>
+                        <option value="Body Contouring">Body Contouring</option>
+                        <option value="Dermatology">Dermatology</option>
+                        <option value="General Equipment">General Equipment</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#1F251A] mb-1">Assigned Branch</label>
+                      <select
+                        value={deviceBranchId}
+                        onChange={(e) => setDeviceBranchId(e.target.value)}
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      >
+                        <option value="">All Branches / Main Storage</option>
+                        {branches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name_en}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#1F251A] mb-1">Initial Pulse Count</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={deviceInitialPulses}
+                        onChange={(e) => setDeviceInitialPulses(e.target.value)}
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Threshold Configuration Box */}
+                  <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#E6E9EB] space-y-3">
+                    <div className="flex items-center gap-2 text-[#414E36] font-semibold text-xs uppercase tracking-wider">
+                      <AlertTriangle size={14} className="text-amber-600" /> Maintenance Alert Thresholds
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-[#5A6A51] mb-1">
+                          1st Warning Threshold (Pulses)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={deviceWarningThreshold1}
+                          onChange={(e) => setDeviceWarningThreshold1(e.target.value)}
+                          className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        />
+                        <p className="text-[10px] text-[#8C9A84] mt-1">Triggers 1st warning alert to admin.</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-[#5A6A51] mb-1">
+                          2nd Threshold (Maintenance Due)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={deviceMaintenanceThreshold2}
+                          onChange={(e) => setDeviceMaintenanceThreshold2(e.target.value)}
+                          className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-red-500"
+                        />
+                        <p className="text-[10px] text-[#8C9A84] mt-1">Triggers critical maintenance due notification.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Notes / Machine Location</label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Primary Alexandrite laser system in Room 1."
+                      value={deviceNotes}
+                      onChange={(e) => setDeviceNotes(e.target.value)}
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E6E9EB]">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddDeviceModal(false)}
+                      className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm"
+                    >
+                      {editingDevice ? "Save Changes" : "Create Device"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ── MODAL: UPDATE PULSE COUNT ── */}
+          {showUpdatePulsesModal && selectedDeviceForPulses && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
+              <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
+                <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-[#1F251A]">Update Current Pulse Count</h3>
+                    <p className="text-xs text-[#5A6A51] mt-1">{selectedDeviceForPulses.name} ({selectedDeviceForPulses.model})</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowUpdatePulsesModal(false)}
+                    className="rounded-full p-2 text-[#5A6A51] hover:bg-gray-100 transition"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const countVal = Number(newPulseCountInput);
+                    if (isNaN(countVal) || countVal < 0) {
+                      alert("Please enter a valid pulse count.");
+                      return;
+                    }
+
+                    try {
+                      const res = await fetch("/api/inventory/devices", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          id: selectedDeviceForPulses.id,
+                          current_pulse_count: countVal
+                        })
+                      });
+
+                      if (res.ok) {
+                        const updated = await res.json();
+                        setShowUpdatePulsesModal(false);
+                        setSelectedDeviceForPulses(null);
+                        fetchInventoryDevices();
+
+                        if (updated.status === "Maintenance Due") {
+                          alert("⚠️ Maintenance Due! Counter has reached or exceeded the 2nd maintenance threshold.");
+                        } else if (updated.status === "Warning") {
+                          alert("⚡ First Warning Reached! Counter has crossed the 1st threshold.");
+                        } else {
+                          alert("Pulse count updated successfully.");
+                        }
+                      } else {
+                        const err = await res.json();
+                        alert(err.error || "Failed to update pulse count.");
+                      }
+                    } catch (err) {
+                      console.error("Update pulse count error:", err);
+                      alert("Error updating pulse count.");
+                    }
+                  }}
+                  className="space-y-5"
+                >
+                  <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#E6E9EB] space-y-2 text-xs">
+                    <div className="flex justify-between text-[#5A6A51]">
+                      <span>1st Warning Threshold:</span>
+                      <span className="font-mono font-bold text-[#1F251A]">
+                        {Number(selectedDeviceForPulses.warning_threshold_1 || 80000).toLocaleString()} pulses
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[#5A6A51]">
+                      <span>2nd Maintenance Due Threshold:</span>
+                      <span className="font-mono font-bold text-[#1F251A]">
+                        {Number(selectedDeviceForPulses.maintenance_threshold_2 || 100000).toLocaleString()} pulses
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">New Current Pulse Count</label>
+                    <input
+                      type="number"
+                      min="0"
+                      required
+                      value={newPulseCountInput}
+                      onChange={(e) => setNewPulseCountInput(e.target.value)}
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-4 py-3 text-lg font-mono font-bold text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    />
+                  </div>
+
+                  {/* Status Live Preview */}
+                  {(() => {
+                    const inputVal = Number(newPulseCountInput) || 0;
+                    const t1 = Number(selectedDeviceForPulses.warning_threshold_1 || 80000);
+                    const t2 = Number(selectedDeviceForPulses.maintenance_threshold_2 || 100000);
+
+                    if (inputVal >= t2) {
+                      return (
+                        <div className="rounded-xl bg-red-50 p-3.5 border border-red-200 text-xs text-red-800 flex items-center gap-2">
+                          <Wrench size={16} className="text-red-600 shrink-0" />
+                          <span>Status will update to <strong>Maintenance Due</strong> and trigger critical notification.</span>
+                        </div>
+                      );
+                    }
+                    if (inputVal >= t1) {
+                      return (
+                        <div className="rounded-xl bg-amber-50 p-3.5 border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+                          <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                          <span>Status will update to <strong>1st Warning</strong> and send alert notification.</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="rounded-xl bg-emerald-50 p-3.5 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
+                        <CheckCircle size={16} className="text-emerald-600 shrink-0" />
+                        <span>Status is <strong>Optimal</strong>. Pulse count is within normal operating range.</span>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E6E9EB]">
+                    <button
+                      type="button"
+                      onClick={() => setShowUpdatePulsesModal(false)}
+                      className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm"
+                    >
+                      Save Pulse Count
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ── MODAL: RESET PULSE COUNTER ── */}
+          {showResetPulsesModal && selectedDeviceForReset && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
+              <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
+                <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-[#1F251A]">Reset Pulse Counter</h3>
+                    <p className="text-xs text-[#5A6A51] mt-1">
+                      Reset maintenance cycle after service for {selectedDeviceForReset.name}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPulsesModal(false)}
+                    className="rounded-full p-2 text-[#5A6A51] hover:bg-gray-100 transition"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      const res = await fetch(`/api/inventory/devices/${selectedDeviceForReset.id}/reset-pulses`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          reason: resetReason,
+                          performedBy: resetPerformedBy,
+                          notes: resetNotes,
+                          resetToZero: true
+                        })
+                      });
+
+                      if (res.ok) {
+                        setShowResetPulsesModal(false);
+                        setSelectedDeviceForReset(null);
+                        fetchInventoryDevices();
+                        alert("Counter reset successfully! Maintenance logged and alert cycle restarted.");
+                      } else {
+                        const err = await res.json();
+                        alert(err.error || "Failed to reset counter.");
+                      }
+                    } catch (err) {
+                      console.error("Reset pulses error:", err);
+                      alert("Error resetting pulse counter.");
+                    }
+                  }}
+                  className="space-y-5"
+                >
+                  <div className="rounded-2xl bg-amber-50 p-4 border border-amber-200 text-xs text-amber-900 space-y-1">
+                    <p className="font-bold flex items-center gap-1.5 text-amber-950">
+                      <RotateCcw size={14} /> Counter Reset Notice:
+                    </p>
+                    <p>
+                      Current counter of <strong>{(Number(selectedDeviceForReset.current_pulse_count) || 0).toLocaleString()} pulses</strong> will be archived in maintenance history. The counter will reset to <strong>0</strong> and status returned to <strong>Optimal</strong>.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Maintenance / Service Reason *</label>
+                    <select
+                      value={resetReason}
+                      onChange={(e) => setResetReason(e.target.value)}
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    >
+                      <option value="Routine Maintenance">Routine Maintenance</option>
+                      <option value="Flashlamp Replacement">Flashlamp Replacement</option>
+                      <option value="Handpiece Diode Stack Service">Handpiece Diode Stack Service</option>
+                      <option value="Vortex Tip & Filter Replacement">Vortex Tip &amp; Filter Replacement</option>
+                      <option value="Calibration & Sensor Alignment">Calibration &amp; Sensor Alignment</option>
+                      <option value="Other Service">Other Service</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Service Agent / Technician Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Eng. Karim (Official Service Agent)"
+                      value={resetPerformedBy}
+                      onChange={(e) => setResetPerformedBy(e.target.value)}
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Service Notes</label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Replaced dual lamps, recalibrated energy sensors."
+                      value={resetNotes}
+                      onChange={(e) => setResetNotes(e.target.value)}
+                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E6E9EB]">
+                    <button
+                      type="button"
+                      onClick={() => setShowResetPulsesModal(false)}
+                      className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-2xl bg-amber-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 transition shadow-sm"
+                    >
+                      Reset Counter &amp; Restart Cycle
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ── MODAL: DEVICE MAINTENANCE HISTORY ── */}
+          {showDeviceHistoryModal && selectedDeviceForHistory && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
+              <div className="w-full max-w-2xl rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
+                  <div>
+                    <h3 className="text-2xl font-bold text-[#1F251A]">Maintenance &amp; Reset History</h3>
+                    <p className="text-xs text-[#5A6A51] mt-1">{selectedDeviceForHistory.name} (S/N: {selectedDeviceForHistory.serial_number || "N/A"})</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeviceHistoryModal(false)}
+                    className="rounded-full p-2 text-[#5A6A51] hover:bg-gray-100 transition"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* History Logs List */}
+                <div className="space-y-4">
+                  {inventoryHistory.filter((h) => h.device_id === selectedDeviceForHistory.id).length === 0 ? (
+                    <div className="text-center py-12 text-sm text-[#5A6A51] bg-[#FBFBF9] rounded-2xl border border-[#E6E9EB]">
+                      No maintenance or counter reset logs recorded yet for this device.
+                    </div>
+                  ) : (
+                    inventoryHistory
+                      .filter((h) => h.device_id === selectedDeviceForHistory.id)
+                      .map((log) => (
+                        <div key={log.id} className="rounded-2xl border border-[#E6E9EB] bg-[#FBFBF9] p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-bold text-[#1F251A]">{log.reason}</span>
+                            <span className="text-xs text-[#5A6A51] font-mono">
+                              {new Date(log.reset_date).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-[#5A6A51] pt-1">
+                            <div>
+                              <span className="block text-[10px] uppercase text-[#8C9A84] font-semibold">Pulses Delivered</span>
+                              <span className="font-mono font-bold text-[#1F251A]">
+                                {(log.pulses_delivered || 0).toLocaleString()} pulses
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] uppercase text-[#8C9A84] font-semibold">Ending Count</span>
+                              <span className="font-mono text-[#1F251A]">
+                                {(log.ending_pulse_count || 0).toLocaleString()}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] uppercase text-[#8C9A84] font-semibold">Technician</span>
+                              <span className="text-[#1F251A]">{log.performed_by || "Clinic Admin"}</span>
+                            </div>
+                          </div>
+
+                          {log.notes && (
+                            <p className="text-xs text-[#5A6A51] italic bg-white p-2.5 rounded-xl border border-[#E6E9EB] mt-2">
+                              &ldquo;{log.notes}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      ))
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end pt-4 border-t border-[#E6E9EB]">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeviceHistoryModal(false)}
+                    className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>
