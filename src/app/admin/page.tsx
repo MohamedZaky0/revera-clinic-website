@@ -10901,6 +10901,17 @@ export default function AdminPage() {
                     >
                       Prescriptions & Records
                     </button>
+                    <button
+                      onClick={() => setCustomerProfileTab("products")}
+                      className={`pb-3.5 pt-4 text-sm font-semibold border-b-2 transition-all outline-none flex items-center gap-1.5 ${
+                        customerProfileTab === "products"
+                          ? "border-[#414E36] text-[#414E36] font-bold"
+                          : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      <ShoppingBag size={15} />
+                      Purchased Products & Cart
+                    </button>
                   </div>
 
                   {/* Tab Content */}
@@ -11184,6 +11195,363 @@ export default function AdminPage() {
                             )}
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* Tab 4: Purchased Products & Cart */}
+                    {customerProfileTab === "products" && (
+                      <div className="space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-[#414E36]/10">
+                          <div className="flex items-center gap-3">
+                            <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Patient Product Balances & Cart</h4>
+                            <div className="flex bg-[#EDF1EC] p-1 rounded-xl gap-1 text-xs font-semibold">
+                              <button
+                                type="button"
+                                onClick={() => setCustomerProductsSubTab("current")}
+                                className={`px-3 py-1 rounded-lg transition ${customerProductsSubTab === "current" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
+                              >
+                                Active Balances
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCustomerProductsSubTab("history")}
+                                className={`px-3 py-1 rounded-lg transition ${customerProductsSubTab === "history" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
+                              >
+                                Purchase History
+                              </button>
+                            </div>
+                          </div>
+
+                          {(adminRole === "superadmin" || adminRole === "admin" || adminRole === "receptionist" || adminRole === "doctor") && (
+                            <button
+                              onClick={() => {
+                                setSelectedAddProductId("");
+                                setSelectedAddProductName("");
+                                setSelectedAddProductQty(1);
+                                setSelectedAddProductUnitPrice(0);
+                                setShowAddPatientProductModal(true);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm w-fit"
+                            >
+                              <Plus size={14} /> Add Product to Cart / Patient
+                            </button>
+                          )}
+                        </div>
+
+                        {customerProductsSubTab === "current" && (
+                          <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm">
+                            {loadingCustomerProducts ? (
+                              <div className="p-8 text-center text-sm text-[#5A6A51]">Loading patient product balances...</div>
+                            ) : customerProductBalances.length === 0 ? (
+                              <div className="p-12 text-center space-y-3">
+                                <div className="mx-auto w-12 h-12 rounded-full bg-[#EDF1EC] flex items-center justify-center text-[#414E36]">
+                                  <ShoppingBag size={24} />
+                                </div>
+                                <p className="text-sm font-semibold text-[#1F251A]">No product balances or active packages</p>
+                                <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
+                                  Add products or home-care packages to this patient's cart so staff can track remaining sessions and usage.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedAddProductId("");
+                                    setSelectedAddProductName("");
+                                    setSelectedAddProductQty(1);
+                                    setSelectedAddProductUnitPrice(0);
+                                    setShowAddPatientProductModal(true);
+                                  }}
+                                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                                >
+                                  <Plus size={14} /> Sell / Assign Product
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs border-collapse">
+                                  <thead>
+                                    <tr className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-[#5A6A51] font-bold uppercase tracking-wider">
+                                      <th className="py-3 px-4">Product Name</th>
+                                      <th className="py-3 px-4 text-center">Purchased Qty</th>
+                                      <th className="py-3 px-4 text-center">Used Qty</th>
+                                      <th className="py-3 px-4 text-center">Remaining Balance</th>
+                                      <th className="py-3 px-4 text-center">Status</th>
+                                      <th className="py-3 px-4 text-right">Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-[#414E36]/5">
+                                    {customerProductBalances.map((bal: any) => {
+                                      const totalPurchased = bal.total_purchased ?? bal.quantity ?? 0;
+                                      const totalUsed = bal.total_used ?? bal.quantity_used ?? 0;
+                                      const remaining = bal.remaining_balance ?? (totalPurchased - totalUsed);
+                                      const isDepleted = remaining <= 0;
+
+                                      return (
+                                        <tr key={bal.id} className="hover:bg-[#FBFBF9]/60 transition">
+                                          <td className="py-3.5 px-4 font-bold text-[#1F251A]">
+                                            {bal.product_name}
+                                          </td>
+                                          <td className="py-3.5 px-4 text-center font-semibold text-[#1F251A]">
+                                            {totalPurchased}
+                                          </td>
+                                          <td className="py-3.5 px-4 text-center text-[#5A6A51]">
+                                            {totalUsed}
+                                          </td>
+                                          <td className="py-3.5 px-4 text-center font-bold">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                              remaining > 0 ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-500"
+                                            }`}>
+                                              {remaining} left
+                                            </span>
+                                          </td>
+                                          <td className="py-3.5 px-4 text-center">
+                                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                              !isDepleted ? "bg-emerald-100/80 text-emerald-800" : "bg-amber-100 text-amber-800"
+                                            }`}>
+                                              <span className={`h-1.5 w-1.5 rounded-full ${!isDepleted ? "bg-emerald-600" : "bg-amber-600"}`} />
+                                              {!isDepleted ? "Active Balance" : "Fully Consumed"}
+                                            </span>
+                                          </td>
+                                          <td className="py-3.5 px-4 text-right">
+                                            {!isDepleted ? (
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setLogUsageModalBalance(bal);
+                                                  setLogUsageQty(1);
+                                                  setLogUsageNotes("");
+                                                }}
+                                                className="inline-flex items-center gap-1 rounded-lg bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-xs"
+                                              >
+                                                Deduct / Log Usage
+                                              </button>
+                                            ) : (
+                                              <span className="text-[11px] text-gray-400 italic">No remaining sessions</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {customerProductsSubTab === "history" && (
+                          <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm p-6 space-y-4">
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Recent Product Sales & Allocations</h5>
+                            {productSalesHistory.filter((s: any) => s.customer_id === viewingCustomerProfile.id).length === 0 ? (
+                              <p className="text-xs text-[#8A9A81] italic text-center py-6">No historical product transactions for this patient.</p>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs border-collapse">
+                                  <thead>
+                                    <tr className="border-b border-[#414E36]/10 text-[#5A6A51] font-bold uppercase bg-[#FBFBF9]">
+                                      <th className="py-2.5 px-3">Date</th>
+                                      <th className="py-2.5 px-3">Product</th>
+                                      <th className="py-2.5 px-3 text-center">Qty</th>
+                                      <th className="py-2.5 px-3 text-right">Unit Price</th>
+                                      <th className="py-2.5 px-3 text-right">Total</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-[#414E36]/5">
+                                    {productSalesHistory
+                                      .filter((s: any) => s.customer_id === viewingCustomerProfile.id)
+                                      .map((sale: any, idx: number) => (
+                                        <tr key={sale.id || idx} className="hover:bg-[#FBFBF9]">
+                                          <td className="py-2.5 px-3 text-[#5A6A51]">
+                                            {new Date(sale.created_at || sale.date || Date.now()).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                                          </td>
+                                          <td className="py-2.5 px-3 font-semibold text-[#1F251A]">{sale.product_name}</td>
+                                          <td className="py-2.5 px-3 text-center font-semibold">{sale.quantity}</td>
+                                          <td className="py-2.5 px-3 text-right">EGP {Number(sale.unit_price || 0).toLocaleString()}</td>
+                                          <td className="py-2.5 px-3 text-right font-bold text-[#414E36]">EGP {Number(sale.total_amount || 0).toLocaleString()}</td>
+                                        </tr>
+                                      ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Log Usage Modal */}
+                    {logUsageModalBalance && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+                        <div className="w-full max-w-md bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4 animate-scaleUp">
+                          <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                            <h4 className="text-base font-bold text-[#1F251A]">Deduct / Log Product Usage</h4>
+                            <button
+                              type="button"
+                              onClick={() => setLogUsageModalBalance(null)}
+                              className="text-gray-400 hover:text-gray-600 transition"
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+
+                          <div className="bg-[#EDF1EC]/60 p-3.5 rounded-xl space-y-1 text-xs">
+                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">Product / Item</span>
+                            <p className="font-bold text-[#1F251A] text-sm">{logUsageModalBalance.product_name}</p>
+                            <p className="text-[#5A6A51]">
+                              Current Remaining Balance: <strong className="text-[#414E36]">{logUsageModalBalance.remaining_balance ?? ((logUsageModalBalance.total_purchased || logUsageModalBalance.quantity || 0) - (logUsageModalBalance.total_used || logUsageModalBalance.quantity_used || 0))}</strong>
+                            </p>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Quantity Used / Deducted</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max={logUsageModalBalance.remaining_balance || 99}
+                                value={logUsageQty}
+                                onChange={(e) => setLogUsageQty(Math.max(1, Number(e.target.value)))}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Usage Notes / Session Details</label>
+                              <textarea
+                                placeholder="e.g. Session #2 administered at New Cairo branch..."
+                                value={logUsageNotes}
+                                onChange={(e) => setLogUsageNotes(e.target.value)}
+                                rows={3}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#414E36]/10">
+                            <button
+                              type="button"
+                              onClick={() => setLogUsageModalBalance(null)}
+                              className="rounded-xl border border-[#414E36]/15 px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSaveUsageLog}
+                              disabled={savingUsageLog}
+                              className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
+                            >
+                              {savingUsageLog ? "Deducting..." : "Confirm Usage"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Add Product to Patient / Cart Modal */}
+                    {showAddPatientProductModal && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+                        <div className="w-full max-w-lg bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4 animate-scaleUp">
+                          <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                            <div>
+                              <h4 className="text-base font-bold text-[#1F251A]">Add Product / Package to Patient</h4>
+                              <p className="text-xs text-[#5A6A51]">Assign product balance to {viewingCustomerProfile.name}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowAddPatientProductModal(false)}
+                              className="text-gray-400 hover:text-gray-600 transition"
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Select Product from Inventory</label>
+                              <select
+                                value={selectedAddProductId}
+                                onChange={(e) => {
+                                  const prodId = e.target.value;
+                                  setSelectedAddProductId(prodId);
+                                  const found = inventoryProducts.find((p) => p.id === prodId);
+                                  if (found) {
+                                    setSelectedAddProductName(found.name);
+                                    setSelectedAddProductUnitPrice(found.selling_price || found.price || 0);
+                                  }
+                                }}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                              >
+                                <option value="">-- Choose Product / Item --</option>
+                                {inventoryProducts.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.name} ({p.category || 'Product'}) - EGP {p.selling_price || p.price || 0}
+                                  </option>
+                                ))}
+                                <option value="custom">Custom Item / Package...</option>
+                              </select>
+                            </div>
+
+                            {(!selectedAddProductId || selectedAddProductId === "custom") && (
+                              <div>
+                                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Custom Product / Package Name</label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Skin Care Home Set (3 Sessions)"
+                                  value={selectedAddProductName}
+                                  onChange={(e) => setSelectedAddProductName(e.target.value)}
+                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                                />
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Quantity</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={selectedAddProductQty}
+                                  onChange={(e) => setSelectedAddProductQty(Math.max(1, Number(e.target.value)))}
+                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Unit Price (EGP)</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={selectedAddProductUnitPrice}
+                                  onChange={(e) => setSelectedAddProductUnitPrice(Number(e.target.value))}
+                                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="bg-[#EDF1EC]/60 p-3.5 rounded-xl flex items-center justify-between text-xs font-semibold text-[#1F251A]">
+                              <span>Total Amount:</span>
+                              <span className="text-base font-bold text-[#414E36]">
+                                EGP {(selectedAddProductQty * selectedAddProductUnitPrice).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#414E36]/10">
+                            <button
+                              type="button"
+                              onClick={() => setShowAddPatientProductModal(false)}
+                              className="rounded-xl border border-[#414E36]/15 px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleAddProductToPatient}
+                              disabled={addingProductToPatient || !selectedAddProductName}
+                              className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
+                            >
+                              {addingProductToPatient ? "Adding..." : "Add to Patient Cart"}
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
