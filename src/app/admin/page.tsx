@@ -4330,7 +4330,7 @@ export default function AdminPage() {
         branch_schedules: finalSchedules
       },
       branchId: providerFormBranchIds[0] || null, // Keep legacy branchId column in sync with first branch
-      startDate: providerFormStartDate || null,
+      startDate: getDoctorFirstReservationDate(providerFormName, allReservations) || providerFormStartDate || null,
       fixedSalary: Number(providerFormFixedSalary || 0),
       commissionType: providerFormCommissionType,
       commissionValue: Number(providerFormCommissionValue || 0)
@@ -7131,26 +7131,28 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Start Date</label>
+                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
+                        <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 flex items-center justify-between min-h-[42px]">
                           {(() => {
                             const autoDate = getDoctorFirstReservationDate(providerFormName, allReservations);
-                            if (autoDate) {
+                            const displayDate = autoDate || providerFormStartDate;
+                            if (displayDate) {
                               return (
-                                <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2 py-0.5 rounded-full border border-[#414E36]/15">
-                                  ⚡ Auto-set: {autoDate}
-                                </span>
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="text-sm font-semibold text-[#1F251A]">{displayDate}</span>
+                                  <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full border border-[#414E36]/15 flex items-center gap-1">
+                                    ⚡ Auto from 1st Booking
+                                  </span>
+                                </div>
                               );
                             }
-                            return null;
+                            return (
+                              <span className="text-xs italic text-[#5A6A51]/70">
+                                Will auto-set on doctor's 1st reservation
+                              </span>
+                            );
                           })()}
                         </div>
-                        <input
-                          type="date"
-                          value={providerFormStartDate || getDoctorFirstReservationDate(providerFormName, allReservations) || ""}
-                          onChange={(e) => setProviderFormStartDate(e.target.value)}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
                       </div>
                     </div>
 
@@ -22034,26 +22036,28 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Start Date</label>
+                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
+                  <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 flex items-center justify-between min-h-[42px]">
                     {(() => {
                       const autoDate = getDoctorFirstReservationDate(providerFormName, allReservations);
-                      if (autoDate) {
+                      const displayDate = autoDate || providerFormStartDate;
+                      if (displayDate) {
                         return (
-                          <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2 py-0.5 rounded-full border border-[#414E36]/15">
-                            ⚡ Auto-set: {autoDate}
-                          </span>
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-sm font-semibold text-[#1F251A]">{displayDate}</span>
+                            <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full border border-[#414E36]/15 flex items-center gap-1">
+                              ⚡ Auto from 1st Booking
+                            </span>
+                          </div>
                         );
                       }
-                      return null;
+                      return (
+                        <span className="text-xs italic text-[#5A6A51]/70">
+                          Will auto-set on doctor's 1st reservation
+                        </span>
+                      );
                     })()}
                   </div>
-                  <input
-                    type="date"
-                    value={providerFormStartDate || getDoctorFirstReservationDate(providerFormName, allReservations) || ""}
-                    onChange={(e) => setProviderFormStartDate(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  />
                 </div>
               </div>
 
