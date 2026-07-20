@@ -2226,7 +2226,7 @@ export default function AdminPage() {
   }
 
   async function triggerCheckout() {
-    if (session?.access_token && adminDbId && adminRole && adminRole !== 'superadmin' && adminRole !== 'admin') {
+    if (session?.access_token && adminDbId) {
       try {
         console.log("Logging attendance check-out for user:", adminDbId);
         await fetch('/api/hr/attendance', {
@@ -2274,9 +2274,10 @@ export default function AdminPage() {
       return;
     }
     
-    // Superadmin and Admin do not have attendance tracking and are exempt
-    if (adminRole === 'superadmin' || adminRole === 'admin') {
-      console.log("Skipping check-in: Admin/Superadmin bypass.");
+    // Bypass location enforcement only for global superadmins who have no assigned branch
+    const loggedEmp = employeesList.find(e => e.id === adminDbId || e.email?.toLowerCase() === adminEmail.toLowerCase());
+    if (adminRole === 'superadmin' && !loggedEmp?.branch_id) {
+      console.log("Skipping location check: global superadmin bypass.");
       return;
     }
 
@@ -2287,7 +2288,6 @@ export default function AdminPage() {
       return;
     }
 
-    // FOR TESTING: Location check runs every time the page/session is loaded.
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
@@ -2309,7 +2309,7 @@ export default function AdminPage() {
             console.warn("Check-in API rejected request:", errData);
             if (errData.error === 'not_in_location') {
               setLocationWarningMsg(
-                `Your current location does not match the required check-in area for your assigned branch.\n\nYou are currently ${errData.distance || 'unknown'} meters away from the branch. Access is restricted while outside the 800-meter radius.`
+                errData.message || `Your current location does not match the required check-in area for your assigned branch.\n\nYou are currently ${errData.distance || 'unknown'} meters away from the branch. Access is restricted while outside the 800-meter radius.`
               );
               setLocationWarningOpen(true);
             } else if (errData.error === 'no_branch') {
@@ -2336,7 +2336,7 @@ export default function AdminPage() {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, [adminEmail, session, adminRole, adminDbId]);
+  }, [adminEmail, session, adminRole, adminDbId, employeesList]);
 
   // Inactivity Presence Monitor for standard staff
   useEffect(() => {

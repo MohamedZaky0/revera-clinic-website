@@ -18,6 +18,42 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   return R * c;
 }
 
+function extractCoordsFromUrlOrEmbed(urlStr: string) {
+  if (!urlStr) return null;
+  try {
+    // Pattern 1: !2d31.45133!3d30.001242 (Embed format: 2d = lng, 3d = lat)
+    const regex2d3d = /!2d(-?\d+\.\d+)!3d(-?\d+\.\d+)/;
+    const match2d3d = urlStr.match(regex2d3d);
+    if (match2d3d) {
+      return { latitude: parseFloat(match2d3d[2]), longitude: parseFloat(match2d3d[1]) };
+    }
+
+    // Pattern 2: !3d30.001242!4d31.45133 (Place pin format: 3d = lat, 4d = lng)
+    const regex3d4d = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
+    const match3d4d = urlStr.match(regex3d4d);
+    if (match3d4d) {
+      return { latitude: parseFloat(match3d4d[1]), longitude: parseFloat(match3d4d[2]) };
+    }
+
+    // Pattern 3: /@30.001242,31.45133
+    const regexAt = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const matchAt = urlStr.match(regexAt);
+    if (matchAt) {
+      return { latitude: parseFloat(matchAt[1]), longitude: parseFloat(matchAt[2]) };
+    }
+
+    // Pattern 4: ?q=30.001242,31.45133
+    const regexQ = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const matchQ = urlStr.match(regexQ);
+    if (matchQ) {
+      return { latitude: parseFloat(matchQ[1]), longitude: parseFloat(matchQ[2]) };
+    }
+  } catch (err) {
+    console.error("Error parsing coords from URL:", err);
+  }
+  return null;
+}
+
 function getFinalUrl(targetUrl: string): Promise<string> {
   return new Promise((resolve) => {
     try {
@@ -52,29 +88,12 @@ function getFinalUrl(targetUrl: string): Promise<string> {
 
 async function extractCoordsFromMapsLink(mapsLink: string) {
   if (!mapsLink) return null;
+  const syncCoords = extractCoordsFromUrlOrEmbed(mapsLink);
+  if (syncCoords) return syncCoords;
+
   try {
     const finalUrl = await getFinalUrl(mapsLink);
-    
-    // Pattern 1: /@30.001242,31.451330
-    const regexAt = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const matchAt = finalUrl.match(regexAt);
-    if (matchAt) {
-      return { latitude: parseFloat(matchAt[1]), longitude: parseFloat(matchAt[2]) };
-    }
-    
-    // Pattern 2: !3d30.0192534!4d31.4913222 (high-accuracy place pin)
-    const regexPlace = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
-    const matchPlace = finalUrl.match(regexPlace);
-    if (matchPlace) {
-      return { latitude: parseFloat(matchPlace[1]), longitude: parseFloat(matchPlace[2]) };
-    }
-
-    // Pattern 3: ?q=30.001242,31.451330
-    const regexQ = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const matchQ = finalUrl.match(regexQ);
-    if (matchQ) {
-      return { latitude: parseFloat(matchQ[1]), longitude: parseFloat(matchQ[2]) };
-    }
+    return extractCoordsFromUrlOrEmbed(finalUrl);
   } catch (err) {
     console.error("Error resolving maps link coordinates:", err);
   }
@@ -131,7 +150,9 @@ export async function GET(req: Request) {
       const matchLeave = approvedLeaves.find((l: any) => {
         if (l.employee_id !== rec.employee_id) return false;
         const rDate = rec.date; // YYYY-MM-DD
-        return rDate >= l.start_date && rDate <= l.end_date;
+        const sDate = (l.start_date || '').slice(0, 10);
+        const eDate = (l.end_date || '').slice(0, 10);
+        return rDate >= sDate && rDate <= eDate;
       });
 
       const shiftStr = rec.employee_accounts?.shift || 'Day';
@@ -217,7 +238,6 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  // Allow any employee to check in
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace('Bearer ', '').trim();
 
@@ -237,23 +257,36 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required parameters.' }, { status: 400 });
     }
 
-    // 1. Fetch employee branch details
-    const { data: employee, error: empErr } = await supabaseServer
+    // 1. Fetch employee branch details (try id first, fallback to auth_user_id or email)
+    let { data: employee } = await supabaseServer
       .from('employee_accounts')
-      .select('id, branch_id, email')
+      .select('id, branch_id, email, role_name')
       .eq('id', employeeId)
       .maybeSingle();
 
-    if (empErr || !employee) {
+    if (!employee) {
+      const { data: empFallback } = await supabaseServer
+        .from('employee_accounts')
+        .select('id, branch_id, email, role_name')
+        .or(`auth_user_id.eq.${user.id},email.eq.${user.email}`)
+        .maybeSingle();
+      if (empFallback) employee = empFallback;
+    }
+
+    if (!employee) {
       return NextResponse.json({ error: 'Employee not found.' }, { status: 404 });
     }
 
-    // Bypass check-in location restrictions for the owner/superadmin account
-    if (employee.email?.toLowerCase() === 'superadmin@revera.com') {
+    const isSuperadmin = employee.role_name?.toLowerCase() === 'superadmin' || 
+                         user.email?.toLowerCase() === 'saif@superadmin.com' ||
+                         user.email?.toLowerCase() === 'superadmin@revera.com';
+
+    // Global superadmin without assigned branch auto-checks in
+    if (isSuperadmin && !employee.branch_id) {
       const { data, error } = await supabaseServer
         .from('hr_attendance')
         .upsert({
-          employee_id: employeeId,
+          employee_id: employee.id,
           date: new Date().toISOString().split('T')[0],
           check_in_time: new Date().toISOString(),
           latitude,
@@ -270,10 +303,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'no_branch', message: 'No branch assigned to employee.' }, { status: 400 });
     }
 
-    // Fetch branch coordinates and maps link
+    // Fetch branch coordinates and maps link / embed
     const { data: branch, error: bErr } = await supabaseServer
       .from('branches')
-      .select('latitude, longitude, maps_link, name_en')
+      .select('latitude, longitude, maps_embed, maps_link, name_en')
       .eq('id', employee.branch_id)
       .single();
 
@@ -284,13 +317,30 @@ export async function POST(req: Request) {
     let targetLat = branch.latitude ? Number(branch.latitude) : null;
     let targetLng = branch.longitude ? Number(branch.longitude) : null;
 
-    // Dynamically extract coordinates from the branch maps link for high accuracy
-    if (branch.maps_link) {
-      const parsedCoords = await extractCoordsFromMapsLink(branch.maps_link);
-      if (parsedCoords) {
-        targetLat = parsedCoords.latitude;
-        targetLng = parsedCoords.longitude;
-        console.log(`Resolved maps_link coords for ${branch.name_en}: ${targetLat}, ${targetLng}`);
+    if (!targetLat || !targetLng || isNaN(targetLat) || isNaN(targetLng)) {
+      // 1. Try sync parsing from maps_embed
+      if (branch.maps_embed) {
+        const parsed = extractCoordsFromUrlOrEmbed(branch.maps_embed);
+        if (parsed) {
+          targetLat = parsed.latitude;
+          targetLng = parsed.longitude;
+        }
+      }
+
+      // 2. Try sync parsing from maps_link
+      if ((!targetLat || !targetLng) && branch.maps_link) {
+        const parsed = extractCoordsFromUrlOrEmbed(branch.maps_link);
+        if (parsed) {
+          targetLat = parsed.latitude;
+          targetLng = parsed.longitude;
+        } else {
+          // 3. Fallback async resolution
+          const asyncParsed = await extractCoordsFromMapsLink(branch.maps_link);
+          if (asyncParsed) {
+            targetLat = asyncParsed.latitude;
+            targetLng = asyncParsed.longitude;
+          }
+        }
       }
     }
 
@@ -309,15 +359,14 @@ export async function POST(req: Request) {
       targetLng
     );
 
-    console.log(`Employee checkin distance to ${branch.name_en}: ${dist.toFixed(0)} meters`);
+    console.log(`Employee ${employee.id} checkin distance to ${branch.name_en}: ${dist.toFixed(0)} meters`);
 
-    // Outside the 800m radius — log attendance as "Out of Location" and return error so frontend can warn
+    // Outside the 800m radius — log attendance as "Out of Location" and return error so frontend locks access
     if (dist > 800) {
-      // Still record the attempt with Out of Location status
       await supabaseServer
         .from('hr_attendance')
         .upsert({
-          employee_id: employeeId,
+          employee_id: employee.id,
           date: new Date().toISOString().split('T')[0],
           check_in_time: new Date().toISOString(),
           latitude,
@@ -326,16 +375,20 @@ export async function POST(req: Request) {
         }, { onConflict: 'employee_id,date' });
 
       return NextResponse.json(
-        { error: 'not_in_location', message: 'You are not in the right location for the attendance.', distance: Math.round(dist) },
+        { 
+          error: 'not_in_location', 
+          message: `Your current location does not match the required check-in area for ${branch.name_en || 'your branch'}.\n\nYou are currently ${Math.round(dist)} meters away from the branch. Access is restricted while outside the 800-meter radius.`, 
+          distance: Math.round(dist) 
+        },
         { status: 400 }
       );
     }
 
-    // Within range — log as Present
+    // Within range (<= 800m)
     const { data, error } = await supabaseServer
       .from('hr_attendance')
       .upsert({
-        employee_id: employeeId,
+        employee_id: employee.id,
         date: new Date().toISOString().split('T')[0],
         check_in_time: new Date().toISOString(),
         latitude,
@@ -392,3 +445,4 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
   }
 }
+
