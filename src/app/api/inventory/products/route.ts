@@ -128,6 +128,17 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
 
 async function getStoredProductsData(): Promise<{ products: ProductItem[] }> {
   try {
+    // 1. Check native Supabase inventory_products table
+    const { data: dbProducts, error: dbErr } = await supabaseServer
+      .from('inventory_products')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!dbErr && dbProducts) {
+      return { products: dbProducts as ProductItem[] };
+    }
+
+    // 2. Fallback to page_settings
     const { data, error } = await supabaseServer
       .from('page_settings')
       .select('value')
@@ -135,7 +146,7 @@ async function getStoredProductsData(): Promise<{ products: ProductItem[] }> {
       .maybeSingle();
 
     if (error || !data || !data.value) {
-      const payload = { products: DEFAULT_PRODUCTS };
+      const payload = { products: [] };
       await supabaseServer
         .from('page_settings')
         .upsert({ key: 'inventory_products', value: payload, updated_at: new Date().toISOString() });
@@ -144,7 +155,7 @@ async function getStoredProductsData(): Promise<{ products: ProductItem[] }> {
     return data.value;
   } catch (err) {
     console.error('Error fetching inventory products settings:', err);
-    return { products: DEFAULT_PRODUCTS };
+    return { products: [] };
   }
 }
 

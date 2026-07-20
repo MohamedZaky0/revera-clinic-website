@@ -16,10 +16,23 @@ export interface ProductSaleRecord {
   total_amount: number;
   created_at: string;
   sold_by?: string;
+  payment_method?: string;
+  notes?: string;
 }
 
 async function getStoredSalesData(): Promise<{ sales: ProductSaleRecord[] }> {
   try {
+    // 1. Try querying native Supabase product_sales table first
+    const { data: dbSales, error: dbErr } = await supabaseServer
+      .from('product_sales')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!dbErr && dbSales) {
+      return { sales: dbSales as ProductSaleRecord[] };
+    }
+
+    // 2. Fallback to page_settings
     const { data, error } = await supabaseServer
       .from('page_settings')
       .select('value')
@@ -72,7 +85,9 @@ export async function POST(req: Request) {
       quantity,
       unit_price,
       total_amount,
-      sold_by
+      sold_by,
+      payment_method,
+      notes
     } = body;
 
     if (!product_id || !customer_id || !quantity || quantity <= 0) {
@@ -82,9 +97,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const currentData = await getStoredSalesData();
-    const newSale: ProductSaleRecord = {
-      id: `sale-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    const newSalePayload = {
       product_id,
       product_name: product_name || 'Product',
       product_sku: product_sku || '',
@@ -94,8 +107,29 @@ export async function POST(req: Request) {
       quantity: Number(quantity),
       unit_price: Number(unit_price || 0),
       total_amount: Number(total_amount || 0),
-      created_at: new Date().toISOString(),
-      sold_by: sold_by || 'Admin/Receptionist'
+      sold_by: sold_by || 'Admin/Receptionist',
+      payment_method: payment_method || 'Cash',
+      notes: notes || '',
+      created_at: new Date().toISOString()
+    };
+
+    // Try inserting into native Supabase product_sales table first
+    const { data: insertedDb, error: dbInsertErr } = await supabaseServer
+      .from('product_sales')
+      .insert(newSalePayload)
+      .select()
+      .single();
+
+    if (!dbInsertErr && insertedDb) {
+      const allSales = await getStoredSalesData();
+      return NextResponse.json({ success: true, sale: insertedDb, sales: allSales.sales });
+    }
+
+    // Fallback to page_settings JSON
+    const currentData = await getStoredSalesData();
+    const newSale: ProductSaleRecord = {
+      id: `sale-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      ...newSalePayload
     };
 
     const updatedSales = [newSale, ...(currentData.sales || [])];

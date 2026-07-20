@@ -1271,7 +1271,7 @@ export default function AdminPage() {
 
   // Customer Profile details drawer state
   const [viewingCustomerProfile, setViewingCustomerProfile] = useState<Customer | null>(null);
-  const [customerProfileTab, setCustomerProfileTab] = useState<"info" | "history" | "prescription">("info");
+  const [customerProfileTab, setCustomerProfileTab] = useState<"info" | "history" | "prescription" | "products">("info");
   const [customerPrescriptions, setCustomerPrescriptions] = useState<any[]>([]);
   const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
   const [prescriptionEditMode, setPrescriptionEditMode] = useState(false);
@@ -3422,10 +3422,10 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (activeNav === "Inventory" || activeNav === "Products") {
+    if (activeNav === "Inventory" || activeNav === "Products" || viewingCustomerProfile?.id) {
       fetchProductSalesHistory();
     }
-  }, [activeNav, fetchProductSalesHistory]);
+  }, [activeNav, viewingCustomerProfile?.id, fetchProductSalesHistory]);
 
   const handleOpenSellProductModal = (prod: any) => {
     setSelectedSellProduct(prod);
