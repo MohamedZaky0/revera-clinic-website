@@ -22,61 +22,98 @@ function SetupContent() {
       return;
     }
 
-    let unsubscribe = () => {};
+    let isSubscribed = true;
 
-    try {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event: string, session: any) => {
-          try {
-            console.log("Auth setup state changed:", event, session ? "Session exists" : "No session");
-            if (session) {
-              const name = session.user?.user_metadata?.full_name || session.user?.email || "";
+    async function initAuth() {
+      try {
+        // 1. Check if token exists in URL hash fragment (access_token & refresh_token)
+        if (typeof window !== "undefined" && window.location.hash) {
+          const rawHash = window.location.hash.startsWith("#")
+            ? window.location.hash.substring(1)
+            : window.location.hash;
+          const hashParams = new URLSearchParams(rawHash);
+
+          const errorDesc = hashParams.get("error_description") || hashParams.get("error");
+          if (errorDesc) {
+            console.error("Auth error in URL hash:", errorDesc);
+            if (isSubscribed) {
+              setError(decodeURIComponent(errorDesc).replace(/\+/g, " "));
+              setChecking(false);
+            }
+            return;
+          }
+
+          const accessToken = hashParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token");
+
+          if (accessToken && refreshToken) {
+            const { data, error: setSessionError } = await supabase!.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (setSessionError) {
+              console.error("Failed to set session from hash:", setSessionError);
+              if (isSubscribed) {
+                setError(setSessionError.message);
+                setChecking(false);
+              }
+              return;
+            }
+
+            if (data?.session && isSubscribed) {
+              const name = data.session.user?.user_metadata?.full_name || data.session.user?.email || "";
               setEmployeeName(name);
               setSessionReady(true);
               setChecking(false);
-            } else {
-              setChecking(false);
+              return;
             }
-          } catch (e: any) {
-            console.error("Error in auth state change callback:", e);
-            setError("Auth change error: " + e.message);
-            setChecking(false);
           }
         }
-      );
-      if (subscription) {
-        unsubscribe = () => subscription.unsubscribe();
+
+        // 2. Fallback check existing session
+        const { data: { session }, error: sessionErr } = await supabase!.auth.getSession();
+        if (sessionErr) {
+          console.error("getSession error:", sessionErr);
+        }
+        if (session && isSubscribed) {
+          const name = session.user?.user_metadata?.full_name || session.user?.email || "";
+          setEmployeeName(name);
+          setSessionReady(true);
+          setChecking(false);
+          return;
+        }
+
+        if (isSubscribed) {
+          setChecking(false);
+        }
+      } catch (err: any) {
+        console.error("Error during auth setup init:", err);
+        if (isSubscribed) {
+          setError(err.message || "Failed to initialize session.");
+          setChecking(false);
+        }
       }
-    } catch (e: any) {
-      console.error("Failed to register onAuthStateChange:", e);
-      setError("Failed to initialize auth listener: " + e.message);
-      setChecking(false);
     }
 
-    try {
-      supabase.auth.getSession().then(
-        ({ data: { session } }: any) => {
-          if (session) {
-            const name = session.user?.user_metadata?.full_name || session.user?.email || "";
-            setEmployeeName(name);
-            setSessionReady(true);
-          }
-          setChecking(false);
-        },
-        (err: any) => {
-          console.error("Failed to get session:", err);
-          setError("Failed to get session: " + err.message);
+    // 3. Register listener for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event: string, session: any) => {
+        console.log("Auth setup state changed:", event, session ? "Session exists" : "No session");
+        if (session && isSubscribed) {
+          const name = session.user?.user_metadata?.full_name || session.user?.email || "";
+          setEmployeeName(name);
+          setSessionReady(true);
           setChecking(false);
         }
-      );
-    } catch (e: any) {
-      console.error("crashed getting session:", e);
-      setError("Session retrieval crashed: " + e.message);
-      setChecking(false);
-    }
+      }
+    );
+
+    initAuth();
 
     return () => {
-      unsubscribe();
+      isSubscribed = false;
+      subscription?.unsubscribe();
     };
   }, []);
 
