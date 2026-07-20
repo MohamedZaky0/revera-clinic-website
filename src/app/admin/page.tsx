@@ -162,6 +162,10 @@ const SIDEBAR_ITEMS = [
   { label: "Inventory", icon: PackageCheck },
   { label: "Employees", icon: CircleUser },
   { label: "HR", icon: ClipboardList },
+  { label: "Marketing", icon: Megaphone, comingSoon: true },
+  { label: "Customer Support", icon: MessageSquare, comingSoon: true },
+  { label: "Reports", icon: BarChart3, comingSoon: true },
+  { label: "Accounting/Finance", icon: CircleDollarSign, comingSoon: true },
   { label: "Settings", icon: Settings, submenu: true },
   { label: "Logout", icon: LogOut },
 ];
@@ -692,6 +696,7 @@ export default function AdminPage() {
     if (adminRole === 'superadmin') return SIDEBAR_ITEMS;
     return SIDEBAR_ITEMS.filter(item => {
       if (item.label === 'Logout') return true;
+      if ((item as any).comingSoon) return true;
       if ((item.label === 'HR' || item.label === 'Inventory') && (adminRole === 'admin' || adminRole === 'HR')) return true;
       if (adminPermissions.includes(item.label)) return true;
       
@@ -7119,11 +7124,16 @@ export default function AdminPage() {
 
               const Icon = item.icon;
               const active = activeNav === item.label;
+              const isComingSoon = Boolean((item as any).comingSoon);
               return (
                 <button
                   key={item.label}
                   type="button"
+                  disabled={isComingSoon}
+                  aria-disabled={isComingSoon}
+                  title={isComingSoon ? "Coming Soon" : undefined}
                   onClick={async () => {
+                    if (isComingSoon) return;
                     if (item.label === "Logout") {
                       if (supabase) {
                         await triggerCheckout();
@@ -7134,7 +7144,9 @@ export default function AdminPage() {
                     }
                   }}
                   className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
-                    active
+                    isComingSoon
+                      ? "cursor-not-allowed opacity-50 text-[#FBFBF9]/50"
+                      : active
                       ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
                       : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
                   }`}
@@ -7142,14 +7154,22 @@ export default function AdminPage() {
                   <div className="flex items-center gap-3">
                     <span
                       className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
-                        active ? "bg-[#C4AE7C]/20 text-[#414E36]" : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
+                        isComingSoon
+                          ? "bg-[#FBFBF9]/5 text-[#FBFBF9]/40"
+                          : active
+                          ? "bg-[#C4AE7C]/20 text-[#414E36]"
+                          : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
                       }`}
                     >
                       <Icon size={18} />
                     </span>
                     <span>{item.label}</span>
                   </div>
-                  {item.submenu ? (
+                  {isComingSoon ? (
+                    <span className="rounded-full bg-[#FBFBF9]/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#FBFBF9]/50">
+                      Soon
+                    </span>
+                  ) : item.submenu ? (
                     <ChevronRight size={18} className="text-[#FBFBF9]/60" />
                   ) : null}
                 </button>
