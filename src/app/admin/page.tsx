@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
@@ -10236,6 +10236,513 @@ export default function AdminPage() {
           {/* ── CUSTOMERS VIEW ── */}
           {activeNav === "Customers" && (
             <div>
+
+              {/* ── INLINE: View Customer Profile ── */}
+              {viewingCustomerProfile && (
+                <div className="space-y-6 animate-fadeIn">
+                  {/* Back button */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => setViewingCustomerProfile(null)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
+                    >
+                      <ArrowLeft size={14} /> Back to Customers
+                    </button>
+                    {hasPermission("customers.edit") && (
+                      <button
+                        onClick={() => {
+                          handleOpenEditCustomer(viewingCustomerProfile);
+                          setViewingCustomerProfile(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
+                      >
+                        <Pencil size={12} /> Edit Profile
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Profile Header Banner */}
+                  <div className="bg-white rounded-3xl border border-[#414E36]/10 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div className="h-16 w-16 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl font-bold font-serif shrink-0">
+                        {viewingCustomerProfile.name ? viewingCustomerProfile.name.charAt(0).toUpperCase() : "P"}
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingCustomerProfile.name}</h3>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "No phone"} • Patient Profile & Clinic Engagement History</p>
+                        <div className="mt-2">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                            viewingCustomerProfile.active !== false ? "bg-[#EDF1EC] text-[#414E36]" : "bg-red-50 text-red-600"
+                          }`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-[#414E36]" : "bg-red-500"}`} />
+                            {viewingCustomerProfile.active !== false ? "Active Patient" : "Inactive"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tab Navigation */}
+                  <div className="flex border-b border-[#414E36]/10 bg-white rounded-t-2xl px-6 gap-6">
+                    <button
+                      onClick={() => setCustomerProfileTab("info")}
+                      className={`pb-3.5 pt-4 text-sm font-semibold border-b-2 transition-all outline-none ${
+                        customerProfileTab === "info"
+                          ? "border-[#414E36] text-[#414E36] font-bold"
+                          : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      Personal Info
+                    </button>
+                    <button
+                      onClick={() => setCustomerProfileTab("history")}
+                      className={`pb-3.5 pt-4 text-sm font-semibold border-b-2 transition-all outline-none ${
+                        customerProfileTab === "history"
+                          ? "border-[#414E36] text-[#414E36] font-bold"
+                          : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      Booking History
+                    </button>
+                    <button
+                      onClick={() => setCustomerProfileTab("prescription")}
+                      className={`pb-3.5 pt-4 text-sm font-semibold border-b-2 transition-all outline-none ${
+                        customerProfileTab === "prescription"
+                          ? "border-[#414E36] text-[#414E36] font-bold"
+                          : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      Prescriptions & Records
+                    </button>
+                  </div>
+
+                  {/* Tab Content */}
+                  <div className="space-y-6">
+                    {/* Tab 1: Info */}
+                    {customerProfileTab === "info" && (
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                          <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Personal Profile</h4>
+                        </div>
+                        <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
+                            <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Age</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Gender</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
+                            <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Referral Source</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Profile Status</span>
+                            <span className={`inline-flex items-center gap-1 text-xs font-bold ${
+                              viewingCustomerProfile.active !== false ? "text-green-700" : "text-gray-400"
+                            }`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-green-600" : "bg-gray-400"}`} />
+                              {viewingCustomerProfile.active !== false ? "Active Patient" : "Inactive"}
+                            </span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Address</span>
+                            <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
+                              {viewingCustomerProfile.address || [
+                                viewingCustomerProfile.building_no,
+                                viewingCustomerProfile.street_name,
+                                viewingCustomerProfile.floor_no,
+                                viewingCustomerProfile.area,
+                                viewingCustomerProfile.location_name
+                              ].filter(Boolean).join(", ") || "—"}
+                            </span>
+                          </div>
+                          {viewingCustomerProfile.note && (
+                            <div className="col-span-2">
+                              <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Notes & Observations</span>
+                              <p className="text-xs text-[#5A6A51] bg-amber-50/40 border border-amber-200/50 rounded-xl p-3 leading-relaxed">
+                                {viewingCustomerProfile.note}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tab 2: History */}
+                    {customerProfileTab === "history" && (
+                      <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                        <div className="border-b border-[#414E36]/10 pb-3 flex items-center justify-between">
+                          <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Booking History</h4>
+                          <span className="text-xs font-semibold bg-[#EDF1EC] text-[#414E36] px-2.5 py-1 rounded-md">
+                            Total: {
+                              allReservations.filter(
+                                (r) =>
+                                  r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
+                                  r.customerId === viewingCustomerProfile.id
+                              ).length
+                            }
+                          </span>
+                        </div>
+                        <div className="overflow-hidden rounded-xl border border-[#E6E9EB]">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] font-bold text-[#5A6A51] uppercase tracking-wider text-[10px]">
+                                <th className="px-4 py-3 text-left">Date / Slot</th>
+                                <th className="px-4 py-3 text-left">Service</th>
+                                <th className="px-4 py-3 text-left">Provider</th>
+                                <th className="px-4 py-3 text-right">Paid</th>
+                                <th className="px-4 py-3 text-right">Left</th>
+                                <th className="px-4 py-3 text-center">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                              {(() => {
+                                const history = allReservations.filter(
+                                  (r) =>
+                                    r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
+                                    r.customerId === viewingCustomerProfile.id
+                                );
+                                if (history.length === 0) {
+                                  return (
+                                    <tr>
+                                      <td colSpan={6} className="px-4 py-6 text-center text-gray-400 italic">
+                                        No booking history records found for this patient.
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+                                return history.map((res) => {
+                                  const resDt = new Date(res.date);
+                                  const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                                  const serv = localServices.find(s => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
+                                  const statusClass = getStatusBadgeClass(res.status);
+                                  const pricesMap: Record<number, number> = {
+                                    1: 400, 2: 500, 3: 450, 4: 600, 5: 800, 6: 700, 7: 1500,
+                                    11: 600, 12: 500, 13: 800, 14: 1200, 15: 1500, 16: 1000, 17: 400,
+                                    21: 300, 22: 350, 23: 300,
+                                    31: 400, 32: 350, 33: 400, 34: 500
+                                  };
+                                  const serviceCost = localServices.find(s => s.id === res.serviceId)?.price ?? pricesMap[res.serviceId] ?? 500;
+                                  const spent = res.amountPaid ?? 0;
+                                  const left = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : Math.max(0, serviceCost - spent);
+                                  return (
+                                    <tr key={res.id} className="hover:bg-[#F9F9F7]">
+                                      <td className="px-4 py-3">
+                                        <span className="block font-semibold text-[#1F251A]">{formattedDate}</span>
+                                        <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "—"}</span>
+                                      </td>
+                                      <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
+                                      <td className="px-4 py-3">{res.doctorName || "—"}</td>
+                                      <td className="px-4 py-3 text-right font-medium text-green-700">{spent} EGP</td>
+                                      <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
+                                      <td className="px-4 py-3 text-center">
+                                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusClass}`}>
+                                          {res.status}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                });
+                              })()}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tab 3: Prescriptions */}
+                    {customerProfileTab === "prescription" && (
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Medical Records & Prescriptions</h4>
+                          {!prescriptionEditMode && (adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor") && (
+                            <button
+                              onClick={handleStartCreatePrescription}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
+                            >
+                              <Plus size={14} /> Write Prescription
+                            </button>
+                          )}
+                        </div>
+                        {prescriptionEditMode ? (
+                          <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                            <h5 className="text-sm font-bold text-[#1F251A] border-b border-[#414E36]/5 pb-2">
+                              {editingPrescription ? "Edit Prescription" : "New Visit Prescription"}
+                            </h5>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Patient Name (Auto-filled)</label>
+                                <input type="text" readOnly value={viewingCustomerProfile.name} className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Date (Auto-filled)</label>
+                                <input type="text" readOnly value={new Date().toISOString().slice(0, 10)} className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none" />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Diagnosis / Assessment</label>
+                              <textarea placeholder="Describe the medical assessment..." value={rxDiagnosis} onChange={(e) => setRxDiagnosis(e.target.value)} rows={3} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+                            </div>
+                            <div className="border border-[#414E36]/10 rounded-xl p-4 bg-[#FBFBF9] space-y-3">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#414E36]">Prescribed Medications</label>
+                              <div className="flex gap-2">
+                                <div className="flex-1 space-y-2">
+                                  <div className="flex gap-2">
+                                    <select value={rxMedDropdown} onChange={(e) => { const val = e.target.value; setRxMedDropdown(val); if (val && val !== "Custom") { setRxMedInput(val); } }} className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition">
+                                      <option value="">-- Choose from Catalog --</option>
+                                      {MOCK_MEDICINES.map((med) => (<option key={med.id} value={med.name}>{med.name}</option>))}
+                                      <option value="Custom">Custom Medication...</option>
+                                    </select>
+                                    <input type="text" placeholder="Enter medication name..." value={rxMedInput} onChange={(e) => setRxMedInput(e.target.value)} className="flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+                                  </div>
+                                </div>
+                                <button type="button" onClick={handleAddMedication} className="rounded-xl bg-[#414E36] px-4 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shrink-0">Add</button>
+                              </div>
+                              {rxMedications.length > 0 ? (
+                                <div className="space-y-2 pt-2 border-t border-[#414E36]/5">
+                                  {rxMedications.map((med, idx) => (
+                                    <div key={idx} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-[#414E36]/10 text-sm">
+                                      <div className="flex-1">
+                                        <span className="font-semibold text-[#1F251A]">{med.name}</span>
+                                        <input type="text" placeholder="Dosage instructions..." value={med.instructions} onChange={(e) => { const newMeds = [...rxMedications]; newMeds[idx].instructions = e.target.value; setRxMedications(newMeds); }} className="w-full mt-1 bg-transparent text-xs text-[#5A6A51] border-b border-transparent hover:border-[#414E36]/15 focus:border-[#C4AE7C] outline-none py-0.5" />
+                                      </div>
+                                      <button type="button" onClick={() => handleRemoveMedication(idx)} className="text-red-500 hover:text-red-700 transition p-1 ml-2"><Trash2 size={14} /></button>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-[#8A9A81] italic text-center py-2">No medications added yet.</p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">General Notes (Optional)</label>
+                              <textarea placeholder="Additional advice..." value={rxGeneralNotes} onChange={(e) => setRxGeneralNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-800">🔒 Doctor-Only Notes (Optional)</label>
+                                <span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1.5 py-0.5 rounded">Hidden from print</span>
+                              </div>
+                              <textarea placeholder="Confidential clinical remarks..." value={rxDocNotes} onChange={(e) => setRxDocNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-amber-300/40 bg-amber-50/20 px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-amber-400 transition" />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Next Follow-Up Date (Optional)</label>
+                              <input type="date" value={rxFollowUpDate} onChange={(e) => setRxFollowUpDate(e.target.value)} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+                            </div>
+                            <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
+                              <button type="button" onClick={() => setPrescriptionEditMode(false)} className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]">Cancel</button>
+                              <button type="button" onClick={handleSavePrescription} disabled={savingPrescription} className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60">{savingPrescription ? "Saving..." : "Save Record"}</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {loadingPrescriptions ? (
+                              <div className="text-center py-12 text-[#5A6A51] text-sm">Loading medical records...</div>
+                            ) : customerPrescriptions.length === 0 ? (
+                              <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-2">
+                                <p className="text-sm font-semibold text-[#1F251A]">No clinical prescriptions recorded yet</p>
+                                <p className="text-xs text-[#5A6A51]">Create a prescription or register clinic visit details for this patient.</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-4">
+                                {customerPrescriptions.map((rx) => {
+                                  const rxDate = new Date(rx.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+                                  const isDocUser = adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor";
+                                  return (
+                                    <div key={rx.id} className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 relative overflow-hidden">
+                                      <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
+                                        <div>
+                                          <span className="font-bold text-[#1F251A] text-sm">{rxDate}</span>
+                                          <span className="text-xs text-[#8A9A81] block">Recorded by Revera Clinic Team</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <button onClick={() => handlePrintPrescription(rx)} className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"><Printer size={13} /> Print</button>
+                                          {isDocUser && (
+                                            <>
+                                              <button onClick={() => handleStartEditPrescription(rx)} className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"><Pencil size={12} /> Edit</button>
+                                              <button onClick={() => handleDeletePrescription(rx.id)} className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition"><Trash2 size={13} /></button>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="space-y-3 text-sm">
+                                        {rx.diagnosis && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Diagnosis</span><p className="text-[#1F251A] font-medium leading-relaxed">{rx.diagnosis}</p></div>)}
+                                        {rx.medications && rx.medications.length > 0 && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Medications Prescribed</span><ul className="space-y-2 bg-[#FBFBF9] rounded-xl border border-[#414E36]/5 p-3">{rx.medications.map((m: any, idx: number) => (<li key={idx} className="flex flex-col"><span className="font-semibold text-[#1F251A]">{m.name}</span>{m.instructions && (<span className="text-xs text-[#5A6A51] italic">{m.instructions}</span>)}</li>))}</ul></div>)}
+                                        {rx.general_notes && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">General Notes</span><p className="text-xs text-[#5A6A51] bg-[#FBFBF9] rounded-xl p-3 border border-[#414E36]/5 leading-relaxed">{rx.general_notes}</p></div>)}
+                                        {rx.doctor_notes && isDocUser && (<div className="border border-amber-300/40 bg-amber-50/20 rounded-xl p-3.5 space-y-1"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-amber-800">🔒 Doctor-Only Notes</span><span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1 py-0.5 rounded">Hidden from print</span></div><p className="text-xs text-amber-900 leading-relaxed">{rx.doctor_notes}</p></div>)}
+                                        {rx.follow_up_date && (<div className="flex items-center gap-1.5 text-xs text-[#414E36] font-semibold bg-[#EDF1EC]/60 px-3 py-2 rounded-xl w-fit"><Calendar size={13} />Next Follow-Up: {new Date(rx.follow_up_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>)}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── INLINE: Add/Edit Customer Form ── */}
+              {showCustomerFormModal && !viewingCustomerProfile && (
+                <div className="space-y-6 animate-fadeIn">
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomerFormModal(false)}
+                      className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
+                    >
+                      <ArrowLeft size={14} /> Back to Customers
+                    </button>
+                  </div>
+                  <div className="w-full bg-white rounded-3xl border border-[#414E36]/10 p-8 shadow-sm">
+                    <h3 className="text-2xl font-bold text-[#1F251A] mb-1">
+                      {selectedCustomerForEdit ? "Edit Customer Details" : "Add New Customer"}
+                    </h3>
+                    <p className="text-xs text-[#5A6A51] mb-6">
+                      {selectedCustomerForEdit ? `Editing profile of ${custName}` : "Create a new customer profile"}
+                    </p>
+                    {customerFormError && (
+                      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 mb-5">{customerFormError}</div>
+                    )}
+                    <div className="space-y-5">
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Patient Profile Details</h4>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Customer Name <span className="text-red-500">*</span></label>
+                            <input type="text" value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="e.g. Mohamed Aly" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" required />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Mobile Number <span className="text-red-500">*</span></label>
+                            <input type="text" value={custMobile} onChange={(e) => setCustMobile(e.target.value)} placeholder="e.g. 01012345678" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" required />
+                          </div>
+                          <div className="col-span-1 sm:col-span-2 space-y-2">
+                            <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#414E36]">
+                              <input type="checkbox" checked={isCustomerWhatsappSame} onChange={(e) => setIsCustomerWhatsappSame(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36]" />
+                              <span>This is the WhatsApp number too</span>
+                            </label>
+                            {!isCustomerWhatsappSame && (
+                              <div className="animate-fadeIn mt-2">
+                                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">WhatsApp Number <span className="text-red-500">*</span></label>
+                                <input type="text" value={customerWhatsapp} onChange={(e) => setCustomerWhatsapp(e.target.value)} placeholder="e.g. 01012345678" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" required />
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Email Address</label>
+                            <input type="email" value={custEmail} onChange={(e) => setCustEmail(e.target.value)} placeholder="e.g. mohamed@example.com" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Age</label>
+                            <input type="number" value={custAge} onChange={(e) => setCustAge(e.target.value)} placeholder="e.g. 28" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Gender</label>
+                            <select value={custGender} onChange={(e) => setCustGender(e.target.value as any)} className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]">
+                              <option value="">Select Gender</option>
+                              <option value="Male">Male / ذكر</option>
+                              <option value="Female">Female / أنثى</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">National ID</label>
+                            <input type="text" value={custNationalId} onChange={(e) => setCustNationalId(e.target.value)} placeholder="Enter 14-digit National ID" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Referral Source</label>
+                            <select value={custReferral} onChange={(e) => setCustReferral(e.target.value)} className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer">
+                              <option value="">Select Referral Source...</option>
+                              <option value="Facebook">Facebook</option>
+                              <option value="Instagram">Instagram</option>
+                              <option value="TikTok">TikTok</option>
+                              <option value="Google Search">Google Search</option>
+                              <option value="Friend / Word of Mouth">Friend / Word of Mouth</option>
+                              <option value="Walk-in">Walk-in</option>
+                              <option value="Website">Website</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Occupation</label>
+                            <input type="text" value={custOccupation} onChange={(e) => setCustOccupation(e.target.value)} placeholder="e.g. Engineer, Doctor" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                          </div>
+                        </div>
+                      </div>
+                      <hr className="border-[#414E36]/10" />
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Address & Location Details</h4>
+                        <div>
+                          <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Address</label>
+                          <input type="text" value={custAddress} onChange={(e) => setCustAddress(e.target.value)} placeholder="e.g. Tagamoa, Street 90, Building 14" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                        </div>
+                      </div>
+                      <hr className="border-[#414E36]/10" />
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Financial Ledgers</h4>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Wallet Balance (EGP)</label>
+                            <input type="number" min="0" value={custWallet} onChange={(e) => setCustWallet(e.target.value)} placeholder="0.00" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Total Spent (EGP)</label>
+                            <input type="number" min="0" value={custSpent} onChange={(e) => setCustSpent(e.target.value)} placeholder="0.00" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Outstanding Balance (EGP)</label>
+                            <input type="number" min="0" value={custOutstanding} onChange={(e) => setCustOutstanding(e.target.value)} placeholder="0.00" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                          </div>
+                        </div>
+                      </div>
+                      <hr className="border-[#414E36]/10" />
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Profile Status & Notes</h4>
+                        <div className="space-y-4">
+                          <div className="flex items-center">
+                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                              <input type="checkbox" checked={custActive} onChange={(e) => setCustActive(e.target.checked)} className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer" />
+                              <span className="text-sm font-semibold text-[#1F251A]">Active Profile</span>
+                            </label>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Internal Notes (Optional)</label>
+                            <textarea value={custNote} onChange={(e) => setCustNote(e.target.value)} placeholder="Add patient history, clinic preferences..." rows={3} className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] resize-none" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-5">
+                        <button type="button" onClick={() => setShowCustomerFormModal(false)} className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]">Cancel</button>
+                        <button type="button" onClick={handleSaveCustomer} disabled={savingCustomer} className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed">{savingCustomer ? "Saving..." : "Save Customer"}</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── CUSTOMER TABLE (only when no inline view is active) ── */}
+              {!viewingCustomerProfile && !showCustomerFormModal && (
+              <>
               {/* Page header and premium controls panel */}
               <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -10441,6 +10948,8 @@ export default function AdminPage() {
                   </tbody>
                 </table>
               </div>
+              </>
+              )}
             </div>
           )}
           {/* ── REPORTS VIEWS ── */}
@@ -22768,287 +23277,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── ADD/EDIT CUSTOMER MODAL ── */}
-      {showCustomerFormModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm overflow-y-auto animate-fadeIn"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowCustomerFormModal(false); }}
-        >
-          <div className="w-full max-w-2xl rounded-2xl bg-[#FBFBF9] shadow-[0_30px_80px_rgba(47,61,41,0.2)] border border-[#414E36]/10 overflow-hidden my-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36]">
-                  <Plus size={18} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-[#1F251A]">
-                    {selectedCustomerForEdit ? "Edit Customer Details" : "Add New Customer"}
-                  </h3>
-                  <p className="text-xs text-[#5A6A51]">
-                    {selectedCustomerForEdit ? `Editing profile of ${custName}` : "Create a new customer profile in Supabase"}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCustomerFormModal(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="px-6 py-5 max-h-[70vh] overflow-y-auto space-y-5 custom-scrollbar">
-              {customerFormError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-                  {customerFormError}
-                </div>
-              )}
-
-              {/* Personal Information section */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Patient Profile Details</h4>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">
-                      Customer Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={custName}
-                      onChange={(e) => setCustName(e.target.value)}
-                      placeholder="e.g. Mohamed Aly"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">
-                      Mobile Number <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={custMobile}
-                      onChange={(e) => setCustMobile(e.target.value)}
-                      placeholder="e.g. 01012345678"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] mb-2"
-                      required
-                    />
-                  </div>
-                  <div className="col-span-1 sm:col-span-2 space-y-2">
-                    <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#414E36]">
-                      <input
-                        type="checkbox"
-                        checked={isCustomerWhatsappSame}
-                        onChange={(e) => setIsCustomerWhatsappSame(e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-[#414E36] focus:ring-[#414E36]"
-                      />
-                      <span>This is the WhatsApp number too</span>
-                    </label>
-                    {!isCustomerWhatsappSame && (
-                      <div className="animate-fadeIn mt-2">
-                        <label className="block text-xs font-semibold text-[#5A6A51] mb-1">
-                          WhatsApp Number <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={customerWhatsapp}
-                          onChange={(e) => setCustomerWhatsapp(e.target.value)}
-                          placeholder="e.g. 01012345678"
-                          className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                          required
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Email Address</label>
-                    <input
-                      type="email"
-                      value={custEmail}
-                      onChange={(e) => setCustEmail(e.target.value)}
-                      placeholder="e.g. mohamed@example.com"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Age</label>
-                    <input
-                      type="number"
-                      value={custAge}
-                      onChange={(e) => setCustAge(e.target.value)}
-                      placeholder="e.g. 28"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Gender</label>
-                    <select
-                      value={custGender}
-                      onChange={(e) => setCustGender(e.target.value as any)}
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    >
-                      <option value="">Select Gender</option>
-                      <option value="Male">Male / ذكر</option>
-                      <option value="Female">Female / أنثى</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">National ID</label>
-                    <input
-                      type="text"
-                      value={custNationalId}
-                      onChange={(e) => setCustNationalId(e.target.value)}
-                      placeholder="Enter 14-digit National ID"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Referral Source</label>
-                    <select
-                      value={custReferral}
-                      onChange={(e) => setCustReferral(e.target.value)}
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer"
-                    >
-                      <option value="">Select Referral Source...</option>
-                      <option value="Facebook">Facebook</option>
-                      <option value="Instagram">Instagram</option>
-                      <option value="TikTok">TikTok</option>
-                      <option value="Google Search">Google Search</option>
-                      <option value="Friend / Word of Mouth">Friend / Word of Mouth</option>
-                      <option value="Walk-in">Walk-in</option>
-                      <option value="Website">Website</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Occupation</label>
-                    <input
-                      type="text"
-                      value={custOccupation}
-                      onChange={(e) => setCustOccupation(e.target.value)}
-                      placeholder="e.g. Engineer, Doctor"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <hr className="border-[#414E36]/10" />
-
-              {/* Address details */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Address & Location Details</h4>
-                <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Address</label>
-                  <input
-                    type="text"
-                    value={custAddress}
-                    onChange={(e) => setCustAddress(e.target.value)}
-                    placeholder="e.g. Tagamoa, Street 90, Building 14"
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                  />
-                </div>
-              </div>
-
-              <hr className="border-[#414E36]/10" />
-
-              {/* Financial balances */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Financial Ledgers</h4>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Wallet Balance (EGP)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={custWallet}
-                      onChange={(e) => setCustWallet(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Total Spent (EGP)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={custSpent}
-                      onChange={(e) => setCustSpent(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Outstanding Balance (EGP)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={custOutstanding}
-                      onChange={(e) => setCustOutstanding(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <hr className="border-[#414E36]/10" />
-
-              {/* Status and Notes section */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Profile Status & Notes</h4>
-                <div className="space-y-4">
-                  <div className="flex items-center">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={custActive}
-                        onChange={(e) => setCustActive(e.target.checked)}
-                        className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
-                      />
-                      <span className="text-sm font-semibold text-[#1F251A]">Active Profile</span>
-                    </label>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Internal Notes (Optional)</label>
-                    <textarea
-                      value={custNote}
-                      onChange={(e) => setCustNote(e.target.value)}
-                      placeholder="Add patient history, clinic preferences, or other notes..."
-                      rows={3}
-                      className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] resize-none"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
-              <div></div>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCustomerFormModal(false)}
-                  className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveCustomer}
-                  disabled={savingCustomer}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {savingCustomer ? "Saving..." : "Save Customer"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── DELETE CUSTOMER CONFIRMATION MODAL ── */}
       {deleteCustomerTarget && (
@@ -23089,574 +23317,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── CUSTOMER PROFILE & BOOKING HISTORY DRAWER ── */}
-      {viewingCustomerProfile && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-6 backdrop-blur-sm overflow-y-auto animate-fadeIn"
-          onClick={(e) => { if (e.target === e.currentTarget) setViewingCustomerProfile(null); }}
-        >
-          <div
-            className="w-full max-w-5xl max-h-[90vh] rounded-2xl bg-[#FBFBF9] shadow-[0_30px_80px_rgba(47,61,41,0.2)] flex flex-col overflow-hidden my-auto border border-[#414E36]/10"
-          >
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10">
-                  <User size={20} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-[#1F251A]">{viewingCustomerProfile.name}</h3>
-                  <p className="text-xs text-[#5A6A51]">Patient Profile & Clinic Engagement History</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setViewingCustomerProfile(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Drawer Tab Navigation */}
-            <div className="flex border-b border-[#414E36]/10 bg-[#F9F9F7] px-6 gap-6 shrink-0">
-              <button
-                onClick={() => setCustomerProfileTab("info")}
-                className={`pb-3.5 pt-2 text-sm font-semibold border-b-2 transition-all outline-none ${
-                  customerProfileTab === "info"
-                    ? "border-[#414E36] text-[#414E36] font-bold"
-                    : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
-                }`}
-              >
-                Personal Info
-              </button>
-              <button
-                onClick={() => setCustomerProfileTab("history")}
-                className={`pb-3.5 pt-2 text-sm font-semibold border-b-2 transition-all outline-none ${
-                  customerProfileTab === "history"
-                    ? "border-[#414E36] text-[#414E36] font-bold"
-                    : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
-                }`}
-              >
-                Booking History
-              </button>
-              <button
-                onClick={() => setCustomerProfileTab("prescription")}
-                className={`pb-3.5 pt-2 text-sm font-semibold border-b-2 transition-all outline-none ${
-                  customerProfileTab === "prescription"
-                    ? "border-[#414E36] text-[#414E36] font-bold"
-                    : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
-                }`}
-              >
-                Prescriptions & Records
-              </button>
-            </div>
-
-            {/* Drawer Content */}
-            <div className="p-6 space-y-6">
-              {/* Tab 1: Info */}
-              {customerProfileTab === "info" && (
-                <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-                  <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-                    <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Personal Profile</h4>
-                    {hasPermission("customers.edit") && (
-                      <button
-                        onClick={() => {
-                          handleOpenEditCustomer(viewingCustomerProfile);
-                          setViewingCustomerProfile(null);
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
-                      >
-                        <Pencil size={12} /> Edit Profile
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
-                    <div>
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
-                      <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
-                      <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Age</span>
-                      <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Gender</span>
-                      <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
-                      <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Referral Source</span>
-                      <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
-                      <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Profile Status</span>
-                      <span className={`inline-flex items-center gap-1 text-xs font-bold ${
-                        viewingCustomerProfile.active !== false ? "text-green-700" : "text-gray-400"
-                      }`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-green-600" : "bg-gray-400"}`} />
-                        {viewingCustomerProfile.active !== false ? "Active Patient" : "Inactive"}
-                      </span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Address</span>
-                      <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
-                        {viewingCustomerProfile.address || [
-                          viewingCustomerProfile.building_no,
-                          viewingCustomerProfile.street_name,
-                          viewingCustomerProfile.floor_no,
-                          viewingCustomerProfile.area,
-                          viewingCustomerProfile.location_name
-                        ].filter(Boolean).join(", ") || "—"}
-                      </span>
-                    </div>
-                    {viewingCustomerProfile.note && (
-                      <div className="col-span-2">
-                        <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Notes & Observations</span>
-                        <p className="text-xs text-[#5A6A51] bg-amber-50/40 border border-amber-200/50 rounded-xl p-3 leading-relaxed">
-                          {viewingCustomerProfile.note}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Tab 2: History */}
-              {customerProfileTab === "history" && (
-                <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-                  <div className="border-b border-[#414E36]/10 pb-3 flex items-center justify-between">
-                    <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Booking History</h4>
-                    <span className="text-xs font-semibold bg-[#EDF1EC] text-[#414E36] px-2.5 py-1 rounded-md">
-                      Total: {
-                        allReservations.filter(
-                          (r) =>
-                            r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
-                            r.customerId === viewingCustomerProfile.id
-                        ).length
-                      }
-                    </span>
-                  </div>
-
-                  <div className="overflow-hidden rounded-xl border border-[#E6E9EB]">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] font-bold text-[#5A6A51] uppercase tracking-wider text-[10px]">
-                          <th className="px-4 py-3 text-left">Date / Slot</th>
-                          <th className="px-4 py-3 text-left">Service</th>
-                          <th className="px-4 py-3 text-left">Provider</th>
-                          <th className="px-4 py-3 text-right">Paid</th>
-                          <th className="px-4 py-3 text-right">Left</th>
-                          <th className="px-4 py-3 text-center">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
-                        {(() => {
-                          const history = allReservations.filter(
-                            (r) =>
-                              r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
-                              r.customerId === viewingCustomerProfile.id
-                          );
-                          if (history.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan={6} className="px-4 py-6 text-center text-gray-400 italic">
-                                  No booking history records found for this patient.
-                                </td>
-                              </tr>
-                            );
-                          }
-                          return history.map((res) => {
-                            const resDt = new Date(res.date);
-                            const formattedDate = resDt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-                            const serv = localServices.find(s => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
-                            const statusClass = getStatusBadgeClass(res.status);
-
-                            const pricesMap: Record<number, number> = {
-                              1: 400, 2: 500, 3: 450, 4: 600, 5: 800, 6: 700, 7: 1500,
-                              11: 600, 12: 500, 13: 800, 14: 1200, 15: 1500, 16: 1000, 17: 400,
-                              21: 300, 22: 350, 23: 300,
-                              31: 400, 32: 350, 33: 400, 34: 500
-                            };
-                            const serviceCost = localServices.find(s => s.id === res.serviceId)?.price ?? pricesMap[res.serviceId] ?? 500;
-                            const spent = res.amountPaid ?? 0;
-                            const left = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : Math.max(0, serviceCost - spent);
-
-                            return (
-                              <tr key={res.id} className="hover:bg-[#F9F9F7]">
-                                <td className="px-4 py-3">
-                                  <span className="block font-semibold text-[#1F251A]">{formattedDate}</span>
-                                  <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "—"}</span>
-                                </td>
-                                <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
-                                <td className="px-4 py-3">{res.doctorName || "—"}</td>
-                                <td className="px-4 py-3 text-right font-medium text-green-700">{spent} EGP</td>
-                                <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
-                                <td className="px-4 py-3 text-center">
-                                  <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusClass}`}>
-                                    {res.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Tab 3: Prescriptions */}
-              {customerProfileTab === "prescription" && (
-                <div className="space-y-6">
-                  {/* Prescription Header */}
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">
-                      Medical Records & Prescriptions
-                    </h4>
-                    {!prescriptionEditMode && (adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor") && (
-                      <button
-                        onClick={handleStartCreatePrescription}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
-                      >
-                        <Plus size={14} /> Write Prescription
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Form Mode */}
-                  {prescriptionEditMode ? (
-                    <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-                      <h5 className="text-sm font-bold text-[#1F251A] border-b border-[#414E36]/5 pb-2">
-                        {editingPrescription ? "Edit Prescription" : "New Visit Prescription"}
-                      </h5>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
-                            Patient Name (Auto-filled)
-                          </label>
-                          <input
-                            type="text"
-                            readOnly
-                            value={viewingCustomerProfile.name}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
-                            Date (Auto-filled)
-                          </label>
-                          <input
-                            type="text"
-                            readOnly
-                            value={new Date().toISOString().slice(0, 10)}
-                            className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
-                          Diagnosis / Assessment
-                        </label>
-                        <textarea
-                          placeholder="Describe the medical assessment, skin conditions or main complaints..."
-                          value={rxDiagnosis}
-                          onChange={(e) => setRxDiagnosis(e.target.value)}
-                          rows={3}
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
-                        />
-                      </div>
-
-                      {/* Medications Area */}
-                      <div className="border border-[#414E36]/10 rounded-xl p-4 bg-[#FBFBF9] space-y-3">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#414E36]">
-                          Prescribed Medications
-                        </label>
-
-                        <div className="flex gap-2">
-                          <div className="flex-1 space-y-2">
-                            <div className="flex gap-2">
-                              <select
-                                value={rxMedDropdown}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setRxMedDropdown(val);
-                                  if (val && val !== "Custom") {
-                                    setRxMedInput(val);
-                                  }
-                                }}
-                                className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
-                              >
-                                <option value="">-- Choose from Catalog --</option>
-                                {MOCK_MEDICINES.map((med) => (
-                                  <option key={med.id} value={med.name}>
-                                    {med.name}
-                                  </option>
-                                ))}
-                                <option value="Custom">Custom Medication...</option>
-                              </select>
-                              
-                              <input
-                                type="text"
-                                placeholder="Enter medication name or custom drug..."
-                                value={rxMedInput}
-                                onChange={(e) => setRxMedInput(e.target.value)}
-                                className="flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
-                              />
-                            </div>
-                          </div>
-                          
-                          <button
-                            type="button"
-                            onClick={handleAddMedication}
-                            className="rounded-xl bg-[#414E36] px-4 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shrink-0"
-                          >
-                            Add
-                          </button>
-                        </div>
-
-                        {/* Active medications list */}
-                        {rxMedications.length > 0 ? (
-                          <div className="space-y-2 pt-2 border-t border-[#414E36]/5">
-                            {rxMedications.map((med, idx) => (
-                              <div key={idx} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-[#414E36]/10 text-sm">
-                                <div className="flex-1">
-                                  <span className="font-semibold text-[#1F251A]">{med.name}</span>
-                                  <input
-                                    type="text"
-                                    placeholder="Enter specific dosage directions (e.g. 1 tab daily, 7 days)"
-                                    value={med.instructions}
-                                    onChange={(e) => {
-                                      const newMeds = [...rxMedications];
-                                      newMeds[idx].instructions = e.target.value;
-                                      setRxMedications(newMeds);
-                                    }}
-                                    className="w-full mt-1 bg-transparent text-xs text-[#5A6A51] border-b border-transparent hover:border-[#414E36]/15 focus:border-[#C4AE7C] outline-none py-0.5"
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveMedication(idx)}
-                                  className="text-red-500 hover:text-red-700 transition p-1 ml-2"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-[#8A9A81] italic text-center py-2">
-                            No medications added yet. Use the dropdown or type custom text above.
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
-                          General Notes (Optional)
-                        </label>
-                        <textarea
-                          placeholder="Any additional diet restrictions, lifestyle recommendations or patient advice..."
-                          value={rxGeneralNotes}
-                          onChange={(e) => setRxGeneralNotes(e.target.value)}
-                          rows={2}
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1">
-                            <span>🔒 Doctor-Only Notes (Optional)</span>
-                          </label>
-                          <span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1.5 py-0.5 rounded">
-                            Hidden from print
-                          </span>
-                        </div>
-                        <textarea
-                          placeholder="Clinical details, private assessment, confidential doctor remarks..."
-                          value={rxDocNotes}
-                          onChange={(e) => setRxDocNotes(e.target.value)}
-                          rows={2}
-                          className="w-full rounded-xl border border-amber-300/40 bg-amber-50/20 px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-amber-400 transition"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
-                          Next Follow-Up Date (Optional)
-                        </label>
-                        <input
-                          type="date"
-                          value={rxFollowUpDate}
-                          onChange={(e) => setRxFollowUpDate(e.target.value)}
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
-                        <button
-                          type="button"
-                          onClick={() => setPrescriptionEditMode(false)}
-                          className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleSavePrescription}
-                          disabled={savingPrescription}
-                          className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60"
-                        >
-                          {savingPrescription ? "Saving..." : "Save Record"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* Read List Mode */
-                    <div className="space-y-4">
-                      {loadingPrescriptions ? (
-                        <div className="text-center py-12 text-[#5A6A51] text-sm">
-                          Loading medical records...
-                        </div>
-                      ) : customerPrescriptions.length === 0 ? (
-                        <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto text-[#8A9A81]" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                          <p className="text-sm font-semibold text-[#1F251A]">No clinical prescriptions recorded yet</p>
-                          <p className="text-xs text-[#5A6A51]">Create a prescription or register clinic visit details for this patient.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {customerPrescriptions.map((rx) => {
-                            const rxDate = new Date(rx.date).toLocaleDateString("en-US", {
-                              year: "numeric", month: "long", day: "numeric"
-                            });
-                            
-                            const isDocUser = adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor";
-
-                            return (
-                              <div key={rx.id} className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 relative overflow-hidden">
-                                <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
-                                  <div>
-                                    <span className="font-bold text-[#1F251A] text-sm">{rxDate}</span>
-                                    <span className="text-xs text-[#8A9A81] block">Recorded by Revera Clinic Team</span>
-                                  </div>
-                                  
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={() => handlePrintPrescription(rx)}
-                                      className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
-                                      title="Print Prescription"
-                                    >
-                                      <Printer size={13} /> Print
-                                    </button>
-                                    
-                                    {isDocUser && (
-                                      <>
-                                        <button
-                                          onClick={() => handleStartEditPrescription(rx)}
-                                          className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
-                                        >
-                                          <Pencil size={12} /> Edit
-                                        </button>
-                                        <button
-                                          onClick={() => handleDeletePrescription(rx.id)}
-                                          className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition"
-                                          title="Delete Visit"
-                                        >
-                                          <Trash2 size={13} />
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="space-y-3 text-sm">
-                                  {rx.diagnosis && (
-                                    <div>
-                                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Diagnosis</span>
-                                      <p className="text-[#1F251A] font-medium leading-relaxed">{rx.diagnosis}</p>
-                                    </div>
-                                  )}
-
-                                  {rx.medications && rx.medications.length > 0 && (
-                                    <div>
-                                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Medications Prescribed</span>
-                                      <ul className="space-y-2 bg-[#FBFBF9] rounded-xl border border-[#414E36]/5 p-3">
-                                        {rx.medications.map((m: any, idx: number) => (
-                                          <li key={idx} className="flex flex-col">
-                                            <span className="font-semibold text-[#1F251A]">{m.name}</span>
-                                            {m.instructions && (
-                                              <span className="text-xs text-[#5A6A51] italic">{m.instructions}</span>
-                                            )}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-
-                                  {rx.general_notes && (
-                                    <div>
-                                      <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">General Notes</span>
-                                      <p className="text-xs text-[#5A6A51] bg-[#FBFBF9] rounded-xl p-3 border border-[#414E36]/5 leading-relaxed">{rx.general_notes}</p>
-                                    </div>
-                                  )}
-
-                                  {rx.doctor_notes && isDocUser && (
-                                    <div className="border border-amber-300/40 bg-amber-50/20 rounded-xl p-3.5 space-y-1">
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-bold text-amber-800">🔒 Doctor-Only Notes</span>
-                                        <span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1 py-0.5 rounded">Hidden from print</span>
-                                      </div>
-                                      <p className="text-xs text-amber-900 leading-relaxed">{rx.doctor_notes}</p>
-                                    </div>
-                                  )}
-
-                                  {rx.follow_up_date && (
-                                    <div className="flex items-center gap-1.5 text-xs text-[#414E36] font-semibold bg-[#EDF1EC]/60 px-3 py-2 rounded-xl w-fit">
-                                      <Calendar size={13} />
-                                      Next Follow-Up: {new Date(rx.follow_up_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Drawer Footer */}
-            <div className="flex items-center justify-end px-6 py-4 border-t border-[#414E36]/10 bg-[#F9F9F7]">
-              <button
-                type="button"
-                onClick={() => setViewingCustomerProfile(null)}
-                className="rounded-lg border border-[#414E36]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
-              >
-                ← Back to Customers
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Setup Password Modal (shown after accepting invite or password reset) ── */}
       {showSetupPasswordModal && (
