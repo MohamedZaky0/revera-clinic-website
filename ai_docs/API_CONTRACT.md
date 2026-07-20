@@ -1,8 +1,8 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-07-14
+> **Last Updated:** 2026-07-20
 > **Base:** Next.js App Router API routes under `/app/api/`
-> **Auth:** None — all routes use the Supabase service role key server-side; no user auth on API layer
+> **Auth:** Browser login form exists, but `/api/*` routes do not validate tokens/middleware; all routes use the Supabase service role key server-side
 > **Previous content was for a different project — discarded entirely**
 
 ---
@@ -161,7 +161,7 @@ Upserts the `page_settings` row (`key='home'`, `value=body`). Falls back to JSON
 Returns reservations. Filterable by query params.
 
 **Query params:**
-- `status` — 'pending', 'approved', 'rejected'
+- `status` — 'pending', 'approved', 'rejected', 'confirmed', 'started', 'completed', 'cancelled'
 - `serviceId` — numeric service ID
 - `date` — YYYY-MM-DD
 - `branchId` — UUID
@@ -254,36 +254,106 @@ Deletes a customer profile record. Nullifies references in `reservations` to pre
 
 ---
 
-## GET /api/prescriptions?customerId={id}
+## GET /api/clinic-settings?key={key}
 
-Returns all prescriptions associated with a customer. Falls back to a local JSON file (`data/prescriptions.json`) if the Supabase database table does not exist or fails.
+Alias for `/api/page-settings` — returns the `value` JSONB for the given key.
 
-**Response:** `Prescription[]`
-
----
-
-## POST /api/prescriptions
-
-Creates or updates a prescription. Automatically generates patient name and current date if missing.
-
-**Body:** `{ id?, customer_id, patient_name?, date?, diagnosis?, medications?, general_notes?, doctor_notes?, follow_up_date? }`
-
-**Response:** Created or updated `Prescription` object
+**Response:** `{ key, value }`
 
 ---
 
-## DELETE /api/prescriptions?id={id}
+## POST /api/clinic-settings?key={key}
 
-Deletes a prescription by ID.
+Alias for `/api/page-settings` — upserts the `value` JSONB for the given key.
 
-**Response:** `{ success: true, message: "Prescription deleted successfully" }`
+**Body:** Full page settings object
+
+**Response:** `{ success: true }`
 
 ---
 
-## POST /api/translate
+## GET /api/employees
 
-Translates text between English and Arabic using the Google Translate API.
+Returns all employee accounts with role and branch info.
 
-**Body:** `{ text, from?, to? }` (detects source language automatically if `from` is omitted)
+**Response:** `EmployeeAccount[]`
 
-**Response:** `{ translatedText }`
+---
+
+## POST /api/employees
+
+Creates an employee account and sends a Supabase Auth invite email.
+
+**Body:** `{ name, email, role_id, branch_id?, active? }`
+
+**Response:** Created employee account
+
+---
+
+## DELETE /api/employees?id={id}
+
+Deletes an employee account and the linked Supabase Auth user.
+
+**Response:** `{ success: true }`
+
+---
+
+## GET /api/roles
+
+Returns all roles with their permission arrays.
+
+**Response:** `Role[]`
+
+---
+
+## POST /api/roles
+
+Creates or updates a role.
+
+**Body:** `{ id?, name, permissions }`
+
+**Response:** Upserted role
+
+---
+
+## DELETE /api/roles?id={id}
+
+Deletes a role by ID.
+
+**Response:** `{ success: true }`
+
+---
+
+## GET /api/provider-attendance?providerId={id}&date={YYYY-MM-DD}
+
+Returns attendance records for a provider on a date.
+
+**Response:** `ProviderAttendance[]`
+
+---
+
+## POST /api/provider-attendance
+
+Records a provider check-in or check-out with optional geolocation.
+
+**Body:** `{ provider_id, branch_id, date, type: 'check_in' | 'check_out', location?, status?, notes? }`
+
+**Response:** Created/updated attendance record
+
+---
+
+## GET /api/auth/me
+
+Verifies the Bearer JWT and returns the employee's role + permissions from `employee_accounts` + `roles`.
+
+**Headers:** `Authorization: Bearer <supabase-jwt>`
+
+**Response:** `{ user, employee, role, permissions }`
+
+---
+
+## GET /api/auth/employee-email?employeeId={id}
+
+Looks up the Supabase Auth email for a given `employee_id`.
+
+**Response:** `{ email }`

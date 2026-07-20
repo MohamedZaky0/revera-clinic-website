@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-07-20
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -140,53 +140,79 @@ Admin notes were previously updated via browser-default `window.prompt()` popup 
 
 ---
 
-## DEC-007: Renaming Providers to Doctors and Multi-Shift Schedules
+## DEC-007: Expanded Booking Lifecycle Stages
 
-**Date:** 2026-07-18
+**Date:** 2026-07-06
 **Status:** Decided — active
 
 **Context:**
-The clinic has medical professionals. We decided to rename the label "Providers" to "Doctors" across all admin/public labels. Additionally, doctor calendars must support multiple shifts per day rather than a single start/end time.
+Reservations previously had only `pending`, `approved`, and `rejected`. The clinic needed a fuller flow to track a patient through arrival, service, and payment.
+
+**Chosen Option:**
+Add statuses `confirmed`, `started`, `completed`, and `cancelled`.
 
 **Reason:**
-- "Doctors" is more natural and patient-centric than "Providers" for a clinic.
-- Doctors frequently work split shifts (e.g. morning and evening slots) on a single day.
+- Matches real-world clinic workflow.
+- Allows payment settlement only when status reaches `completed`.
 
 ---
 
-## DEC-008: Real Database-Backed HR Modules
+## DEC-008: Client-Side PDF Invoice Printing
 
-**Date:** 2026-07-18
+**Date:** 2026-07-09
 **Status:** Decided — active
 
 **Context:**
-All HR features (Payroll, Leaves, Attendance, Performance Reviews, Targets) were previously mock sections using static frontend constants. We implemented real PostgreSQL tables and Next.js backend routes to persist and run HR processes.
+The admin panel needs to print booking invoices/receipts for patients.
+
+**Chosen Option:**
+Generate the invoice DOM inside the admin page and trigger browser `window.print()` on a styled section.
 
 **Reason:**
-- Moves the application from a mock clone to a production-ready internal CRM system.
+- No server-side PDF library needed.
+- Quick to implement and style with existing Tailwind classes.
+
+**Trade-offs:**
+- Print output varies by browser/OS.
+- No downloadable PDF file generated automatically.
 
 ---
 
-## DEC-009: Customer Profile Inline Full-Page Navigation
+## DEC-009: GPS-Based Provider Attendance with 800m Geofence
 
-**Date:** 2026-07-18
+**Date:** 2026-07-06–2026-07-08
 **Status:** Decided — active
 
 **Context:**
-The customer details view and customer creation forms were previously rendered inside a fixed modal/drawer overlay. We refactored them to render inline within the main admin panel layout using back-navigation.
+Providers/employees need to check in/out from branches. The system must verify they are physically near the branch.
 
-**Reason:**
-- Enhances visual space for editing and viewing deep patient medical profiles and history.
+**Chosen Option:**
+- Capture employee browser geolocation on check-in.
+- Compare with branch coordinates resolved from Google Maps `maps_link`.
+- Reject check-in if distance > 800m.
+- Allow `superadmin` and `admin` roles to bypass the check (enforced client-side).
+
+**Trade-offs:**
+- Geolocation can be spoofed; no server-side verification.
+- Branch coordinates are derived from short Google Maps links at runtime.
 
 ---
 
-## DEC-010: Custom Target Metrics and Bonus Calculations
+## DEC-010: Supabase Auth + Employee Accounts for Admin Login
 
-**Date:** 2026-07-19
+**Date:** 2026-07-06
 **Status:** Decided — active
 
 **Context:**
-Target goals for employees were limited to a count of reservations, and bonuses were fixed at a percentage of basic salary. We introduced customizable target metrics (`reservations` or `revenue` in EGP) and bonus calculations (`percentage` of basic salary or a `fixed` money reward).
+The admin panel was publicly accessible. A login gate was needed without building a full custom auth system.
 
-**Reason:**
-- Fits varying compensation strategies for receptionists vs medical staff.
+**Chosen Option:**
+- Supabase Auth email/password for login.
+- `employee_accounts` table links Auth user to role/branch.
+- `roles` table stores permission arrays.
+- `/api/auth/me` verifies JWT and returns permissions.
+- `superadmin@revera.com` hardcoded bypass for initial access.
+
+**Trade-offs:**
+- `/api/*` routes do not validate tokens server-side; gate is browser-only.
+- Hardcoded superadmin email must be removed/parameterized when forking.

@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-06-27
+> **Last Updated:** 2026-07-20
 > **Previous content was for a different project — discarded entirely**
 
 ---
@@ -96,10 +96,10 @@ Correctly stored in env vars (`.env.local`):
 
 **Severity:** Medium (was Critical)
 **Type:** Security
-**Status:** Partially mitigated as of 2026-06-27
+**Status:** Partially mitigated as of 2026-07-06
 
 **What changed:**
-The admin page now has a full Supabase email/password login gate. Employees are managed via `employee_accounts` + `roles` tables. Invites are sent via Supabase Auth. A superadmin bypass exists for `superadmin@revera.com`.
+The admin page now has a full Supabase email/password login gate. Employees are managed via `employee_accounts` + `roles` tables. Invites are sent via Supabase Auth. A superadmin bypass exists for `superadmin@revera.com`. `/api/auth/me` verifies the JWT and returns role/permissions.
 
 **Remaining gap:**
 All `/api/` routes are still unprotected on the server side. A direct HTTP call to e.g. `GET /api/reservations` from outside the browser returns all data without any token check. The session gate exists only in the browser React component, not in middleware or route handlers.
@@ -137,17 +137,57 @@ browser or clears localStorage, they lose unsaved changes. The Supabase copy may
 
 ---
 
-## RISK-005: Single 1.2MB Admin Page File
+## RISK-005: Single 550KB Admin Page File
 
-**Severity:** Medium
+**Severity:** Low (current scale) → Medium (as features grow)
 **Type:** Maintainability
 
 **Description:**
-`src/app/admin/page.tsx` is a single ~1.2MB client component containing 40+ admin sections,
-all state variables, and all UI. Many sections (Payroll, Prescriptions, Leaves, Performance,
-Attendance, and Targets) have been refactored to have full database backends, while other
-finance/POS sections (Finance, Inventory, POS, Refunds, Shipping) are still mock UI backed by
-hardcoded constant arrays — not Supabase.
+`src/app/admin/page.tsx` is a single ~550KB client component containing 40+ admin sections,
+hardcoded mock data arrays, all state variables, and all UI. Many sections (Prescriptions,
+Finance, Payroll, Inventory, POS, Refunds, Shipping) are mock UI backed by hardcoded
+constant arrays — not Supabase.
+
+---
+
+## RISK-006: GPS-Based Attendance Can Be Spoofed
+
+**Severity:** Medium
+**Type:** Security / Trust
+
+**Description:**
+Provider attendance check-in uses browser geolocation captured client-side and compared to branch coordinates. The comparison and rejection logic are visible in the browser; an employee can bypass the geofence by spoofing location, using the admin/superadmin bypass, or calling the API directly.
+
+**Mitigation:**
+- Move distance validation to the server (`/api/provider-attendance`).
+- Require a tamper-resistant check-in token or device binding.
+
+---
+
+## RISK-007: Client-Side PDF Invoice Printing Is Browser-Dependent
+
+**Severity:** Low
+**Type:** Reliability / UX
+
+**Description:**
+Invoices are printed via `window.print()` on a hidden/visible DOM section. Output formatting depends on the browser, print margins, and OS. No actual PDF file is generated.
+
+**Mitigation:**
+- Use a server-side PDF library (e.g., Puppeteer, react-pdf) if consistent PDF output is needed.
+
+---
+
+## RISK-008: Hardcoded Superadmin Email
+
+**Severity:** Medium
+**Type:** Security / Fork risk
+
+**Description:**
+`superadmin@revera.com` is hardcoded in the admin page as a bypass that receives full permissions without an `employee_accounts` record. This is a Revera-specific value and must be changed or removed when forking.
+
+**Mitigation:**
+- Move the bypass email to `src/config/client.ts` after PROPOSAL-001.
+- Or require every admin to have an `employee_accounts` row with the superadmin role.
 
 ---
 

@@ -1,6 +1,6 @@
 # PRODUCT_RULES.md — Revera Clinics Business Rules (Enforced in Code)
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-07-20
 > **Source:** Confirmed from live code only — no speculation
 > **Previous content was for a different project — discarded entirely**
 
@@ -64,6 +64,27 @@ If `sessionType` is not provided, defaults to `'in_person'`.
 
 ---
 
+### Booking origin badge
+**Enforced in:** `POST /api/reservations`
+
+Public website bookings are tagged with `origin: 'website'` and displayed with an origin badge in the admin list.
+
+---
+
+### Booking lifecycle stages
+**Enforced in:** `src/app/admin/page.tsx` + `PATCH /api/reservations`
+
+Valid statuses include: `pending`, `approved`, `rejected`, `confirmed`, `started`, `completed`, `cancelled`. UI enforces stage progression for action buttons.
+
+---
+
+### Booking cancellation constraints
+**Enforced in:** `PATCH /api/reservations` and `src/app/admin/page.tsx`
+
+Cancellation sets `status` to `'cancelled'` and optionally records `cancelled_reason`. Completed bookings cannot be cancelled.
+
+---
+
 ## Service Catalog Rules
 
 ### Service duration format
@@ -96,6 +117,26 @@ Deletes all rows from the reservations table. No soft-delete. No confirmation be
 
 ---
 
+### Admin login and role lookup
+**Enforced in:** `src/app/admin/page.tsx` + `GET /api/auth/me`
+
+- Login uses Supabase Auth email/password.
+- `superadmin@revera.com` bypasses employee lookup and receives full permissions.
+- All other users: session token sent to `/api/auth/me`, which looks up `employee_accounts` + `roles` and returns `permissions` array.
+- **No server-side token validation on `/api/*` routes.**
+
+---
+
+### Provider attendance geofence
+**Enforced in:** `POST /api/provider-attendance`
+
+- Requires branch coordinates (`lat`, `lng`) configured on the branch.
+- Calculates distance between employee GPS location and branch coordinates.
+- If distance > 800m, check-in is rejected.
+- Superadmin and admin roles bypass the distance check (enforced client-side in `/admin`).
+
+---
+
 ## localStorage Keys (Revera-branded)
 
 Service state on the admin side persists to localStorage under these keys:
@@ -117,34 +158,6 @@ When completing a reservation, the receptionist processes a payment settlement. 
 
 ---
 
-## Doctor Multi-Shift Scheduling Rules
-**Enforced in:** `src/components/BookingModal.tsx` & `src/app/admin/page.tsx`
-
-Doctors can define daily schedules containing either legacy single-shift bounds (`start` & `end` strings) or a multi-shift array of objects `shifts: { start, end }[]`.
-- **Availability Search:** The availability check validates whether a requested slot's start and end times fall completely within at least one of the shifts configured for that day.
-- **Min/Max Boundary Expansion:** The calendar grid bounds expand to dynamically encapsulate the lowest starting hour and highest ending hour among all configured shifts.
-
----
-
-## Presence Inactivity Timer Rules
-**Enforced in:** `src/app/admin/page.tsx`
-
-- **Alert Trigger:** Standard staff employees are prompted with a presence confirmation modal after 30 minutes of continuous inactivity (configurable in Settings).
-- **Countdown Timeout:** The employee has 10 seconds to respond. Failure to respond submits an automatic alert to the supervisor/administrator.
-- **Activity Reset Events:** Any keyboard/mouse movements (`mousemove`, `keydown`, `click`, `scroll`, `touchstart`) immediately reset the inactivity check clock and automatically dismiss/close the presence modal.
-
----
-
-## Settings Navigation Sidebar Highlights
-- **Settings Hover Highlighting:** The Settings sidebar link remains highlighted/active when sub-panels `"Deposit Settings"` or `"Inactivity Settings"` are open (`activeNav`).
-
----
-
-## Promotions Rules
-- **Disabled Gray Card Styling:** Promotion cards are styled with `grayscale opacity-60` when their status is `disabled` to visualy highlight inactive rules.
-
----
-
 ## What Is NOT Enforced (But May Be Assumed)
 
 The following are **not currently enforced in code**:
@@ -153,4 +166,4 @@ The following are **not currently enforced in code**:
 - Package/session tracking (not built)
 - External Payment Gateway processing (payments are logged as cash/card settlements in the admin dashboard ledger only)
 - Automated reminders (enable_reminder flag exists on services but no sending logic found)
-
+- Server-side auth validation on `/api/*` routes (browser login gate only)
