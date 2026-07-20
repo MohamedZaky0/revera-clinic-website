@@ -15073,16 +15073,28 @@ export default function AdminPage() {
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 {/* Left Column: Form Settings */}
                 <div className="lg:col-span-7 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                  {/* InstaPay Details */}
                   <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">InstaPay Details</h3>
                   
-                  <div className="space-y-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">InstaPay Account / Clinic Name</label>
+                      <input
+                        type="text"
+                        value={instapayName}
+                        onChange={(e) => setInstapayName(e.target.value)}
+                        placeholder="Revera Clinics"
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] placeholder:text-[#B0BCA7] outline-none focus:border-[#414E36] transition"
+                      />
+                    </div>
+
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">InstaPay Address</label>
                       <input
                         type="text"
                         value={instapayAddress}
                         onChange={(e) => setInstapayAddress(e.target.value)}
-                        placeholder="name@instapay"
+                        placeholder="revera@instapay"
                         className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] placeholder:text-[#B0BCA7] outline-none focus:border-[#414E36] transition"
                       />
                     </div>
@@ -15098,19 +15110,76 @@ export default function AdminPage() {
                       />
                       <span className="text-[11px] text-[#8A9A81] mt-1 block">Quick payment URL or deep link to open the InstaPay app.</span>
                     </div>
+                  </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Reservation Deposit (%)</label>
+                  {/* Mobile Wallet Details */}
+                  <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3 pt-2">Mobile Wallet Settings</h3>
+                  
+                  <div className="space-y-4">
+                    <label className="flex items-center gap-3 cursor-pointer p-3.5 rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 hover:border-[#414E36]/30 transition">
                       <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={bookingDepositPercentage}
-                        onChange={(e) => setBookingDepositPercentage(Math.max(0, Math.min(100, Number(e.target.value))))}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                        type="checkbox"
+                        checked={walletEnabled}
+                        onChange={(e) => setWalletEnabled(e.target.checked)}
+                        className="h-5 w-5 rounded accent-[#414E36]"
                       />
-                      <span className="text-[11px] text-[#8A9A81] mt-1 block">Percentage of service price to secure a booking. Set to 0 to disable prepayment requirement.</span>
-                    </div>
+                      <div>
+                        <span className="text-sm font-bold text-[#1F251A]">Enable Mobile Wallet Payment Method</span>
+                        <p className="text-[11px] text-[#8A9A81]">Allow patients to pay deposits via Vodafone Cash, Orange Cash, Etisalat Cash, WE Pay, etc.</p>
+                      </div>
+                    </label>
+
+                    {walletEnabled && (
+                      <div className="space-y-4 pl-3 border-l-2 border-[#414E36]/15 mt-3">
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Wallet Provider / Name</label>
+                          <input
+                            type="text"
+                            value={walletName}
+                            onChange={(e) => setWalletName(e.target.value)}
+                            placeholder="e.g. Vodafone Cash / Smart Wallet"
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Wallet Mobile Phone Number</label>
+                          <input
+                            type="text"
+                            value={walletNumber}
+                            onChange={(e) => setWalletNumber(e.target.value)}
+                            placeholder="e.g. 01012345678"
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Wallet Direct Link (Optional)</label>
+                          <input
+                            type="text"
+                            value={walletLink}
+                            onChange={(e) => setWalletLink(e.target.value)}
+                            placeholder="e.g. https://..."
+                            className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Prepayment Rule */}
+                  <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3 pt-2">Prepayment Rules</h3>
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">Reservation Deposit (%)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={bookingDepositPercentage}
+                      onChange={(e) => setBookingDepositPercentage(Math.max(0, Math.min(100, Number(e.target.value))))}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                    />
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block">Percentage of service price to secure a booking. Set to 0 to disable prepayment requirement.</span>
                   </div>
                 </div>
 
