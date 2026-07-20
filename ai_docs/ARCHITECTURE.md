@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Revera Clinics System Architecture
 
-> **Last Updated:** 2026-06-27
+> **Last Updated:** 2026-07-20
 > **Audited from:** live source code (all previous content was for a different project — discarded)
 
 ---
@@ -13,7 +13,7 @@
 | Styling | Tailwind CSS v4 + shadcn/ui + CSS custom properties |
 | Database | Supabase (PostgreSQL) |
 | Storage | Supabase primary; local JSON fallback (`data/`) for providers + page_settings |
-| Auth (admin) | Supabase Auth (email + password). Login form rendered in-page; session checked on mount via `supabase.auth.getSession()`. Employee role + permissions fetched from `employee_accounts` + `roles` tables via `/api/auth/me`. Hardcoded bypass: `superadmin@revera.com` → full permissions, no DB lookup. |
+| Auth (admin) | Supabase Auth (email + password). Login form rendered in-page; session checked on mount via `supabase.auth.getSession()`. Employee role + permissions fetched from `employee_accounts` + `roles` tables via `/api/auth/me`. Hardcoded bypass: `superadmin@revera.com` → full permissions, no DB lookup. **Note:** `/api/*` routes are unprotected on the server side; the gate is browser-only. |
 | Auth (patient) | Phone/OTP modal — UI-only; OTP is `setTimeout`-simulated, no real SMS |
 | i18n | Custom `LanguageContext` (EN/AR, RTL/LTR) |
 | Icons | lucide-react |
@@ -33,7 +33,8 @@ src/
 │   ├── services/page.tsx
 │   ├── blog/page.tsx
 │   ├── contact/page.tsx
-│   ├── admin/page.tsx             Full admin panel (single large client component, auth-gated)
+│   ├── admin/page.tsx             Full admin panel (single large client component, browser login gate only)
+│   ├── profile/page.tsx           Patient profile + wallet + visit history
 │   ├── auth/callback/page.tsx     Supabase auth callback: handles invite + recovery hash, redirects to /admin
 │   └── api/
 │       ├── reservations/route.ts  GET/POST/PATCH/DELETE bookings
