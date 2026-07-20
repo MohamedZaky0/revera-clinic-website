@@ -22771,10 +22771,10 @@ export default function AdminPage() {
       {/* ── ADD/EDIT CUSTOMER MODAL ── */}
       {showCustomerFormModal && (
         <div
-          className=""
-
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm overflow-y-auto animate-fadeIn"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCustomerFormModal(false); }}
         >
-          <div className="w-full rounded-2xl bg-[#FBFBF9] shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#414E36]/10 overflow-hidden">
+          <div className="w-full max-w-2xl rounded-2xl bg-[#FBFBF9] shadow-[0_30px_80px_rgba(47,61,41,0.2)] border border-[#414E36]/10 overflow-hidden my-auto">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
               <div className="flex items-center gap-3">
@@ -23092,11 +23092,11 @@ export default function AdminPage() {
       {/* ── CUSTOMER PROFILE & BOOKING HISTORY DRAWER ── */}
       {viewingCustomerProfile && (
         <div
-          className=""
-          style={{}}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-6 backdrop-blur-sm overflow-y-auto animate-fadeIn"
+          onClick={(e) => { if (e.target === e.currentTarget) setViewingCustomerProfile(null); }}
         >
           <div
-            className="w-full rounded-2xl bg-[#FBFBF9] shadow-[0_30px_80px_rgba(47,61,41,0.07)] flex flex-col overflow-hidden"
+            className="w-full max-w-5xl max-h-[90vh] rounded-2xl bg-[#FBFBF9] shadow-[0_30px_80px_rgba(47,61,41,0.2)] flex flex-col overflow-hidden my-auto border border-[#414E36]/10"
           >
             {/* Drawer Header */}
             <div className="flex items-center justify-between px-6 py-5 border-b border-[#414E36]/10 bg-[#F9F9F7]">
