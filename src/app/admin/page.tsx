@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
@@ -80,6 +80,9 @@ import {
   Lock,
   AlertTriangle,
   Zap,
+  Coffee,
+  CheckCircle,
+  UserX,
   Target,
   Check,
   GripVertical,
@@ -1038,6 +1041,36 @@ export default function AdminPage() {
   const [viewingEmployeeBookings, setViewingEmployeeBookings] = useState<any[]>([]);
   const [loadingEmployeeBookings, setLoadingEmployeeBookings] = useState(false);
   const [newEmployeeNoteText, setNewEmployeeNoteText] = useState("");
+  const [attendanceInsightMonth, setAttendanceInsightMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
+
+  function handleExportAttendanceInsights(employee: any, monthStr: string, records: any[]) {
+    if (!employee) return;
+    const fileName = `Attendance_Insights_${(employee.name || 'Employee').replace(/\s+/g, '_')}_${monthStr}.csv`;
+    
+    let csv = `ATTENDANCE INSIGHTS REPORT\n`;
+    csv += `Employee,${employee.name || 'Employee'}\n`;
+    csv += `Staff ID,${employee.employee_id || '—'}\n`;
+    csv += `Department,${employee.department || '—'}\n`;
+    csv += `Role,${employee.role_name || '—'}\n`;
+    csv += `Month,${monthStr}\n\n`;
+
+    csv += `Date,Shift,Scheduled In,Scheduled Out,Actual Check In,Actual Check Out,Status,Worked (Min),Late (Min),Early Leave (Min),Overtime (Min),Mid-Shift Leave (Min)\n`;
+
+    records.forEach((r: any) => {
+      const inTime = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString() : '—';
+      const outTime = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString() : '—';
+      csv += `"${r.date}","${employee.shift || 'Day'}","${r.scheduled_in || '09:00 AM'}","${r.scheduled_out || '05:00 PM'}","${inTime}","${outTime}","${r.status || 'Present'}",${r.worked_minutes || 0},${r.late_minutes || 0},${r.early_leave_minutes || 0},${r.overtime_minutes || 0},${r.combined_mid_shift_duration_minutes || 0}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 
   useEffect(() => {
     if (!viewingEmployee) {
@@ -1063,6 +1096,7 @@ export default function AdminPage() {
           const bookings = await bookingsRes.json();
           setViewingEmployeeBookings(bookings || []);
         }
+        fetchHrAttendance();
       } catch (err) {
         console.error("Failed to load employee profile data:", err);
       } finally {
@@ -17133,7 +17167,7 @@ export default function AdminPage() {
                       { id: "work", label: "Work Details" },
                       { id: "payroll", label: "Payroll" },
                       { id: "performance", label: "Target & Performance" },
-                      { id: "attendance", label: "Attendance" },
+                      { id: "attendance", label: "Attendance Insights" },
                       { id: "contact", label: "Contact Details" },
                       { id: "documents", label: "Notes & Documents" }
                     ] as const).map((tab) => (
@@ -17411,44 +17445,167 @@ export default function AdminPage() {
                       </div>
                     )}
 
-                    {employeeProfileActiveTab === "attendance" && (
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2 border-b border-[#414E36]/5 pb-3">
-                          <Clock size={16} className="text-[#C4AE7C]" />
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Attendance Records</h4>
+                    {employeeProfileActiveTab === "attendance" && (() => {
+                      const empRecords = attendanceList.filter((log: any) => {
+                        const matchesEmp = log.employee_id === viewingEmployee.id || 
+                                           log.employee_db_id === viewingEmployee.id || 
+                                           log.employee_code === viewingEmployee.employee_id || 
+                                           log.employee_name === viewingEmployee.name;
+                        if (!matchesEmp) return false;
+                        if (attendanceInsightMonth && log.date) {
+                          return log.date.startsWith(attendanceInsightMonth);
+                        }
+                        return true;
+                      });
+
+                      const totalWorkedMins = empRecords.reduce((sum: number, r: any) => sum + (r.worked_minutes || 0), 0);
+                      const totalLateMins = empRecords.reduce((sum: number, r: any) => sum + (r.late_minutes || 0), 0);
+                      const totalEarlyLeaveMins = empRecords.reduce((sum: number, r: any) => sum + (r.early_leave_minutes || 0), 0);
+                      const totalOvertimeMins = empRecords.reduce((sum: number, r: any) => sum + (r.overtime_minutes || 0), 0);
+                      const totalMidShiftLeaveMins = empRecords.reduce((sum: number, r: any) => sum + (r.combined_mid_shift_duration_minutes || 0), 0);
+                      const lateCount = empRecords.filter((r: any) => (r.late_minutes || 0) > 0).length;
+                      const absentCount = empRecords.filter((r: any) => r.status === "Absent").length;
+                      const presentCount = empRecords.filter((r: any) => r.status === "Present" || r.check_in_time).length;
+
+                      const workedHrs = Math.floor(totalWorkedMins / 60);
+                      const workedRMin = totalWorkedMins % 60;
+
+                      return (
+                        <div className="space-y-6">
+                          {/* Top Controls & Header */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
+                            <div className="flex items-center gap-2">
+                              <Clock size={18} className="text-[#C4AE7C]" />
+                              <div>
+                                <h4 className="text-sm font-bold uppercase tracking-wider text-[#414E36]">Attendance Insights</h4>
+                                <p className="text-xs text-[#5A6A51]">Comprehensive attendance analytics & daily logs</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="month"
+                                value={attendanceInsightMonth}
+                                onChange={(e) => setAttendanceInsightMonth(e.target.value)}
+                                className="px-3 py-1.5 text-xs font-semibold text-[#414E36] bg-[#F7F9F6] border border-[#414E36]/20 rounded-lg outline-none focus:border-[#414E36]"
+                              />
+                              <button
+                                onClick={() => handleExportAttendanceInsights(viewingEmployee, attendanceInsightMonth, empRecords)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#414E36] rounded-lg hover:bg-[#323D2A] transition-all shadow-xs"
+                              >
+                                <Download size={14} />
+                                Export CSV
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Stat Summary Cards */}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                            <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
+                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Total Worked</span>
+                              <span className="text-base font-bold text-[#414E36]">{workedHrs}h {workedRMin}m</span>
+                              <span className="block text-[10px] text-[#5A6A51] mt-0.5">{presentCount} Days Present</span>
+                            </div>
+
+                            <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
+                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Late Arrival</span>
+                              <span className={`text-base font-bold ${totalLateMins > 0 ? 'text-amber-600' : 'text-[#414E36]'}`}>{totalLateMins} min</span>
+                              <span className="block text-[10px] text-[#5A6A51] mt-0.5">{lateCount} Late Incident{lateCount === 1 ? '' : 's'}</span>
+                            </div>
+
+                            <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
+                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Early Leave</span>
+                              <span className={`text-base font-bold ${totalEarlyLeaveMins > 0 ? 'text-amber-600' : 'text-[#414E36]'}`}>{totalEarlyLeaveMins} min</span>
+                              <span className="block text-[10px] text-[#5A6A51] mt-0.5">Early Departures</span>
+                            </div>
+
+                            <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
+                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Overtime</span>
+                              <span className="text-base font-bold text-emerald-700">{totalOvertimeMins} min</span>
+                              <span className="block text-[10px] text-[#5A6A51] mt-0.5">Extra Hours Worked</span>
+                            </div>
+
+                            <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
+                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Mid-Shift Leave</span>
+                              <span className={`text-base font-bold ${totalMidShiftLeaveMins > 0 ? 'text-purple-700' : 'text-[#414E36]'}`}>{totalMidShiftLeaveMins} min</span>
+                              <span className="block text-[10px] text-[#5A6A51] mt-0.5">Permission Duration</span>
+                            </div>
+
+                            <div className="p-3 bg-[#F7F9F6] rounded-xl border border-[#414E36]/10">
+                              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Absences</span>
+                              <span className={`text-base font-bold ${absentCount > 0 ? 'text-rose-600' : 'text-[#414E36]'}`}>{absentCount} Days</span>
+                              <span className="block text-[10px] text-[#5A6A51] mt-0.5">Unexcused / Leave</span>
+                            </div>
+                          </div>
+
+                          {/* Daily Breakdown Table */}
+                          <div className="border border-[#414E36]/10 rounded-xl overflow-hidden bg-white shadow-xs">
+                            <div className="px-4 py-3 bg-[#F7F9F6] border-b border-[#414E36]/10 flex items-center justify-between">
+                              <h5 className="text-xs font-bold text-[#414E36] uppercase tracking-wider">Daily Attendance Breakdown</h5>
+                              <span className="text-xs font-semibold text-[#5A6A51]">{empRecords.length} Record{empRecords.length === 1 ? '' : 's'}</span>
+                            </div>
+
+                            {loadingAttendance ? (
+                              <div className="p-8 text-center text-xs text-[#5A6A51] flex items-center justify-center gap-2">
+                                <Loader2 size={16} className="animate-spin text-[#414E36]" />
+                                Loading attendance records...
+                              </div>
+                            ) : empRecords.length === 0 ? (
+                              <div className="p-8 text-center text-xs text-[#5A6A51]">
+                                No attendance records found for {attendanceInsightMonth || 'selected month'}.
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                  <thead className="bg-[#F7F9F6]/60 text-[#5A6A51] border-b border-[#414E36]/10 font-bold uppercase tracking-wider text-[10px]">
+                                    <tr>
+                                      <th className="py-2.5 px-3">Date</th>
+                                      <th className="py-2.5 px-3">Shift Time</th>
+                                      <th className="py-2.5 px-3">Check In</th>
+                                      <th className="py-2.5 px-3">Check Out</th>
+                                      <th className="py-2.5 px-3">Status</th>
+                                      <th className="py-2.5 px-3 text-right">Worked</th>
+                                      <th className="py-2.5 px-3 text-right">Late</th>
+                                      <th className="py-2.5 px-3 text-right">Early Out</th>
+                                      <th className="py-2.5 px-3 text-right">Overtime</th>
+                                      <th className="py-2.5 px-3 text-right">Mid-Shift Leave</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-[#414E36]/5 text-[#1F251A]">
+                                    {empRecords.map((r: any, idx: number) => {
+                                      const inStr = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+                                      const outStr = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+                                      return (
+                                        <tr key={r.id || idx} className="hover:bg-[#F7F9F6]/50 transition-colors">
+                                          <td className="py-2.5 px-3 font-semibold text-[#414E36] whitespace-nowrap">{r.date}</td>
+                                          <td className="py-2.5 px-3 text-[#5A6A51] whitespace-nowrap">{r.scheduled_in || '09:00 AM'} - {r.scheduled_out || '05:00 PM'}</td>
+                                          <td className="py-2.5 px-3 font-medium whitespace-nowrap">{inStr}</td>
+                                          <td className="py-2.5 px-3 font-medium whitespace-nowrap">{outStr}</td>
+                                          <td className="py-2.5 px-3 whitespace-nowrap">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                              r.status === 'Absent' ? 'bg-rose-100 text-rose-800' :
+                                              (r.late_minutes || 0) > 0 ? 'bg-amber-100 text-amber-800' :
+                                              'bg-emerald-100 text-emerald-800'
+                                            }`}>
+                                              {r.status || 'Present'}
+                                            </span>
+                                          </td>
+                                          <td className="py-2.5 px-3 text-right font-medium">{Math.floor((r.worked_minutes || 0) / 60)}h {(r.worked_minutes || 0) % 60}m</td>
+                                          <td className={`py-2.5 px-3 text-right font-medium ${r.late_minutes > 0 ? 'text-amber-600' : 'text-[#5A6A51]'}`}>{r.late_minutes || 0} m</td>
+                                          <td className={`py-2.5 px-3 text-right font-medium ${r.early_leave_minutes > 0 ? 'text-amber-600' : 'text-[#5A6A51]'}`}>{r.early_leave_minutes || 0} m</td>
+                                          <td className={`py-2.5 px-3 text-right font-medium ${r.overtime_minutes > 0 ? 'text-emerald-700 font-bold' : 'text-[#5A6A51]'}`}>{r.overtime_minutes || 0} m</td>
+                                          <td className={`py-2.5 px-3 text-right font-medium ${r.combined_mid_shift_duration_minutes > 0 ? 'text-purple-700 font-bold' : 'text-[#5A6A51]'}`}>{r.combined_mid_shift_duration_minutes || 0} m</td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
-                          <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Check-In Time</span>
-                            <span className="font-semibold text-[#1F251A]">
-                              {viewingEmployee.shift === "Night" ? "04:58 PM" : "08:58 AM"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Check-out Time</span>
-                            <span className="font-semibold text-[#1F251A]">
-                              {viewingEmployee.shift === "Night" ? "01:02 AM" : "05:02 PM"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Total Working Hours</span>
-                            <span className="font-semibold text-[#1F251A]">8h 4m</span>
-                          </div>
-                          <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Late Days</span>
-                            <span className="font-semibold text-[#1F251A]">1 Day</span>
-                          </div>
-                          <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Absence Days</span>
-                            <span className="font-semibold text-[#1F251A]">0 Day</span>
-                          </div>
-                          <div>
-                            <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Overtime Hours</span>
-                            <span className="font-semibold text-[#1F251A]">2h 15m</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {employeeProfileActiveTab === "contact" && (
                       <div className="space-y-4">
