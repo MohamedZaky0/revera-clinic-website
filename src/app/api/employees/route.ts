@@ -176,6 +176,8 @@ export async function POST(req: Request) {
           national_id: nationalId || null,
           branch_id: branchId || null,
           fixed_salary: salary ? Number(salary) : 0,
+          commission_type: body.commission_type || 'none',
+          commission_value: body.commission_value ? Number(body.commission_value) : 0,
           working_days_hours: body.workingDaysHours || null,
           bookings_count: 0,
           more_count: Math.max(0, (body.services || []).length - 2)
@@ -311,6 +313,8 @@ export async function PATCH(req: Request) {
             ...(body.specialty !== undefined ? { specialty: body.specialty } : {}),
             ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
             ...(body.workingDaysHours !== undefined ? { working_days_hours: body.workingDaysHours } : {}),
+            ...(body.commission_type !== undefined ? { commission_type: body.commission_type } : {}),
+            ...(body.commission_value !== undefined ? { commission_value: Number(body.commission_value) } : {}),
             ...(docPhone !== undefined ? { phone: docPhone } : {}),
             ...(docNationalId !== undefined ? { national_id: docNationalId } : {}),
             ...(docBranchId !== undefined ? { branch_id: docBranchId || null } : {}),
@@ -329,6 +333,9 @@ export async function PATCH(req: Request) {
               national_id: docNationalId || null,
               branch_id: docBranchId || null,
               fixed_salary: docSalary ? Number(docSalary) : 0,
+              commission_type: body.commission_type || 'none',
+              commission_value: body.commission_value ? Number(body.commission_value) : 0,
+              working_days_hours: body.workingDaysHours || null,
               bookings_count: 0,
               more_count: Math.max(0, (body.services || []).length - 2)
             });

@@ -820,15 +820,27 @@ export default function AdminPage() {
   const [newEmployeeSpecialty, setNewEmployeeSpecialty] = useState("");
   const [newEmployeeSelectedServices, setNewEmployeeSelectedServices] = useState<string[]>([]);
   const [newEmployeeRating, setNewEmployeeRating] = useState("5");
+  const [newEmployeeCommissionType, setNewEmployeeCommissionType] = useState("none");
+  const [newEmployeeCommissionValue, setNewEmployeeCommissionValue] = useState("0");
+  const [newEmployeeScheduleTab, setNewEmployeeScheduleTab] = useState<"in_person" | "online">("in_person");
   const [newEmployeeBranchIds, setNewEmployeeBranchIds] = useState<string[]>([]);
-  const [newEmployeeWorkingDaysHours, setNewEmployeeWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string }>>({
-    Sunday: { isOpen: true, start: "09:00", end: "17:00" },
-    Monday: { isOpen: true, start: "09:00", end: "17:00" },
-    Tuesday: { isOpen: true, start: "09:00", end: "17:00" },
-    Wednesday: { isOpen: true, start: "09:00", end: "17:00" },
-    Thursday: { isOpen: true, start: "09:00", end: "17:00" },
-    Friday: { isOpen: false, start: "09:00", end: "17:00" },
-    Saturday: { isOpen: true, start: "09:00", end: "17:00" }
+  const [newEmployeeWorkingDaysHours, setNewEmployeeWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; shifts?: Array<{ start: string; end: string }> }>>({
+    Sunday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Monday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Tuesday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Wednesday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Thursday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Friday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Saturday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] }
+  });
+  const [newEmployeeOnlineWorkingDaysHours, setNewEmployeeOnlineWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; shifts?: Array<{ start: string; end: string }> }>>({
+    Sunday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Monday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Tuesday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Wednesday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Thursday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Friday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+    Saturday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] }
   });
   const [viewingEmployeeNotes, setViewingEmployeeNotes] = useState<any[]>([]);
   const [loadingEmployeeNotes, setLoadingEmployeeNotes] = useState(false);
@@ -14915,16 +14927,21 @@ export default function AdminPage() {
                     setNewEmployeeSpecialty("");
                     setNewEmployeeSelectedServices([]);
                     setNewEmployeeRating("5");
+                    setNewEmployeeCommissionType("none");
+                    setNewEmployeeCommissionValue("0");
+                    setNewEmployeeScheduleTab("in_person");
                     setNewEmployeeBranchIds(branches.length > 0 ? [branches[0].id] : []);
-                    setNewEmployeeWorkingDaysHours({
-                      Sunday: { isOpen: true, start: "09:00", end: "17:00" },
-                      Monday: { isOpen: true, start: "09:00", end: "17:00" },
-                      Tuesday: { isOpen: true, start: "09:00", end: "17:00" },
-                      Wednesday: { isOpen: true, start: "09:00", end: "17:00" },
-                      Thursday: { isOpen: true, start: "09:00", end: "17:00" },
-                      Friday: { isOpen: false, start: "09:00", end: "17:00" },
-                      Saturday: { isOpen: true, start: "09:00", end: "17:00" }
-                    });
+                    const defaultDays = {
+                      Sunday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+                      Monday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+                      Tuesday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+                      Wednesday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+                      Thursday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+                      Friday: { isOpen: false, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] },
+                      Saturday: { isOpen: true, start: "09:00", end: "17:00", shifts: [{ start: "09:00", end: "17:00" }] }
+                    };
+                    setNewEmployeeWorkingDaysHours(defaultDays);
+                    setNewEmployeeOnlineWorkingDaysHours(defaultDays);
                     setIsEditingEmployeeModalOpen(true);
                   }}
                   className="rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-md shrink-0"
@@ -15248,12 +15265,14 @@ export default function AdminPage() {
                                 specialty: newEmployeeSpecialty,
                                 services: newEmployeeSelectedServices,
                                 rating: Number(newEmployeeRating || 5),
+                                commission_type: newEmployeeCommissionType,
+                                commission_value: Number(newEmployeeCommissionValue || 0),
                                 workingDaysHours: {
                                   branch_ids: newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId],
                                   branch_schedules: {
                                     [newEmployeeBranchIds[0] || newEmployeeBranchId]: {
                                       in_person: newEmployeeWorkingDaysHours,
-                                      online: newEmployeeWorkingDaysHours
+                                      online: newEmployeeOnlineWorkingDaysHours
                                     }
                                   }
                                 }
@@ -15298,12 +15317,14 @@ export default function AdminPage() {
                                 specialty: newEmployeeSpecialty,
                                 services: newEmployeeSelectedServices,
                                 rating: Number(newEmployeeRating || 5),
+                                commission_type: newEmployeeCommissionType,
+                                commission_value: Number(newEmployeeCommissionValue || 0),
                                 workingDaysHours: {
                                   branch_ids: newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId],
                                   branch_schedules: {
                                     [newEmployeeBranchIds[0] || newEmployeeBranchId]: {
                                       in_person: newEmployeeWorkingDaysHours,
-                                      online: newEmployeeWorkingDaysHours
+                                      online: newEmployeeOnlineWorkingDaysHours
                                     }
                                   }
                                 }
