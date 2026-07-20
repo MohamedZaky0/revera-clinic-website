@@ -1416,7 +1416,7 @@ Attached is my payment transaction receipt photo.`;
                         title={isRTL ? "انقر لتكبير رمز الاستجابة السريعة" : "Click to zoom QR Code"}
                       >
                         <img 
-                          src={qrCodeUrl} 
+                          src={instapayQrUrl} 
                           alt="InstaPay QR Code" 
                           className="w-32 h-32 object-contain"
                         />
