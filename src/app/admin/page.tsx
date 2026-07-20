@@ -1282,6 +1282,21 @@ export default function AdminPage() {
   const [prescriptionEditMode, setPrescriptionEditMode] = useState(false);
   const [editingPrescription, setEditingPrescription] = useState<any | null>(null);
 
+  // Patient Product Balances state
+  const [customerProductsSubTab, setCustomerProductsSubTab] = useState<"current" | "history">("current");
+  const [customerProductBalances, setCustomerProductBalances] = useState<any[]>([]);
+  const [loadingCustomerProducts, setLoadingCustomerProducts] = useState(false);
+  const [logUsageModalBalance, setLogUsageModalBalance] = useState<any | null>(null);
+  const [logUsageQty, setLogUsageQty] = useState<number>(1);
+  const [logUsageNotes, setLogUsageNotes] = useState<string>("");
+  const [savingUsageLog, setSavingUsageLog] = useState(false);
+  const [showAddPatientProductModal, setShowAddPatientProductModal] = useState(false);
+  const [selectedAddProductId, setSelectedAddProductId] = useState<string>("");
+  const [selectedAddProductName, setSelectedAddProductName] = useState<string>("");
+  const [selectedAddProductQty, setSelectedAddProductQty] = useState<number>(1);
+  const [selectedAddProductUnitPrice, setSelectedAddProductUnitPrice] = useState<number>(0);
+  const [addingProductToPatient, setAddingProductToPatient] = useState(false);
+
   // Prescription Form states
   const [rxDiagnosis, setRxDiagnosis] = useState("");
   const [rxMedications, setRxMedications] = useState<{ name: string; dosage: string; instructions: string }[]>([]);
@@ -3434,6 +3449,112 @@ export default function AdminPage() {
     }
   }, [activeNav, viewingCustomerProfile?.id, fetchProductSalesHistory]);
 
+  const fetchCustomerProductBalances = useCallback(async (customerId: string) => {
+    try {
+      setLoadingCustomerProducts(true);
+      const res = await fetch(`/api/customers/products?customer_id=${encodeURIComponent(customerId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCustomerProductBalances(data.balances || []);
+      }
+    } catch (err) {
+      console.error("Error fetching customer product balances:", err);
+    } finally {
+      setLoadingCustomerProducts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (viewingCustomerProfile?.id) {
+      fetchCustomerProductBalances(viewingCustomerProfile.id);
+    }
+  }, [viewingCustomerProfile?.id, fetchCustomerProductBalances]);
+
+  const handleSaveUsageLog = async () => {
+    if (!logUsageModalBalance || !logUsageQty || logUsageQty <= 0) return;
+    try {
+      setSavingUsageLog(true);
+      const res = await fetch("/api/customers/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          balance_id: logUsageModalBalance.id,
+          quantity_used: Number(logUsageQty),
+          used_by: session?.user?.email || "Staff",
+          notes: logUsageNotes
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && viewingCustomerProfile?.id) {
+          await fetchCustomerProductBalances(viewingCustomerProfile.id);
+          setLogUsageModalBalance(null);
+          setLogUsageQty(1);
+          setLogUsageNotes("");
+        }
+      }
+    } catch (err) {
+      console.error("Error logging product usage:", err);
+    } finally {
+      setSavingUsageLog(false);
+    }
+  };
+
+  const handleAddProductToPatient = async () => {
+    if (!viewingCustomerProfile || !selectedAddProductName || !selectedAddProductQty || selectedAddProductQty <= 0) return;
+    try {
+      setAddingProductToPatient(true);
+      const totalAmt = Number(selectedAddProductUnitPrice || 0) * Number(selectedAddProductQty || 1);
+      const res = await fetch("/api/customers/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_id: viewingCustomerProfile.id,
+          customer_name: viewingCustomerProfile.name || '',
+          customer_mobile: viewingCustomerProfile.mobile || viewingCustomerProfile.phone || '',
+          product_id: selectedAddProductId || `prod-${Date.now()}`,
+          product_name: selectedAddProductName,
+          quantity: Number(selectedAddProductQty),
+          unit_price: Number(selectedAddProductUnitPrice || 0),
+          total_amount: Number(totalAmt || 0)
+        })
+      });
+
+      if (res.ok) {
+        // Also record in product sales history
+        await fetch("/api/inventory/products/sales", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product_id: selectedAddProductId || `prod-${Date.now()}`,
+            product_name: selectedAddProductName,
+            customer_id: viewingCustomerProfile.id,
+            customer_name: viewingCustomerProfile.name || '',
+            customer_mobile: viewingCustomerProfile.mobile || viewingCustomerProfile.phone || '',
+            quantity: Number(selectedAddProductQty),
+            unit_price: Number(selectedAddProductUnitPrice || 0),
+            total_amount: Number(totalAmt || 0),
+            sold_by: session?.user?.email || "Admin/Receptionist"
+          })
+        });
+
+        if (viewingCustomerProfile.id) {
+          await fetchCustomerProductBalances(viewingCustomerProfile.id);
+        }
+        await fetchProductSalesHistory();
+        setShowAddPatientProductModal(false);
+        setSelectedAddProductId("");
+        setSelectedAddProductName("");
+        setSelectedAddProductQty(1);
+        setSelectedAddProductUnitPrice(0);
+      }
+    } catch (err) {
+      console.error("Error adding product to patient:", err);
+    } finally {
+      setAddingProductToPatient(false);
+    }
+  };
+
   const handleOpenSellProductModal = (prod: any) => {
     setSelectedSellProduct(prod);
     setSellQuantity(1);
@@ -3527,6 +3648,25 @@ export default function AdminPage() {
         setDbCustomers((prev) =>
           prev.map((c) => (c.id === targetPatient.id ? { ...c, spent_amount: newSpentAmount } : c))
         );
+      }
+
+      // 4. Update Customer Product Balance
+      await fetch("/api/customers/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_id: targetPatient.id,
+          customer_name: targetPatient.name,
+          customer_mobile: targetPatient.mobile || targetPatient.phone || '',
+          product_id: selectedSellProduct.id,
+          product_name: selectedSellProduct.name,
+          quantity: sellQuantity,
+          unit_price: unitPrice,
+          total_amount: totalAmount
+        })
+      });
+      if (viewingCustomerProfile?.id === targetPatient.id) {
+        await fetchCustomerProductBalances(targetPatient.id);
       }
 
       // 4. Refresh sales history & close modal
