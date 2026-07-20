@@ -45,6 +45,13 @@ import {
   Monitor,
   Menu,
   Package,
+  PackageCheck,
+  Cpu,
+  Gauge,
+  History,
+  RotateCcw,
+  Wrench,
+  AlertTriangle,
   Plus,
   Receipt,
   Search,
@@ -71,14 +78,12 @@ import {
   Trophy,
   Truck,
   Undo,
-  RotateCcw,
   Upload,
   Users,
   Trash2,
   Briefcase,
   Phone,
   Lock,
-  AlertTriangle,
   Zap,
   Coffee,
   CheckCircle,
@@ -154,6 +159,7 @@ const SIDEBAR_ITEMS = [
   { label: "Doctors", icon: ShieldCheck },
   { label: "Services", icon: Layers },
   { label: "Promotions", icon: Tag },
+  { label: "Inventory", icon: PackageCheck },
   { label: "Employees", icon: CircleUser },
   { label: "HR", icon: ClipboardList },
   { label: "Settings", icon: Settings, submenu: true },
@@ -686,7 +692,7 @@ export default function AdminPage() {
     if (adminRole === 'superadmin') return SIDEBAR_ITEMS;
     return SIDEBAR_ITEMS.filter(item => {
       if (item.label === 'Logout') return true;
-      if (item.label === 'HR' && (adminRole === 'admin' || adminRole === 'HR')) return true;
+      if ((item.label === 'HR' || item.label === 'Inventory') && (adminRole === 'admin' || adminRole === 'HR')) return true;
       if (adminPermissions.includes(item.label)) return true;
       
       const parentScreenMap: Record<string, string> = {
@@ -694,6 +700,7 @@ export default function AdminPage() {
         "Customers": "customers",
         "Doctors": "providers",
         "Services": "services",
+        "Inventory": "inventory",
         "Employees": "employees",
         "Settings": "settings"
       };
@@ -15651,6 +15658,70 @@ export default function AdminPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── INVENTORY VIEW ── */}
+          {activeNav === "Inventory" && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-4xl font-semibold text-[#1F251A]">Inventory Management</h2>
+                  <p className="mt-2 text-sm text-[#5A6A51]">Track clinic supplies, medical stock, products, and reorder levels.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => showConfirm("Inventory item creation form will be available here.")}
+                  className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                >
+                  <Plus size={16} /> Add Inventory Item
+                </button>
+              </div>
+
+              <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
+                <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
+                  <table className="w-full min-w-[800px] text-sm">
+                    <thead>
+                      <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+                        <th className="px-6 py-4 text-left">Item Name</th>
+                        <th className="px-6 py-4 text-left">Category</th>
+                        <th className="px-6 py-4 text-center">Stock Level</th>
+                        <th className="px-6 py-4 text-left">Status</th>
+                        <th className="px-6 py-4 text-right">Unit Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                      <tr className="transition hover:bg-[#F9F9F7]">
+                        <td className="px-6 py-5 font-semibold text-[#1F251A]">Botox Type A (100U)</td>
+                        <td className="px-6 py-5 text-[#5A6A51]">Injectables</td>
+                        <td className="px-6 py-5 text-center font-mono font-bold text-[#1F251A]">42 units</td>
+                        <td className="px-6 py-5">
+                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 border border-emerald-200">In Stock</span>
+                        </td>
+                        <td className="px-6 py-5 text-right font-mono font-semibold">$250.00</td>
+                      </tr>
+                      <tr className="transition hover:bg-[#F9F9F7]">
+                        <td className="px-6 py-5 font-semibold text-[#1F251A]">Hyaluronic Acid Filler (1ml)</td>
+                        <td className="px-6 py-5 text-[#5A6A51]">Injectables</td>
+                        <td className="px-6 py-5 text-center font-mono font-bold text-[#1F251A]">15 units</td>
+                        <td className="px-6 py-5">
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 border border-amber-200">Low Stock</span>
+                        </td>
+                        <td className="px-6 py-5 text-right font-mono font-semibold">$180.00</td>
+                      </tr>
+                      <tr className="transition hover:bg-[#F9F9F7]">
+                        <td className="px-6 py-5 font-semibold text-[#1F251A]">Sterile Surgical Gloves (M)</td>
+                        <td className="px-6 py-5 text-[#5A6A51]">Disposables</td>
+                        <td className="px-6 py-5 text-center font-mono font-bold text-[#1F251A]">350 pairs</td>
+                        <td className="px-6 py-5">
+                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 border border-emerald-200">In Stock</span>
+                        </td>
+                        <td className="px-6 py-5 text-right font-mono font-semibold">$1.50</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
