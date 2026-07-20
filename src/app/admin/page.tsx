@@ -16223,7 +16223,30 @@ export default function AdminPage() {
                             }).length === 0 ? (
                             <tr>
                               <td colSpan={6} className="px-6 py-12 text-center text-sm text-[#5A6A51]">
-                                No clinic devices found. Click <span className="font-semibold text-[#1F251A]">Add Device</span> to register a new machine.
+                                <div className="flex flex-col items-center justify-center gap-3">
+                                  <Gauge size={32} className="text-[#A3B19B]" />
+                                  <p className="font-semibold text-[#1F251A]">No clinic devices found</p>
+                                  <p className="text-xs text-[#5A6A51]">Click below to register your first clinic machine or device.</p>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingDevice(null);
+                                      setDeviceName("");
+                                      setDeviceModel("");
+                                      setDeviceSerial("");
+                                      setDeviceCategory("Laser Hair Removal");
+                                      setDeviceBranchId(branches.length > 0 ? branches[0].id : "");
+                                      setDeviceInitialPulses("0");
+                                      setDeviceWarningThreshold1("80000");
+                                      setDeviceMaintenanceThreshold2("100000");
+                                      setDeviceNotes("");
+                                      setShowAddDeviceModal(true);
+                                    }}
+                                    className="inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] shadow-sm cursor-pointer"
+                                  >
+                                    <Plus size={14} /> Add Device
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ) : (
@@ -16571,7 +16594,17 @@ export default function AdminPage() {
                                     <div className="flex flex-col items-center justify-center gap-2">
                                       <ShoppingBag size={32} className="text-[#A3B19B]" />
                                       <p className="font-semibold text-[#1F251A]">No products found</p>
-                                      <p className="text-xs text-[#5A6A51]">Try adjusting your search query or filter settings.</p>
+                                      <p className="text-xs text-[#5A6A51]">Try adjusting your search query or add a new product item.</p>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          resetProductForm();
+                                          setShowAddProductModal(true);
+                                        }}
+                                        className="mt-2 inline-flex items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] cursor-pointer"
+                                      >
+                                        <Plus size={14} /> Add Item
+                                      </button>
                                     </div>
                                   </td>
                                 </tr>
