@@ -29,6 +29,7 @@ A Next.js (App Router) web application serving two purposes:
 
 - **Single-tenant:** One Supabase project, one deployment — exclusively for Revera Clinics.
 - **Hosted on Vercel** (Next.js, App Router).
+- **Dev Link:** [https://dev.reveraclinics.com/](https://dev.reveraclinics.com/)
 - **Database:** Supabase (PostgreSQL) — tables: `reservations`, `services`, `categories`, `branches`, `providers` (Doctors), `page_settings`, `prescriptions`, `customers`, `employee_accounts`, `employee_notes`, `hr_payroll`, `hr_attendance`, `hr_leave_requests`, `hr_performance_reviews`, `hr_missing_alerts`, `provider_schedule_audit_logs`.
 - **No multi-tenancy.** No org/tenant layer in the schema.
 
