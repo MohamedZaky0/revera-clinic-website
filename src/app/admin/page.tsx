@@ -3804,7 +3804,9 @@ export default function AdminPage() {
   }, [showAddBookingModal, newPatientService, newPatientDate, newPatientBranch]);
 
   function fetchProviders() {
-    cachedFetch("/api/providers", 10000)
+    clearFetchCache("/api/providers");
+    fetch("/api/providers")
+      .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
           setProviders(data);
@@ -15616,67 +15618,72 @@ export default function AdminPage() {
                         </div>
                       )}
 
-                      <div className="mt-4">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Shift</label>
-                        <div className="flex items-center gap-2 max-w-[320px]">
-                          <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-3.5 py-2.5 w-full focus-within:border-[#C4AE7C] transition-colors">
-                            <input
-                              type="time"
-                              value={newEmployeeShiftStart}
-                              onChange={(e) => handleShiftStartChange(e.target.value)}
-                              onClick={(e) => {
-                                try { e.currentTarget.showPicker(); } catch {}
-                              }}
-                              className="bg-transparent text-sm text-[#1F251A] outline-none w-full pr-6 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                            />
-                            <Clock size={14} className="text-[#5A6A51] absolute right-3.5 pointer-events-none" />
+                      {/* Shift & Target for Non-Doctor Employees */}
+                      {!(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc")) && (
+                        <>
+                          <div className="mt-4">
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Shift</label>
+                            <div className="flex items-center gap-2 max-w-[320px]">
+                              <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-3.5 py-2.5 w-full focus-within:border-[#C4AE7C] transition-colors">
+                                <input
+                                  type="time"
+                                  value={newEmployeeShiftStart}
+                                  onChange={(e) => handleShiftStartChange(e.target.value)}
+                                  onClick={(e) => {
+                                    try { e.currentTarget.showPicker(); } catch {}
+                                  }}
+                                  className="bg-transparent text-sm text-[#1F251A] outline-none w-full pr-6 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                                />
+                                <Clock size={14} className="text-[#5A6A51] absolute right-3.5 pointer-events-none" />
+                              </div>
+                              <span className="text-sm font-semibold text-[#5A6A51] select-none">to</span>
+                              <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-3.5 py-2.5 w-full focus-within:border-[#C4AE7C] transition-colors">
+                                <input
+                                  type="time"
+                                  value={newEmployeeShiftEnd}
+                                  onChange={(e) => handleShiftEndChange(e.target.value)}
+                                  onClick={(e) => {
+                                    try { e.currentTarget.showPicker(); } catch {}
+                                  }}
+                                  className="bg-transparent text-sm text-[#1F251A] outline-none w-full pr-6 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                                />
+                                <Clock size={14} className="text-[#5A6A51] absolute right-3.5 pointer-events-none" />
+                              </div>
+                            </div>
                           </div>
-                          <span className="text-sm font-semibold text-[#5A6A51] select-none">to</span>
-                          <div className="relative flex items-center bg-[#FBFBF9] border border-[#414E36]/15 rounded-2xl px-3.5 py-2.5 w-full focus-within:border-[#C4AE7C] transition-colors">
-                            <input
-                              type="time"
-                              value={newEmployeeShiftEnd}
-                              onChange={(e) => handleShiftEndChange(e.target.value)}
-                              onClick={(e) => {
-                                try { e.currentTarget.showPicker(); } catch {}
-                              }}
-                              className="bg-transparent text-sm text-[#1F251A] outline-none w-full pr-6 cursor-pointer font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                            />
-                            <Clock size={14} className="text-[#5A6A51] absolute right-3.5 pointer-events-none" />
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* Target & Bonus Configuration */}
-                      <div className="border-t border-[#414E36]/10 pt-4 space-y-4">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Target &amp; Performance Bonus</h4>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Required Target Amount (EGP)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={newEmployeeRequiredTargetAmount}
-                              onChange={(e) => setNewEmployeeRequiredTargetAmount(e.target.value)}
-                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                            />
+                          {/* Target & Bonus Configuration */}
+                          <div className="border-t border-[#414E36]/10 pt-4 space-y-4">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C]">Target &amp; Performance Bonus</h4>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Required Target Amount (EGP)</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={newEmployeeRequiredTargetAmount}
+                                  onChange={(e) => setNewEmployeeRequiredTargetAmount(e.target.value)}
+                                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Bonus Percentage (%)</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={newEmployeeBonusPercentage}
+                                  onChange={(e) => {
+                                    const val = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                                    setNewEmployeeBonusPercentage(String(val));
+                                  }}
+                                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                                />
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Bonus Percentage (%)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={newEmployeeBonusPercentage}
-                              onChange={(e) => {
-                                const val = Math.min(100, Math.max(0, Number(e.target.value) || 0));
-                                setNewEmployeeBonusPercentage(String(val));
-                              }}
-                              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                            />
-                          </div>
-                        </div>
-                      </div>
+                        </>
+                      )}
 
                       {/* --- NEW EMPLOYEE PROFILE FIELDS (National ID, Photo Uploads, Address) --- */}
                       <div className="border-t border-[#414E36]/10 pt-4 space-y-4">
