@@ -163,6 +163,39 @@ export async function POST(req: Request) {
       bonusType: newEmployee.bonus_type || 'percentage'
     } : null;
 
+    // Sync with providers table if department/role is Doctor
+    const isDoctor = (department && (department.toLowerCase().includes('doc') || department.toLowerCase() === 'doctors')) || (roleName && roleName.toLowerCase().includes('doc'));
+    if (isDoctor) {
+      try {
+        const providerPayload = {
+          name: cleanName,
+          services: Array.isArray(body.services) ? body.services : [],
+          rating: body.rating ? Number(body.rating) : 5,
+          phone: phone || null,
+          specialty: body.specialty || null,
+          national_id: nationalId || null,
+          branch_id: branchId || null,
+          fixed_salary: salary ? Number(salary) : 0,
+          bookings_count: 0,
+          more_count: Math.max(0, (body.services || []).length - 2)
+        };
+
+        const { data: existingProvider } = await supabaseServer
+          .from('providers')
+          .select('id')
+          .or(`name.ilike.${cleanName},phone.eq.${phone || 'none'}`)
+          .maybeSingle();
+
+        if (existingProvider) {
+          await supabaseServer.from('providers').update(providerPayload).eq('id', existingProvider.id);
+        } else {
+          await supabaseServer.from('providers').insert(providerPayload);
+        }
+      } catch (provErr) {
+        console.error('Failed to sync doctor employee to providers table:', provErr);
+      }
+    }
+
     return NextResponse.json(mapped, { status: 201 });
   } catch (err: any) {
     console.error('POST /api/employees error:', err);
@@ -251,6 +284,57 @@ export async function PATCH(req: Request) {
         targetType: updatedEmp.target_type || 'reservations',
         bonusType: updatedEmp.bonus_type || 'percentage'
       } : null;
+
+      // Sync updated employee to providers table if department/role is Doctor
+      const effectiveDept = department !== undefined ? department : employee.department;
+      const effectiveRole = roleName !== undefined ? roleName : employee.role_name;
+      const isDoctor = (effectiveDept && (effectiveDept.toLowerCase().includes('doc') || effectiveDept.toLowerCase() === 'doctors')) || (effectiveRole && effectiveRole.toLowerCase().includes('doc'));
+
+      if (isDoctor) {
+        try {
+          const docName = name !== undefined ? name : employee.name;
+          const docPhone = phone !== undefined ? phone : employee.phone;
+          const docSalary = salary !== undefined ? salary : employee.salary;
+          const docBranchId = branchId !== undefined ? branchId : employee.branch_id;
+          const docNationalId = nationalId !== undefined ? nationalId : employee.national_id;
+
+          const { data: existingProvider } = await supabaseServer
+            .from('providers')
+            .select('id')
+            .or(`name.ilike.${docName},phone.eq.${docPhone || 'none'}`)
+            .maybeSingle();
+
+          const providerPayload: Record<string, any> = {
+            name: docName,
+            ...(body.services !== undefined ? { services: body.services } : {}),
+            ...(body.specialty !== undefined ? { specialty: body.specialty } : {}),
+            ...(body.rating !== undefined ? { rating: Number(body.rating) } : {}),
+            ...(docPhone !== undefined ? { phone: docPhone } : {}),
+            ...(docNationalId !== undefined ? { national_id: docNationalId } : {}),
+            ...(docBranchId !== undefined ? { branch_id: docBranchId || null } : {}),
+            ...(docSalary !== undefined ? { fixed_salary: Number(docSalary) } : {})
+          };
+
+          if (existingProvider) {
+            await supabaseServer.from('providers').update(providerPayload).eq('id', existingProvider.id);
+          } else {
+            await supabaseServer.from('providers').insert({
+              name: docName,
+              services: body.services || [],
+              rating: body.rating ? Number(body.rating) : 5,
+              phone: docPhone || null,
+              specialty: body.specialty || null,
+              national_id: docNationalId || null,
+              branch_id: docBranchId || null,
+              fixed_salary: docSalary ? Number(docSalary) : 0,
+              bookings_count: 0,
+              more_count: Math.max(0, (body.services || []).length - 2)
+            });
+          }
+        } catch (provErr) {
+          console.error('Failed to sync updated doctor employee to providers table:', provErr);
+        }
+      }
 
       return NextResponse.json(mapped);
     }

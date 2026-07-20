@@ -816,6 +816,9 @@ export default function AdminPage() {
   const [isEditingEmployeeModalOpen, setIsEditingEmployeeModalOpen] = useState(false);
   const [newEmployeeRequiredTargetAmount, setNewEmployeeRequiredTargetAmount] = useState("0");
   const [newEmployeeBonusPercentage, setNewEmployeeBonusPercentage] = useState("0");
+  const [newEmployeeSpecialty, setNewEmployeeSpecialty] = useState("");
+  const [newEmployeeSelectedServices, setNewEmployeeSelectedServices] = useState<string[]>([]);
+  const [newEmployeeRating, setNewEmployeeRating] = useState("5");
   const [viewingEmployeeNotes, setViewingEmployeeNotes] = useState<any[]>([]);
   const [loadingEmployeeNotes, setLoadingEmployeeNotes] = useState(false);
   const [viewingEmployeeBookings, setViewingEmployeeBookings] = useState<any[]>([]);
@@ -14898,6 +14901,9 @@ export default function AdminPage() {
                     setNewEmployeeAdditionalFiles([]);
                     setNewEmployeeRequiredTargetAmount("0");
                     setNewEmployeeBonusPercentage("0");
+                    setNewEmployeeSpecialty("");
+                    setNewEmployeeSelectedServices([]);
+                    setNewEmployeeRating("5");
                     setIsEditingEmployeeModalOpen(true);
                   }}
                   className="rounded-2xl bg-[#414E36] px-5 py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-2 shadow-md shrink-0"
@@ -15097,6 +15103,10 @@ export default function AdminPage() {
                                           setNewEmployeeAdditionalFiles(additionalList);
                                           setNewEmployeeRequiredTargetAmount(String(emp.requiredTargetAmount || 0));
                                           setNewEmployeeBonusPercentage(String(emp.bonusPercentage || 0));
+                                          const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
+                                          setNewEmployeeSpecialty(matchProv?.specialty || "");
+                                          setNewEmployeeSelectedServices(matchProv?.services || []);
+                                          setNewEmployeeRating(String(matchProv?.rating || 5));
                                           setIsEditingEmployeeModalOpen(true);
                                         }}
                                         className="text-[#C4AE7C] hover:text-[#a38f61] transition"
@@ -15192,12 +15202,16 @@ export default function AdminPage() {
                                 contractFileName: newEmployeeContractName || null,
                                 requiredTargetAmount: Number(newEmployeeRequiredTargetAmount),
                                 bonusPercentage: Number(newEmployeeBonusPercentage),
+                                specialty: newEmployeeSpecialty,
+                                services: newEmployeeSelectedServices,
+                                rating: Number(newEmployeeRating || 5),
                               }),
                             });
                             if (res.ok) {
                               setIsEditingEmployeeModalOpen(false);
                               clearFetchCache();
                               fetchRolesAndEmployees();
+                              fetchProviders();
                             } else {
                               const d = await res.json();
                               alert(d.error || "Failed to update employee.");
@@ -15229,12 +15243,16 @@ export default function AdminPage() {
                                 contractFileName: newEmployeeContractName || null,
                                 requiredTargetAmount: Number(newEmployeeRequiredTargetAmount),
                                 bonusPercentage: Number(newEmployeeBonusPercentage),
+                                specialty: newEmployeeSpecialty,
+                                services: newEmployeeSelectedServices,
+                                rating: Number(newEmployeeRating || 5),
                               }),
                             });
                             if (res.ok) {
                               setIsEditingEmployeeModalOpen(false);
                               clearFetchCache();
                               fetchRolesAndEmployees();
+                              fetchProviders();
                             } else {
                               const d = await res.json();
                               alert(d.error || "Failed to invite employee.");
@@ -15338,6 +15356,74 @@ export default function AdminPage() {
                           />
                         </div>
                       </div>
+
+                      {/* Doctor / Medical Profile Fields */}
+                      {(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc")) && (
+                        <div className="rounded-2xl border border-[#C4AE7C]/30 bg-[#FBFBF9] p-5 space-y-4 shadow-sm animate-fadeIn">
+                          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#414E36]">
+                            <Stethoscope size={16} className="text-[#C4AE7C]" />
+                            Doctor &amp; Medical Configuration
+                          </div>
+
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                                Medical Specialty
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Dermatology, Cosmetics, Gynecology..."
+                                value={newEmployeeSpecialty}
+                                onChange={(e) => setNewEmployeeSpecialty(e.target.value)}
+                                className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                                Doctor Rating (1 - 5 Stars)
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="5"
+                                step="0.1"
+                                value={newEmployeeRating}
+                                onChange={(e) => setNewEmployeeRating(e.target.value)}
+                                className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
+                              Select Services Offered
+                            </label>
+                            <div className="max-h-[180px] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-3 space-y-1.5">
+                              {allServicesList.map((svc) => {
+                                const isChecked = newEmployeeSelectedServices.includes(svc.en);
+                                return (
+                                  <label key={svc.id} className="flex items-center gap-2.5 cursor-pointer select-none py-1 px-1.5 hover:bg-gray-50 rounded">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setNewEmployeeSelectedServices([...newEmployeeSelectedServices, svc.en]);
+                                        } else {
+                                          setNewEmployeeSelectedServices(newEmployeeSelectedServices.filter(s => s !== svc.en));
+                                        }
+                                      }}
+                                      className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                                    />
+                                    <span className="text-xs text-[#1F251A] font-medium">{svc.en} {svc.ar ? `(${svc.ar})` : ''}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="mt-4">
                         <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Shift</label>

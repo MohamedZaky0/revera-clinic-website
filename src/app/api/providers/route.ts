@@ -34,7 +34,7 @@ function mapProvider(p: Record<string, any>, bookingsCount: number = 0) {
  
 export async function GET() {
   try {
-    const [providersRes, reservationsRes] = await Promise.all([
+    const [providersRes, reservationsRes, docEmployeesRes] = await Promise.all([
       supabaseServer
         .from('providers')
         .select('*')
@@ -42,10 +42,47 @@ export async function GET() {
       supabaseServer
         .from('reservations')
         .select('doctor_name, status')
-        .neq('status', 'rejected')
+        .neq('status', 'rejected'),
+      supabaseServer
+        .from('employee_accounts')
+        .select('*')
+        .or('department.ilike.%doc%,role_name.ilike.%doc%')
     ]);
- 
-    if (!providersRes.error && providersRes.data && providersRes.data.length > 0 && ('working_days_hours' in providersRes.data[0])) {
+
+    let providersData = providersRes.data || [];
+
+    // Auto-sync any Doctor employees missing from providers table
+    if (docEmployeesRes.data && docEmployeesRes.data.length > 0) {
+      for (const emp of docEmployeesRes.data) {
+        const exists = providersData.some(
+          p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) ||
+               (p.phone && emp.phone && p.phone === emp.phone)
+        );
+        if (!exists && emp.name) {
+          const newProvPayload = {
+            name: emp.name,
+            phone: emp.phone || null,
+            fixed_salary: emp.salary ? Number(emp.salary) : 0,
+            branch_id: emp.branch_id || null,
+            national_id: emp.national_id || null,
+            services: [],
+            rating: 5,
+            bookings_count: 0,
+            more_count: 0
+          };
+          try {
+            const { data: created } = await supabaseServer.from('providers').insert(newProvPayload).select().single();
+            if (created) {
+              providersData.push(created);
+            }
+          } catch (e) {
+            console.error("Failed auto-syncing missing doctor employee:", e);
+          }
+        }
+      }
+    }
+
+    if (!providersRes.error && providersData.length > 0) {
       const counts = new Map<string, number>();
       (reservationsRes.data || []).forEach((r: any) => {
         if (r.doctor_name) {
@@ -53,8 +90,8 @@ export async function GET() {
           counts.set(nameKey, (counts.get(nameKey) || 0) + 1);
         }
       });
- 
-      const mapped = providersRes.data.map((p: any) => {
+
+      const mapped = providersData.map((p: any) => {
         const key = p.name ? p.name.trim().toLowerCase() : "";
         const bookingsCount = counts.get(key) || 0;
         return mapProvider(p, bookingsCount);
@@ -63,8 +100,6 @@ export async function GET() {
     } else {
       if (providersRes.error) {
         console.warn("Supabase providers query error, falling back to JSON:", providersRes.error);
-      } else {
-        console.warn("Supabase providers missing columns (schema not migrated), falling back to JSON");
       }
     }
   } catch (dbErr) {
