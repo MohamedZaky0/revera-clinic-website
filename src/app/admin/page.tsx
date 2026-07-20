@@ -15456,12 +15456,13 @@ export default function AdminPage() {
 
                       {/* Doctor / Medical Profile Fields */}
                       {(newEmployeeDepartment?.toLowerCase().includes("doc") || newEmployeeRole?.toLowerCase().includes("doc")) && (
-                        <div className="rounded-2xl border border-[#C4AE7C]/30 bg-[#FBFBF9] p-5 space-y-4 shadow-sm animate-fadeIn">
-                          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#414E36]">
+                        <div className="rounded-2xl border border-[#C4AE7C]/30 bg-[#FBFBF9] p-5 space-y-5 shadow-sm animate-fadeIn">
+                          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#414E36] border-b border-[#C4AE7C]/20 pb-3">
                             <Stethoscope size={16} className="text-[#C4AE7C]" />
                             Doctor &amp; Medical Configuration
                           </div>
 
+                          {/* Row 1: Specialty & Rating */}
                           <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                               <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
@@ -15492,11 +15493,64 @@ export default function AdminPage() {
                             </div>
                           </div>
 
+                          {/* Row 2: Payroll & Commission Settings */}
+                          <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                            <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#414E36]/10 pb-2 flex items-center gap-1.5">
+                              <DollarSign size={14} className="text-[#C4AE7C]" />
+                              Payroll &amp; Commission Settings
+                            </h4>
+                            <div className="grid gap-4 sm:grid-cols-3">
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                                  Fixed Salary (EGP)
+                                </label>
+                                <input
+                                  type="number"
+                                  placeholder="e.g. 5000"
+                                  value={newEmployeeSalary}
+                                  onChange={(e) => setNewEmployeeSalary(e.target.value)}
+                                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                                  Commission Type
+                                </label>
+                                <select
+                                  value={newEmployeeCommissionType}
+                                  onChange={(e) => setNewEmployeeCommissionType(e.target.value)}
+                                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                >
+                                  <option value="none">None</option>
+                                  <option value="fixed">Fixed Amount per Service</option>
+                                  <option value="percentage">Percentage of Service Price</option>
+                                </select>
+                              </div>
+
+                              {newEmployeeCommissionType !== "none" && (
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                                    {newEmployeeCommissionType === "fixed" ? "Fixed Amount (EGP)" : "Percentage (%)"}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    placeholder={newEmployeeCommissionType === "fixed" ? "e.g. 150" : "e.g. 20"}
+                                    value={newEmployeeCommissionValue}
+                                    onChange={(e) => setNewEmployeeCommissionValue(e.target.value)}
+                                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Row 3: Assigned Branches */}
                           <div>
                             <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
                               Assigned Branches (Select one or more for Doctor)
                             </label>
-                            <div className="flex flex-wrap gap-2 p-2 rounded-2xl border border-[#414E36]/15 bg-white min-h-[42px] items-center">
+                            <div className="flex flex-wrap gap-2 p-2.5 rounded-2xl border border-[#414E36]/15 bg-white min-h-[42px] items-center">
                               {branches.map((b) => {
                                 const isSelected = newEmployeeBranchIds.includes(b.id);
                                 return (
@@ -15528,66 +15582,160 @@ export default function AdminPage() {
                             </div>
                           </div>
 
+                          {/* Row 4: Doctor Schedule Grid with In-Clinic vs Online tabs & Multi-shift per day */}
                           <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
-                              Doctor Weekly Shifts &amp; Working Days Schedule
-                            </label>
-                            <div className="rounded-2xl border border-[#414E36]/10 bg-white p-3 space-y-2.5">
-                              {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => {
-                                const daySched = newEmployeeWorkingDaysHours[day] || { isOpen: false, start: "09:00", end: "17:00" };
-                                return (
-                                  <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/5 pb-2 last:border-0 last:pb-0">
-                                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={daySched.isOpen}
-                                        onChange={(e) => {
-                                          setNewEmployeeWorkingDaysHours({
-                                            ...newEmployeeWorkingDaysHours,
-                                            [day]: { ...daySched, isOpen: e.target.checked }
-                                          });
-                                        }}
-                                        className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
-                                      />
-                                      <span className={`text-xs font-semibold ${daySched.isOpen ? "text-[#1F251A]" : "text-gray-400"}`}>
-                                        {day}
-                                      </span>
-                                    </label>
-                                    {daySched.isOpen ? (
-                                      <div className="flex items-center gap-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                                Doctor Weekly Shifts &amp; Working Days Schedule
+                              </label>
+
+                              {/* Tab Selector: In-Clinic / In-Person vs Online */}
+                              <div className="inline-flex rounded-xl bg-white border border-[#414E36]/15 p-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setNewEmployeeScheduleTab("in_person")}
+                                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                    newEmployeeScheduleTab === "in_person"
+                                      ? "bg-[#414E36] text-white"
+                                      : "text-[#5A6A51] hover:text-[#1F251A]"
+                                  }`}
+                                >
+                                  In-Clinic / In-Person
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setNewEmployeeScheduleTab("online")}
+                                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                    newEmployeeScheduleTab === "online"
+                                      ? "bg-[#414E36] text-white"
+                                      : "text-[#5A6A51] hover:text-[#1F251A]"
+                                  }`}
+                                >
+                                  Online Consultation
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                              {(() => {
+                                const activeSched = newEmployeeScheduleTab === "in_person" ? newEmployeeWorkingDaysHours : newEmployeeOnlineWorkingDaysHours;
+                                const setActiveSched = newEmployeeScheduleTab === "in_person" ? setNewEmployeeWorkingDaysHours : setNewEmployeeOnlineWorkingDaysHours;
+
+                                return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => {
+                                  const sched = activeSched[day] || { isOpen: false, start: "09:00", end: "17:00" };
+                                  return (
+                                    <div key={day} className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
+                                      <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
                                         <input
-                                          type="time"
-                                          value={daySched.start}
+                                          type="checkbox"
+                                          checked={sched.isOpen}
                                           onChange={(e) => {
-                                            setNewEmployeeWorkingDaysHours({
-                                              ...newEmployeeWorkingDaysHours,
-                                              [day]: { ...daySched, start: e.target.value }
+                                            setActiveSched({
+                                              ...activeSched,
+                                              [day]: { ...sched, isOpen: e.target.checked }
                                             });
                                           }}
-                                          className="rounded-xl border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                          className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
                                         />
-                                        <span className="text-xs text-gray-400">to</span>
-                                        <input
-                                          type="time"
-                                          value={daySched.end}
-                                          onChange={(e) => {
-                                            setNewEmployeeWorkingDaysHours({
-                                              ...newEmployeeWorkingDaysHours,
-                                              [day]: { ...daySched, end: e.target.value }
-                                            });
-                                          }}
-                                          className="rounded-xl border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
-                                        />
-                                      </div>
-                                    ) : (
-                                      <span className="text-[10px] uppercase font-bold text-gray-400">Off / Closed</span>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                                        <span className={`text-xs font-bold w-24 ${sched.isOpen ? "text-[#1F251A]" : "text-gray-400"}`}>
+                                          {day}
+                                        </span>
+                                      </label>
+
+                                      {sched.isOpen ? (
+                                        <div className="flex flex-col gap-2 w-full sm:w-auto">
+                                          {/* Shifts list with multi-shift support */}
+                                          {((sched.shifts && sched.shifts.length > 0) ? sched.shifts : [{ start: sched.start || "09:00", end: sched.end || "17:00" }]).map((shft, shiftIdx) => (
+                                            <div key={shiftIdx} className="flex items-center gap-2">
+                                              <input
+                                                type="time"
+                                                value={shft.start}
+                                                onChange={(e) => {
+                                                  const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                                  currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], start: e.target.value };
+                                                  setActiveSched({
+                                                    ...activeSched,
+                                                    [day]: {
+                                                      ...sched,
+                                                      start: currentShifts[0].start,
+                                                      end: currentShifts[0].end,
+                                                      shifts: currentShifts
+                                                    }
+                                                  });
+                                                }}
+                                                className="rounded-lg border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                              />
+                                              <span className="text-xs text-[#5A6A51]">to</span>
+                                              <input
+                                                type="time"
+                                                value={shft.end}
+                                                onChange={(e) => {
+                                                  const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                                  currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], end: e.target.value };
+                                                  setActiveSched({
+                                                    ...activeSched,
+                                                    [day]: {
+                                                      ...sched,
+                                                      start: currentShifts[0].start,
+                                                      end: currentShifts[0].end,
+                                                      shifts: currentShifts
+                                                    }
+                                                  });
+                                                }}
+                                                className="rounded-lg border border-[#414E36]/15 px-2.5 py-1 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
+                                              />
+                                              {shiftIdx > 0 && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                                    const filteredShifts = currentShifts.filter((_, i) => i !== shiftIdx);
+                                                    setActiveSched({
+                                                      ...activeSched,
+                                                      [day]: {
+                                                        ...sched,
+                                                        start: filteredShifts[0].start,
+                                                        end: filteredShifts[0].end,
+                                                        shifts: filteredShifts
+                                                      }
+                                                    });
+                                                  }}
+                                                  className="text-red-500 hover:text-red-700 transition"
+                                                >
+                                                  <Trash2 size={14} />
+                                                </button>
+                                              )}
+                                            </div>
+                                          ))}
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                              const newShifts = [...currentShifts, { start: "09:00", end: "17:00" }];
+                                              setActiveSched({
+                                                ...activeSched,
+                                                [day]: {
+                                                  ...sched,
+                                                  shifts: newShifts
+                                                }
+                                              });
+                                            }}
+                                            className="text-xs font-bold text-[#414E36] hover:text-[#2e3a26] transition flex items-center gap-1 mt-0.5 cursor-pointer"
+                                          >
+                                            <Plus size={12} /> Add Shift
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <span className="text-xs text-gray-400 italic">Off / Closed</span>
+                                      )}
+                                    </div>
+                                  );
+                                });
+                              })()}
                             </div>
                           </div>
 
+                          {/* Row 5: Select Services Offered */}
                           <div>
                             <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
                               Select Services Offered
