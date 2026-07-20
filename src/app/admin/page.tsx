@@ -91,6 +91,7 @@ import {
   DoorOpen,
   MapPin,
   Stethoscope,
+  Loader2,
 } from "lucide-react";
 import RoomsManagerView from "@/components/RoomsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
