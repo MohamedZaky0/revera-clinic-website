@@ -212,6 +212,7 @@ type Customer = {
   national_id?: string | null;
   address?: string | null;
   referral?: string | null;
+  avatar_url?: string | null;
   occupation?: string | null;
 };
 
@@ -1290,6 +1291,10 @@ export default function AdminPage() {
       console.error("Failed to fetch customer avatars:", e);
     }
   }, []);
+
+  useEffect(() => {
+    fetchCustomerAvatars();
+  }, [fetchCustomerAvatars]);
 
   const handleAvatarUpload = async (id: string, file: File) => {
     try {
@@ -10899,8 +10904,45 @@ export default function AdminPage() {
                   {/* Profile Header Banner */}
                   <div className="bg-white rounded-3xl border border-[#414E36]/10 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
                     <div className="flex items-center gap-4">
-                      <div className="h-16 w-16 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl font-bold font-serif shrink-0">
-                        {viewingCustomerProfile.name ? viewingCustomerProfile.name.charAt(0).toUpperCase() : "P"}
+                      <div className="relative group shrink-0">
+                        <div className="h-16 w-16 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl font-bold font-serif overflow-hidden shadow-xs">
+                          {(viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url ? (
+                            <img
+                              src={(viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url || ""}
+                              alt={viewingCustomerProfile.name || "Customer"}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span>{viewingCustomerProfile.name ? viewingCustomerProfile.name.charAt(0).toUpperCase() : "P"}</span>
+                          )}
+                        </div>
+                        <label
+                          className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
+                          title="Upload/Change Profile Picture"
+                        >
+                          <Camera size={12} />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file && viewingCustomerProfile.id) {
+                                handleAvatarUpload(viewingCustomerProfile.id, file);
+                              }
+                            }}
+                          />
+                        </label>
+                        {((viewingCustomerProfile.id && customerAvatars[viewingCustomerProfile.id]) || viewingCustomerProfile.avatar_url) && (
+                          <button
+                            type="button"
+                            onClick={() => viewingCustomerProfile.id && handleAvatarRemove(viewingCustomerProfile.id)}
+                            className="absolute -top-1 -right-1 p-1 rounded-full bg-red-600 text-white shadow-xs hover:bg-red-700 transition"
+                            title="Remove Photo"
+                          >
+                            <X size={10} />
+                          </button>
+                        )}
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingCustomerProfile.name}</h3>
@@ -11916,7 +11958,18 @@ export default function AdminPage() {
                       const displayEmail = c.email || "—";
                       return (
                         <tr key={uniqueKey} className="transition hover:bg-[#F9F9F7]">
-                          <td className="px-5 py-4 font-semibold text-[#1F251A]">{c.name}</td>
+                          <td className="px-5 py-4 font-semibold text-[#1F251A]">
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-xs font-bold font-serif overflow-hidden shrink-0">
+                                {(c.id && customerAvatars[c.id]) || c.avatar_url ? (
+                                  <img src={(c.id && customerAvatars[c.id]) || c.avatar_url || ""} alt={c.name} className="h-full w-full object-cover" />
+                                ) : (
+                                  <span>{c.name ? c.name.charAt(0).toUpperCase() : "P"}</span>
+                                )}
+                              </div>
+                              <span>{c.name}</span>
+                            </div>
+                          </td>
                           <td className="px-5 py-4 text-[#1F251A]">{displayPhone}</td>
                           <td className="px-5 py-4 text-[#5A6A51]">{displayEmail}</td>
                           <td className="px-5 py-4 text-[#5A6A51]">
@@ -14417,8 +14470,44 @@ export default function AdminPage() {
                 <div className="rounded-[32px] border border-[#414E36]/10 bg-[#F9F9F7] p-8 shadow-xs">
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
                     <div className="flex flex-col sm:flex-row items-center gap-5">
-                      <div className="h-20 w-20 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-3xl font-bold font-serif shrink-0 shadow-inner">
-                        {profileName ? profileName.charAt(0).toUpperCase() : "E"}
+                      <div className="relative group shrink-0">
+                        <div className="h-20 w-20 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-3xl font-bold font-serif overflow-hidden shadow-inner">
+                          {customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"] ? (
+                            <img
+                              src={customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"]}
+                              alt={profileName || "Profile"}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span>{profileName ? profileName.charAt(0).toUpperCase() : "E"}</span>
+                          )}
+                        </div>
+                        <label
+                          className="absolute -bottom-1 -right-1 p-2 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
+                          title="Upload Profile Picture"
+                        >
+                          <Camera size={14} />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              const key = profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile";
+                              if (file && key) handleAvatarUpload(key, file);
+                            }}
+                          />
+                        </label>
+                        {customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"] && (
+                          <button
+                            type="button"
+                            onClick={() => handleAvatarRemove(profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile")}
+                            className="absolute -top-1 -right-1 p-1 rounded-full bg-red-600 text-white shadow-xs hover:bg-red-700 transition"
+                            title="Remove Photo"
+                          >
+                            <X size={10} />
+                          </button>
+                        )}
                       </div>
                       <div className="text-center sm:text-left space-y-1.5">
                         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
@@ -18498,8 +18587,19 @@ export default function AdminPage() {
                             <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
                               <td className="px-6 py-4 text-xs font-mono font-bold text-[#5A6A51]">{shortId}</td>
                               <td className="px-6 py-4">
-                                <div className="font-semibold text-[#1F251A] text-sm">{emp.name || <span className="italic text-gray-400">No name</span>}</div>
-                                <div className="text-xs text-[#5A6A51]">{emp.email}</div>
+                                <div className="flex items-center gap-3">
+                                  <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-xs font-bold font-serif overflow-hidden shrink-0">
+                                    {customerAvatars[emp.id || emp.employee_id] || emp.photo_url || emp.avatar_url ? (
+                                      <img src={customerAvatars[emp.id || emp.employee_id] || emp.photo_url || emp.avatar_url} alt={emp.name} className="h-full w-full object-cover" />
+                                    ) : (
+                                      <span>{emp.name ? emp.name.charAt(0).toUpperCase() : "E"}</span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold text-[#1F251A] text-sm">{emp.name || <span className="italic text-gray-400">No name</span>}</div>
+                                    <div className="text-xs text-[#5A6A51]">{emp.email}</div>
+                                  </div>
+                                </div>
                               </td>
                               <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.phone || "—"}</td>
                               <td className="px-6 py-4">
@@ -19744,8 +19844,44 @@ export default function AdminPage() {
                   {/* Profile Header Banner */}
                   <div className="bg-white rounded-3xl border border-[#414E36]/10 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
                     <div className="flex items-center gap-4">
-                      <div className="h-16 w-16 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl font-bold font-serif shrink-0">
-                        {viewingEmployee.name ? viewingEmployee.name.charAt(0).toUpperCase() : "E"}
+                      <div className="relative group shrink-0">
+                        <div className="h-16 w-16 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-2xl font-bold font-serif overflow-hidden shadow-xs">
+                          {customerAvatars[viewingEmployee.id || viewingEmployee.employee_id] || viewingEmployee.photo_url || viewingEmployee.avatar_url ? (
+                            <img
+                              src={customerAvatars[viewingEmployee.id || viewingEmployee.employee_id] || viewingEmployee.photo_url || viewingEmployee.avatar_url}
+                              alt={viewingEmployee.name || "Employee"}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span>{viewingEmployee.name ? viewingEmployee.name.charAt(0).toUpperCase() : "E"}</span>
+                          )}
+                        </div>
+                        <label
+                          className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
+                          title="Upload/Change Staff Photo"
+                        >
+                          <Camera size={12} />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              const empKey = viewingEmployee.id || viewingEmployee.employee_id;
+                              if (file && empKey) handleAvatarUpload(empKey, file);
+                            }}
+                          />
+                        </label>
+                        {(customerAvatars[viewingEmployee.id || viewingEmployee.employee_id] || viewingEmployee.photo_url || viewingEmployee.avatar_url) && (
+                          <button
+                            type="button"
+                            onClick={() => handleAvatarRemove(viewingEmployee.id || viewingEmployee.employee_id)}
+                            className="absolute -top-1 -right-1 p-1 rounded-full bg-red-600 text-white shadow-xs hover:bg-red-700 transition"
+                            title="Remove Photo"
+                          >
+                            <X size={10} />
+                          </button>
+                        )}
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingEmployee.name || "Staff Member"}</h3>
