@@ -147,10 +147,32 @@ async function saveInventoryData(payload: any) {
 
   try {
     if (payload.devices && payload.devices.length > 0) {
-      await supabaseServer.from('inventory_devices').upsert(payload.devices);
+      const sqlRows = payload.devices.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        serial_number: d.serial_number || '',
+        model: d.model || '',
+        branch_name: d.branch_id === '803321a0-b761-468f-9ce5-f4af3e37d1f6' 
+          ? 'New Cairo Branch' 
+          : d.branch_id === '1889250c-e335-4c22-8a49-6d1ddcf79f84'
+          ? 'Sheikh Zayed Branch'
+          : (d.branch_name || 'New Cairo Branch'),
+        status: d.status || 'Optimal',
+        total_pulses: Number(d.current_pulse_count) || 0,
+        remaining_pulses: Math.max(0, (Number(d.maintenance_threshold_2) || 100000) - (Number(d.current_pulse_count) || 0)),
+        max_pulses_limit: Number(d.maintenance_threshold_2) || 100000,
+        last_maintenance_date: d.last_maintenance_date || new Date().toISOString(),
+        created_at: d.created_at || new Date().toISOString(),
+        updated_at: d.updated_at || new Date().toISOString()
+      }));
+
+      const { error: upsertErr } = await supabaseServer.from('inventory_devices').upsert(sqlRows);
+      if (upsertErr) {
+        console.error('Error syncing to inventory_devices table:', upsertErr);
+      }
     }
   } catch (e) {
-    // Ignore direct table sync failure
+    console.error('Direct table sync exception:', e);
   }
 
   return data;
