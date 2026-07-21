@@ -22,6 +22,7 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowDown,
+  Camera,
   BarChart3,
   Bell,
   Box,
@@ -1276,6 +1277,51 @@ export default function AdminPage() {
 
   // Customer Profile details drawer state
   const [viewingCustomerProfile, setViewingCustomerProfile] = useState<Customer | null>(null);
+  const [customerAvatars, setCustomerAvatars] = useState<Record<string, string>>({});
+
+  const fetchCustomerAvatars = useCallback(async () => {
+    try {
+      const res = await fetch("/api/customer-avatars");
+      if (res.ok) {
+        const data = await res.json();
+        setCustomerAvatars(data || {});
+      }
+    } catch (e) {
+      console.error("Failed to fetch customer avatars:", e);
+    }
+  }, []);
+
+  const handleAvatarUpload = async (id: string, file: File) => {
+    try {
+      const compressedDataUrl = await compressImage(file, 400, 400, 0.8);
+      setCustomerAvatars(prev => ({ ...prev, [id]: compressedDataUrl }));
+      await fetch("/api/customer-avatars", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, avatar_url: compressedDataUrl })
+      });
+    } catch (e) {
+      console.error("Avatar upload failed:", e);
+    }
+  };
+
+  const handleAvatarRemove = async (id: string) => {
+    try {
+      setCustomerAvatars(prev => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+      await fetch("/api/customer-avatars", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, avatar_url: null })
+      });
+    } catch (e) {
+      console.error("Avatar removal failed:", e);
+    }
+  };
+
   const [customerProfileTab, setCustomerProfileTab] = useState<"info" | "history" | "prescription" | "products">("info");
   const [customerPrescriptions, setCustomerPrescriptions] = useState<any[]>([]);
   const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
@@ -5791,6 +5837,7 @@ export default function AdminPage() {
 
   function fetchCustomers() {
     setLoadingCustomers(true);
+    fetchCustomerAvatars();
     cachedFetch("/api/customers", 4000)
       .then((data) => {
         if (Array.isArray(data)) {
