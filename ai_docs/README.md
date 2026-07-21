@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-07-20
+> **Last Updated:** 2026-07-21
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 
@@ -40,7 +40,7 @@ After that, check task-specific files:
 |---|---|---|
 | `PROJECT.md` | System overview — what it is, who uses it, stack, known gaps | Deployment model changes, new users/roles added, major gaps resolved |
 | `ARCHITECTURE.md` | Full stack, folder structure, data flow, brand token system, i18n | New folders/patterns introduced, Supabase tables added, auth added |
-| `DB_SCHEMA.md` | All Supabase tables with columns, types, and relationships | Any schema change (add table, add column, change type) |
+| `DB_SCHEMA.md` | All Supabase tables with columns, types, and relationships | Any schema change (add table, add column, change type) — must match `supabase/migrations/` |
 | `PRODUCT_RULES.md` | Business logic **actually enforced in code** — nothing aspirational | Any time a rule is added, removed, or changed in an API route or component |
 | `DECISIONS.md` | Decision log — what was decided, why, what was rejected | Any architectural or strategic decision is made or reversed |
 | `RISKS.md` | Risk register — known problems with file/line references | New risks found; existing risks mitigated; hardcoded values changed |
@@ -94,8 +94,8 @@ After that, check task-specific files:
 - Not the same as the mock-UI "Finances Dashboard" below — see RISK-005 for the naming collision
 
 ### What Is Mock UI Only (hardcoded data, not Supabase)
-- All clinical: consultation notes, prescriptions, treatment plans, before/after photos
-- Billing metrics: overall billing analytics reports are mock (but individual customer ledgers are real)
+- Clinical: consultation notes, treatment plans, before/after photos (prescriptions itself is real — corrected 2026-07-21, see DB_SCHEMA.md)
+- Billing metrics: overall billing analytics reports are mock (but individual customer ledgers, and now Payroll/Inventory/POS, are real — corrected 2026-07-21)
 - All marketing: WhatsApp is external `wa.me` links only; no campaigns or templates
 - Notification templates
 - Full RBAC enforcement on API routes (browser login gate exists, but `/api/*` routes don't validate tokens)
@@ -119,11 +119,12 @@ Next.js 15 (App Router) + TypeScript on Vercel. Single app serving both the publ
 1. **Do not add raw hex colors** (`#414E36`, `#C4AE7C`) to components. Use `var(--cr-primary)` and `var(--cr-accent)` from `globals.css`.
 2. **Do not hardcode "Revera"** in component strings, metadata, or alt text. It goes in `src/lib/translations.ts` or will move to `src/config/client.ts` after PROPOSAL-001 is approved.
 3. **Do not hardcode phone numbers or WhatsApp links** inline. See PROPOSAL-001 in `PROPOSALS.md`.
-4. **Do not treat mock UI sections as real features.** Finance, Payroll, Prescriptions, Inventory, POS are backed by hardcoded arrays. Adding real backend to them is a separate task.
+4. **Do not treat mock UI sections as real features.** As of 2026-07-21: consultation notes, treatment plans, before/after photos, the Finances Dashboard aggregate reporting view, Refunds, and Shipping are backed by hardcoded arrays. Prescriptions, Payroll, Inventory, and POS are now real Supabase tables — see `DB_SCHEMA.md` (this list was wrong before 2026-07-21; verify against `DB_SCHEMA.md` rather than trusting this line going forward).
 5. **`branch` is the topmost scoping unit.** There is no `org_id` or `tenant_id`. Do not introduce one without a decision logged in `DECISIONS.md`.
 6. **Do not add localStorage writes** for admin data. The existing `serviceStore.ts` pattern (localStorage as primary, Supabase as secondary) is a known risk (RISK-004) — do not extend it.
 7. **Before any refactor touching hardcoded values**, read `PROPOSALS.md` first — a centralization plan already exists.
 8. **The admin panel has no auth.** Do not assume any middleware protects `/admin`.
+9. **Any schema change must add a file to `supabase/migrations/`** (see that folder's README for naming/idempotency rules) **and** update `DB_SCHEMA.md` in the same change. The migrations folder and `DB_SCHEMA.md` must never drift apart — one is the change log, the other is the current-state reference, and both are read by agents.
 
 ---
 
@@ -131,7 +132,7 @@ Next.js 15 (App Router) + TypeScript on Vercel. Single app serving both the publ
 
 | Trigger | Files to Update |
 |---|---|
-| New Supabase table or column added | `DB_SCHEMA.md`, `ARCHITECTURE.md` |
+| New Supabase table or column added | `supabase/migrations/` (new `.sql` file), `DB_SCHEMA.md`, `ARCHITECTURE.md` |
 | New API route added or changed | `API_CONTRACT.md` |
 | New business rule enforced in code | `PRODUCT_RULES.md` |
 | Architectural decision made | `DECISIONS.md` |

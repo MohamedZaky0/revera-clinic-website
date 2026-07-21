@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-07-20
+> **Last Updated:** 2026-07-21
 > **Previous content was for a different project — discarded entirely**
 
 ---
@@ -144,9 +144,16 @@ browser or clears localStorage, they lose unsaved changes. The Supabase copy may
 
 **Description:**
 `src/app/admin/page.tsx` is a single ~550KB client component containing 40+ admin sections,
-hardcoded mock data arrays, all state variables, and all UI. Many sections (Prescriptions,
-Finance, Payroll, Inventory, POS, Refunds, Shipping) are mock UI backed by hardcoded
-constant arrays — not Supabase.
+hardcoded mock data arrays, all state variables, and all UI. Some sections are genuinely
+mock UI backed by hardcoded constant arrays — not Supabase: consultation notes, treatment
+plans, before/after photos, the Finances Dashboard aggregate reporting view (`MOCK_POS_ORDERS`
+constant), Refunds, Shipping.
+
+**Corrected 2026-07-21:** Prescriptions, Payroll, Inventory, and POS were previously listed
+here as mock too — that was wrong as of the 2026-07-20/21 migrations. They now have real
+Supabase tables (`prescriptions`, `hr_payroll`, `doctor_payroll`, `inventory_products`,
+`inventory_devices`, `product_sales`) with real API routes reading/writing them — see
+`DB_SCHEMA.md`. The size/maintainability concern for `admin/page.tsx` itself is unchanged.
 
 **Naming collision to be aware of:** "Finance" here refers to the pre-existing `Finances Dashboard`
 panel (`activeNav === "Finances Dashboard"`), which has no reachable sidebar trigger (the
