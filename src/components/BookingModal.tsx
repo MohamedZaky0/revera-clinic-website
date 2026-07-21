@@ -12,6 +12,8 @@ import {
   getDynamicCategories, 
   LocalCategory 
 } from "@/lib/serviceStore";
+import TermsModal from "./TermsModal";
+import { ShieldCheck, FileText, ExternalLink, Undo2 } from "lucide-react";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -119,6 +121,7 @@ export function BookingModal() {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [termsText, setTermsText] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   const [branches, setBranches] = useState<any[]>([]);
   const [branchId, setBranchId] = useState<string | null>(null);
@@ -1242,22 +1245,76 @@ Attached is my payment transaction receipt photo.`;
                   )}
                 </div>
 
-                {/* Terms & Conditions Gate */}
+                {/* Terms & Conditions Gate - Image 1 Style */}
                 {termsText.trim() && depositPercentage === 0 && (
-                  <div className="mb-4 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 space-y-3">
-                    <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "الشروط والأحكام" : "Terms & Conditions"}</p>
-                    <div className="max-h-32 overflow-y-auto rounded-xl bg-white border border-[#414E36]/10 p-3 text-[11px] text-[#414E36] leading-relaxed whitespace-pre-wrap">{termsText}</div>
-                    <label className="flex items-start gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={acceptedTerms}
-                        onChange={(e) => setAcceptedTerms(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded accent-[#414E36] shrink-0"
-                      />
-                      <span className="text-[11px] font-semibold text-[#414E36] leading-relaxed">
-                        {isRTL ? "أوافق على الشروط والأحكام" : "I have read and agree to the Terms & Conditions"}
-                      </span>
-                    </label>
+                  <div className="mb-5 text-left" dir={isRTL ? "rtl" : "ltr"}>
+                    <div className="rounded-2xl border border-gray-200/90 bg-white p-5 space-y-4 shadow-2xs">
+                      {/* Header: Shield Icon + TERMS & CONDITIONS */}
+                      <div className="flex items-center gap-2 text-[#2D522D] font-bold text-xs tracking-wider uppercase">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full border border-[#2D522D]/40 text-[#2D522D]">
+                          <ShieldCheck size={14} />
+                        </div>
+                        <span>{isRTL ? "الشروط والأحكام" : "TERMS & CONDITIONS"}</span>
+                      </div>
+
+                      {/* Body text */}
+                      <p className="text-xs text-gray-700 font-medium leading-relaxed">
+                        {isRTL ? "بالمتابعة، فإنك توافق على الشروط والأحكام الخاصة بنا." : "By continuing, you agree to our Terms & Conditions."}
+                      </p>
+
+                      {/* Inner Highlighted Pill Box */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-gray-200/80 bg-[#F4F8F4] p-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E2EBE2] text-[#2D522D]">
+                            <FileText size={16} />
+                          </div>
+                          <span className="text-xs text-gray-600 font-normal leading-normal">
+                            {isRTL ? "يرجى قراءة الشروط والأحكام بعناية قبل المتابعة." : "Please read our Terms & Conditions carefully before proceeding."}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowTermsModal(true)}
+                          className="flex items-center gap-1 text-xs font-semibold text-[#2D522D] underline underline-offset-2 hover:opacity-80 shrink-0 self-end sm:self-auto cursor-pointer"
+                        >
+                          <span>{isRTL ? "عرض الشروط والأحكام" : "View Terms & Conditions"}</span>
+                          <ExternalLink size={13} />
+                        </button>
+                      </div>
+
+                      <div className="border-t border-gray-200/80 my-2" />
+
+                      {/* Custom Checkbox row */}
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <div className="relative flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={acceptedTerms}
+                            onChange={(e) => setAcceptedTerms(e.target.checked)}
+                            className="peer h-4 w-4 appearance-none rounded border-2 border-gray-300 bg-white checked:border-[#2D522D] checked:bg-[#2D522D] focus:outline-none transition cursor-pointer"
+                          />
+                          <svg
+                            className="pointer-events-none absolute left-0.5 top-0.5 hidden h-3 w-3 stroke-white peer-checked:block"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth="3.5"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                        <span className="text-xs text-gray-800 font-normal">
+                          {isRTL ? "لقد قرأت وأوافق على " : "I have read and agree to the "}
+                          <button
+                            type="button"
+                            onClick={() => setShowTermsModal(true)}
+                            className="font-semibold text-[#2D522D] underline underline-offset-2 hover:opacity-80 cursor-pointer"
+                          >
+                            {isRTL ? "الشروط والأحكام" : "Terms & Conditions"}
+                          </button>
+                        </span>
+                      </label>
+                    </div>
                   </div>
                 )}
 
@@ -1498,57 +1555,117 @@ Attached is my payment transaction receipt photo.`;
                   </span>
                 </div>
 
-                {/* Terms & Conditions Gate on Payment Page */}
-                {termsText.trim() && (
-                  <div className="mt-4 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 space-y-3 text-left">
-                    <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "الشروط والأحكام" : "Terms & Conditions"}</p>
-                    <div className="max-h-24 overflow-y-auto rounded-xl bg-white border border-[#414E36]/10 p-3 text-[11px] text-[#414E36] leading-relaxed whitespace-pre-wrap">{termsText}</div>
-                    <label className="flex items-start gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={acceptedTerms}
-                        onChange={(e) => setAcceptedTerms(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded accent-[#414E36] shrink-0"
-                      />
-                      <span className="text-[11px] font-semibold text-[#414E36] leading-relaxed">
-                        {isRTL ? "أوافق على الشروط والأحكام" : "I have read and agree to the Terms & Conditions"}
+                {/* Terms & Conditions Gate on Payment Page - Image 1 Style */}
+                <div className="mt-5 text-left" dir={isRTL ? "rtl" : "ltr"}>
+                  <div className="rounded-2xl border border-gray-200/90 bg-white p-5 space-y-4 shadow-2xs">
+                    {/* Header: Shield Icon + TERMS & CONDITIONS */}
+                    <div className="flex items-center gap-2 text-[#2D522D] font-bold text-xs tracking-wider uppercase">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full border border-[#2D522D]/40 text-[#2D522D]">
+                        <ShieldCheck size={14} />
+                      </div>
+                      <span>{isRTL ? "الشروط والأحكام" : "TERMS & CONDITIONS"}</span>
+                    </div>
+
+                    {/* Body text */}
+                    <p className="text-xs text-gray-700 font-medium leading-relaxed">
+                      {isRTL ? "بالمتابعة، فإنك توافق على الشروط والأحكام الخاصة بنا." : "By continuing, you agree to our Terms & Conditions."}
+                    </p>
+
+                    {/* Inner Highlighted Pill Box */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-gray-200/80 bg-[#F4F8F4] p-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E2EBE2] text-[#2D522D]">
+                          <FileText size={16} />
+                        </div>
+                        <span className="text-xs text-gray-600 font-normal leading-normal">
+                          {isRTL ? "يرجى قراءة الشروط والأحكام بعناية قبل المتابعة." : "Please read our Terms & Conditions carefully before proceeding."}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowTermsModal(true)}
+                        className="flex items-center gap-1 text-xs font-semibold text-[#2D522D] underline underline-offset-2 hover:opacity-80 shrink-0 self-end sm:self-auto cursor-pointer"
+                      >
+                        <span>{isRTL ? "عرض الشروط والأحكام" : "View Terms & Conditions"}</span>
+                        <ExternalLink size={13} />
+                      </button>
+                    </div>
+
+                    <div className="border-t border-gray-200/80 my-2" />
+
+                    {/* Custom Checkbox row */}
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <div className="relative flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={acceptedTerms}
+                          onChange={(e) => setAcceptedTerms(e.target.checked)}
+                          className="peer h-4 w-4 appearance-none rounded border-2 border-gray-300 bg-white checked:border-[#2D522D] checked:bg-[#2D522D] focus:outline-none transition cursor-pointer"
+                        />
+                        <svg
+                          className="pointer-events-none absolute left-0.5 top-0.5 hidden h-3 w-3 stroke-white peer-checked:block"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth="3.5"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-gray-800 font-normal">
+                        {isRTL ? "لقد قرأت وأوافق على " : "I have read and agree to the "}
+                        <button
+                          type="button"
+                          onClick={() => setShowTermsModal(true)}
+                          className="font-semibold text-[#2D522D] underline underline-offset-2 hover:opacity-80 cursor-pointer"
+                        >
+                          {isRTL ? "الشروط والأحكام" : "Terms & Conditions"}
+                        </button>
                       </span>
                     </label>
                   </div>
-                )}
 
-                {/* Green WhatsApp Action Button */}
-                <button
-                  onClick={handlePayDeposit}
-                  disabled={isPaying || (termsText.trim() !== "" && !acceptedTerms)}
-                  className="w-full justify-center mt-4 rounded-2xl py-3 px-4 text-xs font-bold text-white transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: "#25D366" }}
-                >
-                  {isPaying ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      {isRTL ? "جاري الحفظ والتحويل..." : "Saving & Redirecting..."}
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-4.322c1.7.925 3.328 1.459 5.166 1.46 5.485.001 9.948-4.462 9.951-9.95.002-2.658-1.031-5.158-2.906-7.037C17.228 2.275 14.73 1.24 12.072 1.24a9.957 9.957 0 0 0-9.951 9.956c-.001 1.93.513 3.567 1.492 5.093l-.999 3.65 3.743-.981zM17.476 14.398c-.329-.165-1.947-.961-2.245-1.07-.3-.109-.518-.165-.736.165-.218.329-.844 1.07-1.034 1.289-.19.217-.38.244-.709.079a8.932 8.932 0 0 1-2.736-1.688 9.842 9.842 0 0 1-1.893-2.358c-.19-.329-.02-.507.145-.671.148-.148.33-.382.495-.572.164-.19.219-.328.328-.547.11-.219.055-.41-.027-.574-.082-.164-.736-1.776-1.009-2.433-.266-.64-.539-.553-.736-.563-.19-.01-.409-.012-.627-.012s-.573.082-.873.409c-.3.329-1.145 1.12-1.145 2.732s1.173 3.17 1.336 3.389c.164.22 2.308 3.525 5.59 4.945.78.337 1.39.539 1.86.688.784.248 1.498.213 2.062.128.629-.094 1.947-.796 2.219-1.564.272-.767.272-1.424.19-1.564-.081-.138-.3-.22-.629-.385z" />
-                      </svg>
-                      {isRTL ? "تأكيد وإرسال صورة التحويل" : "Confirm & Send Screenshot"}
-                    </>
-                  )}
-                </button>
+                  {/* Buttons matching Image 1 */}
+                  <div className="mt-4 space-y-3">
+                    {/* Primary Confirm Button */}
+                    <button
+                      onClick={handlePayDeposit}
+                      disabled={isPaying || !acceptedTerms}
+                      className="w-full justify-center rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:opacity-95"
+                      style={{ backgroundColor: "#43794E" }}
+                    >
+                      {isPaying ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          {isRTL ? "جاري الحفظ والتحويل..." : "Saving & Redirecting..."}
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex h-5 w-5 items-center justify-center rounded-full border-1.5 border-white">
+                            <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-4.322c1.7.925 3.328 1.459 5.166 1.46 5.485.001 9.948-4.462 9.951-9.95.002-2.658-1.031-5.158-2.906-7.037C17.228 2.275 14.73 1.24 12.072 1.24a9.957 9.957 0 0 0-9.951 9.956c-.001 1.93.513 3.567 1.492 5.093l-.999 3.65 3.743-.981zM17.476 14.398c-.329-.165-1.947-.961-2.245-1.07-.3-.109-.518-.165-.736.165-.218.329-.844 1.07-1.034 1.289-.19.217-.38.244-.709.079a8.932 8.932 0 0 1-2.736-1.688 9.842 9.842 0 0 1-1.893-2.358c-.19-.329-.02-.507.145-.671.148-.148.33-.382.495-.572.164-.19.219-.328.328-.547.11-.219.055-.41-.027-.574-.082-.164-.736-1.776-1.009-2.433-.266-.64-.539-.553-.736-.563-.19-.01-.409-.012-.627-.012s-.573.082-.873.409c-.3.329-1.145 1.12-1.145 2.732s1.173 3.17 1.336 3.389c.164.22 2.308 3.525 5.59 4.945.78.337 1.39.539 1.86.688.784.248 1.498.213 2.062.128.629-.094 1.947-.796 2.219-1.564.272-.767.272-1.424.19-1.564-.081-.138-.3-.22-.629-.385z" />
+                            </svg>
+                          </div>
+                          <span>{isRTL ? "تأكيد وإرسال صورة التحويل" : "Confirm & Send Screenshot"}</span>
+                        </>
+                      )}
+                    </button>
 
-                <button
-                  onClick={() => {
-                    setStep(4);
-                    setCreatedReservation(null);
-                  }}
-                  disabled={isPaying}
-                  className="btn-outline w-full justify-center text-xs mt-1"
-                >
-                  {isRTL ? "إلغاء والعودة" : "Cancel & Return"}
-                </button>
+                    {/* Secondary Return Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep(4);
+                        setCreatedReservation(null);
+                      }}
+                      disabled={isPaying}
+                      className="w-full justify-center rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-semibold text-gray-800 bg-white border border-gray-300 transition flex items-center justify-center gap-2 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <Undo2 size={16} className="text-gray-700" />
+                      <span>{isRTL ? "إلغاء والعودة" : "Cancel & Return"}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1628,6 +1745,12 @@ Attached is my payment transaction receipt photo.`;
           </div>
         </div>
       )}
+      {/* Terms & Conditions Modal overlay - Image 2 */}
+      <TermsModal 
+        isOpen={showTermsModal} 
+        onClose={() => setShowTermsModal(false)} 
+        defaultLang={isRTL ? "ar" : "en"} 
+      />
     </div>
   );
 }
