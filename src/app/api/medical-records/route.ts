@@ -97,7 +97,10 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { type, customerId, recordData, reportData } = body;
+    const type = body.type || 'form';
+    const recordData = body.recordData || body.data || {};
+    const reportData = body.reportData || body.data || {};
+    const customerId = body.customerId || body.customer_id || recordData.customer_id || reportData.customer_id;
 
     if (!customerId) {
       return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });

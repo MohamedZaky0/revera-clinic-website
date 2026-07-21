@@ -11411,52 +11411,88 @@ export default function AdminPage() {
                                   </button>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Skin Type / Fitzpatrick Classification</span>
-                                    <p className="font-semibold text-[#1F251A]">{medicalRecordForm.skin_type || "Not specified"}</p>
-                                  </div>
+                                <div className="space-y-6 text-sm">
+                                  {/* SECTION 1: Skin & Beauty Profile */}
+                                  <div className="bg-[#FBFBF9] p-5 rounded-xl border border-[#414E36]/10 space-y-4">
+                                    <h5 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] border-b border-[#414E36]/10 pb-2">
+                                      Skin & Beauty Profile
+                                    </h5>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <span className="text-[11px] font-semibold text-[#5A6A51] block mb-1">Skin Type</span>
+                                        <span className="inline-block bg-[#414E36]/10 text-[#414E36] font-bold text-xs px-3 py-1 rounded-lg">
+                                          {medicalRecordForm.skin_type || "Normal"}
+                                        </span>
+                                      </div>
 
-                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Primary Aesthetic Concerns</span>
-                                    <div className="flex flex-wrap gap-1.5 pt-1">
-                                      {medicalRecordForm.main_concerns && medicalRecordForm.main_concerns.length > 0 ? (
-                                        medicalRecordForm.main_concerns.map((c: string, idx: number) => (
-                                          <span key={idx} className="bg-[#414E36]/10 text-[#414E36] text-xs font-medium px-2.5 py-1 rounded-lg">
-                                            {c}
-                                          </span>
-                                        ))
-                                      ) : (
-                                        <span className="text-xs text-gray-400 italic">None specified</span>
-                                      )}
+                                      <div>
+                                        <span className="text-[11px] font-semibold text-[#5A6A51] block mb-1">Main Concerns</span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {medicalRecordForm.main_concerns && medicalRecordForm.main_concerns.length > 0 ? (
+                                            medicalRecordForm.main_concerns.map((c: string, idx: number) => (
+                                              <span key={idx} className="bg-white border border-[#414E36]/20 text-[#1F251A] text-xs font-medium px-2.5 py-1 rounded-lg">
+                                                {c}
+                                              </span>
+                                            ))
+                                          ) : (
+                                            <span className="text-xs text-gray-400 italic">None specified</span>
+                                          )}
+                                        </div>
+                                        {medicalRecordForm.other_concerns_details && (
+                                          <p className="text-xs text-[#1F251A] mt-1.5 italic">
+                                            Details: {medicalRecordForm.other_concerns_details}
+                                          </p>
+                                        )}
+                                      </div>
+
+                                      <div className="md:col-span-2 pt-2 border-t border-[#414E36]/5">
+                                        <span className="text-[11px] font-semibold text-[#5A6A51] block">Previous Aesthetic Treatments</span>
+                                        <p className="text-xs font-medium text-[#1F251A] mt-0.5">
+                                          {medicalRecordForm.has_previous_treatments || medicalRecordForm.previous_treatments ? (
+                                            <span className="text-emerald-800 font-semibold">Yes — {medicalRecordForm.previous_treatments_details || medicalRecordForm.previous_treatments || "Specified"}</span>
+                                          ) : (
+                                            <span className="text-gray-500">No</span>
+                                          )}
+                                        </p>
+                                      </div>
                                     </div>
                                   </div>
 
-                                  {medicalRecordForm.other_concerns && (
-                                    <div className="md:col-span-2 space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
-                                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Other Concerns / Specific Focus Areas</span>
-                                      <p className="text-[#1F251A] leading-relaxed">{medicalRecordForm.other_concerns}</p>
+                                  {/* SECTION 2: Medical Information */}
+                                  <div className="bg-[#FBFBF9] p-5 rounded-xl border border-[#414E36]/10 space-y-4">
+                                    <h5 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] border-b border-[#414E36]/10 pb-2">
+                                      Medical Information
+                                    </h5>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <span className="text-[11px] font-semibold text-[#5A6A51] block">Medical Conditions</span>
+                                        <p className="text-xs font-medium text-[#1F251A] mt-0.5">
+                                          {medicalRecordForm.has_medical_conditions || medicalRecordForm.medical_conditions ? (
+                                            <span className="text-amber-900 font-semibold">Yes — {medicalRecordForm.medical_conditions_details || medicalRecordForm.medical_conditions || "Specified"}</span>
+                                          ) : (
+                                            <span className="text-gray-500">No</span>
+                                          )}
+                                        </p>
+                                      </div>
+
+                                      <div>
+                                        <span className="text-[11px] font-semibold text-[#5A6A51] block">Current Medication</span>
+                                        <p className="text-xs font-medium text-[#1F251A] mt-0.5">
+                                          {medicalRecordForm.is_taking_medication || medicalRecordForm.medications ? (
+                                            <span className="text-amber-900 font-semibold">Yes — {medicalRecordForm.medication_details || medicalRecordForm.medications || "Specified"}</span>
+                                          ) : (
+                                            <span className="text-gray-500">No</span>
+                                          )}
+                                        </p>
+                                      </div>
+
+                                      <div className="md:col-span-2 pt-2 border-t border-[#414E36]/5">
+                                        <span className="text-[11px] font-semibold text-[#5A6A51] block">Allergies (Skincare / Ingredients / Drugs)</span>
+                                        <p className="text-xs font-medium text-amber-900 mt-0.5">
+                                          {medicalRecordForm.allergies || "No known allergies reported"}
+                                        </p>
+                                      </div>
                                     </div>
-                                  )}
-
-                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Previous Treatments & Cosmetic History</span>
-                                    <p className="text-[#1F251A] leading-relaxed">{medicalRecordForm.previous_treatments || "None reported"}</p>
-                                  </div>
-
-                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Known Medical Conditions</span>
-                                    <p className="text-[#1F251A] leading-relaxed">{medicalRecordForm.medical_conditions || "None reported"}</p>
-                                  </div>
-
-                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Current Medications & Supplements</span>
-                                    <p className="text-[#1F251A] leading-relaxed">{medicalRecordForm.medications || "None"}</p>
-                                  </div>
-
-                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Allergies (Drugs, Topical, Foods)</span>
-                                    <p className="text-[#1F251A] leading-relaxed font-medium text-amber-900">{medicalRecordForm.allergies || "No known allergies"}</p>
                                   </div>
                                 </div>
                               </div>
