@@ -1280,6 +1280,33 @@ export default function AdminPage() {
   const [viewingCustomerProfile, setViewingCustomerProfile] = useState<Customer | null>(null);
   const [customerAvatars, setCustomerAvatars] = useState<Record<string, string>>({});
 
+  // Medical Record Center & Intake Form states
+  const [medicalRecordForm, setMedicalRecordForm] = useState<any | null>(null);
+  const [medicalReports, setMedicalReports] = useState<any[]>([]);
+  const [loadingMedicalRecords, setLoadingMedicalRecords] = useState(false);
+  
+  // Medical Intake Form Modal state
+  const [showMedicalFormModal, setShowMedicalFormModal] = useState(false);
+  const [savingMedicalForm, setSavingMedicalForm] = useState(false);
+  const [formSkinType, setFormSkinType] = useState<string>("Normal");
+  const [formMainConcerns, setFormMainConcerns] = useState<string[]>([]);
+  const [formOtherConcernsDetails, setFormOtherConcernsDetails] = useState("");
+  const [formHasPreviousTreatments, setFormHasPreviousTreatments] = useState(false);
+  const [formPreviousTreatmentsDetails, setFormPreviousTreatmentsDetails] = useState("");
+  const [formHasMedicalConditions, setFormHasMedicalConditions] = useState(false);
+  const [formMedicalConditionsDetails, setFormMedicalConditionsDetails] = useState("");
+  const [formIsTakingMedication, setFormIsTakingMedication] = useState(false);
+  const [formMedicationDetails, setFormMedicationDetails] = useState("");
+  const [formAllergies, setFormAllergies] = useState("");
+
+  // Medical Report Modal state
+  const [showMedicalReportModal, setShowMedicalReportModal] = useState(false);
+  const [savingMedicalReport, setSavingMedicalReport] = useState(false);
+  const [reportTitle, setReportTitle] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportFileUrl, setReportFileUrl] = useState("");
+  const [reportDoctorName, setReportDoctorName] = useState("");
+
   const fetchCustomerAvatars = useCallback(async () => {
     try {
       const res = await fetch("/api/customer-avatars");
@@ -1328,6 +1355,7 @@ export default function AdminPage() {
   };
 
   const [customerProfileTab, setCustomerProfileTab] = useState<"info" | "history" | "prescription" | "products">("info");
+  const [customerRecordsSubTab, setCustomerRecordsSubTab] = useState<"intake" | "prescriptions" | "reports">("intake");
   const [customerPrescriptions, setCustomerPrescriptions] = useState<any[]>([]);
   const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
   const [prescriptionEditMode, setPrescriptionEditMode] = useState(false);
@@ -1706,10 +1734,12 @@ export default function AdminPage() {
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
   const [calendarView, setCalendarView] = useState<"Calendar" | "List" | "Schedule">("Calendar");
-  // Fetch prescriptions when viewing customer profile changes or when prescriptions tab is active
+  // Fetch prescriptions and medical records when viewing customer profile changes
   useEffect(() => {
     if (!viewingCustomerProfile?.id) {
       setCustomerPrescriptions([]);
+      setMedicalRecordForm(null);
+      setMedicalReports([]);
       setCustomerProfileTab("info");
       setPrescriptionEditMode(false);
       setEditingPrescription(null);
@@ -1731,7 +1761,24 @@ export default function AdminPage() {
       }
     };
 
+    const fetchMedicalRecords = async () => {
+      setLoadingMedicalRecords(true);
+      try {
+        const res = await fetch(`/api/medical-records?customerId=${viewingCustomerProfile.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setMedicalRecordForm(data.form || null);
+          setMedicalReports(data.reports || []);
+        }
+      } catch (err) {
+        console.error("Error fetching medical records:", err);
+      } finally {
+        setLoadingMedicalRecords(false);
+      }
+    };
+
     fetchRx();
+    fetchMedicalRecords();
   }, [viewingCustomerProfile?.id]);
 
   useEffect(() => {
@@ -6416,6 +6463,123 @@ export default function AdminPage() {
     } catch (err: any) {
       console.error("handleDeletePrescription error:", err);
       alert(err.message || "An error occurred while deleting the prescription.");
+    }
+  }
+
+  function handleOpenMedicalFormModal() {
+    const data = medicalRecordForm || {};
+    setFormSkinType(data.skin_type || "Normal");
+    setFormMainConcerns(data.main_concerns || []);
+    setFormOtherConcernsDetails(data.other_concerns_details || "");
+    setFormHasPreviousTreatments(Boolean(data.has_previous_treatments));
+    setFormPreviousTreatmentsDetails(data.previous_treatments_details || "");
+    setFormHasMedicalConditions(Boolean(data.has_medical_conditions));
+    setFormMedicalConditionsDetails(data.medical_conditions_details || "");
+    setFormIsTakingMedication(Boolean(data.is_taking_medication));
+    setFormMedicationDetails(data.medication_details || "");
+    setFormAllergies(data.allergies || "");
+    setShowMedicalFormModal(true);
+  }
+
+  async function handleSaveMedicalForm() {
+    if (!viewingCustomerProfile?.id) return;
+    setSavingMedicalForm(true);
+    try {
+      const payload = {
+        customer_id: viewingCustomerProfile.id,
+        skin_type: formSkinType,
+        main_concerns: formMainConcerns,
+        other_concerns_details: formOtherConcernsDetails,
+        has_previous_treatments: formHasPreviousTreatments,
+        previous_treatments_details: formPreviousTreatmentsDetails,
+        has_medical_conditions: formHasMedicalConditions,
+        medical_conditions_details: formMedicalConditionsDetails,
+        is_taking_medication: formIsTakingMedication,
+        medication_details: formMedicationDetails,
+        allergies: formAllergies,
+        recorded_by: adminRole || "admin",
+        recorded_at: new Date().toISOString(),
+      };
+
+      const res = await fetch("/api/medical-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "form", data: payload }),
+      });
+
+      if (res.ok) {
+        const saved = await res.json();
+        setMedicalRecordForm(saved.form || payload);
+        setShowMedicalFormModal(false);
+      } else {
+        alert("Failed to save medical intake form.");
+      }
+    } catch (err: any) {
+      console.error("Error saving medical form:", err);
+      alert(err.message || "An error occurred while saving.");
+    } finally {
+      setSavingMedicalForm(false);
+    }
+  }
+
+  function handleOpenMedicalReportModal() {
+    setReportTitle("");
+    setReportDescription("");
+    setReportFileUrl("");
+    setReportDoctorName(adminRole || "");
+    setShowMedicalReportModal(true);
+  }
+
+  async function handleSaveMedicalReport() {
+    if (!viewingCustomerProfile?.id || !reportTitle.trim()) {
+      alert("Please enter a report title.");
+      return;
+    }
+    setSavingMedicalReport(true);
+    try {
+      const payload = {
+        customer_id: viewingCustomerProfile.id,
+        title: reportTitle.trim(),
+        description: reportDescription.trim(),
+        file_url: reportFileUrl.trim(),
+        doctor_name: reportDoctorName.trim() || adminRole || "Staff",
+        created_at: new Date().toISOString(),
+      };
+
+      const res = await fetch("/api/medical-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "report", data: payload }),
+      });
+
+      if (res.ok) {
+        const saved = await res.json();
+        if (saved.report) {
+          setMedicalReports((prev) => [saved.report, ...prev]);
+        } else {
+          setMedicalReports((prev) => [payload, ...prev]);
+        }
+        setShowMedicalReportModal(false);
+      } else {
+        alert("Failed to save report.");
+      }
+    } catch (err: any) {
+      console.error("Error saving report:", err);
+      alert(err.message || "An error occurred while saving report.");
+    } finally {
+      setSavingMedicalReport(false);
+    }
+  }
+
+  async function handleDeleteMedicalReport(reportId: string) {
+    if (!confirm("Are you sure you want to delete this report?")) return;
+    try {
+      setMedicalReports((prev) => prev.filter((r) => r.id !== reportId));
+      await fetch(`/api/medical-records?reportId=${encodeURIComponent(reportId)}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.error("Error deleting medical report:", err);
     }
   }
 
@@ -11156,131 +11320,341 @@ export default function AdminPage() {
                       </div>
                     )}
 
-                    {/* Tab 3: Prescriptions */}
+                    {/* Tab 3: Medical Records & Prescriptions */}
                     {customerProfileTab === "prescription" && (
                       <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Medical Records & Prescriptions</h4>
-                          {!prescriptionEditMode && (adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor") && (
+                        {/* Sub-tab Navigation Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#414E36]/10">
+                          <div className="flex items-center gap-1.5 bg-[#F4F6F3] p-1 rounded-xl">
                             <button
+                              type="button"
+                              onClick={() => setCustomerRecordsSubTab("intake")}
+                              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                                customerRecordsSubTab === "intake"
+                                  ? "bg-[#414E36] text-white shadow-sm font-bold"
+                                  : "text-[#5A6A51] hover:text-[#414E36]"
+                              }`}
+                            >
+                              📋 Medical Intake & History
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCustomerRecordsSubTab("prescriptions")}
+                              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                                customerRecordsSubTab === "prescriptions"
+                                  ? "bg-[#414E36] text-white shadow-sm font-bold"
+                                  : "text-[#5A6A51] hover:text-[#414E36]"
+                              }`}
+                            >
+                              💊 Clinical Prescriptions ({customerPrescriptions.length})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCustomerRecordsSubTab("reports")}
+                              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                                customerRecordsSubTab === "reports"
+                                  ? "bg-[#414E36] text-white shadow-sm font-bold"
+                                  : "text-[#5A6A51] hover:text-[#414E36]"
+                              }`}
+                            >
+                              📑 Reports & Documents ({medicalReports.length})
+                            </button>
+                          </div>
+
+                          {customerRecordsSubTab === "intake" && (
+                            <button
+                              type="button"
+                              onClick={handleOpenMedicalFormModal}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm shrink-0"
+                            >
+                              <Pencil size={13} /> {medicalRecordForm ? "Edit Intake Form" : "+ Fill Medical Intake Form"}
+                            </button>
+                          )}
+
+                          {customerRecordsSubTab === "prescriptions" && !prescriptionEditMode && (adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor") && (
+                            <button
+                              type="button"
                               onClick={handleStartCreatePrescription}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm shrink-0"
                             >
                               <Plus size={14} /> Write Prescription
                             </button>
                           )}
+
+                          {customerRecordsSubTab === "reports" && (
+                            <button
+                              type="button"
+                              onClick={handleOpenMedicalReportModal}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm shrink-0"
+                            >
+                              <Plus size={14} /> Upload Report
+                            </button>
+                          )}
                         </div>
-                        {prescriptionEditMode ? (
-                          <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-                            <h5 className="text-sm font-bold text-[#1F251A] border-b border-[#414E36]/5 pb-2">
-                              {editingPrescription ? "Edit Prescription" : "New Visit Prescription"}
-                            </h5>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Patient Name (Auto-filled)</label>
-                                <input type="text" readOnly value={viewingCustomerProfile.name} className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none" />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Date (Auto-filled)</label>
-                                <input type="text" readOnly value={new Date().toISOString().slice(0, 10)} className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none" />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Diagnosis / Assessment</label>
-                              <textarea placeholder="Describe the medical assessment..." value={rxDiagnosis} onChange={(e) => setRxDiagnosis(e.target.value)} rows={3} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
-                            </div>
-                            <div className="border border-[#414E36]/10 rounded-xl p-4 bg-[#FBFBF9] space-y-3">
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#414E36]">Prescribed Medications</label>
-                              <div className="flex gap-2">
-                                <div className="flex-1 space-y-2">
-                                  <div className="flex gap-2">
-                                    <select value={rxMedDropdown} onChange={(e) => { const val = e.target.value; setRxMedDropdown(val); if (val && val !== "Custom") { setRxMedInput(val); } }} className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition">
-                                      <option value="">-- Choose from Catalog --</option>
-                                      {MOCK_MEDICINES.map((med) => (<option key={med.id} value={med.name}>{med.name}</option>))}
-                                      <option value="Custom">Custom Medication...</option>
-                                    </select>
-                                    <input type="text" placeholder="Enter medication name..." value={rxMedInput} onChange={(e) => setRxMedInput(e.target.value)} className="flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+
+                        {/* Sub-tab 1: Medical Intake & History */}
+                        {customerRecordsSubTab === "intake" && (
+                          <div className="space-y-4">
+                            {medicalRecordForm ? (
+                              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-6 space-y-6">
+                                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                                  <div>
+                                    <h4 className="text-sm font-bold text-[#1F251A]">Patient Medical & Aesthetic Intake Form</h4>
+                                    <p className="text-xs text-[#5A6A51]">Clinical background, skin analysis, medical conditions & allergies</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleOpenMedicalFormModal}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                                  >
+                                    <Pencil size={12} /> Edit Form
+                                  </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Skin Type / Fitzpatrick Classification</span>
+                                    <p className="font-semibold text-[#1F251A]">{medicalRecordForm.skin_type || "Not specified"}</p>
+                                  </div>
+
+                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Primary Aesthetic Concerns</span>
+                                    <div className="flex flex-wrap gap-1.5 pt-1">
+                                      {medicalRecordForm.main_concerns && medicalRecordForm.main_concerns.length > 0 ? (
+                                        medicalRecordForm.main_concerns.map((c: string, idx: number) => (
+                                          <span key={idx} className="bg-[#414E36]/10 text-[#414E36] text-xs font-medium px-2.5 py-1 rounded-lg">
+                                            {c}
+                                          </span>
+                                        ))
+                                      ) : (
+                                        <span className="text-xs text-gray-400 italic">None specified</span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {medicalRecordForm.other_concerns && (
+                                    <div className="md:col-span-2 space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Other Concerns / Specific Focus Areas</span>
+                                      <p className="text-[#1F251A] leading-relaxed">{medicalRecordForm.other_concerns}</p>
+                                    </div>
+                                  )}
+
+                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Previous Treatments & Cosmetic History</span>
+                                    <p className="text-[#1F251A] leading-relaxed">{medicalRecordForm.previous_treatments || "None reported"}</p>
+                                  </div>
+
+                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Known Medical Conditions</span>
+                                    <p className="text-[#1F251A] leading-relaxed">{medicalRecordForm.medical_conditions || "None reported"}</p>
+                                  </div>
+
+                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Current Medications & Supplements</span>
+                                    <p className="text-[#1F251A] leading-relaxed">{medicalRecordForm.medications || "None"}</p>
+                                  </div>
+
+                                  <div className="space-y-1 bg-[#FBFBF9] p-4 rounded-xl border border-[#414E36]/5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#C4AE7C]">Allergies (Drugs, Topical, Foods)</span>
+                                    <p className="text-[#1F251A] leading-relaxed font-medium text-amber-900">{medicalRecordForm.allergies || "No known allergies"}</p>
                                   </div>
                                 </div>
-                                <button type="button" onClick={handleAddMedication} className="rounded-xl bg-[#414E36] px-4 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shrink-0">Add</button>
                               </div>
-                              {rxMedications.length > 0 ? (
-                                <div className="space-y-2 pt-2 border-t border-[#414E36]/5">
-                                  {rxMedications.map((med, idx) => (
-                                    <div key={idx} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-[#414E36]/10 text-sm">
-                                      <div className="flex-1">
-                                        <span className="font-semibold text-[#1F251A]">{med.name}</span>
-                                        <input type="text" placeholder="Dosage instructions..." value={med.instructions} onChange={(e) => { const newMeds = [...rxMedications]; newMeds[idx].instructions = e.target.value; setRxMedications(newMeds); }} className="w-full mt-1 bg-transparent text-xs text-[#5A6A51] border-b border-transparent hover:border-[#414E36]/15 focus:border-[#C4AE7C] outline-none py-0.5" />
-                                      </div>
-                                      <button type="button" onClick={() => handleRemoveMedication(idx)} className="text-red-500 hover:text-red-700 transition p-1 ml-2"><Trash2 size={14} /></button>
-                                    </div>
-                                  ))}
+                            ) : (
+                              <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-3">
+                                <FileText size={36} className="mx-auto text-[#8A9A81]" />
+                                <div>
+                                  <p className="text-sm font-semibold text-[#1F251A]">No Medical Intake Form recorded yet</p>
+                                  <p className="text-xs text-[#5A6A51]">Fill out the patient's medical history, skin type, concerns, and allergies.</p>
                                 </div>
-                              ) : (
-                                <p className="text-xs text-[#8A9A81] italic text-center py-2">No medications added yet.</p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">General Notes (Optional)</label>
-                              <textarea placeholder="Additional advice..." value={rxGeneralNotes} onChange={(e) => setRxGeneralNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
-                            </div>
-                            <div>
-                              <div className="flex items-center justify-between mb-1.5">
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-800">🔒 Doctor-Only Notes (Optional)</label>
-                                <span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1.5 py-0.5 rounded">Hidden from print</span>
+                                <button
+                                  type="button"
+                                  onClick={handleOpenMedicalFormModal}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
+                                >
+                                  + Fill Medical Intake Form
+                                </button>
                               </div>
-                              <textarea placeholder="Confidential clinical remarks..." value={rxDocNotes} onChange={(e) => setRxDocNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-amber-300/40 bg-amber-50/20 px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-amber-400 transition" />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Next Follow-Up Date (Optional)</label>
-                              <input type="date" value={rxFollowUpDate} onChange={(e) => setRxFollowUpDate(e.target.value)} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
-                            </div>
-                            <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
-                              <button type="button" onClick={() => setPrescriptionEditMode(false)} className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]">Cancel</button>
-                              <button type="button" onClick={handleSavePrescription} disabled={savingPrescription} className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60">{savingPrescription ? "Saving..." : "Save Record"}</button>
-                            </div>
+                            )}
                           </div>
-                        ) : (
+                        )}
+
+                        {/* Sub-tab 2: Prescriptions */}
+                        {customerRecordsSubTab === "prescriptions" && (
                           <div className="space-y-4">
-                            {loadingPrescriptions ? (
-                              <div className="text-center py-12 text-[#5A6A51] text-sm">Loading medical records...</div>
-                            ) : customerPrescriptions.length === 0 ? (
-                              <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-2">
-                                <p className="text-sm font-semibold text-[#1F251A]">No clinical prescriptions recorded yet</p>
-                                <p className="text-xs text-[#5A6A51]">Create a prescription or register clinic visit details for this patient.</p>
+                            {prescriptionEditMode ? (
+                              <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
+                                <h5 className="text-sm font-bold text-[#1F251A] border-b border-[#414E36]/5 pb-2">
+                                  {editingPrescription ? "Edit Prescription" : "New Visit Prescription"}
+                                </h5>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Patient Name (Auto-filled)</label>
+                                    <input type="text" readOnly value={viewingCustomerProfile.name} className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none" />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Date (Auto-filled)</label>
+                                    <input type="text" readOnly value={new Date().toISOString().slice(0, 10)} className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none" />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Diagnosis / Assessment</label>
+                                  <textarea placeholder="Describe the medical assessment..." value={rxDiagnosis} onChange={(e) => setRxDiagnosis(e.target.value)} rows={3} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+                                </div>
+                                <div className="border border-[#414E36]/10 rounded-xl p-4 bg-[#FBFBF9] space-y-3">
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#414E36]">Prescribed Medications</label>
+                                  <div className="flex gap-2">
+                                    <div className="flex-1 space-y-2">
+                                      <div className="flex gap-2">
+                                        <select value={rxMedDropdown} onChange={(e) => { const val = e.target.value; setRxMedDropdown(val); if (val && val !== "Custom") { setRxMedInput(val); } }} className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition">
+                                          <option value="">-- Choose from Catalog --</option>
+                                          {MOCK_MEDICINES.map((med) => (<option key={med.id} value={med.name}>{med.name}</option>))}
+                                          <option value="Custom">Custom Medication...</option>
+                                        </select>
+                                        <input type="text" placeholder="Enter medication name..." value={rxMedInput} onChange={(e) => setRxMedInput(e.target.value)} className="flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+                                      </div>
+                                    </div>
+                                    <button type="button" onClick={handleAddMedication} className="rounded-xl bg-[#414E36] px-4 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shrink-0">Add</button>
+                                  </div>
+                                  {rxMedications.length > 0 ? (
+                                    <div className="space-y-2 pt-2 border-t border-[#414E36]/5">
+                                      {rxMedications.map((med, idx) => (
+                                        <div key={idx} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-[#414E36]/10 text-sm">
+                                          <div className="flex-1">
+                                            <span className="font-semibold text-[#1F251A]">{med.name}</span>
+                                            <input type="text" placeholder="Dosage instructions..." value={med.instructions} onChange={(e) => { const newMeds = [...rxMedications]; newMeds[idx].instructions = e.target.value; setRxMedications(newMeds); }} className="w-full mt-1 bg-transparent text-xs text-[#5A6A51] border-b border-transparent hover:border-[#414E36]/15 focus:border-[#C4AE7C] outline-none py-0.5" />
+                                          </div>
+                                          <button type="button" onClick={() => handleRemoveMedication(idx)} className="text-red-500 hover:text-red-700 transition p-1 ml-2"><Trash2 size={14} /></button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-[#8A9A81] italic text-center py-2">No medications added yet.</p>
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">General Notes (Optional)</label>
+                                  <textarea placeholder="Additional advice..." value={rxGeneralNotes} onChange={(e) => setRxGeneralNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+                                </div>
+                                <div>
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-800">🔒 Doctor-Only Notes (Optional)</label>
+                                    <span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1.5 py-0.5 rounded">Hidden from print</span>
+                                  </div>
+                                  <textarea placeholder="Confidential clinical remarks..." value={rxDocNotes} onChange={(e) => setRxDocNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-amber-300/40 bg-amber-50/20 px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-amber-400 transition" />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Next Follow-Up Date (Optional)</label>
+                                  <input type="date" value={rxFollowUpDate} onChange={(e) => setRxFollowUpDate(e.target.value)} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+                                </div>
+                                <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
+                                  <button type="button" onClick={() => setPrescriptionEditMode(false)} className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]">Cancel</button>
+                                  <button type="button" onClick={handleSavePrescription} disabled={savingPrescription} className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60">{savingPrescription ? "Saving..." : "Save Record"}</button>
+                                </div>
                               </div>
                             ) : (
                               <div className="space-y-4">
-                                {customerPrescriptions.map((rx) => {
-                                  const rxDate = new Date(rx.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-                                  const isDocUser = adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor";
-                                  return (
-                                    <div key={rx.id} className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 relative overflow-hidden">
-                                      <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
-                                        <div>
-                                          <span className="font-bold text-[#1F251A] text-sm">{rxDate}</span>
-                                          <span className="text-xs text-[#8A9A81] block">Recorded by Revera Clinic Team</span>
+                                {loadingPrescriptions ? (
+                                  <div className="text-center py-12 text-[#5A6A51] text-sm">Loading medical records...</div>
+                                ) : customerPrescriptions.length === 0 ? (
+                                  <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-2">
+                                    <p className="text-sm font-semibold text-[#1F251A]">No clinical prescriptions recorded yet</p>
+                                    <p className="text-xs text-[#5A6A51]">Create a prescription or register clinic visit details for this patient.</p>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-4">
+                                    {customerPrescriptions.map((rx) => {
+                                      const rxDate = new Date(rx.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+                                      const isDocUser = adminRole === "superadmin" || adminRole === "admin" || adminRole === "doctor";
+                                      return (
+                                        <div key={rx.id} className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4 relative overflow-hidden">
+                                          <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
+                                            <div>
+                                              <span className="font-bold text-[#1F251A] text-sm">{rxDate}</span>
+                                              <span className="text-xs text-[#8A9A81] block">Recorded by Revera Clinic Team</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <button type="button" onClick={() => handlePrintPrescription(rx)} className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"><Printer size={13} /> Print</button>
+                                              {isDocUser && (
+                                                <>
+                                                  <button type="button" onClick={() => handleStartEditPrescription(rx)} className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"><Pencil size={12} /> Edit</button>
+                                                  <button type="button" onClick={() => handleDeletePrescription(rx.id)} className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition"><Trash2 size={13} /></button>
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div className="space-y-3 text-sm">
+                                            {rx.diagnosis && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Diagnosis</span><p className="text-[#1F251A] font-medium leading-relaxed">{rx.diagnosis}</p></div>)}
+                                            {rx.medications && rx.medications.length > 0 && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Medications Prescribed</span><ul className="space-y-2 bg-[#FBFBF9] rounded-xl border border-[#414E36]/5 p-3">{rx.medications.map((m: any, idx: number) => (<li key={idx} className="flex flex-col"><span className="font-semibold text-[#1F251A]">{m.name}</span>{m.instructions && (<span className="text-xs text-[#5A6A51] italic">{m.instructions}</span>)}</li>))}</ul></div>)}
+                                            {rx.general_notes && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">General Notes</span><p className="text-xs text-[#5A6A51] bg-[#FBFBF9] rounded-xl p-3 border border-[#414E36]/5 leading-relaxed">{rx.general_notes}</p></div>)}
+                                            {rx.doctor_notes && isDocUser && (<div className="border border-amber-300/40 bg-amber-50/20 rounded-xl p-3.5 space-y-1"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-amber-800">🔒 Doctor-Only Notes</span><span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1 py-0.5 rounded">Hidden from print</span></div><p className="text-xs text-amber-900 leading-relaxed">{rx.doctor_notes}</p></div>)}
+                                            {rx.follow_up_date && (<div className="flex items-center gap-1.5 text-xs text-[#414E36] font-semibold bg-[#EDF1EC]/60 px-3 py-2 rounded-xl w-fit"><Calendar size={13} />Next Follow-Up: {new Date(rx.follow_up_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>)}
+                                          </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                          <button onClick={() => handlePrintPrescription(rx)} className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"><Printer size={13} /> Print</button>
-                                          {isDocUser && (
-                                            <>
-                                              <button onClick={() => handleStartEditPrescription(rx)} className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"><Pencil size={12} /> Edit</button>
-                                              <button onClick={() => handleDeletePrescription(rx.id)} className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition"><Trash2 size={13} /></button>
-                                            </>
-                                          )}
-                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Sub-tab 3: Reports & Documents */}
+                        {customerRecordsSubTab === "reports" && (
+                          <div className="space-y-4">
+                            {medicalReports.length === 0 ? (
+                              <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-3">
+                                <FileText size={36} className="mx-auto text-[#8A9A81]" />
+                                <div>
+                                  <p className="text-sm font-semibold text-[#1F251A]">No medical reports uploaded yet</p>
+                                  <p className="text-xs text-[#5A6A51]">Upload lab results, scan reports, or external clinical documents for this patient.</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={handleOpenMedicalReportModal}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
+                                >
+                                  <Plus size={14} /> Upload Report
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {medicalReports.map((report) => (
+                                  <div key={report.id} className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-3 relative">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="space-y-1">
+                                        <h5 className="font-bold text-[#1F251A] text-sm">{report.report_title}</h5>
+                                        <span className="text-[10px] font-semibold text-[#5A6A51] uppercase bg-[#EDF1EC] px-2 py-0.5 rounded-md">
+                                          {report.report_type || "General Document"}
+                                        </span>
                                       </div>
-                                      <div className="space-y-3 text-sm">
-                                        {rx.diagnosis && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Diagnosis</span><p className="text-[#1F251A] font-medium leading-relaxed">{rx.diagnosis}</p></div>)}
-                                        {rx.medications && rx.medications.length > 0 && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Medications Prescribed</span><ul className="space-y-2 bg-[#FBFBF9] rounded-xl border border-[#414E36]/5 p-3">{rx.medications.map((m: any, idx: number) => (<li key={idx} className="flex flex-col"><span className="font-semibold text-[#1F251A]">{m.name}</span>{m.instructions && (<span className="text-xs text-[#5A6A51] italic">{m.instructions}</span>)}</li>))}</ul></div>)}
-                                        {rx.general_notes && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">General Notes</span><p className="text-xs text-[#5A6A51] bg-[#FBFBF9] rounded-xl p-3 border border-[#414E36]/5 leading-relaxed">{rx.general_notes}</p></div>)}
-                                        {rx.doctor_notes && isDocUser && (<div className="border border-amber-300/40 bg-amber-50/20 rounded-xl p-3.5 space-y-1"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-amber-800">🔒 Doctor-Only Notes</span><span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1 py-0.5 rounded">Hidden from print</span></div><p className="text-xs text-amber-900 leading-relaxed">{rx.doctor_notes}</p></div>)}
-                                        {rx.follow_up_date && (<div className="flex items-center gap-1.5 text-xs text-[#414E36] font-semibold bg-[#EDF1EC]/60 px-3 py-2 rounded-xl w-fit"><Calendar size={13} />Next Follow-Up: {new Date(rx.follow_up_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>)}
-                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteMedicalReport(report.id)}
+                                        className="text-red-500 hover:text-red-700 p-1 transition"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
                                     </div>
-                                  );
-                                })}
+                                    {report.notes && (
+                                      <p className="text-xs text-[#5A6A51] line-clamp-2">{report.notes}</p>
+                                    )}
+                                    <div className="flex items-center justify-between pt-2 border-t border-[#414E36]/5 text-xs text-[#8A9A81]">
+                                      <span>{report.report_date ? new Date(report.report_date).toLocaleDateString() : new Date(report.created_at).toLocaleDateString()}</span>
+                                      {report.file_url && (
+                                        <a
+                                          href={report.file_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1 text-[#414E36] font-semibold hover:underline"
+                                        >
+                                          View File ↗
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             )}
                           </div>
