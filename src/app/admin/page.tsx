@@ -11280,10 +11280,10 @@ export default function AdminPage() {
                                   </thead>
                                   <tbody className="divide-y divide-[#414E36]/5">
                                     {customerProductBalances.map((bal: any) => {
-                                      const totalPurchased = bal.total_purchased ?? bal.quantity ?? 0;
-                                      const totalUsed = bal.total_used ?? bal.quantity_used ?? 0;
-                                      const remaining = bal.remaining_balance ?? (totalPurchased - totalUsed);
-                                      const isDepleted = remaining <= 0;
+                                      const totalPurchased = bal.purchased_quantity ?? bal.total_purchased ?? bal.quantity ?? 0;
+                                      const totalUsed = bal.used_quantity ?? bal.total_used ?? bal.quantity_used ?? 0;
+                                      const remaining = bal.remaining_quantity ?? bal.remaining_balance ?? (totalPurchased - totalUsed);
+                                      const isDepleted = bal.status ? bal.status === "Depleted" || remaining <= 0 : remaining <= 0;
 
                                       return (
                                         <tr key={bal.id} className="hover:bg-[#FBFBF9]/60 transition">
@@ -11398,7 +11398,9 @@ export default function AdminPage() {
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">Product / Item</span>
                             <p className="font-bold text-[#1F251A] text-sm">{logUsageModalBalance.product_name}</p>
                             <p className="text-[#5A6A51]">
-                              Current Remaining Balance: <strong className="text-[#414E36]">{logUsageModalBalance.remaining_balance ?? ((logUsageModalBalance.total_purchased || logUsageModalBalance.quantity || 0) - (logUsageModalBalance.total_used || logUsageModalBalance.quantity_used || 0))}</strong>
+                              Current Remaining Balance: <strong className="text-[#414E36]">
+                                {logUsageModalBalance.remaining_quantity ?? logUsageModalBalance.remaining_balance ?? ((logUsageModalBalance.purchased_quantity || logUsageModalBalance.total_purchased || logUsageModalBalance.quantity || 0) - (logUsageModalBalance.used_quantity || logUsageModalBalance.total_used || logUsageModalBalance.quantity_used || 0))}
+                              </strong>
                             </p>
                           </div>
 
@@ -11408,7 +11410,7 @@ export default function AdminPage() {
                               <input
                                 type="number"
                                 min="1"
-                                max={logUsageModalBalance.remaining_balance || 99}
+                                max={logUsageModalBalance.remaining_quantity ?? logUsageModalBalance.remaining_balance ?? 99}
                                 value={logUsageQty}
                                 onChange={(e) => setLogUsageQty(Math.max(1, Number(e.target.value)))}
                                 className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
