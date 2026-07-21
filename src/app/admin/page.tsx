@@ -11380,8 +11380,9 @@ export default function AdminPage() {
 
                     {/* Log Usage Modal */}
                     {logUsageModalBalance && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-                        <div className="w-full max-w-md bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4 animate-scaleUp">
+                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 bg-black/40" onClick={() => setLogUsageModalBalance(null)} />
+                        <div className="relative z-10 w-full max-w-md bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4">
                           <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
                             <h4 className="text-base font-bold text-[#1F251A]">Deduct / Log Product Usage</h4>
                             <button
@@ -11448,8 +11449,9 @@ export default function AdminPage() {
 
                     {/* Add Product to Patient / Cart Modal */}
                     {showAddPatientProductModal && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-                        <div className="w-full max-w-lg bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4 animate-scaleUp">
+                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 bg-black/40" onClick={() => setShowAddPatientProductModal(false)} />
+                        <div className="relative z-10 w-full max-w-lg bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4">
                           <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
                             <div>
                               <h4 className="text-base font-bold text-[#1F251A]">Add Product / Package to Patient</h4>
