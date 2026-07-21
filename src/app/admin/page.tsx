@@ -11380,7 +11380,7 @@ export default function AdminPage() {
 
                     {/* Log Usage Modal */}
                     {logUsageModalBalance && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
                         <div className="w-full max-w-md bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4 animate-scaleUp">
                           <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
                             <h4 className="text-base font-bold text-[#1F251A]">Deduct / Log Product Usage</h4>
@@ -11448,7 +11448,7 @@ export default function AdminPage() {
 
                     {/* Add Product to Patient / Cart Modal */}
                     {showAddPatientProductModal && (
-                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
                         <div className="w-full max-w-lg bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4 animate-scaleUp">
                           <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
                             <div>
