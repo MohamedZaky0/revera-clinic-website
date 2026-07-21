@@ -11877,6 +11877,7 @@ export default function AdminPage() {
                         )}
                       </div>
                     )}
+                  </div>
 
                     {/* Log Usage Modal */}
                     {logUsageModalBalance && (
@@ -12058,9 +12059,333 @@ export default function AdminPage() {
                         </div>
                       </div>
                     )}
+
+                {/* ── Modal: Medical Intake Form ── */}
+                {showMedicalFormModal && (
+                  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+                    <div className="relative w-full max-w-2xl rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[#414E36]/15 space-y-6 my-8">
+                      <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+                        <div>
+                          <h3 className="text-xl font-bold text-[#1F251A]">Patient Medical & Aesthetic Intake Form</h3>
+                          <p className="text-xs text-[#5A6A51] mt-0.5">Record clinical history, skin classification, medical background & allergies</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowMedicalFormModal(false)}
+                          className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
+                        {/* Skin Type */}
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-2">Skin Classification</label>
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                            {["Normal", "Dry", "Oily", "Combination", "Sensitive"].map((type) => (
+                              <button
+                                key={type}
+                                type="button"
+                                onClick={() => setFormSkinType(type)}
+                                className={`py-2 px-3 text-xs font-semibold rounded-xl border transition ${
+                                  formSkinType === type
+                                    ? "bg-[#414E36] text-[#FBFBF9] border-[#414E36]"
+                                    : "bg-white text-[#1F251A] border-[#414E36]/20 hover:border-[#414E36]"
+                                }`}
+                              >
+                                {type}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Main Concerns */}
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-2">Primary Aesthetic Concerns</label>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {[
+                              "Acne & Blemishes",
+                              "Pigmentation & Dark Spots",
+                              "Aging & Fine Lines",
+                              "Dullness & Uneven Tone",
+                              "Rosacea & Redness",
+                              "Enlarged Pores",
+                              "Sagging & Loss of Volume",
+                            ].map((concern) => {
+                              const isSelected = formMainConcerns.includes(concern);
+                              return (
+                                <button
+                                  key={concern}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setFormMainConcerns(formMainConcerns.filter((c) => c !== concern));
+                                    } else {
+                                      setFormMainConcerns([...formMainConcerns, concern]);
+                                    }
+                                  }}
+                                  className={`py-1.5 px-3 text-xs font-medium rounded-lg border transition ${
+                                    isSelected
+                                      ? "bg-[#414E36]/15 text-[#414E36] border-[#414E36]/40 font-semibold"
+                                      : "bg-white text-gray-700 border-gray-200 hover:border-[#414E36]/30"
+                                  }`}
+                                >
+                                  {isSelected ? "✓ " : "+ "}{concern}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Additional Concern Details / Notes</label>
+                            <input
+                              type="text"
+                              value={formOtherConcernsDetails}
+                              onChange={(e) => setFormOtherConcernsDetails(e.target.value)}
+                              placeholder="e.g. Melasma around cheeks, sensitive under-eye area..."
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Previous Treatments */}
+                        <div className="bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <label className="text-xs font-bold text-[#1F251A]">Previous Aesthetic Treatments</label>
+                              <p className="text-[11px] text-[#5A6A51]">Botox, Fillers, Lasers, Chemical Peels, Microneedling, etc.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setFormHasPreviousTreatments(true)}
+                                className={`px-3 py-1 text-xs font-bold rounded-lg border ${
+                                  formHasPreviousTreatments ? "bg-[#414E36] text-white border-[#414E36]" : "bg-white text-gray-600 border-gray-200"
+                                }`}
+                              >
+                                Yes
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormHasPreviousTreatments(false)}
+                                className={`px-3 py-1 text-xs font-bold rounded-lg border ${
+                                  !formHasPreviousTreatments ? "bg-gray-200 text-gray-800 border-gray-300" : "bg-white text-gray-600 border-gray-200"
+                                }`}
+                              >
+                                No
+                              </button>
+                            </div>
+                          </div>
+                          {formHasPreviousTreatments && (
+                            <textarea
+                              rows={2}
+                              value={formPreviousTreatmentsDetails}
+                              onChange={(e) => setFormPreviousTreatmentsDetails(e.target.value)}
+                              placeholder="List past procedures, approximate dates, and any adverse reactions..."
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-white p-3 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                            />
+                          )}
+                        </div>
+
+                        {/* Medical Conditions */}
+                        <div className="bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <label className="text-xs font-bold text-[#1F251A]">Existing Medical Conditions / Pregnancy</label>
+                              <p className="text-[11px] text-[#5A6A51]">Diabetes, Hypertension, Autoimmune, Pregnancy, Nursing, etc.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setFormHasMedicalConditions(true)}
+                                className={`px-3 py-1 text-xs font-bold rounded-lg border ${
+                                  formHasMedicalConditions ? "bg-[#414E36] text-white border-[#414E36]" : "bg-white text-gray-600 border-gray-200"
+                                }`}
+                              >
+                                Yes
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormHasMedicalConditions(false)}
+                                className={`px-3 py-1 text-xs font-bold rounded-lg border ${
+                                  !formHasMedicalConditions ? "bg-gray-200 text-gray-800 border-gray-300" : "bg-white text-gray-600 border-gray-200"
+                                }`}
+                              >
+                                No
+                              </button>
+                            </div>
+                          </div>
+                          {formHasMedicalConditions && (
+                            <textarea
+                              rows={2}
+                              value={formMedicalConditionsDetails}
+                              onChange={(e) => setFormMedicalConditionsDetails(e.target.value)}
+                              placeholder="Specify conditions..."
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-white p-3 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                            />
+                          )}
+                        </div>
+
+                        {/* Medications */}
+                        <div className="bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <label className="text-xs font-bold text-[#1F251A]">Currently Taking Medications</label>
+                              <p className="text-[11px] text-[#5A6A51]">Roaccutane/Isotretinoin, Blood thinners, Retinoids, Antibiotics, etc.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setFormIsTakingMedication(true)}
+                                className={`px-3 py-1 text-xs font-bold rounded-lg border ${
+                                  formIsTakingMedication ? "bg-[#414E36] text-white border-[#414E36]" : "bg-white text-gray-600 border-gray-200"
+                                }`}
+                              >
+                                Yes
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormIsTakingMedication(false)}
+                                className={`px-3 py-1 text-xs font-bold rounded-lg border ${
+                                  !formIsTakingMedication ? "bg-gray-200 text-gray-800 border-gray-300" : "bg-white text-gray-600 border-gray-200"
+                                }`}
+                              >
+                                No
+                              </button>
+                            </div>
+                          </div>
+                          {formIsTakingMedication && (
+                            <textarea
+                              rows={2}
+                              value={formMedicationDetails}
+                              onChange={(e) => setFormMedicationDetails(e.target.value)}
+                              placeholder="List active medications..."
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-white p-3 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                            />
+                          )}
+                        </div>
+
+                        {/* Allergies */}
+                        <div>
+                          <label className="block text-xs font-bold text-[#1F251A] mb-1">Known Allergies (Drugs / Skincare Ingredients / Latex)</label>
+                          <input
+                            type="text"
+                            value={formAllergies}
+                            onChange={(e) => setFormAllergies(e.target.value)}
+                            placeholder="e.g. Penicillin, Aspirin, Fragrance, Hydroquinone, Latex..."
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#414E36]/10">
+                        <button
+                          type="button"
+                          onClick={() => setShowMedicalFormModal(false)}
+                          className="rounded-xl border border-[#414E36]/15 px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveMedicalForm}
+                          disabled={savingMedicalForm}
+                          className="rounded-xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
+                        >
+                          {savingMedicalForm ? "Saving..." : "Save Medical Intake Form"}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+
+                {/* ── Modal: Medical Report / Document Upload ── */}
+                {showMedicalReportModal && (
+                  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+                    <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[#414E36]/15 space-y-5 my-8">
+                      <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+                        <div>
+                          <h3 className="text-xl font-bold text-[#1F251A]">Upload Medical Report & Document</h3>
+                          <p className="text-xs text-[#5A6A51] mt-0.5">Attach lab results, scan reports, or external clinical documents</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowMedicalReportModal(false)}
+                          className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Report Title <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            value={reportTitle}
+                            onChange={(e) => setReportTitle(e.target.value)}
+                            placeholder="e.g. Complete Blood Count & Hormonal Panel"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Description / Notes</label>
+                          <textarea
+                            rows={3}
+                            value={reportDescription}
+                            onChange={(e) => setReportDescription(e.target.value)}
+                            placeholder="Key clinical findings or doctor observations..."
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white p-3 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Document Link / File URL</label>
+                          <input
+                            type="url"
+                            value={reportFileUrl}
+                            onChange={(e) => setReportFileUrl(e.target.value)}
+                            placeholder="https://..."
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Recording Staff / Doctor Name</label>
+                          <input
+                            type="text"
+                            value={reportDoctorName}
+                            onChange={(e) => setReportDoctorName(e.target.value)}
+                            placeholder="e.g. Dr. Sarah Al-Sayed"
+                            className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#414E36]/10">
+                        <button
+                          type="button"
+                          onClick={() => setShowMedicalReportModal(false)}
+                          className="rounded-xl border border-[#414E36]/15 px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveMedicalReport}
+                          disabled={savingMedicalReport || !reportTitle.trim()}
+                          className="rounded-xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
+                        >
+                          {savingMedicalReport ? "Uploading..." : "Save Medical Report"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
               {/* ── INLINE: Add/Edit Customer Form ── */}
               {showCustomerFormModal && !viewingCustomerProfile && (
@@ -24119,8 +24444,8 @@ export default function AdminPage() {
           </>
           )}
           </>
-          )}
-          </div>
+        )}
+      </div>
         </main>
       </div>
 
