@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { deductInventoryStock } from '@/app/api/inventory/products/route';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,6 +120,8 @@ export async function POST(req: Request) {
       .insert(newSalePayload)
       .select()
       .single();
+
+    await deductInventoryStock(product_id || product_name, Number(quantity));
 
     if (!dbInsertErr && insertedDb) {
       const allSales = await getStoredSalesData();

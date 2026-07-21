@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { deductInventoryStock } from '@/app/api/inventory/products/route';
 
 export const dynamic = 'force-dynamic';
 
@@ -164,6 +165,7 @@ export async function POST(req: Request) {
     }
 
     await saveBalancesData({ balances });
+    await deductInventoryStock(product_id || product_name, qtyNum);
 
     return NextResponse.json({ success: true, balances });
   } catch (err: any) {

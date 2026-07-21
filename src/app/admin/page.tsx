@@ -3292,10 +3292,10 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (activeNav === "Inventory" || activeNav === "Products" || activeNav === "Point of Sale") {
+    if (activeNav === "Inventory" || activeNav === "Products" || activeNav === "Point of Sale" || activeNav === "Customers" || viewingCustomerProfile) {
       fetchInventoryProducts();
     }
-  }, [activeNav, fetchInventoryProducts]);
+  }, [activeNav, viewingCustomerProfile, fetchInventoryProducts]);
 
   const filteredInventoryProducts = useMemo(() => {
     return inventoryProducts.filter((p) => {
@@ -3542,6 +3542,7 @@ export default function AdminPage() {
           await fetchCustomerProductBalances(viewingCustomerProfile.id);
         }
         await fetchProductSalesHistory();
+        await fetchInventoryProducts();
         setShowAddPatientProductModal(false);
         setSelectedAddProductId("");
         setSelectedAddProductName("");

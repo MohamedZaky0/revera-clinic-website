@@ -126,16 +126,54 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
   }
 ];
 
-async function getStoredProductsData(): Promise<{ products: ProductItem[] }> {
+function mapDbRowToProduct(row: any): ProductItem {
+  return {
+    id: row.id,
+    name: row.name || 'Unnamed Product',
+    arabic_name: row.name || '',
+    category: row.category || 'General',
+    branch_id: null,
+    sku: row.sku || '',
+    unit: row.unit || 'Piece',
+    purchase_price: Number(row.cost_price || 0),
+    selling_price: Number(row.price || 0),
+    stock_quantity: Number(row.stock_quantity || 0),
+    min_reorder_quantity: Number(row.min_stock_alert || 5),
+    status: row.status || (Number(row.stock_quantity || 0) <= 0 ? 'Out of Stock' : 'Active'),
+    notes: '',
+    created_at: row.created_at || new Date().toISOString(),
+    updated_at: row.updated_at || new Date().toISOString()
+  };
+}
+
+function mapProductToDbRow(item: ProductItem) {
+  const stockQty = Number(item.stock_quantity || 0);
+  return {
+    id: item.id,
+    name: item.name,
+    sku: item.sku || '',
+    category: item.category || 'General',
+    price: Number(item.selling_price || 0),
+    cost_price: Number(item.purchase_price || 0),
+    stock_quantity: stockQty,
+    min_stock_alert: Number(item.min_reorder_quantity || 5),
+    unit: item.unit || 'Piece',
+    status: stockQty <= 0 ? 'Out of Stock' : (item.status || 'Active'),
+    created_at: item.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+}
+
+export async function getStoredProductsData(): Promise<{ products: ProductItem[] }> {
   try {
-    // 1. Check native Supabase inventory_products table if it has rows
+    // 1. Check native Supabase inventory_products table
     const { data: dbProducts, error: dbErr } = await supabaseServer
       .from('inventory_products')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (!dbErr && dbProducts && dbProducts.length > 0) {
-      return { products: dbProducts as ProductItem[] };
+      return { products: dbProducts.map(mapDbRowToProduct) };
     }
 
     // 2. Fallback to page_settings
@@ -145,21 +183,32 @@ async function getStoredProductsData(): Promise<{ products: ProductItem[] }> {
       .eq('key', 'inventory_products')
       .maybeSingle();
 
-    if (error || !data || !data.value || !Array.isArray(data.value.products)) {
-      const payload = { products: DEFAULT_PRODUCTS };
+    let productsList: ProductItem[] = DEFAULT_PRODUCTS;
+    if (!error && data && data.value && Array.isArray(data.value.products)) {
+      productsList = data.value.products;
+    } else {
       await supabaseServer
         .from('page_settings')
-        .upsert({ key: 'inventory_products', value: payload, updated_at: new Date().toISOString() });
-      return payload;
+        .upsert({ key: 'inventory_products', value: { products: DEFAULT_PRODUCTS }, updated_at: new Date().toISOString() });
     }
-    return data.value;
+
+    // Attempt to seed native Supabase table with these products
+    try {
+      const dbRows = productsList.map(mapProductToDbRow);
+      await supabaseServer.from('inventory_products').upsert(dbRows);
+    } catch (e) {
+      console.warn('Seeding inventory_products DB failed silently:', e);
+    }
+
+    return { products: productsList };
   } catch (err) {
-    console.error('Error fetching inventory products settings:', err);
+    console.error('Error fetching inventory products:', err);
     return { products: DEFAULT_PRODUCTS };
   }
 }
 
-async function saveProductsData(payload: { products: ProductItem[] }) {
+export async function saveProductsData(payload: { products: ProductItem[] }) {
+  // Always save to page_settings fallback
   const { data, error } = await supabaseServer
     .from('page_settings')
     .upsert({
@@ -169,17 +218,49 @@ async function saveProductsData(payload: { products: ProductItem[] }) {
     })
     .select();
 
-  if (error) throw error;
+  if (error) console.error('Error saving to page_settings:', error);
 
+  // Sync to native Supabase inventory_products table
   try {
     if (payload.products && payload.products.length > 0) {
-      await supabaseServer.from('inventory_products').upsert(payload.products);
+      const dbRows = payload.products.map(mapProductToDbRow);
+      await supabaseServer.from('inventory_products').upsert(dbRows);
     }
   } catch (e) {
-    // Ignore direct table sync failure
+    console.warn('Syncing to inventory_products DB table failed:', e);
   }
 
   return data;
+}
+
+// Helper to deduct stock when a product is sold or assigned to a customer
+export async function deductInventoryStock(productIdOrName: string, quantityToDeduct: number) {
+  try {
+    const { products } = await getStoredProductsData();
+    if (!products || products.length === 0 || !quantityToDeduct || quantityToDeduct <= 0) return;
+
+    const targetIndex = products.findIndex(
+      (p) => p.id === productIdOrName || p.name.toLowerCase() === productIdOrName.toLowerCase()
+    );
+
+    if (targetIndex >= 0) {
+      const target = products[targetIndex];
+      const currentStock = Number(target.stock_quantity || 0);
+      const newStock = Math.max(0, currentStock - Number(quantityToDeduct));
+      const newStatus = newStock <= 0 ? 'Out of Stock' : target.status;
+
+      products[targetIndex] = {
+        ...target,
+        stock_quantity: newStock,
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      await saveProductsData({ products });
+    }
+  } catch (err) {
+    console.error('Error deducting inventory stock:', err);
+  }
 }
 
 export async function GET() {
@@ -339,6 +420,12 @@ export async function DELETE(req: Request) {
     const filtered = products.filter((p) => p.id !== id);
 
     await saveProductsData({ products: filtered });
+
+    // Also delete from Supabase table if present
+    try {
+      await supabaseServer.from('inventory_products').delete().eq('id', id);
+    } catch (e) {}
+
     return NextResponse.json({ success: true, id });
   } catch (err: any) {
     console.error('DELETE /api/inventory/products error:', err);
