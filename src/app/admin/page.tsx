@@ -15,6 +15,7 @@ import {
   LocalCategory 
 } from "@/lib/serviceStore";
 import { compressImage } from "@/lib/image";
+import { printInvoice } from "@/lib/printUtils";
 import { Branch } from "@/types";
 import {
   AlarmClock,
@@ -604,30 +605,30 @@ const DEFAULT_HERO_SLIDES = [
 
 const DEFAULT_HERO_SLIDES_AR = [
   {
-    welcome: "مرحباً بكم في عيادات ريفيرا",
-    heading: "حوّل جمالك بشكل طبيعي!",
-    description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية مصممة لمساعدتك على تحقيق أهدافك في الجمال والصحة من خلال تقنيات طبية متقدمة.",
-    bookBtn: "احجز موعدًا",
+    welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
+    heading: "Ø­ÙˆÙ‘Ù„ Ø¬Ù…Ø§Ù„Ùƒ Ø¨Ø´ÙƒÙ„ Ø·Ø¨ÙŠØ¹ÙŠ!",
+    description: "Ø®Ø¯Ù…Ø§Øª Ù…ØªØ®ØµØµØ© ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© Ù…Ø¹ Ø±Ø¹Ø§ÙŠØ© Ø´Ø®ØµÙŠØ© Ù…ØµÙ…Ù…Ø© Ù„Ù…Ø³Ø§Ø¹Ø¯ØªÙƒ Ø¹Ù„Ù‰ ØªØ­Ù‚ÙŠÙ‚ Ø£Ù‡Ø¯Ø§ÙÙƒ ÙÙŠ Ø§Ù„Ø¬Ù…Ø§Ù„ ÙˆØ§Ù„ØµØ­Ø© Ù…Ù† Ø®Ù„Ø§Ù„ ØªÙ‚Ù†ÙŠØ§Øª Ø·Ø¨ÙŠØ© Ù…ØªÙ‚Ø¯Ù…Ø©.",
+    bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
     rating: "4.5",
-    reviewCount: "(1000+ تقييم)",
+    reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
     image: "/images/hero/slide-1.jpg"
   },
   {
-    welcome: "مرحباً بكم في عيادات ريفيرا",
-    heading: "رعاية طبية متقدمة يمكنك الوثوق بها!",
-    description: "اكتشف خدمات شاملة في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان المصممة لاحتياجاتك الفريدة. مع أكثر من 15 عاماً من الخبرة المهنية، نحن هنا لإرشادك نحو الجمال الدائم والعافية.",
-    bookBtn: "احجز موعدًا",
+    welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
+    heading: "Ø±Ø¹Ø§ÙŠØ© Ø·Ø¨ÙŠØ© Ù…ØªÙ‚Ø¯Ù…Ø© ÙŠÙ…ÙƒÙ†Ùƒ Ø§Ù„ÙˆØ«ÙˆÙ‚ Ø¨Ù‡Ø§!",
+    description: "Ø§ÙƒØªØ´Ù Ø®Ø¯Ù…Ø§Øª Ø´Ø§Ù…Ù„Ø© ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© ÙˆØ¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ù„ÙŠØ²Ø± ÙˆØ·Ø¨ Ø§Ù„Ø£Ø³Ù†Ø§Ù† Ø§Ù„Ù…ØµÙ…Ù…Ø© Ù„Ø§Ø­ØªÙŠØ§Ø¬Ø§ØªÙƒ Ø§Ù„ÙØ±ÙŠØ¯Ø©. Ù…Ø¹ Ø£ÙƒØ«Ø± Ù…Ù† 15 Ø¹Ø§Ù…Ø§Ù‹ Ù…Ù† Ø§Ù„Ø®Ø¨Ø±Ø© Ø§Ù„Ù…Ù‡Ù†ÙŠØ©ØŒ Ù†Ø­Ù† Ù‡Ù†Ø§ Ù„Ø¥Ø±Ø´Ø§Ø¯Ùƒ Ù†Ø­Ùˆ Ø§Ù„Ø¬Ù…Ø§Ù„ Ø§Ù„Ø¯Ø§Ø¦Ù… ÙˆØ§Ù„Ø¹Ø§ÙÙŠØ©.",
+    bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
     rating: "4.5",
-    reviewCount: "(1000+ تقييم)",
+    reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
     image: "/images/hero/slide-2.jpg"
   },
   {
-    welcome: "مرحباً بكم في عيادات ريفيرا",
-    heading: "رحلتك نحو الجمال والصحة تبدأ هنا!",
-    description: "عيادات متخصصة تحت إشراف طبي كامل تقدم خدمات في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان لجميع الأعمار.",
-    bookBtn: "احجز موعدًا",
+    welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
+    heading: "Ø±Ø­Ù„ØªÙƒ Ù†Ø­Ùˆ Ø§Ù„Ø¬Ù…Ø§Ù„ ÙˆØ§Ù„ØµØ­Ø© ØªØ¨Ø¯Ø£ Ù‡Ù†Ø§!",
+    description: "Ø¹ÙŠØ§Ø¯Ø§Øª Ù…ØªØ®ØµØµØ© ØªØ­Øª Ø¥Ø´Ø±Ø§Ù Ø·Ø¨ÙŠ ÙƒØ§Ù…Ù„ ØªÙ‚Ø¯Ù… Ø®Ø¯Ù…Ø§Øª ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© ÙˆØ¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ù„ÙŠØ²Ø± ÙˆØ·Ø¨ Ø§Ù„Ø£Ø³Ù†Ø§Ù† Ù„Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø£Ø¹Ù…Ø§Ø±.",
+    bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
     rating: "4.5",
-    reviewCount: "(1000+ تقييم)",
+    reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
     image: "/images/hero/slide-3.jpg"
   }
 ];
@@ -1064,16 +1065,16 @@ export default function AdminPage() {
     
     let csv = `ATTENDANCE INSIGHTS REPORT\n`;
     csv += `Employee,${employee.name || 'Employee'}\n`;
-    csv += `Staff ID,${employee.employee_id || '—'}\n`;
-    csv += `Department,${employee.department || '—'}\n`;
-    csv += `Role,${employee.role_name || '—'}\n`;
+    csv += `Staff ID,${employee.employee_id || 'â€”'}\n`;
+    csv += `Department,${employee.department || 'â€”'}\n`;
+    csv += `Role,${employee.role_name || 'â€”'}\n`;
     csv += `Month,${monthStr}\n\n`;
 
     csv += `Date,Shift,Scheduled In,Scheduled Out,Actual Check In,Actual Check Out,Status,Worked (Min),Late (Min),Early Leave (Min),Overtime (Min),Mid-Shift Leave (Min)\n`;
 
     records.forEach((r: any) => {
-      const inTime = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString() : '—';
-      const outTime = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString() : '—';
+      const inTime = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString() : 'â€”';
+      const outTime = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString() : 'â€”';
       csv += `"${r.date}","${employee.shift || 'Day'}","${r.scheduled_in || '09:00 AM'}","${r.scheduled_out || '05:00 PM'}","${inTime}","${outTime}","${r.status || 'Present'}",${r.worked_minutes || 0},${r.late_minutes || 0},${r.early_leave_minutes || 0},${r.overtime_minutes || 0},${r.combined_mid_shift_duration_minutes || 0}\n`;
     });
 
@@ -1874,7 +1875,7 @@ export default function AdminPage() {
 
     filteredReservations.forEach((reservation) => {
       if (!reservation.date || !['approved', 'confirmed', 'started', 'completed'].includes(reservation.status)) return;
-      // Slice directly — avoids UTC conversion that shifts dates for non-UTC timezones
+      // Slice directly â€” avoids UTC conversion that shifts dates for non-UTC timezones
       const normalizedDate = String(reservation.date).slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) return;
       const [year, month] = normalizedDate.split('-');
@@ -2730,13 +2731,13 @@ export default function AdminPage() {
 
     const addedOn = emp.created_at
       ? new Date(emp.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-      : "—";
+      : "â€”";
 
     const monthlySalary = Number(emp.salary || 0);
     const dailySalary = Math.round(monthlySalary / 20);
     const hourlySalary = (monthlySalary / (20 * 8)).toFixed(2);
     
-    const addressDetails = emp.address || "—";
+    const addressDetails = emp.address || "â€”";
     
     const familyName = emp.name ? emp.name.split(" ").slice(-1)[0] : "Saif";
     const emergencyName = `Ahmed ${familyName}`;
@@ -2881,23 +2882,23 @@ export default function AdminPage() {
           <div class="grid-3">
             <div>
               <div class="label">Employee ID</div>
-              <div class="value">${emp.employee_id || "—"}</div>
+              <div class="value">${emp.employee_id || "â€”"}</div>
             </div>
             <div>
               <div class="label">Full Name</div>
-              <div class="value">${emp.name || "—"}</div>
+              <div class="value">${emp.name || "â€”"}</div>
             </div>
             <div>
               <div class="label">Email Address</div>
-              <div class="value">${emp.email || "—"}</div>
+              <div class="value">${emp.email || "â€”"}</div>
             </div>
             <div>
               <div class="label">Phone Number</div>
-              <div class="value">${emp.phone || "—"}</div>
+              <div class="value">${emp.phone || "â€”"}</div>
             </div>
             <div>
               <div class="label">System Role</div>
-              <div class="value">${emp.role_name || "—"}</div>
+              <div class="value">${emp.role_name || "â€”"}</div>
             </div>
             <div>
               <div class="label">Account Status</div>
@@ -3213,7 +3214,7 @@ export default function AdminPage() {
   const totalServicePages = Math.ceil(filteredServices.length / SERVICE_PAGE_SIZE);
   const pagedServices = filteredServices.slice((servicePage - 1) * SERVICE_PAGE_SIZE, servicePage * SERVICE_PAGE_SIZE);
 
-  // Grouped services: category key → filtered services in that category
+  // Grouped services: category key â†’ filtered services in that category
   const groupedServices = useMemo(() => {
     const groups: Record<string, typeof localServices> = {};
     localCategories.forEach(cat => { groups[cat.key] = []; });
@@ -3988,7 +3989,7 @@ export default function AdminPage() {
 
   const [loadingPageSettings, setLoadingPageSettings] = useState(false);
   const [savingPageSettings, setSavingPageSettings] = useState(false);
-  // ── Branches state ──
+  // â”€â”€ Branches state â”€â”€
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [branchModal, setBranchModal] = useState<{ open: boolean; mode: "add" | "edit"; branch: Partial<Branch> }>({
@@ -3999,13 +4000,13 @@ export default function AdminPage() {
   const [selectedBranchForHoursId, setSelectedBranchForHoursId] = useState<string>("");
   const [savingBranchHours, setSavingBranchHours] = useState(false);
   const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
-    { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
-    { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Sunday", dayAr: "Ø§Ù„Ø£Ø­Ø¯", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Monday", dayAr: "Ø§Ù„Ø¥Ø«Ù†ÙŠÙ†", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Tuesday", dayAr: "Ø§Ù„Ø«Ù„Ø§Ø«Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Wednesday", dayAr: "Ø§Ù„Ø£Ø±Ø¨Ø¹Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Thursday", dayAr: "Ø§Ù„Ø®Ù…ÙŠØ³", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Friday", dayAr: "Ø§Ù„Ø¬Ù…Ø¹Ø©", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+    { day: "Saturday", dayAr: "Ø§Ù„Ø³Ø¨Øª", isOpen: true, openTime: "09:00", closeTime: "20:00" },
   ]);  const [pageSettingsLangTab, setPageSettingsLangTab] = useState<"en" | "ar">("en");
   const [aboutImage1, setAboutImage1] = useState<string>("");
   const [aboutImage2, setAboutImage2] = useState<string>("");
@@ -4052,11 +4053,11 @@ export default function AdminPage() {
   const [smsLogSearch, setSmsLogSearch] = useState("");
   const [settingsUserSearch, setSettingsUserSearch] = useState("");
 
-  // ── Clinic Profile Settings State ──
+  // â”€â”€ Clinic Profile Settings State â”€â”€
   const [clinicName, setClinicName] = useState("Revera Clinics");
-  const [clinicNameAr, setClinicNameAr] = useState("ريفيرا كلينيك");
+  const [clinicNameAr, setClinicNameAr] = useState("Ø±ÙŠÙÙŠØ±Ø§ ÙƒÙ„ÙŠÙ†ÙŠÙƒ");
   const [clinicLocation, setClinicLocation] = useState("Sheikh Zayed City, Giza");
-  const [clinicLocationAr, setClinicLocationAr] = useState("مدينة الشيخ زايد، الجيزة");
+  const [clinicLocationAr, setClinicLocationAr] = useState("Ù…Ø¯ÙŠÙ†Ø© Ø§Ù„Ø´ÙŠØ® Ø²Ø§ÙŠØ¯ØŒ Ø§Ù„Ø¬ÙŠØ²Ø©");
   const [clinicEmail, setClinicEmail] = useState("info@reveraclinics.com");
   const [clinicPhone, setClinicPhone] = useState("+20 2 3796 2200");
   const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
@@ -4083,17 +4084,17 @@ export default function AdminPage() {
 
 
 
-  // ── Notification Settings State ──
+  // â”€â”€ Notification Settings State â”€â”€
   const [notifSmsOtp, setNotifSmsOtp] = useState(true);
   const [notifWhatsApp, setNotifWhatsApp] = useState(true);
   const [notifEmailConfirm, setNotifEmailConfirm] = useState(false);
   const [notifSmsTemplate, setNotifSmsTemplate] = useState("Hello {name}, your appointment for {service} is confirmed on {date} at {time}. See you at Revera Clinics!");
-  const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("مرحباً {name}، تم تأكيد موعدك لخدمة {service} بتاريخ {date} الساعة {time}. نراك في ريفيرا كلينيك!");
+  const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("Ù…Ø±Ø­Ø¨Ø§Ù‹ {name}ØŒ ØªÙ… ØªØ£ÙƒÙŠØ¯ Ù…ÙˆØ¹Ø¯Ùƒ Ù„Ø®Ø¯Ù…Ø© {service} Ø¨ØªØ§Ø±ÙŠØ® {date} Ø§Ù„Ø³Ø§Ø¹Ø© {time}. Ù†Ø±Ø§Ùƒ ÙÙŠ Ø±ÙŠÙÙŠØ±Ø§ ÙƒÙ„ÙŠÙ†ÙŠÙƒ!");
   const [notifReminderHours, setNotifReminderHours] = useState(24);
   const [notifStaffEmail, setNotifStaffEmail] = useState("admin@reveraclinics.com");
   const [savingNotificationSettings, setSavingNotificationSettings] = useState(false);
 
-  // ── Queue Settings State ──
+  // â”€â”€ Queue Settings State â”€â”€
   const [queueVirtualRoom, setQueueVirtualRoom] = useState(false);
   const [queueShowOnScreens, setQueueShowOnScreens] = useState(true);
   const [queueAutoCheckIn, setQueueAutoCheckIn] = useState(false);
@@ -4547,13 +4548,13 @@ export default function AdminPage() {
       setServiceHours(branchRecord.service_hours);
     } else {
       setServiceHours([
-        { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
-        { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Sunday", dayAr: "Ø§Ù„Ø£Ø­Ø¯", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Monday", dayAr: "Ø§Ù„Ø¥Ø«Ù†ÙŠÙ†", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Tuesday", dayAr: "Ø§Ù„Ø«Ù„Ø§Ø«Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Wednesday", dayAr: "Ø§Ù„Ø£Ø±Ø¨Ø¹Ø§Ø¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Thursday", dayAr: "Ø§Ù„Ø®Ù…ÙŠØ³", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Friday", dayAr: "Ø§Ù„Ø¬Ù…Ø¹Ø©", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+        { day: "Saturday", dayAr: "Ø§Ù„Ø³Ø¨Øª", isOpen: true, openTime: "09:00", closeTime: "20:00" },
       ]);
     }
   }, [selectedBranchForHoursId, branches]);
@@ -5088,17 +5089,17 @@ export default function AdminPage() {
             "Osteopathy & Therapeutic Nutrition",
           ]);
           setWhatWeDoListAr(data.aboutPage?.whatWeDoListAr || [
-            "علاجات الجلدية والتجميل",
-            "النساء والتوليد وصحة المرأة",
-            "العلاج الطبيعي وإعادة التأهيل",
-            "تقويم العظام والتغذية العلاجية",
+            "Ø¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„ØªØ¬Ù…ÙŠÙ„",
+            "Ø§Ù„Ù†Ø³Ø§Ø¡ ÙˆØ§Ù„ØªÙˆÙ„ÙŠØ¯ ÙˆØµØ­Ø© Ø§Ù„Ù…Ø±Ø£Ø©",
+            "Ø§Ù„Ø¹Ù„Ø§Ø¬ Ø§Ù„Ø·Ø¨ÙŠØ¹ÙŠ ÙˆØ¥Ø¹Ø§Ø¯Ø© Ø§Ù„ØªØ£Ù‡ÙŠÙ„",
+            "ØªÙ‚ÙˆÙŠÙ… Ø§Ù„Ø¹Ø¸Ø§Ù… ÙˆØ§Ù„ØªØºØ°ÙŠØ© Ø§Ù„Ø¹Ù„Ø§Ø¬ÙŠØ©",
           ]);
 
           // Load FAQ Section Settings
           setFaqTag(data.aboutPage?.faqTag || "frequently asked questions");
-          setFaqTagAr(data.aboutPage?.faqTagAr || "أسئلة شائعة");
+          setFaqTagAr(data.aboutPage?.faqTagAr || "Ø£Ø³Ø¦Ù„Ø© Ø´Ø§Ø¦Ø¹Ø©");
           setFaqHeading(data.aboutPage?.faqHeading || "Questions? We have answers.");
-          setFaqHeadingAr(data.aboutPage?.faqHeadingAr || "أسئلة؟ لدينا إجابات.");
+          setFaqHeadingAr(data.aboutPage?.faqHeadingAr || "Ø£Ø³Ø¦Ù„Ø©ØŸ Ù„Ø¯ÙŠÙ†Ø§ Ø¥Ø¬Ø§Ø¨Ø§Øª.");
           setFaqImage1(data.aboutPage?.faqImage1 || "");
           setFaqImage2(data.aboutPage?.faqImage2 || "");
           setFaqs(data.aboutPage?.faqs || [
@@ -5108,53 +5109,53 @@ export default function AdminPage() {
             },
             {
               question: "2. Who is Revera designed for?",
-              answer: "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best — not the cheapest — and expect a medical experience that matches their standards."
+              answer: "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best â€” not the cheapest â€” and expect a medical experience that matches their standards."
             },
             {
               question: "3. How does my treatment plan work?",
-              answer: "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan — never a template — that evolves with your progress and needs."
+              answer: "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan â€” never a template â€” that evolves with your progress and needs."
             },
             {
               question: "4. What makes Revera different from other clinics?",
-              answer: "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint — from your first appointment to your last follow-up."
+              answer: "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint â€” from your first appointment to your last follow-up."
             }
           ]);
           setFaqsAr(data.aboutPage?.faqsAr || [
             {
-              question: "١. ما الخدمات التي تقدمها ريفيرا؟",
-              answer: "ريفيرا عيادة متميزة متخصصة في علاجات الجلدية والتجميل، وصحة المرأة والنساء والتوليد، والعلاج الطبيعي وإعادة التأهيل، وتقويم العظام والتغذية العلاجية. كل خدمة تُقدَّم بدقة طبية وتجربة فاخرة مصممة لكِ."
+              question: "Ù¡. Ù…Ø§ Ø§Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„ØªÙŠ ØªÙ‚Ø¯Ù…Ù‡Ø§ Ø±ÙŠÙÙŠØ±Ø§ØŸ",
+              answer: "Ø±ÙŠÙÙŠØ±Ø§ Ø¹ÙŠØ§Ø¯Ø© Ù…ØªÙ…ÙŠØ²Ø© Ù…ØªØ®ØµØµØ© ÙÙŠ Ø¹Ù„Ø§Ø¬Ø§Øª Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„ØªØ¬Ù…ÙŠÙ„ØŒ ÙˆØµØ­Ø© Ø§Ù„Ù…Ø±Ø£Ø© ÙˆØ§Ù„Ù†Ø³Ø§Ø¡ ÙˆØ§Ù„ØªÙˆÙ„ÙŠØ¯ØŒ ÙˆØ§Ù„Ø¹Ù„Ø§Ø¬ Ø§Ù„Ø·Ø¨ÙŠØ¹ÙŠ ÙˆØ¥Ø¹Ø§Ø¯Ø© Ø§Ù„ØªØ£Ù‡ÙŠÙ„ØŒ ÙˆØªÙ‚ÙˆÙŠÙ… Ø§Ù„Ø¹Ø¸Ø§Ù… ÙˆØ§Ù„ØªØºØ°ÙŠØ© Ø§Ù„Ø¹Ù„Ø§Ø¬ÙŠØ©. ÙƒÙ„ Ø®Ø¯Ù…Ø© ØªÙÙ‚Ø¯ÙŽÙ‘Ù… Ø¨Ø¯Ù‚Ø© Ø·Ø¨ÙŠØ© ÙˆØªØ¬Ø±Ø¨Ø© ÙØ§Ø®Ø±Ø© Ù…ØµÙ…Ù…Ø© Ù„ÙƒÙ."
             },
             {
-              question: "٢. لمن صُمِّمت ريفيرا؟",
-              answer: "ريفيرا مصممة للمرأة التي تقدّر الأناقة والخصوصية والنتائج الحقيقية. عميلاتنا يبحثن عن الأفضل — لا الأرخص — ويتوقعن تجربة طبية تليق بمعاييرهن."
+              question: "Ù¢. Ù„Ù…Ù† ØµÙÙ…ÙÙ‘Ù…Øª Ø±ÙŠÙÙŠØ±Ø§ØŸ",
+              answer: "Ø±ÙŠÙÙŠØ±Ø§ Ù…ØµÙ…Ù…Ø© Ù„Ù„Ù…Ø±Ø£Ø© Ø§Ù„ØªÙŠ ØªÙ‚Ø¯Ù‘Ø± Ø§Ù„Ø£Ù†Ø§Ù‚Ø© ÙˆØ§Ù„Ø®ØµÙˆØµÙŠØ© ÙˆØ§Ù„Ù†ØªØ§Ø¦Ø¬ Ø§Ù„Ø­Ù‚ÙŠÙ‚ÙŠØ©. Ø¹Ù…ÙŠÙ„Ø§ØªÙ†Ø§ ÙŠØ¨Ø­Ø«Ù† Ø¹Ù† Ø§Ù„Ø£ÙØ¶Ù„ â€” Ù„Ø§ Ø§Ù„Ø£Ø±Ø®Øµ â€” ÙˆÙŠØªÙˆÙ‚Ø¹Ù† ØªØ¬Ø±Ø¨Ø© Ø·Ø¨ÙŠØ© ØªÙ„ÙŠÙ‚ Ø¨Ù…Ø¹Ø§ÙŠÙŠØ±Ù‡Ù†."
             },
             {
-              question: "٣. كيف تعمل خطة علاجي؟",
-              answer: "تبدأ رحلتكِ باستشارة شاملة نُقيّم فيها صحتكِ وأهدافكِ الجمالية وأسلوب حياتكِ. بناءً على ذلك، يضع أطباؤنا خطة علاج شخصية متكاملة — لا نموذجاً جاهزاً — تتطور مع تقدمكِ واحتياجاتكِ."
+              question: "Ù£. ÙƒÙŠÙ ØªØ¹Ù…Ù„ Ø®Ø·Ø© Ø¹Ù„Ø§Ø¬ÙŠØŸ",
+              answer: "ØªØ¨Ø¯Ø£ Ø±Ø­Ù„ØªÙƒÙ Ø¨Ø§Ø³ØªØ´Ø§Ø±Ø© Ø´Ø§Ù…Ù„Ø© Ù†ÙÙ‚ÙŠÙ‘Ù… ÙÙŠÙ‡Ø§ ØµØ­ØªÙƒÙ ÙˆØ£Ù‡Ø¯Ø§ÙÙƒÙ Ø§Ù„Ø¬Ù…Ø§Ù„ÙŠØ© ÙˆØ£Ø³Ù„ÙˆØ¨ Ø­ÙŠØ§ØªÙƒÙ. Ø¨Ù†Ø§Ø¡Ù‹ Ø¹Ù„Ù‰ Ø°Ù„ÙƒØŒ ÙŠØ¶Ø¹ Ø£Ø·Ø¨Ø§Ø¤Ù†Ø§ Ø®Ø·Ø© Ø¹Ù„Ø§Ø¬ Ø´Ø®ØµÙŠØ© Ù…ØªÙƒØ§Ù…Ù„Ø© â€” Ù„Ø§ Ù†Ù…ÙˆØ°Ø¬Ø§Ù‹ Ø¬Ø§Ù‡Ø²Ø§Ù‹ â€” ØªØªØ·ÙˆØ± Ù…Ø¹ ØªÙ‚Ø¯Ù…ÙƒÙ ÙˆØ§Ø­ØªÙŠØ§Ø¬Ø§ØªÙƒÙ."
             },
             {
-              question: "٤. ما الذي يجعل ريفيرا مختلفة؟",
-              answer: "ريفيرا وجهة، لا مجرد عيادة. الفرق في الإحساس: بيئة خاصة وهادئة، وأطباء يستمعون، ومستوى رعاية يمكنكِ رؤيته والشعور به في كل لحظة — من موعدكِ الأول إلى متابعتكِ الأخيرة."
+              question: "Ù¤. Ù…Ø§ Ø§Ù„Ø°ÙŠ ÙŠØ¬Ø¹Ù„ Ø±ÙŠÙÙŠØ±Ø§ Ù…Ø®ØªÙ„ÙØ©ØŸ",
+              answer: "Ø±ÙŠÙÙŠØ±Ø§ ÙˆØ¬Ù‡Ø©ØŒ Ù„Ø§ Ù…Ø¬Ø±Ø¯ Ø¹ÙŠØ§Ø¯Ø©. Ø§Ù„ÙØ±Ù‚ ÙÙŠ Ø§Ù„Ø¥Ø­Ø³Ø§Ø³: Ø¨ÙŠØ¦Ø© Ø®Ø§ØµØ© ÙˆÙ‡Ø§Ø¯Ø¦Ø©ØŒ ÙˆØ£Ø·Ø¨Ø§Ø¡ ÙŠØ³ØªÙ…Ø¹ÙˆÙ†ØŒ ÙˆÙ…Ø³ØªÙˆÙ‰ Ø±Ø¹Ø§ÙŠØ© ÙŠÙ…ÙƒÙ†ÙƒÙ Ø±Ø¤ÙŠØªÙ‡ ÙˆØ§Ù„Ø´Ø¹ÙˆØ± Ø¨Ù‡ ÙÙŠ ÙƒÙ„ Ù„Ø­Ø¸Ø© â€” Ù…Ù† Ù…ÙˆØ¹Ø¯ÙƒÙ Ø§Ù„Ø£ÙˆÙ„ Ø¥Ù„Ù‰ Ù…ØªØ§Ø¨Ø¹ØªÙƒÙ Ø§Ù„Ø£Ø®ÙŠØ±Ø©."
             }
           ]);
           setHowItWorksHeading(data.howItWorks?.heading || "Simple steps to beauty transformations");
           setHowItWorksDescription(data.howItWorks?.description || "Discover a seamless process designed to enhance your beauty and health through personalized consultations, customized treatment plans, and dedicated medical support. We guide you every step toward achieving your beauty and wellness goals.");
-          setHowItWorksHeadingAr(data.howItWorks?.headingAr || "خطوات بسيطة لتحولات الجمال");
-          setHowItWorksDescriptionAr(data.howItWorks?.descriptionAr || "اكتشف عملية سلسة مصممة لتعزيز جمالك وصحتك من خلال استشارات شخصية وخطط علاجية مخصصة ودعم طبي متخصص. نرشدك في كل خطوة نحو تحقيق أهداف الجمال والعافية.");
+          setHowItWorksHeadingAr(data.howItWorks?.headingAr || "Ø®Ø·ÙˆØ§Øª Ø¨Ø³ÙŠØ·Ø© Ù„ØªØ­ÙˆÙ„Ø§Øª Ø§Ù„Ø¬Ù…Ø§Ù„");
+          setHowItWorksDescriptionAr(data.howItWorks?.descriptionAr || "Ø§ÙƒØªØ´Ù Ø¹Ù…Ù„ÙŠØ© Ø³Ù„Ø³Ø© Ù…ØµÙ…Ù…Ø© Ù„ØªØ¹Ø²ÙŠØ² Ø¬Ù…Ø§Ù„Ùƒ ÙˆØµØ­ØªÙƒ Ù…Ù† Ø®Ù„Ø§Ù„ Ø§Ø³ØªØ´Ø§Ø±Ø§Øª Ø´Ø®ØµÙŠØ© ÙˆØ®Ø·Ø· Ø¹Ù„Ø§Ø¬ÙŠØ© Ù…Ø®ØµØµØ© ÙˆØ¯Ø¹Ù… Ø·Ø¨ÙŠ Ù…ØªØ®ØµØµ. Ù†Ø±Ø´Ø¯Ùƒ ÙÙŠ ÙƒÙ„ Ø®Ø·ÙˆØ© Ù†Ø­Ùˆ ØªØ­Ù‚ÙŠÙ‚ Ø£Ù‡Ø¯Ø§Ù Ø§Ù„Ø¬Ù…Ø§Ù„ ÙˆØ§Ù„Ø¹Ø§ÙÙŠØ©.");
 
           // Load Why Choose Us Settings
           setWcuYearsLabel(data.whyChooseUs?.yearsLabel || "15+ years excellence");
           setWcuHeading(data.whyChooseUs?.heading || "Where medical expertise meets a luxury experience");
-          setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional — from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
-          setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions — we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
+          setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional â€” from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
+          setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions â€” we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
           setWcuContactLabel(data.whyChooseUs?.contactLabel || "Reach us:");
           setWcuPhone(data.whyChooseUs?.phone || "(+20) 01035595691");
 
-          setWcuYearsLabelAr(data.whyChooseUs?.yearsLabelAr || "١٥+ عاماً من التميز");
-          setWcuHeadingAr(data.whyChooseUs?.headingAr || "حيث تلتقي الخبرة الطبية بتجربة فاخرة");
-          setWcuDescriptionAr(data.whyChooseUs?.descriptionAr || "في ريفيرا، كل تفصيل مقصود — بدءاً من استشارتك الأولى وحتى لحظة خروجك متحوّلة. نقدم رعاية مدعومة بالعلم مع الثقة الهادئة لوجهة طبية خاصة.");
-          setWcuQuoteAr(data.whyChooseUs?.quoteAr || '"نحن لا نعالج فقط — بل نُحوّل الثقة. كل جلسة في ريفيرا مصممة حولكِ: أهدافكِ، بشرتكِ، رحلتكِ."');
-          setWcuContactLabelAr(data.whyChooseUs?.contactLabelAr || "تواصلي معنا:");
+          setWcuYearsLabelAr(data.whyChooseUs?.yearsLabelAr || "Ù¡Ù¥+ Ø¹Ø§Ù…Ø§Ù‹ Ù…Ù† Ø§Ù„ØªÙ…ÙŠØ²");
+          setWcuHeadingAr(data.whyChooseUs?.headingAr || "Ø­ÙŠØ« ØªÙ„ØªÙ‚ÙŠ Ø§Ù„Ø®Ø¨Ø±Ø© Ø§Ù„Ø·Ø¨ÙŠØ© Ø¨ØªØ¬Ø±Ø¨Ø© ÙØ§Ø®Ø±Ø©");
+          setWcuDescriptionAr(data.whyChooseUs?.descriptionAr || "ÙÙŠ Ø±ÙŠÙÙŠØ±Ø§ØŒ ÙƒÙ„ ØªÙØµÙŠÙ„ Ù…Ù‚ØµÙˆØ¯ â€” Ø¨Ø¯Ø¡Ø§Ù‹ Ù…Ù† Ø§Ø³ØªØ´Ø§Ø±ØªÙƒ Ø§Ù„Ø£ÙˆÙ„Ù‰ ÙˆØ­ØªÙ‰ Ù„Ø­Ø¸Ø© Ø®Ø±ÙˆØ¬Ùƒ Ù…ØªØ­ÙˆÙ‘Ù„Ø©. Ù†Ù‚Ø¯Ù… Ø±Ø¹Ø§ÙŠØ© Ù…Ø¯Ø¹ÙˆÙ…Ø© Ø¨Ø§Ù„Ø¹Ù„Ù… Ù…Ø¹ Ø§Ù„Ø«Ù‚Ø© Ø§Ù„Ù‡Ø§Ø¯Ø¦Ø© Ù„ÙˆØ¬Ù‡Ø© Ø·Ø¨ÙŠØ© Ø®Ø§ØµØ©.");
+          setWcuQuoteAr(data.whyChooseUs?.quoteAr || '"Ù†Ø­Ù† Ù„Ø§ Ù†Ø¹Ø§Ù„Ø¬ ÙÙ‚Ø· â€” Ø¨Ù„ Ù†ÙØ­ÙˆÙ‘Ù„ Ø§Ù„Ø«Ù‚Ø©. ÙƒÙ„ Ø¬Ù„Ø³Ø© ÙÙŠ Ø±ÙŠÙÙŠØ±Ø§ Ù…ØµÙ…Ù…Ø© Ø­ÙˆÙ„ÙƒÙ: Ø£Ù‡Ø¯Ø§ÙÙƒÙØŒ Ø¨Ø´Ø±ØªÙƒÙØŒ Ø±Ø­Ù„ØªÙƒÙ."');
+          setWcuContactLabelAr(data.whyChooseUs?.contactLabelAr || "ØªÙˆØ§ØµÙ„ÙŠ Ù…Ø¹Ù†Ø§:");
           setWcuPhoneAr(data.whyChooseUs?.phoneAr || "(+20) 01035595691");
 
           setWcuImage1(data.whyChooseUs?.image1 || "");
@@ -5334,7 +5335,7 @@ export default function AdminPage() {
     }
   }
 
-  // ── Settings Panel Handlers ──
+  // â”€â”€ Settings Panel Handlers â”€â”€
   async function handleSaveClinicProfile(e: React.FormEvent) {
     e.preventDefault();
     setSavingClinicProfile(true);
@@ -5693,12 +5694,12 @@ export default function AdminPage() {
       image: "/images/hero/slide-1.jpg"
     };
     const newArSlide = {
-      welcome: "مرحباً بكم في عيادات ريفيرا",
-      heading: "عنوان الشريحة الجديدة",
-      description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية.",
-      bookBtn: "احجز موعدًا",
+      welcome: "Ù…Ø±Ø­Ø¨Ø§Ù‹ Ø¨ÙƒÙ… ÙÙŠ Ø¹ÙŠØ§Ø¯Ø§Øª Ø±ÙŠÙÙŠØ±Ø§",
+      heading: "Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø´Ø±ÙŠØ­Ø© Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©",
+      description: "Ø®Ø¯Ù…Ø§Øª Ù…ØªØ®ØµØµØ© ÙÙŠ Ø·Ø¨ Ø§Ù„Ø¬Ù„Ø¯ÙŠØ© ÙˆØ§Ù„Ø¬Ø±Ø§Ø­Ø© Ø§Ù„ØªØ¬Ù…ÙŠÙ„ÙŠØ© Ù…Ø¹ Ø±Ø¹Ø§ÙŠØ© Ø´Ø®ØµÙŠØ©.",
+      bookBtn: "Ø§Ø­Ø¬Ø² Ù…ÙˆØ¹Ø¯Ù‹Ø§",
       rating: "4.5",
-      reviewCount: "(1000+ تقييم)",
+      reviewCount: "(1000+ ØªÙ‚ÙŠÙŠÙ…)",
       image: "/images/hero/slide-1.jpg"
     };
     setHomeHeroSlides([...homeHeroSlides, newEnSlide]);
@@ -7050,219 +7051,7 @@ export default function AdminPage() {
   }
 
   function handlePrintInvoice(booking: any, servicesList: any[], totalCost: number, walletUsed: number, branchName: string) {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      alert("Please allow popups to print/download the invoice.");
-      return;
-    }
-
-    const serviceRows = servicesList.map(s => `
-      <tr>
-        <td style="padding: 12px; border-bottom: 1px solid #F2EFE9; text-align: left; color: #1F251A; font-weight: 600;">${s.name}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #F2EFE9; text-align: center; color: #5A6A51;">1</td>
-        <td style="padding: 12px; border-bottom: 1px solid #F2EFE9; text-align: right; color: #1F251A;">EGP ${s.price.toLocaleString()}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #F2EFE9; text-align: right; color: #1F251A; font-weight: bold;">EGP ${s.price.toLocaleString()}</td>
-      </tr>
-    `).join("");
-
-    const invoiceNo = `REV-INV-${booking.id.slice(0, 8).toUpperCase()}`;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Invoice ${invoiceNo} - Revera Clinics</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Sora:wght@300;400;600;700&display=swap');
-            body {
-              font-family: 'Sora', sans-serif;
-              margin: 40px;
-              color: #1F251A;
-              background-color: #fff;
-            }
-            .header {
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-start;
-              border-bottom: 2px solid #414E36;
-              padding-bottom: 24px;
-              margin-bottom: 30px;
-            }
-            .logo-area h1 {
-              font-family: 'Marcellus', serif;
-              color: #414E36;
-              margin: 0;
-              font-size: 28px;
-              letter-spacing: 0.1em;
-            }
-            .logo-area p {
-              margin: 4px 0 0 0;
-              font-size: 12px;
-              color: #5A6A51;
-            }
-            .invoice-title-area {
-              text-align: right;
-            }
-            .invoice-title-area h2 {
-              margin: 0;
-              color: #C4AE7C;
-              font-size: 32px;
-              font-family: 'Marcellus', serif;
-              letter-spacing: 0.05em;
-            }
-            .invoice-title-area p {
-              margin: 6px 0 0 0;
-              font-size: 13px;
-              color: #5A6A51;
-            }
-            .billing-info {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 40px;
-              font-size: 14px;
-            }
-            .billed-to, .booking-details {
-              width: 48%;
-            }
-            .billing-info h3 {
-              color: #414E36;
-              font-size: 14px;
-              text-transform: uppercase;
-              letter-spacing: 0.1em;
-              margin-bottom: 12px;
-              border-bottom: 1px solid rgba(65, 78, 54, 0.1);
-              padding-bottom: 6px;
-            }
-            .billing-info p {
-              margin: 6px 0;
-              line-height: 1.4;
-            }
-            .table-container {
-              margin-bottom: 40px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              font-size: 14px;
-            }
-            th {
-              background-color: #EDF1EC;
-              color: #414E36;
-              font-weight: 600;
-              padding: 12px;
-              text-align: left;
-              text-transform: uppercase;
-              font-size: 12px;
-              letter-spacing: 0.05em;
-            }
-            .summary-table {
-              width: 320px;
-              margin-left: auto;
-              font-size: 14px;
-            }
-            .summary-table td {
-              padding: 8px 12px;
-            }
-            .summary-table tr.total-row {
-              font-weight: bold;
-              font-size: 16px;
-              color: #414E36;
-              border-top: 2px solid #414E36;
-            }
-            .footer {
-              margin-top: 60px;
-              text-align: center;
-              border-top: 1px solid #F2EFE9;
-              padding-top: 20px;
-              font-size: 12px;
-              color: #5A6A51;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="logo-area">
-              <h1>REVERA CLINICS</h1>
-              <p>Sheikh Zayed / New Cairo Branches</p>
-              <p>Phone: (+20) 01035595691</p>
-              <p>Email: inquiries@reveraclinics.com</p>
-            </div>
-            <div class="invoice-title-area">
-              <h2>INVOICE</h2>
-              <p><strong>Invoice No:</strong> ${invoiceNo}</p>
-              <p><strong>Date:</strong> ${booking.date}</p>
-            </div>
-          </div>
-
-          <div class="billing-info">
-            <div class="billed-to">
-              <h3>Billed To</h3>
-              <p><strong>Patient Name:</strong> ${booking.name}</p>
-              <p><strong>Phone:</strong> ${booking.phone}</p>
-              <p><strong>Email:</strong> ${booking.email || "—"}</p>
-            </div>
-            <div class="booking-details">
-              <h3>Booking Details</h3>
-              <p><strong>Date:</strong> ${booking.date}</p>
-              <p><strong>Time Slot:</strong> ${booking.timeSlot || "—"}</p>
-              <p><strong>Doctor:</strong> ${booking.doctorName || "—"}</p>
-              <p><strong>Branch:</strong> ${branchName}</p>
-            </div>
-          </div>
-
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th style="text-align: left;">Service Rendered</th>
-                  <th style="text-align: center; width: 60px;">Qty</th>
-                  <th style="text-align: right; width: 120px;">Unit Price</th>
-                  <th style="text-align: right; width: 120px;">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${serviceRows}
-              </tbody>
-            </table>
-          </div>
-
-          <table class="summary-table">
-            <tr>
-              <td style="color: #5A6A51;">Subtotal:</td>
-              <td style="text-align: right; font-weight: 600;">EGP ${totalCost.toLocaleString()}</td>
-            </tr>
-            ${walletUsed > 0 ? `
-            <tr>
-              <td style="color: #5A6A51;">Paid from Wallet:</td>
-              <td style="text-align: right; font-weight: 600; color: #414E36;">- EGP ${walletUsed.toLocaleString()}</td>
-            </tr>
-            ` : ""}
-            <tr class="total-row">
-              <td>Amount Paid:</td>
-              <td style="text-align: right;">EGP ${booking.amountPaid.toLocaleString()}</td>
-            </tr>
-            ${booking.amountLeft > 0 ? `
-            <tr style="color: #DC2626; font-weight: 600;">
-              <td>Outstanding Due:</td>
-              <td style="text-align: right;">EGP ${booking.amountLeft.toLocaleString()}</td>
-            </tr>
-            ` : ""}
-          </table>
-
-          <div class="footer">
-            <p>Thank you for choosing Revera Clinics!</p>
-            <p style="font-size: 10px; margin-top: 6px; color: #A3A3A3;">Generated automatically on ${new Date().toLocaleDateString()}</p>
-          </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    printInvoice(booking, servicesList, totalCost, walletUsed, branchName);
   }
 
   const calendarDays = useMemo(
@@ -7331,7 +7120,7 @@ export default function AdminPage() {
 
             {loginError && (
               <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-xl p-3">
-                ⚠️ {loginError}
+                âš ï¸ {loginError}
               </p>
             )}
 
@@ -7406,7 +7195,7 @@ export default function AdminPage() {
               className="md:hidden flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10 text-[#FBFBF9]/80 hover:text-[#FBFBF9] transition text-xl font-bold"
               title="Close sidebar"
             >
-              ×
+              Ã—
             </button>
           </div>
 
@@ -7749,7 +7538,7 @@ export default function AdminPage() {
                     className="flex items-center justify-between gap-4 rounded-3xl border border-rose-200 bg-rose-50 px-6 py-4 text-rose-800 shadow-sm animate-pulse"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">⚠️</span>
+                      <span className="text-xl">âš ï¸</span>
                       <p className="text-sm font-semibold">
                         Alert: Employee <strong>{alertItem.employee_accounts?.name}</strong> ({alertItem.employee_accounts?.role_name}) went missing at {new Date(alertItem.timestamp).toLocaleTimeString()}!
                       </p>
@@ -7794,7 +7583,7 @@ export default function AdminPage() {
             ) : (
               <>
 
-          {/* ── PROVIDERS VIEW ── */}
+          {/* â”€â”€ PROVIDERS VIEW â”€â”€ */}
           {activeNav === "Doctors" && (
             <section className="space-y-6">
               {editingDoctorInline ? (
@@ -7881,8 +7670,8 @@ export default function AdminPage() {
                           if (check.isValid) {
                             return (
                               <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/70 px-4 py-2 text-xs text-[#1F251A] font-semibold flex items-center justify-between min-h-[42px]">
-                                <span>{check.age} yrs • DOB: {check.dobFormatted}</span>
-                                <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">✓ National ID</span>
+                                <span>{check.age} yrs â€¢ DOB: {check.dobFormatted}</span>
+                                <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">âœ“ National ID</span>
                               </div>
                             );
                           }
@@ -7931,7 +7720,7 @@ export default function AdminPage() {
                                     : "bg-[#414E36]/5 text-[#414E36] border-transparent hover:bg-[#414E36]/10"
                                 }`}
                               >
-                                {b.name_en} {isSelected ? "✓" : "+"}
+                                {b.name_en} {isSelected ? "âœ“" : "+"}
                               </button>
                             );
                           })}
@@ -7948,7 +7737,7 @@ export default function AdminPage() {
                                 <div className="flex items-center justify-between w-full">
                                   <span className="text-sm font-semibold text-[#1F251A]">{displayDate}</span>
                                   <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full border border-[#414E36]/15 flex items-center gap-1">
-                                    ⚡ Auto from 1st Booking
+                                    âš¡ Auto from 1st Booking
                                   </span>
                                 </div>
                               );
@@ -8261,7 +8050,7 @@ export default function AdminPage() {
             </section>
           )}
 
-          {/* ── SERVICES VIEW ── */}
+          {/* â”€â”€ SERVICES VIEW â”€â”€ */}
           {activeNav === "Services" && (
              <div>
                {/* Header */}
@@ -8307,7 +8096,7 @@ export default function AdminPage() {
                   <input
                     value={serviceSearch}
                     onChange={(e) => { setServiceSearch(e.target.value); }}
-                    placeholder="Search services…"
+                    placeholder="Search servicesâ€¦"
                     className="w-full rounded-lg border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
                   />
                 </div>
@@ -8607,7 +8396,7 @@ export default function AdminPage() {
                 </button>
               </div>
 
-              {/* ── DELETE CATEGORY CONFIRMATION MODAL ── */}
+              {/* â”€â”€ DELETE CATEGORY CONFIRMATION MODAL â”€â”€ */}
               {deleteCategoryTarget && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
                   <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[#414E36]/10 animate-fadeIn">
@@ -8647,7 +8436,7 @@ export default function AdminPage() {
                 </div>
               )}
               
-              {/* ── DELETE SERVICE CONFIRMATION MODAL ── */}
+              {/* â”€â”€ DELETE SERVICE CONFIRMATION MODAL â”€â”€ */}
               {deleteServiceTarget && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
                   <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[#414E36]/10 animate-fadeIn">
@@ -8689,7 +8478,7 @@ export default function AdminPage() {
               )}
 
 
-              {/* ── ADD CATEGORY MODAL ── */}
+              {/* â”€â”€ ADD CATEGORY MODAL â”€â”€ */}
               {showAddCategoryModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
                   <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
@@ -8702,7 +8491,7 @@ export default function AdminPage() {
                         onClick={() => setShowAddCategoryModal(false)}
                         className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] hover:bg-[#F9F9F7]"
                       >
-                        ✕
+                        âœ•
                       </button>
                     </div>
                     <div className="flex flex-col gap-4">
@@ -8743,7 +8532,7 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* ── REDESIGNED ADD/EDIT SERVICE MODAL ── */}
+              {/* â”€â”€ REDESIGNED ADD/EDIT SERVICE MODAL â”€â”€ */}
               {showAddServiceModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto">
                   <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl my-8 border border-[#414E36]/10 animate-fadeIn flex flex-col max-h-[90vh]">
@@ -8772,7 +8561,7 @@ export default function AdminPage() {
                           onClick={() => setShowAddServiceModal(false)}
                           className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#FBFBF9]"
                         >
-                          ✕
+                          âœ•
                         </button>
                       </div>
                     </div>
@@ -8903,7 +8692,7 @@ export default function AdminPage() {
                             type="text"
                             value={serviceNameAr}
                             onChange={(e) => setServiceNameAr(e.target.value)}
-                            placeholder="علاج طبيعي: باقة التحول (15 جلسة)"
+                            placeholder="Ø¹Ù„Ø§Ø¬ Ø·Ø¨ÙŠØ¹ÙŠ: Ø¨Ø§Ù‚Ø© Ø§Ù„ØªØ­ÙˆÙ„ (15 Ø¬Ù„Ø³Ø©)"
                             dir="rtl"
                             className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                           />
@@ -8928,7 +8717,7 @@ export default function AdminPage() {
                             value={serviceDescAr}
                             onChange={(e) => setServiceDescAr(e.target.value)}
                             rows={3}
-                            placeholder="أدخل الوصف باللغة العربية..."
+                            placeholder="Ø£Ø¯Ø®Ù„ Ø§Ù„ÙˆØµÙ Ø¨Ø§Ù„Ù„ØºØ© Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©..."
                             dir="rtl"
                             className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium resize-none"
                           />
@@ -9105,13 +8894,13 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── PROMOTIONS VIEW ── */}
+          {/* â”€â”€ PROMOTIONS VIEW â”€â”€ */}
           {activeNav === "Promotions" && (
             <div>
               {/* Header */}
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-semibold text-[#1F251A]">Promotions & Discounts / عروض وخصومات الفروع</h2>
+                  <h2 className="text-2xl font-semibold text-[#1F251A]">Promotions & Discounts / Ø¹Ø±ÙˆØ¶ ÙˆØ®ØµÙˆÙ…Ø§Øª Ø§Ù„ÙØ±ÙˆØ¹</h2>
                   <p className="text-xs text-[#5A6A51] mt-1">Manage special pricing, percentage discounts, and fixed discounts across branches</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -9344,13 +9133,13 @@ export default function AdminPage() {
                     {/* Modal Header */}
                     <div className="flex items-center justify-between border-b border-[#414E36]/10 px-6 py-4">
                       <h3 className="text-base font-bold text-[#1F251A]">
-                        {editingPromo ? "Edit Promotion / تعديل العرض" : "Add Promotion / إضافة عرض"}
+                        {editingPromo ? "Edit Promotion / ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ø¹Ø±Ø¶" : "Add Promotion / Ø¥Ø¶Ø§ÙØ© Ø¹Ø±Ø¶"}
                       </h3>
                       <button
                         onClick={() => setShowAddPromoModal(false)}
                         className="flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#FBFBF9]"
                       >
-                        ✕
+                        âœ•
                       </button>
                     </div>
 
@@ -9369,7 +9158,7 @@ export default function AdminPage() {
                         </label>
                         {editingPromo ? (
                           <div className="rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] font-medium">
-                            {localServices.find(s => s.id === editingPromo.serviceId)?.en || "—"}
+                            {localServices.find(s => s.id === editingPromo.serviceId)?.en || "â€”"}
                           </div>
                         ) : (
                           <div className="rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] overflow-hidden">
@@ -9472,7 +9261,7 @@ export default function AdminPage() {
                                   return Array.from(names);
                                 })();
                             if (branchList.length === 0) {
-                              return <p className="px-3 py-2 text-[10px] text-amber-600 font-medium">⚠ No branches found. Configure branches in Settings → Branches first.</p>;
+                              return <p className="px-3 py-2 text-[10px] text-amber-600 font-medium">âš  No branches found. Configure branches in Settings â†’ Branches first.</p>;
                             }
                             return branchList.map(name => {
                               const checked = promoBranchNames.includes(name);
@@ -9564,7 +9353,7 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Live Price note — shows for single-service selection only */}
+                      {/* Live Price note â€” shows for single-service selection only */}
                       {promoServiceIds.length === 1 && promoBranchNames.length > 0 && (() => {
                         const selectedSvc = localServices.find(s => s.id === promoServiceIds[0]);
                         if (!selectedSvc) return null;
@@ -9573,7 +9362,7 @@ export default function AdminPage() {
                           : promoBranchNames;
                         return (
                           <div className="pt-3 border-t border-[#414E36]/10 space-y-1.5">
-                            <div className="text-xs font-bold text-[#414E36] mb-1">Preview Selling Price by Branch / معاينة السعر حسب الفرع:</div>
+                            <div className="text-xs font-bold text-[#414E36] mb-1">Preview Selling Price by Branch / Ù…Ø¹Ø§ÙŠÙ†Ø© Ø§Ù„Ø³Ø¹Ø± Ø­Ø³Ø¨ Ø§Ù„ÙØ±Ø¹:</div>
                             <div className="max-h-24 overflow-y-auto space-y-1.5 pr-1">
                               {branchesToPreview.map(branchName => {
                                 const selectedBp = (selectedSvc.branchPricing || []).find(bp => bp.name.toLowerCase() === branchName.toLowerCase());
@@ -9603,7 +9392,7 @@ export default function AdminPage() {
                       {(promoServiceIds.length > 1 || promoBranchNames.length > 1) && (
                         <div className="pt-3 border-t border-[#414E36]/10">
                           <p className="text-[10px] text-[#5A6A51] font-medium">
-                            ℹ This promotion will apply to <strong>{editingPromo ? 1 : promoServiceIds.length} service{(!editingPromo && promoServiceIds.length > 1) ? 's' : ''}</strong> across <strong>{promoBranchNames.length > 0 ? promoBranchNames.join(', ') : 'selected'}</strong> branch{promoBranchNames.length > 1 ? 'es' : ''}.
+                            â„¹ This promotion will apply to <strong>{editingPromo ? 1 : promoServiceIds.length} service{(!editingPromo && promoServiceIds.length > 1) ? 's' : ''}</strong> across <strong>{promoBranchNames.length > 0 ? promoBranchNames.join(', ') : 'selected'}</strong> branch{promoBranchNames.length > 1 ? 'es' : ''}.
                           </p>
                         </div>
                       )}
@@ -9638,7 +9427,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── ALL PRESCRIPTIONS VIEW ── */}
+          {/* â”€â”€ ALL PRESCRIPTIONS VIEW â”€â”€ */}
           {activeNav === "All Prescriptions" && (
             <div>
               {/* Page header */}
@@ -9667,7 +9456,7 @@ export default function AdminPage() {
                   <input
                     value={prescriptionsSearch}
                     onChange={(e) => { setPrescriptionsSearch(e.target.value); setPrescriptionPage(1); }}
-                    placeholder="Search prescriptions…"
+                    placeholder="Search prescriptionsâ€¦"
                     className="w-full rounded-lg border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
                   />
                 </div>
@@ -9738,7 +9527,7 @@ export default function AdminPage() {
 
               {/* Pagination */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#5A6A51]">
-                <span>Showing {(prescriptionPage - 1) * PRESCRIPTION_PAGE_SIZE + 1}–{Math.min(prescriptionPage * PRESCRIPTION_PAGE_SIZE, filteredPrescriptions.length)} of {filteredPrescriptions.length}</span>
+                <span>Showing {(prescriptionPage - 1) * PRESCRIPTION_PAGE_SIZE + 1}â€“{Math.min(prescriptionPage * PRESCRIPTION_PAGE_SIZE, filteredPrescriptions.length)} of {filteredPrescriptions.length}</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setPrescriptionPage((p) => Math.max(1, p - 1))}
@@ -9772,7 +9561,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── MEDICINE LIBRARY VIEW ── */}
+          {/* â”€â”€ MEDICINE LIBRARY VIEW â”€â”€ */}
           {activeNav === "Medicine Library" && (
             <div>
               {/* Page header */}
@@ -9801,7 +9590,7 @@ export default function AdminPage() {
                   <input
                     value={medicinesSearch}
                     onChange={(e) => { setMedicinesSearch(e.target.value); setMedicinePage(1); }}
-                    placeholder="Search medicine library…"
+                    placeholder="Search medicine libraryâ€¦"
                     className="w-full rounded-lg border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
                   />
                 </div>
@@ -9908,7 +9697,7 @@ export default function AdminPage() {
 
               {/* Pagination */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#5A6A51]">
-                <span>Showing {(medicinePage - 1) * MEDICINE_PAGE_SIZE + 1}–{Math.min(medicinePage * MEDICINE_PAGE_SIZE, filteredMedicines.length)} of {filteredMedicines.length}</span>
+                <span>Showing {(medicinePage - 1) * MEDICINE_PAGE_SIZE + 1}â€“{Math.min(medicinePage * MEDICINE_PAGE_SIZE, filteredMedicines.length)} of {filteredMedicines.length}</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setMedicinePage((p) => Math.max(1, p - 1))}
@@ -9942,7 +9731,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── PRODUCTS VIEW ── */}
+          {/* â”€â”€ PRODUCTS VIEW â”€â”€ */}
           {activeNav === "Products" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10033,9 +9822,9 @@ export default function AdminPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3.5 font-medium text-[#1F251A]" dir="rtl">{
-                            p.name.includes("Cream") ? "كريم ترطيب الوجه" :
-                            p.name.includes("Sunscreen") ? "واقي شمس 50+" :
-                            p.name.includes("Serum") ? "سيروم ريتينول" : "جل منظف لطيف"
+                            p.name.includes("Cream") ? "ÙƒØ±ÙŠÙ… ØªØ±Ø·ÙŠØ¨ Ø§Ù„ÙˆØ¬Ù‡" :
+                            p.name.includes("Sunscreen") ? "ÙˆØ§Ù‚ÙŠ Ø´Ù…Ø³ 50+" :
+                            p.name.includes("Serum") ? "Ø³ÙŠØ±ÙˆÙ… Ø±ÙŠØªÙŠÙ†ÙˆÙ„" : "Ø¬Ù„ Ù…Ù†Ø¸Ù Ù„Ø·ÙŠÙ"
                           }</td>
                           <td className="px-4 py-3.5 font-medium text-[#1F251A]">{p.name}</td>
                           <td className="px-4 py-3.5">
@@ -10072,7 +9861,7 @@ export default function AdminPage() {
 
               {/* Pagination */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#5A6A51]">
-                <span>Showing {(productPage - 1) * PRODUCT_PAGE_SIZE + 1}–{Math.min(productPage * PRODUCT_PAGE_SIZE, filteredProducts.length)} of {filteredProducts.length}</span>
+                <span>Showing {(productPage - 1) * PRODUCT_PAGE_SIZE + 1}â€“{Math.min(productPage * PRODUCT_PAGE_SIZE, filteredProducts.length)} of {filteredProducts.length}</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setProductPage((p) => Math.max(1, p - 1))}
@@ -10106,7 +9895,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── PRODUCT CATEGORIES VIEW ── */}
+          {/* â”€â”€ PRODUCT CATEGORIES VIEW â”€â”€ */}
           {activeNav === "Product Categories" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10136,11 +9925,11 @@ export default function AdminPage() {
                     ) : (
                       MOCK_PRODUCT_CATEGORIES.map((cat, idx) => {
                         const colors = ["#C4AE7C", "#414E36", "#3B82F6", "#EC4899"];
-                        const arabicTitles = ["العناية بالبشرة", "الحماية من الشمس", "السيروم", "العناية بالشعر"];
+                        const arabicTitles = ["Ø§Ù„Ø¹Ù†Ø§ÙŠØ© Ø¨Ø§Ù„Ø¨Ø´Ø±Ø©", "Ø§Ù„Ø­Ù…Ø§ÙŠØ© Ù…Ù† Ø§Ù„Ø´Ù…Ø³", "Ø§Ù„Ø³ÙŠØ±ÙˆÙ…", "Ø§Ù„Ø¹Ù†Ø§ÙŠØ© Ø¨Ø§Ù„Ø´Ø¹Ø±"];
                         return (
                           <tr key={cat.id} className="transition hover:bg-[#F9F9F7]">
                             <td className="px-5 py-4 font-mono font-semibold text-[#5A6A51]">{cat.id}</td>
-                            <td className="px-5 py-4 font-semibold text-[#1F251A]" dir="rtl">{arabicTitles[idx] || "تصنيف عام"}</td>
+                            <td className="px-5 py-4 font-semibold text-[#1F251A]" dir="rtl">{arabicTitles[idx] || "ØªØµÙ†ÙŠÙ Ø¹Ø§Ù…"}</td>
                             <td className="px-5 py-4 font-semibold text-[#1F251A]">{cat.name}</td>
                             <td className="px-5 py-4">
                               <span
@@ -10164,7 +9953,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── SUPPLIERS VIEW ── */}
+          {/* â”€â”€ SUPPLIERS VIEW â”€â”€ */}
           {activeNav === "Suppliers" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10268,7 +10057,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── PURCHASES VIEW ── */}
+          {/* â”€â”€ PURCHASES VIEW â”€â”€ */}
           {activeNav === "Purchases" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10400,7 +10189,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── BATCH MANAGEMENT VIEW ── */}
+          {/* â”€â”€ BATCH MANAGEMENT VIEW â”€â”€ */}
           {activeNav === "Batch Management" && (
             <div>
               <div className="mb-6">
@@ -10500,7 +10289,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── POINT OF SALE VIEW ── */}
+          {/* â”€â”€ POINT OF SALE VIEW â”€â”€ */}
           {activeNav === "Point of Sale" && (
             <div>
               <div className="mb-6">
@@ -10630,7 +10419,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── POS ORDERS VIEW ── */}
+          {/* â”€â”€ POS ORDERS VIEW â”€â”€ */}
           {activeNav === "POS Orders" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10682,7 +10471,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── INSIGHTS VIEW ── */}
+          {/* â”€â”€ INSIGHTS VIEW â”€â”€ */}
           {activeNav === "Insights" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -10780,7 +10569,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── SALES DASHBOARD VIEW ── */}
+          {/* â”€â”€ SALES DASHBOARD VIEW â”€â”€ */}
           {activeNav === "Sales Dashboard" && (
             <div>
               <div className="mb-6">
@@ -10790,17 +10579,17 @@ export default function AdminPage() {
                 <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
                   <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">E-Commerce Revenue</p>
                   <p className="text-2xl font-bold text-[#1F251A] mt-2">EGP 113,200.00</p>
-                  <span className="text-[10px] text-green-600 font-bold">↑ +14.8% vs last month</span>
+                  <span className="text-[10px] text-green-600 font-bold">â†‘ +14.8% vs last month</span>
                 </div>
                 <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
                   <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Completed Transactions</p>
                   <p className="text-2xl font-bold text-[#1F251A] mt-2">124 Sales</p>
-                  <span className="text-[10px] text-green-600 font-bold">↑ +8.5% vs last month</span>
+                  <span className="text-[10px] text-green-600 font-bold">â†‘ +8.5% vs last month</span>
                 </div>
                 <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
                   <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Average Order Value</p>
                   <p className="text-2xl font-bold text-[#1F251A] mt-2">EGP 912.00</p>
-                  <span className="text-[10px] text-green-600 font-bold">↑ +5.7% vs last month</span>
+                  <span className="text-[10px] text-green-600 font-bold">â†‘ +5.7% vs last month</span>
                 </div>
 
               {/* Progress visualizers */}
@@ -10827,7 +10616,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── REFUNDS VIEW ── */}
+          {/* â”€â”€ REFUNDS VIEW â”€â”€ */}
           {activeNav === "Refunds" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10882,7 +10671,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── SHIPPING METHODS VIEW ── */}
+          {/* â”€â”€ SHIPPING METHODS VIEW â”€â”€ */}
           {activeNav === "Shipping Methods" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10929,7 +10718,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── TARGET BONUSES VIEW ── */}
+          {/* â”€â”€ TARGET BONUSES VIEW â”€â”€ */}
           {activeNav === "Target Bonuses" && (
             <section className="space-y-6">
               <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
@@ -10965,7 +10754,7 @@ export default function AdminPage() {
             </section>
           )}
 
-          {/* ── COUPONS VIEW ── */}
+          {/* â”€â”€ COUPONS VIEW â”€â”€ */}
           {activeNav === "Coupons" && (
             <section className="space-y-6">
               <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
@@ -11037,11 +10826,11 @@ export default function AdminPage() {
             </section>
           )}
 
-          {/* ── CUSTOMERS VIEW ── */}
+          {/* â”€â”€ CUSTOMERS VIEW â”€â”€ */}
           {activeNav === "Customers" && (
             <div>
 
-              {/* ── INLINE: View Customer Profile ── */}
+              {/* â”€â”€ INLINE: View Customer Profile â”€â”€ */}
               {viewingCustomerProfile && (
                 <div className="space-y-6 animate-fadeIn">
                   {/* Back button */}
@@ -11110,7 +10899,7 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingCustomerProfile.name}</h3>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "No phone"} • Patient Profile & Clinic Engagement History</p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "No phone"} â€¢ Patient Profile & Clinic Engagement History</p>
                         <div className="mt-2">
                           <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                             viewingCustomerProfile.active !== false ? "bg-[#EDF1EC] text-[#414E36]" : "bg-red-50 text-red-600"
@@ -11179,31 +10968,31 @@ export default function AdminPage() {
                         <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
-                            <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "—"}</span>
+                            <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Age</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "—"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Gender</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "—"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
-                            <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "—"}</span>
+                            <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Referral Source</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "—"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Profile Status</span>
@@ -11223,7 +11012,7 @@ export default function AdminPage() {
                                 viewingCustomerProfile.floor_no,
                                 viewingCustomerProfile.area,
                                 viewingCustomerProfile.location_name
-                              ].filter(Boolean).join(", ") || "—"}
+                              ].filter(Boolean).join(", ") || "â€”"}
                             </span>
                           </div>
                           {viewingCustomerProfile.note && (
@@ -11299,10 +11088,10 @@ export default function AdminPage() {
                                     <tr key={res.id} className="hover:bg-[#F9F9F7]">
                                       <td className="px-4 py-3">
                                         <span className="block font-semibold text-[#1F251A]">{formattedDate}</span>
-                                        <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "—"}</span>
+                                        <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "â€”"}</span>
                                       </td>
                                       <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
-                                      <td className="px-4 py-3">{res.doctorName || "—"}</td>
+                                      <td className="px-4 py-3">{res.doctorName || "â€”"}</td>
                                       <td className="px-4 py-3 text-right font-medium text-green-700">{spent} EGP</td>
                                       <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
                                       <td className="px-4 py-3 text-center">
@@ -11335,7 +11124,7 @@ export default function AdminPage() {
                                   : "text-[#5A6A51] hover:text-[#414E36]"
                               }`}
                             >
-                              📋 Medical Intake & History
+                              ðŸ“‹ Medical Intake & History
                             </button>
                             <button
                               type="button"
@@ -11346,7 +11135,7 @@ export default function AdminPage() {
                                   : "text-[#5A6A51] hover:text-[#414E36]"
                               }`}
                             >
-                              💊 Clinical Prescriptions ({customerPrescriptions.length})
+                              ðŸ’Š Clinical Prescriptions ({customerPrescriptions.length})
                             </button>
                             <button
                               type="button"
@@ -11357,7 +11146,7 @@ export default function AdminPage() {
                                   : "text-[#5A6A51] hover:text-[#414E36]"
                               }`}
                             >
-                              📑 Reports & Documents ({medicalReports.length})
+                              ðŸ“‘ Reports & Documents ({medicalReports.length})
                             </button>
                           </div>
 
@@ -11449,7 +11238,7 @@ export default function AdminPage() {
                                         <span className="text-[11px] font-semibold text-[#5A6A51] block">Previous Aesthetic Treatments</span>
                                         <p className="text-xs font-medium text-[#1F251A] mt-0.5">
                                           {medicalRecordForm.has_previous_treatments || medicalRecordForm.previous_treatments ? (
-                                            <span className="text-emerald-800 font-semibold">Yes — {medicalRecordForm.previous_treatments_details || medicalRecordForm.previous_treatments || "Specified"}</span>
+                                            <span className="text-emerald-800 font-semibold">Yes â€” {medicalRecordForm.previous_treatments_details || medicalRecordForm.previous_treatments || "Specified"}</span>
                                           ) : (
                                             <span className="text-gray-500">No</span>
                                           )}
@@ -11468,7 +11257,7 @@ export default function AdminPage() {
                                         <span className="text-[11px] font-semibold text-[#5A6A51] block">Medical Conditions</span>
                                         <p className="text-xs font-medium text-[#1F251A] mt-0.5">
                                           {medicalRecordForm.has_medical_conditions || medicalRecordForm.medical_conditions ? (
-                                            <span className="text-amber-900 font-semibold">Yes — {medicalRecordForm.medical_conditions_details || medicalRecordForm.medical_conditions || "Specified"}</span>
+                                            <span className="text-amber-900 font-semibold">Yes â€” {medicalRecordForm.medical_conditions_details || medicalRecordForm.medical_conditions || "Specified"}</span>
                                           ) : (
                                             <span className="text-gray-500">No</span>
                                           )}
@@ -11479,7 +11268,7 @@ export default function AdminPage() {
                                         <span className="text-[11px] font-semibold text-[#5A6A51] block">Current Medication</span>
                                         <p className="text-xs font-medium text-[#1F251A] mt-0.5">
                                           {medicalRecordForm.is_taking_medication || medicalRecordForm.medications ? (
-                                            <span className="text-amber-900 font-semibold">Yes — {medicalRecordForm.medication_details || medicalRecordForm.medications || "Specified"}</span>
+                                            <span className="text-amber-900 font-semibold">Yes â€” {medicalRecordForm.medication_details || medicalRecordForm.medications || "Specified"}</span>
                                           ) : (
                                             <span className="text-gray-500">No</span>
                                           )}
@@ -11574,7 +11363,7 @@ export default function AdminPage() {
                                 </div>
                                 <div>
                                   <div className="flex items-center justify-between mb-1.5">
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-800">🔒 Doctor-Only Notes (Optional)</label>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-800">ðŸ”’ Doctor-Only Notes (Optional)</label>
                                     <span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1.5 py-0.5 rounded">Hidden from print</span>
                                   </div>
                                   <textarea placeholder="Confidential clinical remarks..." value={rxDocNotes} onChange={(e) => setRxDocNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-amber-300/40 bg-amber-50/20 px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-amber-400 transition" />
@@ -11623,7 +11412,7 @@ export default function AdminPage() {
                                             {rx.diagnosis && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Diagnosis</span><p className="text-[#1F251A] font-medium leading-relaxed">{rx.diagnosis}</p></div>)}
                                             {rx.medications && rx.medications.length > 0 && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Medications Prescribed</span><ul className="space-y-2 bg-[#FBFBF9] rounded-xl border border-[#414E36]/5 p-3">{rx.medications.map((m: any, idx: number) => (<li key={idx} className="flex flex-col"><span className="font-semibold text-[#1F251A]">{m.name}</span>{m.instructions && (<span className="text-xs text-[#5A6A51] italic">{m.instructions}</span>)}</li>))}</ul></div>)}
                                             {rx.general_notes && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">General Notes</span><p className="text-xs text-[#5A6A51] bg-[#FBFBF9] rounded-xl p-3 border border-[#414E36]/5 leading-relaxed">{rx.general_notes}</p></div>)}
-                                            {rx.doctor_notes && isDocUser && (<div className="border border-amber-300/40 bg-amber-50/20 rounded-xl p-3.5 space-y-1"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-amber-800">🔒 Doctor-Only Notes</span><span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1 py-0.5 rounded">Hidden from print</span></div><p className="text-xs text-amber-900 leading-relaxed">{rx.doctor_notes}</p></div>)}
+                                            {rx.doctor_notes && isDocUser && (<div className="border border-amber-300/40 bg-amber-50/20 rounded-xl p-3.5 space-y-1"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-amber-800">ðŸ”’ Doctor-Only Notes</span><span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1 py-0.5 rounded">Hidden from print</span></div><p className="text-xs text-amber-900 leading-relaxed">{rx.doctor_notes}</p></div>)}
                                             {rx.follow_up_date && (<div className="flex items-center gap-1.5 text-xs text-[#414E36] font-semibold bg-[#EDF1EC]/60 px-3 py-2 rounded-xl w-fit"><Calendar size={13} />Next Follow-Up: {new Date(rx.follow_up_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>)}
                                           </div>
                                         </div>
@@ -11685,7 +11474,7 @@ export default function AdminPage() {
                                           rel="noopener noreferrer"
                                           className="inline-flex items-center gap-1 text-[#414E36] font-semibold hover:underline"
                                         >
-                                          View File ↗
+                                          View File â†—
                                         </a>
                                       )}
                                     </div>
@@ -12060,7 +11849,7 @@ export default function AdminPage() {
                       </div>
                     )}
 
-                {/* ── Modal: Medical Intake Form ── */}
+                {/* â”€â”€ Modal: Medical Intake Form â”€â”€ */}
                 {showMedicalFormModal && (
                   <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
                     <div className="relative w-full max-w-2xl rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[#414E36]/15 space-y-6 my-8">
@@ -12131,7 +11920,7 @@ export default function AdminPage() {
                                       : "bg-white text-gray-700 border-gray-200 hover:border-[#414E36]/30"
                                   }`}
                                 >
-                                  {isSelected ? "✓ " : "+ "}{concern}
+                                  {isSelected ? "âœ“ " : "+ "}{concern}
                                 </button>
                               );
                             })}
@@ -12299,7 +12088,7 @@ export default function AdminPage() {
                   </div>
                 )}
 
-                {/* ── Modal: Medical Report / Document Upload ── */}
+                {/* â”€â”€ Modal: Medical Report / Document Upload â”€â”€ */}
                 {showMedicalReportModal && (
                   <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
                     <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[#414E36]/15 space-y-5 my-8">
@@ -12387,7 +12176,7 @@ export default function AdminPage() {
               </div>
             )}
 
-              {/* ── INLINE: Add/Edit Customer Form ── */}
+              {/* â”€â”€ INLINE: Add/Edit Customer Form â”€â”€ */}
               {showCustomerFormModal && !viewingCustomerProfile && (
                 <div className="space-y-6 animate-fadeIn">
                   <div>
@@ -12445,8 +12234,8 @@ export default function AdminPage() {
                             <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Gender</label>
                             <select value={custGender} onChange={(e) => setCustGender(e.target.value as any)} className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]">
                               <option value="">Select Gender</option>
-                              <option value="Male">Male / ذكر</option>
-                              <option value="Female">Female / أنثى</option>
+                              <option value="Male">Male / Ø°ÙƒØ±</option>
+                              <option value="Female">Female / Ø£Ù†Ø«Ù‰</option>
                             </select>
                           </div>
                           <div>
@@ -12524,7 +12313,7 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* ── CUSTOMER TABLE (only when no inline view is active) ── */}
+              {/* â”€â”€ CUSTOMER TABLE (only when no inline view is active) â”€â”€ */}
               {!viewingCustomerProfile && !showCustomerFormModal && (
               <>
               {/* Page header and premium controls panel */}
@@ -12689,8 +12478,8 @@ export default function AdminPage() {
                       const dateStr = dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
                       const timeStr = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
                       const uniqueKey = c.id || c.email || c.phone;
-                      const displayPhone = c.mobile || c.phone || "—";
-                      const displayEmail = c.email || "—";
+                      const displayPhone = c.mobile || c.phone || "â€”";
+                      const displayEmail = c.email || "â€”";
                       return (
                         <tr key={uniqueKey} className="transition hover:bg-[#F9F9F7]">
                           <td className="px-5 py-4 font-semibold text-[#1F251A]">
@@ -12747,7 +12536,7 @@ export default function AdminPage() {
               )}
             </div>
           )}
-          {/* ── REPORTS VIEWS ── */}
+          {/* â”€â”€ REPORTS VIEWS â”€â”€ */}
           {activeNav === "Transaction Reports" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -12944,7 +12733,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── INVENTORY VIEWS ── */}
+          {/* â”€â”€ INVENTORY VIEWS â”€â”€ */}
           {activeNav === "Procurement" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -13045,7 +12834,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── SMS MANAGEMENT VIEWS ── */}
+          {/* â”€â”€ SMS MANAGEMENT VIEWS â”€â”€ */}
           {activeNav === "SMS Templates" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -13118,7 +12907,7 @@ export default function AdminPage() {
                       <p className="text-[11px] font-bold text-[#C4AE7C] mt-1">{g.size}</p>
                       <p className="text-xs text-[#5A6A51] mt-3 leading-relaxed">{g.desc}</p>
                     </div>
-                    <button className="mt-4 text-xs font-bold text-[#414E36] hover:underline text-left">View Members →</button>
+                    <button className="mt-4 text-xs font-bold text-[#414E36] hover:underline text-left">View Members â†’</button>
                   </div>
                 ))}
               </div>
@@ -13372,7 +13161,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── PAGES SETTINGS VIEW ── */}
+          {/* â”€â”€ PAGES SETTINGS VIEW â”€â”€ */}
           {activeNav === "Pages Settings" && (
             <div className="space-y-6">
               <div className="mb-2">
@@ -13441,7 +13230,7 @@ export default function AdminPage() {
                           pageSettingsLangTab === "ar" ? "border-[#414E36] text-[#414E36]" : "border-transparent text-[#5A6A51]/70 hover:text-[#414E36]"
                         }`}
                       >
-                        Arabic Version (العربية)
+                        Arabic Version (Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©)
                       </button>
                     </div>
 
@@ -13554,7 +13343,7 @@ export default function AdminPage() {
                                         onClick={() => handleTranslateSlideField(index, "welcome", slide.welcome || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                       >
-                                        {translatingField === `slide-${index}-welcome-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ➔`}
+                                        {translatingField === `slide-${index}-welcome-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} âž”`}
                                       </button>
                                     </div>
                                     <input
@@ -13575,7 +13364,7 @@ export default function AdminPage() {
                                         onClick={() => handleTranslateSlideField(index, "heading", slide.heading || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                       >
-                                        {translatingField === `slide-${index}-heading-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ➔`}
+                                        {translatingField === `slide-${index}-heading-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} âž”`}
                                       </button>
                                     </div>
                                     <input
@@ -13596,7 +13385,7 @@ export default function AdminPage() {
                                         onClick={() => handleTranslateSlideField(index, "description", slide.description || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                       >
-                                        {translatingField === `slide-${index}-description-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ➔`}
+                                        {translatingField === `slide-${index}-description-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} âž”`}
                                       </button>
                                     </div>
                                     <textarea
@@ -13617,7 +13406,7 @@ export default function AdminPage() {
                                         onClick={() => handleTranslateSlideField(index, "bookBtn", slide.bookBtn || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                       >
-                                        {translatingField === `slide-${index}-bookBtn-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ➔`}
+                                        {translatingField === `slide-${index}-bookBtn-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} âž”`}
                                       </button>
                                     </div>
                                     <input
@@ -13649,7 +13438,7 @@ export default function AdminPage() {
                                           onClick={() => handleTranslateSlideField(index, "reviewCount", slide.reviewCount || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
                                           className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                         >
-                                          {translatingField === `slide-${index}-reviewCount-${pageSettingsLangTab}` ? "Translating..." : `➔`}
+                                          {translatingField === `slide-${index}-reviewCount-${pageSettingsLangTab}` ? "Translating..." : `âž”`}
                                         </button>
                                       </div>
                                       <input
@@ -14223,7 +14012,7 @@ export default function AdminPage() {
                                 onClick={() => handleTranslateChecklistItem(index, item, "en", "ar")}
                                 className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                               >
-                                {translatingField === `whatwedo-${index}-en` ? "Translating..." : "Translate to Arabic ➔"}
+                                {translatingField === `whatwedo-${index}-en` ? "Translating..." : "Translate to Arabic âž”"}
                               </button>
                             </div>
                             <input
@@ -14263,9 +14052,9 @@ export default function AdminPage() {
                           onClick={() => setWhatWeDoListAr([...whatWeDoListAr, ""])}
                           className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
                         >
-                          + إضافة عنصر
+                          + Ø¥Ø¶Ø§ÙØ© Ø¹Ù†ØµØ±
                         </button>
-                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">عناصر القائمة باللغة العربية</h4>
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">Ø¹Ù†Ø§ØµØ± Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© Ø¨Ø§Ù„Ù„ØºØ© Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©</h4>
                       </div>
                       {whatWeDoListAr.map((item, index) => (
                         <div key={index} className="flex items-end gap-2" dir="rtl">
@@ -14277,9 +14066,9 @@ export default function AdminPage() {
                                 onClick={() => handleTranslateChecklistItem(index, item, "ar", "en")}
                                 className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                               >
-                                {translatingField === `whatwedo-${index}-ar` ? "Translating..." : "Translate to English ➔"}
+                                {translatingField === `whatwedo-${index}-ar` ? "Translating..." : "Translate to English âž”"}
                               </button>
-                              <label className="block text-xs font-semibold text-[#5A6A51] text-right">العنصر {index + 1}</label>
+                              <label className="block text-xs font-semibold text-[#5A6A51] text-right">Ø§Ù„Ø¹Ù†ØµØ± {index + 1}</label>
                             </div>
                             <input
                               type="text"
@@ -14290,7 +14079,7 @@ export default function AdminPage() {
                                 setWhatWeDoListAr(newList);
                               }}
                               className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
-                              placeholder={`عنصر القائمة ${index + 1}`}
+                              placeholder={`Ø¹Ù†ØµØ± Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© ${index + 1}`}
                             />
                           </div>
                           {whatWeDoListAr.length > 1 && (
@@ -14301,7 +14090,7 @@ export default function AdminPage() {
                                 setWhatWeDoListAr(newList);
                               }}
                               className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition duration-155 cursor-pointer"
-                              title="حذف العنصر"
+                              title="Ø­Ø°Ù Ø§Ù„Ø¹Ù†ØµØ±"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -14460,7 +14249,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(faqTag, "en", "ar", setFaqTagAr, "faqTag-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "faqTag-en" ? "Translating..." : "Translate to Arabic ➔"}
+                              {translatingField === "faqTag-en" ? "Translating..." : "Translate to Arabic âž”"}
                             </button>
                           </div>
                           <input
@@ -14481,7 +14270,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(faqHeading, "en", "ar", setFaqHeadingAr, "faqHeading-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "faqHeading-en" ? "Translating..." : "Translate to Arabic ➔"}
+                              {translatingField === "faqHeading-en" ? "Translating..." : "Translate to Arabic âž”"}
                             </button>
                           </div>
                           <input
@@ -14496,7 +14285,7 @@ export default function AdminPage() {
 
                       {/* Arabic General */}
                       <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">المعلومات باللغة العربية</h4>
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø¨Ø§Ù„Ù„ØºØ© Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©</h4>
                         
                         <div className="space-y-2" dir="rtl">
                           <div className="flex items-center justify-between mb-1" dir="ltr">
@@ -14506,15 +14295,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(faqTagAr, "ar", "en", setFaqTag, "faqTag-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "faqTag-ar" ? "Translating..." : "Translate to English ➔"}
+                              {translatingField === "faqTag-ar" ? "Translating..." : "Translate to English âž”"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الجانبي</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">Ø§Ù„Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠ</label>
                           </div>
                           <input
                             type="text"
                             value={faqTagAr}
                             onChange={(e) => setFaqTagAr(e.target.value)}
-                            placeholder="أسئلة شائعة"
+                            placeholder="Ø£Ø³Ø¦Ù„Ø© Ø´Ø§Ø¦Ø¹Ø©"
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -14527,15 +14316,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(faqHeadingAr, "ar", "en", setFaqHeading, "faqHeading-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "faqHeading-ar" ? "Translating..." : "Translate to English ➔"}
+                              {translatingField === "faqHeading-ar" ? "Translating..." : "Translate to English âž”"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الرئيسي</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">Ø§Ù„Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ</label>
                           </div>
                           <input
                             type="text"
                             value={faqHeadingAr}
                             onChange={(e) => setFaqHeadingAr(e.target.value)}
-                            placeholder="أسئلة؟ لدينا إجابات."
+                            placeholder="Ø£Ø³Ø¦Ù„Ø©ØŸ Ù„Ø¯ÙŠÙ†Ø§ Ø¥Ø¬Ø§Ø¨Ø§Øª."
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -14581,7 +14370,7 @@ export default function AdminPage() {
                                     onClick={() => handleTranslateFaqItem(index, "question", faq.question, "en", "ar")}
                                     className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                   >
-                                    {translatingField === `faq-${index}-question-en` ? "Translating..." : "Translate to Arabic ➔"}
+                                    {translatingField === `faq-${index}-question-en` ? "Translating..." : "Translate to Arabic âž”"}
                                   </button>
                                 </div>
                                 <input
@@ -14605,7 +14394,7 @@ export default function AdminPage() {
                                     onClick={() => handleTranslateFaqItem(index, "answer", faq.answer, "en", "ar")}
                                     className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                   >
-                                    {translatingField === `faq-${index}-answer-en` ? "Translating..." : "Translate to Arabic ➔"}
+                                    {translatingField === `faq-${index}-answer-en` ? "Translating..." : "Translate to Arabic âž”"}
                                   </button>
                                 </div>
                                 <textarea
@@ -14633,16 +14422,16 @@ export default function AdminPage() {
                             onClick={() => setFaqsAr([...faqsAr, { question: "", answer: "" }])}
                             className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
                           >
-                            + إضافة سؤال
+                            + Ø¥Ø¶Ø§ÙØ© Ø³Ø¤Ø§Ù„
                           </button>
-                          <h4 className="text-sm font-semibold text-[#1F251A] text-right">أسئلة وأجوبة باللغة العربية</h4>
+                          <h4 className="text-sm font-semibold text-[#1F251A] text-right">Ø£Ø³Ø¦Ù„Ø© ÙˆØ£Ø¬ÙˆØ¨Ø© Ø¨Ø§Ù„Ù„ØºØ© Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©</h4>
                         </div>
 
                         <div className="space-y-6 max-h-[500px] overflow-y-auto pl-2" dir="rtl">
                           {faqsAr.map((faq, index) => (
                             <div key={index} className="p-4 rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] space-y-3 relative group text-right">
                               <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold text-[#5A6A51]">سؤال وجواب #{index + 1}</span>
+                                <span className="text-xs font-bold text-[#5A6A51]">Ø³Ø¤Ø§Ù„ ÙˆØ¬ÙˆØ§Ø¨ #{index + 1}</span>
                                 {faqsAr.length > 1 && (
                                   <button
                                     type="button"
@@ -14661,9 +14450,9 @@ export default function AdminPage() {
                                     onClick={() => handleTranslateFaqItem(index, "question", faq.question, "ar", "en")}
                                     className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                   >
-                                    {translatingField === `faq-${index}-question-ar` ? "Translating..." : "Translate to English ➔"}
+                                    {translatingField === `faq-${index}-question-ar` ? "Translating..." : "Translate to English âž”"}
                                   </button>
-                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">السؤال</label>
+                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">Ø§Ù„Ø³Ø¤Ø§Ù„</label>
                                 </div>
                                 <input
                                   type="text"
@@ -14673,7 +14462,7 @@ export default function AdminPage() {
                                     newFaqs[index].question = e.target.value;
                                     setFaqsAr(newFaqs);
                                   }}
-                                  placeholder="اكتب السؤال هنا..."
+                                  placeholder="Ø§ÙƒØªØ¨ Ø§Ù„Ø³Ø¤Ø§Ù„ Ù‡Ù†Ø§..."
                                   className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                                 />
                               </div>
@@ -14685,9 +14474,9 @@ export default function AdminPage() {
                                     onClick={() => handleTranslateFaqItem(index, "answer", faq.answer, "ar", "en")}
                                     className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                   >
-                                    {translatingField === `faq-${index}-answer-ar` ? "Translating..." : "Translate to English ➔"}
+                                    {translatingField === `faq-${index}-answer-ar` ? "Translating..." : "Translate to English âž”"}
                                   </button>
-                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">الإجابة</label>
+                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">Ø§Ù„Ø¥Ø¬Ø§Ø¨Ø©</label>
                                 </div>
                                 <textarea
                                   rows={3}
@@ -14697,7 +14486,7 @@ export default function AdminPage() {
                                     newFaqs[index].answer = e.target.value;
                                     setFaqsAr(newFaqs);
                                   }}
-                                  placeholder="اكتب الإجابة هنا..."
+                                  placeholder="Ø§ÙƒØªØ¨ Ø§Ù„Ø¥Ø¬Ø§Ø¨Ø© Ù‡Ù†Ø§..."
                                   className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none text-right"
                                 />
                               </div>
@@ -14745,7 +14534,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(howItWorksHeading, "en", "ar", setHowItWorksHeadingAr, "howItWorksHeading-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "howItWorksHeading-en" ? "Translating..." : "Translate to Arabic ➔"}
+                              {translatingField === "howItWorksHeading-en" ? "Translating..." : "Translate to Arabic âž”"}
                             </button>
                           </div>
                           <input
@@ -14766,7 +14555,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(howItWorksDescription, "en", "ar", setHowItWorksDescriptionAr, "howItWorksDescription-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "howItWorksDescription-en" ? "Translating..." : "Translate to Arabic ➔"}
+                              {translatingField === "howItWorksDescription-en" ? "Translating..." : "Translate to Arabic âž”"}
                             </button>
                           </div>
                           <textarea
@@ -14781,7 +14570,7 @@ export default function AdminPage() {
 
                       {/* Arabic Settings */}
                       <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">المحتوى باللغة العربية</h4>
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">Ø§Ù„Ù…Ø­ØªÙˆÙ‰ Ø¨Ø§Ù„Ù„ØºØ© Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©</h4>
                         
                         <div className="space-y-2" dir="rtl">
                           <div className="flex items-center justify-between mb-1" dir="ltr">
@@ -14791,15 +14580,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(howItWorksHeadingAr, "ar", "en", setHowItWorksHeading, "howItWorksHeading-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "howItWorksHeading-ar" ? "Translating..." : "Translate to English ➔"}
+                              {translatingField === "howItWorksHeading-ar" ? "Translating..." : "Translate to English âž”"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">Ø§Ù„Ø¹Ù†ÙˆØ§Ù†</label>
                           </div>
                           <input
                             type="text"
                             value={howItWorksHeadingAr}
                             onChange={(e) => setHowItWorksHeadingAr(e.target.value)}
-                            placeholder="خطوات بسيطة لتحولات الجمال"
+                            placeholder="Ø®Ø·ÙˆØ§Øª Ø¨Ø³ÙŠØ·Ø© Ù„ØªØ­ÙˆÙ„Ø§Øª Ø§Ù„Ø¬Ù…Ø§Ù„"
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -14812,15 +14601,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(howItWorksDescriptionAr, "ar", "en", setHowItWorksDescription, "howItWorksDescription-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "howItWorksDescription-ar" ? "Translating..." : "Translate to English ➔"}
+                              {translatingField === "howItWorksDescription-ar" ? "Translating..." : "Translate to English âž”"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">الوصف</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">Ø§Ù„ÙˆØµÙ</label>
                           </div>
                           <textarea
                             rows={5}
                             value={howItWorksDescriptionAr}
                             onChange={(e) => setHowItWorksDescriptionAr(e.target.value)}
-                            placeholder="اكتشف عملية سلسة مصممة لتعزيز جمالك وصحتك..."
+                            placeholder="Ø§ÙƒØªØ´Ù Ø¹Ù…Ù„ÙŠØ© Ø³Ù„Ø³Ø© Ù…ØµÙ…Ù…Ø© Ù„ØªØ¹Ø²ÙŠØ² Ø¬Ù…Ø§Ù„Ùƒ ÙˆØµØ­ØªÙƒ..."
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none leading-relaxed text-right"
                           />
                         </div>
@@ -14976,7 +14765,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuHeading, "en", "ar", setWcuHeadingAr, "wcuHeading-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuHeading-en" ? "Translating..." : "Translate to Arabic ➔"}
+                              {translatingField === "wcuHeading-en" ? "Translating..." : "Translate to Arabic âž”"}
                             </button>
                           </div>
                           <input
@@ -14997,7 +14786,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuYearsLabel, "en", "ar", setWcuYearsLabelAr, "wcuYearsLabel-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuYearsLabel-en" ? "Translating..." : "Translate to Arabic ➔"}
+                              {translatingField === "wcuYearsLabel-en" ? "Translating..." : "Translate to Arabic âž”"}
                             </button>
                           </div>
                           <input
@@ -15018,14 +14807,14 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuQuote, "en", "ar", setWcuQuoteAr, "wcuQuote-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuQuote-en" ? "Translating..." : "Translate to Arabic ➔"}
+                              {translatingField === "wcuQuote-en" ? "Translating..." : "Translate to Arabic âž”"}
                             </button>
                           </div>
                           <input
                             type="text"
                             value={wcuQuote}
                             onChange={(e) => setWcuQuote(e.target.value)}
-                            placeholder="We don't treat conditions — we transform confidence..."
+                            placeholder="We don't treat conditions â€” we transform confidence..."
                             className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                           />
                         </div>
@@ -15040,7 +14829,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuDescription, "en", "ar", setWcuDescriptionAr, "wcuDescription-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuDescription-en" ? "Translating..." : "Translate to Arabic ➔"}
+                              {translatingField === "wcuDescription-en" ? "Translating..." : "Translate to Arabic âž”"}
                             </button>
                           </div>
                           <textarea
@@ -15055,7 +14844,7 @@ export default function AdminPage() {
 
                       {/* Arabic Settings */}
                       <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">المحتوى باللغة العربية</h4>
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">Ø§Ù„Ù…Ø­ØªÙˆÙ‰ Ø¨Ø§Ù„Ù„ØºØ© Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©</h4>
                         
                         <div className="space-y-2" dir="rtl">
                           <div className="flex items-center justify-between mb-1" dir="ltr">
@@ -15065,15 +14854,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuHeadingAr, "ar", "en", setWcuHeading, "wcuHeading-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuHeading-ar" ? "Translating..." : "Translate to English ➔"}
+                              {translatingField === "wcuHeading-ar" ? "Translating..." : "Translate to English âž”"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">Ø§Ù„Ø¹Ù†ÙˆØ§Ù†</label>
                           </div>
                           <input
                             type="text"
                             value={wcuHeadingAr}
                             onChange={(e) => setWcuHeadingAr(e.target.value)}
-                            placeholder="حيث تلتقي الخبرة الطبية بتجربة فاخرة"
+                            placeholder="Ø­ÙŠØ« ØªÙ„ØªÙ‚ÙŠ Ø§Ù„Ø®Ø¨Ø±Ø© Ø§Ù„Ø·Ø¨ÙŠØ© Ø¨ØªØ¬Ø±Ø¨Ø© ÙØ§Ø®Ø±Ø©"
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -15086,15 +14875,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuYearsLabelAr, "ar", "en", setWcuYearsLabel, "wcuYearsLabel-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuYearsLabel-ar" ? "Translating..." : "Translate to English ➔"}
+                              {translatingField === "wcuYearsLabel-ar" ? "Translating..." : "Translate to English âž”"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">عبارة التميز (رأسية)</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">Ø¹Ø¨Ø§Ø±Ø© Ø§Ù„ØªÙ…ÙŠØ² (Ø±Ø£Ø³ÙŠØ©)</label>
                           </div>
                           <input
                             type="text"
                             value={wcuYearsLabelAr}
                             onChange={(e) => setWcuYearsLabelAr(e.target.value)}
-                            placeholder="١٥+ عاماً من التميز"
+                            placeholder="Ù¡Ù¥+ Ø¹Ø§Ù…Ø§Ù‹ Ù…Ù† Ø§Ù„ØªÙ…ÙŠØ²"
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -15107,15 +14896,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuQuoteAr, "ar", "en", setWcuQuote, "wcuQuote-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuQuote-ar" ? "Translating..." : "Translate to English ➔"}
+                              {translatingField === "wcuQuote-ar" ? "Translating..." : "Translate to English âž”"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">اقتباس الثقة</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">Ø§Ù‚ØªØ¨Ø§Ø³ Ø§Ù„Ø«Ù‚Ø©</label>
                           </div>
                           <input
                             type="text"
                             value={wcuQuoteAr}
                             onChange={(e) => setWcuQuoteAr(e.target.value)}
-                            placeholder="نحن لا نعالج فقط — بل نُحوّل الثقة..."
+                            placeholder="Ù†Ø­Ù† Ù„Ø§ Ù†Ø¹Ø§Ù„Ø¬ ÙÙ‚Ø· â€” Ø¨Ù„ Ù†ÙØ­ÙˆÙ‘Ù„ Ø§Ù„Ø«Ù‚Ø©..."
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -15129,15 +14918,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuDescriptionAr, "ar", "en", setWcuDescription, "wcuDescription-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuDescription-ar" ? "Translating..." : "Translate to English ➔"}
+                              {translatingField === "wcuDescription-ar" ? "Translating..." : "Translate to English âž”"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">الوصف</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">Ø§Ù„ÙˆØµÙ</label>
                           </div>
                           <textarea
                             rows={5}
                             value={wcuDescriptionAr}
                             onChange={(e) => setWcuDescriptionAr(e.target.value)}
-                            placeholder="في ريفيرا، كل تفصيل مقصود..."
+                            placeholder="ÙÙŠ Ø±ÙŠÙÙŠØ±Ø§ØŒ ÙƒÙ„ ØªÙØµÙŠÙ„ Ù…Ù‚ØµÙˆØ¯..."
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none leading-relaxed text-right"
                           />
                         </div>
@@ -15161,7 +14950,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── SETTINGS VIEWS ── */}
+          {/* â”€â”€ SETTINGS VIEWS â”€â”€ */}
           {activeNav === "Profile" && (() => {
             const isSuperadminBypass = adminRole === "superadmin";
             const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
@@ -15184,7 +14973,7 @@ export default function AdminPage() {
 
             const addedOn = profileEmployee?.created_at
               ? new Date(profileEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-              : "—";
+              : "â€”";
 
             const monthlySalary = Number(profileEmployee?.salary || 0);
             const dailySalary = Math.round(monthlySalary / 20);
@@ -15276,7 +15065,7 @@ export default function AdminPage() {
                         <div>
                           <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Employee ID</span>
                           <span className="font-semibold text-[#1F251A] font-mono block bg-gray-50/50 rounded-xl px-3.5 py-2 border border-gray-200/50">
-                            {isSuperadminBypass ? "EMP-SUPER" : profileEmployee?.employee_id || "—"}
+                            {isSuperadminBypass ? "EMP-SUPER" : profileEmployee?.employee_id || "â€”"}
                           </span>
                         </div>
                         <div>
@@ -15292,7 +15081,7 @@ export default function AdminPage() {
                         <div>
                           <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Email Address</span>
                           <span className="font-semibold text-[#1F251A] break-all block bg-gray-50/50 rounded-xl px-3.5 py-2 border border-gray-200/50">
-                            {adminEmail || "—"}
+                            {adminEmail || "â€”"}
                           </span>
                         </div>
                         <div>
@@ -15308,7 +15097,7 @@ export default function AdminPage() {
                           <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">System Role</span>
                           <div>
                             <span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-1 text-xs font-semibold text-[#414E36]">
-                              {isSuperadminBypass ? "superadmin" : profileEmployee?.role_name || "—"}
+                              {isSuperadminBypass ? "superadmin" : profileEmployee?.role_name || "â€”"}
                             </span>
                           </div>
                         </div>
@@ -15584,7 +15373,7 @@ export default function AdminPage() {
                       {idCheckPassed && (
                         <div className="rounded-xl bg-green-50/50 border border-green-200/50 p-4 space-y-2 text-xs">
                           <div className="flex items-center gap-1.5 font-bold text-green-800">
-                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">âœ“</span>
                             Verified Egyptian National ID Check
                           </div>
                           <div className="grid grid-cols-3 gap-4 text-green-700 font-medium">
@@ -15769,22 +15558,22 @@ export default function AdminPage() {
                   <div className="mt-2 text-xs space-y-1 font-semibold text-gray-500">
                     <div className="flex items-center gap-1.5">
                       <span className={profilePassword.length >= 8 ? "text-green-600" : ""}>
-                        {profilePassword.length >= 8 ? "✓" : "○"} At least 8 characters
+                        {profilePassword.length >= 8 ? "âœ“" : "â—‹"} At least 8 characters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[A-Z]/.test(profilePassword) && /[a-z]/.test(profilePassword) ? "text-green-600" : ""}>
-                        {/[A-Z]/.test(profilePassword) && /[a-z]/.test(profilePassword) ? "✓" : "○"} Uppercase & lowercase letters
+                        {/[A-Z]/.test(profilePassword) && /[a-z]/.test(profilePassword) ? "âœ“" : "â—‹"} Uppercase & lowercase letters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/\d/.test(profilePassword) ? "text-green-600" : ""}>
-                        {/\d/.test(profilePassword) ? "✓" : "○"} At least one number
+                        {/\d/.test(profilePassword) ? "âœ“" : "â—‹"} At least one number
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[^A-Za-z0-9]/.test(profilePassword) ? "text-green-600" : ""}>
-                        {/[^A-Za-z0-9]/.test(profilePassword) ? "✓" : "○"} At least one special character (e.g. @$!%*?&#)
+                        {/[^A-Za-z0-9]/.test(profilePassword) ? "âœ“" : "â—‹"} At least one special character (e.g. @$!%*?&#)
                       </span>
                     </div>
                   </div>
@@ -15906,7 +15695,7 @@ export default function AdminPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">اسم العلامة التجارية (AR)</label>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">Ø§Ø³Ù… Ø§Ù„Ø¹Ù„Ø§Ù…Ø© Ø§Ù„ØªØ¬Ø§Ø±ÙŠØ© (AR)</label>
                       <input
                         type="text"
                         dir="rtl"
@@ -15925,7 +15714,7 @@ export default function AdminPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">الموقع الرئيسي (AR)</label>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">Ø§Ù„Ù…ÙˆÙ‚Ø¹ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ (AR)</label>
                       <input
                         type="text"
                         dir="rtl"
@@ -16063,7 +15852,7 @@ export default function AdminPage() {
               </div>
 
               {loadingBranches ? (
-                <div className="text-center py-16 text-[#5A6A51]">Loading branches…</div>
+                <div className="text-center py-16 text-[#5A6A51]">Loading branchesâ€¦</div>
               ) : branches.length === 0 ? (
                 <div className="text-center py-16 text-[#5A6A51]">
                   <MapIcon size={40} className="mx-auto mb-3 opacity-30" />
@@ -16114,7 +15903,7 @@ export default function AdminPage() {
                             }}
                             className="text-xs font-bold text-red-500 hover:underline disabled:opacity-50"
                             disabled={deletingBranchId === br.id}
-                          >{deletingBranchId === br.id ? "Deleting…" : "Delete"}</button>
+                          >{deletingBranchId === br.id ? "Deletingâ€¦" : "Delete"}</button>
                         </div>
                       </div>
                     </div>
@@ -16159,12 +15948,12 @@ export default function AdminPage() {
                     >
                       {([
                         { field: "name_en", label: "Branch Name (English)", placeholder: "e.g. New Cairo Branch", required: true },
-                        { field: "name_ar", label: "Branch Name (Arabic)", placeholder: "مثال: فرع القاهرة الجديدة", required: true, dir: "rtl" },
+                        { field: "name_ar", label: "Branch Name (Arabic)", placeholder: "Ù…Ø«Ø§Ù„: ÙØ±Ø¹ Ø§Ù„Ù‚Ø§Ù‡Ø±Ø© Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©", required: true, dir: "rtl" },
                         { field: "address_en", label: "Address (English)", placeholder: "e.g. 5th Settlement, New Cairo", required: true },
-                        { field: "address_ar", label: "Address (Arabic)", placeholder: "مثال: التجمع الخامس، القاهرة الجديدة", required: true, dir: "rtl" },
+                        { field: "address_ar", label: "Address (Arabic)", placeholder: "Ù…Ø«Ø§Ù„: Ø§Ù„ØªØ¬Ù…Ø¹ Ø§Ù„Ø®Ø§Ù…Ø³ØŒ Ø§Ù„Ù‚Ø§Ù‡Ø±Ø© Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©", required: true, dir: "rtl" },
                         { field: "phone", label: "Phone Number", placeholder: "e.g. +201035595691" },
-                        { field: "maps_embed", label: "Google Maps Embed URL", placeholder: "https://www.google.com/maps/embed?pb=…" },
-                        { field: "maps_link", label: "Google Maps Link", placeholder: "https://maps.app.goo.gl/…" },
+                        { field: "maps_embed", label: "Google Maps Embed URL", placeholder: "https://www.google.com/maps/embed?pb=â€¦" },
+                        { field: "maps_link", label: "Google Maps Link", placeholder: "https://maps.app.goo.gl/â€¦" },
                       ] as Array<{ field: keyof Branch; label: string; placeholder: string; required?: boolean; dir?: string }>).map(({ field, label, placeholder, required, dir }) => (
                         <div key={field}>
                           <label className="block text-xs font-semibold uppercase tracking-[0.15em] text-[#5A6A51] mb-1.5">{label}</label>
@@ -16195,7 +15984,7 @@ export default function AdminPage() {
                         disabled={savingBranch}
                         className="w-full rounded-3xl bg-[#414E36] py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-2"
                       >
-                        {savingBranch ? "Saving…" : branchModal.mode === "add" ? "Add Branch" : "Save Changes"}
+                        {savingBranch ? "Savingâ€¦" : branchModal.mode === "add" ? "Add Branch" : "Save Changes"}
                       </button>
                     </form>
                   </div>
@@ -16426,7 +16215,7 @@ export default function AdminPage() {
                       rows={14}
                       value={termsText}
                       onChange={(e) => setTermsText(e.target.value)}
-                      placeholder={"By proceeding with this booking, you agree to our terms and conditions:\n\n• Deposits are non-refundable within 24 hours of the appointment.\n• Please arrive 10 minutes before your scheduled time.\n• Revera reserves the right to cancel or reschedule appointments.\n\nFor more information, contact us at +20 103 559 5691."}
+                      placeholder={"By proceeding with this booking, you agree to our terms and conditions:\n\nâ€¢ Deposits are non-refundable within 24 hours of the appointment.\nâ€¢ Please arrive 10 minutes before your scheduled time.\nâ€¢ Revera reserves the right to cancel or reschedule appointments.\n\nFor more information, contact us at +20 103 559 5691."}
                       className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] resize-y leading-relaxed font-mono"
                     />
                     <p className="text-[10px] text-[#8A9A81]">
@@ -16712,7 +16501,7 @@ export default function AdminPage() {
                       <p className="text-xs text-[#5A6A51]">Please verify that you are active at your workstation.</p>
                       <div className="text-4xl font-bold text-[#414E36]">{inactivityCountdown}s</div>
                       <p className="text-[10px] text-[#8A9A81]">An inactivity alert will be sent to the administrator.</p>
-                      <div className="rounded-2xl bg-[#414E36] py-2 px-4 text-xs font-bold text-white">✓ I am Present &amp; Working</div>
+                      <div className="rounded-2xl bg-[#414E36] py-2 px-4 text-xs font-bold text-white">âœ“ I am Present &amp; Working</div>
                     </div>
                   </div>
                   <div className="flex-1 space-y-4">
@@ -16865,15 +16654,15 @@ export default function AdminPage() {
                       <button
                         type="button"
                         onClick={() => setActiveInfoFeature({
-                          title: "قالب رسالة التأكيد النصية (AR)",
-                          description: "قم بتهيئة نص الرسالة باللغة العربية التي تُرسل للمرضى عند تأكيد الحجز. يدعم الحقول المتغيرة مثل {name} لاسم المريض، و {service} لاسم الخدمة، و {date} لتاريخ الموعد، و {time} لوقت الموعد."
+                          title: "Ù‚Ø§Ù„Ø¨ Ø±Ø³Ø§Ù„Ø© Ø§Ù„ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ù†ØµÙŠØ© (AR)",
+                          description: "Ù‚Ù… Ø¨ØªÙ‡ÙŠØ¦Ø© Ù†Øµ Ø§Ù„Ø±Ø³Ø§Ù„Ø© Ø¨Ø§Ù„Ù„ØºØ© Ø§Ù„Ø¹Ø±Ø¨ÙŠØ© Ø§Ù„ØªÙŠ ØªÙØ±Ø³Ù„ Ù„Ù„Ù…Ø±Ø¶Ù‰ Ø¹Ù†Ø¯ ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø­Ø¬Ø². ÙŠØ¯Ø¹Ù… Ø§Ù„Ø­Ù‚ÙˆÙ„ Ø§Ù„Ù…ØªØºÙŠØ±Ø© Ù…Ø«Ù„ {name} Ù„Ø§Ø³Ù… Ø§Ù„Ù…Ø±ÙŠØ¶ØŒ Ùˆ {service} Ù„Ø§Ø³Ù… Ø§Ù„Ø®Ø¯Ù…Ø©ØŒ Ùˆ {date} Ù„ØªØ§Ø±ÙŠØ® Ø§Ù„Ù…ÙˆØ¹Ø¯ØŒ Ùˆ {time} Ù„ÙˆÙ‚Øª Ø§Ù„Ù…ÙˆØ¹Ø¯."
                         })}
                         className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
                         title="Click for info"
                       >
                         <Info size={13} />
                       </button>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] text-right">قالب رسالة التأكيد النصية (AR)</label>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] text-right">Ù‚Ø§Ù„Ø¨ Ø±Ø³Ø§Ù„Ø© Ø§Ù„ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ù†ØµÙŠØ© (AR)</label>
                     </div>
                     <textarea
                       value={notifSmsTemplateAr}
@@ -16882,7 +16671,7 @@ export default function AdminPage() {
                       dir="rtl"
                       className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition font-mono text-right"
                     />
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block text-right">يدعم الحقول المتغيرة: <code>{`{name}`}</code>، <code>{`{service}`}</code>، <code>{`{date}`}</code>، <code>{`{time}`}</code>.</span>
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block text-right">ÙŠØ¯Ø¹Ù… Ø§Ù„Ø­Ù‚ÙˆÙ„ Ø§Ù„Ù…ØªØºÙŠØ±Ø©: <code>{`{name}`}</code>ØŒ <code>{`{service}`}</code>ØŒ <code>{`{date}`}</code>ØŒ <code>{`{time}`}</code>.</span>
                   </div>
                 </div>
 
@@ -17246,8 +17035,8 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {roleCreateError && <p className="text-xs text-red-600 font-medium">⚠️ {roleCreateError}</p>}
-                    {roleCreateSuccess && <p className="text-xs text-green-700 font-medium">✅ {roleCreateSuccess}</p>}
+                    {roleCreateError && <p className="text-xs text-red-600 font-medium">âš ï¸ {roleCreateError}</p>}
+                    {roleCreateSuccess && <p className="text-xs text-green-700 font-medium">âœ… {roleCreateSuccess}</p>}
 
                     <button
                       type="submit"
@@ -17309,7 +17098,7 @@ export default function AdminPage() {
                 <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
                   <h3 className="text-xl font-bold text-[#1F251A] mb-4">Provision Employee Credentials</h3>
                   
-                  {/* Create Employee Form — OAuth Invite Flow */}
+                  {/* Create Employee Form â€” OAuth Invite Flow */}
                   <form onSubmit={handleCreateEmployee} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
                     <div className="grid gap-4 sm:grid-cols-3">
                       <div>
@@ -17363,12 +17152,12 @@ export default function AdminPage() {
                     <div className="flex items-start gap-2.5 rounded-2xl bg-[#EDF5E8] border border-[#414E36]/15 px-4 py-3">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mt-0.5 shrink-0 text-[#414E36]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                       <p className="text-xs text-[#414E36] font-medium leading-relaxed">
-                        An official <strong>invitation email</strong> will be sent to the employee&apos;s address. They will set their own password via the link — no password is stored by the admin.
+                        An official <strong>invitation email</strong> will be sent to the employee&apos;s address. They will set their own password via the link â€” no password is stored by the admin.
                       </p>
                     </div>
 
-                    {employeeCreateError && <p className="text-xs text-red-600 font-medium">⚠️ {employeeCreateError}</p>}
-                    {employeeCreateSuccess && <p className="text-xs text-green-700 font-medium">✅ {employeeCreateSuccess}</p>}
+                    {employeeCreateError && <p className="text-xs text-red-600 font-medium">âš ï¸ {employeeCreateError}</p>}
+                    {employeeCreateSuccess && <p className="text-xs text-green-700 font-medium">âœ… {employeeCreateSuccess}</p>}
 
                     <button
                       type="submit"
@@ -17403,7 +17192,7 @@ export default function AdminPage() {
                           </tr>
                         ) : employeesList.map((emp) => (
                           <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
-                            <td className="px-6 py-4 font-semibold text-[#1F251A]">{emp.name || emp.employee_id || '—'}</td>
+                            <td className="px-6 py-4 font-semibold text-[#1F251A]">{emp.name || emp.employee_id || 'â€”'}</td>
                             <td className="px-6 py-4 text-xs font-semibold text-[#414E36]">
                               {adminRole === "superadmin" && emp.employee_id !== "superadmin" ? (
                                 <select
@@ -17424,9 +17213,9 @@ export default function AdminPage() {
                             <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">{emp.email}</td>
                             <td className="px-6 py-4 text-center">
                               {emp.email_confirmed_at ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">✓ Active</span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">âœ“ Active</span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">⏳ Invite Pending</span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">â³ Invite Pending</span>
                               )}
                             </td>
                             <td className="px-6 py-4 text-center">
@@ -17521,7 +17310,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── INVENTORY VIEW ── */}
+          {/* â”€â”€ INVENTORY VIEW â”€â”€ */}
           {activeNav === "Inventory" && (
             <div className="space-y-6 animate-fadeIn">
               {/* Header */}
@@ -18273,7 +18062,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── MODAL: ADD / EDIT CLINIC DEVICE ── */}
+          {/* â”€â”€ MODAL: ADD / EDIT CLINIC DEVICE â”€â”€ */}
           {showAddDeviceModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-2xl rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6 max-h-[90vh] overflow-y-auto">
@@ -18486,7 +18275,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── MODAL: ADD / EDIT PRODUCT ITEM ── */}
+          {/* â”€â”€ MODAL: ADD / EDIT PRODUCT ITEM â”€â”€ */}
           {showAddProductModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-2xl rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6 max-h-[90vh] overflow-y-auto">
@@ -18525,7 +18314,7 @@ export default function AdminPage() {
                       <label className="block text-xs font-semibold text-[#1F251A] mb-1">Product Name (Arabic)</label>
                       <input
                         type="text"
-                        placeholder="e.g. بوتوكس نوع أ"
+                        placeholder="e.g. Ø¨ÙˆØªÙˆÙƒØ³ Ù†ÙˆØ¹ Ø£"
                         value={prodNameAr}
                         onChange={(e) => setProdNameAr(e.target.value)}
                         className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] dir-rtl font-sans"
@@ -18658,7 +18447,7 @@ export default function AdminPage() {
                     <label className="block text-xs font-semibold text-[#1F251A] mb-1">Description &amp; Storage Notes</label>
                     <textarea
                       rows={2}
-                      placeholder="e.g. Keep refrigerated between 2-8°C."
+                      placeholder="e.g. Keep refrigerated between 2-8Â°C."
                       value={prodNotes}
                       onChange={(e) => setProdNotes(e.target.value)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
@@ -18685,14 +18474,14 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── MODAL: SELL PRODUCT TO PATIENT ── */}
+          {/* â”€â”€ MODAL: SELL PRODUCT TO PATIENT â”€â”€ */}
           {showSellProductModal && selectedSellProduct && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
                 <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
                   <div>
                     <h3 className="text-xl font-bold text-[#1F251A]">Sell Product to Patient</h3>
-                    <p className="text-xs text-[#5A6A51] mt-1">{selectedSellProduct.name} — Stock: {selectedSellProduct.stock_quantity} {selectedSellProduct.unit}s</p>
+                    <p className="text-xs text-[#5A6A51] mt-1">{selectedSellProduct.name} â€” Stock: {selectedSellProduct.stock_quantity} {selectedSellProduct.unit}s</p>
                   </div>
                   <button
                     type="button"
@@ -18807,7 +18596,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── MODAL: UPDATE PULSE COUNT ── */}
+          {/* â”€â”€ MODAL: UPDATE PULSE COUNT â”€â”€ */}
           {showUpdatePulsesModal && selectedDeviceForPulses && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
@@ -18851,9 +18640,9 @@ export default function AdminPage() {
                         fetchInventoryDevices();
 
                         if (updated.status === "Maintenance Due") {
-                          alert("⚠️ Maintenance Due! Counter has reached or exceeded the 2nd maintenance threshold.");
+                          alert("âš ï¸ Maintenance Due! Counter has reached or exceeded the 2nd maintenance threshold.");
                         } else if (updated.status === "Warning") {
-                          alert("⚡ First Warning Reached! Counter has crossed the 1st threshold.");
+                          alert("âš¡ First Warning Reached! Counter has crossed the 1st threshold.");
                         } else {
                           alert("Pulse count updated successfully.");
                         }
@@ -18945,7 +18734,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── MODAL: RESET PULSE COUNTER ── */}
+          {/* â”€â”€ MODAL: RESET PULSE COUNTER â”€â”€ */}
           {showResetPulsesModal && selectedDeviceForReset && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
@@ -19063,7 +18852,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── MODAL: DEVICE MAINTENANCE HISTORY ── */}
+          {/* â”€â”€ MODAL: DEVICE MAINTENANCE HISTORY â”€â”€ */}
           {showDeviceHistoryModal && selectedDeviceForHistory && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-2xl rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6 max-h-[90vh] overflow-y-auto">
@@ -19334,7 +19123,7 @@ export default function AdminPage() {
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.phone || "—"}</td>
+                              <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.phone || "â€”"}</td>
                               <td className="px-6 py-4">
                                 <span className="inline-block rounded-xl bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold text-[#8B7544]">
                                   {emp.department || "Reception"}
@@ -19342,7 +19131,7 @@ export default function AdminPage() {
                               </td>
                               <td className="px-6 py-4">
                                 <span className="inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">
-                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
+                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "â€”"}
                                 </span>
                               </td>
                               <td className="px-6 py-4">
@@ -19869,7 +19658,7 @@ export default function AdminPage() {
                                         : "bg-gray-50 text-[#414E36] border-[#414E36]/15 hover:bg-[#414E36]/10"
                                     }`}
                                   >
-                                    {b.name_en} {isSelected ? "✓" : "+"}
+                                    {b.name_en} {isSelected ? "âœ“" : "+"}
                                   </button>
                                 );
                               })}
@@ -20079,7 +19868,7 @@ export default function AdminPage() {
                                   <div className="mt-3 flex items-start gap-2 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium animate-fadeIn">
                                     <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
                                     <div>
-                                      <span className="font-bold block text-amber-900 mb-0.5">⚠️ Shift Overlap Warning:</span>
+                                      <span className="font-bold block text-amber-900 mb-0.5">âš ï¸ Shift Overlap Warning:</span>
                                       {overlap.message}
                                     </div>
                                   </div>
@@ -20230,7 +20019,7 @@ export default function AdminPage() {
                                 <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Address Line 2 <span className="text-[#8A9A81] font-normal">(Optional)</span></label>
                                 <input
                                   type="text"
-                                  placeholder="Apartment, floor, building, compound…"
+                                  placeholder="Apartment, floor, building, compoundâ€¦"
                                   value={newEmployeeAddressLine2}
                                   onChange={(e) => {
                                     setNewEmployeeAddressLine2(e.target.value);
@@ -20263,7 +20052,7 @@ export default function AdminPage() {
                                     }}
                                     className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
                                   >
-                                    <option value="">— Select —</option>
+                                    <option value="">â€” Select â€”</option>
                                     {["Cairo","Giza","Alexandria","Aswan","Asyut","Beheira","Beni Suef","Dakahlia","Damietta","Faiyum","Gharbia","Ismailia","Kafr el-Sheikh","Luxor","Matruh","Minya","Monufia","New Valley","North Sinai","Port Said","Qalyubia","Qena","Red Sea","Sharqia","Sohag","South Sinai","Suez"].map(g => (
                                       <option key={g} value={g}>{g}</option>
                                     ))}
@@ -20309,7 +20098,7 @@ export default function AdminPage() {
                             return (
                               <div className="rounded-2xl bg-green-50/50 border border-green-200/50 p-3.5 space-y-1.5 text-xs">
                                 <div className="flex items-center gap-1.5 font-bold text-green-800">
-                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">âœ“</span>
                                   Egyptian National ID Check Passed
                                 </div>
                                 <div className="grid grid-cols-3 gap-2 text-green-700 font-medium">
@@ -20462,7 +20251,7 @@ export default function AdminPage() {
                             <label className="flex flex-col items-center justify-center cursor-pointer py-5 w-full">
                               <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
                               <span className="text-[11px] font-semibold text-[#414E36]">Upload Contract (PDF, Word, or Image)</span>
-                              <span className="text-[9px] text-gray-400 mt-0.5">PDF, DOCX, PNG, JPEG – up to 10MB</span>
+                              <span className="text-[9px] text-gray-400 mt-0.5">PDF, DOCX, PNG, JPEG â€“ up to 10MB</span>
                               <input
                                 type="file"
                                 accept=".pdf,.doc,.docx,image/*"
@@ -20561,7 +20350,7 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* View Employee Details — Inline View */}
+              {/* View Employee Details â€” Inline View */}
               {viewingEmployee && (
                 <div className="space-y-6 animate-fadeIn">
                   {/* Back button */}
@@ -20618,7 +20407,7 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingEmployee.name || "Staff Member"}</h3>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">{viewingEmployee.role_name || "Employee"} • Staff ID: <span className="font-mono">{viewingEmployee.employee_id || "—"}</span></p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">{viewingEmployee.role_name || "Employee"} â€¢ Staff ID: <span className="font-mono">{viewingEmployee.employee_id || "â€”"}</span></p>
                         <div className="mt-2">
                           <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                             viewingEmployee.email_confirmed_at ? "bg-[#EDF1EC] text-[#414E36]" : "bg-amber-50 text-amber-700"
@@ -20733,25 +20522,25 @@ export default function AdminPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employee ID</span>
-                            <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.employee_id || "—"}</span>
+                            <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.employee_id || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Full Name</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.name || "—"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.name || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
-                            <span className="font-semibold text-[#1F251A] break-all">{viewingEmployee.email || "—"}</span>
+                            <span className="font-semibold text-[#1F251A] break-all">{viewingEmployee.email || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.phone || "—"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.phone || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">System Role</span>
                             <div>
                               <span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-0.5 text-xs font-semibold text-[#414E36]">
-                                {viewingEmployee.role_name || "—"}
+                                {viewingEmployee.role_name || "â€”"}
                               </span>
                             </div>
                           </div>
@@ -20765,7 +20554,7 @@ export default function AdminPage() {
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
-                            <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.national_id || "—"}</span>
+                            <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.national_id || "â€”"}</span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Date of Birth &amp; Age</span>
@@ -20793,7 +20582,7 @@ export default function AdminPage() {
                             <span className="font-semibold text-[#1F251A]">
                               {viewingEmployee.created_at
                                 ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-                                : "—"}
+                                : "â€”"}
                             </span>
                           </div>
                         </div>
@@ -20820,12 +20609,12 @@ export default function AdminPage() {
                                   <div className="flex flex-col">
                                     <span className="font-semibold text-[#1F251A]">{autoDate}</span>
                                     <span className="text-[10px] text-[#414E36] font-bold bg-[#EDF1EC] px-2 py-0.5 rounded-full border border-[#414E36]/10 w-max mt-0.5">
-                                      ⚡ Auto-set (1st Booking)
+                                      âš¡ Auto-set (1st Booking)
                                     </span>
                                   </div>
                                 );
                               }
-                              return <span className="font-semibold text-[#1F251A]">{viewingEmployee.start_date || "—"}</span>;
+                              return <span className="font-semibold text-[#1F251A]">{viewingEmployee.start_date || "â€”"}</span>;
                             })()}
                           </div>
                           <div>
@@ -20927,7 +20716,7 @@ export default function AdminPage() {
                                 </div>
                                 {hasAchievedTarget && (
                                   <span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200">
-                                    Target Met ✓
+                                    Target Met âœ“
                                   </span>
                                 )}
                               </div>
@@ -21110,8 +20899,8 @@ export default function AdminPage() {
                                   </thead>
                                   <tbody className="divide-y divide-[#414E36]/5 text-[#1F251A]">
                                     {empRecords.map((r: any, idx: number) => {
-                                      const inStr = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-                                      const outStr = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+                                      const inStr = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'â€”';
+                                      const outStr = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'â€”';
                                       return (
                                         <tr key={r.id || idx} className="hover:bg-[#F7F9F6]/50 transition-colors">
                                           <td className="py-2.5 px-3 font-semibold text-[#414E36] whitespace-nowrap">{r.date}</td>
@@ -21154,7 +20943,7 @@ export default function AdminPage() {
                           <div className="md:col-span-2">
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Home Address</span>
                             <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3.5 py-2.5 rounded-xl border border-[#414E36]/5 leading-relaxed max-w-xl">
-                              {viewingEmployee.address || "—"}
+                              {viewingEmployee.address || "â€”"}
                             </span>
                           </div>
                           <div>
@@ -21276,7 +21065,7 @@ export default function AdminPage() {
                             return (
                               <div className="rounded-xl bg-green-50/50 border border-green-200/50 p-4 space-y-2 text-xs max-w-xl">
                                 <div className="flex items-center gap-1.5 font-bold text-green-800">
-                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">âœ“</span>
                                   Verified Egyptian National ID Check
                                 </div>
                                 <div className="grid grid-cols-3 gap-4 text-green-700 font-medium">
@@ -21433,7 +21222,7 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">API Secret Credentials Key</label>
-                    <input type="password" defaultValue="••••••••••••••••••••" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
+                    <input type="password" defaultValue="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
                   </div>
                   <button type="submit" className="w-full rounded-3xl bg-[#414E36] py-3.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]">
                     Apply API Settings
@@ -21475,7 +21264,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── EXPENSE CATEGORIES VIEW ── */}
+          {/* â”€â”€ EXPENSE CATEGORIES VIEW â”€â”€ */}
           {activeNav === "Expense Categories" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -21595,7 +21384,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── TRANSACTIONS VIEW ── */}
+          {/* â”€â”€ TRANSACTIONS VIEW â”€â”€ */}
           {activeNav === "Transactions" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -21720,7 +21509,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── EXPENSES VIEW ── */}
+          {/* â”€â”€ EXPENSES VIEW â”€â”€ */}
           {activeNav === "Expenses" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -21829,7 +21618,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── PAYROLL VIEW ── */}
+          {/* â”€â”€ PAYROLL VIEW â”€â”€ */}
           {activeNav === "Payroll" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -21947,7 +21736,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── FINANCES DASHBOARD VIEW ── */}
+          {/* â”€â”€ FINANCES DASHBOARD VIEW â”€â”€ */}
           {activeNav === "Finances Dashboard" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -21974,7 +21763,7 @@ export default function AdminPage() {
                       <TrendingUp size={18} />
                     </span>
                   </div>
-                  <p className="mt-2 text-[10px] text-green-600 font-bold">↑ +18.4% vs last month</p>
+                  <p className="mt-2 text-[10px] text-green-600 font-bold">â†‘ +18.4% vs last month</p>
                 </div>
                 <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Total Expenses</p>
@@ -21984,7 +21773,7 @@ export default function AdminPage() {
                       <TrendingUp size={18} className="rotate-180" />
                     </span>
                   </div>
-                  <p className="mt-2 text-[10px] text-red-500 font-bold">↓ -4.2% vs last month</p>
+                  <p className="mt-2 text-[10px] text-red-500 font-bold">â†“ -4.2% vs last month</p>
                 </div>
                 <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Net Profit</p>
@@ -21994,7 +21783,7 @@ export default function AdminPage() {
                       <CircleDollarSign size={18} />
                     </span>
                   </div>
-                  <p className="mt-2 text-[10px] text-green-600 font-bold">↑ +38.1% vs last month</p>
+                  <p className="mt-2 text-[10px] text-green-600 font-bold">â†‘ +38.1% vs last month</p>
                 </div>
                 <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Operating Margin</p>
@@ -22004,7 +21793,7 @@ export default function AdminPage() {
                       <BarChart3 size={18} />
                     </span>
                   </div>
-                  <p className="mt-2 text-[10px] text-green-600 font-bold">↑ +8.2% in margin</p>
+                  <p className="mt-2 text-[10px] text-green-600 font-bold">â†‘ +8.2% in margin</p>
                 </div>
               </div>
 
@@ -22123,7 +21912,7 @@ export default function AdminPage() {
                           <div key={tx.id} className="py-3 flex items-center justify-between text-sm">
                             <div>
                               <p className="font-semibold text-[#1F251A]">{tx.description}</p>
-                              <p className="text-xs text-[#5A6A51] mt-0.5">{tx.date} • {tx.category}</p>
+                              <p className="text-xs text-[#5A6A51] mt-0.5">{tx.date} â€¢ {tx.category}</p>
                             </div>
                             <span className={`font-semibold ${isCredit ? "text-green-600" : "text-red-500"}`}>
                               {isCredit ? "+" : "-"}{tx.amount.replace("EGP ", "")}
@@ -22138,7 +21927,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── HUMAN RESOURCES (HR) VIEW ── */}
+          {/* â”€â”€ HUMAN RESOURCES (HR) VIEW â”€â”€ */}
           {activeNav === "HR" && (
             <div className="space-y-6 animate-fadeIn">
               {/* Header */}
@@ -22239,10 +22028,10 @@ export default function AdminPage() {
                                   <div className="font-semibold text-[#1F251A]">{emp.name}</div>
                                   <div className="text-xs text-[#5A6A51]">{emp.email}</div>
                                 </td>
-                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.department || "—"}</td>
-                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.role_name || "—"}</td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.department || "â€”"}</td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.role_name || "â€”"}</td>
                                 <td className="px-6 py-4 text-xs text-[#5A6A51]">
-                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
+                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "â€”"}
                                 </td>
                                 <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
                                   EGP {Number(emp.salary || 0).toLocaleString()}
@@ -22306,9 +22095,9 @@ export default function AdminPage() {
                 const paged = filtered.slice(startIndex, endIndex);
 
                 const getPaymentDate = (monthStr: string) => {
-                  if (!monthStr) return "—";
+                  if (!monthStr) return "â€”";
                   const parts = monthStr.split("-");
-                  if (parts.length < 2) return "—";
+                  if (parts.length < 2) return "â€”";
                   const year = parts[0];
                   const monthNum = parseInt(parts[1], 10);
                   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -22501,8 +22290,8 @@ export default function AdminPage() {
                                           {initials}
                                         </div>
                                         <div>
-                                          <div className="font-semibold text-[#1F251A] text-sm">{empObj.name || "—"}</div>
-                                          <div className="text-[10px] text-[#5A6A51]">{empObj.email || "—"}</div>
+                                          <div className="font-semibold text-[#1F251A] text-sm">{empObj.name || "â€”"}</div>
+                                          <div className="text-[10px] text-[#5A6A51]">{empObj.email || "â€”"}</div>
                                         </div>
                                       </div>
                                     </td>
@@ -22587,7 +22376,7 @@ export default function AdminPage() {
                                           </div>
                                         </div>
                                       ) : (
-                                        <span className="text-xs text-[#5A6A51]/60 font-semibold">—</span>
+                                        <span className="text-xs text-[#5A6A51]/60 font-semibold">â€”</span>
                                       )}
                                     </td>
                                     {/* Performance Bonus */}
@@ -22622,7 +22411,7 @@ export default function AdminPage() {
                                     </td>
                                     {/* Payment Date */}
                                     <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
-                                      {isPaid ? getPaymentDate(pay.month) : "—"}
+                                      {isPaid ? getPaymentDate(pay.month) : "â€”"}
                                     </td>
                                     {/* Actions */}
                                     <td className="px-6 py-4 text-right">
@@ -22763,9 +22552,9 @@ export default function AdminPage() {
                 const paged = filtered.slice(startIndex, endIndex);
 
                 const getPaymentDate = (monthStr: string) => {
-                  if (!monthStr) return "—";
+                  if (!monthStr) return "â€”";
                   const parts = monthStr.split("-");
-                  if (parts.length < 2) return "—";
+                  if (parts.length < 2) return "â€”";
                   const year = parts[0];
                   const monthNum = parseInt(parts[1], 10);
                   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -22926,7 +22715,7 @@ export default function AdminPage() {
                                           {initials}
                                         </div>
                                         <div>
-                                          <div className="font-semibold text-[#1F251A] text-sm">{docObj.name || "—"}</div>
+                                          <div className="font-semibold text-[#1F251A] text-sm">{docObj.name || "â€”"}</div>
                                           <div className="text-[10px] text-[#5A6A51]">{docObj.specialization || docObj.role_name || "Doctor"}</div>
                                         </div>
                                       </div>
@@ -22969,7 +22758,7 @@ export default function AdminPage() {
                                       </span>
                                     </td>
                                     <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
-                                      {isPaid ? getPaymentDate(pay.month) : "—"}
+                                      {isPaid ? getPaymentDate(pay.month) : "â€”"}
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                       <div className="flex items-center justify-end gap-2">
@@ -23092,15 +22881,15 @@ export default function AdminPage() {
                             leavesList.map((leave: any) => (
                               <tr key={leave.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
                                 <td className="px-6 py-4">
-                                  <div className="font-semibold text-[#1F251A]">{leave.employee_accounts?.name || "—"}</div>
-                                  <div className="text-xs text-[#5A6A51]">{leave.employee_accounts?.role_name || "—"}</div>
+                                  <div className="font-semibold text-[#1F251A]">{leave.employee_accounts?.name || "â€”"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{leave.employee_accounts?.role_name || "â€”"}</div>
                                 </td>
                                 <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{leave.leave_type}</td>
                                 <td className="px-6 py-4 text-xs text-[#1F251A]">
                                   {leave.start_date} to {leave.end_date}
                                 </td>
                                 <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">{leave.days_count}</td>
-                                <td className="px-6 py-4 text-xs text-[#5A6A51] max-w-[150px] truncate" title={leave.reason}>{leave.reason || "—"}</td>
+                                <td className="px-6 py-4 text-xs text-[#5A6A51] max-w-[150px] truncate" title={leave.reason}>{leave.reason || "â€”"}</td>
                                 <td className="px-6 py-4">
                                   <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
                                     leave.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
@@ -23304,8 +23093,8 @@ export default function AdminPage() {
                               {rev.employee_accounts?.name?.slice(0, 2).toUpperCase() || "??"}
                             </div>
                             <div className="space-y-1">
-                              <h4 className="font-bold text-[#1F251A]">{rev.employee_accounts?.name || "—"}</h4>
-                              <p className="text-xs text-[#5A6A51]">Role: {rev.employee_accounts?.role_name || "—"}</p>
+                              <h4 className="font-bold text-[#1F251A]">{rev.employee_accounts?.name || "â€”"}</h4>
+                              <p className="text-xs text-[#5A6A51]">Role: {rev.employee_accounts?.role_name || "â€”"}</p>
                               <div className="flex items-center gap-1.5 py-1">
                                 {Array.from({ length: 5 }).map((_, i) => (
                                   <Star
@@ -23461,15 +23250,15 @@ export default function AdminPage() {
                         </thead>
                         <tbody className="divide-y divide-[#414E36]/5">
                           {loadingAttendance ? (
-                            <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51]">Loading attendance records…</td></tr>
+                            <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51]">Loading attendance recordsâ€¦</td></tr>
                           ) : attendanceList.length === 0 ? (
                             <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">No attendance records found. Records appear after employees log in each day.</td></tr>
                           ) : (
                             attendanceList.map((rec: any) => (
                               <tr key={rec.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
                                 <td className="px-6 py-4">
-                                  <div className="font-semibold text-[#1F251A]">{rec.employee_accounts?.name || "—"}</div>
-                                  <div className="text-xs text-[#5A6A51]">{rec.employee_accounts?.role_name || "—"}</div>
+                                  <div className="font-semibold text-[#1F251A]">{rec.employee_accounts?.name || "â€”"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{rec.employee_accounts?.role_name || "â€”"}</div>
                                 </td>
                                 <td className="px-6 py-4 text-xs text-[#1F251A]">{rec.date}</td>
                                 <td className="px-6 py-4 text-xs">
@@ -23482,10 +23271,10 @@ export default function AdminPage() {
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
-                                  {rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                                  {rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "â€”"}
                                 </td>
                                 <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
-                                  {rec.check_out_time ? new Date(rec.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                                  {rec.check_out_time ? new Date(rec.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "â€”"}
                                 </td>
                                 <td className="px-6 py-4 text-xs">
                                   <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
@@ -23499,7 +23288,7 @@ export default function AdminPage() {
                                 <td className="px-6 py-4 text-xs text-[#5A6A51]">
                                   {rec.latitude && rec.longitude
                                     ? `${Number(rec.latitude).toFixed(4)}, ${Number(rec.longitude).toFixed(4)}`
-                                    : "—"}
+                                    : "â€”"}
                                 </td>
                                 <td className="px-6 py-4">
                                   <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
@@ -23541,8 +23330,8 @@ export default function AdminPage() {
                             activeMissingAlerts.map((a: any) => (
                               <tr key={a.id} className="hover:bg-rose-50/30 transition-colors">
                                 <td className="px-6 py-4">
-                                  <div className="font-semibold text-[#1F251A]">{a.employee_accounts?.name || "—"}</div>
-                                  <div className="text-xs text-[#5A6A51]">{a.employee_accounts?.role_name || "—"}</div>
+                                  <div className="font-semibold text-[#1F251A]">{a.employee_accounts?.name || "â€”"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{a.employee_accounts?.role_name || "â€”"}</div>
                                 </td>
                                 <td className="px-6 py-4 text-xs text-[#1F251A]">{new Date(a.timestamp).toLocaleString()}</td>
                                 <td className="px-6 py-4">
@@ -23633,7 +23422,7 @@ export default function AdminPage() {
                               <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
                                 <td className="px-6 py-4">
                                   <div className="font-semibold text-[#1F251A]">{emp.name}</div>
-                                  <div className="text-xs text-[#5A6A51]">{emp.email} • {emp.role_name || "Staff"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{emp.email} â€¢ {emp.role_name || "Staff"}</div>
                                 </td>
                                 <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
                                   {targetAmount > 0 ? (
@@ -23656,7 +23445,7 @@ export default function AdminPage() {
                                     <div className="space-y-1 w-44">
                                       <div className="flex items-center justify-between font-semibold text-[#5A6A51] text-[10px]">
                                         <span>{progressPercent}%</span>
-                                        {hasAchievedTarget && <span className="text-green-700 font-bold">Met ✓</span>}
+                                        {hasAchievedTarget && <span className="text-green-700 font-bold">Met âœ“</span>}
                                       </div>
                                       <div className="w-full bg-gray-150 h-2 rounded-full overflow-hidden">
                                         <div 
@@ -23716,7 +23505,7 @@ export default function AdminPage() {
                   onClick={() => setPresenceModalOpen(false)}
                   className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
                 >
-                  ✓ I am Present &amp; Working
+                  âœ“ I am Present &amp; Working
                 </button>
               </div>
             </div>
@@ -23750,7 +23539,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── BOOKINGS VIEW ── */}
+          {/* â”€â”€ BOOKINGS VIEW â”€â”€ */}
           {activeNav === "Bookings" && (
           <>
           <header className="mb-8">
@@ -23768,7 +23557,7 @@ export default function AdminPage() {
           </header>
 
           <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            {/* ── CALENDAR VIEW SWITCHER ── */}
+            {/* â”€â”€ CALENDAR VIEW SWITCHER â”€â”€ */}
             <div className="flex items-center gap-1 p-1 w-fit rounded-full border border-[#414E36]/12 bg-white shadow-sm">
               {(["Calendar", "List", "Schedule"] as const).filter(view => {
                 if (view === "Calendar" || view === "Schedule") return hasPermission("bookings.view_calendar");
@@ -23816,7 +23605,7 @@ export default function AdminPage() {
 
           {calendarView === "Calendar" && (
           <section className="mb-8 flex flex-col gap-6">
-            {/* ── Dashboard summary row ── */}
+            {/* â”€â”€ Dashboard summary row â”€â”€ */}
             <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
               {/* Today's bookings stat */}
               <div
@@ -23846,7 +23635,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* ── Calendar grid ── */}
+            {/* â”€â”€ Calendar grid â”€â”€ */}
             <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
               <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
@@ -23937,13 +23726,13 @@ export default function AdminPage() {
           </section>
           )}
 
-          {/* ── LIST VIEW ── */}
+          {/* â”€â”€ LIST VIEW â”€â”€ */}
           {calendarView === "List" && (
           <section className="mb-8 rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
             <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80">Booking panel</p>
-                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">All bookings — list</h3>
+                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">All bookings â€” list</h3>
               </div>
               <span className="rounded-full bg-[#EDF1EC] px-4 py-2 text-sm font-semibold text-[#5A6A51]">
                 {filteredReservations.filter(r => ['approved', 'confirmed', 'started', 'completed'].includes(r.status)).length} active
@@ -24004,7 +23793,7 @@ export default function AdminPage() {
                         const dateObj = dateStr ? new Date(dateStr + 'T00:00:00') : null;
                         const dateLabel = dateObj
                           ? dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'long' })
-                          : '—';
+                          : 'â€”';
                         const timeLabel = r.timeSlot || r.requestedTime || null;
                         const refId = `#${r.id.replace(/-/g,'').slice(0,8).toUpperCase()}`;
                         const statusClass = getStatusBadgeClass(r.status);
@@ -24041,7 +23830,7 @@ export default function AdminPage() {
                               {timeLabel && <p className="mt-0.5 text-[10px] text-[#5A6A51]/70">{timeLabel}</p>}
                             </td>
                             <td className="px-4 py-4 text-[#5A6A51]">0</td>
-                            <td className="px-4 py-4 font-semibold text-[#1F251A] whitespace-nowrap">—</td>
+                            <td className="px-4 py-4 font-semibold text-[#1F251A] whitespace-nowrap">â€”</td>
                             <td className="px-4 py-4 whitespace-nowrap text-[#5A6A51]">0</td>
                             <td className="px-4 py-4">
                               <button className="flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#414E36]/40 hover:text-[#414E36]">
@@ -24062,9 +23851,9 @@ export default function AdminPage() {
           </section>
           )}
 
-          {/* ── SCHEDULE VIEW ── */}
+          {/* â”€â”€ SCHEDULE VIEW â”€â”€ */}
           {calendarView === "Schedule" && (() => {
-            // Build 15-min slots 09:00 → 20:00 in 24h ("HH:MM") format for matching
+            // Build 15-min slots 09:00 â†’ 20:00 in 24h ("HH:MM") format for matching
             const RAW_SLOTS: string[] = [];
             for (let h = 9; h <= 20; h++) {
               for (const m of [0, 15, 30, 45]) {
@@ -24073,7 +23862,7 @@ export default function AdminPage() {
               }
             }
 
-            // Convert 24h "HH:MM" → display label "H:MM AM/PM"
+            // Convert 24h "HH:MM" â†’ display label "H:MM AM/PM"
             const toLabel = (raw: string) => {
               const [hh, mm] = raw.split(':').map(Number);
               const ampm = hh < 12 ? 'AM' : 'PM';
@@ -24167,7 +23956,7 @@ export default function AdminPage() {
 
             return (
             <section className="mb-8 rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-              {/* ── top bar ── */}
+              {/* â”€â”€ top bar â”€â”€ */}
               <div className="mb-5 flex flex-wrap items-center gap-3">
                 <select
                   value={scheduleProviderFilter}
@@ -24211,7 +24000,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* ── schedule table (doctors as rows, time slots as columns) ── */}
+              {/* â”€â”€ schedule table (doctors as rows, time slots as columns) â”€â”€ */}
               <div className="overflow-auto rounded-[24px] border border-[#414E36]/08" style={{ maxHeight: '600px' }}>
                 <table className="border-collapse" style={{ minWidth: `${180 + RAW_SLOTS.length * 140}px` }}>
                   <thead className="sticky top-0 z-20">
@@ -24239,7 +24028,7 @@ export default function AdminPage() {
                           {/* time-slot cells */}
                           {RAW_SLOTS.map((raw, si) => {
                             const cellKey = `${doc}-${si}`;
-                            // Skip — this cell is consumed by an earlier colspan
+                            // Skip â€” this cell is consumed by an earlier colspan
                             if (blocked.has(cellKey)) return null;
 
                             const cells = bookingMap[raw]?.[doc] ?? [];
@@ -24272,7 +24061,7 @@ export default function AdminPage() {
                                       return (
                                         <div
                                           key={b.id}
-                                          title={`${b.name} — ${svcName} (${b.status})`}
+                                          title={`${b.name} â€” ${svcName} (${b.status})`}
                                           className="flex min-w-[130px] flex-1 flex-col justify-center gap-1 rounded-2xl bg-[#414E36]/10 px-3 py-2 ring-1 ring-[#414E36]/20"
                                         >
                                           <div className="flex items-center gap-1.5">
@@ -24280,14 +24069,14 @@ export default function AdminPage() {
                                             <p className="truncate text-xs font-semibold text-[#1F251A]">{b.name}</p>
                                           </div>
                                           <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]">{b.phone}</p>
-                                          <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]/60 capitalize">{svcName} · {b.status}</p>
+                                          <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]/60 capitalize">{svcName} Â· {b.status}</p>
                                         </div>
                                       );
                                     })}
                                     {hiddenCount > 0 && (
                                       <button
                                         type="button"
-                                        title={`${hiddenCount} more booking${hiddenCount > 1 ? 's' : ''} for ${doc} on ${scheduleDateLabel} — view in list`}
+                                        title={`${hiddenCount} more booking${hiddenCount > 1 ? 's' : ''} for ${doc} on ${scheduleDateLabel} â€” view in list`}
                                         onClick={() => {
                                           setDocFilter(doc);
                                           setDateFilter(scheduleDateStr);
@@ -24338,7 +24127,7 @@ export default function AdminPage() {
 
             </div>
 
-            {loading && <p>Loading requests…</p>}
+            {loading && <p>Loading requestsâ€¦</p>}
             {!loading && requests.length === 0 && (
               <p className="rounded-3xl border border-[#414E36]/10 bg-[#EDF1EC] p-6 text-[#5A6A51]">
                 No pending reservation requests at the moment.
@@ -24362,7 +24151,7 @@ export default function AdminPage() {
                           Service: {service ? service.en : `Service #${req.serviceId}`}
                         </p>
                         <p className="mt-1 text-xs text-[#5A6A51]">
-                          {req.email} • {req.phone} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === req.branchId)?.name_en || "Default/All"}</span>
+                          {req.email} â€¢ {req.phone} â€¢ <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === req.branchId)?.name_en || "Default/All"}</span>
                         </p>
                       </div>
                       <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#414E36]">
@@ -24376,7 +24165,7 @@ export default function AdminPage() {
                       </p>
                       <p className="mt-2 text-sm text-[#414E36]">
                         {req.date}
-                        {req.requestedTime ? ` • requested ${req.requestedTime}` : ""}
+                        {req.requestedTime ? ` â€¢ requested ${req.requestedTime}` : ""}
                       </p>
                     </div>
                     <div className="rounded-3xl bg-[#FBFBF9] p-4">
@@ -24687,8 +24476,8 @@ export default function AdminPage() {
                          }}
                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                        >
-                         <option value="in_person">In Person / في العيادة</option>
-                         <option value="online">Online / أونلاين</option>
+                         <option value="in_person">In Person / ÙÙŠ Ø§Ù„Ø¹ÙŠØ§Ø¯Ø©</option>
+                         <option value="online">Online / Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†</option>
                        </select>
                      </div>
                      
@@ -25276,7 +25065,7 @@ export default function AdminPage() {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Email</p>
-                              <p className="mt-0.5 break-all font-semibold">{viewingBooking.email || "—"}</p>
+                              <p className="mt-0.5 break-all font-semibold">{viewingBooking.email || "â€”"}</p>
                             </div>
                             <div>
                               <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Phone</p>
@@ -25308,7 +25097,7 @@ export default function AdminPage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Provider</p>
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-[#C4AE7C]/20 flex items-center justify-center text-[#414E36] font-bold">
-                        {(viewingBooking.doctorName || "—").split(' ').map((n: string) => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()}
+                        {(viewingBooking.doctorName || "â€”").split(' ').map((n: string) => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()}
                       </div>
                       <div>
                         <p className="font-bold text-[#1F251A] text-sm">
@@ -25316,7 +25105,7 @@ export default function AdminPage() {
                         </p>
                         {viewingBooking.doctorName && (
                           <div className="flex items-center gap-1 text-[#C4AE7C] mt-0.5">
-                            {"★".repeat(5)}
+                            {"â˜…".repeat(5)}
                             <span className="text-xs text-[#5A6A51] ml-1">(5.0)</span>
                           </div>
                         )}
@@ -25557,7 +25346,7 @@ export default function AdminPage() {
               <div>
                 <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Quick actions</p>
                 <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">
-                  Today's Bookings • {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  Today's Bookings â€¢ {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </h3>
               </div>
               <button
@@ -25603,7 +25392,7 @@ export default function AdminPage() {
                         <div>
                           <p className="font-bold text-[#1F251A]">{r.name}</p>
                           <p className="text-xs text-[#5A6A51] mt-1">
-                            {service ? service.en : `Service #${r.serviceId}`} • {r.timeSlot ? `@ ${r.timeSlot}` : 'Time not specified'}
+                            {service ? service.en : `Service #${r.serviceId}`} â€¢ {r.timeSlot ? `@ ${r.timeSlot}` : 'Time not specified'}
                           </p>
                         </div>
                         <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[#414E36]">
@@ -25953,8 +25742,8 @@ export default function AdminPage() {
                       const showOnline = allowedType === "both" || allowedType === "online";
                       return (
                         <>
-                          {showInClinic && <option value="in_person">In Person / في العيادة</option>}
-                          {showOnline && <option value="online">Online / أونلاين</option>}
+                          {showInClinic && <option value="in_person">In Person / ÙÙŠ Ø§Ù„Ø¹ÙŠØ§Ø¯Ø©</option>}
+                          {showOnline && <option value="online">Online / Ø£ÙˆÙ†Ù„Ø§ÙŠÙ†</option>}
                         </>
                       );
                     })()}
@@ -26128,7 +25917,7 @@ export default function AdminPage() {
                         <div>
                           <p className="font-bold text-[#1F251A]">{r.name}</p>
                           <p className="text-xs text-[#5A6A51] mt-1">
-                            {service ? service.en : `Service #${r.serviceId}`} • {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}</span>
+                            {service ? service.en : `Service #${r.serviceId}`} â€¢ {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""} â€¢ <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}</span>
                           </p>
                           {r.doctorName && (
                             <p className="text-xs text-[#C4AE7C] mt-0.5 font-semibold">
@@ -26248,8 +26037,8 @@ export default function AdminPage() {
                     if (check.isValid) {
                       return (
                         <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/70 px-4 py-2 text-xs text-[#1F251A] font-semibold flex items-center justify-between min-h-[42px]">
-                          <span>{check.age} yrs • DOB: {check.dobFormatted}</span>
-                          <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">✓ National ID</span>
+                          <span>{check.age} yrs â€¢ DOB: {check.dobFormatted}</span>
+                          <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">âœ“ National ID</span>
                         </div>
                       );
                     }
@@ -26298,7 +26087,7 @@ export default function AdminPage() {
                               : "bg-[#414E36]/5 text-[#414E36] border-transparent hover:bg-[#414E36]/10"
                           }`}
                         >
-                          {b.name_en} {isSelected ? "✓" : "+"}
+                          {b.name_en} {isSelected ? "âœ“" : "+"}
                         </button>
                       );
                     })}
@@ -26315,7 +26104,7 @@ export default function AdminPage() {
                           <div className="flex items-center justify-between w-full">
                             <span className="text-sm font-semibold text-[#1F251A]">{displayDate}</span>
                             <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full border border-[#414E36]/15 flex items-center gap-1">
-                              ⚡ Auto from 1st Booking
+                              âš¡ Auto from 1st Booking
                             </span>
                           </div>
                         );
@@ -26745,7 +26534,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── EXPORT CUSTOMERS MODAL ── */}
+      {/* â”€â”€ EXPORT CUSTOMERS MODAL â”€â”€ */}
       {showExportCustomersModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
@@ -26833,7 +26622,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── IMPORT CUSTOMERS MODAL ── */}
+      {/* â”€â”€ IMPORT CUSTOMERS MODAL â”€â”€ */}
       {showImportCustomersModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto"
@@ -26888,7 +26677,7 @@ export default function AdminPage() {
                       <div>
                         <p className="text-sm font-semibold text-[#1F251A]">{importFile.name}</p>
                         <p className="text-xs text-[#5A6A51]">
-                          {(importFile.size / 1024).toFixed(1)} KB • {importRows.length} rows found
+                          {(importFile.size / 1024).toFixed(1)} KB â€¢ {importRows.length} rows found
                         </p>
                       </div>
                     </div>
@@ -27035,7 +26824,7 @@ export default function AdminPage() {
       )}
 
 
-      {/* ── DELETE CUSTOMER CONFIRMATION MODAL ── */}
+      {/* â”€â”€ DELETE CUSTOMER CONFIRMATION MODAL â”€â”€ */}
       {deleteCustomerTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
           <div className="w-full max-w-md rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
@@ -27075,7 +26864,7 @@ export default function AdminPage() {
       )}
 
 
-      {/* ── Setup Password Modal (shown after accepting invite or password reset) ── */}
+      {/* â”€â”€ Setup Password Modal (shown after accepting invite or password reset) â”€â”€ */}
       {showSetupPasswordModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="relative w-full max-w-md mx-4 rounded-3xl bg-white shadow-2xl overflow-hidden">
@@ -27103,7 +26892,7 @@ export default function AdminPage() {
                     </svg>
                   </div>
                   <p className="text-green-700 font-semibold text-base">{setupSuccess}</p>
-                  <p className="text-sm text-[#5A6A51]">You will be redirected automatically…</p>
+                  <p className="text-sm text-[#5A6A51]">You will be redirected automaticallyâ€¦</p>
                 </div>
               ) : (
                 <form onSubmit={handleSetupPassword} className="space-y-5">
@@ -27124,22 +26913,22 @@ export default function AdminPage() {
                   <div className="mt-2 text-xs space-y-1 font-semibold text-gray-500">
                     <div className="flex items-center gap-1.5">
                       <span className={setupPassword.length >= 8 ? "text-green-600" : ""}>
-                        {setupPassword.length >= 8 ? "✓" : "○"} At least 8 characters
+                        {setupPassword.length >= 8 ? "âœ“" : "â—‹"} At least 8 characters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "✓" : "○"} Uppercase & lowercase letters
+                        {/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "âœ“" : "â—‹"} Uppercase & lowercase letters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/\d/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/\d/.test(setupPassword) ? "✓" : "○"} At least one number
+                        {/\d/.test(setupPassword) ? "âœ“" : "â—‹"} At least one number
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[^A-Za-z0-9]/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/[^A-Za-z0-9]/.test(setupPassword) ? "✓" : "○"} At least one special character (e.g. @$!%*?&#)
+                        {/[^A-Za-z0-9]/.test(setupPassword) ? "âœ“" : "â—‹"} At least one special character (e.g. @$!%*?&#)
                       </span>
                     </div>
                   </div>
@@ -27176,7 +26965,7 @@ export default function AdminPage() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                         </svg>
-                        Setting password…
+                        Setting passwordâ€¦
                       </span>
                     ) : "Confirm & Access Dashboard"}
                   </button>
@@ -27187,7 +26976,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── PAYMENT SETTLEMENT MODAL ── */}
+      {/* â”€â”€ PAYMENT SETTLEMENT MODAL â”€â”€ */}
       {checkoutBooking && (
         (() => {
           // 1. Calculate service cost
@@ -27277,14 +27066,14 @@ export default function AdminPage() {
                 <div className="space-y-4 text-sm text-[#414E36]">
                   {/* Customer Information */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">Customer / المريض</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">Customer / Ø§Ù„Ù…Ø±ÙŠØ¶</p>
                     <p className="font-bold text-[#1F251A]">{checkoutBooking.name}</p>
                     <p className="text-xs text-[#5A6A51] mt-0.5">{checkoutBooking.phone}</p>
                   </div>
 
                   {/* Services Invoice details */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-[#EDF1EC]/30 p-4 space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-1">Services List / الخدمات</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-1">Services List / Ø§Ù„Ø®Ø¯Ù…Ø§Øª</p>
                     {bookingServicesList.map((svc: any, idx: number) => (
                       <div key={idx} className="flex justify-between font-medium">
                         <span className="text-[#1F251A]">{svc.name}</span>
@@ -27292,7 +27081,7 @@ export default function AdminPage() {
                       </div>
                     ))}
                     <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
-                      <span>Total Cost / الإجمالي</span>
+                      <span>Total Cost / Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ</span>
                       <span>{totalCost} EGP</span>
                     </div>
                   </div>
@@ -27303,7 +27092,7 @@ export default function AdminPage() {
                       <div>
                         <p className="font-bold text-[#1F251A] flex items-center gap-1.5">
                           <span className="inline-block h-2 w-2 rounded-full bg-[#C4AE7C]"></span>
-                          Use Customer Wallet / استخدام المحفظة
+                          Use Customer Wallet / Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù…Ø­ÙØ¸Ø©
                         </p>
                         <p className="text-xs text-[#5A6A51] mt-0.5">Available balance: {walletBalance} EGP</p>
                       </div>
@@ -27322,7 +27111,7 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-[#5A6A51] mb-1">
-                        Net Due / المطلوب
+                        Net Due / Ø§Ù„Ù…Ø·Ù„ÙˆØ¨
                       </label>
                       <div className="relative">
                         <input
@@ -27335,7 +27124,7 @@ export default function AdminPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-[#5A6A51] mb-1">
-                        Amount Paid / المدفوع
+                        Amount Paid / Ø§Ù„Ù…Ø¯ÙÙˆØ¹
                       </label>
                       <div className="relative">
                         <input
@@ -27355,7 +27144,7 @@ export default function AdminPage() {
                   {changeAmount > 0 && (
                     <div className="rounded-2xl border border-green-200 bg-green-50/50 p-4 space-y-3">
                       <div className="flex justify-between font-bold text-green-800 text-sm">
-                        <span>Change / الباقي</span>
+                        <span>Change / Ø§Ù„Ø¨Ø§Ù‚ÙŠ</span>
                         <span>{changeAmount} EGP</span>
                       </div>
                       <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -27366,7 +27155,7 @@ export default function AdminPage() {
                           className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
                         />
                         <span className="text-xs font-semibold text-[#1F251A]">
-                          Put change in customer's wallet / حفظ الباقي في المحفظة
+                          Put change in customer's wallet / Ø­ÙØ¸ Ø§Ù„Ø¨Ø§Ù‚ÙŠ ÙÙŠ Ø§Ù„Ù…Ø­ÙØ¸Ø©
                         </span>
                       </label>
                     </div>
@@ -27374,7 +27163,7 @@ export default function AdminPage() {
 
                   {remainingAmount > 0 && (
                     <div className="rounded-2xl border border-red-200 bg-red-50/50 p-4 flex justify-between font-bold text-red-800 text-sm">
-                      <span>Outstanding Balance / المتبقي دين</span>
+                      <span>Outstanding Balance / Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ Ø¯ÙŠÙ†</span>
                       <span>{remainingAmount} EGP</span>
                     </div>
                   )}
@@ -27414,7 +27203,7 @@ export default function AdminPage() {
         })()
       )}
 
-      {/* ── BOOKING INVOICE MODAL ── */}
+      {/* â”€â”€ BOOKING INVOICE MODAL â”€â”€ */}
       {invoiceBooking && (
         (() => {
           // 1. Calculate service cost
@@ -27423,7 +27212,7 @@ export default function AdminPage() {
             const s = localServices.find(srv => srv.id === id);
             return {
               name: s?.en || `Service #${id}`,
-              nameAr: s?.ar || `خدمة #${id}`,
+              nameAr: s?.ar || `Ø®Ø¯Ù…Ø© #${id}`,
               price: s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500
             };
           });
@@ -27476,12 +27265,12 @@ export default function AdminPage() {
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2 border-b pb-1">Billed To</p>
                       <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name}</p>
                       <p className="text-[#5A6A51] mt-1"><strong>Phone:</strong> {invoiceBooking.phone}</p>
-                      <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
+                      <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "â€”"}</p>
                     </div>
                     <div className="bg-white rounded-2xl border border-gray-100 p-4">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2 border-b pb-1">Booking Details</p>
-                      <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
-                      <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
+                      <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "â€”"}</p>
+                      <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "â€”"}</p>
                       <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
                     </div>
                   </div>

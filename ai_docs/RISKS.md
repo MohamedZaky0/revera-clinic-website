@@ -179,11 +179,13 @@ The distance-vs-800m check in `POST /api/hr/attendance` is already computed serv
 **Severity:** Low
 **Type:** Reliability / UX
 
-**Description:**
-Invoices are printed via `window.print()` on a hidden/visible DOM section. Output formatting depends on the browser, print margins, and OS. No actual PDF file is generated.
+**Status:** Partially mitigated 2026-07-22
 
-**Mitigation:**
-- Use a server-side PDF library (e.g., Puppeteer, react-pdf) if consistent PDF output is needed.
+**Description:**
+Invoice printing now uses the shared `src/lib/printUtils.ts` utility with a standardized A4 layout, fixed print margins, and print-color rules. Output still depends on the browser and OS because no actual PDF file is generated.
+
+**Remaining mitigation:**
+- Use a server-side PDF library (e.g., Puppeteer, react-pdf) if downloadable, identical PDF output is required.
 
 ---
 
