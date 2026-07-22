@@ -1,6 +1,5 @@
 import { CLIENT } from "@/config/client";
 import { SERVICES, CATEGORY_LABELS, ServiceItem } from "./services";
-import { CLIENT } from "@/config/client";
 
 const TOGGLES_KEY = `${CLIENT.storagePrefix}_service_toggles`;
 const SERVICES_KEY = `${CLIENT.storagePrefix}_dynamic_services`;
