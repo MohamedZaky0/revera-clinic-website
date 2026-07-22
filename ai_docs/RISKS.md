@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-07-21
+> **Last Updated:** 2026-07-22
 > **Previous content was for a different project — discarded entirely**
 
 ---
@@ -99,10 +99,10 @@ Correctly stored in env vars (`.env.local`):
 **Status:** Partially mitigated as of 2026-07-06
 
 **What changed:**
-The admin page now has a full Supabase email/password login gate. Employees are managed via `employee_accounts` + `roles` tables. Invites are sent via Supabase Auth. A superadmin bypass exists for `superadmin@revera.com`. `/api/auth/me` verifies the JWT and returns role/permissions.
+The admin page now has a full Supabase email/password login gate. Employees are managed via `employee_accounts` + `roles` tables. Invites are sent via Supabase Auth. Superadmin access is determined by the persisted employee role. `/api/auth/me` verifies the JWT and returns role/permissions.
 
 **Remaining gap:**
-All `/api/` routes are still unprotected on the server side. A direct HTTP call to e.g. `GET /api/reservations` from outside the browser returns all data without any token check. The session gate exists only in the browser React component, not in middleware or route handlers.
+A migration at `supabase/migrations/20260722140000_enable_row_level_security.sql` enables RLS for all `public` tables, preventing direct browser/anon-key table access once applied to Supabase. API routes still use the service role key, which bypasses RLS, so each sensitive API route still requires server-side authorization before this risk can be closed.
 
 **What would fully resolve this:**
 - Add Next.js middleware that validates a Supabase session cookie for `/api/` routes
@@ -195,12 +195,13 @@ Invoices are printed via `window.print()` on a hidden/visible DOM section. Outpu
 **Severity:** Medium
 **Type:** Security / Fork risk
 
-**Description:**
-`superadmin@revera.com` is hardcoded in the admin page as a bypass that receives full permissions without an `employee_accounts` record. This is a Revera-specific value and must be changed or removed when forking.
+**Status:** Mitigated 2026-07-22
 
-**Mitigation:**
-- Move the bypass email to `src/config/client.ts` after PROPOSAL-001.
-- Or require every admin to have an `employee_accounts` row with the superadmin role.
+**Description:**
+Superadmin access is now determined solely by the persisted `employee_accounts.role_name` value. Email-based bypasses were removed from admin authentication, attendance, and payroll handling.
+
+**Remaining requirement:**
+Every superadmin must have an `employee_accounts` row linked through `auth_user_id` and assigned the `superadmin` role.
 
 ---
 

@@ -1,8 +1,9 @@
+import { CLIENT } from "@/config/client";
 import { SERVICES, CATEGORY_LABELS, ServiceItem } from "./services";
 
-const TOGGLES_KEY = "revera_service_toggles";
-const SERVICES_KEY = "revera_dynamic_services";
-const CATEGORIES_KEY = "revera_dynamic_categories";
+const TOGGLES_KEY = `${CLIENT.storagePrefix}_service_toggles`;
+const SERVICES_KEY = `${CLIENT.storagePrefix}_dynamic_services`;
+const CATEGORIES_KEY = `${CLIENT.storagePrefix}_dynamic_categories`;
 
 export interface LocalCategory {
   key: string;

@@ -37,11 +37,11 @@ export async function POST(req: Request) {
     // 1. Fetch all active employees including target configurations
     const { data: employees, error: empErr } = await supabaseServer
       .from('employee_accounts')
-      .select('id, salary, required_target_amount, bonus_percentage, target_type, bonus_type')
-      .not('email', 'eq', 'superadmin@revera.com'); // skip owner
+      .select('id, role_name, salary, required_target_amount, bonus_percentage, target_type, bonus_type');
 
     if (empErr) throw empErr;
-    if (!employees || employees.length === 0) {
+    const payrollEmployees = (employees || []).filter((employee: any) => employee.role_name?.toLowerCase() !== 'superadmin');
+    if (payrollEmployees.length === 0) {
       return NextResponse.json({ error: 'No employee accounts found to run payroll.' }, { status: 400 });
     }
 
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     });
 
     // 3. Prepare bulk inserts with target and bonus calculations
-    const inserts = employees.map((emp: any) => {
+    const inserts = payrollEmployees.map((emp: any) => {
       const basic = Number(emp.salary || 0);
       const target = Number(emp.required_target_amount || 0);
       const bonusVal = Number(emp.bonus_percentage || 0);

@@ -257,29 +257,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required parameters.' }, { status: 400 });
     }
 
-    // 1. Fetch employee branch details (try id first, fallback to auth_user_id or email)
-    let { data: employee } = await supabaseServer
+    const { data: employee, error: employeeError } = await supabaseServer
       .from('employee_accounts')
-      .select('id, branch_id, email, role_name')
-      .eq('id', employeeId)
+      .select('id, branch_id, role_name')
+      .eq('auth_user_id', user.id)
       .maybeSingle();
 
-    if (!employee) {
-      const { data: empFallback } = await supabaseServer
-        .from('employee_accounts')
-        .select('id, branch_id, email, role_name')
-        .or(`auth_user_id.eq.${user.id},email.eq.${user.email}`)
-        .maybeSingle();
-      if (empFallback) employee = empFallback;
-    }
-
+    if (employeeError) throw employeeError;
     if (!employee) {
       return NextResponse.json({ error: 'Employee not found.' }, { status: 404 });
     }
+    if (employee.id !== employeeId) {
+      return NextResponse.json({ error: 'You can only check in for your own employee account.' }, { status: 403 });
+    }
 
-    const isSuperadmin = employee.role_name?.toLowerCase() === 'superadmin' || 
-                         user.email?.toLowerCase() === 'saif@superadmin.com' ||
-                         user.email?.toLowerCase() === 'superadmin@revera.com';
+    const isSuperadmin = employee.role_name?.toLowerCase() === 'superadmin';
 
     // Global superadmin without assigned branch auto-checks in
     if (isSuperadmin && !employee.branch_id) {
