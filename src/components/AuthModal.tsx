@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
+import { CLIENT } from "@/config/client";
 
 type AuthStep = 1 | 2 | 3;
 
@@ -631,7 +632,7 @@ export function AuthModal() {
               style={{ backgroundColor: "var(--cr-secondary)" }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/main_logo.png" alt="Revera" width={28} height={28} style={{ objectFit: "contain" }} />
+              <img src={CLIENT.logoPath} alt={CLIENT.nameShort} width={28} height={28} style={{ objectFit: "contain" }} />
             </div>
             <h3 className="text-lg font-semibold" style={{ color: "var(--cr-primary)" }}>
               {t.auth.title}

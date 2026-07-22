@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 export function WhatsappButton() {
   const [mounted, setMounted] = useState(false);
@@ -20,7 +21,7 @@ export function WhatsappButton() {
     return null;
   }
 
-  const whatsappUrl = "https://api.whatsapp.com/send/?phone=201035595691&text=Hello+Revera%2C+I%27d+love+to+schedule+a+consultation+at+your+New+Cairo+branch.+Please+let+me+know+your+earliest+availability.+Thank+you.&type=phone_number&app_absent=0";
+  const whatsappUrl = `https://api.whatsapp.com/send/?phone=${CLIENT.whatsappNumber}&text=${encodeURIComponent(CLIENT.whatsappGreeting)}&type=phone_number&app_absent=0`;
 
   return (
     <a

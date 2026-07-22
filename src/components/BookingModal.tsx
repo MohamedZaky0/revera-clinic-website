@@ -14,6 +14,7 @@ import {
 } from "@/lib/serviceStore";
 import TermsModal from "./TermsModal";
 import { ShieldCheck, FileText, ExternalLink, Undo2 } from "lucide-react";
+import { CLIENT } from "@/config/client";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -117,7 +118,7 @@ export function BookingModal() {
   const [isPaying, setIsPaying] = useState(false);
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   const [createdReservation, setCreatedReservation] = useState<any>(null);
-  const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
+  const [clinicWhatsapp, setClinicWhatsapp] = useState(CLIENT.phoneTel);
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [termsText, setTermsText] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -719,7 +720,7 @@ I have paid the reservation deposit for my booking:
 Attached is my payment transaction receipt photo.`;
 
     const cleanWhatsapp = clinicWhatsapp.replace(/[^0-9]/g, "");
-    const whatsappLink = `https://wa.me/${cleanWhatsapp || "201035595691"}?text=${encodeURIComponent(textMessage)}`;
+    const whatsappLink = `https://wa.me/${cleanWhatsapp || CLIENT.whatsappNumber}?text=${encodeURIComponent(textMessage)}`;
 
     setTimeout(() => {
       fetch(`/api/reservations?id=${createdReservation.id}`, {

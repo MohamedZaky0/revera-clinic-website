@@ -10,10 +10,11 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 
+import { CLIENT } from "@/config/client";
+
 export const metadata: Metadata = {
-  title: "Services - Revera Clinics | Medical Center",
-  description:
-    "Explore Revera Clinics' comprehensive dermatology & aesthetic, gynecology, physical therapy, and osteopathy & nutrition services.",
+  title: `Services - ${CLIENT.name} | ${CLIENT.tagline}`,
+  description: `Explore ${CLIENT.name}' comprehensive medical and aesthetic services.`,
 };
 
 export default function ServicesPage() {
