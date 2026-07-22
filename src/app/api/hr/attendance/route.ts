@@ -251,10 +251,22 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { employeeId, latitude, longitude } = await req.json();
+    const { employeeId, latitude, longitude, accuracy } = await req.json();
 
-    if (!employeeId || latitude === undefined || longitude === undefined) {
+    if (!employeeId || latitude === undefined || longitude === undefined || accuracy === undefined) {
       return NextResponse.json({ error: 'Missing required parameters.' }, { status: 400 });
+    }
+
+    const parsedLatitude = Number(latitude);
+    const parsedLongitude = Number(longitude);
+    const parsedAccuracy = Number(accuracy);
+    if (!Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude) || !Number.isFinite(parsedAccuracy) ||
+      parsedLatitude < -90 || parsedLatitude > 90 || parsedLongitude < -180 || parsedLongitude > 180 ||
+      parsedAccuracy <= 0 || parsedAccuracy > 100) {
+      return NextResponse.json({
+        error: 'location_accuracy_insufficient',
+        message: 'A GPS reading accurate within 100 meters is required for attendance check-in.'
+      }, { status: 400 });
     }
 
     const { data: employee, error: employeeError } = await supabaseServer
@@ -281,8 +293,8 @@ export async function POST(req: Request) {
           employee_id: employee.id,
           date: new Date().toISOString().split('T')[0],
           check_in_time: new Date().toISOString(),
-          latitude,
-          longitude,
+          latitude: parsedLatitude,
+          longitude: parsedLongitude,
           status: 'Present'
         }, { onConflict: 'employee_id,date' })
         .select()
@@ -345,8 +357,8 @@ export async function POST(req: Request) {
 
     // Compute distance between employee and branch
     const dist = getDistanceInMeters(
-      Number(latitude),
-      Number(longitude),
+      parsedLatitude,
+      parsedLongitude,
       targetLat,
       targetLng
     );
@@ -361,8 +373,8 @@ export async function POST(req: Request) {
           employee_id: employee.id,
           date: new Date().toISOString().split('T')[0],
           check_in_time: new Date().toISOString(),
-          latitude,
-          longitude,
+          latitude: parsedLatitude,
+          longitude: parsedLongitude,
           status: 'Out of Location'
         }, { onConflict: 'employee_id,date' });
 
@@ -383,8 +395,8 @@ export async function POST(req: Request) {
         employee_id: employee.id,
         date: new Date().toISOString().split('T')[0],
         check_in_time: new Date().toISOString(),
-        latitude,
-        longitude,
+        latitude: parsedLatitude,
+        longitude: parsedLongitude,
         status: 'Present'
       }, { onConflict: 'employee_id,date' })
       .select()

@@ -168,7 +168,11 @@ no page behind it at all). Do not conflate the two when working on either.
 **Description:**
 The distance-vs-800m check in `POST /api/hr/attendance` is already computed server-side (`getDistanceInMeters` in the route itself) — that part is not client-bypassable by tampering with browser JS. The actual weak point is the **input**: `latitude`/`longitude` are read from `navigator.geolocation` in the browser and sent as plain, unsigned values in the request body. An employee can spoof these (devtools, a location-spoofing browser extension, a rooted/jailbroken device, or calling the API directly with fabricated coordinates) and the server has no way to tell real GPS from a faked value.
 
-**Mitigation:**
+**Partial mitigation implemented 2026-07-22:**
+- The server validates finite latitude/longitude values, geographic bounds, and a browser-reported GPS accuracy of 100 meters or better before calculating distance or recording attendance.
+- The check-in is bound to the authenticated employee account, so an employee cannot submit attendance for another employee.
+
+**Remaining mitigation:**
 - Require a tamper-resistant/signed check-in token or device attestation, since server-side distance math alone can't detect spoofed input coordinates.
 - Consider IP/network-based corroboration as a secondary signal (not a full fix, but raises the spoofing bar).
 
