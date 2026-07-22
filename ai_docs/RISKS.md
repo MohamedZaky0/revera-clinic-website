@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-07-20
 > **Previous content was for a different project — discarded entirely**
 
 ---
@@ -92,20 +92,22 @@ Correctly stored in env vars (`.env.local`):
 
 ---
 
-## RISK-002: Admin Panel Has No Authentication
+## RISK-002: Admin Auth Is Client-Side Only (Partially Resolved)
 
-**Severity:** Critical
+**Severity:** Medium (was Critical)
 **Type:** Security
+**Status:** Partially mitigated as of 2026-07-06
 
-**Description:**
-The `/admin` route is publicly accessible. Anyone who knows the URL can view all bookings,
-customer data (name, email, phone), edit services, and change CMS content.
+**What changed:**
+The admin page now has a full Supabase email/password login gate. Employees are managed via `employee_accounts` + `roles` tables. Invites are sent via Supabase Auth. A superadmin bypass exists for `superadmin@revera.com`. `/api/auth/me` verifies the JWT and returns role/permissions.
 
-**Affected data:** All reservations (patient names, emails, phones), all admin actions.
+**Remaining gap:**
+All `/api/` routes are still unprotected on the server side. A direct HTTP call to e.g. `GET /api/reservations` from outside the browser returns all data without any token check. The session gate exists only in the browser React component, not in middleware or route handlers.
 
-**Mitigation (not yet implemented):**
-- Add Supabase Auth or a simple password gate in Next.js middleware before `/admin`
-- Until fixed, ensure the admin URL is not publicly discoverable (security through obscurity is insufficient)
+**What would fully resolve this:**
+- Add Next.js middleware that validates a Supabase session cookie for `/api/` routes
+- Or add `Authorization: Bearer` token validation in individual route handlers
+- Or use Supabase RLS policies on all tables (currently bypassed by service role key)
 
 ---
 
@@ -145,6 +147,69 @@ browser or clears localStorage, they lose unsaved changes. The Supabase copy may
 hardcoded mock data arrays, all state variables, and all UI. Many sections (Prescriptions,
 Finance, Payroll, Inventory, POS, Refunds, Shipping) are mock UI backed by hardcoded
 constant arrays — not Supabase.
+
+**Naming collision to be aware of:** "Finance" here refers to the pre-existing `Finances Dashboard`
+panel (`activeNav === "Finances Dashboard"`), which has no reachable sidebar trigger (the
+`financesExpanded` state that would expand it is never wired to a nav item). This is unrelated
+to the disabled `Finance` sidebar stub added in DEC-011 (`comingSoon: true`, superadmin-only,
+no page behind it at all). Do not conflate the two when working on either.
+
+---
+
+## RISK-006: GPS-Based Attendance Can Be Spoofed
+
+**Severity:** Medium
+**Type:** Security / Trust
+
+**Description:**
+The distance-vs-800m check in `POST /api/hr/attendance` is already computed server-side (`getDistanceInMeters` in the route itself) — that part is not client-bypassable by tampering with browser JS. The actual weak point is the **input**: `latitude`/`longitude` are read from `navigator.geolocation` in the browser and sent as plain, unsigned values in the request body. An employee can spoof these (devtools, a location-spoofing browser extension, a rooted/jailbroken device, or calling the API directly with fabricated coordinates) and the server has no way to tell real GPS from a faked value.
+
+**Mitigation:**
+- Require a tamper-resistant/signed check-in token or device attestation, since server-side distance math alone can't detect spoofed input coordinates.
+- Consider IP/network-based corroboration as a secondary signal (not a full fix, but raises the spoofing bar).
+
+---
+
+## RISK-007: Client-Side PDF Invoice Printing Is Browser-Dependent
+
+**Severity:** Low
+**Type:** Reliability / UX
+
+**Description:**
+Invoices are printed via `window.print()` on a hidden/visible DOM section. Output formatting depends on the browser, print margins, and OS. No actual PDF file is generated.
+
+**Mitigation:**
+- Use a server-side PDF library (e.g., Puppeteer, react-pdf) if consistent PDF output is needed.
+
+---
+
+## RISK-008: Hardcoded Superadmin Email
+
+**Severity:** Medium
+**Type:** Security / Fork risk
+
+**Description:**
+`superadmin@revera.com` is hardcoded in the admin page as a bypass that receives full permissions without an `employee_accounts` record. This is a Revera-specific value and must be changed or removed when forking.
+
+**Mitigation:**
+- Move the bypass email to `src/config/client.ts` after PROPOSAL-001.
+- Or require every admin to have an `employee_accounts` row with the superadmin role.
+
+---
+
+## RISK-009: Schedule Grid Can Silently Clip Overlapping Bookings
+
+**Severity:** Low (mitigated 2026-07-20)
+**Type:** Data visibility / UX
+
+**Description:**
+The Bookings → Schedule view (`calendarView === "Schedule"`, `src/app/admin/page.tsx`, see DEC-012) fixes every cell to a hard `84px` height with `overflow-hidden` on the inner content wrapper, so that booked cells render at the same height as empty ones. If more than a couple of bookings ever land on the same doctor/slot (whether from a real double-booking, a manual admin entry, or a data edge case — overlap-prevention exists in `api/availability` and `api/reservations` but was not exhaustively re-audited here), the extra booking cards could visually clip and become invisible in this view.
+
+**Mitigation (applied):**
+- Cell now shows at most `MAX_VISIBLE_BOOKINGS = 3` cards; any beyond that render as a `+N more` pill instead of clipping silently.
+- Clicking `+N more` sets `docFilter` to that cell's doctor, `dateFilter` to that day (`YYYY-MM-DD`), resets `statusFilter`/`typeFilter` to `"All"`, and switches `calendarView` to `"List"` — narrowing to exactly that doctor's bookings on that day.
+- A `dateFilter` state was added to `filteredReservations` (previously List/Calendar had no date filter at all) with a date input + clear button in the existing Filter modal, and an active-filter chip row with a "Clear all" button in the List view header — so the filtered state from a `+N more` jump is visible and easy to back out of, not a hidden/stuck state.
+- Residual gap: the List view has no date filter, so the jump narrows by doctor only, not by the specific day/slot — acceptable since the doctor filter is the highest-value narrowing already wired into `filteredReservations`.
 
 ---
 

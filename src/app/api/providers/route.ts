@@ -7,35 +7,13 @@ export const dynamic = 'force-dynamic';
 
 const JSON_FILE_PATH = path.join(process.cwd(), 'data', 'providers.json');
 
-const DEFAULT_PROVIDERS = [
-  {
-    name: "Dr. Ahmed Medhat",
-    bookings_count: 0,
-    services: ["Tattoo Removal (Small)", "Tattoo Removal (Medium)"],
-    more_count: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Radwa Seif",
-    bookings_count: 0,
-    services: ["Physio: Basic Relief (3)", "Physio: Standard Recovery (6)"],
-    more_count: 4,
-    rating: 0,
-  },
-  {
-    name: "Dr. Sara El Gamel",
-    bookings_count: 1,
-    services: ["Half Arm", "Full Arms"],
-    more_count: 14,
-    rating: 0,
-  },
-];
+const DEFAULT_PROVIDERS: any[] = [];
 
-function mapProvider(p: Record<string, any>) {
+function mapProvider(p: Record<string, any>, bookingsCount: number = 0) {
   return {
     id: p.id,
     name: p.name,
-    bookings: p.bookings_count ?? 0,
+    bookings: bookingsCount,
     services: p.services ?? [],
     more: p.more_count ?? 0,
     rating: Number(p.rating || 0),
@@ -48,48 +26,112 @@ function mapProvider(p: Record<string, any>) {
     workingDaysHours: p.working_days_hours || null,
     branchId: p.branch_id || null,
     startDate: p.start_date || null,
+    fixedSalary: p.fixed_salary ? Number(p.fixed_salary) : 0,
+    commissionType: p.commission_type || 'none',
+    commissionValue: p.commission_value ? Number(p.commission_value) : 0,
   };
 }
-
+ 
 export async function GET() {
   try {
-    const { data, error } = await supabaseServer
-      .from('providers')
-      .select('*')
-      .order('name', { ascending: true });
+    const [providersRes, reservationsRes, docEmployeesRes] = await Promise.all([
+      supabaseServer
+        .from('providers')
+        .select('*')
+        .order('name', { ascending: true }),
+      supabaseServer
+        .from('reservations')
+        .select('doctor_name, status')
+        .neq('status', 'rejected'),
+      supabaseServer
+        .from('employee_accounts')
+        .select('*')
+        .or('department.ilike.%doc%,role_name.ilike.%doc%')
+    ]);
 
-    if (!error && data) {
-      if (data.length === 0) {
-        // Seed default providers
-        const { data: seeded, error: seedError } = await supabaseServer
-          .from('providers')
-          .insert(DEFAULT_PROVIDERS)
-          .select();
-        
-        if (!seedError && seeded) {
-          return NextResponse.json(seeded.map(mapProvider));
-        } else {
-          console.warn("Failed to seed default providers to Supabase:", seedError);
+    let providersData = providersRes.data || [];
+
+    // Auto-sync any Doctor employees missing from providers table
+    if (docEmployeesRes.data && docEmployeesRes.data.length > 0) {
+      for (const emp of docEmployeesRes.data) {
+        const exists = providersData.some(
+          (p: any) => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) ||
+                      (p.phone && emp.phone && p.phone === emp.phone)
+        );
+        if (!exists && emp.name) {
+          const newProvPayload = {
+            name: emp.name,
+            phone: emp.phone || null,
+            fixed_salary: emp.salary ? Number(emp.salary) : 0,
+            branch_id: emp.branch_id || null,
+            national_id: emp.national_id || null,
+            services: [],
+            rating: 5,
+            bookings_count: 0,
+            more_count: 0
+          };
+          try {
+            const { data: created } = await supabaseServer.from('providers').insert(newProvPayload).select().single();
+            if (created) {
+              providersData.push(created);
+            }
+          } catch (e) {
+            console.error("Failed auto-syncing missing doctor employee:", e);
+          }
         }
-      } else {
-        return NextResponse.json(data.map(mapProvider));
       }
+    }
+
+    if (!providersRes.error && providersData.length > 0) {
+      const counts = new Map<string, number>();
+      (reservationsRes.data || []).forEach((r: any) => {
+        if (r.doctor_name) {
+          const nameKey = r.doctor_name.trim().toLowerCase();
+          counts.set(nameKey, (counts.get(nameKey) || 0) + 1);
+        }
+      });
+
+      const mapped = providersData.map((p: any) => {
+        const key = p.name ? p.name.trim().toLowerCase() : "";
+        const bookingsCount = counts.get(key) || 0;
+        return mapProvider(p, bookingsCount);
+      });
+      return NextResponse.json(mapped);
     } else {
-      console.warn("Supabase providers query error, falling back to JSON:", error);
+      if (providersRes.error) {
+        console.warn("Supabase providers query error, falling back to JSON:", providersRes.error);
+      }
     }
   } catch (dbErr) {
     console.error("Database providers load error, falling back to JSON:", dbErr);
   }
-
+ 
   // Fallback to local JSON file
   try {
+    const reservationsRes = await supabaseServer.from('reservations').select('doctor_name, status').neq('status', 'rejected');
+    const counts = new Map<string, number>();
+    (reservationsRes.data || []).forEach((r: any) => {
+      if (r.doctor_name) {
+        const nameKey = r.doctor_name.trim().toLowerCase();
+        counts.set(nameKey, (counts.get(nameKey) || 0) + 1);
+      }
+    });
+ 
     if (!fs.existsSync(JSON_FILE_PATH)) {
       fs.mkdirSync(path.dirname(JSON_FILE_PATH), { recursive: true });
-      fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(DEFAULT_PROVIDERS.map((p, i) => ({ ...mapProvider(p), id: `local-${i}` })), null, 2));
-      return NextResponse.json(DEFAULT_PROVIDERS.map((p, i) => ({ ...mapProvider(p), id: `local-${i}` })));
+      fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(DEFAULT_PROVIDERS.map((p, i) => ({ ...mapProvider(p, counts.get(p.name ? p.name.trim().toLowerCase() : "") || 0), id: `local-${i}` })), null, 2));
+      return NextResponse.json(DEFAULT_PROVIDERS.map((p, i) => ({ ...mapProvider(p, counts.get(p.name ? p.name.trim().toLowerCase() : "") || 0), id: `local-${i}` })));
     }
     const fileContent = fs.readFileSync(JSON_FILE_PATH, 'utf-8');
-    return NextResponse.json(JSON.parse(fileContent));
+    const localProviders = JSON.parse(fileContent);
+    const mappedLocal = localProviders.map((p: any) => {
+      const key = p.name ? p.name.trim().toLowerCase() : "";
+      return {
+        ...p,
+        bookings: counts.get(key) || 0
+      };
+    });
+    return NextResponse.json(mappedLocal);
   } catch (err) {
     console.error("JSON fallback load error:", err);
     return NextResponse.json([]);
@@ -104,7 +146,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate } = body;
+  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue } = body;
+  
+  let finalBranchId = branchId || null;
+  if (workingDaysHours && typeof workingDaysHours === 'object') {
+    const wdh = workingDaysHours as any;
+    if (Array.isArray(wdh.branch_ids) && wdh.branch_ids.length > 0) {
+      finalBranchId = wdh.branch_ids[0];
+    }
+  }
+
   const newProvider = {
     name,
     services: services || [],
@@ -118,9 +169,26 @@ export async function POST(req: Request) {
     specialty: specialty || null,
     national_id: nationalId || null,
     working_days_hours: workingDaysHours || null,
-    branch_id: branchId || null,
-    start_date: startDate || null
+    branch_id: finalBranchId,
+    start_date: startDate || null,
+    fixed_salary: fixedSalary ? Number(fixedSalary) : 0,
+    commission_type: commissionType || 'none',
+    commission_value: commissionValue ? Number(commissionValue) : 0,
   };
+
+  const authHeader = req.headers.get('Authorization') || '';
+  const token = authHeader.replace('Bearer ', '').trim();
+  let changedBy = 'System/Unknown';
+  if (token) {
+    try {
+      const { data: { user } } = await supabaseServer.auth.getUser(token);
+      if (user?.email) {
+        changedBy = user.email;
+      }
+    } catch (e) {
+      console.warn("Could not get user from auth token in providers API:", e);
+    }
+  }
 
   try {
     const { data, error } = await supabaseServer
@@ -130,6 +198,22 @@ export async function POST(req: Request) {
       .single();
 
     if (!error && data) {
+      if (workingDaysHours) {
+        try {
+          await supabaseServer
+            .from('provider_schedule_audit_logs')
+            .insert({
+              provider_id: data.id,
+              provider_name: data.name,
+              changed_by: changedBy,
+              action: 'create_schedule',
+              previous_schedule: null,
+              new_schedule: workingDaysHours
+            });
+        } catch (auditErr: any) {
+          console.warn("Could not write provider schedule audit log:", auditErr.message);
+        }
+      }
       return NextResponse.json(mapProvider(data), { status: 201 });
     } else {
       console.warn("Supabase providers insert error, falling back to JSON:", error);
@@ -159,7 +243,10 @@ export async function POST(req: Request) {
       nationalId: nationalId || null,
       workingDaysHours: workingDaysHours || null,
       branchId: branchId || null,
-      startDate: startDate || null
+      startDate: startDate || null,
+      fixedSalary: fixedSalary ? Number(fixedSalary) : 0,
+      commissionType: commissionType || 'none',
+      commissionValue: commissionValue ? Number(commissionValue) : 0
     };
     list.push(localNew);
     fs.mkdirSync(path.dirname(JSON_FILE_PATH), { recursive: true });
@@ -183,7 +270,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate } = body;
+  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue } = body;
   const updates: Record<string, any> = {};
   if (name !== undefined) updates.name = name;
   if (services !== undefined) updates.services = services;
@@ -195,9 +282,51 @@ export async function PATCH(req: Request) {
   if (age !== undefined) updates.age = age ? Number(age) : null;
   if (specialty !== undefined) updates.specialty = specialty;
   if (nationalId !== undefined) updates.national_id = nationalId;
-  if (workingDaysHours !== undefined) updates.working_days_hours = workingDaysHours;
-  if (branchId !== undefined) updates.branch_id = branchId;
+  if (workingDaysHours !== undefined) {
+    updates.working_days_hours = workingDaysHours;
+    if (workingDaysHours && typeof workingDaysHours === 'object') {
+      const wdh = workingDaysHours as any;
+      if (Array.isArray(wdh.branch_ids) && wdh.branch_ids.length > 0) {
+        updates.branch_id = wdh.branch_ids[0];
+      } else {
+        updates.branch_id = null;
+      }
+    } else {
+      updates.branch_id = null;
+    }
+  } else if (branchId !== undefined) {
+    updates.branch_id = branchId;
+  }
   if (startDate !== undefined) updates.start_date = startDate;
+  if (fixedSalary !== undefined) updates.fixed_salary = Number(fixedSalary || 0);
+  if (commissionType !== undefined) updates.commission_type = commissionType;
+  if (commissionValue !== undefined) updates.commission_value = Number(commissionValue || 0);
+
+  const authHeader = req.headers.get('Authorization') || '';
+  const token = authHeader.replace('Bearer ', '').trim();
+  let changedBy = 'System/Unknown';
+  if (token) {
+    try {
+      const { data: { user } } = await supabaseServer.auth.getUser(token);
+      if (user?.email) {
+        changedBy = user.email;
+      }
+    } catch (e) {
+      console.warn("Could not get user from auth token in providers API:", e);
+    }
+  }
+
+  let oldProvider: any = null;
+  try {
+    const { data } = await supabaseServer
+      .from('providers')
+      .select('name, working_days_hours')
+      .eq('id', id)
+      .maybeSingle();
+    oldProvider = data;
+  } catch (e) {
+    console.warn("Could not fetch old provider for audit logging:", e);
+  }
 
   try {
     const { data, error } = await supabaseServer
@@ -208,6 +337,22 @@ export async function PATCH(req: Request) {
       .single();
 
     if (!error && data) {
+      if (workingDaysHours !== undefined && oldProvider) {
+        try {
+          await supabaseServer
+            .from('provider_schedule_audit_logs')
+            .insert({
+              provider_id: id,
+              provider_name: oldProvider.name,
+              changed_by: changedBy,
+              action: 'update_schedule',
+              previous_schedule: oldProvider.working_days_hours,
+              new_schedule: workingDaysHours
+            });
+        } catch (auditErr: any) {
+          console.warn("Could not write provider schedule audit log:", auditErr.message);
+        }
+      }
       return NextResponse.json(mapProvider(data));
     } else {
       console.warn("Supabase providers update error, falling back to JSON:", error);
@@ -234,6 +379,9 @@ export async function PATCH(req: Request) {
           workingDaysHours: updates.working_days_hours !== undefined ? updates.working_days_hours : list[index].workingDaysHours,
           branchId: updates.branch_id !== undefined ? updates.branch_id : list[index].branchId,
           startDate: updates.start_date !== undefined ? updates.start_date : list[index].startDate,
+          fixedSalary: updates.fixed_salary !== undefined ? updates.fixed_salary : list[index].fixedSalary,
+          commissionType: updates.commission_type !== undefined ? updates.commission_type : list[index].commissionType,
+          commissionValue: updates.commission_value !== undefined ? updates.commission_value : list[index].commissionValue,
         };
 
         list[index] = {

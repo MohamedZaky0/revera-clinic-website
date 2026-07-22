@@ -486,6 +486,12 @@ export function AuthModal() {
 
     try {
       if (isSignUp) {
+        const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+        if (!strongPasswordRegex.test(passwordInput)) {
+          setPasswordError("Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (e.g. @$!%*?&#).");
+          setVerifying(false);
+          return;
+        }
         const { data, error } = await supabase.auth.signUp({
           email: emailInput,
           password: passwordInput,
@@ -763,6 +769,30 @@ export function AuthModal() {
                 }}
                 required
               />
+              {isSignUp && passwordInput && (
+                  <div className="mt-2 text-xs space-y-1 font-semibold opacity-90" style={{ color: "var(--cr-text-muted)" }}>
+                    <div className="flex items-center gap-1.5">
+                      <span className={passwordInput.length >= 8 ? "text-green-600" : ""}>
+                        {passwordInput.length >= 8 ? "✓" : "○"} {isRTL ? "٨ أحرف على الأقل" : "At least 8 characters"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/[A-Z]/.test(passwordInput) && /[a-z]/.test(passwordInput) ? "text-green-600" : ""}>
+                        {/[A-Z]/.test(passwordInput) && /[a-z]/.test(passwordInput) ? "✓" : "○"} {isRTL ? "حروف كبيرة وصغيرة" : "Uppercase & lowercase letters"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/\d/.test(passwordInput) ? "text-green-600" : ""}>
+                        {/\d/.test(passwordInput) ? "✓" : "○"} {isRTL ? "رقم واحد على الأقل" : "At least one number"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={/[^A-Za-z0-9]/.test(passwordInput) ? "text-green-600" : ""}>
+                        {/[^A-Za-z0-9]/.test(passwordInput) ? "✓" : "○"} {isRTL ? "رمز خاص واحد على الأقل" : "At least one special character (e.g. @$!%*?&#)"}
+                      </span>
+                    </div>
+                  </div>
+                )}
               {passwordError && (
                 <p className="mt-1.5 text-xs" style={{ color: "var(--cr-error)" }}>
                   {passwordError}

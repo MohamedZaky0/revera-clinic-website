@@ -1,6 +1,6 @@
 # PROJECT.md — Revera Clinics Website & Admin System
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-07-20
 > **Audited from:** live source code (no trust placed in stub files)
 
 ---
@@ -53,7 +53,8 @@ This is explicitly NOT a multi-tenant SaaS build. That decision is gated to appr
 | Styling | Tailwind CSS v4 + shadcn/ui |
 | Database | Supabase (PostgreSQL) |
 | Auth (patient) | Phone/OTP modal — UI-only in current code (OTP not wired to real SMS) |
-| Admin auth | None — `/admin` is unprotected |
+| Admin auth | Supabase email/password — login form rendered in `/admin`, session checked on mount; employees invited via Supabase Auth; roles/permissions from `employee_accounts` + `roles` tables; `/api/auth/me` returns role + permissions |
+| Attendance | GPS geofence check-in per branch with 800m radius; admin/superadmin bypass |
 | i18n | Custom LanguageContext (EN/AR) with translations.ts |
 | Icons | lucide-react |
 | Fonts | Marcellus (heading), Sora (body) |
@@ -68,19 +69,28 @@ src/
     page.tsx              — Homepage
     layout.tsx            — Root layout + metadata
     admin/page.tsx        — Full admin panel (single file, ~550KB)
+    profile/page.tsx      — Patient profile + wallet + visit history
+    auth/callback/page.tsx — Supabase invite/recovery redirect handler
     about/page.tsx
     services/page.tsx
     blog/page.tsx
     contact/page.tsx
     api/
-      reservations/       — Booking CRUD
+      reservations/       — Booking CRUD + lifecycle/payment/wallet
       availability/       — Slot availability check
       services/           — Service catalog CRUD
       categories/         — Category CRUD
       branches/           — Branch CRUD
       providers/          — Provider CRUD (Supabase + JSON fallback)
       page-settings/      — CMS content CRUD (Supabase + JSON fallback)
-      health/supabase/    — Env/connection health check
+      clinic-settings/    — Alias for page_settings by key
+      customers/          — Customer profile CRUD
+      employees/          — Employee accounts + Supabase Auth invites
+      roles/               — Role definitions with permissions
+      provider-attendance/ — Daily provider check-in/out
+      auth/me/             — Verify JWT + return role/permissions
+      auth/employee-email/ — Lookup employee email by employee_id
+      health/supabase/    — Env/connection diagnostics
   components/             — All public website components
   lib/
     supabaseClient.ts     — Browser Supabase client
@@ -104,7 +114,11 @@ scratch/                  — Dev scripts (DB seed, test queries)
 
 ## Critical Known Gaps
 
-- Admin panel has **no authentication** — anyone with the URL can access it.
-- Patient OTP auth is **simulated** (setTimeout) — no real SMS gateway wired.
+- Admin auth is **client-side login gate only** — browser login form exists, but `/api/*` routes still don't validate tokens/middleware. (RISK-002 partially resolved)
+- Patient OTP auth is **simulated** (setTimeout) — no real SMS gateway wired. (RISK-003)
 - Many admin sections (Prescriptions, Finance, Payroll, Inventory, POS) are **mock UI only** — backed by hardcoded constant arrays, not Supabase.
+- Separately, 4 sidebar items (Marketing, Customer Support, Reports, Finance) are **disabled placeholders** with no page behind them at all — superadmin-only, see DECISIONS.md DEC-011. Note the "Finance" name collision with the mock-UI `Finances Dashboard` above; they are unrelated.
 - localStorage is used as primary storage for services/categories on the admin side (Supabase is secondary/fallback in several places).
+- `customers` and `reservations` are **unlinked** — no FK; booking name/phone is not auto-matched to a customer record.
+- Employee attendance relies on browser geolocation — GPS spoofing is not mitigated.
+- Booking invoice PDF is generated client-side; print behavior varies by browser.

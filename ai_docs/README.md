@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-07-20
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 
@@ -64,27 +64,44 @@ After that, check task-specific files:
 
 ---
 
-## Project Status Snapshot (as of 2026-06-26)
+## Project Status Snapshot (as of 2026-07-20)
 
 ### What Is Actually Built and Working
 - Public website (homepage, about, services, contact, blog stub)
-- Booking modal → `reservations` table (real Supabase writes)
-- Admin booking management (calendar, list, approve/reject, status changes)
+- Patient Profile (`/profile`) — persistent customer profile details, wallet ledgers, and visit logs history
+- Booking modal → `reservations` table (real Supabase writes with customer_id links)
+- Admin booking management — calendar, list, approve/reject, full lifecycle stages, inline notes editor
+- Admin Bookings "Schedule" view — single-day grid, doctors as rows, 15-min time slots as columns
+- Booking lifecycle stages: `pending → approved → confirmed → started → completed`
+- Customer Wallet Ledgers — real writes updating spent_amount, outstanding, and wallet_balance during checkout
+- Payment settlement drawer inside admin booking details
+- Booking invoice popup + PDF printing inside admin
+- Branch-specific service hours (separate schedules for Sheikh Zayed / New Cairo stored in database and enforced in booking availability)
 - Service catalog CRUD (with drag-sort, bilingual names, branch pricing)
 - Branch management CRUD
 - Website CMS — hero slides (EN/AR) editable via admin
 - Provider records (doctors) — basic CRUD
+- Employee attendance with GPS geofence check-in (500m radius, widened to 800m on Jul 8)
+- Employee accounts and roles (`employee_accounts` + `roles` tables) with `/api/auth/me` permission lookup
+- Superadmin/admin bypass for daily GPS check-in
+- WhatsApp confirmation step for website bookings (English only)
+- Booking origin badges (website vs other sources)
+
+### Disabled Placeholder Nav Items (Coming Soon, superadmin-only)
+- Sidebar entries: Marketing, Customer Support, Reports, Finance
+- No page/functionality behind any of them — `disabled`, greyed out, "Coming Soon" tooltip
+- Only visible to `adminRole === 'superadmin'`; filtered out for every other role
+- Not the same as the mock-UI "Finances Dashboard" below — see RISK-005 for the naming collision
 
 ### What Is Mock UI Only (hardcoded data, not Supabase)
 - All clinical: consultation notes, prescriptions, treatment plans, before/after photos
-- All billing: POS, invoicing, payments, refunds, package tracking
-- All reporting: every chart and metric shows static hardcoded values
+- Billing metrics: overall billing analytics reports are mock (but individual customer ledgers are real)
 - All marketing: WhatsApp is external `wa.me` links only; no campaigns or templates
 - Notification templates
-- RBAC / roles and permissions
+- Full RBAC enforcement on API routes (browser login gate exists, but `/api/*` routes don't validate tokens)
 
 ### Critical Gaps (do not assume these work)
-- **Admin has no authentication** — `/admin` is publicly accessible (RISK-002)
+- **API routes have no auth validation** — browser login gate exists, but direct HTTP calls to `/api/*` are unprotected (RISK-002 partially resolved)
 - **Patient OTP auth is simulated** — no SMS sent, no user created (RISK-003)
 - Doctor shifts and availability — not built; derived only from existing bookings
 - Waitlist — not built

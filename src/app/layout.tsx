@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Marcellus, Sora } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { AlertConfirmProvider } from "@/contexts/AlertConfirmContext";
 
 const marcellus = Marcellus({
   weight: "400",
@@ -39,7 +40,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body suppressHydrationWarning spellCheck={false}>
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider>
+          <AlertConfirmProvider>
+            {children}
+          </AlertConfirmProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

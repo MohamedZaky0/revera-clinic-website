@@ -68,6 +68,15 @@ const DEFAULT_SETTINGS = {
           image: "/images/hero/slide-3.jpg"
         }
       ]
+    },
+    booking: {
+      minAdvance: 2,
+      maxAdvance: 30,
+      cancelWindow: 2,
+      maxPerSlot: 1,
+      instantApproval: false,
+      showDoctorNotes: false,
+      depositPercentage: 20
     }
   }
 };
@@ -124,10 +133,22 @@ export async function POST(req: Request) {
   }
 
   try {
+    // Fetch existing settings to merge them
+    const { data: existing } = await supabaseServer
+      .from('page_settings')
+      .select('value')
+      .eq('key', 'home')
+      .maybeSingle();
+
+    const mergedValue = {
+      ...(existing?.value || {}),
+      ...body
+    };
+
     // Save to Supabase
     const { error } = await supabaseServer
       .from('page_settings')
-      .upsert({ key: 'home', value: body, updated_at: new Date().toISOString() });
+      .upsert({ key: 'home', value: mergedValue, updated_at: new Date().toISOString() });
 
     if (!error) {
       return NextResponse.json({ success: true });
@@ -140,8 +161,18 @@ export async function POST(req: Request) {
 
   // Fallback save to JSON
   try {
+    let existingLocal = {};
+    if (fs.existsSync(JSON_FILE_PATH)) {
+      try {
+        existingLocal = JSON.parse(fs.readFileSync(JSON_FILE_PATH, 'utf-8'));
+      } catch (e) {}
+    }
+    const mergedLocal = {
+      ...existingLocal,
+      ...body
+    };
     fs.mkdirSync(path.dirname(JSON_FILE_PATH), { recursive: true });
-    fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(body, null, 2));
+    fs.writeFileSync(JSON_FILE_PATH, JSON.stringify(mergedLocal, null, 2));
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("JSON fallback save error:", err);

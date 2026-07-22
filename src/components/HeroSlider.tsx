@@ -55,7 +55,8 @@ export function HeroSlider() {
   }, []);
 
   const slide = slides[activeIndex];
-  const wordCount = slide.heading.split(" ").length;
+  if (!slide) return null;
+  const wordCount = (slide.heading || "").split(" ").length;
   const descDelay = wordCount * 65 + 200;
   const ctaDelay = wordCount * 65 + 360;
   const contentKey = heroReady ? activeIndex : "pre";

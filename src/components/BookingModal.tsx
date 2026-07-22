@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { cachedFetch, prefetchUrl } from "@/lib/fetchCache";
 import { Category, ServiceItem, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
 import { 
   getServiceToggles, 
@@ -11,8 +12,10 @@ import {
   getDynamicCategories, 
   LocalCategory 
 } from "@/lib/serviceStore";
+import TermsModal from "./TermsModal";
+import { ShieldCheck, FileText, ExternalLink, Undo2 } from "lucide-react";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 function getNext30Days(): Date[] {
   const days: Date[] = [];
@@ -83,6 +86,26 @@ export function BookingModal() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState("");
+  const [isWhatsappSame, setIsWhatsappSame] = useState(true);
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [serviceHours, setServiceHours] = useState<any[]>([]);
+  const [instapayName, setInstapayName] = useState("Revera Clinics");
+  const [instapayAddress, setInstapayAddress] = useState("revera@instapay");
+  const [instapayLink, setInstapayLink] = useState("https://www.instapay.eg");
+  const [walletEnabled, setWalletEnabled] = useState(true);
+  const [walletName, setWalletName] = useState("Vodafone Cash / Mobile Wallet");
+  const [walletNumber, setWalletNumber] = useState("01035595691");
+  const [walletLink, setWalletLink] = useState("");
+  const [selectedDepositMethod, setSelectedDepositMethod] = useState<"instapay" | "wallet">("instapay");
+  const [customerPaymentSender, setCustomerPaymentSender] = useState("");
+  const [zoomQr, setZoomQr] = useState(false);
+
+  // Update serviceHours when translations load
+  useEffect(() => {
+    if (t.footer?.serviceHours) {
+      setServiceHours(t.footer.serviceHours);
+    }
+  }, [t]);
   const [sessionType, setSessionType] = useState<"in_person" | "online">("in_person");
   const [confirmed, setConfirmed] = useState(false);
   const [disabledDates, setDisabledDates] = useState<Record<string, number>>({});
@@ -90,9 +113,31 @@ export function BookingModal() {
   const [doctors, setDoctors] = useState<any[]>([]);
   const [selectedDoctor, setSelectedDoctor] = useState<string>("");
   const [reservationsForDate, setReservationsForDate] = useState<any[]>([]);
+  const [depositPercentage, setDepositPercentage] = useState(20);
+  const [isPaying, setIsPaying] = useState(false);
+  const [isCreatingReservation, setIsCreatingReservation] = useState(false);
+  const [createdReservation, setCreatedReservation] = useState<any>(null);
+  const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
+  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [termsText, setTermsText] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
-  const [branches, setBranches] = useState<{ id: string; name_en: string; name_ar: string; status: string }[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [branchId, setBranchId] = useState<string | null>(null);
+
+  const stepsList = useMemo(() => {
+    const isPaymentRequired = depositPercentage > 0;
+    if (isPaymentRequired) {
+      return isRTL 
+        ? ["اختر الخدمة", "اختر التاريخ", "اختر الوقت", "تأكيد", "الدفع"]
+        : ["Select Service", "Select Date", "Select Time", "Confirm", "Payment"];
+    } else {
+      return isRTL
+        ? ["اختر الخدمة", "اختر التاريخ", "اختر الوقت", "تأكيد"]
+        : ["Select Service", "Select Date", "Select Time", "Confirm"];
+    }
+  }, [depositPercentage, isRTL]);
 
   const days = getNext30Days();
 
@@ -111,6 +156,11 @@ export function BookingModal() {
     setNotes("");
     setSessionType("in_person");
     setConfirmed(false);
+    setIsPaying(false);
+    setCreatedReservation(null);
+    setInstapayAddress("");
+    setCopiedAddress(false);
+    setAcceptedTerms(false);
   }, [branches]);
 
   const handleClose = useCallback(() => {
@@ -132,6 +182,17 @@ export function BookingModal() {
         const selected = svcs.find((service) => service.id === id);
         const cats = getDynamicCategories();
         setSelectedCategory(selected?.cat ?? cats[0]?.key ?? "dermatology");
+        if (selected) {
+          let allowedType = selected.unit?.toLowerCase() || "both";
+          if (allowedType !== "both" && allowedType !== "in_clinic" && allowedType !== "online") {
+            allowedType = "both";
+          }
+          if (allowedType === "in_clinic") {
+            setSessionType("in_person");
+          } else if (allowedType === "online") {
+            setSessionType("online");
+          }
+        }
       } else {
         const cats = getDynamicCategories();
         setSelectedCategory(cats[0]?.key ?? "dermatology");
@@ -165,6 +226,25 @@ export function BookingModal() {
 
   // Derived from dynamicServices — must be declared before useEffects that depend on it
   const selectedService = serviceId ? dynamicServices.find((service) => service.id === serviceId) : undefined;
+
+  // Clear serviceId if it doesn't support the selected sessionType
+  useEffect(() => {
+    if (serviceId !== null) {
+      const selected = dynamicServices.find(s => s.id === serviceId);
+      if (selected) {
+        let allowedType = selected.unit?.toLowerCase() || "both";
+        if (allowedType !== "both" && allowedType !== "in_clinic" && allowedType !== "online") {
+          allowedType = "both";
+        }
+        const isValidForSession = sessionType === "online" 
+          ? (allowedType === "online" || allowedType === "both")
+          : (allowedType === "in_clinic" || allowedType === "both");
+        if (!isValidForSession) {
+          setServiceId(null);
+        }
+      }
+    }
+  }, [sessionType, serviceId, dynamicServices]);
 
   useEffect(() => {
     setServiceToggles(getServiceToggles());
@@ -204,11 +284,72 @@ export function BookingModal() {
       .catch(() => {});
   }, []);
 
-  // Fetch availability for next 30 days when modal opens, service changes, or branch changes
+  // Load deposit percentage settings
+  useEffect(() => {
+    fetch("/api/page-settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.deposit) {
+          if (data.deposit.depositPercentage !== undefined) {
+            setDepositPercentage(Number(data.deposit.depositPercentage));
+          }
+          if (data.deposit.instapayName) {
+            setInstapayName(data.deposit.instapayName);
+          }
+          if (data.deposit.instapayAddress) {
+            setInstapayAddress(data.deposit.instapayAddress);
+          }
+          if (data.deposit.instapayLink) {
+            setInstapayLink(data.deposit.instapayLink);
+          }
+          if (data.deposit.walletEnabled !== undefined) {
+            setWalletEnabled(Boolean(data.deposit.walletEnabled));
+          } else {
+            setWalletEnabled(true);
+          }
+          if (data.deposit.walletName) {
+            setWalletName(data.deposit.walletName);
+          } else {
+            setWalletName("Vodafone Cash / Mobile Wallet");
+          }
+          if (data.deposit.walletNumber) {
+            setWalletNumber(data.deposit.walletNumber);
+          } else {
+            setWalletNumber("01035595691");
+          }
+          if (data.deposit.walletLink) {
+            setWalletLink(data.deposit.walletLink);
+          }
+        } else if (data && data.booking && data.booking.depositPercentage !== undefined) {
+          setDepositPercentage(Number(data.booking.depositPercentage));
+        }
+        if (data && data.clinic && data.clinic.whatsapp) {
+          setClinicWhatsapp(data.clinic.whatsapp);
+        }
+        if (data && data.booking && data.booking.termsText) {
+          setTermsText(data.booking.termsText);
+        }
+        if (data && data.footer && Array.isArray(data.footer.serviceHours)) {
+          setServiceHours(data.footer.serviceHours);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Prefetch 30-day availability the moment serviceId + branchId + sessionType are known
+  // — fires BEFORE the user even clicks "Next", so the calendar is warm
+  useEffect(() => {
+    if (!serviceId) return;
+    const branchQuery = branchId ? `&branchId=${branchId}` : "";
+    const url = `/api/availability?serviceId=${serviceId}&days=30${branchQuery}&sessionType=${sessionType}`;
+    prefetchUrl(url, 30000);
+  }, [serviceId, branchId, sessionType]);
+
+  // Consume the cached 30-day data when the user actually reaches step 2 (date picker)
   useEffect(() => {
     if (!open || !serviceId) return;
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    fetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}`).then(r => r.json()).then((data) => {
+    cachedFetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}&sessionType=${sessionType}`, 30000).then((data) => {
       const map: Record<string, number> = {};
       if (Array.isArray(data)) {
         data.forEach((d: { date: string; approvedCount: number; isAvailable?: boolean }) => { 
@@ -219,7 +360,15 @@ export function BookingModal() {
       }
       setDisabledDates(map);
     }).catch(()=>{});
-  }, [open, serviceId, branchId]);
+  }, [open, serviceId, branchId, sessionType]);
+
+  // Prefetch slots for the currently selected date so step 3 renders instantly
+  useEffect(() => {
+    if (!serviceId || !selectedDate) return;
+    const date = toLocalDateStr(selectedDate);
+    const branchQuery = branchId ? `&branchId=${branchId}` : "";
+    prefetchUrl(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}&sessionType=${sessionType}`, 5000);
+  }, [serviceId, selectedDate, branchId, sessionType]);
 
   // Fetch taken time slots for a single selected date and calculate duration-based availability
   useEffect(() => {
@@ -235,59 +384,18 @@ export function BookingModal() {
     }
     const date = toLocalDateStr(selectedDate);
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    fetch(`/api/reservations?date=${date}&status=approved${branchQuery}`)
-      .then(r=>r.json())
-      .then((list)=>{
+    cachedFetch(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}&sessionType=${sessionType}`, 5000)
+      .then((data) => {
         if (active) {
-          if (Array.isArray(list)) {
-            setReservationsForDate(list);
-
-            const serviceReservations = list.filter((r: any) => r.serviceId === serviceId);
-            const targetDuration = getDurationInMinutes(selectedService?.duration);
-            const targetSlotsNeeded = Math.ceil(targetDuration / 15);
-            
-            const occupied = new Array(ALL_15MIN_SLOTS.length).fill(false);
-            
-            for (const res of serviceReservations) {
-              if (!res.timeSlot) continue;
-              const norm = normaliseTo24hSlot(res.timeSlot);
-              if (norm) {
-                const idx = ALL_15MIN_SLOTS.indexOf(norm);
-                if (idx >= 0) {
-                  const resService = dynamicServices.find(s => s.id === res.serviceId);
-                  const resDuration = getDurationInMinutes(resService?.duration);
-                  const resSlotsOccupied = Math.ceil(resDuration / 15);
-                  for (let k = 0; k < resSlotsOccupied; k++) {
-                    if (idx + k < occupied.length) {
-                      occupied[idx + k] = true;
-                    }
-                  }
-                }
-              }
-            }
-            
-            const unavailable: string[] = [];
-            for (let i = 0; i < ALL_15MIN_SLOTS.length; i++) {
-              let fit = true;
-              for (let k = 0; k < targetSlotsNeeded; k++) {
-                if (i + k >= occupied.length || occupied[i + k]) {
-                  fit = false;
-                  break;
-                }
-              }
-              if (!fit) {
-                unavailable.push(ALL_15MIN_SLOTS[i]);
-              }
-            }
-            setTakenSlots(unavailable);
+          if (data && Array.isArray(data.unavailableSlots)) {
+            setTakenSlots(data.unavailableSlots);
           } else {
-            console.error("Fetch reservations expected array, got", list);
             setTakenSlots([]);
-            setReservationsForDate([]);
           }
+          setReservationsForDate([]);
         }
       })
-      .catch(()=>{
+      .catch(() => {
         if (active) {
           setTakenSlots([]);
           setReservationsForDate([]);
@@ -296,7 +404,7 @@ export function BookingModal() {
     return () => {
       active = false;
     };
-  }, [serviceId, selectedDate, branchId, selectedService]);
+  }, [serviceId, selectedDate, branchId, selectedService, sessionType]);
 
   // Close on Escape key
   useEffect(() => {
@@ -318,6 +426,10 @@ export function BookingModal() {
     if (step === 2) setStep(1);
     if (step === 3) setStep(2);
     if (step === 4) setStep(3);
+    if (step === 5) {
+      setStep(4);
+      setCreatedReservation(null);
+    }
   }
 
   const getDayOperatingHours = useCallback((date: Date) => {
@@ -325,40 +437,106 @@ export function BookingModal() {
     const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const weekdayName = weekdays[date.getDay()];
     
+    // Find active branch specific service hours
+    const selectedBranch = branches.find(b => b.id === branchId);
+    const activeHours = selectedBranch && Array.isArray(selectedBranch.service_hours) && selectedBranch.service_hours.length > 0
+      ? selectedBranch.service_hours
+      : (serviceHours.length > 0 ? serviceHours : (t.footer?.serviceHours || []));
+
+    const clinicDay = activeHours.find(
+      (sh: any) => sh.day?.toLowerCase() === weekdayName.toLowerCase()
+    );
+
+    let clinicStartMins = 9 * 60; // 09:00 default
+    let clinicEndMins = 20 * 60;  // 20:00 default
+    let clinicClosed = false;
+
+    if (clinicDay) {
+      if (!clinicDay.isOpen) {
+        clinicClosed = true;
+      } else {
+        const [csh, csm] = clinicDay.openTime.split(":").map(Number);
+        const [ceh, cem] = clinicDay.closeTime.split(":").map(Number);
+        clinicStartMins = csh * 60 + csm;
+        clinicEndMins = ceh * 60 + cem;
+      }
+    }
+
+    if (clinicClosed) {
+      return { start: "23:59", end: "23:59" }; // clinic closed
+    }
+
     let minStart = 24 * 60; // in minutes
     let maxEnd = 0; // in minutes
     let found = false;
 
     doctors.forEach((doc) => {
       // Check branch
-      if (branchId && doc.branchId && doc.branchId !== branchId) return;
+      if (branchId) {
+        const wdh = doc.workingDaysHours;
+        if (wdh && typeof wdh === 'object' && Array.isArray(wdh.branch_ids)) {
+          if (!wdh.branch_ids.includes(branchId)) return;
+        } else if (doc.branchId && doc.branchId !== branchId) {
+          return;
+        }
+      }
       
       // Check service
       if (doc.services && doc.services.length > 0) {
         if (!doc.services.includes(selectedService.en)) return;
       }
-
+ 
       // Check working days & hours
       if (doc.workingDaysHours) {
-        const dayConfig = doc.workingDaysHours[weekdayName];
+        const wdh = doc.workingDaysHours;
+        let config = wdh;
+        if (wdh.branch_schedules && branchId && wdh.branch_schedules[branchId]) {
+          config = wdh.branch_schedules[branchId];
+        }
+
+        let dayConfig = config[weekdayName];
+        if (!dayConfig) {
+          const typeKey = sessionType === 'online' ? 'online' : 'in_person';
+          dayConfig = config[typeKey]?.[weekdayName] || 
+                      config.in_person?.[weekdayName] || 
+                      config.online?.[weekdayName];
+        }
         if (dayConfig && dayConfig.isOpen) {
-          const [sh, sm] = dayConfig.start.split(":").map(Number);
-          const [eh, em] = dayConfig.end.split(":").map(Number);
-          const startMins = sh * 60 + sm;
-          const endMins = eh * 60 + em;
-          if (startMins < minStart) minStart = startMins;
-          if (endMins > maxEnd) maxEnd = endMins;
-          found = true;
+          if (dayConfig.shifts && Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
+            dayConfig.shifts.forEach((shft: any) => {
+              if (shft.start && shft.end) {
+                const [sh, sm] = shft.start.split(":").map(Number);
+                const [eh, em] = shft.end.split(":").map(Number);
+                const startMins = sh * 60 + sm;
+                const endMins = eh * 60 + em;
+                if (startMins < minStart) minStart = startMins;
+                if (endMins > maxEnd) maxEnd = endMins;
+                found = true;
+              }
+            });
+          } else {
+            const [sh, sm] = dayConfig.start.split(":").map(Number);
+            const [eh, em] = dayConfig.end.split(":").map(Number);
+            const startMins = sh * 60 + sm;
+            const endMins = eh * 60 + em;
+            if (startMins < minStart) minStart = startMins;
+            if (endMins > maxEnd) maxEnd = endMins;
+            found = true;
+          }
         }
       } else {
-        if (9 * 60 < minStart) minStart = 9 * 60;
-        if (20 * 60 > maxEnd) maxEnd = 20 * 60;
+        if (clinicStartMins < minStart) minStart = clinicStartMins;
+        if (clinicEndMins > maxEnd) maxEnd = clinicEndMins;
         found = true;
       }
     });
 
-    if (!found) {
-      return { start: "09:00", end: "20:00" };
+    if (found) {
+      if (minStart < clinicStartMins) minStart = clinicStartMins;
+      if (maxEnd > clinicEndMins) maxEnd = clinicEndMins;
+    } else {
+      minStart = clinicStartMins;
+      maxEnd = clinicEndMins;
     }
 
     const formatMins = (totalMins: number) => {
@@ -371,7 +549,7 @@ export function BookingModal() {
       start: formatMins(minStart),
       end: formatMins(maxEnd)
     };
-  }, [doctors, branchId, selectedService]);
+  }, [doctors, branchId, selectedService, t, branches]);
 
   const getAvailableDoctors = useCallback(() => {
     if (!selectedDate || !selectedTime || !selectedService) return [];
@@ -384,29 +562,60 @@ export function BookingModal() {
     const weekdayName = weekdays[selectedDate.getDay()];
 
     return doctors.filter((doctor) => {
-      if (branchId && doctor.branchId && doctor.branchId !== branchId) {
-        return false;
+      if (branchId) {
+        const wdh = doctor.workingDaysHours;
+        if (wdh && typeof wdh === 'object' && Array.isArray(wdh.branch_ids)) {
+          if (!wdh.branch_ids.includes(branchId)) {
+            return false;
+          }
+        } else if (doctor.branchId && doctor.branchId !== branchId) {
+          return false;
+        }
       }
-
+ 
       if (doctor.services && doctor.services.length > 0) {
         if (!doctor.services.includes(selectedService.en)) {
           return false;
         }
       }
-
+ 
       if (doctor.workingDaysHours) {
-        const dayConfig = doctor.workingDaysHours[weekdayName];
+        const wdh = doctor.workingDaysHours;
+        let config = wdh;
+        if (wdh.branch_schedules && branchId && wdh.branch_schedules[branchId]) {
+          config = wdh.branch_schedules[branchId];
+        }
+
+        let dayConfig = config[weekdayName];
+        if (!dayConfig) {
+          const typeKey = sessionType === 'online' ? 'online' : 'in_person';
+          dayConfig = config[typeKey]?.[weekdayName] || 
+                      config.in_person?.[weekdayName] || 
+                      config.online?.[weekdayName];
+        }
         if (!dayConfig || !dayConfig.isOpen) {
           return false;
         }
         
-        const [sh, sm] = dayConfig.start.split(":").map(Number);
-        const [eh, em] = dayConfig.end.split(":").map(Number);
-        const shiftStart = sh * 60 + sm;
-        const shiftEnd = eh * 60 + em;
-
-        if (startNew < shiftStart || endNew > shiftEnd) {
-          return false;
+        if (dayConfig.shifts && Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
+          const slotFitsAnyShift = dayConfig.shifts.some((shft: any) => {
+            if (!shft.start || !shft.end) return false;
+            const [sh, sm] = shft.start.split(":").map(Number);
+            const [eh, em] = shft.end.split(":").map(Number);
+            const shiftStart = sh * 60 + sm;
+            const shiftEnd = eh * 60 + em;
+            return startNew >= shiftStart && endNew <= shiftEnd;
+          });
+          if (!slotFitsAnyShift) return false;
+        } else {
+          const [sh, sm] = dayConfig.start.split(":").map(Number);
+          const [eh, em] = dayConfig.end.split(":").map(Number);
+          const shiftStart = sh * 60 + sm;
+          const shiftEnd = eh * 60 + em;
+   
+          if (startNew < shiftStart || endNew > shiftEnd) {
+            return false;
+          }
         }
       }
 
@@ -432,29 +641,145 @@ export function BookingModal() {
 
   function handleConfirm() {
     if (!serviceId || !selectedDate || !selectedTime || !name || !email || !phone) return;
+    setIsCreatingReservation(true);
+    const finalNotes = isWhatsappSame 
+      ? notes 
+      : `${notes ? notes + "\n" : ""}[WhatsApp: ${whatsappNumber}]`;
     const payload = {
       serviceId,
       date: toLocalDateStr(selectedDate),
       requestedTime: selectedTime,
-      name, email, phone, notes,
+      name, email, phone, notes: finalNotes,
       sessionType,
       branchId,
       doctorName: selectedDoctor || null,
     };
     fetch('/api/reservations', { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } })
-      .then(r => r.json())
-      .then(() => setConfirmed(true))
-      .catch(() => setConfirmed(true));
+      .then(async r => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok) {
+          throw new Error((data && data.error) || "Failed to create reservation");
+        }
+        return data;
+      })
+      .then((data) => {
+        setIsCreatingReservation(false);
+        if (data && (data.status === 'pending_deposit' || data.requiresDeposit || depositPercentage > 0)) {
+          setCreatedReservation(data);
+          setStep(5);
+        } else {
+          setConfirmed(true);
+        }
+      })
+      .catch((err) => {
+        setIsCreatingReservation(false);
+        console.error("Failed to create reservation:", err);
+        alert(err.message || (isRTL ? "حدث خطأ أثناء إنشاء الحجز، يرجى المحاولة مرة أخرى." : "Failed to create reservation. Please try again."));
+      });
+  }
+
+  function handlePayDeposit() {
+    if (!createdReservation || !selectedService) return;
+    if (termsText.trim() !== "" && !acceptedTerms) {
+      alert(isRTL ? "يرجى الموافقة على الشروط والأحكام أولاً" : "Please agree to the Terms & Conditions first");
+      return;
+    }
+    if (!customerPaymentSender.trim()) {
+      alert(isRTL 
+        ? (selectedDepositMethod === 'wallet' ? "يرجى إدخال رقم المحفظة الإلكترونية التي قمت بالتحويل منها" : "يرجى إدخال عنوان إنستاباي الخاص بك") 
+        : (selectedDepositMethod === 'wallet' ? "Please enter your Mobile Wallet number sent from" : "Please enter your InstaPay address"));
+      return;
+    }
+    
+    setIsPaying(true);
+    
+    const svcPrice = selectedService.price || 0;
+    const depAmount = Math.round(svcPrice * (depositPercentage / 100));
+    const remBalance = svcPrice - depAmount;
+    
+    const methodLabel = selectedDepositMethod === 'wallet' ? `Mobile Wallet (${walletName || 'Wallet'})` : 'InstaPay';
+    const updatedNotes = notes 
+      ? `${notes}\n[${methodLabel} Sent From: ${customerPaymentSender}]`
+      : `[${methodLabel} Sent From: ${customerPaymentSender}]`;
+
+    const formattedDate = selectedDate ? formatDate(selectedDate) : "";
+    const svcName = isRTL ? selectedService.ar : selectedService.en;
+    
+    const textMessage = `Hello Revera Clinics,
+
+I have paid the reservation deposit for my booking:
+• Patient: ${name}
+• Phone: ${phone}${isWhatsappSame ? "" : ` (WhatsApp: ${whatsappNumber})`}
+• Service: ${svcName}
+• Date: ${formattedDate} at ${selectedTime}
+• Deposit Amount: EGP ${depAmount}
+• Payment Method: ${methodLabel}
+• Sent From: ${customerPaymentSender}
+
+Attached is my payment transaction receipt photo.`;
+
+    const cleanWhatsapp = clinicWhatsapp.replace(/[^0-9]/g, "");
+    const whatsappLink = `https://wa.me/${cleanWhatsapp || "201035595691"}?text=${encodeURIComponent(textMessage)}`;
+
+    setTimeout(() => {
+      fetch(`/api/reservations?id=${createdReservation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'pending',
+          amountPaid: depAmount,
+          amountLeft: remBalance,
+          notes: updatedNotes
+        })
+      })
+        .then(r => {
+          if (!r.ok) throw new Error("Failed to process payment");
+          return r.json();
+        })
+        .then(() => {
+          setIsPaying(false);
+          setConfirmed(true);
+          window.open(whatsappLink, '_blank');
+        })
+        .catch((err) => {
+          console.error("Payment registration error:", err);
+          setIsPaying(false);
+          setConfirmed(true);
+          window.open(whatsappLink, '_blank');
+        });
+    }, 1500);
   }
 
   // Filter out services that admin marked as inactive or hidden
   const activeServices = dynamicServices.filter(s => isServiceActive(s.id, serviceToggles));
-  const servicesForCategory = activeServices.filter((service) => service.cat === selectedCategory);
+  const servicesForCategory = activeServices.filter((service) => {
+    if (service.cat !== selectedCategory) return false;
+    let serviceType = service.unit?.toLowerCase() || "both";
+    if (serviceType !== "both" && serviceType !== "in_clinic" && serviceType !== "online") {
+      serviceType = "both";
+    }
+    if (sessionType === "online") {
+      return serviceType === "online" || serviceType === "both";
+    } else {
+      return serviceType === "in_clinic" || serviceType === "both";
+    }
+  });
 
   const canNext =
     (step === 1 && serviceId !== null && (branches.length === 0 || branchId !== null)) ||
     (step === 2 && selectedDate !== null) ||
     (step === 3 && selectedTime !== null);
+
+  const instapayQrUrl = instapayLink && instapayLink !== "https://www.instapay.eg" 
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(instapayLink)}` 
+    : "/images/instapay_qr.png";
+
+  const walletQrUrl = walletLink 
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(walletLink)}`
+    : `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(walletNumber || "01035595691")}`;
+
+  const currentQrUrl = selectedDepositMethod === "wallet" ? walletQrUrl : instapayQrUrl;
+  const currentPaymentLink = selectedDepositMethod === "wallet" ? (walletLink || `tel:${walletNumber || "01035595691"}`) : instapayLink;
 
   return (
     <div
@@ -543,75 +868,135 @@ export function BookingModal() {
         ) : (
           <>
             {/* Step progress */}
-            <div className="flex items-center justify-between mb-8">
-              {t.booking.steps.map((label, i) => {
-                const stepNum = (i + 1) as Step;
-                const isActive = step === stepNum;
-                const isDone = step > stepNum;
-                return (
-                  <div key={i} className={`flex flex-1 flex-col items-center gap-1.5 ${isRTL ? "items-center" : ""}`}>
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors"
-                      style={{
-                        backgroundColor: isActive || isDone ? "var(--cr-primary)" : "var(--cr-secondary)",
-                        color: isActive || isDone ? "var(--cr-white)" : "var(--cr-accent)",
-                      }}
-                    >
-                      {isDone ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      ) : (
-                        stepNum
-                      )}
-                    </div>
-                    <span
-                      className="text-center text-xs leading-tight"
-                      style={{ color: isActive ? "var(--cr-primary)" : "var(--cr-accent)" }}
-                    >
-                      {label}
-                    </span>
-                    {i < t.booking.steps.length - 1 && (
+            <div className="relative mb-8">
+              {/* Connecting line */}
+              <div 
+                className="absolute top-4 left-0 right-0 h-0.5 bg-[#414E36]/10 -translate-y-1/2 z-0" 
+                style={{
+                  left: `${100 / (stepsList.length * 2)}%`,
+                  right: `${100 / (stepsList.length * 2)}%`
+                }}
+              />
+              <div 
+                className="grid relative z-10"
+                style={{ gridTemplateColumns: `repeat(${stepsList.length}, minmax(0, 1fr))` }}
+              >
+                {stepsList.map((label, i) => {
+                  const stepNum = (i + 1) as Step;
+                  const isActive = step === stepNum;
+                  const isDone = step > stepNum;
+                  return (
+                    <div key={i} className="flex flex-col items-center gap-1.5">
                       <div
-                        className={`hidden sm:block h-px flex-1 absolute`}
-                        aria-hidden="true"
-                      />
-                    )}
-                  </div>
-                );
-              })}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors border-2"
+                        style={{
+                          backgroundColor: isActive || isDone ? "var(--cr-primary)" : "#ffffff",
+                          color: isActive || isDone ? "#ffffff" : "var(--cr-accent)",
+                          borderColor: isActive || isDone ? "var(--cr-primary)" : "var(--cr-secondary)"
+                        }}
+                      >
+                        {isDone ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        ) : (
+                          stepNum
+                        )}
+                      </div>
+                      <span
+                        className="text-center text-[11px] leading-tight font-semibold px-1 whitespace-nowrap"
+                        style={{ color: isActive ? "var(--cr-primary)" : "var(--cr-accent)" }}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+
 
             {/* Step 1: Service selection */}
             {step === 1 && (
               <div>
-                {branches.length > 0 && (
-                  <div className="mb-6">
-                    <p className="mb-3 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
-                      {isRTL ? "اختر الفرع" : "Select Branch"}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {branches.map((branch) => {
-                        const label = isRTL ? branch.name_ar : branch.name_en;
-                        const isActive = branchId === branch.id;
-                        return (
-                          <button
-                            key={branch.id}
-                            type="button"
-                            onClick={() => setBranchId(branch.id)}
-                            className="rounded-full px-4 py-2 text-xs font-semibold transition-colors"
-                            style={{
-                              backgroundColor: isActive ? "var(--cr-primary)" : "var(--cr-secondary)",
-                              color: isActive ? "var(--cr-white)" : "var(--cr-primary)",
-                              border: isActive ? "none" : "1.5px solid rgba(65, 78, 54, 0.18)",
-                            }}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
+                {/* Session Type Switcher */}
+                <div className="mb-6">
+                  <p className="mb-3 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
+                    {isRTL ? "نوع الجلسة" : "Session Type"}
+                  </p>
+                  <div className="flex rounded-3xl border border-[#414E36]/15 p-1 bg-[#F2EFE9]/30">
+                    <button
+                      type="button"
+                      onClick={() => setSessionType("in_person")}
+                      className={`flex-1 rounded-2xl py-2.5 text-xs font-bold transition-all ${
+                        sessionType === "in_person"
+                          ? "bg-[#414E36] text-[#FBFBF9] shadow-sm"
+                          : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      {isRTL ? "بالعيادة (حضوري)" : "In-Clinic (In-Person)"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSessionType("online")}
+                      className={`flex-1 rounded-2xl py-2.5 text-xs font-bold transition-all ${
+                        sessionType === "online"
+                          ? "bg-[#414E36] text-[#FBFBF9] shadow-sm"
+                          : "text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      {isRTL ? "استشارة عبر الإنترنت" : "Online Consultation"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Conditional Branch Picker or Online Info */}
+                {sessionType === "online" ? (
+                  <div className="mb-6 rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 flex items-start gap-2.5 text-xs text-[#414E36] leading-relaxed">
+                    <svg className="w-5 h-5 shrink-0 text-[#C4AE7C] mt-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <div>
+                      <p className="font-bold mb-0.5">
+                        {isRTL ? "استشارة فيديو افتراضية" : "Virtual Video Consultation"}
+                      </p>
+                      <p className="opacity-90">
+                        {isRTL 
+                          ? "تُجرى هذه الجلسة افتراضياً عبر الإنترنت. لا داعي لزيارة مقر العيادة."
+                          : "This session is conducted virtually. You do not need to visit any clinic location."
+                        }
+                      </p>
                     </div>
                   </div>
+                ) : (
+                  branches.length > 0 && (
+                    <div className="mb-6">
+                      <p className="mb-3 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
+                        {isRTL ? "اختر الفرع" : "Select Branch"}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {branches.map((branch) => {
+                          const label = isRTL ? branch.name_ar : branch.name_en;
+                          const isActive = branchId === branch.id;
+                          return (
+                            <button
+                              key={branch.id}
+                              type="button"
+                              onClick={() => setBranchId(branch.id)}
+                              className="rounded-full px-4 py-2 text-xs font-semibold transition-colors"
+                              style={{
+                                backgroundColor: isActive ? "var(--cr-primary)" : "var(--cr-secondary)",
+                                color: isActive ? "var(--cr-white)" : "var(--cr-primary)",
+                                border: isActive ? "none" : "1.5px solid rgba(65, 78, 54, 0.18)",
+                              }}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )
                 )}
 
                 <p className="mb-4 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
@@ -675,7 +1060,9 @@ export function BookingModal() {
                     const isSelected =
                       selectedDate?.toDateString() === day.toDateString();
                     const key = toLocalDateStr(day);
-                    const isDisabled = (disabledDates[key] ?? 0) >= 8;
+                    const hours = getDayOperatingHours(day);
+                    const isClosed = hours.start === "23:59" && hours.end === "23:59";
+                    const isDisabled = ((disabledDates[key] ?? 0) >= 8) || isClosed;
                     return (
                       <button
                         key={i}
@@ -743,14 +1130,9 @@ export function BookingModal() {
                 </div>
               </div>
             )}
-
             {/* Step 4: Confirm */}
             {step === 4 && (
               <div>
-                <p className="mb-4 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
-                  {t.booking.confirmTitle}
-                </p>
-
                 {/* Summary */}
                 <div
                   className="rounded-xl p-4 mb-5 text-sm flex flex-col gap-2"
@@ -789,6 +1171,14 @@ export function BookingModal() {
                       {selectedDoctor}
                     </p>
                   )}
+                  {selectedService && depositPercentage > 0 && (
+                    <div className="mt-2 border-t border-[#414E36]/10 pt-2 text-xs space-y-1 text-[#414E36] font-medium">
+                      <p>
+                        <span className="font-semibold text-purple-800">{isRTL ? "عربون الحجز المطلـوب:" : "Required Deposit:"} </span>
+                        EGP {Math.round((selectedService.price || 0) * (depositPercentage / 100))} ({depositPercentage}%)
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Notes */}
@@ -822,52 +1212,545 @@ export function BookingModal() {
                   ))}
                 </select>
 
-
-
                 <label className="block mb-1 text-xs font-semibold">Name</label>
                 <input className="cr-input mb-2" value={name} onChange={(e)=>setName(e.target.value)} />
                 <label className="block mb-1 text-xs font-semibold">Email</label>
                 <input className="cr-input mb-2" value={email} onChange={(e)=>setEmail(e.target.value)} />
                 <label className="block mb-1 text-xs font-semibold">Phone</label>
-                <input className="cr-input mb-4" value={phone} onChange={(e)=>setPhone(e.target.value)} />
+                <input className="cr-input mb-2" value={phone} onChange={(e)=>setPhone(e.target.value)} />
+
+                <div className="mb-4 space-y-2 text-left">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-[#414E36]">
+                    <input 
+                      type="checkbox" 
+                      checked={isWhatsappSame} 
+                      onChange={(e) => setIsWhatsappSame(e.target.checked)} 
+                      className="h-4 w-4 rounded accent-[#414E36]"
+                    />
+                    <span>{isRTL ? "هذا الرقم هو رقم الواتساب أيضاً" : "This is the WhatsApp number too"}</span>
+                  </label>
+
+                  {!isWhatsappSame && (
+                    <div className="animate-fadeIn mt-2">
+                      <label className="block mb-1 text-xs font-semibold">{isRTL ? "رقم الواتساب" : "WhatsApp Number"}</label>
+                      <input 
+                        type="tel" 
+                        required 
+                        placeholder={isRTL ? "أدخل رقم الواتساب" : "Enter WhatsApp number"} 
+                        className="cr-input" 
+                        value={whatsappNumber} 
+                        onChange={(e) => setWhatsappNumber(e.target.value)} 
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Terms & Conditions Gate - Image 1 Style */}
+                {termsText.trim() && depositPercentage === 0 && (
+                  <div className="mb-5 text-left" dir={isRTL ? "rtl" : "ltr"}>
+                    <div className="rounded-2xl border border-gray-200/90 bg-white p-5 space-y-4 shadow-2xs">
+                      {/* Header: Shield Icon + TERMS & CONDITIONS */}
+                      <div className="flex items-center gap-2 text-[#2D522D] font-bold text-xs tracking-wider uppercase">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full border border-[#2D522D]/40 text-[#2D522D]">
+                          <ShieldCheck size={14} />
+                        </div>
+                        <span>{isRTL ? "الشروط والأحكام" : "TERMS & CONDITIONS"}</span>
+                      </div>
+
+                      {/* Body text */}
+                      <p className="text-xs text-gray-700 font-medium leading-relaxed">
+                        {isRTL ? "بالمتابعة، فإنك توافق على الشروط والأحكام الخاصة بنا." : "By continuing, you agree to our Terms & Conditions."}
+                      </p>
+
+                      {/* Inner Highlighted Pill Box */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-gray-200/80 bg-[#F4F8F4] p-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E2EBE2] text-[#2D522D]">
+                            <FileText size={16} />
+                          </div>
+                          <span className="text-xs text-gray-600 font-normal leading-normal">
+                            {isRTL ? "يرجى قراءة الشروط والأحكام بعناية قبل المتابعة." : "Please read our Terms & Conditions carefully before proceeding."}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowTermsModal(true)}
+                          className="flex items-center gap-1 text-xs font-semibold text-[#2D522D] underline underline-offset-2 hover:opacity-80 shrink-0 self-end sm:self-auto cursor-pointer"
+                        >
+                          <span>{isRTL ? "عرض الشروط والأحكام" : "View Terms & Conditions"}</span>
+                          <ExternalLink size={13} />
+                        </button>
+                      </div>
+
+                      <div className="border-t border-gray-200/80 my-2" />
+
+                      {/* Custom Checkbox row */}
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <div className="relative flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={acceptedTerms}
+                            onChange={(e) => setAcceptedTerms(e.target.checked)}
+                            className="peer h-4 w-4 appearance-none rounded border-2 border-gray-300 bg-white checked:border-[#2D522D] checked:bg-[#2D522D] focus:outline-none transition cursor-pointer"
+                          />
+                          <svg
+                            className="pointer-events-none absolute left-0.5 top-0.5 hidden h-3 w-3 stroke-white peer-checked:block"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth="3.5"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                        <span className="text-xs text-gray-800 font-normal">
+                          {isRTL ? "لقد قرأت وأوافق على " : "I have read and agree to the "}
+                          <button
+                            type="button"
+                            onClick={() => setShowTermsModal(true)}
+                            className="font-semibold text-[#2D522D] underline underline-offset-2 hover:opacity-80 cursor-pointer"
+                          >
+                            {isRTL ? "الشروط والأحكام" : "Terms & Conditions"}
+                          </button>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={handleConfirm}
-                  className="btn-primary w-full justify-center"
+                  disabled={isCreatingReservation || (depositPercentage === 0 && termsText.trim() !== "" && !acceptedTerms)}
+                  className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  {t.booking.confirmBtn}
+                  {isCreatingReservation ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      {isRTL ? "جاري الحفظ..." : "Creating Reservation..."}
+                    </>
+                  ) : depositPercentage > 0 ? (
+                    isRTL ? "الذهاب للدفع" : "Proceed to Payment"
+                  ) : (
+                    t.booking.confirmBtn
+                  )}
                 </button>
               </div>
             )}
 
+            {/* Step 5: Payment */}
+            {step === 5 && (
+              <div className="space-y-4">
+                <p className="text-sm font-bold text-[#1F251A]">
+                  {selectedDepositMethod === "wallet"
+                    ? (isRTL ? "دفع عربون الحجز عبر المحفظة الإلكترونية" : "Reservation Deposit via Mobile Wallet")
+                    : (isRTL ? "دفع عربون الحجز عبر إنستاباي" : "Reservation Deposit via InstaPay")
+                  }
+                </p>
+                <p className="text-xs text-[#5A6A51] leading-relaxed">
+                  {selectedDepositMethod === "wallet"
+                    ? (isRTL 
+                        ? `لتأكيد حجزك، يرجى تحويل عربون الحجز المطلـوب (${depositPercentage}%) إلى رقم المحفظة أدناه، ثم أدخل رقم الهاتف وأرسل صورة التحويل عبر الواتساب.` 
+                        : `To secure your reservation, please pay the required deposit (${depositPercentage}%) to the wallet number below, enter your mobile number, and send the transaction screenshot on WhatsApp.`)
+                    : (isRTL 
+                        ? `لتأكيد حجزك، يرجى تحويل عربون الحجز المطلـوب (${depositPercentage}%) عبر تطبيق إنستاباي، ثم أدخل اسم حسابك وأرسل صورة التحويل عبر الواتساب.` 
+                        : `To secure your reservation, please pay the required deposit (${depositPercentage}%) via InstaPay, then input your account name below and send the transaction screenshot on WhatsApp.`)
+                  }
+                </p>
+
+                {/* Payment Method Selector Tab */}
+                <div className="space-y-1.5 pt-1">
+                  <label className="block text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider">
+                    {isRTL ? "اختر طريقة دفع العربون" : "Select Payment Method"}
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-[#EDF1EC] border border-[#414E36]/15">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDepositMethod("instapay")}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                        selectedDepositMethod === "instapay"
+                          ? "bg-white text-[#414E36] shadow-sm border border-[#414E36]/10"
+                          : "text-[#5A6A51] hover:text-[#1F251A]"
+                      }`}
+                    >
+                      <span className={`h-2 w-2 rounded-full ${selectedDepositMethod === "instapay" ? "bg-[#C4AE7C]" : "bg-gray-400"}`}></span>
+                      {isRTL ? "إنستاباي (InstaPay)" : "InstaPay"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDepositMethod("wallet")}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                        selectedDepositMethod === "wallet"
+                          ? "bg-white text-[#414E36] shadow-sm border border-[#414E36]/10"
+                          : "text-[#5A6A51] hover:text-[#1F251A]"
+                      }`}
+                    >
+                      <span className={`h-2 w-2 rounded-full ${selectedDepositMethod === "wallet" ? "bg-emerald-600" : "bg-gray-400"}`}></span>
+                      {walletName ? (isRTL ? `محفظة ${walletName}` : `${walletName} Wallet`) : (isRTL ? "محفظة إلكترونية" : "Mobile Wallet")}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Deposit Awareness Banner */}
+                {depositPercentage > 0 && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-3.5 flex items-start gap-2.5 text-xs text-amber-800 leading-relaxed font-medium">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-amber-700">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <div>
+                      <p className="font-bold mb-0.5 text-amber-900">
+                        {isRTL ? "تنبيه هام حول تأكيد الحجز" : "Important Booking Confirmation Notice"}
+                      </p>
+                      <p className="opacity-90">
+                        {isRTL 
+                          ? `يرجى العلم أن حجزك لا يعتبر مؤكداً حتى يتم سداد عربون الحجز (${depositPercentage}%). سيبقى الحجز معلقاً لحين إتمام التحويل وإرسال الصورة.` 
+                          : `Please note that your booking is not confirmed until the required ${depositPercentage}% reservation deposit is paid. It will remain pending deposit until the transfer is made and receipt screenshot is received.`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Price Breakdown */}
+                <div className="rounded-2xl border border-[#C4AE7C]/20 bg-[#FBFBF9] p-4 text-xs space-y-2 text-[#1F251A]">
+                  <div className="flex justify-between">
+                    <span className="opacity-70">{isRTL ? "سعر الخدمة الإجمالي:" : "Service Price:"}</span>
+                    <span className="font-semibold">EGP {selectedService?.price || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-purple-700 font-bold">
+                    <span>{isRTL ? `عربون الحجز المطلـوب (${depositPercentage}%):` : `Required Deposit (${depositPercentage}%):`}</span>
+                    <span>EGP {Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
+                  </div>
+                  <div className="border-t border-dashed border-[#C4AE7C]/20 pt-2 flex justify-between font-bold">
+                    <span>{isRTL ? "المبلغ المتبقي بالعيادة:" : "Remaining Balance (Pay at Clinic):"}</span>
+                    <span>EGP {(selectedService?.price || 0) - Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
+                  </div>
+                </div>
+
+                {selectedDepositMethod === "instapay" ? (
+                  /* Clinic InstaPay Info Box */
+                  <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "عنوان إنستاباي الخاص بالعيادة" : "CLINIC INSTAPAY ADDRESS"}</p>
+                        <p className="text-xs font-bold text-[#1F251A] mt-0.5">{instapayAddress}</p>
+                        {instapayName && <p className="text-[10px] font-bold text-[#5A6A51] mt-0.5">{instapayName}</p>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(instapayAddress);
+                          setCopiedAddress(true);
+                          setTimeout(() => setCopiedAddress(false), 2000);
+                        }}
+                        className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                      >
+                        {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
+                      </button>
+                    </div>
+
+                    {instapayLink && (
+                      <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط تحويل إنستاباي" : "INSTAPAY QUICK LINK"}</span>
+                        <a 
+                          href={instapayLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs font-bold text-[#C4AE7C] hover:underline"
+                        >
+                          {isRTL ? "فتح تطبيق إنستاباي" : "Open InstaPay"} &rarr;
+                        </a>
+                      </div>
+                    )}
+
+                    {/* InstaPay QR Code */}
+                    <div className="pt-2 text-center">
+                      <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">{isRTL ? "امسح رمز الاستجابة السريعة (QR) [انقر للتكبير]" : "SCAN QR CODE TO PAY [Click to Zoom]"}</p>
+                      <div 
+                        onClick={() => setZoomQr(true)}
+                        className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm hover:border-[#C4AE7C] hover:scale-105 transition duration-200 cursor-pointer"
+                        title={isRTL ? "انقر لتكبير رمز الاستجابة السريعة" : "Click to zoom QR Code"}
+                      >
+                        <img 
+                          src={instapayQrUrl} 
+                          alt="InstaPay QR Code" 
+                          className="w-32 h-32 object-contain"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Clinic Wallet Info Box */
+                  <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{walletName ? (isRTL ? `رقم محفظة ${walletName}` : `CLINIC ${walletName.toUpperCase()} NUMBER`) : (isRTL ? "رقم المحفظة الإلكترونية للعيادة" : "CLINIC WALLET NUMBER")}</p>
+                        <p className="text-sm font-extrabold text-[#1F251A] mt-0.5 tracking-wider">{walletNumber}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(walletNumber);
+                          setCopiedAddress(true);
+                          setTimeout(() => setCopiedAddress(false), 2000);
+                        }}
+                        className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                      >
+                        {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
+                      </button>
+                    </div>
+
+                    <div className="border-t border-[#414E36]/10 pt-2 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{isRTL ? "رابط المحفظة الإلكترونية" : "WALLET QUICK LINK"}</span>
+                      <a 
+                        href={currentPaymentLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-xs font-bold text-[#C4AE7C] hover:underline"
+                      >
+                        {walletLink ? (isRTL ? "فتح رابط المحفظة" : "Open Wallet") : (isRTL ? "اتصال بالرقم" : "Dial Number")} &rarr;
+                      </a>
+                    </div>
+
+                    {/* Wallet QR Code */}
+                    <div className="pt-2 text-center">
+                      <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">
+                        {isRTL ? "امسح رمز الاستجابة السريعة للمحفظة (QR) [انقر للتكبير]" : "SCAN WALLET QR CODE TO PAY [Click to Zoom]"}
+                      </p>
+                      <div 
+                        onClick={() => setZoomQr(true)}
+                        className="inline-block rounded-2xl bg-white p-2 border border-[#C4AE7C]/20 shadow-sm hover:border-[#C4AE7C] hover:scale-105 transition duration-200 cursor-pointer"
+                        title={isRTL ? "انقر لتكبير رمز الاستجابة السريعة" : "Click to zoom QR Code"}
+                      >
+                        <img 
+                          src={currentQrUrl} 
+                          alt="Wallet QR Code" 
+                          className="w-32 h-32 object-contain"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Patient's Account / Phone Input */}
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider">
+                    {selectedDepositMethod === "wallet"
+                      ? (isRTL ? "رقم المحفظة الإلكترونية الخاص بك (الذي قمت بالتحويل منه)" : "Your Wallet Mobile Number (Sent From)")
+                      : (isRTL ? "عنوان إنستاباي الخاص بك (الذي قمت بالتحويل منه)" : "Your InstaPay Address (Sent From)")}
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder={selectedDepositMethod === "wallet" ? "010xxxxxxxx" : "name@instapay"} 
+                    value={customerPaymentSender}
+                    onChange={(e) => setCustomerPaymentSender(e.target.value)}
+                    disabled={isPaying}
+                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36] font-medium"
+                  />
+                  <span className="text-[10px] text-[#8A9A81] block">
+                    {selectedDepositMethod === "wallet"
+                      ? (isRTL ? "مثال: 01012345678" : "Example: 01012345678")
+                      : (isRTL ? "مثال: name@instapay أو رقم الهاتف المسجل بإنستاباي" : "Example: name@instapay or phone number registered on InstaPay")}
+                  </span>
+                </div>
+
+                {/* Terms & Conditions Gate on Payment Page - Image 1 Style */}
+                <div className="mt-5 text-left" dir={isRTL ? "rtl" : "ltr"}>
+                  <div className="rounded-2xl border border-gray-200/90 bg-white p-5 space-y-4 shadow-2xs">
+                    {/* Header: Shield Icon + TERMS & CONDITIONS */}
+                    <div className="flex items-center gap-2 text-[#2D522D] font-bold text-xs tracking-wider uppercase">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full border border-[#2D522D]/40 text-[#2D522D]">
+                        <ShieldCheck size={14} />
+                      </div>
+                      <span>{isRTL ? "الشروط والأحكام" : "TERMS & CONDITIONS"}</span>
+                    </div>
+
+                    {/* Body text */}
+                    <p className="text-xs text-gray-700 font-medium leading-relaxed">
+                      {isRTL ? "بالمتابعة، فإنك توافق على الشروط والأحكام الخاصة بنا." : "By continuing, you agree to our Terms & Conditions."}
+                    </p>
+
+                    {/* Inner Highlighted Pill Box */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-gray-200/80 bg-[#F4F8F4] p-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E2EBE2] text-[#2D522D]">
+                          <FileText size={16} />
+                        </div>
+                        <span className="text-xs text-gray-600 font-normal leading-normal">
+                          {isRTL ? "يرجى قراءة الشروط والأحكام بعناية قبل المتابعة." : "Please read our Terms & Conditions carefully before proceeding."}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowTermsModal(true)}
+                        className="flex items-center gap-1 text-xs font-semibold text-[#2D522D] underline underline-offset-2 hover:opacity-80 shrink-0 self-end sm:self-auto cursor-pointer"
+                      >
+                        <span>{isRTL ? "عرض الشروط والأحكام" : "View Terms & Conditions"}</span>
+                        <ExternalLink size={13} />
+                      </button>
+                    </div>
+
+                    <div className="border-t border-gray-200/80 my-2" />
+
+                    {/* Custom Checkbox row */}
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <div className="relative flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={acceptedTerms}
+                          onChange={(e) => setAcceptedTerms(e.target.checked)}
+                          className="peer h-4 w-4 appearance-none rounded border-2 border-gray-300 bg-white checked:border-[#2D522D] checked:bg-[#2D522D] focus:outline-none transition cursor-pointer"
+                        />
+                        <svg
+                          className="pointer-events-none absolute left-0.5 top-0.5 hidden h-3 w-3 stroke-white peer-checked:block"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth="3.5"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-gray-800 font-normal">
+                        {isRTL ? "لقد قرأت وأوافق على " : "I have read and agree to the "}
+                        <button
+                          type="button"
+                          onClick={() => setShowTermsModal(true)}
+                          className="font-semibold text-[#2D522D] underline underline-offset-2 hover:opacity-80 cursor-pointer"
+                        >
+                          {isRTL ? "الشروط والأحكام" : "Terms & Conditions"}
+                        </button>
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Buttons matching Image 1 */}
+                  <div className="mt-4 space-y-3">
+                    {/* Primary Confirm Button */}
+                    <button
+                      onClick={handlePayDeposit}
+                      disabled={isPaying || !acceptedTerms}
+                      className="w-full justify-center rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:opacity-95"
+                      style={{ backgroundColor: "#43794E" }}
+                    >
+                      {isPaying ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          {isRTL ? "جاري الحفظ والتحويل..." : "Saving & Redirecting..."}
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex h-5 w-5 items-center justify-center rounded-full border-1.5 border-white">
+                            <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-4.322c1.7.925 3.328 1.459 5.166 1.46 5.485.001 9.948-4.462 9.951-9.95.002-2.658-1.031-5.158-2.906-7.037C17.228 2.275 14.73 1.24 12.072 1.24a9.957 9.957 0 0 0-9.951 9.956c-.001 1.93.513 3.567 1.492 5.093l-.999 3.65 3.743-.981zM17.476 14.398c-.329-.165-1.947-.961-2.245-1.07-.3-.109-.518-.165-.736.165-.218.329-.844 1.07-1.034 1.289-.19.217-.38.244-.709.079a8.932 8.932 0 0 1-2.736-1.688 9.842 9.842 0 0 1-1.893-2.358c-.19-.329-.02-.507.145-.671.148-.148.33-.382.495-.572.164-.19.219-.328.328-.547.11-.219.055-.41-.027-.574-.082-.164-.736-1.776-1.009-2.433-.266-.64-.539-.553-.736-.563-.19-.01-.409-.012-.627-.012s-.573.082-.873.409c-.3.329-1.145 1.12-1.145 2.732s1.173 3.17 1.336 3.389c.164.22 2.308 3.525 5.59 4.945.78.337 1.39.539 1.86.688.784.248 1.498.213 2.062.128.629-.094 1.947-.796 2.219-1.564.272-.767.272-1.424.19-1.564-.081-.138-.3-.22-.629-.385z" />
+                            </svg>
+                          </div>
+                          <span>{isRTL ? "تأكيد وإرسال صورة التحويل" : "Confirm & Send Screenshot"}</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Secondary Return Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep(4);
+                        setCreatedReservation(null);
+                      }}
+                      disabled={isPaying}
+                      className="w-full justify-center rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-semibold text-gray-800 bg-white border border-gray-300 transition flex items-center justify-center gap-2 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <Undo2 size={16} className="text-gray-700" />
+                      <span>{isRTL ? "إلغاء والعودة" : "Cancel & Return"}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Navigation */}
-            <div
-              className={`flex mt-6 gap-3 ${
-                step === 1 ? "justify-end" : "justify-between"
-              }`}
-            >
-              {step > 1 && (
-                <button
-                  onClick={handleBack}
-                  className="btn-outline"
-                >
-                  {t.booking.backBtn}
-                </button>
-              )}
-              {step < 4 && (
-                <button
-                  onClick={handleNext}
-                  disabled={!canNext}
-                  className="btn-primary"
-                  style={{ opacity: canNext ? 1 : 0.4, cursor: canNext ? "pointer" : "not-allowed" }}
-                >
-                  {t.booking.nextBtn}
-                </button>
-              )}
-            </div>
+            {step < 5 && (
+              <div
+                className={`flex mt-6 gap-3 ${
+                  step === 1 ? "justify-end" : "justify-between"
+                }`}
+              >
+                {step > 1 && (
+                  <button
+                    onClick={handleBack}
+                    className="btn-outline"
+                  >
+                    {t.booking.backBtn}
+                  </button>
+                )}
+                {step < 4 && (
+                  <button
+                    onClick={handleNext}
+                    disabled={!canNext}
+                    className="btn-primary"
+                    style={{ opacity: canNext ? 1 : 0.4, cursor: canNext ? "pointer" : "not-allowed" }}
+                  >
+                    {t.booking.nextBtn}
+                  </button>
+                )}
+              </div>
+            ) }
           </>
         )}
       </div>
+
+      {/* Zoomed QR Overlay */}
+      {zoomQr && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm transition-all cursor-pointer"
+          onClick={() => setZoomQr(false)}
+        >
+          <div className="relative max-w-sm w-full bg-white rounded-3xl p-6 shadow-2xl flex flex-col items-center border border-[#414E36]/10 animate-scaleIn cursor-default" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setZoomQr(false)}
+              className="absolute right-6 top-6 h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition font-bold text-lg cursor-pointer"
+            >
+              &times;
+            </button>
+            <p className="text-sm font-bold text-[#414E36] mb-4 uppercase tracking-wider text-center">
+              {selectedDepositMethod === "wallet"
+                ? (isRTL ? `رمز الاستجابة السريعة للمحفظة` : `SCAN WALLET QR CODE`)
+                : (isRTL ? "رمز الاستجابة السريعة (InstaPay)" : "SCAN INSTAPAY QR CODE")
+              }
+            </p>
+            <div className="bg-white p-3 rounded-2xl border border-[#C4AE7C]/20 shadow-inner">
+              <img 
+                src={currentQrUrl} 
+                alt="QR Code Zoomed" 
+                className="w-64 h-64 object-contain"
+              />
+            </div>
+            {currentPaymentLink && (
+              <a 
+                href={currentPaymentLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white hover:bg-[#2e3a26] transition shadow"
+              >
+                {selectedDepositMethod === "wallet"
+                  ? (walletLink ? (isRTL ? "فتح رابط المحفظة" : "Open Wallet App") : (isRTL ? "اتصال بالرقم" : "Dial Number"))
+                  : (isRTL ? "فتح تطبيق إنستاباي" : "Open InstaPay App")
+                }
+              </a>
+            )}
+            <p className="text-[11px] text-[#8A9A81] mt-3 text-center">
+              {isRTL ? "انقر في أي مكان للإغلاق" : "Click anywhere outside to close"}
+            </p>
+          </div>
+        </div>
+      )}
+      {/* Terms & Conditions Modal overlay - Image 2 */}
+      <TermsModal 
+        isOpen={showTermsModal} 
+        onClose={() => setShowTermsModal(false)} 
+        defaultLang={isRTL ? "ar" : "en"} 
+      />
     </div>
   );
 }

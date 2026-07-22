@@ -1,4 +1,4 @@
-# Revera Website Frontend
+# Revera System
 
 A modern, bilingual (English/Arabic with RTL support) medical clinic website built with Next.js 16, React 19, Tailwind CSS v4, and shadcn/ui.
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Category, ServiceItem } from "@/lib/services";
+import { Category, ServiceItem, getServicePriceDetails } from "@/lib/services";
 import { 
   getServiceToggles, 
   isServiceActive, 
@@ -11,6 +11,7 @@ import {
   getDynamicCategories, 
   LocalCategory 
 } from "@/lib/serviceStore";
+import { prefetchUrl } from "@/lib/fetchCache";
 
 // ── Service categories and items for Revera Clinics
 
@@ -140,7 +141,11 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
 
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
+      onMouseEnter={() => {
+        setHovered(true);
+        // Prefetch availability on hover so calendar loads instantly when user opens modal
+        prefetchUrl(`/api/availability?serviceId=${service.id}&days=30`, 30000);
+      }}
       onMouseLeave={() => setHovered(false)}
       onClick={() => {
         window.dispatchEvent(new CustomEvent("open-booking", { detail: { serviceId: service.id } }));
@@ -187,6 +192,68 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
             </svg>
           </div>
         </div>
+        {(() => {
+          const priceDetails = getServicePriceDetails(service);
+          if (priceDetails.basePrice <= 0) return null;
+
+          return (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 8,
+              marginTop: -12,
+              marginBottom: -12,
+              fontFamily: "var(--font-sora), sans-serif",
+            }}>
+              {priceDetails.hasPromotion ? (
+                <>
+                  <span style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "#C4AE7C",
+                  }}>
+                    {lang === "ar" 
+                      ? `${priceDetails.discountedPrice.toLocaleString()} ج.م` 
+                      : `${priceDetails.discountedPrice.toLocaleString()} EGP`}
+                  </span>
+                  <span style={{
+                    fontSize: 13,
+                    fontWeight: 400,
+                    color: "rgba(90, 106, 81, 0.45)",
+                    textDecoration: "line-through",
+                  }}>
+                    {lang === "ar"
+                      ? `${priceDetails.basePrice.toLocaleString()} ج.م`
+                      : `${priceDetails.basePrice.toLocaleString()} EGP`}
+                  </span>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#FFFFFF",
+                    backgroundColor: "#C4AE7C",
+                    padding: "2px 6px",
+                    borderRadius: 6,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}>
+                    {lang === "ar" ? priceDetails.promotionTextAr : priceDetails.promotionText}
+                  </span>
+                </>
+              ) : (
+                <span style={{
+                  fontSize: 16,
+                  fontWeight: 650,
+                  color: "#C4AE7C",
+                }}>
+                  {lang === "ar" 
+                    ? `${priceDetails.basePrice.toLocaleString()} ج.م` 
+                    : `${priceDetails.basePrice.toLocaleString()} EGP`}
+                </span>
+              )}
+            </div>
+          );
+        })()}
 
         <p style={{
           margin: 0,

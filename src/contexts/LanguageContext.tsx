@@ -86,7 +86,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
           if (homeSettings) {
             setDynamicTranslations(prev => {
               const updated = { ...prev };
-              if (homeSettings.hero?.slides) {
+              if (homeSettings.hero?.slides && homeSettings.hero.slides.length > 0) {
                 updated.en = {
                   ...updated.en,
                   hero: {
@@ -95,7 +95,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
                   },
                 };
               }
-              if (homeSettings.hero?.slides_ar) {
+              if (homeSettings.hero?.slides_ar && homeSettings.hero.slides_ar.length > 0) {
                 updated.ar = {
                   ...updated.ar,
                   hero: {

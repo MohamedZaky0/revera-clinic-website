@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { getDurationInMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot, getEffectiveServicePrice } from '@/lib/services';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -12,9 +13,14 @@ function fmtDate(d: unknown): string {
 }
 
 function mapRow(r: Record<string, any>) {
+  const serviceIds = Array.isArray(r.service_ids) ? r.service_ids : [];
+  if (serviceIds.length === 0 && r.service_id) {
+    serviceIds.push(r.service_id);
+  }
   return {
     id: r.id,
     serviceId: r.service_id,
+    serviceIds: serviceIds,
     date: fmtDate(r.date),
     requestedTime: r.requested_time,
     name: r.name,
@@ -24,12 +30,17 @@ function mapRow(r: Record<string, any>) {
     status: r.status,
     timeSlot: r.time_slot,
     sessionType: r.session_type,
-    doctorName: r.doctor_name,
     createdAt: r.created_at,
+    isManual: r.is_manual ?? false,
     branchId: r.branch_id ?? null,
     customerId: r.customer_id ?? null,
     amountPaid: r.amount_paid ?? 0,
     amountLeft: r.amount_left ?? null,
+    roomId: r.room_id ?? null,
+    rooms: r.rooms || [],
+    createdByEmployeeId: r.created_by_employee_id ?? null,
+    services: r.services || null,
+    doctorName: r.doctor_name ?? null,
   };
 }
 
@@ -40,6 +51,9 @@ export async function GET(req: Request) {
   const serviceId = params.get('serviceId');
   const date = params.get('date');
   const branchId = params.get('branchId');
+  const phone = params.get('phone');
+  const customerId = params.get('customerId');
+  const createdByEmployeeId = params.get('createdByEmployeeId');
 
   try {
     let q = supabaseServer
@@ -47,15 +61,38 @@ export async function GET(req: Request) {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (status) q = q.eq('status', status);
+    if (status) {
+      if (status === 'pending') {
+        q = q.in('status', ['pending', 'pending_deposit']);
+      } else {
+        q = q.eq('status', status);
+      }
+    }
     if (serviceId) q = q.eq('service_id', Number(serviceId));
     if (date) q = q.eq('date', date);
-    if (branchId) q = q.eq('branch_id', branchId);
+    if (phone) q = q.eq('phone', phone);
+    if (customerId) q = q.eq('customer_id', customerId);
+    if (createdByEmployeeId) q = q.eq('created_by_employee_id', createdByEmployeeId);
+    // Include bookings that match this branch OR have no branch set (website bookings without branch)
+    if (branchId) q = q.or(`branch_id.eq.${branchId},branch_id.is.null`);
 
-    const { data: rows, error } = await q;
+    const [resResult, servicesResult] = await Promise.all([
+      q,
+      supabaseServer.from('services').select('id, price')
+    ]);
 
-    if (error) throw error;
-    return NextResponse.json(rows ? rows.map(mapRow) : []);
+    if (resResult.error) throw resResult.error;
+    if (servicesResult.error) {
+      console.warn("Could not fetch services for reservations mapping:", servicesResult.error.message);
+    }
+
+    const servicesMap = new Map((servicesResult.data || []).map((s: any) => [s.id, s.price]));
+    const mappedRows = (resResult.data || []).map((r: any) => ({
+      ...r,
+      services: r.service_id ? { price: servicesMap.get(r.service_id) || 0 } : null
+    }));
+
+    return NextResponse.json(mappedRows.map(mapRow));
   } catch (err) {
     console.error('GET /api/reservations error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
@@ -65,7 +102,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId, doctorName } = body;
+    const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId, doctorName, createdByEmployeeId } = body;
 
     if (!serviceId || !date || !name || !email || !phone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -134,31 +171,148 @@ export async function POST(req: Request) {
       console.error('Customer integration error:', custErr);
     }
 
+    // Fetch compatible rooms for this service
+    let compRoomIds: string[] = [];
+    try {
+      const { data: sRooms } = await supabaseServer
+        .from('service_rooms')
+        .select('room_id')
+        .eq('service_id', Number(serviceId));
+      if (sRooms && sRooms.length > 0) {
+        compRoomIds = sRooms.map((sr: any) => sr.room_id);
+      }
+    } catch (e) {
+      console.warn("Could not load service compatible rooms:", e);
+    }
+
+    // Fetch service details for price calculation
+    let servicePrice = 0;
+    try {
+      const { data: svc } = await supabaseServer
+        .from('services')
+        .select('price, branch_pricing')
+        .eq('id', Number(serviceId))
+        .maybeSingle();
+      if (svc) {
+        let targetBranchName: string | null = null;
+        if (branchId) {
+          const { data: bObj } = await supabaseServer
+            .from('branches')
+            .select('name')
+            .eq('id', Number(branchId))
+            .maybeSingle();
+          if (bObj) {
+            targetBranchName = bObj.name;
+          }
+        }
+
+        const mappedService = {
+          price: svc.price !== null ? Number(svc.price) : 0,
+          branchPricing: svc.branch_pricing
+        };
+
+        servicePrice = getEffectiveServicePrice(mappedService, targetBranchName);
+      }
+    } catch (e) {
+      console.error("Could not fetch service details for price calculation:", e);
+    }
+
+    // Fetch deposit settings
+    let depositPercentage = 20; // Default 20%
+    try {
+      const { data: pageSet } = await supabaseServer
+        .from('page_settings')
+        .select('value')
+        .eq('key', 'home')
+        .maybeSingle();
+      if (pageSet && pageSet.value?.booking?.depositPercentage !== undefined) {
+        depositPercentage = Number(pageSet.value.booking.depositPercentage);
+      }
+    } catch (e) {
+      console.error("Could not fetch deposit percentage settings:", e);
+    }
+
+    const isManualBooking = body.isManual ?? false;
+    let initialStatus = 'pending';
+    let initialAmountPaid = body.amountPaid !== undefined ? Number(body.amountPaid) : 0;
+    let initialAmountLeft = body.amountLeft !== undefined ? (body.amountLeft !== null ? Number(body.amountLeft) : null) : servicePrice;
+
+    if (!isManualBooking && depositPercentage > 0) {
+      initialStatus = 'pending_deposit';
+      initialAmountPaid = 0;
+      initialAmountLeft = servicePrice;
+    }
+
     // 2. Insert reservation linked to customer
-    const { data, error } = await supabaseServer
+    const insertPayload: any = {
+      service_id: Number(serviceId),
+      date,
+      requested_time: requestedTime || null,
+      name,
+      email,
+      phone,
+      notes: notes || '',
+      status: initialStatus,
+      time_slot: null,
+      session_type: sessionType || 'in_person',
+      branch_id: branchId || null,
+      customer_id: customerId,
+      amount_paid: initialAmountPaid,
+      amount_left: initialAmountLeft,
+      doctor_name: doctorName || null,
+      is_manual: isManualBooking,
+      rooms: compRoomIds,
+      created_by_employee_id: createdByEmployeeId || null,
+    };
+
+    let { data, error } = await supabaseServer
       .from('reservations')
-      .insert({
-        service_id: Number(serviceId),
-        date,
-        requested_time: requestedTime || null,
-        name,
-        email,
-        phone,
-        notes: notes || '',
-        status: 'pending',
-        time_slot: null,
-        session_type: sessionType || 'in_person',
-        branch_id: branchId || null,
-        customer_id: customerId,
-        amount_paid: body.amountPaid !== undefined ? Number(body.amountPaid) : 0,
-        amount_left: body.amountLeft !== undefined ? Number(body.amountLeft) : null,
-        doctor_name: doctorName || null,
-      })
+      .insert({ ...insertPayload })
       .select()
       .single();
 
+    if (error) {
+      console.warn("Primary reservation insert failed, attempting clean fallback:", error.message, error.code);
+      const fallbackPayload = { ...insertPayload };
+      if (fallbackPayload.status === 'pending_deposit') {
+        fallbackPayload.status = 'pending';
+      }
+      delete fallbackPayload.is_manual;
+      delete fallbackPayload.created_by_employee_id;
+
+      const retry1 = await supabaseServer
+        .from('reservations')
+        .insert(fallbackPayload)
+        .select()
+        .single();
+
+      data = retry1.data;
+      error = retry1.error;
+
+      if (error) {
+        console.warn("Retry 1 reservation insert failed, trying minimal payload:", error.message, error.code);
+        delete fallbackPayload.rooms;
+        delete fallbackPayload.doctor_name;
+
+        const retry2 = await supabaseServer
+          .from('reservations')
+          .insert(fallbackPayload)
+          .select()
+          .single();
+
+        data = retry2.data;
+        error = retry2.error;
+      }
+    }
+
     if (error) throw error;
-    return NextResponse.json(mapRow(data), { status: 201 });
+    const mapped = mapRow(data);
+    const requiresDeposit = !isManualBooking && depositPercentage > 0;
+    return NextResponse.json({
+      ...mapped,
+      requiresDeposit,
+      status: requiresDeposit ? 'pending_deposit' : mapped.status,
+    }, { status: 201 });
   } catch (err) {
     console.error('POST /api/reservations error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });
@@ -172,7 +326,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft } = body;
+    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId } = body;
 
     const { data: target, error: findError } = await supabaseServer
       .from('reservations')
@@ -184,48 +338,172 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
+    if (target.status === 'started' && (action === 'reject' || status === 'cancelled' || status === 'rejected')) {
+      return NextResponse.json({ error: 'Cannot cancel a booking that has already started.' }, { status: 400 });
+    }
+
     if (action === 'approve') {
       if (!timeSlot) return NextResponse.json({ error: 'Missing timeSlot' }, { status: 400 });
 
-      let bookedQuery = supabaseServer
-        .from('reservations')
-        .select('*', { count: 'exact', head: true })
-        .eq('service_id', target.service_id)
-        .eq('date', target.date)
-        .eq('status', 'approved');
+      let chosenRoomId: string | null = null;
+      let serviceCompRoomIds: string[] = [];
 
-      if (target.branch_id) {
-        bookedQuery = bookedQuery.eq('branch_id', target.branch_id);
-      } else {
-        bookedQuery = bookedQuery.is('branch_id', null);
-      }
+      if (target.session_type !== 'online') {
+        // Get all active, available clinical rooms in this branch
+        let roomsQuery = supabaseServer
+          .from('rooms')
+          .select('id, name')
+          .eq('type', 'clinical')
+          .eq('status', 'available');
 
-      const { count: bookedCount, error: countError1 } = await bookedQuery;
+        if (target.branch_id) {
+          roomsQuery = roomsQuery.eq('branch_id', target.branch_id);
+        }
 
-      if (countError1) throw countError1;
-      if (Number(bookedCount || 0) >= 8) {
-        return NextResponse.json({ error: 'Day is fully booked' }, { status: 400 });
-      }
+        const { data: rawBranchRooms, error: roomsError } = await roomsQuery;
+        if (roomsError) throw roomsError;
 
-      let slotQuery = supabaseServer
-        .from('reservations')
-        .select('*', { count: 'exact', head: true })
-        .eq('service_id', target.service_id)
-        .eq('date', target.date)
-        .eq('status', 'approved')
-        .eq('time_slot', timeSlot);
+        let branchRooms = rawBranchRooms || [];
+        if (branchRooms.length === 0) {
+          // Fallback: If no clinical rooms exist, construct a default virtual clinical room so bookings are not blocked
+          branchRooms = [{ id: '00000000-0000-0000-0000-000000000000', name: 'Virtual Clinical Room', branch_id: target.branch_id }];
+        }
 
-      if (target.branch_id) {
-        slotQuery = slotQuery.eq('branch_id', target.branch_id);
-      } else {
-        slotQuery = slotQuery.is('branch_id', null);
-      }
+        // Find compatible rooms for the service
+        const { data: mappedRooms, error: mappingError } = await supabaseServer
+          .from('service_rooms')
+          .select('room_id')
+          .eq('service_id', target.service_id);
 
-      const { count: slotCount, error: countError2 } = await slotQuery;
+        if (mappingError) throw mappingError;
 
-      if (countError2) throw countError2;
-      if (Number(slotCount || 0) > 0) {
-        return NextResponse.json({ error: 'Time slot already taken' }, { status: 400 });
+        const mappedRoomIds = mappedRooms ? mappedRooms.map((mr: any) => mr.room_id) : [];
+        let serviceCompRooms = branchRooms.filter((r: any) => mappedRoomIds.includes(r.id));
+
+        if (serviceCompRooms.length === 0) {
+          // Fallback: If service is not mapped to any specific clinical rooms, allow booking in any clinical room of the branch
+          serviceCompRooms = branchRooms;
+        }
+
+        // Fetch target service duration
+        const { data: targetSvc, error: svcError } = await supabaseServer
+          .from('services')
+          .select('duration')
+          .eq('id', target.service_id)
+          .single();
+
+        if (svcError) throw svcError;
+
+        const targetDuration = targetSvc?.duration ? getDurationInMinutes(targetSvc.duration) : 30;
+        const targetSlotsCount = Math.ceil(targetDuration / 15);
+
+        const normSlot = normaliseTo24hSlot(timeSlot);
+        if (!normSlot) return NextResponse.json({ error: 'Invalid time slot format' }, { status: 400 });
+
+        const startIdx = ALL_15MIN_SLOTS.indexOf(normSlot);
+        if (startIdx === -1) return NextResponse.json({ error: 'Invalid time slot value' }, { status: 400 });
+
+        // Fetch all approved bookings for this date
+        const { data: dayBookings, error: bookingsError } = await supabaseServer
+          .from('reservations')
+          .select('id, room_id, time_slot, service_id')
+          .eq('date', target.date)
+          .eq('status', 'approved')
+          .not('room_id', 'is', null);
+
+        if (bookingsError) throw bookingsError;
+
+        // Fetch all service durations to calculate overlap
+        const { data: allSvcs, error: allSvcsError } = await supabaseServer
+          .from('services')
+          .select('id, duration');
+
+        if (allSvcsError) throw allSvcsError;
+
+        const durationMap = new Map<number, number>();
+        if (allSvcs) {
+          allSvcs.forEach((s: any) => {
+            durationMap.set(s.id, getDurationInMinutes(s.duration));
+          });
+        }
+
+        // Determine which rooms are available (not occupied)
+        const availableRooms: { id: string; name: string }[] = [];
+
+        for (const room of serviceCompRooms) {
+          let roomOccupied = false;
+          const roomBookings = dayBookings ? dayBookings.filter((b: any) => b.room_id === room.id) : [];
+
+          for (const rb of roomBookings) {
+            const rbNorm = normaliseTo24hSlot(rb.time_slot);
+            if (!rbNorm) continue;
+            const rbStartIdx = ALL_15MIN_SLOTS.indexOf(rbNorm);
+            if (rbStartIdx === -1) continue;
+
+            const rbDuration = durationMap.get(rb.service_id) ?? 30;
+            const rbSlotsCount = Math.ceil(rbDuration / 15);
+
+            // Overlap condition:
+            if (rbStartIdx < startIdx + targetSlotsCount && startIdx < rbStartIdx + rbSlotsCount) {
+              roomOccupied = true;
+              break;
+            }
+          }
+
+          if (!roomOccupied) {
+            availableRooms.push(room);
+          }
+        }
+
+        if (availableRooms.length === 0) {
+          return NextResponse.json({ error: 'No clinical rooms are available at this time slot.' }, { status: 400 });
+        }
+
+        let chosenRoom = availableRooms[0];
+
+        // Priority algorithm: if more than 1 room is available, select the room with the fewest exclusive services
+        if (availableRooms.length > 1) {
+          const { data: allSR, error: allSRError } = await supabaseServer
+            .from('service_rooms')
+            .select('service_id, room_id');
+
+          if (allSRError) throw allSRError;
+
+          const serviceRoomCounts = new Map<number, number>();
+          if (allSR) {
+            allSR.forEach((sr: any) => {
+              const count = serviceRoomCounts.get(sr.service_id) ?? 0;
+              serviceRoomCounts.set(sr.service_id, count + 1);
+            });
+          }
+
+          const roomScores = new Map<string, number>();
+          availableRooms.forEach((room: any) => {
+            let exclusiveServices = 0;
+            if (allSR) {
+              allSR.forEach((sr: any) => {
+                if (sr.room_id === room.id) {
+                  const mappedRoomsCount = serviceRoomCounts.get(sr.service_id) ?? 0;
+                  if (mappedRoomsCount === 1) {
+                    exclusiveServices++;
+                  }
+                }
+              });
+            }
+            roomScores.set(room.id, exclusiveServices);
+          });
+
+          availableRooms.sort((a: any, b: any) => {
+            const scoreA = roomScores.get(a.id) ?? 0;
+            const scoreB = roomScores.get(b.id) ?? 0;
+            return scoreA - scoreB;
+          });
+
+          chosenRoom = availableRooms[0];
+        }
+
+        chosenRoomId = chosenRoom.id;
+        serviceCompRoomIds = serviceCompRooms.map((r: any) => r.id);
       }
 
       const { data: updated, error: updateError } = await supabaseServer
@@ -233,7 +511,9 @@ export async function PATCH(req: Request) {
         .update({
           status: 'approved',
           time_slot: timeSlot,
-          doctor_name: doctorName || null
+          doctor_name: doctorName || null,
+          room_id: chosenRoomId,
+          rooms: serviceCompRoomIds
         })
         .eq('id', id)
         .select()
@@ -241,7 +521,6 @@ export async function PATCH(req: Request) {
 
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
-
     } else if (action === 'reject') {
       const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
@@ -253,7 +532,7 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined) {
+    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (notes !== undefined) updates.notes = notes;
@@ -261,6 +540,14 @@ export async function PATCH(req: Request) {
       if (sessionType !== undefined) updates.session_type = sessionType;
       if (amountPaid !== undefined) updates.amount_paid = amountPaid;
       if (amountLeft !== undefined) updates.amount_left = amountLeft;
+      if (serviceId !== undefined) updates.service_id = Number(serviceId);
+      if (serviceIds !== undefined) {
+        updates.service_ids = serviceIds.map(Number);
+        if (serviceIds.length > 0) {
+          updates.service_id = Number(serviceIds[0]);
+        }
+      }
+      if (createdByEmployeeId !== undefined) updates.created_by_employee_id = createdByEmployeeId || null;
 
       const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
@@ -270,6 +557,42 @@ export async function PATCH(req: Request) {
         .single();
 
       if (updateError) throw updateError;
+
+      // Handle customer wallet and spent/outstanding updates on checkout / completed
+      if (status === 'completed' && target.customer_id) {
+        try {
+          const { data: customer, error: fetchCustErr } = await supabaseServer
+            .from('customers')
+            .select('wallet_balance, spent_amount, outstanding')
+            .eq('id', target.customer_id)
+            .single();
+
+          if (!fetchCustErr && customer) {
+            const currentWallet = Number(customer.wallet_balance || 0);
+            const currentSpent = Number(customer.spent_amount || 0);
+            const currentOutstanding = Number(customer.outstanding || 0);
+
+            const deposit = Number(walletDeposit || 0);
+            const withdrawal = Number(walletWithdrawal || 0);
+
+            const newWallet = Math.max(0, currentWallet + deposit - withdrawal);
+            const newSpent = currentSpent + Number(amountPaid || 0) + withdrawal;
+            const newOutstanding = currentOutstanding + Number(amountLeft || 0);
+
+            await supabaseServer
+              .from('customers')
+              .update({
+                wallet_balance: newWallet,
+                spent_amount: newSpent,
+                outstanding: newOutstanding
+              })
+              .eq('id', target.customer_id);
+          }
+        } catch (custErr) {
+          console.error("Failed to update customer wallet balance:", custErr);
+        }
+      }
+
       return NextResponse.json(mapRow(updated));
     } else {
       return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

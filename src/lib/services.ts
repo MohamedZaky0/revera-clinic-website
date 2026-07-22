@@ -35,9 +35,9 @@ export function getDurationInMinutes(duration: string | null | undefined): numbe
 
 export const ALL_15MIN_SLOTS: string[] = (() => {
   const slots: string[] = [];
-  for (let h = 9; h <= 20; h++) {
+  for (let h = 9; h <= 21; h++) {
     for (const m of [0, 15, 30, 45]) {
-      if (h === 20 && m > 0) break;
+      if (h === 21 && m > 0) break;
       slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     }
   }
@@ -85,31 +85,38 @@ export interface ServiceItem {
     visible: boolean;
     status: boolean;
     isDefault?: boolean;
+    promotion?: {
+      enabled: boolean;
+      type: "percentage" | "fixed";
+      value: number;
+      startDate?: string;
+      endDate?: string;
+    };
   }>;
 }
 
 export const SERVICES: ServiceItem[] = [
-  { id: 1, en: "Skin Dermatology Clinics", ar: "عيادات الجلدية", img: "/images/services/dermatology-service/dermatology.jpeg", cat: "dermatology", unit: "session" },
-  { id: 2, en: "Skin Care Treatments", ar: "تجميل البشرة", img: "/images/services/dermatology-service/skincare-treatment.jpg", cat: "dermatology", unit: "session" },
-  { id: 3, en: "Skin Care Sessions", ar: "جلسات العناية بالبشرة", img: "/images/services/dermatology-service/skincare-session.webp", cat: "dermatology", unit: "session" },
-  { id: 4, en: "Hair & Scalp Treatment", ar: "علاج الشعر والتساقط", img: "/images/services/dermatology-service/hair-scalp-treatment.jpg", cat: "dermatology", unit: "session" },
-  { id: 5, en: "Laser Hair Removal", ar: "إزالة الشعر بالليزر (رجالي ونسائي)", img: "/images/services/dermatology-service/laser-hair-removal.jpg", cat: "dermatology", unit: "session" },
-  { id: 6, en: "Therapeutic Laser", ar: "الليزر العلاجي", img: "/images/services/dermatology-service/therapeutic-laser.jpg", cat: "dermatology", unit: "session" },
-  { id: 7, en: "Aesthetic Injections (Botox/Filler/Plasma)", ar: "حقن تجميلية (بوتوكس / فيلر / بلازما)", img: "/images/services/dermatology-service/aesthetic-injections.jpg", cat: "dermatology", unit: "session" },
-  { id: 11, en: "Gynecology Clinics", ar: "النساء والتوليد", img: "/images/services/gyna-service/gyna.jpg", cat: "gynecology", unit: "session" },
-  { id: 12, en: "Pregnancy Follow-Up", ar: "متابعة الحمل", img: "/images/services/gyna-service/pregnancy-followup.webp", cat: "gynecology", unit: "session" },
-  { id: 13, en: "Infertility & Fertility Treatment", ar: "علاج العقم وتأخر الإنجاب", img: "/images/services/gyna-service/infertility.avif", cat: "gynecology", unit: "session" },
-  { id: 14, en: "Women's Aesthetic Treatments", ar: "التجميل النسائي", img: "/images/services/gyna-service/women-aethetic-treatment.webp", cat: "gynecology", unit: "session" },
-  { id: 15, en: "Laser Vaginal Rejuvenation", ar: "ليزر تجديد المهبل", img: "/images/services/gyna-service/laser-vaginal-rejuvenation.jpg", cat: "gynecology", unit: "session" },
-  { id: 16, en: "Vaginal Tightening", ar: "شد المهبل (Tightening)", img: "/images/services/gyna-service/vaginal-tightening.jpg", cat: "gynecology", unit: "session" },
-  { id: 17, en: "Marital & Family Counseling", ar: "الاستشارات الزوجية والأسرية", img: "/images/services/gyna-service/consultation.jpg", cat: "gynecology", unit: "session" },
-  { id: 21, en: "Physical Therapy", ar: "العلاج الطبيعي", img: "/images/services/physicaltherapy_service/physical-therapy.jpg", cat: "physiotherapy", unit: "session" },
-  { id: 22, en: "Rehabilitation", ar: "إعادة التأهيل", img: "/images/services/physicaltherapy_service/rehab.jpg", cat: "physiotherapy", unit: "session" },
-  { id: 23, en: "Posture & Motion Improvement", ar: "تحسين القوام والحركة", img: "/images/services/physicaltherapy_service/posture.webp", cat: "physiotherapy", unit: "session" },
-  { id: 31, en: "Osteopathy", ar: "تقويم العظام", img: "/images/services/nutrition_service/osteopathy.jpg", cat: "osteopathy", unit: "session" },
-  { id: 32, en: "Therapeutic Nutrition", ar: "التغذية العلاجية", img: "/images/services/nutrition_service/therapeutic-diet.png", cat: "osteopathy", unit: "session" },
-  { id: 33, en: "Weight Loss Programs", ar: "برامج إنقاص الوزن", img: "/images/services/nutrition_service/weight-loss.jpg", cat: "osteopathy", unit: "session" },
-  { id: 34, en: "Body Contouring & Shaping", ar: "تنسيق القوام", img: "/images/services/nutrition_service/body-contouring.jpg", cat: "osteopathy", unit: "session" },
+  { id: 1, en: "Skin Dermatology Clinics", ar: "عيادات الجلدية", img: "/images/services/dermatology-service/dermatology.jpeg", cat: "dermatology", unit: "in_clinic" },
+  { id: 2, en: "Skin Care Treatments", ar: "تجميل البشرة", img: "/images/services/dermatology-service/skincare-treatment.jpg", cat: "dermatology", unit: "in_clinic" },
+  { id: 3, en: "Skin Care Sessions", ar: "جلسات العناية بالبشرة", img: "/images/services/dermatology-service/skincare-session.webp", cat: "dermatology", unit: "in_clinic" },
+  { id: 4, en: "Hair & Scalp Treatment", ar: "علاج الشعر والتساقط", img: "/images/services/dermatology-service/hair-scalp-treatment.jpg", cat: "dermatology", unit: "in_clinic" },
+  { id: 5, en: "Laser Hair Removal", ar: "إزالة الشعر بالليزر (رجالي ونسائي)", img: "/images/services/dermatology-service/laser-hair-removal.jpg", cat: "dermatology", unit: "in_clinic" },
+  { id: 6, en: "Therapeutic Laser", ar: "الليزر العلاجي", img: "/images/services/dermatology-service/therapeutic-laser.jpg", cat: "dermatology", unit: "in_clinic" },
+  { id: 7, en: "Aesthetic Injections (Botox/Filler/Plasma)", ar: "حقن تجميلية (بوتوكس / فيلر / بلازما)", img: "/images/services/dermatology-service/aesthetic-injections.jpg", cat: "dermatology", unit: "in_clinic" },
+  { id: 11, en: "Gynecology Clinics", ar: "النساء والتوليد", img: "/images/services/gyna-service/gyna.jpg", cat: "gynecology", unit: "both" },
+  { id: 12, en: "Pregnancy Follow-Up", ar: "متابعة الحمل", img: "/images/services/gyna-service/pregnancy-followup.webp", cat: "gynecology", unit: "both" },
+  { id: 13, en: "Infertility & Fertility Treatment", ar: "علاج العقم وتأخر الإنجاب", img: "/images/services/gyna-service/infertility.avif", cat: "gynecology", unit: "both" },
+  { id: 14, en: "Women's Aesthetic Treatments", ar: "التجميل النسائي", img: "/images/services/gyna-service/women-aethetic-treatment.webp", cat: "gynecology", unit: "in_clinic" },
+  { id: 15, en: "Laser Vaginal Rejuvenation", ar: "ليزر تجديد المهبل", img: "/images/services/gyna-service/laser-vaginal-rejuvenation.jpg", cat: "gynecology", unit: "in_clinic" },
+  { id: 16, en: "Vaginal Tightening", ar: "شد المهبل (Tightening)", img: "/images/services/gyna-service/vaginal-tightening.jpg", cat: "gynecology", unit: "in_clinic" },
+  { id: 17, en: "Marital & Family Counseling", ar: "الاستشارات الزوجية والأسرية", img: "/images/services/gyna-service/consultation.jpg", cat: "gynecology", unit: "both" },
+  { id: 21, en: "Physical Therapy", ar: "العلاج الطبيعي", img: "/images/services/physicaltherapy_service/physical-therapy.jpg", cat: "physiotherapy", unit: "in_clinic" },
+  { id: 22, en: "Rehabilitation", ar: "إعادة التأهيل", img: "/images/services/physicaltherapy_service/rehab.jpg", cat: "physiotherapy", unit: "in_clinic" },
+  { id: 23, en: "Posture & Motion Improvement", ar: "تحسين القوام والحركة", img: "/images/services/physicaltherapy_service/posture.webp", cat: "physiotherapy", unit: "in_clinic" },
+  { id: 31, en: "Osteopathy", ar: "تقويم العظام", img: "/images/services/nutrition_service/osteopathy.jpg", cat: "osteopathy", unit: "in_clinic" },
+  { id: 32, en: "Therapeutic Nutrition", ar: "التغذية العلاجية", img: "/images/services/nutrition_service/therapeutic-diet.png", cat: "osteopathy", unit: "both" },
+  { id: 33, en: "Weight Loss Programs", ar: "برامج إنقاص الوزن", img: "/images/services/nutrition_service/weight-loss.jpg", cat: "osteopathy", unit: "both" },
+  { id: 34, en: "Body Contouring & Shaping", ar: "تنسيق القوام", img: "/images/services/nutrition_service/body-contouring.jpg", cat: "osteopathy", unit: "in_clinic" },
 ];
 
 export const CATEGORY_LABELS: Record<Category, { en: string; ar: string }> = {
@@ -118,3 +125,175 @@ export const CATEGORY_LABELS: Record<Category, { en: string; ar: string }> = {
   physiotherapy: { en: "Physical Therapy", ar: "العلاج الطبيعي" },
   osteopathy: { en: "Osteopathy & Nutrition", ar: "تقويم العظام والتغذية" },
 };
+
+export function getEffectiveServicePrice(
+  service: { price?: number; branchPricing?: any[] | null } | null | undefined,
+  branchNameOrId?: string | number | null,
+  branchesList?: Array<{ id: number | string; name?: string; name_en?: string; name_ar?: string }> | null
+): number {
+  if (!service) return 0;
+
+  let targetBranchName: string | null = null;
+  if (branchNameOrId !== undefined && branchNameOrId !== null) {
+    if (typeof branchNameOrId === "string" && isNaN(Number(branchNameOrId))) {
+      targetBranchName = branchNameOrId;
+    } else if (branchesList && branchesList.length > 0) {
+      const bId = Number(branchNameOrId);
+      const bObj = branchesList.find((b) => Number(b.id) === bId);
+      if (bObj) {
+        targetBranchName = bObj.name || bObj.name_en || bObj.name_ar || null;
+      }
+    }
+  }
+
+  let bpItem: any = null;
+  if (targetBranchName && service.branchPricing && Array.isArray(service.branchPricing)) {
+    bpItem = service.branchPricing.find(
+      (bp) => bp && bp.name && bp.name.toLowerCase() === targetBranchName!.toLowerCase()
+    );
+  }
+
+  // Fallback to default branch pricing
+  if (!bpItem && service.branchPricing && Array.isArray(service.branchPricing)) {
+    bpItem = service.branchPricing.find((bp) => bp && bp.isDefault);
+  }
+
+  const basePrice = bpItem ? Number(bpItem.price) : Number(service.price ?? 0);
+
+  // Apply promotion if enabled
+  if (bpItem && bpItem.promotion && bpItem.promotion.enabled) {
+    const promo = bpItem.promotion;
+
+    // Compare date strings using Egypt local time
+    const now = new Date();
+    const egyptTimeStr = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+    const todayStr = egyptTimeStr.slice(0, 10); // YYYY-MM-DD
+
+    let isDateActive = true;
+    if (promo.startDate && todayStr < promo.startDate) {
+      isDateActive = false;
+    }
+    if (promo.endDate && todayStr > promo.endDate) {
+      isDateActive = false;
+    }
+
+    if (isDateActive) {
+      let finalPrice = basePrice;
+      const val = Number(promo.value) || 0;
+      if (promo.type === "percentage") {
+        finalPrice = basePrice * (1 - val / 100);
+      } else if (promo.type === "fixed") {
+        finalPrice = basePrice - val;
+      }
+      return Math.max(0, Math.round(finalPrice));
+    }
+  }
+
+  return basePrice;
+}
+
+export interface ServicePriceDetails {
+  basePrice: number;
+  discountedPrice: number;
+  hasPromotion: boolean;
+  promotionText?: string;
+  promotionTextAr?: string;
+}
+
+export function getServicePriceDetails(
+  service: { price?: number; branchPricing?: any[] | null } | null | undefined,
+  branchNameOrId?: string | number | null,
+  branchesList?: Array<{ id: number | string; name?: string; name_en?: string; name_ar?: string }> | null
+): ServicePriceDetails {
+  const result: ServicePriceDetails = {
+    basePrice: 0,
+    discountedPrice: 0,
+    hasPromotion: false,
+  };
+
+  if (!service) return result;
+
+  let targetBranchName: string | null = null;
+  if (branchNameOrId !== undefined && branchNameOrId !== null) {
+    if (typeof branchNameOrId === "string" && isNaN(Number(branchNameOrId))) {
+      targetBranchName = branchNameOrId;
+    } else if (branchesList && branchesList.length > 0) {
+      const bId = Number(branchNameOrId);
+      const bObj = branchesList.find((b) => Number(b.id) === bId);
+      if (bObj) {
+        targetBranchName = bObj.name || bObj.name_en || bObj.name_ar || null;
+      }
+    }
+  }
+
+  let bpItem: any = null;
+  if (targetBranchName && service.branchPricing && Array.isArray(service.branchPricing)) {
+    bpItem = service.branchPricing.find(
+      (bp) => bp && bp.name && bp.name.toLowerCase() === targetBranchName!.toLowerCase()
+    );
+  }
+
+  // Fallback to default branch pricing or any branch with active promotion
+  if (!bpItem && service.branchPricing && Array.isArray(service.branchPricing)) {
+    const now = new Date();
+    const egyptTimeStr = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+    const todayStr = egyptTimeStr.slice(0, 10);
+
+    const activePromoBranch = service.branchPricing.find((bp) => {
+      if (bp && bp.promotion && bp.promotion.enabled) {
+        const promo = bp.promotion;
+        let isDateActive = true;
+        if (promo.startDate && todayStr < promo.startDate) isDateActive = false;
+        if (promo.endDate && todayStr > promo.endDate) isDateActive = false;
+        return isDateActive;
+      }
+      return false;
+    });
+
+    if (activePromoBranch) {
+      bpItem = activePromoBranch;
+    } else {
+      bpItem = service.branchPricing.find((bp) => bp && bp.isDefault);
+    }
+  }
+
+  const basePrice = bpItem ? Number(bpItem.price) : Number(service.price ?? 0);
+  result.basePrice = basePrice;
+  result.discountedPrice = basePrice;
+
+  // Apply promotion if enabled
+  if (bpItem && bpItem.promotion && bpItem.promotion.enabled) {
+    const promo = bpItem.promotion;
+
+    // Compare date strings using Egypt local time
+    const now = new Date();
+    const egyptTimeStr = now.toLocaleDateString("en-CA", { timeZone: "Africa/Cairo" });
+    const todayStr = egyptTimeStr.slice(0, 10); // YYYY-MM-DD
+
+    let isDateActive = true;
+    if (promo.startDate && todayStr < promo.startDate) {
+      isDateActive = false;
+    }
+    if (promo.endDate && todayStr > promo.endDate) {
+      isDateActive = false;
+    }
+
+    if (isDateActive) {
+      let finalPrice = basePrice;
+      const val = Number(promo.value) || 0;
+      if (promo.type === "percentage") {
+        finalPrice = basePrice * (1 - val / 100);
+        result.promotionText = `${val}% OFF`;
+        result.promotionTextAr = `خصم ${val}%`;
+      } else if (promo.type === "fixed") {
+        finalPrice = basePrice - val;
+        result.promotionText = `SAVE ${val} EGP`;
+        result.promotionTextAr = `وفر ${val} ج.م`;
+      }
+      result.discountedPrice = Math.max(0, Math.round(finalPrice));
+      result.hasPromotion = result.discountedPrice < basePrice;
+    }
+  }
+
+  return result;
+}

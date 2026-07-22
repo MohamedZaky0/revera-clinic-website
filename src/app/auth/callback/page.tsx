@@ -19,9 +19,9 @@ function AuthCallbackContent() {
     const isRecovery = hash.includes("type=recovery");
 
     const getRedirectUrl = (defaultNext: string) => {
-      if (isInvite) return "/admin?setup=true";
-      if (isRecovery) return "/admin?recovery=true";
-      return defaultNext;
+      if (isInvite || isRecovery) return "/auth/setup";
+      if (defaultNext && defaultNext !== "/admin") return defaultNext;
+      return "/admin";
     };
 
     // 1. Listen for auth state changes. When signed in, redirect to next (or /admin).
