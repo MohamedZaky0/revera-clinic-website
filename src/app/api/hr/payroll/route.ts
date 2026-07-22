@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyHrAccess } from '@/lib/auth';
+import { CLIENT } from '@/config/client';
 
 export async function GET(req: Request) {
   const auth = await verifyHrAccess(req);
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
     const { data: employees, error: empErr } = await supabaseServer
       .from('employee_accounts')
       .select('id, salary, required_target_amount, bonus_percentage, target_type, bonus_type')
-      .not('email', 'eq', 'superadmin@revera.com'); // skip owner
+      .not('email', 'eq', CLIENT.superadminEmail); // skip owner
 
     if (empErr) throw empErr;
     if (!employees || employees.length === 0) {

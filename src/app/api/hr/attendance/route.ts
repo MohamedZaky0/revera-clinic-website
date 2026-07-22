@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyHrAccess } from '@/lib/auth';
+import { CLIENT } from '@/config/client';
 import https from 'https';
 
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -279,7 +280,7 @@ export async function POST(req: Request) {
 
     const isSuperadmin = employee.role_name?.toLowerCase() === 'superadmin' || 
                          user.email?.toLowerCase() === 'saif@superadmin.com' ||
-                         user.email?.toLowerCase() === 'superadmin@revera.com';
+                         user.email?.toLowerCase() === CLIENT.superadminEmail.toLowerCase();
 
     // Global superadmin without assigned branch auto-checks in
     if (isSuperadmin && !employee.branch_id) {

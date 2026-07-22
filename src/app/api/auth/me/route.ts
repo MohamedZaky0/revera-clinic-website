@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { CLIENT } from '@/config/client';
 
 export async function GET(req: Request) {
   try {
@@ -34,8 +35,8 @@ export async function GET(req: Request) {
       );
     }
 
-    // 1. Check if user is the hardcoded superadmin bypass
-    if (email.toLowerCase() === 'superadmin@revera.com') {
+    // 1. Check if user is the superadmin bypass
+    if (email.toLowerCase() === CLIENT.superadminEmail.toLowerCase()) {
       return NextResponse.json({
         role: 'superadmin',
         permissions: ['Bookings', 'Customers', 'Providers', 'Services', 'Settings'],

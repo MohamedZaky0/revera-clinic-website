@@ -1,4 +1,5 @@
 import { supabaseServer } from './supabaseServer';
+import { CLIENT } from '@/config/client';
 
 export async function verifyHrAccess(req: Request) {
   try {
@@ -19,7 +20,7 @@ export async function verifyHrAccess(req: Request) {
     const email = user.email || '';
 
     // 1. Superadmin bypass
-    if (email.toLowerCase() === 'superadmin@revera.com') {
+    if (email.toLowerCase() === CLIENT.superadminEmail.toLowerCase()) {
       return { isAuthorized: true, role: 'superadmin', user };
     }
 
