@@ -4,6 +4,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { CLIENT } from "@/config/client";
 
 const QUICK_LINK_HREFS = ["/", "/about", "/services", "/contact"];
 
@@ -529,11 +530,11 @@ export function SiteFooter() {
                     </svg>
                     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                       <a
-                        href="tel:+201035595691"
+                        href={`tel:${CLIENT.phoneTel}`}
                         style={{ fontSize: "14px", color: "rgba(255,255,255,0.85)", textDecoration: "none", fontWeight: 500 }}
                         className="hover:underline"
                       >
-                        {isRTL ? "القاهرة الجديدة: (+20) 01035595691" : "New Cairo: (+20) 01035595691"}
+                        {isRTL ? `القاهرة الجديدة: ${CLIENT.phoneDisplay}` : `New Cairo: ${CLIENT.phoneDisplay}`}
                       </a>
                       <a
                         href="tel:+201023122323"

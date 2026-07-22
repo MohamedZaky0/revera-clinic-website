@@ -256,3 +256,19 @@ The Bookings → Schedule view (`calendarView === "Schedule"` in `src/app/admin/
 
 **Trade-offs:**
 - Still single-day only in the Schedule view itself; no multi-day/week view was requested or built.
+
+---
+
+## DEC-013: Inline Customer Details Profile and Edit Drawer
+
+**Date:** 2026-07-22
+**Status:** Decided — active
+
+**Context:**
+The admin panel Customer profile (`viewingCustomerProfile`) and Customer edit form (`showCustomerFormModal`) originally rendered as fixed overlay popups (`fixed inset-0`) obscuring the dashboard. The user requested that these panels open inline within the Customers page view, following the pattern established for Employee management.
+
+**Chosen Option:**
+- Replaced the fixed overlay modal components in `src/app/admin/page.tsx` with an inline panel view rendered inside `activeNav === "Customers"`.
+- Maintained conditional table rendering (`!viewingCustomerProfile && !showCustomerFormModal`) so opening a customer profile or edit form hides the customer table and displays the panel inline with a "Back to Customers" navigation header.
+- Verified zero build/TypeScript errors using `npm run build`.
+

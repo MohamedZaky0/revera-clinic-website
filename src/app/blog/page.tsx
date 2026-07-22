@@ -7,9 +7,11 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 
+import { CLIENT } from "@/config/client";
+
 export const metadata: Metadata = {
-  title: "Blog - Revera Clinics | Medical Center",
-  description: "Latest insights on beauty, skincare, and medical care from Revera Clinics.",
+  title: `Blog - ${CLIENT.name} | ${CLIENT.tagline}`,
+  description: `Latest insights on beauty, skincare, and medical care from ${CLIENT.name}.`,
 };
 
 export default function BlogPage() {

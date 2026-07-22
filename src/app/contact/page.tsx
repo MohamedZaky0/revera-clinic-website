@@ -7,10 +7,11 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 
+import { CLIENT } from "@/config/client";
+
 export const metadata: Metadata = {
-  title: "Contact Us - Revera Clinics | Medical Center",
-  description:
-    "Get in touch with Revera Clinics. Visit us at 36 A El-Nozha St, Ard El Golf, Nasr City, or call (+20) 01125787019.",
+  title: `Contact Us - ${CLIENT.name} | ${CLIENT.tagline}`,
+  description: `Get in touch with ${CLIENT.name}. Phone: ${CLIENT.phoneDisplay}.`,
 };
 
 export default function ContactPage() {

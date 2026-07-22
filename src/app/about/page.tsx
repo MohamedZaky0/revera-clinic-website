@@ -13,10 +13,11 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 
+import { CLIENT } from "@/config/client";
+
 export const metadata: Metadata = {
-  title: "About Us - Revera Clinics | Medical Center",
-  description:
-    "Revera Clinics, under the supervision of Dr. Mahmoud Nasr Abu Obeid, Consultant Surgical Dermatologist with over 15 years of experience.",
+  title: `About Us - ${CLIENT.name} | ${CLIENT.tagline}`,
+  description: `${CLIENT.name}, leading medical center offering specialized healthcare and cosmetic services.`,
 };
 
 export default function AboutPage() {

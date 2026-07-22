@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Phone, ChevronDown, User, LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { CLIENT } from "@/config/client";
 
 const NAV_LINKS = [
   { key: "home" as const, href: "/" },
@@ -222,7 +223,7 @@ export function Navbar() {
             {/* Phone */}
             {!user && (
               <a
-                href="tel:+201035595691"
+                href={`tel:${CLIENT.phoneTel}`}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -241,7 +242,7 @@ export function Navbar() {
                 }}
               >
                 <Phone size={18} strokeWidth={1.5} />
-                <span>(+20) 01035595691</span>
+                <span>{CLIENT.phoneDisplay}</span>
               </a>
             )}
 
@@ -615,7 +616,7 @@ export function Navbar() {
 
               {/* Mobile phone */}
               <a
-                href="tel:+201035595691"
+                href={`tel:${CLIENT.phoneTel}`}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -627,7 +628,7 @@ export function Navbar() {
                 }}
               >
                 <Phone size={18} strokeWidth={1.5} />
-                <span>(+20) 01035595691</span>
+                <span>{CLIENT.phoneDisplay}</span>
               </a>
 
               {/* Mobile language selector */}

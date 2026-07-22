@@ -4,6 +4,8 @@ import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AlertConfirmProvider } from "@/contexts/AlertConfirmContext";
 
+import { CLIENT } from "@/config/client";
+
 const marcellus = Marcellus({
   weight: "400",
   subsets: ["latin"],
@@ -19,12 +21,11 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Revera Clinics - Medical Center",
-  description:
-    "Expert dermatology and cosmetic surgery services with personalized care designed to help you achieve your beauty and health goals through advanced medical techniques.",
+  title: `${CLIENT.name} - ${CLIENT.tagline}`,
+  description: CLIENT.metaDescription,
   icons: {
-    icon: "/icon.png",
-    apple: "/icon.png",
+    icon: CLIENT.faviconPath,
+    apple: CLIENT.faviconPath,
   },
 };
 
