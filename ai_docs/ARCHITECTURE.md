@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Revera Clinics System Architecture
 
-> **Last Updated:** 2026-07-20
-> **Audited from:** live source code (all previous content was for a different project — discarded)
+> **Last Updated:** 2026-07-21
+> **Audited from:** live source code, cross-checked against `supabase/migrations/` (all previous content was for a different project — discarded)
 
 ---
 
@@ -51,6 +51,22 @@ src/
 │       ├── provider-attendance/   GET/POST provider check-in/out by date
 │       ├── auth/me/route.ts       Verify JWT → return role + permissions from DB
 │       ├── auth/employee-email/   Lookup employee email by employee_id
+│       ├── rooms/route.ts         GET/POST/PATCH/DELETE rooms (per-branch clinical/admin rooms)
+│       ├── service-rooms/route.ts GET/POST/DELETE service↔room junction
+│       ├── prescriptions/route.ts GET/POST prescriptions (Supabase, local JSON fallback on error)
+│       ├── hr/payroll/            GET/POST monthly payroll runs for employee_accounts
+│       ├── hr/doctor-payroll/     GET/POST monthly payroll runs for providers (fixed+commission)
+│       ├── hr/leaves/             GET/POST/PATCH leave requests
+│       ├── hr/attendance/         GET/POST employee GPS check-in/out (800m geofence)
+│       ├── hr/performance/        GET/POST performance reviews
+│       ├── hr/alerts/             GET/POST missing-checkin alerts
+│       ├── employees/notes/       GET/POST administrative employee notes
+│       ├── providers/schedule-audit-logs/  GET provider schedule change history
+│       ├── inventory/products/    GET/POST/PUT inventory products (+ /sales for POS transactions)
+│       ├── inventory/devices/     GET/POST devices (+ /[id]/reset-pulses for maintenance)
+│       ├── customers/products/    GET/POST customer product purchase balances (`customer_product_balances` table — no migration file, see DB_SCHEMA.md drift note)
+│       ├── medical-records/       GET/POST intake form + reports (`medical_records`/`medical_reports` tables — no migration file, see DB_SCHEMA.md drift note)
+│       ├── customer-avatars/      GET/POST avatar images — stored in `page_settings` (key `customer_avatars`), not a dedicated table
 │       └── health/supabase/       Env var diagnostics
 │
 ├── components/                   All public website UI components
@@ -79,8 +95,9 @@ src/
 └── types/index.ts                 Branch, Translation, ServiceCard, BlogPost interfaces
 
 public/images/                    Static assets (logo, heroes, service images, doctors)
-data/                             JSON fallbacks (providers.json, page_settings.json)
+data/                             JSON fallbacks (providers.json, page_settings.json, prescriptions.json)
 scratch/                          Dev/seed scripts (not production code)
+supabase/migrations/              SQL migration history (manual — run via Supabase SQL Editor, see its README)
 ```
 
 ---
@@ -122,7 +139,10 @@ Browser → /admin/page.tsx (client component)
 
 ---
 
-## Supabase Tables (confirmed from API routes + code)
+## Supabase Tables (confirmed from `supabase/migrations/` + API routes)
+
+See `DB_SCHEMA.md` for full column-level detail — this is a purpose summary only, kept short
+so it doesn't drift; update both when a table is added.
 
 | Table | Purpose | Branch-scoped? |
 |---|---|---|
@@ -130,12 +150,28 @@ Browser → /admin/page.tsx (client component)
 | `services` | Service catalog | Via `branch_pricing` JSON field |
 | `categories` | Service categories | No |
 | `branches` | Clinic branches | Root entity |
-| `providers` | Doctors/staff | No |
-| `page_settings` | CMS content (JSONB) | No — multiple keys; `key='home'` for homepage |
+| `providers` | Doctors/staff | Yes — `branch_id` column (added 2026-06-26) |
+| `page_settings` | CMS content (JSONB) | No — multiple keys; also used as a JSON fallback store for several other tables (dual-storage pattern) |
 | `customers` | Patient/customer records with demographics | No |
-| `employee_accounts` | Admin/staff accounts linked to Supabase Auth | No |
+| `employee_accounts` | Admin/staff accounts linked to Supabase Auth | Yes — `branch_id` column |
 | `roles` | Role definitions with permissions array | No |
-| `provider_attendance` | Daily check-in/out records per provider | No |
+| `provider_attendance` | Daily check-in/out per doctor (no GPS) | No |
+| `rooms` | Physical rooms per branch, for room-based booking | Yes |
+| `service_rooms` | Junction: which rooms a service can use | Via `rooms` |
+| `hr_payroll` | Monthly payroll runs for `employee_accounts` | No |
+| `doctor_payroll` | Monthly payroll runs for `providers` (fixed+commission) | No |
+| `hr_leave_requests` | Employee leave requests | No |
+| `hr_performance_reviews` | Employee performance reviews | No |
+| `hr_attendance` | Employee GPS check-in/out (800m geofence) | Via `employee_accounts.branch_id` |
+| `hr_missing_alerts` | Missed-checkin alerts | No |
+| `employee_notes` | Administrative notes about an employee | No |
+| `provider_schedule_audit_logs` | Audit trail for doctor schedule changes | No |
+| `prescriptions` | Real (not mock) — diagnosis/medications/follow-up per customer | No |
+| `inventory_products` | Real (not mock) — product catalog + stock | Via `branch_name` (text, not FK) |
+| `product_sales` | Real (not mock) — POS transaction log | Via `branch_name` (text, not FK) |
+| `inventory_devices` | Real (not mock) — laser/medical equipment + pulse counters | Via `branch_name` (text, not FK) |
+| `device_maintenance_history` | Maintenance/pulse-reset log per device | No |
+| `medical_records`, `medical_reports`, `customer_product_balances` | Real, but **no migration file exists for these** — schema drift, see `DB_SCHEMA.md` | No |
 
 **`branch` is the topmost scoping unit. There is no org/tenant layer above it.**
 

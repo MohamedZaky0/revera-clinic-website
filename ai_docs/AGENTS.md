@@ -24,7 +24,7 @@ Before making any code changes:
 
 - This is a **single-tenant** clinic management system for Revera Clinics only.
 - The **admin panel (`/admin`) has a browser login gate** via Supabase Auth + `employee_accounts`/`roles`, but **API routes are not protected** — direct HTTP calls to `/api/*` are unauthenticated.
-- Many admin sections (Finance, Payroll, Prescriptions, Inventory, POS) are **mock UI only** — backed by hardcoded constant arrays, not Supabase. Do not treat them as real features.
+- Prescriptions, Payroll (`hr_payroll`/`doctor_payroll`), Inventory (products/devices), and POS (`product_sales`) are **real Supabase-backed features** as of 2026-07-20/21 — do not treat them as mock. What's still mock UI only (hardcoded arrays, not Supabase): consultation notes, treatment plans, before/after photos, the Finances Dashboard aggregate reporting view, Refunds, Shipping. See `DB_SCHEMA.md` for the verified table list.
 - **Patient auth is non-functional** — the OTP flow is UI-only.
 - Provider attendance uses **browser geolocation + 800m geofence**; it can be spoofed and is bypassed for admin/superadmin roles.
 - **`branch` is the topmost scoping unit.** There is no org/tenant layer.
