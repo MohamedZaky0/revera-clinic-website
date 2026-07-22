@@ -25,5 +25,8 @@ export const CLIENT = {
   storagePrefix: "revera",
 
   // Superadmin Email Bypass
-  superadminEmail: "superadmin@revera.com",
+  superadminEmail: process.env.NEXT_PUBLIC_SUPERADMIN_EMAIL || "superadmin@revera.com",
 } as const;
+
+export const clientConfig = CLIENT;
+

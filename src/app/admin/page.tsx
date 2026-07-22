@@ -2220,7 +2220,7 @@ export default function AdminPage() {
       if (adminRole !== "superadmin" && adminRole !== "admin" && profileEmployee.branch_id) {
         setBranch(profileEmployee.branch_id);
       }
-    } else if (adminEmail.toLowerCase() === "superadmin@revera.com") {
+    } else if (adminEmail.toLowerCase() === CLIENT.superadminEmail.toLowerCase()) {
       setProfileName("System Owner");
     }
   }, [adminEmail, employeesList, adminRole]);
@@ -15164,7 +15164,7 @@ export default function AdminPage() {
 
           {/* ── SETTINGS VIEWS ── */}
           {activeNav === "Profile" && (() => {
-            const isSuperadminBypass = adminEmail?.toLowerCase() === "superadmin@revera.com";
+            const isSuperadminBypass = adminEmail?.toLowerCase() === CLIENT.superadminEmail.toLowerCase();
             const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
             
             // Check Egyptian ID check details
@@ -19241,7 +19241,7 @@ export default function AdminPage() {
                   <option value="Night">Night Shift</option>
                 </select>
                 <div className="flex items-center justify-end text-xs font-semibold text-[#5A6A51] px-2">
-                  {loadingRolesAndEmployees ? "Loading..." : `${employeesList.filter((emp: any) => emp.role_name !== 'superadmin' && emp.employee_id !== 'superadmin' && emp.email?.toLowerCase() !== 'saif@superadmin.com' && emp.email?.toLowerCase() !== 'superadmin@revera.com').length} Total Employees`}
+                  {loadingRolesAndEmployees ? "Loading..." : `${employeesList.filter((emp: any) => emp.role_name !== 'superadmin' && emp.employee_id !== 'superadmin' && emp.email?.toLowerCase() !== 'saif@superadmin.com' && emp.email?.toLowerCase() !== CLIENT.superadminEmail.toLowerCase()).length} Total Employees`}
                 </div>
               </div>
 
@@ -19276,7 +19276,7 @@ export default function AdminPage() {
                             emp.role_name === 'superadmin' ||
                             emp.employee_id === 'superadmin' ||
                             emp.email?.toLowerCase() === 'saif@superadmin.com' ||
-                            emp.email?.toLowerCase() === 'superadmin@revera.com';
+                            emp.email?.toLowerCase() === CLIENT.superadminEmail.toLowerCase();
                           if (isSuperadmin) return false;
                           if (employeeFilterDepartment !== "All" && emp.department !== employeeFilterDepartment) return false;
                           if (employeeFilterShift !== "All") {
@@ -22269,7 +22269,7 @@ export default function AdminPage() {
                   const roleName = pay.employee_accounts?.role_name;
                   if (
                     email === "saif@superadmin.com" ||
-                    email === "superadmin@revera.com" ||
+                    email === CLIENT.superadminEmail.toLowerCase() ||
                     roleName === "superadmin"
                   ) {
                     return false;

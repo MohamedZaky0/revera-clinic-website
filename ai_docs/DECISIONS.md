@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-07-20
+> **Last Updated:** 2026-07-22
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
