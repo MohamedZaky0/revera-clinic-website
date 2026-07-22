@@ -54,7 +54,6 @@ export function AuthModal() {
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<AuthStep>(1);
-  const [demoMode, setDemoMode] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [authType, setAuthType] = useState<"phone" | "email">("email");
 
@@ -97,7 +96,6 @@ export function AuthModal() {
     setCustomerId(null);
     setLoadingProfileOnboarding(false);
     setHasPhoneInDb(false);
-    setDemoMode(false);
     setVerifying(false);
     setAuthType("email");
     setEmailInput("");
@@ -315,26 +313,27 @@ export function AuthModal() {
     // Normalize phone number in the UI/state to the 11-digit format
     setPhone(localPhone);
 
-    if (supabase) {
-      try {
-        console.log("Sending SMS OTP via Supabase to:", e164Phone);
-        const { error } = await supabase.auth.signInWithOtp({
-          phone: e164Phone,
-        });
-        if (error) {
-          setPhoneError(error.message || "Failed to send code. Please try again.");
-          setSending(false);
-          return;
-        }
-        console.log("Real Supabase OTP sent successfully!");
-        setDemoMode(false);
-      } catch (err: any) {
-        setPhoneError(err.message || "An error occurred while sending the code.");
+    if (!supabase) {
+      setPhoneError("Customer authentication is unavailable. Please contact the clinic.");
+      setSending(false);
+      return;
+    }
+
+    try {
+      console.log("Sending SMS OTP via Supabase to:", e164Phone);
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: e164Phone,
+      });
+      if (error) {
+        setPhoneError(error.message || "Failed to send code. Please try again.");
         setSending(false);
         return;
       }
-    } else {
-      setDemoMode(true);
+      console.log("Real Supabase OTP sent successfully!");
+    } catch (err: any) {
+      setPhoneError(err.message || "An error occurred while sending the code.");
+      setSending(false);
+      return;
     }
 
     setSending(false);
@@ -357,32 +356,28 @@ export function AuthModal() {
     }
     let verifiedSuccess = false;
 
-    if (!demoMode && supabase) {
-      try {
-        const { error } = await supabase.auth.verifyOtp({
-          phone: e164Phone,
-          token: otp,
-          type: "sms",
-        });
-        if (error) {
-          setOtpError(error.message);
-          setVerifying(false);
-          return;
-        }
-        verifiedSuccess = true;
-      } catch (err: any) {
-        setOtpError(err.message || "Verification failed. Please try again.");
+    if (!supabase) {
+      setOtpError("Customer authentication is unavailable. Please contact the clinic.");
+      setVerifying(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        phone: e164Phone,
+        token: otp,
+        type: "sms",
+      });
+      if (error) {
+        setOtpError(error.message);
         setVerifying(false);
         return;
       }
-    } else {
-      if (otp === "123456") {
-        verifiedSuccess = true;
-      } else {
-        setOtpError("Verification error. Try using '123456' as a demo code.");
-        setVerifying(false);
-        return;
-      }
+      verifiedSuccess = true;
+    } catch (err: any) {
+      setOtpError(err.message || "Verification failed. Please try again.");
+      setVerifying(false);
+      return;
     }
 
     if (verifiedSuccess) {
@@ -417,7 +412,7 @@ export function AuthModal() {
     setSending(true);
     const { e164Phone, isValid } = cleanAndFormatPhone(phone);
 
-    if (!demoMode && supabase && isValid) {
+    if (supabase && isValid) {
       try {
         const { error } = await supabase.auth.signInWithOtp({
           phone: e164Phone,
@@ -462,25 +457,7 @@ export function AuthModal() {
     }
 
     if (!supabase) {
-      console.warn("Supabase not initialized. Using demo email auth fallback.");
-      try {
-        const res = await fetch(`/api/customers?email=${emailInput}`);
-        if (res.ok) {
-          const customer = await res.json();
-          if (customer) {
-            localStorage.setItem("revera_user", JSON.stringify(customer));
-            window.dispatchEvent(new CustomEvent("revera-auth-change"));
-            setVerifying(false);
-            handleClose();
-            return;
-          }
-        }
-      } catch (err) {
-        console.error("Demo email auth customer lookup error:", err);
-      }
-      
-      setEmail(emailInput);
-      setStep(3);
+      setEmailError("Customer authentication is unavailable. Please contact the clinic.");
       setVerifying(false);
       return;
     }
@@ -907,22 +884,6 @@ export function AuthModal() {
             >
               {sending ? t.auth.sending : t.auth.resendOtp}
             </button>
-
-            {demoMode && (
-              <div
-                className="text-xs p-3 rounded-lg text-center"
-                style={{
-                  backgroundColor: "rgba(196,174,124,0.1)",
-                  color: "var(--cr-primary)",
-                  border: "1px dashed var(--cr-primary)",
-                  marginTop: "8px"
-                }}
-              >
-                {isRTL
-                  ? "وضع التجربة نشط: استخدم رمز التحقق 123456 للمتابعة."
-                  : "Demo Mode Active: Enter verification code 123456 to continue."}
-              </div>
-            )}
           </div>
         )}
 

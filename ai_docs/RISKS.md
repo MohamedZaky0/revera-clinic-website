@@ -102,7 +102,7 @@ Correctly stored in env vars (`.env.local`):
 The admin page now has a full Supabase email/password login gate. Employees are managed via `employee_accounts` + `roles` tables. Invites are sent via Supabase Auth. Superadmin access is determined by the persisted employee role. `/api/auth/me` verifies the JWT and returns role/permissions.
 
 **Remaining gap:**
-A migration at `supabase/migrations/20260722140000_enable_row_level_security.sql` enables RLS for all `public` tables, preventing direct browser/anon-key table access once applied to Supabase. API routes still use the service role key, which bypasses RLS, so each sensitive API route still requires server-side authorization before this risk can be closed.
+A migration at `supabase/migrations/20260722140000_enable_row_level_security.sql` enables RLS for all `public` tables, preventing direct browser/anon-key table access once applied to Supabase. Middleware rejects unauthenticated requests to employee, HR, role, and provider schedule-audit endpoints. API routes still use the service role key, which bypasses RLS, so remaining sensitive routes require server-side authorization before this risk can be closed.
 
 **What would fully resolve this:**
 - Add Next.js middleware that validates a Supabase session cookie for `/api/` routes
@@ -115,13 +115,10 @@ A migration at `supabase/migrations/20260722140000_enable_row_level_security.sql
 
 **Severity:** Medium
 **Type:** Feature completeness
+**Status:** Mitigated 2026-07-22
 
-**Description:**
-The `AuthModal` collects a phone number, shows an OTP input, and then a profile form —
-but no actual OTP is sent (it uses `setTimeout`), no user is created in Supabase, and no
-session is established. The booking flow works without auth.
-
-**Impact:** Patients cannot log in or track their bookings. Booking history is not tied to any account.
+**Resolution:**
+`AuthModal` now sends and verifies OTPs through Supabase Auth only. Insecure demo fallbacks, including the `123456` verification code and unauthenticated email lookup fallback, were removed. If Supabase Auth is unavailable, sign-in fails safely with a user-facing error.
 
 ---
 
@@ -217,7 +214,7 @@ The Bookings → Schedule view (`calendarView === "Schedule"`, `src/app/admin/pa
 - Cell now shows at most `MAX_VISIBLE_BOOKINGS = 3` cards; any beyond that render as a `+N more` pill instead of clipping silently.
 - Clicking `+N more` sets `docFilter` to that cell's doctor, `dateFilter` to that day (`YYYY-MM-DD`), resets `statusFilter`/`typeFilter` to `"All"`, and switches `calendarView` to `"List"` — narrowing to exactly that doctor's bookings on that day.
 - A `dateFilter` state was added to `filteredReservations` (previously List/Calendar had no date filter at all) with a date input + clear button in the existing Filter modal, and an active-filter chip row with a "Clear all" button in the List view header — so the filtered state from a `+N more` jump is visible and easy to back out of, not a hidden/stuck state.
-- Residual gap: the List view has no date filter, so the jump narrows by doctor only, not by the specific day/slot — acceptable since the doctor filter is the highest-value narrowing already wired into `filteredReservations`.
+- The List view applies the selected date filter, so the jump narrows to that doctor's bookings on the selected day.
 
 ---
 
