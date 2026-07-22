@@ -16,15 +16,28 @@ export async function middleware(request: NextRequest) {
   if (isProtectedApi) {
     const authHeader = request.headers.get('authorization') || '';
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    // Allow requests with an Authorization header token or Supabase session cookie
-    const hasToken = !!token || request.cookies.has('sb-access-token') || request.headers.has('x-supabase-auth');
-
-    if (!hasToken) {
+    if (!token) {
       return NextResponse.json(
         { error: 'Unauthorized: Authentication required for administrative endpoint.' },
         { status: 401 }
       );
+    }
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json({ error: 'Authentication service is not configured.' }, { status: 500 });
+    }
+
+    const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        apikey: supabaseAnonKey,
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!authResponse.ok) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid or expired session.' }, { status: 401 });
     }
   }
 
