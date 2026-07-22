@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireAdministratorAccess } from '@/lib/access';
 
-export async function GET() {
+export async function GET(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
   try {
     const { data: employees, error } = await supabaseServer
       .from('employee_accounts')
@@ -41,6 +44,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const body = await req.json();
     const { email, name, roleName, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType } = body;
@@ -207,6 +213,9 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const body = await req.json();
     const { id, roleName, name, phone, department, shift, salary, nationalId, nationalIdFront, nationalIdBack, address, branchId, contractFile, contractFileName, requiredTargetAmount, bonusPercentage, targetType, bonusType, resendInvite } = body;
@@ -385,6 +394,9 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

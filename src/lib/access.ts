@@ -54,3 +54,12 @@ export async function requireStaffAccess(req: Request): Promise<AccessResult> {
 export function hasStaffPermission(access: StaffAccess, permission: string) {
   return access.role === "superadmin" || access.role === "admin" || access.permissions.includes(permission);
 }
+
+export async function requireAdministratorAccess(req: Request): Promise<AccessResult> {
+  const result = await requireStaffAccess(req);
+  if ("error" in result) return result;
+  if (result.access.role !== "superadmin" && result.access.role !== "admin") {
+    return { error: "Administrator access is required.", status: 403 };
+  }
+  return result;
+}
