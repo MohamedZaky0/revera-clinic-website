@@ -632,3 +632,44 @@ normal operations with an `is_opening` flag and a shared `as_of` date. Both dire
 - If opening balances are wrong, every derived balance stays wrong; the import needs a review-and-
   confirm step, not a blind CSV load.
 
+---
+
+## DEC-025: Expired Package Sessions Either Convert To Revenue Or Are Extended
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+**Closes the open question left by DEC-023.**
+
+**Context:**
+A package carries a validity period. When it lapses with sessions undelivered, the clinic is
+holding money against an obligation it will now never perform. Something has to happen to that
+deferred balance — leaving it deferred forever would permanently understate profit and inflate
+liabilities.
+
+**Chosen Option:**
+Two permitted outcomes, both supported:
+
+1. **Convert to revenue (breakage).** The remaining deferred balance is recognised as revenue in
+   the period the package expired. The `customer_package` moves to status `expired`.
+2. **Extend.** The expiry date is pushed out and the balance stays deferred. Available both as a
+   per-package default (`packages.on_expiry = 'extend'` with `extension_days`) and as a manual
+   per-customer action, since extending is usually a goodwill decision made case by case.
+
+`packages.on_expiry` ∈ `recognise_revenue` | `extend` sets the default. The manual extend action
+is always available regardless of the default, and every extension is recorded with who did it and
+when.
+
+**Reason:**
+- Both outcomes happen in real clinics; forcing one would make the module wrong for some of them,
+  which conflicts with the reusable-across-clinics goal.
+- Breakage revenue is real income and should be visible as its own line, not silently mixed into
+  service revenue — a month with unusual breakage should be legible as such.
+- Recording who extended a package and when prevents it becoming an untracked way to hide an
+  aging liability.
+
+**Trade-offs:**
+- Breakage recognised on expiry is a judgement call about when the obligation ends. If the clinic
+  habitually honours expired packages anyway, recognising breakage overstates profit — the manual
+  extend action exists precisely so that policy and practice can be kept aligned.
+- Requires an expiry sweep (scheduled job or on-read evaluation); a package does not expire itself.
+

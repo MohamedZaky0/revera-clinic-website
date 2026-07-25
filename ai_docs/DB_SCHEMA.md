@@ -604,8 +604,9 @@ only when the table is empty, then seeds the real table from it.
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | text | Primary key |
+| `id` | text | Primary key — **no default**, the application must supply it (`sale-<ts>-<rand>`) |
 | `product_id` | text | FK → inventory_products.id, nullable on delete |
+| `customer_id` | UUID | FK → customers.id ON DELETE SET NULL, nullable. **Added 2026-07-25** by `20260725160000_add_customer_id_to_product_sales.sql` — the POS route had always sent this field with no column to receive it. Indexed. |
 | `product_name` | text | NOT NULL — denormalized snapshot |
 | `sku` | text | nullable |
 | `quantity` | integer | Default 1 |
@@ -621,16 +622,25 @@ only when the table is empty, then seeds the real table from it.
 | `sale_date` | timestamptz | Default now() |
 | `created_at` | timestamptz | |
 
-**Verified against the live dev database 2026-07-25 — the table matches this migration exactly.**
-The previous "confirmed wired" claim was still wrong, but the fault is in the route, not the schema.
-`src/app/api/inventory/products/sales/route.ts:101-115` inserts `product_sku`, `customer_mobile`,
-`total_amount`, `sold_by` and `customer_id`, and omits `id` — the real columns are `sku`,
-`customer_phone`, `total_price`, `cashier_name`, there is no `customer_id` at all, and `id` is
-`text` PK with no default. So **every POS sale insert fails** and falls through to a `page_settings`
-JSON blob (key `product_sales_history`), while `getStoredSalesData` (`:32-34`) treats the empty
-table as authoritative because an empty array is truthy — sales are written to one store and read
-from another. **This table is currently empty and is not a usable revenue source until the route is
-fixed.** See RISK-014 for the exact column mapping.
+**Verified against the live dev database 2026-07-25 — the table matches its migration exactly.**
+The earlier "confirmed wired" claim was wrong, but the fault was in the route, not the schema:
+it sent `product_sku` / `customer_mobile` / `total_amount` / `sold_by` against real columns named
+`sku` / `customer_phone` / `total_price` / `cashier_name`, never supplied the no-default `id`, and
+sent a `customer_id` that had no column. Every insert failed and fell through to a `page_settings`
+JSON blob (key `product_sales_history`), while the read path treated the empty table as
+authoritative because an empty array is truthy — so sales were written to one store and read from
+another.
+
+**Fixed 2026-07-25.** `src/app/api/inventory/products/sales/route.ts` now translates between the
+API contract (`total_amount`, `product_sku`, `customer_mobile`, `sold_by` — consumed directly by
+the admin UI, so deliberately unchanged) and these column names via `mapSaleToDbRow` /
+`mapDbRowToSale`. It generates the `id`, persists `branch_name`, logs the reason on fallback rather
+than failing over silently, and only trusts the table when it returns rows. The `customer_id`
+column was added by `20260725160000_add_customer_id_to_product_sales.sql`.
+
+**This table only becomes a usable revenue source once that migration has been run** — see
+`ai_docs/FINANCE_TRACKER.md` for whether it has. Rows written before the fix live in the
+`page_settings` blob and still need migrating in.
 
 Note: the "Finances Dashboard" analytics view is unreachable dead code and uses
 `MOCK_FINANCE_TRANSACTIONS`, not `MOCK_POS_ORDERS` (which belongs to the equally unreachable
