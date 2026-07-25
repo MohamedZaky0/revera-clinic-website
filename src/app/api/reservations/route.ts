@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { getDurationInMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot, getEffectiveServicePrice } from '@/lib/services';
+import { computeSettledBalances } from '@/lib/billing';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -548,8 +549,14 @@ export async function PATCH(req: Request) {
 
       if (updateError) throw updateError;
 
-      // Handle customer wallet and spent/outstanding updates on checkout / completed
-      if (status === 'completed' && target.customer_id) {
+      // Settle customer balances when the booking is being completed, or when money
+      // fields change on one that is already completed (paying down an outstanding
+      // balance later). The second case has no UI yet — see FINANCE_TRACKER.md 0.5.
+      const isSettlement =
+        status === 'completed' ||
+        (target.status === 'completed' && (amountPaid !== undefined || amountLeft !== undefined));
+
+      if (isSettlement && target.customer_id) {
         try {
           const { data: customer, error: fetchCustErr } = await supabaseServer
             .from('customers')
@@ -558,23 +565,40 @@ export async function PATCH(req: Request) {
             .single();
 
           if (!fetchCustErr && customer) {
-            const currentWallet = Number(customer.wallet_balance || 0);
-            const currentSpent = Number(customer.spent_amount || 0);
-            const currentOutstanding = Number(customer.outstanding || 0);
+            const oldPaid = Number(target.amount_paid || 0);
+            const oldLeft = Number(target.amount_left || 0);
 
-            const deposit = Number(walletDeposit || 0);
-            const withdrawal = Number(walletWithdrawal || 0);
+            const settled = computeSettledBalances({
+              current: {
+                wallet: Number(customer.wallet_balance || 0),
+                spent: Number(customer.spent_amount || 0),
+                outstanding: Number(customer.outstanding || 0),
+              },
+              wasCompleted: target.status === 'completed',
+              oldPaid,
+              oldLeft,
+              newPaid: amountPaid !== undefined ? Number(amountPaid) : oldPaid,
+              newLeft: amountLeft !== undefined ? Number(amountLeft) : oldLeft,
+              walletDeposit: Number(walletDeposit || 0),
+              walletWithdrawal: Number(walletWithdrawal || 0),
+            });
 
-            const newWallet = Math.max(0, currentWallet + deposit - withdrawal);
-            const newSpent = currentSpent + Number(amountPaid || 0) + withdrawal;
-            const newOutstanding = currentOutstanding + Number(amountLeft || 0);
+            if (settled.clamped) {
+              console.warn('Customer balance clamped at 0:', target.customer_id, '| reservation:', id);
+            }
+            if (settled.walletIgnored) {
+              console.warn(
+                'Wallet movement ignored on an already-completed reservation:', id,
+                '| deposit:', walletDeposit, 'withdrawal:', walletWithdrawal
+              );
+            }
 
             await supabaseServer
               .from('customers')
               .update({
-                wallet_balance: newWallet,
-                spent_amount: newSpent,
-                outstanding: newOutstanding
+                wallet_balance: settled.wallet,
+                spent_amount: settled.spent,
+                outstanding: settled.outstanding
               })
               .eq('id', target.customer_id);
           }

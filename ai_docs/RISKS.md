@@ -259,9 +259,9 @@ Any revenue report built on this is not reproducible.
 to treat a UUID as a name; the server query uses `.eq('id', branchId)` with `select('name_en,
 name_ar')` and no longer discards its error. Regression check: `npx tsx scratch/pricecheck.ts`.
 
-**Note for anyone reading historical revenue:** every price ever charged before this fix used the
-`isDefault` entry or `services.price`, never a branch-specific price. Any backfill of historical
-invoices (PROPOSAL-002 Phase 1) must not retroactively apply branch pricing that was never charged.
+**Historical impact: none.** Every price charged before this fix used the `isDefault` entry or
+`services.price` rather than a branch price — but all of that data is mock (DEC-026), and no
+backfill is being built, so there is nothing to restate.
 
 Original diagnosis below.
 
@@ -286,7 +286,20 @@ service never touched in the pricing UI silently uses `services.price`.
 ## RISK-012: Patient Debt Only Ever Grows
 
 **Severity:** High · **Type:** Data integrity
-**Found:** 2026-07-25
+**Found:** 2026-07-25 · **RESOLVED (server side) 2026-07-25**
+
+**Fix:** the arithmetic moved to `src/lib/billing.ts` → `computeSettledBalances()`, a pure tested
+function, and now applies **deltas** against the pre-update reservation row rather than absolutes.
+Debt is booked on the completion transition, reduced by later payments, unaffected by a replayed
+PATCH, and clamped at zero with a warning. Regression check: `npx tsx scratch/billingcheck.ts`
+(15 assertions).
+
+> **Still open — a feature, not a bug.** `outstanding` *can* now decrease, but **no admin UI lets a
+> patient settle a balance.** Only "mark deposit paid" and checkout send money fields. In practice
+> debt still accumulates; the server just no longer guarantees it. A settle-debt flow needs
+> building — Phase 1's payments ledger is the natural home.
+
+Original diagnosis below.
 
 `src/app/api/reservations/route.ts:580`: `newOutstanding = currentOutstanding + amountLeft`.
 No code path anywhere decrements `customers.outstanding` when a patient later pays their balance.
@@ -311,9 +324,9 @@ Re-firing the same completed PATCH double-counts `spent_amount` and `outstanding
 dead `PUT /api/inventory/products` call in the sell flow that always 400'd and would have been a
 third deduction path had it worked.
 
-**Not fixed by this:** existing `stock_quantity` values are already corrupted by past
-double-deductions and need a physical stock count to correct — fold into the opening-balance import
-(DEC-024). The concurrency issue below is also still open.
+**Not fixed by this:** existing `stock_quantity` values are corrupted by past double-deductions —
+which does not matter, since all current data is mock (DEC-026). A real clinic's stock arrives via
+the opening-balance import (DEC-024). The concurrency issue below is still open.
 
 Original diagnosis below.
 

@@ -215,7 +215,7 @@ so historical invoice totals silently change whenever the service catalog is edi
 | Depth | Management accounting in clinic language — **no** chart of accounts, no journal entries, no double entry |
 | Sequencing | Repair the foundation first; do not build reporting on broken inputs |
 | Overheads | Two-level: contribution margin (primary, unallocated) + fully-loaded cost (secondary, allocated by room-minutes) |
-| History | Estimated backfill, visibly flagged, plus exact data from a cutover date |
+| History | **No backfill** — all existing data is mock (DEC-026, supersedes DEC-020). Real data starts at go-live |
 | Labour | Staff salaries stay fixed overhead; only doctor commission is per-session |
 | Tax | Prices stored **tax-inclusive** with a `tax_rate` on the line so a split stays derivable; products carry a **role** flag (retail / consumable / both) |
 | Permissions | `finance.*` granted to `admin` by default but **revocable** from Role Permission settings — finance checks short-circuit on `superadmin` only |
@@ -263,7 +263,7 @@ The core structural change. Money stops being a scalar and becomes an event.
 ```
 invoices           id, invoice_no (sequence), reservation_id?, customer_id, branch_id,
                    issued_at, subtotal, discount_total, grand_total (tax-inclusive),
-                   status, is_estimated (backfill flag), is_opening
+                   status, is_opening
 invoice_lines      invoice_id, line_type ('service'|'product'|'package'), service_id?,
                    product_id?, package_id?, description, qty, unit_price, discount,
                    line_total, tax_rate, cogs_snapshot, commission_snapshot, provider_id
@@ -303,8 +303,9 @@ column is inflated by RISK-012 and must not be baked in as verified opening data
   with a reconciliation job. This alone fixes the never-decrementing debt bug permanently.
 - Price, discount, COGS and commission are **snapshotted at issue time** — reprinting an old
   invoice can never change its total again.
-- Backfill generates estimated invoices from historical reservations, flagged `is_estimated` and
-  rendered with a visible marker in the UI.
+- **No backfill (DEC-026).** All existing data is mock, so there is no history worth reconstructing.
+  The only import built is the opening-balance one (DEC-024), which is a different thing: a real
+  clinic's day-one balances, not its transaction history.
 
 **Still open:** package expiry policy — if an unused session expires, is the remaining deferred
 balance then recognised as revenue, or refunded/extended?

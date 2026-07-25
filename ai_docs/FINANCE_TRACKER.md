@@ -22,6 +22,21 @@
 
 ---
 
+## All existing data is mock
+
+Every reservation, customer, sale and inventory row in the database is development test data.
+Production has never gone live (confirmed 2026-07-25). Consequences:
+
+- **You can freely reset, wipe or reshape data.** Nothing in there needs preserving.
+- **No backfill is being built** (DEC-026, supersedes DEC-020). Real data begins at go-live.
+- Current `stock_quantity` values are wrong from the old double-deduction bug — and it does not
+  matter, because they are fictional anyway.
+- What *is* being built is the **opening-balance import** (DEC-024): a real clinic's day-one cash,
+  stock, patient debts, wallet credit and undelivered packages. That is not history, and it is the
+  only import in scope.
+
+---
+
 ## Ground truth you must not assume (read before touching schema)
 
 **A migration file existing in `supabase/migrations/` proves nothing about any database.**
@@ -73,7 +88,7 @@ would be confidently wrong, which is worse than absent (DEC-019).
 | 0.2 | Fix server-side branch pricing | `DONE` | Claude | `see 0.2/0.3 below` |
 | 0.3 | Fix client-side branch pricing | `DONE` | Claude | `see 0.2/0.3 below` |
 | 0.4 | Fix double stock deduction | `DONE` | Claude | `see 0.4 below` |
-| 0.5 | Fix `customers.outstanding` never decrementing | `TODO` | — | — |
+| 0.5 | Fix `customers.outstanding` never decrementing | `DONE` | Claude | `see 0.5 below` |
 | 0.6 | Fix `product_sales` route column mapping | `DONE` | Claude | `23e0e5e`, `8108b82` |
 | 0.7 | Add `provider_id` FK to `reservations` | `TODO` | — | — |
 | 0.8 | Add `services.duration_minutes` numeric | `TODO` | — | — |
@@ -301,7 +316,39 @@ the whole catalog per sale (`inventory/products/route.ts:242-244`) — concurren
 
 ---
 
-### 0.5 — Patient debt only grows (RISK-012)
+### 0.5 — Patient debt only grows (RISK-012) — DONE
+
+The maths moved out of the route into **`src/lib/billing.ts` → `computeSettledBalances()`**, a pure
+function. It is money arithmetic and does not belong inline in a request handler; it is also where
+Phase 1's ledger maths should land.
+
+**Deltas, not absolutes.** Balances are now computed against the reservation row as it was *before*
+the update:
+- Debt exists only once the service is delivered — before completion `amount_left` is merely "not
+  paid yet". So the completion transition books the whole remaining balance as debt, and a later
+  payment books only the change.
+- Wallet movements arrive as deltas from the checkout modal, so they apply **only** on the
+  completion transition; re-sending them later is ignored and logged.
+- Negative results clamp at 0 and are logged.
+
+The settlement now also triggers when money fields change on an already-completed booking, not only
+when `status: 'completed'` is sent.
+
+**Regression check:** `npx tsx scratch/billingcheck.ts` — 15 assertions, all passing. Covers first
+completion, later payment clearing the debt, a replayed identical PATCH being a no-op, wallet-funded
+payment, overpayment to wallet, replayed wallet movement, and overpaying a debt.
+
+> ### Feature gap found while fixing this — NOT a bug, and NOT fixed
+>
+> `outstanding` can now decrease, but **nothing in the admin UI lets a patient pay off a balance.**
+> Only two flows send money fields: "mark deposit paid" (sends `status: 'pending'`, correctly no
+> debt yet) and checkout (`status: 'completed'`). There is no "settle outstanding" screen at all.
+>
+> So patient debt still only ever accumulates in practice — the server just no longer makes that
+> inevitable. **A settle-debt flow needs building.** Phase 1's payments ledger is the natural home;
+> until then, debt figures will keep drifting upward.
+
+**Original diagnosis, kept for reference:**
 
 `src/app/api/reservations/route.ts:580`: `newOutstanding = currentOutstanding + amountLeft`.
 No code path anywhere decrements it when a patient later pays.

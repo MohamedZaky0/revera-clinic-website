@@ -457,7 +457,8 @@ Execute PROPOSAL-002 Phase 0 (verify + repair) and Phase 1 (immutable `invoices`
 ## DEC-020: Historical Data Is Backfilled As Visibly Estimated, Exact From A Cutover Date
 
 **Date:** 2026-07-25
-**Status:** Decided — active
+**Status:** SUPERSEDED the same day by DEC-026 — all existing data turned out to be mock.
+Kept for the reasoning, which still applies to any clinic arriving with real history.
 
 **Context:**
 Existing reservations have no stored price, no payment dates, no material cost and no payment
@@ -672,4 +673,48 @@ when.
   habitually honours expired packages anyway, recognising breakage overstates profit — the manual
   extend action exists precisely so that policy and practice can be kept aligned.
 - Requires an expiry sweep (scheduled job or on-read evaluation); a package does not expire itself.
+
+---
+
+## DEC-026: No Historical Backfill — All Existing Data Is Mock
+
+**Date:** 2026-07-25
+**Status:** Decided — active. **Supersedes DEC-020.**
+
+**Context:**
+Every reservation, customer, sale and inventory row currently in the database is test data entered
+during development. Production has never gone live. There is no real clinic history anywhere in the
+system.
+
+**Chosen Option:**
+Build **no backfill machinery at all**. Drop the `is_estimated` flag from the Phase 1 invoice
+schema and drop the reconstruct-from-reservations step. Real data begins when the clinic starts
+operating on the finished system; everything before that is discarded, not migrated.
+
+**Reason:**
+- Reconstructing invoices from mock reservations produces mock invoices. It would cost real
+  implementation effort to manufacture numbers nobody should ever look at.
+- It removes the hardest correctness problem in Phase 1: historical rows have no stored price, no
+  payment method, no material cost and no payment dates, so any backfill was always going to be an
+  estimate carrying a permanent "do not trust this" caveat.
+- It also retires several awkward consequences recorded elsewhere — see below.
+
+**What this cancels:**
+- The `is_estimated` invoice flag and every UI marker for it.
+- The RISK-011 warning against retroactively applying branch pricing to historical bookings.
+  There are no historical bookings worth pricing.
+- The RISK-013 requirement for a physical stock count to repair double-deducted quantities. The
+  current quantities are fictional; the real count happens at clinic onboarding regardless.
+
+**What this does NOT cancel:**
+- **DEC-024 opening balances stays, and becomes more important.** A real clinic still arrives with
+  cash, stock, patient debts, wallet credit and undelivered packages on day one. That is an opening
+  balance import, not a history backfill — a different thing, and the only one now being built.
+- The cutover concept survives in a simpler form: the date the clinic starts real operations.
+  No mixed-quality reporting periods, so no UI caveats needed.
+
+**Trade-offs:**
+- No trend data on day one. Accepted: the alternative was fabricated trend data.
+- If a future clinic arrives wanting its old system's transaction history imported, that capability
+  will have to be built then. DEC-020's reasoning is preserved above for that case.
 
