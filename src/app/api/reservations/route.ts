@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { getServiceDurationMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot, getEffectiveServicePrice } from '@/lib/services';
 import { computeSettledBalances } from '@/lib/billing';
+import { requireAdministratorAccess } from '@/lib/access';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -365,6 +366,20 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
+    // NOT gated behind requireStaffAccess, deliberately, for now. This endpoint has a
+    // legitimate unauthenticated caller: a patient self-declares their deposit payment from
+    // BookingModal.tsx (there is no patient login — RISK-003) by PATCHing status:'pending'
+    // with only amountPaid/amountLeft/notes while the row is `pending_deposit`. Every other
+    // shape here — approve, reject, complete, reassign a doctor or services — is staff-only
+    // and is NOT currently checked.
+    //
+    // Adding a staff gate on the non-self-report shapes was attempted and reverted: none of
+    // the ~15 admin call sites in src/app/admin/page.tsx send an Authorization header today
+    // (confirmed by grep), so it would 401 every approve/reject/checkout/edit action in the
+    // booking workflow. Fixing that requires auditing and updating all ~15 call sites, which
+    // is real, separate work — see RISK-018 / FINANCE_TRACKER.md 0.10 for the exact shape of
+    // the fix (mirrors what was just done for the two sales-route callers below).
+
     if (target.status === 'started' && (action === 'reject' || status === 'cancelled' || status === 'rejected')) {
       return NextResponse.json({ error: 'Cannot cancel a booking that has already started.' }, { status: 400 });
     }
@@ -659,6 +674,13 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  // No patient-facing caller for this endpoint exists — it can hard-delete every
+  // reservation via ?id=all with no soft-delete and no confirmation beyond the admin UI.
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });

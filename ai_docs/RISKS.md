@@ -468,8 +468,22 @@ Notable traps inside it:
 
 ## RISK-018: The Money-Mutating API Routes Are Unauthenticated
 
-**Severity:** High · **Type:** Security
-**Found:** 2026-07-25
+**Severity:** High → Medium · **Type:** Security
+**Found:** 2026-07-25 · **PARTIALLY resolved 2026-07-25** — see `FINANCE_TRACKER.md` 0.10 for the
+full breakdown, including what was deliberately reverted and why.
+
+**Fixed:** `DELETE /api/reservations` now requires admin; `POST /api/inventory/products/sales`
+now requires staff, with both real callers updated to send an auth header.
+
+**Still open, and this is the significant part:** `PATCH /api/reservations` — the route that
+approves, rejects, completes and settles bookings — remains unauthenticated. A staff gate was
+written and tested, then reverted, because none of the ~15 admin call sites that PATCH this route
+currently send an `Authorization` header; shipping the gate would have 401'd the entire booking
+workflow. `/api/customers` is untouched for a related reason: patients call it directly for OTP
+login and self-service, so it cannot be staff-gated without per-field scoping. See the tracker for
+the exact remaining steps.
+
+Original diagnosis below.
 
 Despite commit `f53bc4d` "security: enforce admin API authorization", only 2 of 34 API route files
 import `requireStaffAccess` / `requireAdministratorAccess` (`/api/roles`, `/api/employees`).

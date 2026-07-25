@@ -9,6 +9,12 @@ const PROTECTED_API_PREFIXES = [
   '/api/providers/schedule-audit-logs',
 ];
 
+// Deliberately NOT added to the prefix list above: the admin panel's GET call for POS sales
+// history (fetchProductSalesHistory, admin/page.tsx:3539) sends no Authorization header
+// today, so a blanket prefix match on '/api/inventory/products/sales' would 401 that read
+// and break the sales history display. The POST (creating a sale) is instead protected at
+// the handler level in that route file. See RISK-018 / FINANCE_TRACKER 0.10.
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 

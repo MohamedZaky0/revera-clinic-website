@@ -3629,7 +3629,10 @@ export default function AdminPage() {
         // Also record in product sales history
         await fetch("/api/inventory/products/sales", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+          },
           body: JSON.stringify({
             product_id: selectedAddProductId || `prod-${Date.now()}`,
             product_name: selectedAddProductName,
@@ -3705,7 +3708,10 @@ export default function AdminPage() {
       // 1. Post to product sales endpoint
       const saleRes = await fetch("/api/inventory/products/sales", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+        },
         body: JSON.stringify({
           product_id: selectedSellProduct.id,
           product_name: selectedSellProduct.name,

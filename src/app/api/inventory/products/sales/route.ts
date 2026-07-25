@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { deductInventoryStock } from '@/app/api/inventory/products/route';
+import { requireStaffAccess } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -202,6 +203,12 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // POS sales are entered by staff only — no patient-facing caller exists for this route.
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await req.json();
     const {

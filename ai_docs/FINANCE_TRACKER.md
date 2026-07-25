@@ -93,7 +93,12 @@ would be confidently wrong, which is worse than absent (DEC-019).
 | 0.7 | Add `provider_id` FK to `reservations` | `NEEDS-DB` | Claude | `see 0.7/0.8 below` |
 | 0.8 | Add `services.duration_minutes` numeric | `NEEDS-DB` | Claude | `see 0.7/0.8 below` |
 | 0.9 | Correct `ai_docs` drift | `DONE` | Claude | `9b4c3e7`, `3cf1c8a`, `1c3d151` |
-| 0.10 | Protect money-mutating API routes | `TODO` | — | — |
+| 0.10 | Protect money-mutating API routes | `PARTIAL` | Claude | `see 0.10 below` |
+
+**Phase 0 summary at end of this session:** 9 of 11 tasks done or partially done. Two pending
+migrations need running against dev (0.7/0.8's file, on top of the four from earlier — see the
+checklist above). 0.10 needs the ~15-call-site fix described below before it can close. 0.0 needs
+`supabase db pull` to establish the baseline, which needs the database password.
 
 ---
 
@@ -455,7 +460,49 @@ backfilled from `doctor_name`.
 
 ---
 
-### 0.10 — Money-mutating routes are unauthenticated (RISK-018)
+### 0.10 — Money-mutating routes are unauthenticated (RISK-018) — PARTIAL
+
+**Done, safely:**
+- `DELETE /api/reservations` (both `?id=all` and single-id) → `requireAdministratorAccess`.
+  Verified zero admin-UI callers exist for this method on this route — nothing could regress.
+- `POST /api/inventory/products/sales` → `requireStaffAccess`. Both real callers
+  (`handleConfirmSellProduct`, `handleAddProductToPatient` in `admin/page.tsx`) sent no
+  `Authorization` header and would have 401'd; both were updated to send
+  `Bearer ${session.access_token}`, matching the pattern already used elsewhere
+  (`admin/page.tsx:2233` etc). `GET` on the same route is untouched — the admin's
+  `fetchProductSalesHistory` sends no auth header either, and protecting `GET` too was out of
+  scope for this pass.
+
+**Found, NOT done — this is the important part:**
+- `PATCH /api/reservations` is **still unauthenticated**, and that was a deliberate revert, not
+  an oversight. It has a genuine unauthenticated caller — a patient self-declares their deposit
+  payment from `BookingModal.tsx` (there is no patient login, RISK-003) via
+  `status:'pending'` + `amountPaid`/`amountLeft`/`notes` while the row is `pending_deposit`.
+  Every other shape through this handler — approve, reject, complete, reassign doctor/services —
+  is staff-only and is **not currently checked**.
+  A staff gate on the non-self-report shapes was written and tested, then reverted: **none of
+  the ~15 admin call sites** in `src/app/admin/page.tsx` that PATCH this route send an
+  `Authorization` header today (confirmed by grep). Shipping the gate would have 401'd every
+  approve, reject, checkout and booking edit in the admin panel — a severe regression, worse
+  than the gap it closes.
+- `/api/customers` is untouched for the same reason, one level worse: **patients** call it
+  directly (`AuthModal.tsx` self-lookup during OTP login, `profile/page.tsx` self-service), so it
+  cannot be staff-gated wholesale at all — it needs per-field or per-branch scoping, not a
+  blanket check.
+- `GET /api/inventory/products/sales`, and all of `/api/inventory/products` and
+  `/api/customers/products`, are unreviewed for this task.
+
+**To finish this properly:**
+1. Add `Authorization: Bearer ${session.access_token}` to all ~15 `PATCH /api/reservations`
+   call sites in `admin/page.tsx` (same pattern as the two sales-route fixes above).
+2. Re-add the `isPatientDepositSelfReport` gate that was written and reverted — it is still in
+   git history in this commit's parent if you want the starting shape — using `requireStaffAccess`
+   for every non-self-report PATCH.
+3. Decide the scoping for `/api/customers` — it cannot be a blanket staff gate.
+4. Test the admin panel's full booking lifecycle (create, approve, reject, checkout, edit) end to
+   end before considering this task complete, since no test run was possible in this pass.
+
+**Original diagnosis, kept for reference:**
 
 `/api/reservations` PATCH (mutates `amount_paid`), `/api/inventory/products/sales`,
 `/api/inventory/products` and `/api/customers` are not in `PROTECTED_API_PREFIXES`
