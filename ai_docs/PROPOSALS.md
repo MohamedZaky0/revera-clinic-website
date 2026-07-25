@@ -228,6 +228,7 @@ so historical invoice totals silently change whenever the service catalog is edi
 
 | # | Task | Reference |
 |---|---|---|
+| 0.0 | **Fix the migration pipeline first (RISK-020).** The migrations folder describes no live database, and dev/main have diverged. Snapshot the live dev schema, consolidate the 30 files into one clean baseline (cheap now — production is not live), adopt the Supabase CLI for state tracking, and remove the silent-fallback insert chain at `reservations/route.ts:274-305` that hides schema errors | RISK-020 |
 | 0.1 | **Verify live DB against migrations.** `product_sales` above all — the insert payload and the table definition disagree | `src/app/api/inventory/products/sales/route.ts:101-115` vs `supabase/migrations/20260720164008_setup_inventory_schema.sql:21-38` |
 | 0.2 | Fix branch pricing — server: `Number(branchId)` on a UUID → NaN, and `select('name')` on a table with only `name_en`/`name_ar` | `src/app/api/reservations/route.ts:198-206` |
 | 0.3 | Fix branch pricing — client: a UUID is a non-numeric string, so the UUID is used as the branch *name* | `src/lib/services.ts:137-147` |

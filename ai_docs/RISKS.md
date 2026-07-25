@@ -464,8 +464,22 @@ applied** (RISK-020).
 
 ## RISK-020: Migrations Are Not Tracked As Applied, And Two Databases Have Diverged
 
-**Severity:** Critical · **Type:** Operational / Data integrity
+**Severity:** High · **Type:** Operational / Delivery model
 **Found:** 2026-07-25 · **Verified by querying both live databases**
+
+**Production is not live yet** (confirmed 2026-07-25) — `main` serves no real patients, so nothing
+is currently broken for users. The severity is not about today; it is about two moments that are
+already scheduled:
+
+1. **At merge time.** Bringing `main` up to date means hand-applying ~15 migrations in order, with
+   no record of what already ran, against a database whose actual state nobody has snapshotted.
+   The silent-fallback insert chain below guarantees that partial failure looks like success.
+2. **At every new clinic.** DEC-001 commits to fork-per-client with a **separate Supabase project
+   per clinic**. With hand-pasted, untracked migrations, provisioning each new clinic's schema is a
+   manual 30-file operation that must go right every time. This is a scaling defect built into the
+   delivery model, not a one-off.
+
+Fixing this is far cheaper now, before production exists, than at any later point.
 
 There is no migration state tracking. `supabase/migrations/README.md` instructs operators to paste
 SQL by hand into the Supabase SQL Editor, so whether a migration ran depends on someone remembering.
@@ -503,11 +517,17 @@ anywhere.
 file:** `admin_roles` (both databases) and `employees` (main only).
 
 **Required before any Finance work:**
-1. Establish which database is authoritative for production patient data.
-2. Take a full live-schema snapshot of each and reconcile it against `supabase/migrations/`.
-3. Adopt migration state tracking — at minimum a `schema_migrations` table recording applied
-   filenames, ideally the Supabase CLI.
-4. Remove the silent-fallback insert chain in `reservations/route.ts`; let schema errors surface.
+1. Take a full live-schema snapshot of the dev database and reconcile it against
+   `supabase/migrations/`.
+2. **Consolidate the 30 migration files into one clean baseline schema.** With no production data
+   to preserve, this is a one-time cheap fix that removes the conflicting duplicate table
+   definitions (`141242` vs `141244`), the `DISABLE ROW LEVEL SECURITY` re-run hazard, and the
+   ambiguity about what ran. It also makes provisioning a new clinic a single script.
+3. Adopt migration state tracking — ideally the Supabase CLI (`supabase db push`, which maintains
+   `supabase_migrations.schema_migrations`, and gives generated TypeScript types and a local stack).
+   At minimum a hand-rolled `schema_migrations` table recording applied filenames.
+4. Remove the silent-fallback insert chain in `reservations/route.ts:274-305`; let schema errors
+   surface instead of degrading data quietly.
 
 A finance module built on the assumption that the migrations folder describes the live database
 would be built on a false premise.
