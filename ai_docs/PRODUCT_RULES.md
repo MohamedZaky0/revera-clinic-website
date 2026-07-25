@@ -1,8 +1,12 @@
 # PRODUCT_RULES.md — Revera Clinics Business Rules (Enforced in Code)
 
-> **Last Updated:** 2026-07-20
+> **Last Updated:** 2026-07-25
 > **Source:** Confirmed from live code only — no speculation
 > **Previous content was for a different project — discarded entirely**
+> **2026-07-25:** three entries were removed or corrected after a full read of
+> `src/app/api/reservations/route.ts` — the 8-per-day cap and the per-service slot-uniqueness rule
+> were never enforced, and the "no admin authentication" entry was stale. Struck-through headings
+> are kept deliberately so the false rules are not silently re-added.
 
 ---
 
@@ -15,27 +19,39 @@ It is not a wishlist or aspirational spec. If a rule is not enforced in code, it
 
 ## Booking / Scheduling Rules
 
-### Daily capacity cap — 8 bookings per service per day per branch
-**Enforced in:** `src/app/api/reservations/route.ts` — PATCH approve action
+### ~~Daily capacity cap — 8 bookings per service per day per branch~~ — REMOVED 2026-07-25
 
-When approving a reservation, the system counts existing approved reservations for the same
-`service_id`, `date`, and `branch_id`. If count >= 8, the approval is rejected with:
-`{ error: 'Day is fully booked' }` (HTTP 400).
+**This rule was never enforced.** It violated this file's own contract (only rules actually
+enforced in code belong here) and was carried for weeks.
 
-```
-If (approved bookings for service+date+branch) >= 8 → reject approval
-```
+`src/app/api/reservations/route.ts` was read in full: the PATCH approve block (lines 345–523)
+contains **no count check of any kind**. The only `8` relating to bookings is
+`src/components/BookingModal.tsx:1066`, a client-side check that is dead code — the `disabledDates`
+map it reads is populated as `isAvailable === false ? 99 : 0` (`BookingModal.tsx:356-358`), so it
+only ever holds 0 or 99, never an actual count.
 
-Branch matching: if reservation has a `branch_id`, filter by branch. If null, filter by `branch_id IS NULL`.
+Do not plan capacity work around an 8-per-day ceiling; it does not exist.
 
 ---
 
-### Time slot uniqueness — one booking per 15-min slot per service per day per branch
-**Enforced in:** `src/app/api/reservations/route.ts` — PATCH approve action
+### ~~Time slot uniqueness per service~~ — REMOVED 2026-07-25
 
-When approving with a `timeSlot`, the system checks if any other approved booking for the same
-service+date+branch already occupies that slot. If yes, returns:
-`{ error: 'Time slot already taken' }` (HTTP 400).
+**This constraint was deliberately dropped**, not lost. See
+`supabase/migrations/20260705141243_setup_rooms_schema.sql:104-105`, with the comment
+"to allow multiple bookings per slot in different rooms".
+
+**What IS enforced:** a `room_id` can be assigned only once per date + time_slot when status is
+`'approved'` — unique partial index `reservations_unique_room_slot`. Note the approve-time conflict
+query (`src/app/api/reservations/route.ts:407-412`) filters by date and status but **not** by
+branch; this is currently correct only because `room_id` is globally unique across branches.
+
+---
+
+### Doctor double-booking is NOT prevented
+**Confirmed 2026-07-25:** `src/app/api/reservations/route.ts:509-520` writes `doctor_name` with no
+validation against `working_days_hours` or existing bookings. Doctor conflict checking exists only
+in the read-only `/api/availability` (lines 305–345). An admin approving from the panel can
+double-book a doctor, so any doctor-utilization figure derived from `reservations` may exceed 100%.
 
 ---
 
@@ -105,8 +121,17 @@ without filtering by visible/active.
 
 ## Admin Panel Rules
 
-### No authentication on admin panel
-**Confirmed:** `/admin` page has no login gate. No middleware protects it. Anyone with the URL can access it.
+### ~~No authentication on admin panel~~ — STALE, corrected 2026-07-25
+
+`/admin` **does** have a Supabase email/password login gate (see "Admin login and role lookup"
+below, and DEC-010). This entry predated it and contradicted the rest of this file.
+
+**The accurate statement:** `src/middleware.ts:5` enforces a Supabase bearer token, but only for 4
+hardcoded route prefixes, and it only proves the caller is *some* valid Supabase user — not that
+they are staff. Only 2 of 34 API route files call `requireStaffAccess` / `requireAdministratorAccess`
+(`/api/roles`, `/api/employees`). The money-mutating routes — `/api/reservations` PATCH,
+`/api/inventory/products/sales`, `/api/inventory/products`, `/api/customers` — are **unauthenticated**.
+See RISK-018.
 
 ---
 

@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-07-22
+> **Last Updated:** 2026-07-25
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -271,4 +271,364 @@ The admin panel Customer profile (`viewingCustomerProfile`) and Customer edit fo
 - Replaced the fixed overlay modal components in `src/app/admin/page.tsx` with an inline panel view rendered inside `activeNav === "Customers"`.
 - Maintained conditional table rendering (`!viewingCustomerProfile && !showCustomerFormModal`) so opening a customer profile or edit form hides the customer table and displays the panel inline with a "Back to Customers" navigation header.
 - Verified zero build/TypeScript errors using `npm run build`.
+
+---
+
+## DEC-014: Finance Module Is Management Accounting, Not Bookkeeping
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+
+**Context:**
+The Finance sidebar section (a `comingSoon` stub since DEC-011) is to become a deep financial
+analytics module. The stated goal is to let a **non-accountant clinic owner** understand the
+clinic's finances without help.
+
+**Alternatives Considered:**
+- Full bookkeeping: chart of accounts, journal entries, double entry, trial balance
+- Management accounting: purpose-built clinic metrics in clinic vocabulary
+- Management first, with tables shaped so ledger entries could be generated later
+
+**Chosen Option:** Management accounting, in clinic language.
+
+**Reason:**
+- A general ledger is an accountant's tool. Requiring an accountant to operate it defeats the goal.
+- Everything the owner asked for (profit per session, monthly P&L, depreciation, debt, capacity,
+  optimal service mix) is management accounting, not statutory reporting.
+- Statutory books can be produced by exporting to the clinic's accountant.
+
+**Trade-offs:**
+- Output is not a legally-recognised set of books.
+- If real bookkeeping is needed later it is an additional build, not a refactor of this one.
+
+---
+
+## DEC-015: Two-Level Costing — Contribution Margin Primary, Fully-Loaded Secondary
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+
+**Context:**
+"True revenue from a session" requires deciding how fixed costs (rent, salaries, depreciation)
+are charged to an individual session.
+
+**Chosen Option:**
+- **Primary metric — contribution margin**, with **no** fixed-cost allocation:
+  `price − materials − doctor commission − device pulse cost`. This is the number used for all
+  service-mix and pricing decisions.
+- **Secondary view — fully-loaded cost**, allocating fixed costs by **room-minutes occupied**.
+- Break-even analysis links the two.
+- **Non-doctor salaries (nurse, technician, reception) are fixed overhead**, not per-session cost.
+  Only doctor commission is genuinely variable per session.
+
+**Reason:**
+- Allocating fixed overhead to individual units is the classic cause of bad decisions —
+  it makes profitable services look unprofitable when volume is low.
+- Room-minutes is the honest allocation basis for a clinic: the constrained resource is chair time.
+- Per-session staff logging was explicitly rejected: nurses and receptionists are paid the same
+  regardless of session count, so attributing their salary per session adds staff burden without
+  adding accuracy.
+
+**Trade-offs:**
+- Two numbers per service can confuse a non-specialist; the UI must label clearly which is for
+  decisions and which is for full-cost curiosity.
+- Staff productivity analysis is not possible without a `reservation_staff` table (deferred).
+
+---
+
+## DEC-016: Consumables Tracked By Standard Recipe, Editable At Completion
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+
+**Context:**
+Nothing links a service to the materials it consumes — no BOM, recipe, or consumable concept
+exists anywhere in the schema or code (verified by grep across `src/` and `supabase/migrations/`).
+
+**Chosen Option:**
+A `service_consumables` recipe defines standard consumption per service. On session completion the
+recipe is auto-deducted, and staff may **edit the actual quantities** at that moment. Edited rows
+are flagged so variance against standard is reportable.
+
+**Reason:**
+- A fixed recipe alone cannot capture waste or an unusually heavy session.
+- Requiring staff to log every material from scratch on every session reliably fails in practice.
+- The hybrid gives accuracy where it matters with near-zero friction in the common case.
+
+**Trade-offs:**
+- Recipes must be defined per service before per-session material cost is meaningful.
+- Until then, the P&L uses total monthly material purchases as an unallocated expense.
+
+**Note:** staff are already improvising this — `customer_product_balances.usage_history` free-text
+notes contain entries like "Session #2 administered at New Cairo branch"
+(`src/app/admin/page.tsx:11718`). That is the closest thing to consumption tracking today, and it
+is unparseable.
+
+---
+
+## DEC-017: Per-Branch Fixed Asset Register With Straight-Line Depreciation
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+
+**Context:**
+No asset, depreciation, useful-life or book-value concept exists in the schema.
+`inventory_devices` tracks lasers operationally (serial, model, pulses) but has no purchase price,
+purchase date, useful life, or salvage value — it is an ops list, not a financial register.
+
+**Chosen Option:**
+A dedicated `fixed_assets` table scoped by branch, with category (furniture / medical device / IT /
+leasehold improvement), purchase date, cost, useful life in months, salvage value, and status.
+Depreciation is **straight-line**: `(cost − salvage) / useful_life_months`, posted monthly to
+`depreciation_entries`. `inventory_devices` links to it via `fixed_assets.device_id`, so a laser is
+simultaneously an operational device and a depreciating asset.
+
+**Reason:**
+- Entering assets inside Branch Settings (the originally suggested approach) is simpler but cannot
+  carry categories, disposal, or end-of-life alerts, and cannot link to `inventory_devices`.
+- Straight-line is the standard, is what الإهلاك is normally understood to mean, and is trivially
+  explainable to a non-specialist.
+
+**Trade-offs:**
+- Requires an accurate opening asset list from the clinic at setup.
+- No declining-balance or units-of-production method (the latter would arguably suit lasers, whose
+  wear is pulse-driven — device pulse cost is handled separately as a variable cost instead).
+
+---
+
+## DEC-018: Doctor Commission Is Configurable Per Doctor, With An Explicit Base
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+
+**Context:**
+`providers.commission_type` / `commission_value` exist but `commission_type` has **no database
+CHECK constraint** (`20260715202003_add_provider_payroll.sql:4`) — only the admin `<select>`
+restricts it. Any unexpected value falls through both branches in the payroll calculation and
+silently yields commission 0.
+
+**Chosen Option:**
+Each doctor is configured independently: fixed per session, percentage, or both combined.
+The **commission base** becomes explicit and stored (gross service price vs. net after materials)
+rather than implied. Commission is computed and **snapshotted per invoice line**, not re-derived
+monthly from a name-string match.
+
+**Reason:**
+- Different doctors at the same clinic genuinely have different contracts.
+- Making this configurable is also what makes the module reusable for other clinics.
+- A stored per-line snapshot fixes RISK-015: renaming a doctor can no longer detach history.
+
+**Trade-offs:**
+- `commission_type` needs a CHECK constraint added and existing rows validated.
+- Effective-dated commission history is still not modelled — changing a doctor's rate does not
+  restate past sessions (which is correct), but there is no record of when it changed.
+
+---
+
+## DEC-019: Repair The Money Layer Before Building Finance Reporting
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+
+**Context:**
+A 6-agent audit found that no reservation stores the price it charged, branch pricing has never
+worked, patient debt only grows, stock is deducted twice per sale, and POS writes may be failing
+silently. See RISK-010 … RISK-015.
+
+**Chosen Option:**
+Execute PROPOSAL-002 Phase 0 (verify + repair) and Phase 1 (immutable `invoices` / `invoice_lines`
+/ `payments` / `wallet_txns` ledger) **before** any reporting UI. `customers.outstanding`,
+`spent_amount` and `wallet_balance` become derived from the ledger rather than mutable scalars.
+
+**Reason:**
+- Reporting built on these inputs would be confidently wrong, which is worse than absent.
+- The root cause is structural: every financial number is a mutable column on a mutable row, with
+  no append-only structure to reconstruct history from. Reporting cannot patch over that.
+- The expense/asset/liability tables (Phase 3) are new and isolated, so the repair work is
+  concentrated entirely on the revenue side.
+
+**Trade-offs:**
+- Meaningfully delays the first visible Finance screen.
+- Phase 0 touches live booking and POS code paths, so it carries regression risk in areas that
+  currently "work" from the staff's point of view.
+
+---
+
+## DEC-020: Historical Data Is Backfilled As Visibly Estimated, Exact From A Cutover Date
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+
+**Context:**
+Existing reservations have no stored price, no payment dates, no material cost and no payment
+method, so history cannot be reconstructed accurately.
+
+**Chosen Option:**
+Generate estimated invoices from historical reservations, flagged `is_estimated` on the row and
+marked visibly in every UI that renders them. From an agreed cutover date, all data is captured
+exactly through the Phase 1 ledger.
+
+**Reason:**
+- A pure cutover leaves the owner with no trends for months.
+- A silent full backfill would present reconstructed numbers — priced at *today's* catalog, with
+  no material cost — as if they were measured. That is the worse failure.
+- Flagging makes the distinction the user's to judge rather than the system's to hide.
+
+**Trade-offs:**
+- Charts mix two data qualities; period-over-period comparisons spanning the cutover need a caveat
+  in the UI, not just in this document.
+
+---
+
+## DEC-021: Tax-Inclusive Prices, With A Stored Rate; Products Have A Dual Role
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+
+**Context:**
+No tax/VAT column, table or calculation exists anywhere on the revenue path. The two `14%`
+occurrences (`src/app/admin/page.tsx:9817, 10403`) are display-only multipliers in the inert
+e-commerce cart and persist nothing.
+
+A second, more important point surfaced in discussion: **the same stock item can be sold to a
+patient as a retail product OR consumed as a material inside a service.** Keeping two pricing
+regimes for one item would be a permanent source of confusion.
+
+**Chosen Option:**
+- All prices are stored **tax-inclusive (gross)** — sale prices and purchase costs alike.
+- A `tax_rate` is stored **on the line**, so a tax split can be derived later without a migration:
+  `tax = gross × rate / (1 + rate)`.
+- `inventory_products` gains a **role** flag: `retail` / `consumable` / `both`. The same product may
+  appear simultaneously in `service_consumables` (as a cost) and `product_sales` (as revenue).
+
+**Reason:**
+- One gross price per item, whichever role it is playing — no dual pricing regime.
+- Storing the rate rather than a split keeps the door open without paying for it now.
+- Purchase costs recorded gross means the recorded cost is what the clinic actually paid, which is
+  correct when input VAT is not reclaimable.
+
+**Trade-offs / open:**
+- The exempt-vs-taxable treatment of medical services versus retail product sales under Egyptian
+  law was **not verified** and must be confirmed with the clinic's accountant. The design holds
+  either way, which is why it was chosen.
+- Reporting a legally-formatted tax return is out of scope (DEC-014).
+
+---
+
+## DEC-022: Finance Permissions Are Grantable AND Revocable
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+
+**Context:**
+Requirement: whoever is granted the permission sees Finance — admins by default, plus anyone
+granted it from Role Permission settings.
+
+**This does not work today.** `hasStaffPermission` (`src/lib/access.ts:54-56`) short-circuits:
+`role === 'superadmin' || role === 'admin' || permissions.includes(permission)`. Any role named
+`admin` passes **every** permission check and the permissions array is ignored entirely. Finance
+could be granted but never revoked from an admin. `PERMISSION_STRUCTURE`
+(`src/app/admin/page.tsx:403-464`) also has no `finance.*`, `hr.*`, `inventory.*` or `employees.*`
+keys at all — live sections work around this by hardcoding role names at `:703`.
+
+**Chosen Option:**
+1. Add `finance.*` keys to `PERMISSION_STRUCTURE`.
+2. Seed the `admin` role's permissions array with Finance — admins have it by default, as required.
+3. Finance checks use a helper that short-circuits **only** on `superadmin`, not on `admin` — so the
+   permissions array is authoritative and Finance is revocable from Role Permission settings.
+4. Leave the other permissions on the existing short-circuit for now; migrating them all is a
+   separate change with real regression risk.
+
+**Reason:**
+- Delivers the stated requirement exactly, with the blast radius limited to the new section.
+- The practical risk being avoided: appointing a branch manager with the `admin` role would
+  otherwise expose every employee's salary and every service's margin, silently.
+
+**Trade-offs:**
+- Two permission-evaluation paths coexist until the wider fix lands — must be documented in code.
+- Wiring a section requires editing **four** separate maps (`PERMISSION_STRUCTURE`, `hasPermission`'s
+  `parentScreenMap` `:681-687`, `permittedSidebarItems`' map `:706-714`, and the redirect effect's
+  map `:2098-2104`). The existing Rooms entry is already broken this way — it is gated on
+  `settings.rooms`, which does not exist (`:7262`), so no non-superadmin can ever see it.
+
+---
+
+## DEC-023: Packages Are First-Class, With Deferred Revenue Recognition
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+
+**Context:**
+The clinic sells prepaid multi-session packages (e.g. "6 laser sessions") and confirms this is
+**core to the business**. No package concept exists anywhere — a grep for
+`package|sessions_remaining|sessions_left|remaining_sessions` across `src/app/api` and
+`supabase/migrations` returns nothing. `customer_product_balances` is retail-only by construction.
+
+Staff are already improvising: the usage-log placeholder reads
+`"e.g. Session #2 administered at New Cairo branch"` (`src/app/admin/page.tsx:11718`) — session
+consumption is being written into a free-text notes field, unparseable.
+
+**Chosen Option:**
+New tables: `packages`, `package_items`, `customer_packages`, `customer_package_items`.
+Money received for a package is **deferred revenue (a liability)**, not income. Revenue is
+recognised **per session delivered**, pro-rata:
+
+```
+recognised per session = price_paid / total_sessions_in_package
+deferred balance       = Σ price_paid × qty_remaining / qty_total
+```
+
+**Reason:**
+- Without this the P&L is wrong in the most damaging direction: it books cash received as profit
+  earned, so a month with heavy package sales looks far more profitable than it was, while the
+  months delivering those sessions look like losses.
+- Pro-rata allocation spreads any package discount evenly and is explainable to a non-specialist.
+- Undelivered sessions are a genuine obligation and belong on the liability side.
+
+**Trade-offs:**
+- Adds real scope to Phase 1 and Phase 2.
+- Package expiry policy must be decided (does an unused session expire, and if so is the deferred
+  balance then recognised as revenue?) — **still open**.
+- Committed-but-undelivered sessions are also pre-booked future capacity, so Phase 5's
+  max-potential calculation must net them out rather than treating all capacity as sellable.
+
+---
+
+## DEC-024: Opening Balances Are Bidirectional And Generic Across Clinics
+
+**Date:** 2026-07-25
+**Status:** Decided — active
+
+**Context:**
+At setup, any clinic may be owed money by patients **and** owe patients money — wallet credit or
+undelivered packages. This is a product requirement, not a Revera one: different clinics will
+arrive with different mixes.
+
+Note that the existing `customers.outstanding` figures cannot be trusted as a starting point:
+they only ever grow and are never decremented on payment (RISK-012), so they are inflated by an
+unknown amount.
+
+**Chosen Option:**
+A single opening-balance import, run once per clinic at setup, writing into the **same** ledgers as
+normal operations with an `is_opening` flag and a shared `as_of` date. Both directions supported:
+
+| Direction | What it represents |
+|---|---|
+| Patient owes clinic | receivables (verified by physical audit, **not** migrated from `outstanding`) |
+| Clinic owes patient | wallet credit balances |
+| Clinic owes patient | undelivered package sessions (deferred revenue) |
+| Clinic owes supplier | payables |
+| Clinic assets | cash/bank, inventory at cost, fixed assets with accumulated depreciation to date |
+| Clinic liabilities | loans at **remaining** balance, not original principal |
+
+**Reason:**
+- Writing into the same ledgers means no downstream report needs to special-case opening data.
+- Bidirectional by design makes the module portable to any clinic, per DEC-001's fork-per-client model.
+- Forcing a physical audit of receivables rather than importing `customers.outstanding` prevents
+  RISK-012's inflated figures from being baked in as "verified" opening data.
+
+**Trade-offs:**
+- Setup requires real effort from the clinic — a stock count and a receivables audit.
+- If opening balances are wrong, every derived balance stays wrong; the import needs a review-and-
+  confirm step, not a blind CSV load.
 

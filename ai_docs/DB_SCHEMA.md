@@ -157,9 +157,9 @@ API routes that query them.
 | `status` | text | `'pending_deposit'`, `'pending'`, `'approved'`, `'confirmed'`, `'started'`, `'completed'`, `'cancelled'`, `'rejected'` — enforced via CHECK constraint `reservations_status_check` |
 | `time_slot` | text | Assigned 15-min slot (e.g., '09:00'), nullable — set on approve |
 | `session_type` | text | Default `'in_person'` |
-| `origin` | text | Booking source, e.g., 'website' — displayed as badge |
+| `origin` | text | **UNVERIFIED — no migration creates this column.** Documented here since an earlier audit but absent from all 30 files in `supabase/migrations/`. `20260709154350_add_reservation_source.sql` adds `is_manual`, not `origin`, despite its filename. Confirm in the live DB before use. |
 | `is_manual` | boolean | Default false — true when created by staff in admin rather than via public booking |
-| `cancelled_reason` | text | Reason for cancellation, nullable |
+| `cancelled_reason` | text | **UNVERIFIED — no migration creates this column**, and no reference to it exists in `src/` outside these docs. Confirm in the live DB before use. |
 | `doctor_name` | text | Assigned doctor name, nullable |
 | `amount_paid` | numeric | Default 0 |
 | `amount_left` | numeric | nullable |
@@ -172,9 +172,21 @@ API routes that query them.
 | `updated_at` | timestamptz | |
 
 **Business rules enforced in code:**
-- Max 8 approved bookings per service per day per branch (checked in PATCH approve action)
-- A time_slot can only be assigned once per service per date per branch
 - A `room_id` can only be assigned once per date+time_slot when status is `'approved'` (unique partial index `reservations_unique_room_slot`)
+
+**Corrected 2026-07-25 — two rules previously listed here do NOT exist:**
+- ~~Max 8 approved bookings per service per day per branch~~ — **never implemented.** The PATCH
+  approve block (`src/app/api/reservations/route.ts:345-523`) contains no count check of any kind.
+  The only `8` in the codebase is a client-side check at `src/components/BookingModal.tsx:1066`,
+  and it is dead code: `disabledDates` is populated as `isAvailable === false ? 99 : 0`, so it only
+  ever holds 0 or 99, never a real count.
+- ~~A time_slot can only be assigned once per service per date per branch~~ — **deliberately
+  dropped** in `supabase/migrations/20260705141243_setup_rooms_schema.sql:104-105`, with the
+  comment "to allow multiple bookings per slot in different rooms".
+
+Also note: the approve endpoint enforces room conflicts but performs **no doctor validation**
+(`route.ts:509-520` writes `doctor_name` unchecked). Doctor conflict checking exists only in the
+read-only `/api/availability`. An admin can double-book a doctor from the panel.
 
 ---
 
@@ -406,8 +418,18 @@ separate from `hr_payroll`.
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
-Unique constraint on `(provider_id, month)`. RLS disabled. Confirmed wired to real reads/writes
-via `/api/hr/doctor-payroll`.
+Unique constraint on `(provider_id, month)`. Confirmed wired to real reads/writes via
+`/api/hr/doctor-payroll`.
+
+**RLS corrected 2026-07-25:** this migration disables RLS at `:26`, but
+`20260722140000_enable_row_level_security.sql` later re-enables it for every public table. RLS is
+**on** with **no policies** — service-role-only. Re-running the older file would silently turn it
+back off (RISK-019).
+
+**Caution:** rows here are not an immutable ledger. `PATCH /api/hr/doctor-payroll:258-315`
+recomputes `completed_services_count`, `total_commission_earned` and `net_salary` on **any** patch,
+including already-`Paid` records. Commission is attributed by matching `reservations.doctor_name`
+as a lowercased string against `providers.name` (`:172`) — see RISK-015.
 
 ---
 
@@ -600,9 +622,19 @@ only when the table is empty, then seeds the real table from it.
 | `sale_date` | timestamptz | Default now() |
 | `created_at` | timestamptz | |
 
-Confirmed wired via `/api/inventory/products/sales` (the admin POS flow writes here). Note: the
-"Finances Dashboard" analytics view still uses a separate hardcoded `MOCK_POS_ORDERS` constant for
-its ledger display — the underlying sale records are real, the aggregate reporting UI is not.
+**Corrected 2026-07-25 — the previous "confirmed wired" claim is NOT justified by the code.**
+`src/app/api/inventory/products/sales/route.ts:101-115` inserts `customer_id`, `product_sku`,
+`total_amount`, `sold_by` and omits `id` — but this table defines `sku`, `customer_phone`,
+`total_price`, `cashier_name`, has **no** `customer_id`, and `id` is `TEXT PRIMARY KEY` with no
+default. Against the migrated schema that insert fails and falls through to a `page_settings` JSON
+blob (key `product_sales_history`). Compounding it, `getStoredSalesData` returns `{sales: dbSales}`
+whenever there is no error (`:32-34`), and an empty array is truthy — so the fallback read at `:37`
+is unreachable once the table exists, and POS history reads back empty. **Verify the live table's
+columns before treating this as a revenue source.** See RISK-014.
+
+Note: the "Finances Dashboard" analytics view is unreachable dead code and uses
+`MOCK_FINANCE_TRANSACTIONS`, not `MOCK_POS_ORDERS` (which belongs to the equally unreachable
+POS Orders view) — see RISK-017.
 
 ---
 
@@ -646,6 +678,13 @@ Confirmed wired via `/api/inventory/devices` and `/api/inventory/devices/[id]/re
 | `performed_by` | text | nullable |
 | `date` | timestamptz | Default now() |
 | `created_at` | timestamptz | |
+
+**Corrected 2026-07-25: this table is dead — nothing writes to it.** The previous claim that it was
+"confirmed wired via `/api/inventory/devices/[id]/reset-pulses`" is wrong. That route writes only to
+`page_settings` (`src/app/inventory/devices/[id]/reset-pulses/route.ts:90`); no file in `src/` ever
+inserts into `device_maintenance_history`. Note also that reset-pulses reads its device list from
+`page_settings` while `GET /api/inventory/devices` prefers this SQL table — so reset-pulses returns
+404 for a device the UI is displaying if the two sources disagree.
 
 ---
 
@@ -740,7 +779,17 @@ the table is empty. Previously (2026-07-21 to 2026-07-25) POST/PATCH only wrote
 - Persistent patient records are stored in the `customers` table, and connected to `reservations` via `customer_id`.
 - No `staff` table. Providers are stored with minimal fields (name, services list, rating) plus payroll/schedule fields added later.
 - No `shifts` or `availability` table for providers. Availability is calculated by scanning reservations.
-- Most tables have RLS **disabled** (service role key bypasses it anyway from the server). A subset (`roles`, `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`) has RLS **enabled** with permissive "allow all"/public policies — functionally equivalent to disabled, since the policies don't restrict by role.
+- **RLS — corrected 2026-07-25.** The previous claim that "most tables have RLS disabled" is wrong.
+  `supabase/migrations/20260722140000_enable_row_level_security.sql:11` loops every table in
+  `pg_tables` where `schemaname='public'` and enables RLS unconditionally. **All 28 tables have RLS
+  on.** A subset (`roles`, `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`,
+  `inventory_*`, `product_sales`) additionally has permissive "allow all" policies — functionally
+  open, since those policies don't restrict by role. The other **15 tables have RLS on and zero
+  policies**, making them service-role-only: `branches`, `categories`, `services`, `providers`,
+  `provider_attendance`, `customers`, `reservations`, `rooms`, `service_rooms`, `page_settings`,
+  `doctor_payroll`, `provider_schedule_audit_logs`, `medical_records`, `medical_reports`,
+  `customer_product_balances`. See RISK-019 for two hazards this creates for new tables and for
+  re-running older migrations.
 - `reservations.branch_id` is nullable — reservations without a branch are treated as "no branch" and are filtered separately.
 - `reservations.date` is stored as `text`, not a native `date` column.
 - Still genuinely mock UI (no table exists): consultation notes, treatment plans, before/after photos, Finances Dashboard aggregate reporting, Refunds, Shipping. See `PROJECT.md` and `RISKS.md` RISK-005 for the current, corrected list.
