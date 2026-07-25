@@ -68,7 +68,7 @@ would be confidently wrong, which is worse than absent (DEC-019).
 
 | ID | Task | Status | Owner | Commit |
 |---|---|---|---|---|
-| 0.0 | Fix the migration pipeline — see below | `TODO` | — | — |
+| 0.0 | Fix the migration pipeline — see below | `WIP` | Claude | `see below` |
 | 0.1 | Verify live DB against migrations | `DONE` | Claude | `1c3d151` |
 | 0.2 | Fix server-side branch pricing | `TODO` | — | — |
 | 0.3 | Fix client-side branch pricing | `TODO` | — | — |
@@ -82,25 +82,54 @@ would be confidently wrong, which is worse than absent (DEC-019).
 
 ---
 
-### 0.0 — Fix the migration pipeline (RISK-020)
+### 0.0 — Fix the migration pipeline (RISK-020) — WIP
 
-**Do this first.** Everything else depends on knowing what the schema actually is.
+| Step | Status |
+|---|---|
+| a. Supabase CLI configured (`supabase init`, generic `project_id`) | `DONE` |
+| b. Silent-fallback insert chain removed | `DONE` |
+| c. Migration `README.md` rewritten with the CLI runbook | `DONE` |
+| d. **`supabase link` + `supabase db pull` to establish the baseline** | `TODO` — needs credentials |
+| e. Move the 30 legacy files to `_legacy/`, update `DB_SCHEMA.md` to the baseline | `TODO` — blocked on (d) |
+| f. Bring the main DB up to the baseline | `TODO` — blocked on (e) |
 
-1. Snapshot the live dev schema and reconcile against `supabase/migrations/`.
-2. **Consolidate the 30 migration files into one clean baseline.** Cheap now, because there is no
-   production data to preserve. Removes the conflicting duplicate table definitions
-   (`20260705141242_full_migration.sql` vs `20260705141244_setup_supabase_schema.sql`) and the
-   `DISABLE ROW LEVEL SECURITY` re-run hazard.
-3. Adopt the Supabase CLI — `supabase db push` tracks applied migrations in
-   `supabase_migrations.schema_migrations`, and also gives generated TypeScript types and a local
-   stack. There is currently no `supabase/config.toml`.
-4. Remove the silent-fallback insert chain at `src/app/api/reservations/route.ts:274-305`. It
-   retries a failed insert after deleting `created_by_employee_id`, then again after also deleting
-   `doctor_name`, then reports success — so a missing column produces a booking with silently
-   dropped attribution and no error. **This is why RISK-020 stayed invisible.**
+**(d) is yours to run — it needs the database password, which I must not handle:**
+```bash
+npx supabase login
+npx supabase link --project-ref <dev-project-ref>
+npx supabase db pull --schema public
+```
+`db pull` generates a migration **from the live database**, which is the only trustworthy
+description of the schema. Run it against **dev**, the more current of the two.
 
-**Verify:** a fresh Supabase project can be provisioned from scratch with one command, and
-`schema_migrations` lists every applied file.
+When reviewing the output, decide what `admin_roles` and `employees` are — they exist live, in no
+migration and in no doc.
+
+**(b) — what was removed and why.** `src/app/api/reservations/route.ts` previously retried a failed
+insert after deleting `is_manual` and `created_by_employee_id`, then again after also deleting
+`rooms` and `doctor_name`, and — worst of all — **silently rewrote status `pending_deposit` to
+`pending`** before reporting success. On a database missing any of those columns that produced a
+booking with no employee attribution, no doctor, no rooms and **no deposit requirement**, while the
+API response still told the UI a deposit was due. This is the mechanism that kept RISK-020 invisible.
+
+It now fails loudly, logging the error code and the payload keys.
+
+> **Consequence to expect:** if the dev database's `reservations_status_check` constraint predates
+> `20260711204540`, deposit bookings will now **fail visibly** instead of being silently downgraded.
+> `20260725170000_ensure_reservation_status_check.sql` restates the constraint with all eight
+> statuses and is the fix. Run it together with the others below.
+
+### Migrations pending — run these against dev, then update this table
+
+| Migration | Ran? | Against | Effect until run |
+|---|---|---|---|
+| `20260722140000_enable_row_level_security.sql` | ☐ | — | RLS off on the patient-data tables |
+| `20260725120000_backfill_medical_and_product_balance_tables.sql` | ☐ | — | 3 tables missing; routes on JSON fallback |
+| `20260725160000_add_customer_id_to_product_sales.sql` | ☐ | — | POS sales still fail into the blob (RISK-014) |
+| `20260725170000_ensure_reservation_status_check.sql` | ☐ | — | `pending_deposit` may now fail loudly |
+
+**Verify 0.0 complete when:** a fresh Supabase project can be provisioned with one command, and
+`supabase_migrations.schema_migrations` lists every applied file.
 
 ---
 

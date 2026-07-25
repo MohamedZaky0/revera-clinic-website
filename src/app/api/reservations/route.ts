@@ -265,47 +265,27 @@ export async function POST(req: Request) {
       created_by_employee_id: createdByEmployeeId || null,
     };
 
-    let { data, error } = await supabaseServer
+    // No fallback retries here — deliberately. This used to retry a failed insert after
+    // deleting is_manual and created_by_employee_id, then again after also deleting rooms
+    // and doctor_name, and it silently rewrote status 'pending_deposit' to 'pending' before
+    // reporting success. On a database missing any of those columns that produced a booking
+    // with no employee attribution, no doctor, no rooms and no deposit requirement, while
+    // the response still told the UI a deposit was due. It is why the schema drift in
+    // RISK-020 stayed invisible for weeks. Schema errors must surface. See RISK-020 and
+    // ai_docs/FINANCE_TRACKER.md task 0.0.
+    const { data, error } = await supabaseServer
       .from('reservations')
-      .insert({ ...insertPayload })
+      .insert(insertPayload)
       .select()
       .single();
 
     if (error) {
-      console.warn("Primary reservation insert failed, attempting clean fallback:", error.message, error.code);
-      const fallbackPayload = { ...insertPayload };
-      if (fallbackPayload.status === 'pending_deposit') {
-        fallbackPayload.status = 'pending';
-      }
-      delete fallbackPayload.is_manual;
-      delete fallbackPayload.created_by_employee_id;
-
-      const retry1 = await supabaseServer
-        .from('reservations')
-        .insert(fallbackPayload)
-        .select()
-        .single();
-
-      data = retry1.data;
-      error = retry1.error;
-
-      if (error) {
-        console.warn("Retry 1 reservation insert failed, trying minimal payload:", error.message, error.code);
-        delete fallbackPayload.rooms;
-        delete fallbackPayload.doctor_name;
-
-        const retry2 = await supabaseServer
-          .from('reservations')
-          .insert(fallbackPayload)
-          .select()
-          .single();
-
-        data = retry2.data;
-        error = retry2.error;
-      }
+      console.error(
+        'Reservation insert failed:', error.code, error.message,
+        '| payload keys:', Object.keys(insertPayload).join(', ')
+      );
+      throw error;
     }
-
-    if (error) throw error;
     const mapped = mapRow(data);
     const requiresDeposit = !isManualBooking && depositPercentage > 0;
     return NextResponse.json({
