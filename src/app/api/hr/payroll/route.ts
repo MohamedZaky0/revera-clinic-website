@@ -46,11 +46,15 @@ export async function POST(req: Request) {
     }
 
     // 2. Fetch all reservations with employee credit for the target month
+    const [year, monthNumber] = month.split('-').map(Number);
+    const monthStart = `${month}-01`;
+    const nextMonthStart = new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10);
     const { data: monthReservations, error: resErr } = await supabaseServer
       .from('reservations')
       .select('created_by_employee_id, amount_paid, amount_left, status, date, services(price)')
       .not('created_by_employee_id', 'is', null)
-      .like('date', `${month}-%`);
+      .gte('date', monthStart)
+      .lt('date', nextMonthStart);
 
     if (resErr) {
       console.warn("Could not fetch month reservations for payroll target calculation:", resErr.message);
@@ -68,8 +72,23 @@ export async function POST(req: Request) {
       }
     });
 
+    const { data: existingPayroll, error: existingPayrollError } = await supabaseServer
+      .from('hr_payroll')
+      .select('employee_id, status')
+      .eq('month', month);
+
+    if (existingPayrollError) throw existingPayrollError;
+
+    const paidEmployeeIds = new Set(
+      (existingPayroll || [])
+        .filter((payroll: any) => payroll.status === 'Paid')
+        .map((payroll: any) => payroll.employee_id)
+    );
+
     // 3. Prepare bulk inserts with target and bonus calculations
-    const inserts = payrollEmployees.map((emp: any) => {
+    const inserts = payrollEmployees
+      .filter((emp: any) => !paidEmployeeIds.has(emp.id))
+      .map((emp: any) => {
       const basic = Number(emp.salary || 0);
       const target = Number(emp.required_target_amount || 0);
       const bonusVal = Number(emp.bonus_percentage || 0);
@@ -115,14 +134,22 @@ export async function POST(req: Request) {
       };
     });
 
+    if (inserts.length === 0) {
+      return NextResponse.json({ success: true, count: 0, skippedPaid: paidEmployeeIds.size });
+    }
+
     // 4. Upsert payroll records (ignore duplicates if already ran, or overwrite)
     const { data, error } = await supabaseServer
       .from('hr_payroll')
-      .upsert(inserts, { onConflict: 'employee_id, month' })
+      .upsert(inserts, { onConflict: 'employee_id,month' })
       .select();
 
     if (error) throw error;
-    return NextResponse.json({ success: true, count: data?.length || 0 });
+    return NextResponse.json({
+      success: true,
+      count: data?.length || 0,
+      skippedPaid: paidEmployeeIds.size
+    });
   } catch (err: any) {
     console.error('POST /api/hr/payroll error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });

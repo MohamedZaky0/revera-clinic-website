@@ -718,3 +718,27 @@ operating on the finished system; everything before that is discarded, not migra
 - If a future clinic arrives wanting its old system's transaction history imported, that capability
   will have to be built then. DEC-020's reasoning is preserved above for that case.
 
+---
+
+## DEC-027: Modular Admin Sections Are Mandatory
+
+**Date:** 2026-07-26
+**Status:** Decided — active
+
+**Context:**
+`src/app/admin/page.tsx` is a large legacy client component containing Booking, Customer, Doctor,
+and many other section implementations. Adding new sections to that file increases regression risk,
+makes ownership unclear, and further slows targeted work.
+
+**Chosen Option:**
+- Every new admin section must be implemented as a focused submodule under `src/components/admin/`.
+- `src/app/admin/page.tsx` is limited to the legacy shell and composition of those submodules; new
+  section-level view code, state, and data orchestration must not be added there.
+- Existing Booking, Customer, Doctor, and all other legacy sections will be extracted incrementally
+  when they are touched or through dedicated refactor tasks. No large-bang rewrite is permitted.
+
+**Trade-offs:**
+- Some shared state will temporarily remain in the legacy shell while a section is being extracted.
+- New feature delivery may require creating a small module boundary first, which is accepted to stop
+  the legacy file from growing and to make the staged extraction safe.
+

@@ -19354,7 +19354,10 @@ export default function AdminPage() {
                           if (editingEmployee) {
                             const res = await fetch("/api/employees", {
                               method: "PATCH",
-                              headers: { "Content-Type": "application/json" },
+                              headers: {
+                                "Content-Type": "application/json",
+                                "Authorization": `Bearer ${session?.access_token || ""}`
+                              },
                               body: JSON.stringify({
                                 id: editingEmployee.id,
                                 name: newEmployeeName.trim(),
@@ -22152,7 +22155,10 @@ export default function AdminPage() {
                                 body: JSON.stringify({ month: selectedPayrollMonth })
                               });
                               if (res.ok) {
-                                alert("Payroll ran successfully!");
+                                const result = await res.json();
+                                alert(result.skippedPaid > 0
+                                  ? `Payroll refreshed. ${result.skippedPaid} paid record(s) were preserved.`
+                                  : "Payroll ran successfully!");
                                 fetchHrPayroll();
                               } else {
                                 const err = await res.json();

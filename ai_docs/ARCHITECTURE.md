@@ -33,7 +33,7 @@ src/
 │   ├── services/page.tsx
 │   ├── blog/page.tsx
 │   ├── contact/page.tsx
-│   ├── admin/page.tsx             Full admin panel (single large client component, browser login gate only)
+│   ├── admin/page.tsx             Legacy admin shell/composer (browser login gate only; do not add new section logic here)
 │   ├── profile/page.tsx           Patient profile + wallet + visit history
 │   ├── auth/callback/page.tsx     Supabase auth callback: handles invite + recovery hash, redirects to /admin
 │   └── api/
@@ -69,7 +69,8 @@ src/
 │       ├── customer-avatars/      GET/POST avatar images — stored in `page_settings` (key `customer_avatars`), not a dedicated table
 │       └── health/supabase/       Env var diagnostics
 │
-├── components/                   All public website UI components
+├── components/                   Public website UI components and admin submodules
+│   ├── admin/                     Required location for every new admin section; legacy sections are extracted here incrementally
 │   ├── Navbar.tsx
 │   ├── HeroSlider.tsx
 │   ├── ServicesSection.tsx        Services catalog + WhatsApp CTA

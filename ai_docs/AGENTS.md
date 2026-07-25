@@ -18,6 +18,7 @@ Before making any code changes:
 - Treat `ai_docs/` as the source of truth: update the relevant document whenever a completed change affects architecture, schema, API contracts, enforced business rules, decisions, risks, or project status.
 - After each completed change, validate it, commit it, and push it. Do not push until `npm run build` succeeds with no compiler errors.
 - Keep changes to the minimum required. Reuse existing functions, components, and endpoints before creating new ones; do not duplicate logic.
+- All **new admin sections** must be implemented as separate submodules under `src/components/admin/` (plus focused hooks/utilities where appropriate) and composed by `src/app/admin/page.tsx`. Do not add new section-level UI, state, or data orchestration to the legacy page. Progressively extract Booking, Customer, Doctor, and the other existing sections without a large-bang rewrite.
 - Design UI/UX for non-technical users: use clear labels, obvious actions, and the fewest necessary steps.
 
 ## Key Facts to Keep in Mind
