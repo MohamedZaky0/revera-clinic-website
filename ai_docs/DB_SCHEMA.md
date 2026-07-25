@@ -148,7 +148,7 @@ API routes that query them.
 | `id` | UUID | Primary key |
 | `service_id` | bigint | Legacy single-service FK → services.id; superseded by `service_ids[]` but still populated |
 | `service_ids` | bigint[] | Array of service IDs for multi-service bookings, default `{}` — backfilled from `service_id` |
-| `date` | text | Booking date (YYYY-MM-DD), stored as text not `date` type |
+| `date` | text | Booking date (YYYY-MM-DD), stored as text not `date` type. **Verified `text` on the dev DB 2026-07-25 — but it is a real `date` type on the main DB.** The two databases were built by different paths (RISK-020); any period-aggregation code must not assume one or the other. |
 | `requested_time` | text | Patient-requested time (free text), nullable |
 | `name` | text | Patient full name |
 | `email` | text | Patient email |
@@ -157,9 +157,9 @@ API routes that query them.
 | `status` | text | `'pending_deposit'`, `'pending'`, `'approved'`, `'confirmed'`, `'started'`, `'completed'`, `'cancelled'`, `'rejected'` — enforced via CHECK constraint `reservations_status_check` |
 | `time_slot` | text | Assigned 15-min slot (e.g., '09:00'), nullable — set on approve |
 | `session_type` | text | Default `'in_person'` |
-| `origin` | text | **UNVERIFIED — no migration creates this column.** Documented here since an earlier audit but absent from all 30 files in `supabase/migrations/`. `20260709154350_add_reservation_source.sql` adds `is_manual`, not `origin`, despite its filename. Confirm in the live DB before use. |
+| ~~`origin`~~ | — | **DOES NOT EXIST.** Verified absent from the live dev database 2026-07-25, and created by no migration. `20260709154350_add_reservation_source.sql` adds `is_manual`, not `origin`, despite its filename. Row kept struck through so it is not silently re-added. |
 | `is_manual` | boolean | Default false — true when created by staff in admin rather than via public booking |
-| `cancelled_reason` | text | **UNVERIFIED — no migration creates this column**, and no reference to it exists in `src/` outside these docs. Confirm in the live DB before use. |
+| ~~`cancelled_reason`~~ | — | **DOES NOT EXIST.** Verified absent from the live dev database 2026-07-25, created by no migration, and referenced nowhere in `src/` outside these docs. Row kept struck through so it is not silently re-added. |
 | `doctor_name` | text | Assigned doctor name, nullable |
 | `amount_paid` | numeric | Default 0 |
 | `amount_left` | numeric | nullable |
@@ -621,15 +621,16 @@ only when the table is empty, then seeds the real table from it.
 | `sale_date` | timestamptz | Default now() |
 | `created_at` | timestamptz | |
 
-**Corrected 2026-07-25 — the previous "confirmed wired" claim is NOT justified by the code.**
-`src/app/api/inventory/products/sales/route.ts:101-115` inserts `customer_id`, `product_sku`,
-`total_amount`, `sold_by` and omits `id` — but this table defines `sku`, `customer_phone`,
-`total_price`, `cashier_name`, has **no** `customer_id`, and `id` is `TEXT PRIMARY KEY` with no
-default. Against the migrated schema that insert fails and falls through to a `page_settings` JSON
-blob (key `product_sales_history`). Compounding it, `getStoredSalesData` returns `{sales: dbSales}`
-whenever there is no error (`:32-34`), and an empty array is truthy — so the fallback read at `:37`
-is unreachable once the table exists, and POS history reads back empty. **Verify the live table's
-columns before treating this as a revenue source.** See RISK-014.
+**Verified against the live dev database 2026-07-25 — the table matches this migration exactly.**
+The previous "confirmed wired" claim was still wrong, but the fault is in the route, not the schema.
+`src/app/api/inventory/products/sales/route.ts:101-115` inserts `product_sku`, `customer_mobile`,
+`total_amount`, `sold_by` and `customer_id`, and omits `id` — the real columns are `sku`,
+`customer_phone`, `total_price`, `cashier_name`, there is no `customer_id` at all, and `id` is
+`text` PK with no default. So **every POS sale insert fails** and falls through to a `page_settings`
+JSON blob (key `product_sales_history`), while `getStoredSalesData` (`:32-34`) treats the empty
+table as authoritative because an empty array is truthy — sales are written to one store and read
+from another. **This table is currently empty and is not a usable revenue source until the route is
+fixed.** See RISK-014 for the exact column mapping.
 
 Note: the "Finances Dashboard" analytics view is unreachable dead code and uses
 `MOCK_FINANCE_TRANSACTIONS`, not `MOCK_POS_ORDERS` (which belongs to the equally unreachable

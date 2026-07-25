@@ -312,23 +312,44 @@ updates, and two products sharing a name deduct the wrong item.
 
 ---
 
-## RISK-014: `product_sales` Writes May Be Failing Silently
+## RISK-014: Every POS Sale Fails To Write, And Sales History Reads Back Empty
 
-**Severity:** High · **Type:** Data loss · **Status:** Needs live-DB verification
-**Found:** 2026-07-25
+**Severity:** High · **Type:** Data loss
+**Found:** 2026-07-25 · **CONFIRMED against the live dev database 2026-07-25**
 
-The route inserts `customer_id`, `product_sku`, `total_amount`, `sold_by` and omits `id`
-(`src/app/api/inventory/products/sales/route.ts:101-115`). The migrated table has `sku`,
-`customer_phone`, `total_price`, `cashier_name`, **no** `customer_id`, and `id TEXT PRIMARY KEY`
-with no default (`20260720164008_setup_inventory_schema.sql:21-38`). Against the migration-defined
-schema this insert fails outright and falls back to a `page_settings` JSON blob.
+The live `product_sales` table matches its migration exactly. **The route is what is wrong** —
+`src/app/api/inventory/products/sales/route.ts:101-115` inserts column names that do not exist:
 
-Worse, `getStoredSalesData` returns `{sales: dbSales}` whenever `!dbErr` (`:32-34`) — and an
-**empty array is truthy** — so the fallback at `:37` is unreachable once the table exists.
-POS history then reads back empty with no error.
+| Route sends | Live column | |
+|---|---|---|
+| `product_sku` | `sku` | mismatch |
+| `customer_mobile` | `customer_phone` | mismatch |
+| `total_amount` | `total_price` | mismatch |
+| `sold_by` | `cashier_name` | mismatch |
+| `customer_id` | *no such column* | missing |
+| *(never sent)* | `id` — `text` PK, no default | omitted |
+| *(never sent)* | `branch_name` | omitted, so no per-branch product P&L |
 
-`DB_SCHEMA.md:603` claims this route is "confirmed wired". That confidence is not justified by
-the code. **Verify the live `product_sales` columns before treating it as a revenue source.**
+Live columns, verified: `id, product_id, product_name, sku, quantity, unit_price, total_price,
+customer_name, customer_phone, customer_email, cashier_name, branch_name, payment_method, notes,
+sale_date, created_at`.
+
+**Consequence:** every POS sale insert fails and falls through to the `page_settings` JSON blob
+(key `product_sales_history`). Then `getStoredSalesData` returns `{sales: dbSales}` whenever
+`!dbErr` (`:32-34`) — and an **empty array is truthy** — so the fallback read at `:37` is
+unreachable now that the table exists. Sales are written to one place and read from another,
+so POS history displays empty.
+
+**Fix:** correct the insert payload to the six mismatched/missing names above, generate an `id`,
+set `branch_name`, and change the read guard to treat an empty result as "fall through" rather than
+"authoritative" — matching the pattern already applied to `customer_product_balances` in `8f280cc`.
+
+Note `inventory_products` is fine: its live columns match the migration
+(`id, name, sku, category, price, cost_price, stock_quantity, min_stock_alert, unit, status,
+branch_name, created_at, updated_at`). The TypeScript interface at `route.ts:6-22` uses different
+names (`purchase_price`, `selling_price`, `min_reorder_quantity`, `branch_id`, `arabic_name`) but
+`mapProductToDbRow` translates them — except that it never writes `branch_name` and
+`mapDbRowToProduct` hardcodes `branch_id: null`, so branch attribution is lost for products too.
 
 Same class of issue: `device_maintenance_history` is a dead table — nothing in `src/` inserts
 into it; the reset-pulses route writes only to `page_settings`
