@@ -93,17 +93,46 @@ would be confidently wrong, which is worse than absent (DEC-019).
 | e. Move the 30 legacy files to `_legacy/`, update `DB_SCHEMA.md` to the baseline | `TODO` — blocked on (d) |
 | f. Bring the main DB up to the baseline | `TODO` — blocked on (e) |
 
-**(d) is yours to run — it needs the database password, which I must not handle:**
-```bash
-npx supabase login
-npx supabase link --project-ref <dev-project-ref>
-npx supabase db pull --schema public
-```
-`db pull` generates a migration **from the live database**, which is the only trustworthy
-description of the schema. Run it against **dev**, the more current of the two.
+**(d) is yours to run — it needs the database password, which I must not handle.**
 
-When reviewing the output, decide what `admin_roles` and `employees` are — they exist live, in no
-migration and in no doc.
+`link` succeeded. `db pull` then failed with *"The remote database's migration history does not
+match local files"*, which is expected: the CLI has never been used on this project, so the remote
+`supabase_migrations.schema_migrations` table is empty while 31 files exist locally.
+
+> ### Do NOT run the repair commands the CLI printed
+>
+> It offers to mark **all 31** migrations as `applied`. **Four of them have not been applied** — we
+> measured this. Marking them applied would make `db push` skip them forever, permanently locking in
+> the drift and hiding it again. That is the exact failure this task exists to eliminate.
+
+**Mark applied only the 27 that genuinely ran** (everything up to and including the 2026-07-20
+inventory schema — verified by the presence of their tables and columns in the live dev DB):
+
+```bash
+for v in 20260624015717 20260625001607 20260625002536 20260626073345 20260626081049 \
+         20260626081641 20260626214919 20260626215946 20260705141242 20260705141243 \
+         20260705141244 20260705171941 20260705180607 20260706081326 20260706090122 \
+         20260706091942 20260706174841 20260707132614 20260709154350 20260711204540 \
+         20260712003001 20260712230858 20260713172113 20260715202002 20260715202003 \
+         20260719162731 20260720164008 ; do
+  npx supabase migration repair --status applied "$v"
+done
+```
+
+**Leave these four out** — they must remain unapplied so `db push` picks them up:
+`20260722140000` · `20260725120000` · `20260725160000` · `20260725170000`
+
+Then:
+```bash
+npx supabase db pull --schema public   # baseline from the live database
+```
+
+> One caveat on `20260711204540` (adds `pending_deposit` to the status CHECK): we never confirmed it
+> ran. It is in the repair list anyway because `20260725170000` restates that constraint
+> unconditionally and *is* in the push set — so the constraint ends up correct either way.
+
+When reviewing the pulled baseline, decide what `admin_roles` and `employees` are — they exist live,
+in no migration and in no doc.
 
 **(b) — what was removed and why.** `src/app/api/reservations/route.ts` previously retried a failed
 insert after deleting `is_manual` and `created_by_employee_id`, then again after also deleting
@@ -121,12 +150,32 @@ It now fails loudly, logging the error code and the payload keys.
 
 ### Migrations pending — run these against dev, then update this table
 
-| Migration | Ran? | Against | Effect until run |
-|---|---|---|---|
-| `20260722140000_enable_row_level_security.sql` | ☐ | — | RLS off on the patient-data tables |
-| `20260725120000_backfill_medical_and_product_balance_tables.sql` | ☐ | — | 3 tables missing; routes on JSON fallback |
-| `20260725160000_add_customer_id_to_product_sales.sql` | ☐ | — | POS sales still fail into the blob (RISK-014) |
-| `20260725170000_ensure_reservation_status_check.sql` | ☐ | — | `pending_deposit` may now fail loudly |
+**Push in this order.** The first three are additive and safe; the RLS one is not, and had a
+blocker that is now cleared.
+
+| # | Migration | Ran? | Against | Notes |
+|---|---|---|---|---|
+| 1 | `20260725160000_add_customer_id_to_product_sales.sql` | ☐ | — | Additive. Until run, POS sales keep failing into the blob (RISK-014) |
+| 2 | `20260725170000_ensure_reservation_status_check.sql` | ☐ | — | Restates the status CHECK. Run this **before** taking any new deposit booking — the fallback that used to hide a stale constraint has been removed |
+| 3 | `20260725120000_backfill_medical_and_product_balance_tables.sql` | ☐ | — | Additive. Creates the 3 missing tables; until then those routes run on JSON-file fallback |
+| 4 | `20260722140000_enable_row_level_security.sql` | ☐ | — | **Read the warning below before running.** Enables RLS on all public tables, most with no policies |
+
+> ### The RLS migration had a blocker — now cleared, but verify before running
+>
+> `src/app/admin/page.tsx` used to write to `customers` **directly from the browser** with the anon
+> key (`supabase.from("customers").update({ spent_amount })`). Enabling RLS on `customers` with no
+> policies would have made that update affect zero rows **while still reporting success** — silent
+> data loss, exactly the class of bug this phase exists to remove.
+>
+> That write is now server-side in `POST /api/inventory/products/sales`. There is no remaining
+> `.from(...)` table access in any client component — confirm before running step 4:
+> ```bash
+> grep -rnE "\.from\(['\"]" src/ --include=*.tsx
+> ```
+> This should return nothing. If it returns a real call, fix it first.
+>
+> After running step 4, most tables have RLS on with **zero policies**, i.e. service-role-only.
+> Every read must go through an API route. Re-test the admin panel end to end.
 
 **Verify 0.0 complete when:** a fresh Supabase project can be provisioned with one command, and
 `supabase_migrations.schema_migrations` lists every applied file.

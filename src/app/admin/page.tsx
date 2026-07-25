@@ -3741,20 +3741,14 @@ export default function AdminPage() {
       });
       setInventoryProducts(updatedProducts);
 
-      // 3. Update Customer spent_amount
+      // 3. Reflect the new spend locally. The persistence itself is done server-side by
+      // POST /api/inventory/products/sales — this used to be a direct browser
+      // supabase.from("customers").update(), which enabling RLS on `customers` would
+      // have turned into a silent no-op that still reported success.
       const newSpentAmount = (Number(targetPatient.spent_amount) || 0) + totalAmount;
-      const { error: customerErr } = await supabase
-        .from("customers")
-        .update({ spent_amount: newSpentAmount, updated_at: new Date().toISOString() })
-        .eq("id", targetPatient.id);
-
-      if (customerErr) {
-        console.error("Error updating customer spent amount:", customerErr);
-      } else {
-        setDbCustomers((prev) =>
-          prev.map((c) => (c.id === targetPatient.id ? { ...c, spent_amount: newSpentAmount } : c))
-        );
-      }
+      setDbCustomers((prev) =>
+        prev.map((c) => (c.id === targetPatient.id ? { ...c, spent_amount: newSpentAmount } : c))
+      );
 
       // 4. Update Customer Product Balance
       await fetch("/api/customers/products", {

@@ -103,6 +103,49 @@ function generateSaleId(): string {
   return `sale-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 }
 
+/**
+ * Roll a retail sale into the patient's lifetime spend.
+ *
+ * This used to be done from the browser with the anon key
+ * (src/app/admin/page.tsx, `supabase.from("customers").update(...)`), which read a
+ * possibly-stale spent_amount out of React state. It moved here because enabling RLS
+ * on `customers` would have made that browser write silently affect zero rows while
+ * still reporting success.
+ *
+ * Still a read-modify-write, so concurrent sales to the same patient can lose an
+ * update. PROPOSAL-002 Phase 1 removes the problem properly by deriving spent_amount
+ * from the invoice ledger rather than storing a running scalar (RISK-016).
+ */
+async function addToCustomerSpend(customerId: string, amount: number) {
+  if (!customerId || !amount) return;
+  try {
+    const { data: customer, error: readErr } = await supabaseServer
+      .from('customers')
+      .select('spent_amount')
+      .eq('id', customerId)
+      .maybeSingle();
+
+    if (readErr || !customer) {
+      console.error('Could not read customer for spend update:', customerId, readErr?.message);
+      return;
+    }
+
+    const { error: writeErr } = await supabaseServer
+      .from('customers')
+      .update({
+        spent_amount: Number(customer.spent_amount || 0) + Number(amount),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', customerId);
+
+    if (writeErr) {
+      console.error('Failed to update customer spent_amount:', customerId, writeErr.message);
+    }
+  } catch (err) {
+    console.error('Error updating customer spent_amount:', err);
+  }
+}
+
 async function getStoredSalesData(): Promise<{ sales: ProductSaleRecord[] }> {
   try {
     // 1. Prefer the native product_sales table, but only trust it when it has rows.
@@ -212,6 +255,7 @@ export async function POST(req: Request) {
       .single();
 
     await deductInventoryStock(product_id || product_name, Number(quantity));
+    await addToCustomerSpend(customer_id, newSale.total_amount);
 
     if (!dbInsertErr && insertedDb) {
       const allSales = await getStoredSalesData();
