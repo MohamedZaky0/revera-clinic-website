@@ -724,12 +724,14 @@ purchased vs. used per customer (retail products sold alongside treatments).
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
-Read via `/api/customers/products` (GET) tries this table first. **POST/PATCH never write to
-it** — both only write to a `page_settings` JSON snapshot (key `'customer_product_balances'`);
-the native table is populated only if something else (a migration seed, manual insert) puts
-data there. This is a real gap in the route, not a doc error — worth fixing in
-`src/app/api/customers/products/route.ts` so writes go to the native table like
-`inventory_products` does, but that's a code change outside this doc-sync task.
+**Fixed 2026-07-25.** Follows the same dual-storage pattern as `inventory_products`:
+`/api/customers/products` GET reads the native table first, but only trusts it when
+non-empty (an empty-but-no-error result now correctly falls through instead of masking
+real data); POST/PATCH write to `page_settings` (key `'customer_product_balances'`) and
+upsert the same rows into this table. Read is seeded from `page_settings` the first time
+the table is empty. Previously (2026-07-21 to 2026-07-25) POST/PATCH only wrote
+`page_settings` and GET silently returned `[]` once this table existed empty — see
+`src/app/api/customers/products/route.ts`.
 
 ---
 

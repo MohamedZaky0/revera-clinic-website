@@ -39,7 +39,7 @@ async function getStoredBalances(): Promise<{ balances: CustomerProductBalance[]
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!dbErr && dbData) {
+    if (!dbErr && dbData && dbData.length > 0) {
       return { balances: dbData as CustomerProductBalance[] };
     }
 
@@ -50,14 +50,25 @@ async function getStoredBalances(): Promise<{ balances: CustomerProductBalance[]
       .eq('key', 'customer_product_balances')
       .maybeSingle();
 
-    if (error || !data || !data.value) {
-      const payload = { balances: [] };
+    let balancesList: CustomerProductBalance[] = [];
+    if (!error && data && data.value && Array.isArray(data.value.balances)) {
+      balancesList = data.value.balances;
+    } else {
       await supabaseServer
         .from('page_settings')
-        .upsert({ key: 'customer_product_balances', value: payload, updated_at: new Date().toISOString() });
-      return payload;
+        .upsert({ key: 'customer_product_balances', value: { balances: [] }, updated_at: new Date().toISOString() });
     }
-    return data.value;
+
+    // Seed the native table from page_settings so it becomes the source of truth going forward
+    if (balancesList.length > 0) {
+      try {
+        await supabaseServer.from('customer_product_balances').upsert(balancesList);
+      } catch (e) {
+        console.warn('Seeding customer_product_balances DB failed silently:', e);
+      }
+    }
+
+    return { balances: balancesList };
   } catch (err) {
     console.error('Error fetching customer product balances:', err);
     return { balances: [] };
@@ -65,6 +76,7 @@ async function getStoredBalances(): Promise<{ balances: CustomerProductBalance[]
 }
 
 async function saveBalancesData(payload: { balances: CustomerProductBalance[] }) {
+  // Always save to page_settings fallback (dual-storage pattern, matches inventory_products)
   await supabaseServer
     .from('page_settings')
     .upsert({
@@ -72,6 +84,15 @@ async function saveBalancesData(payload: { balances: CustomerProductBalance[] })
       value: payload,
       updated_at: new Date().toISOString()
     });
+
+  // Sync to native Supabase customer_product_balances table
+  try {
+    if (payload.balances && payload.balances.length > 0) {
+      await supabaseServer.from('customer_product_balances').upsert(payload.balances);
+    }
+  } catch (e) {
+    console.warn('Syncing to customer_product_balances DB table failed:', e);
+  }
 }
 
 // GET: Fetch product balances

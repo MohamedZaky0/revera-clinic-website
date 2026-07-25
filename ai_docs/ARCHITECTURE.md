@@ -64,7 +64,7 @@ src/
 │       ├── providers/schedule-audit-logs/  GET provider schedule change history
 │       ├── inventory/products/    GET/POST/PUT inventory products (+ /sales for POS transactions)
 │       ├── inventory/devices/     GET/POST devices (+ /[id]/reset-pulses for maintenance)
-│       ├── customers/products/    GET/POST customer product purchase balances (`customer_product_balances` table — migration backfilled 2026-07-25; POST/PATCH still only write `page_settings`, see DB_SCHEMA.md)
+│       ├── customers/products/    GET/POST/PATCH customer product purchase balances (`customer_product_balances` table, dual-storage with `page_settings` — fixed 2026-07-25, see DB_SCHEMA.md)
 │       ├── medical-records/       GET/POST intake form + reports (`medical_records`/`medical_reports` tables — migration backfilled 2026-07-25)
 │       ├── customer-avatars/      GET/POST avatar images — stored in `page_settings` (key `customer_avatars`), not a dedicated table
 │       └── health/supabase/       Env var diagnostics
