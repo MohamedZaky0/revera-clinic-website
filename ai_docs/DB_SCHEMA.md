@@ -1,6 +1,6 @@
 # DB_SCHEMA.md — Revera Clinics Database Schema
 
-> **Last Updated:** 2026-07-21
+> **Last Updated:** 2026-07-25
 > **Database:** Supabase (PostgreSQL)
 > **Audited from:** `supabase/migrations/*.sql` (full read, not grep), cross-checked against live API routes
 > **Previous content was for a different project — discarded entirely**
@@ -50,6 +50,9 @@ providers (doctors)
 customers
   └──< reservations (customer_id FK, nullable)
   └──< prescriptions (customer_id FK)
+  └──< medical_records (customer_id FK, unique — one row per customer)
+  └──< medical_reports (customer_id FK)
+  └──< customer_product_balances (customer_id FK)
 
 page_settings
   (key/value CMS store — key='home' for homepage content; also reused as a JSON fallback
@@ -646,37 +649,87 @@ Confirmed wired via `/api/inventory/devices` and `/api/inventory/devices/[id]/re
 
 ---
 
-## Schema Drift: Tables Queried by Code With No Migration File
+### `medical_records`
 
-Found while auditing this doc against `supabase/migrations/` (2026-07-21). These three tables
-are queried by live API routes but were never created by any script in `supabase/migrations/` —
-they exist in the live database only because someone ran ad-hoc SQL or created them via the
-Supabase Table Editor UI outside the tracked migration history. **Whoever touches these next
-should write a proper migration file for them** (see `supabase/migrations/README.md`) so they
-stop being drift.
+**Backfilled 2026-07-25.** Was schema drift (queried by code, no migration file) from
+2026-07-21 to 2026-07-25 — see `supabase/migrations/20260725120000_backfill_medical_and_product_balance_tables.sql`.
+One row per customer — medical intake form, upserted on `customer_id`.
 
-### `medical_records` (one row per customer — intake form)
-Columns inferred from `src/app/api/medical-records/route.ts` upsert payload: `customer_id`
-(unique, onConflict target), `skin_type`, `main_concerns` (array), `other_concerns_details`,
-`has_previous_treatments` (bool), `previous_treatments_details`, `has_medical_conditions` (bool),
-`medical_conditions_details`, `is_taking_medication` (bool), `medication_details`, `allergies`,
-`updated_at`, `created_by_role`, `created_by_name`. Falls back to `data/medical_records.json` on
-Supabase error (file-based, not the `page_settings` dual-storage pattern used elsewhere).
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `customer_id` | UUID | NOT NULL, UNIQUE — FK → customers.id, cascade delete; upsert `onConflict` target |
+| `skin_type` | text | Default `'Normal'` |
+| `main_concerns` | text[] | Default `{}` |
+| `other_concerns_details` | text | Default `''` |
+| `has_previous_treatments` | boolean | Default false |
+| `previous_treatments_details` | text | Default `''` |
+| `has_medical_conditions` | boolean | Default false |
+| `medical_conditions_details` | text | Default `''` |
+| `is_taking_medication` | boolean | Default false |
+| `medication_details` | text | Default `''` |
+| `allergies` | text | Default `''` |
+| `created_by_role` | text | Default `'Receptionist'` |
+| `created_by_name` | text | Default `'Staff'` |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
 
-### `medical_reports` (many rows per customer — uploaded files/reports)
-Columns inferred from the same route: `id` (text, `REP-<timestamp>` format), `customer_id`,
-`title`, `description`, `file_url`, `doctor_name`, `date`, `created_at`. Falls back to
+Confirmed wired via `/api/medical-records` (GET/POST). Falls back to `data/medical_records.json`
+on Supabase error — a plain file fallback, not the `page_settings` dual-storage pattern.
+
+---
+
+### `medical_reports`
+
+**Backfilled 2026-07-25.** Was schema drift — see backfill migration above. Many rows per
+customer (uploaded files/reports).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | text | Primary key — app-generated `REP-<timestamp>`, not DB-generated |
+| `customer_id` | UUID | NOT NULL — FK → customers.id, cascade delete |
+| `title` | text | Default `'Medical Report'` |
+| `description` | text | Default `''` |
+| `file_url` | text | nullable |
+| `doctor_name` | text | Default `'Dr. Revera'` |
+| `date` | date | Default `CURRENT_DATE` |
+| `created_at` | timestamptz | |
+
+Confirmed wired via `/api/medical-records` (GET/POST/DELETE). Falls back to
 `data/medical_reports.json` on Supabase error.
 
-### `customer_product_balances` (product units purchased vs. used per customer)
-Columns inferred from `src/app/api/customers/products/route.ts`: `id`, `customer_id`,
-`customer_name`, `customer_mobile`, `product_id`, `product_name`, `product_sku`,
-`purchased_quantity`, `used_quantity`, `remaining_quantity`, `unit_price`, `total_amount`,
-`status` (`'Active'`/`'Depleted'`), `created_at`, `updated_at`, `usage_history` (JSON array of
-`{id, quantity_used, used_at, used_by, notes}`). Unlike the two tables above, this one **does**
-follow the dual-storage pattern — falls back to a `page_settings` JSON snapshot (key
-`'customer_product_balances'`) when the native table errors or is empty, same as
-`inventory_products`.
+---
+
+### `customer_product_balances`
+
+**Backfilled 2026-07-25.** Was schema drift — see backfill migration above. Product units
+purchased vs. used per customer (retail products sold alongside treatments).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | text | Primary key — app-generated `cpb-<timestamp>-<rand>`, not DB-generated |
+| `customer_id` | UUID | NOT NULL — FK → customers.id, cascade delete |
+| `customer_name` | text | nullable — denormalized snapshot |
+| `customer_mobile` | text | nullable |
+| `product_id` | text | nullable, **not** a hard FK to `inventory_products.id` — the route synthesizes a `prod-<timestamp>` placeholder when none is supplied |
+| `product_name` | text | NOT NULL |
+| `product_sku` | text | nullable |
+| `purchased_quantity` | numeric | Default 0 |
+| `used_quantity` | numeric | Default 0 |
+| `remaining_quantity` | numeric | Default 0 |
+| `unit_price` | numeric | Default 0 |
+| `total_amount` | numeric | Default 0 |
+| `status` | text | Default `'Active'`, CHECK IN (`'Active'`, `'Depleted'`) |
+| `usage_history` | JSONB | Default `[]` — array of `{id, quantity_used, used_at, used_by, notes}` |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
+
+Read via `/api/customers/products` (GET) tries this table first. **POST/PATCH never write to
+it** — both only write to a `page_settings` JSON snapshot (key `'customer_product_balances'`);
+the native table is populated only if something else (a migration seed, manual insert) puts
+data there. This is a real gap in the route, not a doc error — worth fixing in
+`src/app/api/customers/products/route.ts` so writes go to the native table like
+`inventory_products` does, but that's a code change outside this doc-sync task.
 
 ---
 

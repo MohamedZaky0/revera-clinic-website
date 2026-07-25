@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Revera Clinics System Architecture
 
-> **Last Updated:** 2026-07-21
+> **Last Updated:** 2026-07-25
 > **Audited from:** live source code, cross-checked against `supabase/migrations/` (all previous content was for a different project — discarded)
 
 ---
@@ -64,8 +64,8 @@ src/
 │       ├── providers/schedule-audit-logs/  GET provider schedule change history
 │       ├── inventory/products/    GET/POST/PUT inventory products (+ /sales for POS transactions)
 │       ├── inventory/devices/     GET/POST devices (+ /[id]/reset-pulses for maintenance)
-│       ├── customers/products/    GET/POST customer product purchase balances (`customer_product_balances` table — no migration file, see DB_SCHEMA.md drift note)
-│       ├── medical-records/       GET/POST intake form + reports (`medical_records`/`medical_reports` tables — no migration file, see DB_SCHEMA.md drift note)
+│       ├── customers/products/    GET/POST customer product purchase balances (`customer_product_balances` table — migration backfilled 2026-07-25; POST/PATCH still only write `page_settings`, see DB_SCHEMA.md)
+│       ├── medical-records/       GET/POST intake form + reports (`medical_records`/`medical_reports` tables — migration backfilled 2026-07-25)
 │       ├── customer-avatars/      GET/POST avatar images — stored in `page_settings` (key `customer_avatars`), not a dedicated table
 │       └── health/supabase/       Env var diagnostics
 │
@@ -171,7 +171,9 @@ so it doesn't drift; update both when a table is added.
 | `product_sales` | Real (not mock) — POS transaction log | Via `branch_name` (text, not FK) |
 | `inventory_devices` | Real (not mock) — laser/medical equipment + pulse counters | Via `branch_name` (text, not FK) |
 | `device_maintenance_history` | Maintenance/pulse-reset log per device | No |
-| `medical_records`, `medical_reports`, `customer_product_balances` | Real, but **no migration file exists for these** — schema drift, see `DB_SCHEMA.md` | No |
+| `medical_records` | Medical intake form, one row per customer | No |
+| `medical_reports` | Uploaded medical reports/files per customer | No |
+| `customer_product_balances` | Retail product units purchased vs. used per customer | No |
 
 **`branch` is the topmost scoping unit. There is no org/tenant layer above it.**
 

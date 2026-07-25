@@ -1,6 +1,6 @@
 # PROJECT.md — Revera Clinics Website & Admin System
 
-> **Last Updated:** 2026-07-21
+> **Last Updated:** 2026-07-25
 > **Audited from:** live source code, cross-checked against `supabase/migrations/` (no trust placed in stub files)
 
 ---
@@ -28,7 +28,7 @@ A Next.js (App Router) web application serving two purposes:
 
 - **Single-tenant:** One Supabase project, one deployment — exclusively for Revera Clinics.
 - **Hosted on Vercel** (Next.js, App Router).
-- **Database:** Supabase (PostgreSQL) — 25+ tables as of 2026-07-21. Full list with columns: `ai_docs/DB_SCHEMA.md`. Migration history: `supabase/migrations/`.
+- **Database:** Supabase (PostgreSQL) — 28+ tables as of 2026-07-25. Full list with columns: `ai_docs/DB_SCHEMA.md`. Migration history: `supabase/migrations/`.
 - **No multi-tenancy.** No org/tenant layer in the schema.
 
 ---
@@ -97,7 +97,8 @@ src/
       employees/notes/     — Administrative employee notes
       providers/schedule-audit-logs/ — Doctor schedule change history
       inventory/products/, inventory/devices/ — Real Supabase inventory + POS (not mock)
-      customers/products/, medical-records/, customer-avatars/ — see DB_SCHEMA.md schema-drift note (tables exist, no migration file)
+      customers/products/, medical-records/ — real Supabase tables, migration backfilled 2026-07-25 (see DB_SCHEMA.md)
+      customer-avatars/ — stored in `page_settings` (key `customer_avatars`), not a dedicated table
       health/supabase/    — Env/connection diagnostics
   components/             — All public website components
   lib/
