@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { deductInventoryStock } from '@/app/api/inventory/products/route';
 
 export const dynamic = 'force-dynamic';
 
@@ -138,7 +137,7 @@ export async function POST(req: Request) {
     }
 
     const currentData = await getStoredBalances();
-    let balances = [...(currentData.balances || [])];
+    const balances = [...(currentData.balances || [])];
 
     // Check if an existing balance for customer + product_id/product_name exists
     const existingIndex = balances.findIndex(
@@ -186,7 +185,12 @@ export async function POST(req: Request) {
     }
 
     await saveBalancesData({ balances });
-    await deductInventoryStock(product_id || product_name, qtyNum);
+
+    // Stock is NOT deducted here — deliberately. This route records what a patient owns;
+    // POST /api/inventory/products/sales owns stock movement and is called alongside it by
+    // both admin flows (handleConfirmSellProduct and handleAddProductToPatient). Deducting
+    // in both meant selling 2 units removed 4 (RISK-013). If you add a caller that creates a
+    // patient balance WITHOUT recording a sale, deduct stock there or the count will drift.
 
     return NextResponse.json({ success: true, balances });
   } catch (err: any) {
@@ -208,7 +212,7 @@ export async function PATCH(req: Request) {
     }
 
     const currentData = await getStoredBalances();
-    let balances = [...(currentData.balances || [])];
+    const balances = [...(currentData.balances || [])];
 
     const targetIndex = balances.findIndex(b => b.id === balance_id);
     if (targetIndex === -1) {

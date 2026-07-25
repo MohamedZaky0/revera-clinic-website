@@ -72,7 +72,7 @@ would be confidently wrong, which is worse than absent (DEC-019).
 | 0.1 | Verify live DB against migrations | `DONE` | Claude | `1c3d151` |
 | 0.2 | Fix server-side branch pricing | `DONE` | Claude | `see 0.2/0.3 below` |
 | 0.3 | Fix client-side branch pricing | `DONE` | Claude | `see 0.2/0.3 below` |
-| 0.4 | Fix double stock deduction | `TODO` | — | — |
+| 0.4 | Fix double stock deduction | `DONE` | Claude | `see 0.4 below` |
 | 0.5 | Fix `customers.outstanding` never decrementing | `TODO` | — | — |
 | 0.6 | Fix `product_sales` route column mapping | `DONE` | Claude | `23e0e5e`, `8108b82` |
 | 0.7 | Add `provider_id` FK to `reservations` | `TODO` | — | — |
@@ -257,7 +257,35 @@ invoice both use it. Today they do not.
 
 ---
 
-### 0.4 — Double stock deduction (RISK-013)
+### 0.4 — Double stock deduction (RISK-013) — DONE
+
+**Decision: `POST /api/inventory/products/sales` owns stock movement.** It is the only place
+`deductInventoryStock` is now called. `POST /api/customers/products` records what a patient *owns*
+and no longer touches stock — both admin flows call the two endpoints together, so a single
+deduction happens in each.
+
+> If you ever add a caller that creates a patient balance **without** recording a sale, deduct
+> stock there or the count will drift. The constraint is documented in the route itself.
+
+Also removed: `handleConfirmSellProduct` PUT the entire catalog to `/api/inventory/products` after
+each sale. That call **always returned 400** ("Product ID is required" — the handler expects a
+single product object, not `{products: [...]}`) and its response was never checked. Had it ever
+worked it would have been a *third* deduction path, overwriting the server's stock with a
+client-computed figure. The optimistic local update remains for immediate UI feedback, followed by
+`fetchInventoryProducts()` to reconcile with the server.
+
+`PATCH /api/customers/products` (log usage) correctly does **not** deduct — the patient already
+owns those units.
+
+**Still open — `branch_name` on sales.** Not wired, and deliberately not faked. There is no branch
+context anywhere in the sell flow, `inventory_products.branch_id` is hardcoded `null` in the
+mapper, and `branch_name` is never written. Per-branch product P&L needs products associated with
+branches first; that is its own task, not a line in this one.
+
+**Verify:** sell 2 units of a product with known stock; stock drops by exactly 2, in the DB not
+just the UI.
+
+**Original diagnosis, kept for reference:**
 
 `src/app/admin/page.tsx:3690-3773` calls `POST /api/inventory/products/sales`, which deducts stock
 at `sales/route.ts:124`, **and then** calls `POST /api/customers/products`, which deducts the same

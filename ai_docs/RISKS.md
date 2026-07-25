@@ -304,7 +304,18 @@ Re-firing the same completed PATCH double-counts `spent_amount` and `outstanding
 ## RISK-013: Every Product Sale Deducts Stock Twice
 
 **Severity:** High · **Type:** Data integrity
-**Found:** 2026-07-25
+**Found:** 2026-07-25 · **RESOLVED 2026-07-25**
+
+**Fix:** `POST /api/inventory/products/sales` is now the single owner of stock movement;
+`POST /api/customers/products` records patient ownership only and no longer deducts. Also removed a
+dead `PUT /api/inventory/products` call in the sell flow that always 400'd and would have been a
+third deduction path had it worked.
+
+**Not fixed by this:** existing `stock_quantity` values are already corrupted by past
+double-deductions and need a physical stock count to correct — fold into the opening-balance import
+(DEC-024). The concurrency issue below is also still open.
+
+Original diagnosis below.
 
 The admin POS flow (`src/app/admin/page.tsx:3690-3773`) calls
 `POST /api/inventory/products/sales`, which deducts stock internally

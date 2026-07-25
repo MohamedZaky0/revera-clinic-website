@@ -3725,21 +3725,21 @@ export default function AdminPage() {
         throw new Error(errorData.error || "Failed to record sale.");
       }
 
-      // 2. Update Product Stock Quantity
+      // 2. Reflect the new stock level locally. The deduction itself already happened
+      // server-side inside POST /api/inventory/products/sales, which owns stock movement.
+      // This used to also PUT the entire catalog to /api/inventory/products — a call that
+      // always returned 400 ("Product ID is required", the handler expects a single product)
+      // and whose response was never checked. Had it worked it would have been a third
+      // deduction path, writing client-computed stock over the server's. See RISK-013.
       const newStock = Math.max(0, selectedSellProduct.stock_quantity - sellQuantity);
       const newStatus = newStock === 0 ? "Out of Stock" : selectedSellProduct.status;
-      const updatedProducts = inventoryProducts.map((p) =>
-        p.id === selectedSellProduct.id
-          ? { ...p, stock_quantity: newStock, status: newStatus }
-          : p
+      setInventoryProducts((prev) =>
+        prev.map((p) =>
+          p.id === selectedSellProduct.id
+            ? { ...p, stock_quantity: newStock, status: newStatus }
+            : p
+        )
       );
-
-      await fetch("/api/inventory/products", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products: updatedProducts })
-      });
-      setInventoryProducts(updatedProducts);
 
       // 3. Reflect the new spend locally. The persistence itself is done server-side by
       // POST /api/inventory/products/sales — this used to be a direct browser
@@ -3769,8 +3769,9 @@ export default function AdminPage() {
         await fetchCustomerProductBalances(targetPatient.id);
       }
 
-      // 4. Refresh sales history & close modal
+      // 5. Reconcile with the server rather than trusting the optimistic update above.
       await fetchProductSalesHistory();
+      await fetchInventoryProducts();
       setShowSellProductModal(false);
       alert(`Sale confirmed! ${sellQuantity} x ${selectedSellProduct.name} recorded for ${targetPatient.name}.`);
     } catch (err: any) {
