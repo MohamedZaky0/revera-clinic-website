@@ -34,7 +34,7 @@ END $$;
 UPDATE public.reservations r
 SET provider_id = m.provider_id
 FROM (
-  SELECT lower(btrim(p.name)) AS norm_name, min(p.id) AS provider_id
+  SELECT lower(btrim(p.name)) AS norm_name, (array_agg(p.id))[1] AS provider_id
   FROM public.providers p
   WHERE p.name IS NOT NULL AND btrim(p.name) <> ''
   GROUP BY lower(btrim(p.name))

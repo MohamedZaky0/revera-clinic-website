@@ -17,6 +17,7 @@ import {
 import { compressImage } from "@/lib/image";
 import { printInvoice } from "@/lib/printUtils";
 import { Branch } from "@/types";
+import { translations } from "@/lib/translations";
 import {
   AlarmClock,
   ArrowLeft,
@@ -605,30 +606,30 @@ const DEFAULT_HERO_SLIDES = [
 
 const DEFAULT_HERO_SLIDES_AR = [
   {
-    welcome: "Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â±ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ ÃƒËœÃ‚Â¨Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Â¦ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§",
-    heading: "ÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬ËœÃƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã†â€™ ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â´Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â !",
-    description: "ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒËœÃ‚ÂµÃƒËœÃ‚Â© Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹ ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â´ÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™ ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â° ÃƒËœÃ‚ÂªÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¡ ÃƒËœÃ‚Â£Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã†â€™ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂµÃƒËœÃ‚Â­ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â©.",
-    bookBtn: "ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â² Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¹ÃƒËœÃ‚Â§",
+    welcome: "مرحباً بكم في عيادات ريفيرا",
+    heading: "حوّل جمالك بشكل طبيعي!",
+    description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية مصممة لمساعدتك على تحقيق أهدافك في الجمال والصحة من خلال تقنيات طبية متقدمة.",
+    bookBtn: "احجز موعدًا",
     rating: "4.5",
-    reviewCount: "(1000+ ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¦)",
+    reviewCount: "(1000+ تقييم)",
     image: "/images/hero/slide-1.jpg"
   },
   {
-    welcome: "Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â±ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ ÃƒËœÃ‚Â¨Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Â¦ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§",
-    heading: "ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã†â€™ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â«Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¡ ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§!",
-    description: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã†â€™ÃƒËœÃ‚ÂªÃƒËœÃ‚Â´Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â´ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â© Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â²ÃƒËœÃ‚Â± Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â©. Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹ ÃƒËœÃ‚Â£Ãƒâ„¢Ã†â€™ÃƒËœÃ‚Â«ÃƒËœÃ‚Â± Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  15 ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â±ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©ÃƒËœÃ…â€™ Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Â  Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§ Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â±ÃƒËœÃ‚Â´ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯Ãƒâ„¢Ã†â€™ Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¦Ãƒâ„¢Ã¢â‚¬Â¦ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â©.",
-    bookBtn: "ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â² Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¹ÃƒËœÃ‚Â§",
+    welcome: "مرحباً بكم في عيادات ريفيرا",
+    heading: "رعاية طبية متقدمة يمكنك الوثوق بها!",
+    description: "اكتشف خدمات شاملة في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان المصممة لاحتياجاتك الفريدة. مع أكثر من 15 عاماً من الخبرة المهنية، نحن هنا لإرشادك نحو الجمال الدائم والعافية.",
+    bookBtn: "احجز موعدًا",
     rating: "4.5",
-    reviewCount: "(1000+ ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¦)",
+    reviewCount: "(1000+ تقييم)",
     image: "/images/hero/slide-2.jpg"
   },
   {
-    welcome: "Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â±ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ ÃƒËœÃ‚Â¨Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Â¦ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§",
-    heading: "ÃƒËœÃ‚Â±ÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™ Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂµÃƒËœÃ‚Â­ÃƒËœÃ‚Â© ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â£ Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§!",
-    description: "ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒËœÃ‚ÂµÃƒËœÃ‚Â© ÃƒËœÃ‚ÂªÃƒËœÃ‚Â­ÃƒËœÃ‚Âª ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â´ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â  Ãƒâ„¢Ã†â€™ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â²ÃƒËœÃ‚Â± Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â  Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¹ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ÃƒËœÃ‚Â±.",
-    bookBtn: "ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â² Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¹ÃƒËœÃ‚Â§",
+    welcome: "مرحباً بكم في عيادات ريفيرا",
+    heading: "رحلتك نحو الجمال والصحة تبدأ هنا!",
+    description: "عيادات متخصصة تحت إشراف طبي كامل تقدم خدمات في طب الجلدية والجراحة التجميلية وعلاجات الليزر وطب الأسنان لجميع الأعمار.",
+    bookBtn: "احجز موعدًا",
     rating: "4.5",
-    reviewCount: "(1000+ ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¦)",
+    reviewCount: "(1000+ تقييم)",
     image: "/images/hero/slide-3.jpg"
   }
 ];
@@ -1065,16 +1066,16 @@ export default function AdminPage() {
     
     let csv = `ATTENDANCE INSIGHTS REPORT\n`;
     csv += `Employee,${employee.name || 'Employee'}\n`;
-    csv += `Staff ID,${employee.employee_id || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}\n`;
-    csv += `Department,${employee.department || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}\n`;
-    csv += `Role,${employee.role_name || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}\n`;
+    csv += `Staff ID,${employee.employee_id || '—'}\n`;
+    csv += `Department,${employee.department || '—'}\n`;
+    csv += `Role,${employee.role_name || '—'}\n`;
     csv += `Month,${monthStr}\n\n`;
 
     csv += `Date,Shift,Scheduled In,Scheduled Out,Actual Check In,Actual Check Out,Status,Worked (Min),Late (Min),Early Leave (Min),Overtime (Min),Mid-Shift Leave (Min)\n`;
 
     records.forEach((r: any) => {
-      const inTime = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString() : 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
-      const outTime = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString() : 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
+      const inTime = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString() : '—';
+      const outTime = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString() : '—';
       csv += `"${r.date}","${employee.shift || 'Day'}","${r.scheduled_in || '09:00 AM'}","${r.scheduled_out || '05:00 PM'}","${inTime}","${outTime}","${r.status || 'Present'}",${r.worked_minutes || 0},${r.late_minutes || 0},${r.early_leave_minutes || 0},${r.overtime_minutes || 0},${r.combined_mid_shift_duration_minutes || 0}\n`;
     });
 
@@ -1875,7 +1876,7 @@ export default function AdminPage() {
 
     filteredReservations.forEach((reservation) => {
       if (!reservation.date || !['approved', 'confirmed', 'started', 'completed'].includes(reservation.status)) return;
-      // Slice directly ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â avoids UTC conversion that shifts dates for non-UTC timezones
+      // Slice directly — avoids UTC conversion that shifts dates for non-UTC timezones
       const normalizedDate = String(reservation.date).slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) return;
       const [year, month] = normalizedDate.split('-');
@@ -2737,13 +2738,13 @@ export default function AdminPage() {
 
     const addedOn = emp.created_at
       ? new Date(emp.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-      : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â";
+      : "—";
 
     const monthlySalary = Number(emp.salary || 0);
     const dailySalary = Math.round(monthlySalary / 20);
     const hourlySalary = (monthlySalary / (20 * 8)).toFixed(2);
     
-    const addressDetails = emp.address || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â";
+    const addressDetails = emp.address || "—";
     
     const familyName = emp.name ? emp.name.split(" ").slice(-1)[0] : "Saif";
     const emergencyName = `Ahmed ${familyName}`;
@@ -2888,23 +2889,23 @@ export default function AdminPage() {
           <div class="grid-3">
             <div>
               <div class="label">Employee ID</div>
-              <div class="value">${emp.employee_id || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
+              <div class="value">${emp.employee_id || "—"}</div>
             </div>
             <div>
               <div class="label">Full Name</div>
-              <div class="value">${emp.name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
+              <div class="value">${emp.name || "—"}</div>
             </div>
             <div>
               <div class="label">Email Address</div>
-              <div class="value">${emp.email || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
+              <div class="value">${emp.email || "—"}</div>
             </div>
             <div>
               <div class="label">Phone Number</div>
-              <div class="value">${emp.phone || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
+              <div class="value">${emp.phone || "—"}</div>
             </div>
             <div>
               <div class="label">System Role</div>
-              <div class="value">${emp.role_name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
+              <div class="value">${emp.role_name || "—"}</div>
             </div>
             <div>
               <div class="label">Account Status</div>
@@ -3220,7 +3221,7 @@ export default function AdminPage() {
   const totalServicePages = Math.ceil(filteredServices.length / SERVICE_PAGE_SIZE);
   const pagedServices = filteredServices.slice((servicePage - 1) * SERVICE_PAGE_SIZE, servicePage * SERVICE_PAGE_SIZE);
 
-  // Grouped services: category key ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ filtered services in that category
+  // Grouped services: category key → filtered services in that category
   const groupedServices = useMemo(() => {
     const groups: Record<string, typeof localServices> = {};
     localCategories.forEach(cat => { groups[cat.key] = []; });
@@ -3791,7 +3792,12 @@ export default function AdminPage() {
   const [pagesSettingsTab, setPagesSettingsTab] = useState<"Home" | "About Us" | "Services">("Home");
   const [termsText, setTermsText] = useState("");
   const [homeHeroSlides, setHomeHeroSlides] = useState<any[]>(DEFAULT_HERO_SLIDES);
-  const [homeHeroSlidesAr, setHomeHeroSlidesAr] = useState<any[]>(DEFAULT_HERO_SLIDES_AR);
+  const [homeHeroSlidesAr, setHomeHeroSlidesAr] = useState<any[]>(() =>
+    translations.ar.hero.slides.map((slide, index) => ({
+      ...slide,
+      image: DEFAULT_HERO_SLIDES[index]?.image,
+    })),
+  );
   const [providers, setProviders] = useState<any[]>(PROVIDERS);
 
   const isDoctorAvailableAdmin = useCallback((
@@ -3996,7 +4002,7 @@ export default function AdminPage() {
 
   const [loadingPageSettings, setLoadingPageSettings] = useState(false);
   const [savingPageSettings, setSavingPageSettings] = useState(false);
-  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Branches state ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+  // ── Branches state ──
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [branchModal, setBranchModal] = useState<{ open: boolean; mode: "add" | "edit"; branch: Partial<Branch> }>({
@@ -4007,13 +4013,13 @@ export default function AdminPage() {
   const [selectedBranchForHoursId, setSelectedBranchForHoursId] = useState<string>("");
   const [savingBranchHours, setSavingBranchHours] = useState(false);
   const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
-    { day: "Sunday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¯", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Monday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â ", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Tuesday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â«ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Wednesday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Thursday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â³", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Friday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â©", isOpen: false, openTime: "09:00", closeTime: "20:00" },
-    { day: "Saturday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¨ÃƒËœÃ‚Âª", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+    { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+    { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
   ]);  const [pageSettingsLangTab, setPageSettingsLangTab] = useState<"en" | "ar">("en");
   const [aboutImage1, setAboutImage1] = useState<string>("");
   const [aboutImage2, setAboutImage2] = useState<string>("");
@@ -4060,11 +4066,11 @@ export default function AdminPage() {
   const [smsLogSearch, setSmsLogSearch] = useState("");
   const [settingsUserSearch, setSettingsUserSearch] = useState("");
 
-  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Clinic Profile Settings State ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+  // ── Clinic Profile Settings State ──
   const [clinicName, setClinicName] = useState("Revera Clinics");
-  const [clinicNameAr, setClinicNameAr] = useState("ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã†â€™");
+  const [clinicNameAr, setClinicNameAr] = useState("ريفيرا كلينك");
   const [clinicLocation, setClinicLocation] = useState("Sheikh Zayed City, Giza");
-  const [clinicLocationAr, setClinicLocationAr] = useState("Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â´Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â® ÃƒËœÃ‚Â²ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ÃƒËœÃ…â€™ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â²ÃƒËœÃ‚Â©");
+  const [clinicLocationAr, setClinicLocationAr] = useState("مدينة الشيخ زايد، الجيزة");
   const [clinicEmail, setClinicEmail] = useState("info@reveraclinics.com");
   const [clinicPhone, setClinicPhone] = useState("+20 2 3796 2200");
   const [clinicWhatsapp, setClinicWhatsapp] = useState("+201035595691");
@@ -4091,17 +4097,17 @@ export default function AdminPage() {
 
 
 
-  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Notification Settings State ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+  // ── Notification Settings State ──
   const [notifSmsOtp, setNotifSmsOtp] = useState(true);
   const [notifWhatsApp, setNotifWhatsApp] = useState(true);
   const [notifEmailConfirm, setNotifEmailConfirm] = useState(false);
   const [notifSmsTemplate, setNotifSmsTemplate] = useState("Hello {name}, your appointment for {service} is confirmed on {date} at {time}. See you at Revera Clinics!");
-  const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â±ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ {name}ÃƒËœÃ…â€™ ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚ÂªÃƒËœÃ‚Â£Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯Ãƒâ„¢Ã†â€™ Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© {service} ÃƒËœÃ‚Â¨ÃƒËœÃ‚ÂªÃƒËœÃ‚Â§ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â® {date} ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â© {time}. Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§Ãƒâ„¢Ã†â€™ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã†â€™!");
+  const [notifSmsTemplateAr, setNotifSmsTemplateAr] = useState("مرحباً {name}، تم تأكيد موعدك لخدمة {service} بتاريخ {date} الساعة {time}. نراك في ريفيرا كلينيك!");
   const [notifReminderHours, setNotifReminderHours] = useState(24);
   const [notifStaffEmail, setNotifStaffEmail] = useState("admin@reveraclinics.com");
   const [savingNotificationSettings, setSavingNotificationSettings] = useState(false);
 
-  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Queue Settings State ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+  // ── Queue Settings State ──
   const [queueVirtualRoom, setQueueVirtualRoom] = useState(false);
   const [queueShowOnScreens, setQueueShowOnScreens] = useState(true);
   const [queueAutoCheckIn, setQueueAutoCheckIn] = useState(false);
@@ -4555,13 +4561,13 @@ export default function AdminPage() {
       setServiceHours(branchRecord.service_hours);
     } else {
       setServiceHours([
-        { day: "Sunday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¯", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Monday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â ", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Tuesday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â«ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Wednesday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¡", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Thursday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â³", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-        { day: "Friday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â©", isOpen: false, openTime: "09:00", closeTime: "20:00" },
-        { day: "Saturday", dayAr: "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¨ÃƒËœÃ‚Âª", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
+        { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+        { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
       ]);
     }
   }, [selectedBranchForHoursId, branches]);
@@ -5072,9 +5078,18 @@ export default function AdminPage() {
               : DEFAULT_HERO_SLIDES
           );
           setHomeHeroSlidesAr(
-            data.hero?.slides_ar && data.hero.slides_ar.length > 0
+            data.hero?.slides_ar &&
+            data.hero.slides_ar.length > 0 &&
+            !data.hero.slides_ar.some((slide: Record<string, unknown>) =>
+              Object.values(slide).some(
+                (value) => typeof value === "string" && value.includes("\u00C3"),
+              ),
+            )
               ? data.hero.slides_ar
-              : DEFAULT_HERO_SLIDES_AR
+              : translations.ar.hero.slides.map((slide, index) => ({
+                  ...slide,
+                  image: DEFAULT_HERO_SLIDES[index]?.image,
+                }))
           );
           setAboutImage1(data.about?.image1 || "");
           setAboutImage2(data.about?.image2 || "");
@@ -5096,17 +5111,17 @@ export default function AdminPage() {
             "Osteopathy & Therapeutic Nutrition",
           ]);
           setWhatWeDoListAr(data.aboutPage?.whatWeDoListAr || [
-            "ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾",
-            "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¡ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂµÃƒËœÃ‚Â­ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â±ÃƒËœÃ‚Â£ÃƒËœÃ‚Â©",
-            "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â  Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â£Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾",
-            "ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¸ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚ÂºÃƒËœÃ‚Â°Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©",
+            "علاجات الجلدية والتجميل",
+            "النساء والتوليد وصحة المرأة",
+            "العلاج الطبيعي وإعادة التأهيل",
+            "تقويم العظام والتغذية العلاجية",
           ]);
 
           // Load FAQ Section Settings
           setFaqTag(data.aboutPage?.faqTag || "frequently asked questions");
-          setFaqTagAr(data.aboutPage?.faqTagAr || "ÃƒËœÃ‚Â£ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¦Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â© ÃƒËœÃ‚Â´ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¦ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â©");
+          setFaqTagAr(data.aboutPage?.faqTagAr || "أسئلة شائعة");
           setFaqHeading(data.aboutPage?.faqHeading || "Questions? We have answers.");
-          setFaqHeadingAr(data.aboutPage?.faqHeadingAr || "ÃƒËœÃ‚Â£ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¦Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â©ÃƒËœÃ…Â¸ Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª.");
+          setFaqHeadingAr(data.aboutPage?.faqHeadingAr || "أسئلة؟ لدينا إجابات.");
           setFaqImage1(data.aboutPage?.faqImage1 || "");
           setFaqImage2(data.aboutPage?.faqImage2 || "");
           setFaqs(data.aboutPage?.faqs || [
@@ -5116,53 +5131,53 @@ export default function AdminPage() {
             },
             {
               question: "2. Who is Revera designed for?",
-              answer: "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â not the cheapest ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â and expect a medical experience that matches their standards."
+              answer: "Revera is designed for women who value elegance, privacy, and visible results. Our clients seek the best — not the cheapest — and expect a medical experience that matches their standards."
             },
             {
               question: "3. How does my treatment plan work?",
-              answer: "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â never a template ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â that evolves with your progress and needs."
+              answer: "Your journey begins with a comprehensive consultation where we assess your health, aesthetic goals, and lifestyle. From this, our doctors build a fully personalized treatment plan — never a template — that evolves with your progress and needs."
             },
             {
               question: "4. What makes Revera different from other clinics?",
-              answer: "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â from your first appointment to your last follow-up."
+              answer: "Revera is a destination, not a clinic. The difference is in the feeling: a private, unhurried environment, doctors who listen, and a standard of care that you can see and feel at every touchpoint — from your first appointment to your last follow-up."
             }
           ]);
           setFaqsAr(data.aboutPage?.faqsAr || [
             {
-              question: "Ãƒâ„¢Ã‚Â¡. Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã…Â  ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ÃƒËœÃ…Â¸",
-              answer: "ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â²ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒËœÃ‚ÂµÃƒËœÃ‚Â© Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ…â€™ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂµÃƒËœÃ‚Â­ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â±ÃƒËœÃ‚Â£ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¡ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ÃƒËœÃ…â€™ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â  Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â£Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ…â€™ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¸ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚ÂºÃƒËœÃ‚Â°Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©. Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© ÃƒËœÃ‚ÂªÃƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â½Ãƒâ„¢Ã¢â‚¬ËœÃƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â© ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â© Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â§ÃƒËœÃ‚Â®ÃƒËœÃ‚Â±ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â."
+              question: "١. ما الخدمات التي تقدمها ريفيرا؟",
+              answer: "ريفيرا عيادة متميزة متخصصة في علاجات الجلدية والتجميل، وصحة المرأة والنساء والتوليد، والعلاج الطبيعي وإعادة التأهيل، وتقويم العظام والتغذية العلاجية. كل خدمة تُقدَّم بدقة طبية وتجربة فاخرة مصممة لكِ."
             },
             {
-              question: "Ãƒâ„¢Ã‚Â¢. Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚ÂµÃƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬ËœÃƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Âª ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ÃƒËœÃ…Â¸",
-              answer: "ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â±ÃƒËœÃ‚Â£ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã…Â  ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬ËœÃƒËœÃ‚Â± ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂµÃƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂªÃƒËœÃ‚Â§ÃƒËœÃ‚Â¦ÃƒËœÃ‚Â¬ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©. ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§ Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â­ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â¶Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£ÃƒËœÃ‚Â±ÃƒËœÃ‚Â®ÃƒËœÃ‚Âµ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã…Â ÃƒËœÃ‚ÂªÃƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â© ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¡ ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â ."
+              question: "٢. لمن صُمِّمت ريفيرا؟",
+              answer: "ريفيرا مصممة للمرأة التي تقدّر الأناقة والخصوصية والنتائج الحقيقية. عميلاتنا يبحثن عن الأفضل — لا الأرخص — ويتوقعن تجربة طبية تليق بمعاييرهن."
             },
             {
-              question: "Ãƒâ„¢Ã‚Â£. Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚Â ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â®ÃƒËœÃ‚Â·ÃƒËœÃ‚Â© ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬Ãƒâ„¢Ã…Â ÃƒËœÃ…Â¸",
-              answer: "ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â£ ÃƒËœÃ‚Â±ÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³ÃƒËœÃ‚ÂªÃƒËœÃ‚Â´ÃƒËœÃ‚Â§ÃƒËœÃ‚Â±ÃƒËœÃ‚Â© ÃƒËœÃ‚Â´ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬ËœÃƒâ„¢Ã¢â‚¬Â¦ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§ ÃƒËœÃ‚ÂµÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â£Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â£ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â­Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â. ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¡Ãƒâ„¢Ã¢â‚¬Â¹ ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â° ÃƒËœÃ‚Â°Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã†â€™ÃƒËœÃ…â€™ Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¶ÃƒËœÃ‚Â¹ ÃƒËœÃ‚Â£ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¤Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â®ÃƒËœÃ‚Â·ÃƒËœÃ‚Â© ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬ ÃƒËœÃ‚Â´ÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â© ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â°ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â²ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ÃƒËœÃ‚ÂªÃƒËœÃ‚ÂªÃƒËœÃ‚Â·Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â± Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹ ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â."
+              question: "٣. كيف تعمل خطة علاجي؟",
+              answer: "تبدأ رحلتكِ باستشارة شاملة نُقيّم فيها صحتكِ وأهدافكِ الجمالية وأسلوب حياتكِ. بناءً على ذلك، يضع أطباؤنا خطة علاج شخصية متكاملة — لا نموذجاً جاهزاً — تتطور مع تقدمكِ واحتياجاتكِ."
             },
             {
-              question: "Ãƒâ„¢Ã‚Â¤. Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â°Ãƒâ„¢Ã…Â  Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â®ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â©ÃƒËœÃ…Â¸",
-              answer: "ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â©ÃƒËœÃ…â€™ Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¯ ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â©. ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Å¡ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â­ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³: ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¦ÃƒËœÃ‚Â© ÃƒËœÃ‚Â®ÃƒËœÃ‚Â§ÃƒËœÃ‚ÂµÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â¦ÃƒËœÃ‚Â©ÃƒËœÃ…â€™ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â£ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¡ Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â³ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ…â€™ Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚ÂªÃƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â° ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¤Ãƒâ„¢Ã…Â ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â¡ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â´ÃƒËœÃ‚Â¹Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â± ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Â¡ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¸ÃƒËœÃ‚Â© ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â¥Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â° Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¹ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£ÃƒËœÃ‚Â®Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â©."
+              question: "٤. ما الذي يجعل ريفيرا مختلفة؟",
+              answer: "ريفيرا وجهة، لا مجرد عيادة. الفرق في الإحساس: بيئة خاصة وهادئة، وأطباء يستمعون، ومستوى رعاية يمكنكِ رؤيته والشعور به في كل لحظة — من موعدكِ الأول إلى متابعتكِ الأخيرة."
             }
           ]);
           setHowItWorksHeading(data.howItWorks?.heading || "Simple steps to beauty transformations");
           setHowItWorksDescription(data.howItWorks?.description || "Discover a seamless process designed to enhance your beauty and health through personalized consultations, customized treatment plans, and dedicated medical support. We guide you every step toward achieving your beauty and wellness goals.");
-          setHowItWorksHeadingAr(data.howItWorks?.headingAr || "ÃƒËœÃ‚Â®ÃƒËœÃ‚Â·Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â·ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾");
-          setHowItWorksDescriptionAr(data.howItWorks?.descriptionAr || "ÃƒËœÃ‚Â§Ãƒâ„¢Ã†â€™ÃƒËœÃ‚ÂªÃƒËœÃ‚Â´Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¹ÃƒËœÃ‚Â²Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â² ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã†â€™ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂµÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³ÃƒËœÃ‚ÂªÃƒËœÃ‚Â´ÃƒËœÃ‚Â§ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â´ÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â®ÃƒËœÃ‚Â·ÃƒËœÃ‚Â· ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒËœÃ‚ÂµÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â  Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒËœÃ‚Âµ. Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â´ÃƒËœÃ‚Â¯Ãƒâ„¢Ã†â€™ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â®ÃƒËœÃ‚Â·Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€  ÃƒËœÃ‚ÂªÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¡ ÃƒËœÃ‚Â£Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â©.");
+          setHowItWorksHeadingAr(data.howItWorks?.headingAr || "خطوات بسيطة لتحولات الجمال");
+          setHowItWorksDescriptionAr(data.howItWorks?.descriptionAr || "اكتشف عملية سلسة مصممة لتعزيز جمالك وصحتك من خلال استشارات شخصية وخطط علاجية مخصصة ودعم طبي متخصص. نرشدك في كل خطوة نحو تحقيق أهداف الجمال والعافية.");
 
           // Load Why Choose Us Settings
           setWcuYearsLabel(data.whyChooseUs?.yearsLabel || "15+ years excellence");
           setWcuHeading(data.whyChooseUs?.heading || "Where medical expertise meets a luxury experience");
-          setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
-          setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
+          setWcuDescription(data.whyChooseUs?.description || "At Revera, every detail is intentional — from your first consultation to the moment you walk out transformed. We deliver science-backed care with the calm confidence of a private medical destination.");
+          setWcuQuote(data.whyChooseUs?.quote || '"We don\'t treat conditions — we transform confidence. Every session at Revera is designed around you: your goals, your skin, your journey."');
           setWcuContactLabel(data.whyChooseUs?.contactLabel || "Reach us:");
           setWcuPhone(data.whyChooseUs?.phone || "(+20) 01035595691");
 
-          setWcuYearsLabelAr(data.whyChooseUs?.yearsLabelAr || "Ãƒâ„¢Ã‚Â¡Ãƒâ„¢Ã‚Â¥+ ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â²");
-          setWcuHeadingAr(data.whyChooseUs?.headingAr || "ÃƒËœÃ‚Â­Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â« ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â±ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â¨ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â© Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â§ÃƒËœÃ‚Â®ÃƒËœÃ‚Â±ÃƒËœÃ‚Â©");
-          setWcuDescriptionAr(data.whyChooseUs?.descriptionAr || "Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ÃƒËœÃ…â€™ Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚ÂªÃƒâ„¢Ã‚ÂÃƒËœÃ‚ÂµÃƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚ÂµÃƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¯ ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â¡ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³ÃƒËœÃ‚ÂªÃƒËœÃ‚Â´ÃƒËœÃ‚Â§ÃƒËœÃ‚Â±ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â° Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â° Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¸ÃƒËœÃ‚Â© ÃƒËœÃ‚Â®ÃƒËœÃ‚Â±Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¬Ãƒâ„¢Ã†â€™ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬ËœÃƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â©. Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â¹Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â¦ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â© ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â®ÃƒËœÃ‚Â§ÃƒËœÃ‚ÂµÃƒËœÃ‚Â©.");
-          setWcuQuoteAr(data.whyChooseUs?.quoteAr || '"Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Â  Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â· ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬ËœÃƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â©. Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³ÃƒËœÃ‚Â© Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© ÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â: ÃƒËœÃ‚Â£Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã†â€™Ãƒâ„¢Ã‚ÂÃƒËœÃ…â€™ ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â´ÃƒËœÃ‚Â±ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™Ãƒâ„¢Ã‚ÂÃƒËœÃ…â€™ ÃƒËœÃ‚Â±ÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™Ãƒâ„¢Ã‚Â."');
-          setWcuContactLabelAr(data.whyChooseUs?.contactLabelAr || "ÃƒËœÃ‚ÂªÃƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§ÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â  Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§:");
+          setWcuYearsLabelAr(data.whyChooseUs?.yearsLabelAr || "١٥+ عاماً من التميز");
+          setWcuHeadingAr(data.whyChooseUs?.headingAr || "حيث تلتقي الخبرة الطبية بتجربة فاخرة");
+          setWcuDescriptionAr(data.whyChooseUs?.descriptionAr || "في ريفيرا، كل تفصيل مقصود — بدءاً من استشارتك الأولى وحتى لحظة خروجك متحوّلة. نقدم رعاية مدعومة بالعلم مع الثقة الهادئة لوجهة طبية خاصة.");
+          setWcuQuoteAr(data.whyChooseUs?.quoteAr || '"نحن لا نعالج فقط — بل نُحوّل الثقة. كل جلسة في ريفيرا مصممة حولكِ: أهدافكِ، بشرتكِ، رحلتكِ."');
+          setWcuContactLabelAr(data.whyChooseUs?.contactLabelAr || "تواصلي معنا:");
           setWcuPhoneAr(data.whyChooseUs?.phoneAr || "(+20) 01035595691");
 
           setWcuImage1(data.whyChooseUs?.image1 || "");
@@ -5342,7 +5357,7 @@ export default function AdminPage() {
     }
   }
 
-  // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Settings Panel Handlers ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+  // ── Settings Panel Handlers ──
   async function handleSaveClinicProfile(e: React.FormEvent) {
     e.preventDefault();
     setSavingClinicProfile(true);
@@ -5701,12 +5716,12 @@ export default function AdminPage() {
       image: "/images/hero/slide-1.jpg"
     };
     const newArSlide = {
-      welcome: "Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â±ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ ÃƒËœÃ‚Â¨Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Â¦ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§",
-      heading: "ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â´ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â­ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â©",
-      description: "ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒËœÃ‚ÂµÃƒËœÃ‚Â© Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹ ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â´ÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒâ„¢Ã…Â ÃƒËœÃ‚Â©.",
-      bookBtn: "ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â² Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¹ÃƒËœÃ‚Â§",
+      welcome: "مرحباً بكم في عيادات ريفيرا",
+      heading: "عنوان الشريحة الجديدة",
+      description: "خدمات متخصصة في طب الجلدية والجراحة التجميلية مع رعاية شخصية.",
+      bookBtn: "احجز موعدًا",
       rating: "4.5",
-      reviewCount: "(1000+ ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¦)",
+      reviewCount: "(1000+ تقييم)",
       image: "/images/hero/slide-1.jpg"
     };
     setHomeHeroSlides([...homeHeroSlides, newEnSlide]);
@@ -7127,7 +7142,7 @@ export default function AdminPage() {
 
             {loginError && (
               <p className="text-xs text-red-600 font-medium bg-red-50 border border-red-100 rounded-xl p-3">
-                ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â {loginError}
+                ⚠️ {loginError}
               </p>
             )}
 
@@ -7202,7 +7217,7 @@ export default function AdminPage() {
               className="md:hidden flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10 text-[#FBFBF9]/80 hover:text-[#FBFBF9] transition text-xl font-bold"
               title="Close sidebar"
             >
-              ÃƒÆ’Ã¢â‚¬â€
+              ×
             </button>
           </div>
 
@@ -7545,7 +7560,7 @@ export default function AdminPage() {
                     className="flex items-center justify-between gap-4 rounded-3xl border border-rose-200 bg-rose-50 px-6 py-4 text-rose-800 shadow-sm animate-pulse"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â</span>
+                      <span className="text-xl">⚠️</span>
                       <p className="text-sm font-semibold">
                         Alert: Employee <strong>{alertItem.employee_accounts?.name}</strong> ({alertItem.employee_accounts?.role_name}) went missing at {new Date(alertItem.timestamp).toLocaleTimeString()}!
                       </p>
@@ -7590,7 +7605,7 @@ export default function AdminPage() {
             ) : (
               <>
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PROVIDERS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── PROVIDERS VIEW ── */}
           {activeNav === "Doctors" && (
             <section className="space-y-6">
               {editingDoctorInline ? (
@@ -7677,8 +7692,8 @@ export default function AdminPage() {
                           if (check.isValid) {
                             return (
                               <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/70 px-4 py-2 text-xs text-[#1F251A] font-semibold flex items-center justify-between min-h-[42px]">
-                                <span>{check.age} yrs ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ DOB: {check.dobFormatted}</span>
-                                <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ National ID</span>
+                                <span>{check.age} yrs • DOB: {check.dobFormatted}</span>
+                                <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">✓ National ID</span>
                               </div>
                             );
                           }
@@ -7727,7 +7742,7 @@ export default function AdminPage() {
                                     : "bg-[#414E36]/5 text-[#414E36] border-transparent hover:bg-[#414E36]/10"
                                 }`}
                               >
-                                {b.name_en} {isSelected ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" : "+"}
+                                {b.name_en} {isSelected ? "✓" : "+"}
                               </button>
                             );
                           })}
@@ -7744,7 +7759,7 @@ export default function AdminPage() {
                                 <div className="flex items-center justify-between w-full">
                                   <span className="text-sm font-semibold text-[#1F251A]">{displayDate}</span>
                                   <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full border border-[#414E36]/15 flex items-center gap-1">
-                                    ÃƒÂ¢Ã…Â¡Ã‚Â¡ Auto from 1st Booking
+                                    ⚡ Auto from 1st Booking
                                   </span>
                                 </div>
                               );
@@ -8057,7 +8072,7 @@ export default function AdminPage() {
             </section>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ SERVICES VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── SERVICES VIEW ── */}
           {activeNav === "Services" && (
              <div>
                {/* Header */}
@@ -8103,7 +8118,7 @@ export default function AdminPage() {
                   <input
                     value={serviceSearch}
                     onChange={(e) => { setServiceSearch(e.target.value); }}
-                    placeholder="Search servicesÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"
+                    placeholder="Search services…"
                     className="w-full rounded-lg border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
                   />
                 </div>
@@ -8403,7 +8418,7 @@ export default function AdminPage() {
                 </button>
               </div>
 
-              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ DELETE CATEGORY CONFIRMATION MODAL ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+              {/* ── DELETE CATEGORY CONFIRMATION MODAL ── */}
               {deleteCategoryTarget && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
                   <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[#414E36]/10 animate-fadeIn">
@@ -8443,7 +8458,7 @@ export default function AdminPage() {
                 </div>
               )}
               
-              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ DELETE SERVICE CONFIRMATION MODAL ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+              {/* ── DELETE SERVICE CONFIRMATION MODAL ── */}
               {deleteServiceTarget && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
                   <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[#414E36]/10 animate-fadeIn">
@@ -8485,7 +8500,7 @@ export default function AdminPage() {
               )}
 
 
-              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ ADD CATEGORY MODAL ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+              {/* ── ADD CATEGORY MODAL ── */}
               {showAddCategoryModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
                   <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
@@ -8498,7 +8513,7 @@ export default function AdminPage() {
                         onClick={() => setShowAddCategoryModal(false)}
                         className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] hover:bg-[#F9F9F7]"
                       >
-                        ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢
+                        ✕
                       </button>
                     </div>
                     <div className="flex flex-col gap-4">
@@ -8539,7 +8554,7 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ REDESIGNED ADD/EDIT SERVICE MODAL ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+              {/* ── REDESIGNED ADD/EDIT SERVICE MODAL ── */}
               {showAddServiceModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto">
                   <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl my-8 border border-[#414E36]/10 animate-fadeIn flex flex-col max-h-[90vh]">
@@ -8568,7 +8583,7 @@ export default function AdminPage() {
                           onClick={() => setShowAddServiceModal(false)}
                           className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#FBFBF9]"
                         >
-                          ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢
+                          ✕
                         </button>
                       </div>
                     </div>
@@ -8699,7 +8714,7 @@ export default function AdminPage() {
                             type="text"
                             value={serviceNameAr}
                             onChange={(e) => setServiceNameAr(e.target.value)}
-                            placeholder="ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¬ ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â : ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾ (15 ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³ÃƒËœÃ‚Â©)"
+                            placeholder="علاج طبيعي: باقة التحول (15 جلسة)"
                             dir="rtl"
                             className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                           />
@@ -8724,7 +8739,7 @@ export default function AdminPage() {
                             value={serviceDescAr}
                             onChange={(e) => setServiceDescAr(e.target.value)}
                             rows={3}
-                            placeholder="ÃƒËœÃ‚Â£ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂµÃƒâ„¢Ã‚Â ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂºÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©..."
+                            placeholder="أدخل الوصف باللغة العربية..."
                             dir="rtl"
                             className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium resize-none"
                           />
@@ -8901,13 +8916,13 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PROMOTIONS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── PROMOTIONS VIEW ── */}
           {activeNav === "Promotions" && (
             <div>
               {/* Header */}
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-semibold text-[#1F251A]">Promotions & Discounts / ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¶ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â®ÃƒËœÃ‚ÂµÃƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â±Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹</h2>
+                  <h2 className="text-2xl font-semibold text-[#1F251A]">Promotions & Discounts / عروض وخصومات الفروع</h2>
                   <p className="text-xs text-[#5A6A51] mt-1">Manage special pricing, percentage discounts, and fixed discounts across branches</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -9140,13 +9155,13 @@ export default function AdminPage() {
                     {/* Modal Header */}
                     <div className="flex items-center justify-between border-b border-[#414E36]/10 px-6 py-4">
                       <h3 className="text-base font-bold text-[#1F251A]">
-                        {editingPromo ? "Edit Promotion / ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¶" : "Add Promotion / ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â¶ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â© ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¶"}
+                        {editingPromo ? "Edit Promotion / تعديل العرض" : "Add Promotion / إضافة عرض"}
                       </h3>
                       <button
                         onClick={() => setShowAddPromoModal(false)}
                         className="flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#FBFBF9]"
                       >
-                        ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¢
+                        ✕
                       </button>
                     </div>
 
@@ -9165,7 +9180,7 @@ export default function AdminPage() {
                         </label>
                         {editingPromo ? (
                           <div className="rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] font-medium">
-                            {localServices.find(s => s.id === editingPromo.serviceId)?.en || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                            {localServices.find(s => s.id === editingPromo.serviceId)?.en || "—"}
                           </div>
                         ) : (
                           <div className="rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] overflow-hidden">
@@ -9268,7 +9283,7 @@ export default function AdminPage() {
                                   return Array.from(names);
                                 })();
                             if (branchList.length === 0) {
-                              return <p className="px-3 py-2 text-[10px] text-amber-600 font-medium">ÃƒÂ¢Ã…Â¡Ã‚Â  No branches found. Configure branches in Settings ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ Branches first.</p>;
+                              return <p className="px-3 py-2 text-[10px] text-amber-600 font-medium">⚠ No branches found. Configure branches in Settings → Branches first.</p>;
                             }
                             return branchList.map(name => {
                               const checked = promoBranchNames.includes(name);
@@ -9360,7 +9375,7 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Live Price note ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â shows for single-service selection only */}
+                      {/* Live Price note — shows for single-service selection only */}
                       {promoServiceIds.length === 1 && promoBranchNames.length > 0 && (() => {
                         const selectedSvc = localServices.find(s => s.id === promoServiceIds[0]);
                         if (!selectedSvc) return null;
@@ -9369,7 +9384,7 @@ export default function AdminPage() {
                           : promoBranchNames;
                         return (
                           <div className="pt-3 border-t border-[#414E36]/10 space-y-1.5">
-                            <div className="text-xs font-bold text-[#414E36] mb-1">Preview Selling Price by Branch / Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â± ÃƒËœÃ‚Â­ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â±ÃƒËœÃ‚Â¹:</div>
+                            <div className="text-xs font-bold text-[#414E36] mb-1">Preview Selling Price by Branch / معاينة السعر حسب الفرع:</div>
                             <div className="max-h-24 overflow-y-auto space-y-1.5 pr-1">
                               {branchesToPreview.map(branchName => {
                                 const selectedBp = (selectedSvc.branchPricing || []).find(bp => bp.name.toLowerCase() === branchName.toLowerCase());
@@ -9399,7 +9414,7 @@ export default function AdminPage() {
                       {(promoServiceIds.length > 1 || promoBranchNames.length > 1) && (
                         <div className="pt-3 border-t border-[#414E36]/10">
                           <p className="text-[10px] text-[#5A6A51] font-medium">
-                            ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¹ This promotion will apply to <strong>{editingPromo ? 1 : promoServiceIds.length} service{(!editingPromo && promoServiceIds.length > 1) ? 's' : ''}</strong> across <strong>{promoBranchNames.length > 0 ? promoBranchNames.join(', ') : 'selected'}</strong> branch{promoBranchNames.length > 1 ? 'es' : ''}.
+                            ℹ This promotion will apply to <strong>{editingPromo ? 1 : promoServiceIds.length} service{(!editingPromo && promoServiceIds.length > 1) ? 's' : ''}</strong> across <strong>{promoBranchNames.length > 0 ? promoBranchNames.join(', ') : 'selected'}</strong> branch{promoBranchNames.length > 1 ? 'es' : ''}.
                           </p>
                         </div>
                       )}
@@ -9434,7 +9449,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ ALL PRESCRIPTIONS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── ALL PRESCRIPTIONS VIEW ── */}
           {activeNav === "All Prescriptions" && (
             <div>
               {/* Page header */}
@@ -9463,7 +9478,7 @@ export default function AdminPage() {
                   <input
                     value={prescriptionsSearch}
                     onChange={(e) => { setPrescriptionsSearch(e.target.value); setPrescriptionPage(1); }}
-                    placeholder="Search prescriptionsÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"
+                    placeholder="Search prescriptions…"
                     className="w-full rounded-lg border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
                   />
                 </div>
@@ -9534,7 +9549,7 @@ export default function AdminPage() {
 
               {/* Pagination */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#5A6A51]">
-                <span>Showing {(prescriptionPage - 1) * PRESCRIPTION_PAGE_SIZE + 1}ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“{Math.min(prescriptionPage * PRESCRIPTION_PAGE_SIZE, filteredPrescriptions.length)} of {filteredPrescriptions.length}</span>
+                <span>Showing {(prescriptionPage - 1) * PRESCRIPTION_PAGE_SIZE + 1}–{Math.min(prescriptionPage * PRESCRIPTION_PAGE_SIZE, filteredPrescriptions.length)} of {filteredPrescriptions.length}</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setPrescriptionPage((p) => Math.max(1, p - 1))}
@@ -9568,7 +9583,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ MEDICINE LIBRARY VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── MEDICINE LIBRARY VIEW ── */}
           {activeNav === "Medicine Library" && (
             <div>
               {/* Page header */}
@@ -9597,7 +9612,7 @@ export default function AdminPage() {
                   <input
                     value={medicinesSearch}
                     onChange={(e) => { setMedicinesSearch(e.target.value); setMedicinePage(1); }}
-                    placeholder="Search medicine libraryÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"
+                    placeholder="Search medicine library…"
                     className="w-full rounded-lg border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
                   />
                 </div>
@@ -9704,7 +9719,7 @@ export default function AdminPage() {
 
               {/* Pagination */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#5A6A51]">
-                <span>Showing {(medicinePage - 1) * MEDICINE_PAGE_SIZE + 1}ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“{Math.min(medicinePage * MEDICINE_PAGE_SIZE, filteredMedicines.length)} of {filteredMedicines.length}</span>
+                <span>Showing {(medicinePage - 1) * MEDICINE_PAGE_SIZE + 1}–{Math.min(medicinePage * MEDICINE_PAGE_SIZE, filteredMedicines.length)} of {filteredMedicines.length}</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setMedicinePage((p) => Math.max(1, p - 1))}
@@ -9738,7 +9753,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PRODUCTS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── PRODUCTS VIEW ── */}
           {activeNav === "Products" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -9829,9 +9844,9 @@ export default function AdminPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3.5 font-medium text-[#1F251A]" dir="rtl">{
-                            p.name.includes("Cream") ? "Ãƒâ„¢Ã†â€™ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚ÂªÃƒËœÃ‚Â±ÃƒËœÃ‚Â·Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¡" :
-                            p.name.includes("Sunscreen") ? "Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â  ÃƒËœÃ‚Â´Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ 50+" :
-                            p.name.includes("Serum") ? "ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â±Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â ÃƒËœÃ‚ÂªÃƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾" : "ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¸Ãƒâ„¢Ã‚Â Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â·Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚Â"
+                            p.name.includes("Cream") ? "كريم ترطيب الوجه" :
+                            p.name.includes("Sunscreen") ? "واقي شمس 50+" :
+                            p.name.includes("Serum") ? "سيروم ريتينول" : "جل منظف لطيف"
                           }</td>
                           <td className="px-4 py-3.5 font-medium text-[#1F251A]">{p.name}</td>
                           <td className="px-4 py-3.5">
@@ -9868,7 +9883,7 @@ export default function AdminPage() {
 
               {/* Pagination */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#5A6A51]">
-                <span>Showing {(productPage - 1) * PRODUCT_PAGE_SIZE + 1}ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“{Math.min(productPage * PRODUCT_PAGE_SIZE, filteredProducts.length)} of {filteredProducts.length}</span>
+                <span>Showing {(productPage - 1) * PRODUCT_PAGE_SIZE + 1}–{Math.min(productPage * PRODUCT_PAGE_SIZE, filteredProducts.length)} of {filteredProducts.length}</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setProductPage((p) => Math.max(1, p - 1))}
@@ -9902,7 +9917,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PRODUCT CATEGORIES VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── PRODUCT CATEGORIES VIEW ── */}
           {activeNav === "Product Categories" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -9932,11 +9947,11 @@ export default function AdminPage() {
                     ) : (
                       MOCK_PRODUCT_CATEGORIES.map((cat, idx) => {
                         const colors = ["#C4AE7C", "#414E36", "#3B82F6", "#EC4899"];
-                        const arabicTitles = ["ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â´ÃƒËœÃ‚Â±ÃƒËœÃ‚Â©", "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â´Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³", "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â±Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¦", "ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â´ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±"];
+                        const arabicTitles = ["العناية بالبشرة", "الحماية من الشمس", "السيروم", "العناية بالشعر"];
                         return (
                           <tr key={cat.id} className="transition hover:bg-[#F9F9F7]">
                             <td className="px-5 py-4 font-mono font-semibold text-[#5A6A51]">{cat.id}</td>
-                            <td className="px-5 py-4 font-semibold text-[#1F251A]" dir="rtl">{arabicTitles[idx] || "ÃƒËœÃ‚ÂªÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦"}</td>
+                            <td className="px-5 py-4 font-semibold text-[#1F251A]" dir="rtl">{arabicTitles[idx] || "تصنيف عام"}</td>
                             <td className="px-5 py-4 font-semibold text-[#1F251A]">{cat.name}</td>
                             <td className="px-5 py-4">
                               <span
@@ -9960,7 +9975,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ SUPPLIERS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── SUPPLIERS VIEW ── */}
           {activeNav === "Suppliers" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10064,7 +10079,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PURCHASES VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── PURCHASES VIEW ── */}
           {activeNav === "Purchases" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10196,7 +10211,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ BATCH MANAGEMENT VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── BATCH MANAGEMENT VIEW ── */}
           {activeNav === "Batch Management" && (
             <div>
               <div className="mb-6">
@@ -10296,7 +10311,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ POINT OF SALE VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── POINT OF SALE VIEW ── */}
           {activeNav === "Point of Sale" && (
             <div>
               <div className="mb-6">
@@ -10426,7 +10441,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ POS ORDERS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── POS ORDERS VIEW ── */}
           {activeNav === "POS Orders" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10478,7 +10493,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ INSIGHTS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── INSIGHTS VIEW ── */}
           {activeNav === "Insights" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -10576,7 +10591,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ SALES DASHBOARD VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── SALES DASHBOARD VIEW ── */}
           {activeNav === "Sales Dashboard" && (
             <div>
               <div className="mb-6">
@@ -10586,17 +10601,17 @@ export default function AdminPage() {
                 <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
                   <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">E-Commerce Revenue</p>
                   <p className="text-2xl font-bold text-[#1F251A] mt-2">EGP 113,200.00</p>
-                  <span className="text-[10px] text-green-600 font-bold">ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬Ëœ +14.8% vs last month</span>
+                  <span className="text-[10px] text-green-600 font-bold">↑ +14.8% vs last month</span>
                 </div>
                 <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
                   <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Completed Transactions</p>
                   <p className="text-2xl font-bold text-[#1F251A] mt-2">124 Sales</p>
-                  <span className="text-[10px] text-green-600 font-bold">ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬Ëœ +8.5% vs last month</span>
+                  <span className="text-[10px] text-green-600 font-bold">↑ +8.5% vs last month</span>
                 </div>
                 <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
                   <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Average Order Value</p>
                   <p className="text-2xl font-bold text-[#1F251A] mt-2">EGP 912.00</p>
-                  <span className="text-[10px] text-green-600 font-bold">ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬Ëœ +5.7% vs last month</span>
+                  <span className="text-[10px] text-green-600 font-bold">↑ +5.7% vs last month</span>
                 </div>
 
               {/* Progress visualizers */}
@@ -10623,7 +10638,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ REFUNDS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── REFUNDS VIEW ── */}
           {activeNav === "Refunds" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10678,7 +10693,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ SHIPPING METHODS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── SHIPPING METHODS VIEW ── */}
           {activeNav === "Shipping Methods" && (
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -10725,7 +10740,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ TARGET BONUSES VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── TARGET BONUSES VIEW ── */}
           {activeNav === "Target Bonuses" && (
             <section className="space-y-6">
               <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
@@ -10761,7 +10776,7 @@ export default function AdminPage() {
             </section>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ COUPONS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── COUPONS VIEW ── */}
           {activeNav === "Coupons" && (
             <section className="space-y-6">
               <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
@@ -10833,11 +10848,11 @@ export default function AdminPage() {
             </section>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ CUSTOMERS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── CUSTOMERS VIEW ── */}
           {activeNav === "Customers" && (
             <div>
 
-              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ INLINE: View Customer Profile ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+              {/* ── INLINE: View Customer Profile ── */}
               {viewingCustomerProfile && (
                 <div className="space-y-6 animate-fadeIn">
                   {/* Back button */}
@@ -10906,7 +10921,7 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingCustomerProfile.name}</h3>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "No phone"} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Patient Profile & Clinic Engagement History</p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "No phone"} • Patient Profile & Clinic Engagement History</p>
                         <div className="mt-2">
                           <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                             viewingCustomerProfile.active !== false ? "bg-[#EDF1EC] text-[#414E36]" : "bg-red-50 text-red-600"
@@ -10975,31 +10990,31 @@ export default function AdminPage() {
                         <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
-                            <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Age</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Gender</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
-                            <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Referral Source</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Profile Status</span>
@@ -11019,7 +11034,7 @@ export default function AdminPage() {
                                 viewingCustomerProfile.floor_no,
                                 viewingCustomerProfile.area,
                                 viewingCustomerProfile.location_name
-                              ].filter(Boolean).join(", ") || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                              ].filter(Boolean).join(", ") || "—"}
                             </span>
                           </div>
                           {viewingCustomerProfile.note && (
@@ -11095,10 +11110,10 @@ export default function AdminPage() {
                                     <tr key={res.id} className="hover:bg-[#F9F9F7]">
                                       <td className="px-4 py-3">
                                         <span className="block font-semibold text-[#1F251A]">{formattedDate}</span>
-                                        <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                                        <span className="text-[10px] text-[#5A6A51]">{res.timeSlot || res.requestedTime || "—"}</span>
                                       </td>
                                       <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
-                                      <td className="px-4 py-3">{res.doctorName || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</td>
+                                      <td className="px-4 py-3">{res.doctorName || "—"}</td>
                                       <td className="px-4 py-3 text-right font-medium text-green-700">{spent} EGP</td>
                                       <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
                                       <td className="px-4 py-3 text-center">
@@ -11131,7 +11146,7 @@ export default function AdminPage() {
                                   : "text-[#5A6A51] hover:text-[#414E36]"
                               }`}
                             >
-                              ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Medical Intake & History
+                              📋 Medical Intake & History
                             </button>
                             <button
                               type="button"
@@ -11142,7 +11157,7 @@ export default function AdminPage() {
                                   : "text-[#5A6A51] hover:text-[#414E36]"
                               }`}
                             >
-                              ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã…Â  Clinical Prescriptions ({customerPrescriptions.length})
+                              💊 Clinical Prescriptions ({customerPrescriptions.length})
                             </button>
                             <button
                               type="button"
@@ -11153,7 +11168,7 @@ export default function AdminPage() {
                                   : "text-[#5A6A51] hover:text-[#414E36]"
                               }`}
                             >
-                              ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Ëœ Reports & Documents ({medicalReports.length})
+                              📄 Reports & Documents ({medicalReports.length})
                             </button>
                           </div>
 
@@ -11245,7 +11260,7 @@ export default function AdminPage() {
                                         <span className="text-[11px] font-semibold text-[#5A6A51] block">Previous Aesthetic Treatments</span>
                                         <p className="text-xs font-medium text-[#1F251A] mt-0.5">
                                           {medicalRecordForm.has_previous_treatments || medicalRecordForm.previous_treatments ? (
-                                            <span className="text-emerald-800 font-semibold">Yes ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {medicalRecordForm.previous_treatments_details || medicalRecordForm.previous_treatments || "Specified"}</span>
+                                            <span className="text-emerald-800 font-semibold">Yes — {medicalRecordForm.previous_treatments_details || medicalRecordForm.previous_treatments || "Specified"}</span>
                                           ) : (
                                             <span className="text-gray-500">No</span>
                                           )}
@@ -11264,7 +11279,7 @@ export default function AdminPage() {
                                         <span className="text-[11px] font-semibold text-[#5A6A51] block">Medical Conditions</span>
                                         <p className="text-xs font-medium text-[#1F251A] mt-0.5">
                                           {medicalRecordForm.has_medical_conditions || medicalRecordForm.medical_conditions ? (
-                                            <span className="text-amber-900 font-semibold">Yes ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {medicalRecordForm.medical_conditions_details || medicalRecordForm.medical_conditions || "Specified"}</span>
+                                            <span className="text-amber-900 font-semibold">Yes — {medicalRecordForm.medical_conditions_details || medicalRecordForm.medical_conditions || "Specified"}</span>
                                           ) : (
                                             <span className="text-gray-500">No</span>
                                           )}
@@ -11275,7 +11290,7 @@ export default function AdminPage() {
                                         <span className="text-[11px] font-semibold text-[#5A6A51] block">Current Medication</span>
                                         <p className="text-xs font-medium text-[#1F251A] mt-0.5">
                                           {medicalRecordForm.is_taking_medication || medicalRecordForm.medications ? (
-                                            <span className="text-amber-900 font-semibold">Yes ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {medicalRecordForm.medication_details || medicalRecordForm.medications || "Specified"}</span>
+                                            <span className="text-amber-900 font-semibold">Yes — {medicalRecordForm.medication_details || medicalRecordForm.medications || "Specified"}</span>
                                           ) : (
                                             <span className="text-gray-500">No</span>
                                           )}
@@ -11370,7 +11385,7 @@ export default function AdminPage() {
                                 </div>
                                 <div>
                                   <div className="flex items-center justify-between mb-1.5">
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-800">ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬â„¢ Doctor-Only Notes (Optional)</label>
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-800">📝 Doctor-Only Notes (Optional)</label>
                                     <span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1.5 py-0.5 rounded">Hidden from print</span>
                                   </div>
                                   <textarea placeholder="Confidential clinical remarks..." value={rxDocNotes} onChange={(e) => setRxDocNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-amber-300/40 bg-amber-50/20 px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-amber-400 transition" />
@@ -11419,7 +11434,7 @@ export default function AdminPage() {
                                             {rx.diagnosis && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Diagnosis</span><p className="text-[#1F251A] font-medium leading-relaxed">{rx.diagnosis}</p></div>)}
                                             {rx.medications && rx.medications.length > 0 && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Medications Prescribed</span><ul className="space-y-2 bg-[#FBFBF9] rounded-xl border border-[#414E36]/5 p-3">{rx.medications.map((m: any, idx: number) => (<li key={idx} className="flex flex-col"><span className="font-semibold text-[#1F251A]">{m.name}</span>{m.instructions && (<span className="text-xs text-[#5A6A51] italic">{m.instructions}</span>)}</li>))}</ul></div>)}
                                             {rx.general_notes && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">General Notes</span><p className="text-xs text-[#5A6A51] bg-[#FBFBF9] rounded-xl p-3 border border-[#414E36]/5 leading-relaxed">{rx.general_notes}</p></div>)}
-                                            {rx.doctor_notes && isDocUser && (<div className="border border-amber-300/40 bg-amber-50/20 rounded-xl p-3.5 space-y-1"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-amber-800">ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬â„¢ Doctor-Only Notes</span><span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1 py-0.5 rounded">Hidden from print</span></div><p className="text-xs text-amber-900 leading-relaxed">{rx.doctor_notes}</p></div>)}
+                                            {rx.doctor_notes && isDocUser && (<div className="border border-amber-300/40 bg-amber-50/20 rounded-xl p-3.5 space-y-1"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-amber-800">🔒 Doctor-Only Notes</span><span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1 py-0.5 rounded">Hidden from print</span></div><p className="text-xs text-amber-900 leading-relaxed">{rx.doctor_notes}</p></div>)}
                                             {rx.follow_up_date && (<div className="flex items-center gap-1.5 text-xs text-[#414E36] font-semibold bg-[#EDF1EC]/60 px-3 py-2 rounded-xl w-fit"><Calendar size={13} />Next Follow-Up: {new Date(rx.follow_up_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>)}
                                           </div>
                                         </div>
@@ -11481,7 +11496,7 @@ export default function AdminPage() {
                                           rel="noopener noreferrer"
                                           className="inline-flex items-center gap-1 text-[#414E36] font-semibold hover:underline"
                                         >
-                                          View File ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â€
+                                          View File ↗
                                         </a>
                                       )}
                                     </div>
@@ -11856,7 +11871,7 @@ export default function AdminPage() {
                       </div>
                     )}
 
-                {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Modal: Medical Intake Form ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+                {/* ── Modal: Medical Intake Form ── */}
                 {showMedicalFormModal && (
                   <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
                     <div className="relative w-full max-w-2xl rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[#414E36]/15 space-y-6 my-8">
@@ -11927,7 +11942,7 @@ export default function AdminPage() {
                                       : "bg-white text-gray-700 border-gray-200 hover:border-[#414E36]/30"
                                   }`}
                                 >
-                                  {isSelected ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ " : "+ "}{concern}
+                                  {isSelected ? "✓ " : "+ "}{concern}
                                 </button>
                               );
                             })}
@@ -12095,7 +12110,7 @@ export default function AdminPage() {
                   </div>
                 )}
 
-                {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Modal: Medical Report / Document Upload ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+                {/* ── Modal: Medical Report / Document Upload ── */}
                 {showMedicalReportModal && (
                   <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
                     <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[#414E36]/15 space-y-5 my-8">
@@ -12183,7 +12198,7 @@ export default function AdminPage() {
               </div>
             )}
 
-              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ INLINE: Add/Edit Customer Form ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+              {/* ── INLINE: Add/Edit Customer Form ── */}
               {showCustomerFormModal && !viewingCustomerProfile && (
                 <div className="space-y-6 animate-fadeIn">
                   <div>
@@ -12241,8 +12256,8 @@ export default function AdminPage() {
                             <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Gender</label>
                             <select value={custGender} onChange={(e) => setCustGender(e.target.value as any)} className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]">
                               <option value="">Select Gender</option>
-                              <option value="Male">Male / ÃƒËœÃ‚Â°Ãƒâ„¢Ã†â€™ÃƒËœÃ‚Â±</option>
-                              <option value="Female">Female / ÃƒËœÃ‚Â£Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Â°</option>
+                              <option value="Male">Male / ذكر</option>
+                              <option value="Female">Female / أنثى</option>
                             </select>
                           </div>
                           <div>
@@ -12320,7 +12335,7 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ CUSTOMER TABLE (only when no inline view is active) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+              {/* ── CUSTOMER TABLE (only when no inline view is active) ── */}
               {!viewingCustomerProfile && !showCustomerFormModal && (
               <>
               {/* Page header and premium controls panel */}
@@ -12485,8 +12500,8 @@ export default function AdminPage() {
                       const dateStr = dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
                       const timeStr = dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).toLowerCase();
                       const uniqueKey = c.id || c.email || c.phone;
-                      const displayPhone = c.mobile || c.phone || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â";
-                      const displayEmail = c.email || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â";
+                      const displayPhone = c.mobile || c.phone || "—";
+                      const displayEmail = c.email || "—";
                       return (
                         <tr key={uniqueKey} className="transition hover:bg-[#F9F9F7]">
                           <td className="px-5 py-4 font-semibold text-[#1F251A]">
@@ -12543,7 +12558,7 @@ export default function AdminPage() {
               )}
             </div>
           )}
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ REPORTS VIEWS ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── REPORTS VIEWS ── */}
           {activeNav === "Transaction Reports" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -12740,7 +12755,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ INVENTORY VIEWS ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── INVENTORY VIEWS ── */}
           {activeNav === "Procurement" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -12841,7 +12856,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ SMS MANAGEMENT VIEWS ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── SMS MANAGEMENT VIEWS ── */}
           {activeNav === "SMS Templates" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -12914,7 +12929,7 @@ export default function AdminPage() {
                       <p className="text-[11px] font-bold text-[#C4AE7C] mt-1">{g.size}</p>
                       <p className="text-xs text-[#5A6A51] mt-3 leading-relaxed">{g.desc}</p>
                     </div>
-                    <button className="mt-4 text-xs font-bold text-[#414E36] hover:underline text-left">View Members ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢</button>
+                    <button className="mt-4 text-xs font-bold text-[#414E36] hover:underline text-left">View Members →</button>
                   </div>
                 ))}
               </div>
@@ -13168,7 +13183,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PAGES SETTINGS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── PAGES SETTINGS VIEW ── */}
           {activeNav === "Pages Settings" && (
             <div className="space-y-6">
               <div className="mb-2">
@@ -13237,7 +13252,7 @@ export default function AdminPage() {
                           pageSettingsLangTab === "ar" ? "border-[#414E36] text-[#414E36]" : "border-transparent text-[#5A6A51]/70 hover:text-[#414E36]"
                         }`}
                       >
-                        Arabic Version (ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©)
+                        Arabic Version (العربية)
                       </button>
                     </div>
 
@@ -13350,7 +13365,7 @@ export default function AdminPage() {
                                         onClick={() => handleTranslateSlideField(index, "welcome", slide.welcome || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                       >
-                                        {translatingField === `slide-${index}-welcome-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â`}
+                                        {translatingField === `slide-${index}-welcome-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} âž"`}
                                       </button>
                                     </div>
                                     <input
@@ -13371,7 +13386,7 @@ export default function AdminPage() {
                                         onClick={() => handleTranslateSlideField(index, "heading", slide.heading || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                       >
-                                        {translatingField === `slide-${index}-heading-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â`}
+                                        {translatingField === `slide-${index}-heading-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} âž"`}
                                       </button>
                                     </div>
                                     <input
@@ -13392,7 +13407,7 @@ export default function AdminPage() {
                                         onClick={() => handleTranslateSlideField(index, "description", slide.description || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                       >
-                                        {translatingField === `slide-${index}-description-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â`}
+                                        {translatingField === `slide-${index}-description-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} âž"`}
                                       </button>
                                     </div>
                                     <textarea
@@ -13413,7 +13428,7 @@ export default function AdminPage() {
                                         onClick={() => handleTranslateSlideField(index, "bookBtn", slide.bookBtn || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                       >
-                                        {translatingField === `slide-${index}-bookBtn-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â`}
+                                        {translatingField === `slide-${index}-bookBtn-${pageSettingsLangTab}` ? "Translating..." : `Translate to ${pageSettingsLangTab === "en" ? "Arabic" : "English"} âž"`}
                                       </button>
                                     </div>
                                     <input
@@ -13445,7 +13460,7 @@ export default function AdminPage() {
                                           onClick={() => handleTranslateSlideField(index, "reviewCount", slide.reviewCount || "", pageSettingsLangTab, pageSettingsLangTab === "en" ? "ar" : "en")}
                                           className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                         >
-                                          {translatingField === `slide-${index}-reviewCount-${pageSettingsLangTab}` ? "Translating..." : `ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â`}
+                                          {translatingField === `slide-${index}-reviewCount-${pageSettingsLangTab}` ? "Translating..." : `âž"`}
                                         </button>
                                       </div>
                                       <input
@@ -14019,7 +14034,7 @@ export default function AdminPage() {
                                 onClick={() => handleTranslateChecklistItem(index, item, "en", "ar")}
                                 className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                               >
-                                {translatingField === `whatwedo-${index}-en` ? "Translating..." : "Translate to Arabic ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                                {translatingField === `whatwedo-${index}-en` ? "Translating..." : "Translate to Arabic →"}
                               </button>
                             </div>
                             <input
@@ -14059,9 +14074,9 @@ export default function AdminPage() {
                           onClick={() => setWhatWeDoListAr([...whatWeDoListAr, ""])}
                           className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
                         >
-                          + ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â¶ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â© ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂµÃƒËœÃ‚Â±
+                          + إضافة عنصر
                         </button>
-                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§ÃƒËœÃ‚ÂµÃƒËœÃ‚Â± ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¦Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂºÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©</h4>
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">عناصر القائمة باللغة العربية</h4>
                       </div>
                       {whatWeDoListAr.map((item, index) => (
                         <div key={index} className="flex items-end gap-2" dir="rtl">
@@ -14073,9 +14088,9 @@ export default function AdminPage() {
                                 onClick={() => handleTranslateChecklistItem(index, item, "ar", "en")}
                                 className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                               >
-                                {translatingField === `whatwedo-${index}-ar` ? "Translating..." : "Translate to English ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                                {translatingField === `whatwedo-${index}-ar` ? "Translating..." : "Translate to English →"}
                               </button>
-                              <label className="block text-xs font-semibold text-[#5A6A51] text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂµÃƒËœÃ‚Â± {index + 1}</label>
+                              <label className="block text-xs font-semibold text-[#5A6A51] text-right">العنصر {index + 1}</label>
                             </div>
                             <input
                               type="text"
@@ -14086,7 +14101,7 @@ export default function AdminPage() {
                                 setWhatWeDoListAr(newList);
                               }}
                               className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
-                              placeholder={`ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂµÃƒËœÃ‚Â± ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¦Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© ${index + 1}`}
+                              placeholder={`عنصر القائمة ${index + 1}`}
                             />
                           </div>
                           {whatWeDoListAr.length > 1 && (
@@ -14097,7 +14112,7 @@ export default function AdminPage() {
                                 setWhatWeDoListAr(newList);
                               }}
                               className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition duration-155 cursor-pointer"
-                              title="ÃƒËœÃ‚Â­ÃƒËœÃ‚Â°Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂµÃƒËœÃ‚Â±"
+                              title="حذف العنصر"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -14256,7 +14271,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(faqTag, "en", "ar", setFaqTagAr, "faqTag-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "faqTag-en" ? "Translating..." : "Translate to Arabic ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "faqTag-en" ? "Translating..." : "Translate to Arabic →"}
                             </button>
                           </div>
                           <input
@@ -14277,7 +14292,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(faqHeading, "en", "ar", setFaqHeadingAr, "faqHeading-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "faqHeading-en" ? "Translating..." : "Translate to Arabic ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "faqHeading-en" ? "Translating..." : "Translate to Arabic →"}
                             </button>
                           </div>
                           <input
@@ -14292,7 +14307,7 @@ export default function AdminPage() {
 
                       {/* Arabic General */}
                       <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂºÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©</h4>
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">المعلومات باللغة العربية</h4>
                         
                         <div className="space-y-2" dir="rtl">
                           <div className="flex items-center justify-between mb-1" dir="ltr">
@@ -14302,15 +14317,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(faqTagAr, "ar", "en", setFaqTag, "faqTag-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "faqTag-ar" ? "Translating..." : "Translate to English ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "faqTag-ar" ? "Translating..." : "Translate to English →"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â </label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الجانبي</label>
                           </div>
                           <input
                             type="text"
                             value={faqTagAr}
                             onChange={(e) => setFaqTagAr(e.target.value)}
-                            placeholder="ÃƒËœÃ‚Â£ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¦Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â© ÃƒËœÃ‚Â´ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¦ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â©"
+                            placeholder="أسئلة شائعة"
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -14323,15 +14338,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(faqHeadingAr, "ar", "en", setFaqHeading, "faqHeading-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "faqHeading-ar" ? "Translating..." : "Translate to English ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "faqHeading-ar" ? "Translating..." : "Translate to English →"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â </label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان الرئيسي</label>
                           </div>
                           <input
                             type="text"
                             value={faqHeadingAr}
                             onChange={(e) => setFaqHeadingAr(e.target.value)}
-                            placeholder="ÃƒËœÃ‚Â£ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¦Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â©ÃƒËœÃ…Â¸ Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª."
+                            placeholder="أسئلة؟ لدينا إجابات."
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -14377,7 +14392,7 @@ export default function AdminPage() {
                                     onClick={() => handleTranslateFaqItem(index, "question", faq.question, "en", "ar")}
                                     className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                   >
-                                    {translatingField === `faq-${index}-question-en` ? "Translating..." : "Translate to Arabic ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                                    {translatingField === `faq-${index}-question-en` ? "Translating..." : "Translate to Arabic →"}
                                   </button>
                                 </div>
                                 <input
@@ -14401,7 +14416,7 @@ export default function AdminPage() {
                                     onClick={() => handleTranslateFaqItem(index, "answer", faq.answer, "en", "ar")}
                                     className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                   >
-                                    {translatingField === `faq-${index}-answer-en` ? "Translating..." : "Translate to Arabic ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                                    {translatingField === `faq-${index}-answer-en` ? "Translating..." : "Translate to Arabic →"}
                                   </button>
                                 </div>
                                 <textarea
@@ -14429,16 +14444,16 @@ export default function AdminPage() {
                             onClick={() => setFaqsAr([...faqsAr, { question: "", answer: "" }])}
                             className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] hover:underline flex items-center gap-1 cursor-pointer"
                           >
-                            + ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â¶ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â© ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¤ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾
+                            + إضافة سؤال
                           </button>
-                          <h4 className="text-sm font-semibold text-[#1F251A] text-right">ÃƒËœÃ‚Â£ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¦Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â£ÃƒËœÃ‚Â¬Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â© ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂºÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©</h4>
+                          <h4 className="text-sm font-semibold text-[#1F251A] text-right">أسئلة وأجوبة باللغة العربية</h4>
                         </div>
 
                         <div className="space-y-6 max-h-[500px] overflow-y-auto pl-2" dir="rtl">
                           {faqsAr.map((faq, index) => (
                             <div key={index} className="p-4 rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] space-y-3 relative group text-right">
                               <div className="flex justify-between items-center">
-                                <span className="text-xs font-bold text-[#5A6A51]">ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¤ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¬Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨ #{index + 1}</span>
+                                <span className="text-xs font-bold text-[#5A6A51]">سؤال وجواب #{index + 1}</span>
                                 {faqsAr.length > 1 && (
                                   <button
                                     type="button"
@@ -14457,9 +14472,9 @@ export default function AdminPage() {
                                     onClick={() => handleTranslateFaqItem(index, "question", faq.question, "ar", "en")}
                                     className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                   >
-                                    {translatingField === `faq-${index}-question-ar` ? "Translating..." : "Translate to English ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                                    {translatingField === `faq-${index}-question-ar` ? "Translating..." : "Translate to English →"}
                                   </button>
-                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¤ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾</label>
+                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">السؤال</label>
                                 </div>
                                 <input
                                   type="text"
@@ -14469,7 +14484,7 @@ export default function AdminPage() {
                                     newFaqs[index].question = e.target.value;
                                     setFaqsAr(newFaqs);
                                   }}
-                                  placeholder="ÃƒËœÃ‚Â§Ãƒâ„¢Ã†â€™ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³ÃƒËœÃ‚Â¤ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§..."
+                                  placeholder="اكتب السؤال هنا..."
                                   className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                                 />
                               </div>
@@ -14481,9 +14496,9 @@ export default function AdminPage() {
                                     onClick={() => handleTranslateFaqItem(index, "answer", faq.answer, "ar", "en")}
                                     className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                                   >
-                                    {translatingField === `faq-${index}-answer-ar` ? "Translating..." : "Translate to English ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                                    {translatingField === `faq-${index}-answer-ar` ? "Translating..." : "Translate to English →"}
                                   </button>
-                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â©</label>
+                                  <label className="block text-[10px] font-semibold text-[#5A6A51] uppercase text-right">الإجابة</label>
                                 </div>
                                 <textarea
                                   rows={3}
@@ -14493,7 +14508,7 @@ export default function AdminPage() {
                                     newFaqs[index].answer = e.target.value;
                                     setFaqsAr(newFaqs);
                                   }}
-                                  placeholder="ÃƒËœÃ‚Â§Ãƒâ„¢Ã†â€™ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§..."
+                                  placeholder="اكتب الإجابة هنا..."
                                   className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none text-right"
                                 />
                               </div>
@@ -14541,7 +14556,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(howItWorksHeading, "en", "ar", setHowItWorksHeadingAr, "howItWorksHeading-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "howItWorksHeading-en" ? "Translating..." : "Translate to Arabic ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "howItWorksHeading-en" ? "Translating..." : "Translate to Arabic →"}
                             </button>
                           </div>
                           <input
@@ -14562,7 +14577,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(howItWorksDescription, "en", "ar", setHowItWorksDescriptionAr, "howItWorksDescription-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "howItWorksDescription-en" ? "Translating..." : "Translate to Arabic ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "howItWorksDescription-en" ? "Translating..." : "Translate to Arabic →"}
                             </button>
                           </div>
                           <textarea
@@ -14577,7 +14592,7 @@ export default function AdminPage() {
 
                       {/* Arabic Settings */}
                       <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â° ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂºÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©</h4>
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">المحتوى باللغة العربية</h4>
                         
                         <div className="space-y-2" dir="rtl">
                           <div className="flex items-center justify-between mb-1" dir="ltr">
@@ -14587,15 +14602,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(howItWorksHeadingAr, "ar", "en", setHowItWorksHeading, "howItWorksHeading-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "howItWorksHeading-ar" ? "Translating..." : "Translate to English ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "howItWorksHeading-ar" ? "Translating..." : "Translate to English →"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â </label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان</label>
                           </div>
                           <input
                             type="text"
                             value={howItWorksHeadingAr}
                             onChange={(e) => setHowItWorksHeadingAr(e.target.value)}
-                            placeholder="ÃƒËœÃ‚Â®ÃƒËœÃ‚Â·Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â·ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾"
+                            placeholder="خطوات بسيطة لتحولات الجمال"
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -14608,15 +14623,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(howItWorksDescriptionAr, "ar", "en", setHowItWorksDescription, "howItWorksDescription-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "howItWorksDescription-ar" ? "Translating..." : "Translate to English ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "howItWorksDescription-ar" ? "Translating..." : "Translate to English →"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂµÃƒâ„¢Ã‚Â</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">الوصف</label>
                           </div>
                           <textarea
                             rows={5}
                             value={howItWorksDescriptionAr}
                             onChange={(e) => setHowItWorksDescriptionAr(e.target.value)}
-                            placeholder="ÃƒËœÃ‚Â§Ãƒâ„¢Ã†â€™ÃƒËœÃ‚ÂªÃƒËœÃ‚Â´Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¹ÃƒËœÃ‚Â²Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â² ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã†â€™ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂµÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã†â€™..."
+                            placeholder="اكتشف عملية سلسة مصممة لتعزيز جمالك وصحتك..."
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none leading-relaxed text-right"
                           />
                         </div>
@@ -14772,7 +14787,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuHeading, "en", "ar", setWcuHeadingAr, "wcuHeading-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuHeading-en" ? "Translating..." : "Translate to Arabic ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "wcuHeading-en" ? "Translating..." : "Translate to Arabic →"}
                             </button>
                           </div>
                           <input
@@ -14793,7 +14808,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuYearsLabel, "en", "ar", setWcuYearsLabelAr, "wcuYearsLabel-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuYearsLabel-en" ? "Translating..." : "Translate to Arabic ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "wcuYearsLabel-en" ? "Translating..." : "Translate to Arabic →"}
                             </button>
                           </div>
                           <input
@@ -14814,14 +14829,14 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuQuote, "en", "ar", setWcuQuoteAr, "wcuQuote-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuQuote-en" ? "Translating..." : "Translate to Arabic ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "wcuQuote-en" ? "Translating..." : "Translate to Arabic →"}
                             </button>
                           </div>
                           <input
                             type="text"
                             value={wcuQuote}
                             onChange={(e) => setWcuQuote(e.target.value)}
-                            placeholder="We don't treat conditions ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â we transform confidence..."
+                            placeholder="We don't treat conditions — we transform confidence..."
                             className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                           />
                         </div>
@@ -14836,7 +14851,7 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuDescription, "en", "ar", setWcuDescriptionAr, "wcuDescription-en")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuDescription-en" ? "Translating..." : "Translate to Arabic ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "wcuDescription-en" ? "Translating..." : "Translate to Arabic →"}
                             </button>
                           </div>
                           <textarea
@@ -14851,7 +14866,7 @@ export default function AdminPage() {
 
                       {/* Arabic Settings */}
                       <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â° ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂºÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©</h4>
+                        <h4 className="text-sm font-semibold text-[#1F251A] text-right">المحتوى باللغة العربية</h4>
                         
                         <div className="space-y-2" dir="rtl">
                           <div className="flex items-center justify-between mb-1" dir="ltr">
@@ -14861,15 +14876,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuHeadingAr, "ar", "en", setWcuHeading, "wcuHeading-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuHeading-ar" ? "Translating..." : "Translate to English ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "wcuHeading-ar" ? "Translating..." : "Translate to English →"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â </label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">العنوان</label>
                           </div>
                           <input
                             type="text"
                             value={wcuHeadingAr}
                             onChange={(e) => setWcuHeadingAr(e.target.value)}
-                            placeholder="ÃƒËœÃ‚Â­Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â« ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â±ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â¨ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â© Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â§ÃƒËœÃ‚Â®ÃƒËœÃ‚Â±ÃƒËœÃ‚Â©"
+                            placeholder="حيث تلتقي الخبرة الطبية بتجربة فاخرة"
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -14882,15 +14897,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuYearsLabelAr, "ar", "en", setWcuYearsLabel, "wcuYearsLabel-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuYearsLabel-ar" ? "Translating..." : "Translate to English ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "wcuYearsLabel-ar" ? "Translating..." : "Translate to English →"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â±ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â² (ÃƒËœÃ‚Â±ÃƒËœÃ‚Â£ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©)</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">عبارة التميز (رأسية)</label>
                           </div>
                           <input
                             type="text"
                             value={wcuYearsLabelAr}
                             onChange={(e) => setWcuYearsLabelAr(e.target.value)}
-                            placeholder="Ãƒâ„¢Ã‚Â¡Ãƒâ„¢Ã‚Â¥+ ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â²"
+                            placeholder="١٥+ عاماً من التميز"
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -14903,15 +14918,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuQuoteAr, "ar", "en", setWcuQuote, "wcuQuote-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuQuote-ar" ? "Translating..." : "Translate to English ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "wcuQuote-ar" ? "Translating..." : "Translate to English →"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â©</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">اقتباس الثقة</label>
                           </div>
                           <input
                             type="text"
                             value={wcuQuoteAr}
                             onChange={(e) => setWcuQuoteAr(e.target.value)}
-                            placeholder="Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Â  Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â· ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬ËœÃƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â©..."
+                            placeholder="نحن لا نعالج فقط — بل نُحوّل الثقة..."
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] text-right"
                           />
                         </div>
@@ -14925,15 +14940,15 @@ export default function AdminPage() {
                               onClick={() => handleAutoTranslate(wcuDescriptionAr, "ar", "en", setWcuDescription, "wcuDescription-ar")}
                               className="inline-flex items-center gap-1 text-[9px] font-bold text-[#414E36] hover:text-[#C4AE7C] transition disabled:opacity-50"
                             >
-                              {translatingField === "wcuDescription-ar" ? "Translating..." : "Translate to English ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â"}
+                              {translatingField === "wcuDescription-ar" ? "Translating..." : "Translate to English →"}
                             </button>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂµÃƒâ„¢Ã‚Â</label>
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51] text-right">الوصف</label>
                           </div>
                           <textarea
                             rows={5}
                             value={wcuDescriptionAr}
                             onChange={(e) => setWcuDescriptionAr(e.target.value)}
-                            placeholder="Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â§ÃƒËœÃ…â€™ Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚ÂªÃƒâ„¢Ã‚ÂÃƒËœÃ‚ÂµÃƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚ÂµÃƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¯..."
+                            placeholder="في ريفيرا، كل تفصيل مقصود..."
                             className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C] resize-none leading-relaxed text-right"
                           />
                         </div>
@@ -14957,7 +14972,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ SETTINGS VIEWS ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── SETTINGS VIEWS ── */}
           {activeNav === "Profile" && (() => {
             const isSuperadminBypass = adminRole === "superadmin";
             const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
@@ -14980,7 +14995,7 @@ export default function AdminPage() {
 
             const addedOn = profileEmployee?.created_at
               ? new Date(profileEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-              : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â";
+              : "—";
 
             const monthlySalary = Number(profileEmployee?.salary || 0);
             const dailySalary = Math.round(monthlySalary / 20);
@@ -15072,7 +15087,7 @@ export default function AdminPage() {
                         <div>
                           <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Employee ID</span>
                           <span className="font-semibold text-[#1F251A] font-mono block bg-gray-50/50 rounded-xl px-3.5 py-2 border border-gray-200/50">
-                            {isSuperadminBypass ? "EMP-SUPER" : profileEmployee?.employee_id || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                            {isSuperadminBypass ? "EMP-SUPER" : profileEmployee?.employee_id || "—"}
                           </span>
                         </div>
                         <div>
@@ -15088,7 +15103,7 @@ export default function AdminPage() {
                         <div>
                           <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">Email Address</span>
                           <span className="font-semibold text-[#1F251A] break-all block bg-gray-50/50 rounded-xl px-3.5 py-2 border border-gray-200/50">
-                            {adminEmail || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                            {adminEmail || "—"}
                           </span>
                         </div>
                         <div>
@@ -15104,7 +15119,7 @@ export default function AdminPage() {
                           <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1.5">System Role</span>
                           <div>
                             <span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-1 text-xs font-semibold text-[#414E36]">
-                              {isSuperadminBypass ? "superadmin" : profileEmployee?.role_name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                              {isSuperadminBypass ? "superadmin" : profileEmployee?.role_name || "—"}
                             </span>
                           </div>
                         </div>
@@ -15380,7 +15395,7 @@ export default function AdminPage() {
                       {idCheckPassed && (
                         <div className="rounded-xl bg-green-50/50 border border-green-200/50 p-4 space-y-2 text-xs">
                           <div className="flex items-center gap-1.5 font-bold text-green-800">
-                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“</span>
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
                             Verified Egyptian National ID Check
                           </div>
                           <div className="grid grid-cols-3 gap-4 text-green-700 font-medium">
@@ -15565,22 +15580,22 @@ export default function AdminPage() {
                   <div className="mt-2 text-xs space-y-1 font-semibold text-gray-500">
                     <div className="flex items-center gap-1.5">
                       <span className={profilePassword.length >= 8 ? "text-green-600" : ""}>
-                        {profilePassword.length >= 8 ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" : "ÃƒÂ¢Ã¢â‚¬â€Ã¢â‚¬Â¹"} At least 8 characters
+                        {profilePassword.length >= 8 ? "✓" : "○"} At least 8 characters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[A-Z]/.test(profilePassword) && /[a-z]/.test(profilePassword) ? "text-green-600" : ""}>
-                        {/[A-Z]/.test(profilePassword) && /[a-z]/.test(profilePassword) ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" : "ÃƒÂ¢Ã¢â‚¬â€Ã¢â‚¬Â¹"} Uppercase & lowercase letters
+                        {/[A-Z]/.test(profilePassword) && /[a-z]/.test(profilePassword) ? "✓" : "○"} Uppercase & lowercase letters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/\d/.test(profilePassword) ? "text-green-600" : ""}>
-                        {/\d/.test(profilePassword) ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" : "ÃƒÂ¢Ã¢â‚¬â€Ã¢â‚¬Â¹"} At least one number
+                        {/\d/.test(profilePassword) ? "✓" : "○"} At least one number
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[^A-Za-z0-9]/.test(profilePassword) ? "text-green-600" : ""}>
-                        {/[^A-Za-z0-9]/.test(profilePassword) ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" : "ÃƒÂ¢Ã¢â‚¬â€Ã¢â‚¬Â¹"} At least one special character (e.g. @$!%*?&#)
+                        {/[^A-Za-z0-9]/.test(profilePassword) ? "✓" : "○"} At least one special character (e.g. @$!%*?&#)
                       </span>
                     </div>
                   </div>
@@ -15702,7 +15717,7 @@ export default function AdminPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© (AR)</label>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">اسم العلامة التجارية (AR)</label>
                       <input
                         type="text"
                         dir="rtl"
@@ -15721,7 +15736,7 @@ export default function AdminPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¹ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â  (AR)</label>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2 text-right">الموقع الرئيسي (AR)</label>
                       <input
                         type="text"
                         dir="rtl"
@@ -15859,7 +15874,7 @@ export default function AdminPage() {
               </div>
 
               {loadingBranches ? (
-                <div className="text-center py-16 text-[#5A6A51]">Loading branchesÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</div>
+                <div className="text-center py-16 text-[#5A6A51]">Loading branches…</div>
               ) : branches.length === 0 ? (
                 <div className="text-center py-16 text-[#5A6A51]">
                   <MapIcon size={40} className="mx-auto mb-3 opacity-30" />
@@ -15910,7 +15925,7 @@ export default function AdminPage() {
                             }}
                             className="text-xs font-bold text-red-500 hover:underline disabled:opacity-50"
                             disabled={deletingBranchId === br.id}
-                          >{deletingBranchId === br.id ? "DeletingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦" : "Delete"}</button>
+                          >{deletingBranchId === br.id ? "Deleting…" : "Delete"}</button>
                         </div>
                       </div>
                     </div>
@@ -15955,12 +15970,12 @@ export default function AdminPage() {
                     >
                       {([
                         { field: "name_en", label: "Branch Name (English)", placeholder: "e.g. New Cairo Branch", required: true },
-                        { field: "name_ar", label: "Branch Name (Arabic)", placeholder: "Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â«ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾: Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â±ÃƒËœÃ‚Â¹ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â±ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â©", required: true, dir: "rtl" },
+                        { field: "name_ar", label: "Branch Name (Arabic)", placeholder: "مثال: فرع القاهرة الجديدة", required: true, dir: "rtl" },
                         { field: "address_en", label: "Address (English)", placeholder: "e.g. 5th Settlement, New Cairo", required: true },
-                        { field: "address_ar", label: "Address (Arabic)", placeholder: "Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â«ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾: ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¹ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ…â€™ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â±ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â©", required: true, dir: "rtl" },
+                        { field: "address_ar", label: "Address (Arabic)", placeholder: "مثال: التجمع الخامس، القاهرة الجديدة", required: true, dir: "rtl" },
                         { field: "phone", label: "Phone Number", placeholder: "e.g. +201035595691" },
-                        { field: "maps_embed", label: "Google Maps Embed URL", placeholder: "https://www.google.com/maps/embed?pb=ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦" },
-                        { field: "maps_link", label: "Google Maps Link", placeholder: "https://maps.app.goo.gl/ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦" },
+                        { field: "maps_embed", label: "Google Maps Embed URL", placeholder: "https://www.google.com/maps/embed?pb=…" },
+                        { field: "maps_link", label: "Google Maps Link", placeholder: "https://maps.app.goo.gl/…" },
                       ] as Array<{ field: keyof Branch; label: string; placeholder: string; required?: boolean; dir?: string }>).map(({ field, label, placeholder, required, dir }) => (
                         <div key={field}>
                           <label className="block text-xs font-semibold uppercase tracking-[0.15em] text-[#5A6A51] mb-1.5">{label}</label>
@@ -15991,7 +16006,7 @@ export default function AdminPage() {
                         disabled={savingBranch}
                         className="w-full rounded-3xl bg-[#414E36] py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-2"
                       >
-                        {savingBranch ? "SavingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦" : branchModal.mode === "add" ? "Add Branch" : "Save Changes"}
+                        {savingBranch ? "Saving…" : branchModal.mode === "add" ? "Add Branch" : "Save Changes"}
                       </button>
                     </form>
                   </div>
@@ -16222,7 +16237,7 @@ export default function AdminPage() {
                       rows={14}
                       value={termsText}
                       onChange={(e) => setTermsText(e.target.value)}
-                      placeholder={"By proceeding with this booking, you agree to our terms and conditions:\n\nÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Deposits are non-refundable within 24 hours of the appointment.\nÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Please arrive 10 minutes before your scheduled time.\nÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Revera reserves the right to cancel or reschedule appointments.\n\nFor more information, contact us at +20 103 559 5691."}
+                      placeholder={"By proceeding with this booking, you agree to our terms and conditions:\n\n• Deposits are non-refundable within 24 hours of the appointment.\n• Please arrive 10 minutes before your scheduled time.\n• Revera reserves the right to cancel or reschedule appointments.\n\nFor more information, contact us at +20 103 559 5691."}
                       className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] resize-y leading-relaxed font-mono"
                     />
                     <p className="text-[10px] text-[#8A9A81]">
@@ -16508,7 +16523,7 @@ export default function AdminPage() {
                       <p className="text-xs text-[#5A6A51]">Please verify that you are active at your workstation.</p>
                       <div className="text-4xl font-bold text-[#414E36]">{inactivityCountdown}s</div>
                       <p className="text-[10px] text-[#8A9A81]">An inactivity alert will be sent to the administrator.</p>
-                      <div className="rounded-2xl bg-[#414E36] py-2 px-4 text-xs font-bold text-white">ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ I am Present &amp; Working</div>
+                      <div className="rounded-2xl bg-[#414E36] py-2 px-4 text-xs font-bold text-white">✓ I am Present &amp; Working</div>
                     </div>
                   </div>
                   <div className="flex-1 space-y-4">
@@ -16661,15 +16676,15 @@ export default function AdminPage() {
                       <button
                         type="button"
                         onClick={() => setActiveInfoFeature({
-                          title: "Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â±ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â£Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂµÃƒâ„¢Ã…Â ÃƒËœÃ‚Â© (AR)",
-                          description: "Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â¨ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¦ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Âµ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â±ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â© ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂºÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã…Â  ÃƒËœÃ‚ÂªÃƒâ„¢Ã‚ÂÃƒËœÃ‚Â±ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¶Ãƒâ„¢Ã¢â‚¬Â° ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¯ ÃƒËœÃ‚ÂªÃƒËœÃ‚Â£Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â­ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â². Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒËœÃ‚ÂºÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Å¾ {name} Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¶ÃƒËœÃ…â€™ Ãƒâ„¢Ã‹â€  {service} Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â©ÃƒËœÃ…â€™ Ãƒâ„¢Ã‹â€  {date} Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â§ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â® ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯ÃƒËœÃ…â€™ Ãƒâ„¢Ã‹â€  {time} Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯."
+                          title: "قالب رسالة التأكيد النصية (AR)",
+                          description: "قم بتهيئة نص الرسالة باللغة العربية التي تُرسل للمرضى عند تأكيد الحجز. يدعم الحقول المتغيرة مثل {name} لاسم المريض، و {service} لاسم الخدمة، و {date} لتاريخ الموعد، و {time} لوقت الموعد."
                         })}
                         className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
                         title="Click for info"
                       >
                         <Info size={13} />
                       </button>
-                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] text-right">Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¨ ÃƒËœÃ‚Â±ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â£Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂµÃƒâ„¢Ã…Â ÃƒËœÃ‚Â© (AR)</label>
+                      <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] text-right">قالب رسالة التأكيد النصية (AR)</label>
                     </div>
                     <textarea
                       value={notifSmsTemplateAr}
@@ -16678,7 +16693,7 @@ export default function AdminPage() {
                       dir="rtl"
                       className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition font-mono text-right"
                     />
-                    <span className="text-[11px] text-[#8A9A81] mt-1 block text-right">Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒËœÃ‚ÂºÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±ÃƒËœÃ‚Â©: <code>{`{name}`}</code>ÃƒËœÃ…â€™ <code>{`{service}`}</code>ÃƒËœÃ…â€™ <code>{`{date}`}</code>ÃƒËœÃ…â€™ <code>{`{time}`}</code>.</span>
+                    <span className="text-[11px] text-[#8A9A81] mt-1 block text-right">يدعم الحقول المتغيرة: <code>{`{name}`}</code>، <code>{`{service}`}</code>، <code>{`{date}`}</code>، <code>{`{time}`}</code>.</span>
                   </div>
                 </div>
 
@@ -17042,8 +17057,8 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {roleCreateError && <p className="text-xs text-red-600 font-medium">ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â {roleCreateError}</p>}
-                    {roleCreateSuccess && <p className="text-xs text-green-700 font-medium">ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ {roleCreateSuccess}</p>}
+                    {roleCreateError && <p className="text-xs text-red-600 font-medium">⚠️ {roleCreateError}</p>}
+                    {roleCreateSuccess && <p className="text-xs text-green-700 font-medium">✅ {roleCreateSuccess}</p>}
 
                     <button
                       type="submit"
@@ -17105,7 +17120,7 @@ export default function AdminPage() {
                 <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
                   <h3 className="text-xl font-bold text-[#1F251A] mb-4">Provision Employee Credentials</h3>
                   
-                  {/* Create Employee Form ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â OAuth Invite Flow */}
+                  {/* Create Employee Form — OAuth Invite Flow */}
                   <form onSubmit={handleCreateEmployee} className="mb-6 space-y-4 rounded-3xl border border-[#414E36]/10 bg-white p-5">
                     <div className="grid gap-4 sm:grid-cols-3">
                       <div>
@@ -17159,12 +17174,12 @@ export default function AdminPage() {
                     <div className="flex items-start gap-2.5 rounded-2xl bg-[#EDF5E8] border border-[#414E36]/15 px-4 py-3">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mt-0.5 shrink-0 text-[#414E36]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                       <p className="text-xs text-[#414E36] font-medium leading-relaxed">
-                        An official <strong>invitation email</strong> will be sent to the employee&apos;s address. They will set their own password via the link ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â no password is stored by the admin.
+                        An official <strong>invitation email</strong> will be sent to the employee&apos;s address. They will set their own password via the link — no password is stored by the admin.
                       </p>
                     </div>
 
-                    {employeeCreateError && <p className="text-xs text-red-600 font-medium">ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â {employeeCreateError}</p>}
-                    {employeeCreateSuccess && <p className="text-xs text-green-700 font-medium">ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ {employeeCreateSuccess}</p>}
+                    {employeeCreateError && <p className="text-xs text-red-600 font-medium">⚠️ {employeeCreateError}</p>}
+                    {employeeCreateSuccess && <p className="text-xs text-green-700 font-medium">✅ {employeeCreateSuccess}</p>}
 
                     <button
                       type="submit"
@@ -17199,7 +17214,7 @@ export default function AdminPage() {
                           </tr>
                         ) : employeesList.map((emp) => (
                           <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
-                            <td className="px-6 py-4 font-semibold text-[#1F251A]">{emp.name || emp.employee_id || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</td>
+                            <td className="px-6 py-4 font-semibold text-[#1F251A]">{emp.name || emp.employee_id || '—'}</td>
                             <td className="px-6 py-4 text-xs font-semibold text-[#414E36]">
                               {adminRole === "superadmin" && emp.employee_id !== "superadmin" ? (
                                 <select
@@ -17220,9 +17235,9 @@ export default function AdminPage() {
                             <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">{emp.email}</td>
                             <td className="px-6 py-4 text-center">
                               {emp.email_confirmed_at ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ Active</span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-semibold text-green-700">✓ Active</span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">ÃƒÂ¢Ã‚ÂÃ‚Â³ Invite Pending</span>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">⏳ Invite Pending</span>
                               )}
                             </td>
                             <td className="px-6 py-4 text-center">
@@ -17317,7 +17332,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ INVENTORY VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── INVENTORY VIEW ── */}
           {activeNav === "Inventory" && (
             <div className="space-y-6 animate-fadeIn">
               {/* Header */}
@@ -18069,7 +18084,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ MODAL: ADD / EDIT CLINIC DEVICE ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── MODAL: ADD / EDIT CLINIC DEVICE ── */}
           {showAddDeviceModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-2xl rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6 max-h-[90vh] overflow-y-auto">
@@ -18282,7 +18297,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ MODAL: ADD / EDIT PRODUCT ITEM ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── MODAL: ADD / EDIT PRODUCT ITEM ── */}
           {showAddProductModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-2xl rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6 max-h-[90vh] overflow-y-auto">
@@ -18321,7 +18336,7 @@ export default function AdminPage() {
                       <label className="block text-xs font-semibold text-[#1F251A] mb-1">Product Name (Arabic)</label>
                       <input
                         type="text"
-                        placeholder="e.g. ÃƒËœÃ‚Â¨Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂªÃƒâ„¢Ã‹â€ Ãƒâ„¢Ã†â€™ÃƒËœÃ‚Â³ Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹ ÃƒËœÃ‚Â£"
+                        placeholder="e.g. بوتوكس نوع أ"
                         value={prodNameAr}
                         onChange={(e) => setProdNameAr(e.target.value)}
                         className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] dir-rtl font-sans"
@@ -18454,7 +18469,7 @@ export default function AdminPage() {
                     <label className="block text-xs font-semibold text-[#1F251A] mb-1">Description &amp; Storage Notes</label>
                     <textarea
                       rows={2}
-                      placeholder="e.g. Keep refrigerated between 2-8Ãƒâ€šÃ‚Â°C."
+                      placeholder="e.g. Keep refrigerated between 2-8°C."
                       value={prodNotes}
                       onChange={(e) => setProdNotes(e.target.value)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
@@ -18481,14 +18496,14 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ MODAL: SELL PRODUCT TO PATIENT ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── MODAL: SELL PRODUCT TO PATIENT ── */}
           {showSellProductModal && selectedSellProduct && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
                 <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
                   <div>
                     <h3 className="text-xl font-bold text-[#1F251A]">Sell Product to Patient</h3>
-                    <p className="text-xs text-[#5A6A51] mt-1">{selectedSellProduct.name} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Stock: {selectedSellProduct.stock_quantity} {selectedSellProduct.unit}s</p>
+                    <p className="text-xs text-[#5A6A51] mt-1">{selectedSellProduct.name} — Stock: {selectedSellProduct.stock_quantity} {selectedSellProduct.unit}s</p>
                   </div>
                   <button
                     type="button"
@@ -18603,7 +18618,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ MODAL: UPDATE PULSE COUNT ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── MODAL: UPDATE PULSE COUNT ── */}
           {showUpdatePulsesModal && selectedDeviceForPulses && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
@@ -18647,9 +18662,9 @@ export default function AdminPage() {
                         fetchInventoryDevices();
 
                         if (updated.status === "Maintenance Due") {
-                          alert("ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Maintenance Due! Counter has reached or exceeded the 2nd maintenance threshold.");
+                          alert("⚠️ Maintenance Due! Counter has reached or exceeded the 2nd maintenance threshold.");
                         } else if (updated.status === "Warning") {
-                          alert("ÃƒÂ¢Ã…Â¡Ã‚Â¡ First Warning Reached! Counter has crossed the 1st threshold.");
+                          alert("⚡ First Warning Reached! Counter has crossed the 1st threshold.");
                         } else {
                           alert("Pulse count updated successfully.");
                         }
@@ -18741,7 +18756,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ MODAL: RESET PULSE COUNTER ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── MODAL: RESET PULSE COUNTER ── */}
           {showResetPulsesModal && selectedDeviceForReset && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
@@ -18859,7 +18874,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ MODAL: DEVICE MAINTENANCE HISTORY ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── MODAL: DEVICE MAINTENANCE HISTORY ── */}
           {showDeviceHistoryModal && selectedDeviceForHistory && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
               <div className="w-full max-w-2xl rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6 max-h-[90vh] overflow-y-auto">
@@ -19130,7 +19145,7 @@ export default function AdminPage() {
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.phone || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</td>
+                              <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.phone || "—"}</td>
                               <td className="px-6 py-4">
                                 <span className="inline-block rounded-xl bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold text-[#8B7544]">
                                   {emp.department || "Reception"}
@@ -19138,7 +19153,7 @@ export default function AdminPage() {
                               </td>
                               <td className="px-6 py-4">
                                 <span className="inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">
-                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
                                 </span>
                               </td>
                               <td className="px-6 py-4">
@@ -19665,7 +19680,7 @@ export default function AdminPage() {
                                         : "bg-gray-50 text-[#414E36] border-[#414E36]/15 hover:bg-[#414E36]/10"
                                     }`}
                                   >
-                                    {b.name_en} {isSelected ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" : "+"}
+                                    {b.name_en} {isSelected ? "✓" : "+"}
                                   </button>
                                 );
                               })}
@@ -19875,7 +19890,7 @@ export default function AdminPage() {
                                   <div className="mt-3 flex items-start gap-2 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium animate-fadeIn">
                                     <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
                                     <div>
-                                      <span className="font-bold block text-amber-900 mb-0.5">ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Shift Overlap Warning:</span>
+                                      <span className="font-bold block text-amber-900 mb-0.5">⚠️ Shift Overlap Warning:</span>
                                       {overlap.message}
                                     </div>
                                   </div>
@@ -20026,7 +20041,7 @@ export default function AdminPage() {
                                 <label className="block text-[10px] font-semibold text-[#8A9A81] mb-1">Address Line 2 <span className="text-[#8A9A81] font-normal">(Optional)</span></label>
                                 <input
                                   type="text"
-                                  placeholder="Apartment, floor, building, compoundÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"
+                                  placeholder="Apartment, floor, building, compound…"
                                   value={newEmployeeAddressLine2}
                                   onChange={(e) => {
                                     setNewEmployeeAddressLine2(e.target.value);
@@ -20059,7 +20074,7 @@ export default function AdminPage() {
                                     }}
                                     className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
                                   >
-                                    <option value="">ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Select ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â</option>
+                                    <option value="">— Select —</option>
                                     {["Cairo","Giza","Alexandria","Aswan","Asyut","Beheira","Beni Suef","Dakahlia","Damietta","Faiyum","Gharbia","Ismailia","Kafr el-Sheikh","Luxor","Matruh","Minya","Monufia","New Valley","North Sinai","Port Said","Qalyubia","Qena","Red Sea","Sharqia","Sohag","South Sinai","Suez"].map(g => (
                                       <option key={g} value={g}>{g}</option>
                                     ))}
@@ -20105,7 +20120,7 @@ export default function AdminPage() {
                             return (
                               <div className="rounded-2xl bg-green-50/50 border border-green-200/50 p-3.5 space-y-1.5 text-xs">
                                 <div className="flex items-center gap-1.5 font-bold text-green-800">
-                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“</span>
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
                                   Egyptian National ID Check Passed
                                 </div>
                                 <div className="grid grid-cols-3 gap-2 text-green-700 font-medium">
@@ -20258,7 +20273,7 @@ export default function AdminPage() {
                             <label className="flex flex-col items-center justify-center cursor-pointer py-5 w-full">
                               <Upload className="h-6 w-6 text-[#5A6A51]/50 mb-1.5" />
                               <span className="text-[11px] font-semibold text-[#414E36]">Upload Contract (PDF, Word, or Image)</span>
-                              <span className="text-[9px] text-gray-400 mt-0.5">PDF, DOCX, PNG, JPEG ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ up to 10MB</span>
+                              <span className="text-[9px] text-gray-400 mt-0.5">PDF, DOCX, PNG, JPEG – up to 10MB</span>
                               <input
                                 type="file"
                                 accept=".pdf,.doc,.docx,image/*"
@@ -20357,7 +20372,7 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* View Employee Details ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Inline View */}
+              {/* View Employee Details — Inline View */}
               {viewingEmployee && (
                 <div className="space-y-6 animate-fadeIn">
                   {/* Back button */}
@@ -20414,7 +20429,7 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingEmployee.name || "Staff Member"}</h3>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">{viewingEmployee.role_name || "Employee"} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Staff ID: <span className="font-mono">{viewingEmployee.employee_id || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span></p>
+                        <p className="text-xs text-[#5A6A51] mt-0.5">{viewingEmployee.role_name || "Employee"} • Staff ID: <span className="font-mono">{viewingEmployee.employee_id || "—"}</span></p>
                         <div className="mt-2">
                           <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                             viewingEmployee.email_confirmed_at ? "bg-[#EDF1EC] text-[#414E36]" : "bg-amber-50 text-amber-700"
@@ -20529,25 +20544,25 @@ export default function AdminPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-sm">
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Employee ID</span>
-                            <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.employee_id || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.employee_id || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Full Name</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.name || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
-                            <span className="font-semibold text-[#1F251A] break-all">{viewingEmployee.email || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A] break-all">{viewingEmployee.email || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
-                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.phone || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A]">{viewingEmployee.phone || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">System Role</span>
                             <div>
                               <span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-0.5 text-xs font-semibold text-[#414E36]">
-                                {viewingEmployee.role_name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                                {viewingEmployee.role_name || "—"}
                               </span>
                             </div>
                           </div>
@@ -20561,7 +20576,7 @@ export default function AdminPage() {
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
-                            <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.national_id || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>
+                            <span className="font-semibold text-[#1F251A] font-mono">{viewingEmployee.national_id || "—"}</span>
                           </div>
                           <div>
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Date of Birth &amp; Age</span>
@@ -20589,7 +20604,7 @@ export default function AdminPage() {
                             <span className="font-semibold text-[#1F251A]">
                               {viewingEmployee.created_at
                                 ? new Date(viewingEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-                                : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                                : "—"}
                             </span>
                           </div>
                         </div>
@@ -20616,12 +20631,12 @@ export default function AdminPage() {
                                   <div className="flex flex-col">
                                     <span className="font-semibold text-[#1F251A]">{autoDate}</span>
                                     <span className="text-[10px] text-[#414E36] font-bold bg-[#EDF1EC] px-2 py-0.5 rounded-full border border-[#414E36]/10 w-max mt-0.5">
-                                      ÃƒÂ¢Ã…Â¡Ã‚Â¡ Auto-set (1st Booking)
+                                      ⚡ Auto-set (1st Booking)
                                     </span>
                                   </div>
                                 );
                               }
-                              return <span className="font-semibold text-[#1F251A]">{viewingEmployee.start_date || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</span>;
+                              return <span className="font-semibold text-[#1F251A]">{viewingEmployee.start_date || "—"}</span>;
                             })()}
                           </div>
                           <div>
@@ -20723,7 +20738,7 @@ export default function AdminPage() {
                                 </div>
                                 {hasAchievedTarget && (
                                   <span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200">
-                                    Target Met ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“
+                                    Target Met ✓
                                   </span>
                                 )}
                               </div>
@@ -20906,8 +20921,8 @@ export default function AdminPage() {
                                   </thead>
                                   <tbody className="divide-y divide-[#414E36]/5 text-[#1F251A]">
                                     {empRecords.map((r: any, idx: number) => {
-                                      const inStr = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
-                                      const outStr = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
+                                      const inStr = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+                                      const outStr = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
                                       return (
                                         <tr key={r.id || idx} className="hover:bg-[#F7F9F6]/50 transition-colors">
                                           <td className="py-2.5 px-3 font-semibold text-[#414E36] whitespace-nowrap">{r.date}</td>
@@ -20950,7 +20965,7 @@ export default function AdminPage() {
                           <div className="md:col-span-2">
                             <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Home Address</span>
                             <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3.5 py-2.5 rounded-xl border border-[#414E36]/5 leading-relaxed max-w-xl">
-                              {viewingEmployee.address || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                              {viewingEmployee.address || "—"}
                             </span>
                           </div>
                           <div>
@@ -21072,7 +21087,7 @@ export default function AdminPage() {
                             return (
                               <div className="rounded-xl bg-green-50/50 border border-green-200/50 p-4 space-y-2 text-xs max-w-xl">
                                 <div className="flex items-center gap-1.5 font-bold text-green-800">
-                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“</span>
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] text-white">✓</span>
                                   Verified Egyptian National ID Check
                                 </div>
                                 <div className="grid grid-cols-3 gap-4 text-green-700 font-medium">
@@ -21229,7 +21244,7 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-2">API Secret Credentials Key</label>
-                    <input type="password" defaultValue="ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
+                    <input type="password" defaultValue="••••••••••••••••••••" className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none" />
                   </div>
                   <button type="submit" className="w-full rounded-3xl bg-[#414E36] py-3.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]">
                     Apply API Settings
@@ -21271,7 +21286,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ EXPENSE CATEGORIES VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── EXPENSE CATEGORIES VIEW ── */}
           {activeNav === "Expense Categories" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -21391,7 +21406,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ TRANSACTIONS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── TRANSACTIONS VIEW ── */}
           {activeNav === "Transactions" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -21516,7 +21531,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ EXPENSES VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── EXPENSES VIEW ── */}
           {activeNav === "Expenses" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -21625,7 +21640,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PAYROLL VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── PAYROLL VIEW ── */}
           {activeNav === "Payroll" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -21743,7 +21758,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ FINANCES DASHBOARD VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── FINANCES DASHBOARD VIEW ── */}
           {activeNav === "Finances Dashboard" && (
             <div className="space-y-6">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -21770,7 +21785,7 @@ export default function AdminPage() {
                       <TrendingUp size={18} />
                     </span>
                   </div>
-                  <p className="mt-2 text-[10px] text-green-600 font-bold">ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬Ëœ +18.4% vs last month</p>
+                  <p className="mt-2 text-[10px] text-green-600 font-bold">↑ +18.4% vs last month</p>
                 </div>
                 <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Total Expenses</p>
@@ -21780,7 +21795,7 @@ export default function AdminPage() {
                       <TrendingUp size={18} className="rotate-180" />
                     </span>
                   </div>
-                  <p className="mt-2 text-[10px] text-red-500 font-bold">ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬Å“ -4.2% vs last month</p>
+                  <p className="mt-2 text-[10px] text-red-500 font-bold">↓ -4.2% vs last month</p>
                 </div>
                 <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Net Profit</p>
@@ -21790,7 +21805,7 @@ export default function AdminPage() {
                       <CircleDollarSign size={18} />
                     </span>
                   </div>
-                  <p className="mt-2 text-[10px] text-green-600 font-bold">ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬Ëœ +38.1% vs last month</p>
+                  <p className="mt-2 text-[10px] text-green-600 font-bold">↑ +38.1% vs last month</p>
                 </div>
                 <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Operating Margin</p>
@@ -21800,7 +21815,7 @@ export default function AdminPage() {
                       <BarChart3 size={18} />
                     </span>
                   </div>
-                  <p className="mt-2 text-[10px] text-green-600 font-bold">ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬Ëœ +8.2% in margin</p>
+                  <p className="mt-2 text-[10px] text-green-600 font-bold">↑ +8.2% in margin</p>
                 </div>
               </div>
 
@@ -21919,7 +21934,7 @@ export default function AdminPage() {
                           <div key={tx.id} className="py-3 flex items-center justify-between text-sm">
                             <div>
                               <p className="font-semibold text-[#1F251A]">{tx.description}</p>
-                              <p className="text-xs text-[#5A6A51] mt-0.5">{tx.date} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {tx.category}</p>
+                              <p className="text-xs text-[#5A6A51] mt-0.5">{tx.date} • {tx.category}</p>
                             </div>
                             <span className={`font-semibold ${isCredit ? "text-green-600" : "text-red-500"}`}>
                               {isCredit ? "+" : "-"}{tx.amount.replace("EGP ", "")}
@@ -21934,7 +21949,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ HUMAN RESOURCES (HR) VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── HUMAN RESOURCES (HR) VIEW ── */}
           {activeNav === "HR" && (
             <div className="space-y-6 animate-fadeIn">
               {/* Header */}
@@ -22035,10 +22050,10 @@ export default function AdminPage() {
                                   <div className="font-semibold text-[#1F251A]">{emp.name}</div>
                                   <div className="text-xs text-[#5A6A51]">{emp.email}</div>
                                 </td>
-                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.department || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</td>
-                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.role_name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.department || "—"}</td>
+                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.role_name || "—"}</td>
                                 <td className="px-6 py-4 text-xs text-[#5A6A51]">
-                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
                                 </td>
                                 <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
                                   EGP {Number(emp.salary || 0).toLocaleString()}
@@ -22102,9 +22117,9 @@ export default function AdminPage() {
                 const paged = filtered.slice(startIndex, endIndex);
 
                 const getPaymentDate = (monthStr: string) => {
-                  if (!monthStr) return "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â";
+                  if (!monthStr) return "—";
                   const parts = monthStr.split("-");
-                  if (parts.length < 2) return "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â";
+                  if (parts.length < 2) return "—";
                   const year = parts[0];
                   const monthNum = parseInt(parts[1], 10);
                   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -22297,8 +22312,8 @@ export default function AdminPage() {
                                           {initials}
                                         </div>
                                         <div>
-                                          <div className="font-semibold text-[#1F251A] text-sm">{empObj.name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
-                                          <div className="text-[10px] text-[#5A6A51]">{empObj.email || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
+                                          <div className="font-semibold text-[#1F251A] text-sm">{empObj.name || "—"}</div>
+                                          <div className="text-[10px] text-[#5A6A51]">{empObj.email || "—"}</div>
                                         </div>
                                       </div>
                                     </td>
@@ -22383,7 +22398,7 @@ export default function AdminPage() {
                                           </div>
                                         </div>
                                       ) : (
-                                        <span className="text-xs text-[#5A6A51]/60 font-semibold">ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â</span>
+                                        <span className="text-xs text-[#5A6A51]/60 font-semibold">—</span>
                                       )}
                                     </td>
                                     {/* Performance Bonus */}
@@ -22418,7 +22433,7 @@ export default function AdminPage() {
                                     </td>
                                     {/* Payment Date */}
                                     <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
-                                      {isPaid ? getPaymentDate(pay.month) : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                                      {isPaid ? getPaymentDate(pay.month) : "—"}
                                     </td>
                                     {/* Actions */}
                                     <td className="px-6 py-4 text-right">
@@ -22559,9 +22574,9 @@ export default function AdminPage() {
                 const paged = filtered.slice(startIndex, endIndex);
 
                 const getPaymentDate = (monthStr: string) => {
-                  if (!monthStr) return "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â";
+                  if (!monthStr) return "—";
                   const parts = monthStr.split("-");
-                  if (parts.length < 2) return "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â";
+                  if (parts.length < 2) return "—";
                   const year = parts[0];
                   const monthNum = parseInt(parts[1], 10);
                   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -22722,7 +22737,7 @@ export default function AdminPage() {
                                           {initials}
                                         </div>
                                         <div>
-                                          <div className="font-semibold text-[#1F251A] text-sm">{docObj.name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
+                                          <div className="font-semibold text-[#1F251A] text-sm">{docObj.name || "—"}</div>
                                           <div className="text-[10px] text-[#5A6A51]">{docObj.specialization || docObj.role_name || "Doctor"}</div>
                                         </div>
                                       </div>
@@ -22765,7 +22780,7 @@ export default function AdminPage() {
                                       </span>
                                     </td>
                                     <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
-                                      {isPaid ? getPaymentDate(pay.month) : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                                      {isPaid ? getPaymentDate(pay.month) : "—"}
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                       <div className="flex items-center justify-end gap-2">
@@ -22888,15 +22903,15 @@ export default function AdminPage() {
                             leavesList.map((leave: any) => (
                               <tr key={leave.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
                                 <td className="px-6 py-4">
-                                  <div className="font-semibold text-[#1F251A]">{leave.employee_accounts?.name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
-                                  <div className="text-xs text-[#5A6A51]">{leave.employee_accounts?.role_name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
+                                  <div className="font-semibold text-[#1F251A]">{leave.employee_accounts?.name || "—"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{leave.employee_accounts?.role_name || "—"}</div>
                                 </td>
                                 <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{leave.leave_type}</td>
                                 <td className="px-6 py-4 text-xs text-[#1F251A]">
                                   {leave.start_date} to {leave.end_date}
                                 </td>
                                 <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">{leave.days_count}</td>
-                                <td className="px-6 py-4 text-xs text-[#5A6A51] max-w-[150px] truncate" title={leave.reason}>{leave.reason || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</td>
+                                <td className="px-6 py-4 text-xs text-[#5A6A51] max-w-[150px] truncate" title={leave.reason}>{leave.reason || "—"}</td>
                                 <td className="px-6 py-4">
                                   <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
                                     leave.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
@@ -23100,8 +23115,8 @@ export default function AdminPage() {
                               {rev.employee_accounts?.name?.slice(0, 2).toUpperCase() || "??"}
                             </div>
                             <div className="space-y-1">
-                              <h4 className="font-bold text-[#1F251A]">{rev.employee_accounts?.name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</h4>
-                              <p className="text-xs text-[#5A6A51]">Role: {rev.employee_accounts?.role_name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</p>
+                              <h4 className="font-bold text-[#1F251A]">{rev.employee_accounts?.name || "—"}</h4>
+                              <p className="text-xs text-[#5A6A51]">Role: {rev.employee_accounts?.role_name || "—"}</p>
                               <div className="flex items-center gap-1.5 py-1">
                                 {Array.from({ length: 5 }).map((_, i) => (
                                   <Star
@@ -23257,15 +23272,15 @@ export default function AdminPage() {
                         </thead>
                         <tbody className="divide-y divide-[#414E36]/5">
                           {loadingAttendance ? (
-                            <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51]">Loading attendance recordsÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</td></tr>
+                            <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51]">Loading attendance records…</td></tr>
                           ) : attendanceList.length === 0 ? (
                             <tr><td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">No attendance records found. Records appear after employees log in each day.</td></tr>
                           ) : (
                             attendanceList.map((rec: any) => (
                               <tr key={rec.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
                                 <td className="px-6 py-4">
-                                  <div className="font-semibold text-[#1F251A]">{rec.employee_accounts?.name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
-                                  <div className="text-xs text-[#5A6A51]">{rec.employee_accounts?.role_name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
+                                  <div className="font-semibold text-[#1F251A]">{rec.employee_accounts?.name || "—"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{rec.employee_accounts?.role_name || "—"}</div>
                                 </td>
                                 <td className="px-6 py-4 text-xs text-[#1F251A]">{rec.date}</td>
                                 <td className="px-6 py-4 text-xs">
@@ -23278,10 +23293,10 @@ export default function AdminPage() {
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
-                                  {rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                                  {rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
                                 </td>
                                 <td className="px-6 py-4 text-xs font-mono text-[#1F251A]">
-                                  {rec.check_out_time ? new Date(rec.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                                  {rec.check_out_time ? new Date(rec.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
                                 </td>
                                 <td className="px-6 py-4 text-xs">
                                   <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
@@ -23295,7 +23310,7 @@ export default function AdminPage() {
                                 <td className="px-6 py-4 text-xs text-[#5A6A51]">
                                   {rec.latitude && rec.longitude
                                     ? `${Number(rec.latitude).toFixed(4)}, ${Number(rec.longitude).toFixed(4)}`
-                                    : "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}
+                                    : "—"}
                                 </td>
                                 <td className="px-6 py-4">
                                   <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
@@ -23337,8 +23352,8 @@ export default function AdminPage() {
                             activeMissingAlerts.map((a: any) => (
                               <tr key={a.id} className="hover:bg-rose-50/30 transition-colors">
                                 <td className="px-6 py-4">
-                                  <div className="font-semibold text-[#1F251A]">{a.employee_accounts?.name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
-                                  <div className="text-xs text-[#5A6A51]">{a.employee_accounts?.role_name || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</div>
+                                  <div className="font-semibold text-[#1F251A]">{a.employee_accounts?.name || "—"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{a.employee_accounts?.role_name || "—"}</div>
                                 </td>
                                 <td className="px-6 py-4 text-xs text-[#1F251A]">{new Date(a.timestamp).toLocaleString()}</td>
                                 <td className="px-6 py-4">
@@ -23429,7 +23444,7 @@ export default function AdminPage() {
                               <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
                                 <td className="px-6 py-4">
                                   <div className="font-semibold text-[#1F251A]">{emp.name}</div>
-                                  <div className="text-xs text-[#5A6A51]">{emp.email} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {emp.role_name || "Staff"}</div>
+                                  <div className="text-xs text-[#5A6A51]">{emp.email} • {emp.role_name || "Staff"}</div>
                                 </td>
                                 <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
                                   {targetAmount > 0 ? (
@@ -23452,7 +23467,7 @@ export default function AdminPage() {
                                     <div className="space-y-1 w-44">
                                       <div className="flex items-center justify-between font-semibold text-[#5A6A51] text-[10px]">
                                         <span>{progressPercent}%</span>
-                                        {hasAchievedTarget && <span className="text-green-700 font-bold">Met ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“</span>}
+                                        {hasAchievedTarget && <span className="text-green-700 font-bold">Met ✓</span>}
                                       </div>
                                       <div className="w-full bg-gray-150 h-2 rounded-full overflow-hidden">
                                         <div 
@@ -23512,7 +23527,7 @@ export default function AdminPage() {
                   onClick={() => setPresenceModalOpen(false)}
                   className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
                 >
-                  ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ I am Present &amp; Working
+                  ✓ I am Present &amp; Working
                 </button>
               </div>
             </div>
@@ -23546,7 +23561,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ BOOKINGS VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── BOOKINGS VIEW ── */}
           {activeNav === "Bookings" && (
           <>
           <header className="mb-8">
@@ -23564,7 +23579,7 @@ export default function AdminPage() {
           </header>
 
           <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ CALENDAR VIEW SWITCHER ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+            {/* ── CALENDAR VIEW SWITCHER ── */}
             <div className="flex items-center gap-1 p-1 w-fit rounded-full border border-[#414E36]/12 bg-white shadow-sm">
               {(["Calendar", "List", "Schedule"] as const).filter(view => {
                 if (view === "Calendar" || view === "Schedule") return hasPermission("bookings.view_calendar");
@@ -23612,7 +23627,7 @@ export default function AdminPage() {
 
           {calendarView === "Calendar" && (
           <section className="mb-8 flex flex-col gap-6">
-            {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Dashboard summary row ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+            {/* ── Dashboard summary row ── */}
             <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
               {/* Today's bookings stat */}
               <div
@@ -23642,7 +23657,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Calendar grid ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+            {/* ── Calendar grid ── */}
             <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
               <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
@@ -23733,13 +23748,13 @@ export default function AdminPage() {
           </section>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ LIST VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── LIST VIEW ── */}
           {calendarView === "List" && (
           <section className="mb-8 rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
             <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80">Booking panel</p>
-                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">All bookings ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â list</h3>
+                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">All bookings — list</h3>
               </div>
               <span className="rounded-full bg-[#EDF1EC] px-4 py-2 text-sm font-semibold text-[#5A6A51]">
                 {filteredReservations.filter(r => ['approved', 'confirmed', 'started', 'completed'].includes(r.status)).length} active
@@ -23800,7 +23815,7 @@ export default function AdminPage() {
                         const dateObj = dateStr ? new Date(dateStr + 'T00:00:00') : null;
                         const dateLabel = dateObj
                           ? dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'long' })
-                          : 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â';
+                          : '—';
                         const timeLabel = r.timeSlot || r.requestedTime || null;
                         const refId = `#${r.id.replace(/-/g,'').slice(0,8).toUpperCase()}`;
                         const statusClass = getStatusBadgeClass(r.status);
@@ -23837,7 +23852,7 @@ export default function AdminPage() {
                               {timeLabel && <p className="mt-0.5 text-[10px] text-[#5A6A51]/70">{timeLabel}</p>}
                             </td>
                             <td className="px-4 py-4 text-[#5A6A51]">0</td>
-                            <td className="px-4 py-4 font-semibold text-[#1F251A] whitespace-nowrap">ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â</td>
+                            <td className="px-4 py-4 font-semibold text-[#1F251A] whitespace-nowrap">—</td>
                             <td className="px-4 py-4 whitespace-nowrap text-[#5A6A51]">0</td>
                             <td className="px-4 py-4">
                               <button className="flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#414E36]/40 hover:text-[#414E36]">
@@ -23858,9 +23873,9 @@ export default function AdminPage() {
           </section>
           )}
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ SCHEDULE VIEW ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* ── SCHEDULE VIEW ── */}
           {calendarView === "Schedule" && (() => {
-            // Build 15-min slots 09:00 ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 20:00 in 24h ("HH:MM") format for matching
+            // Build 15-min slots 09:00 → 20:00 in 24h ("HH:MM") format for matching
             const RAW_SLOTS: string[] = [];
             for (let h = 9; h <= 20; h++) {
               for (const m of [0, 15, 30, 45]) {
@@ -23869,7 +23884,7 @@ export default function AdminPage() {
               }
             }
 
-            // Convert 24h "HH:MM" ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ display label "H:MM AM/PM"
+            // Convert 24h "HH:MM" → display label "H:MM AM/PM"
             const toLabel = (raw: string) => {
               const [hh, mm] = raw.split(':').map(Number);
               const ampm = hh < 12 ? 'AM' : 'PM';
@@ -23963,7 +23978,7 @@ export default function AdminPage() {
 
             return (
             <section className="mb-8 rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ top bar ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+              {/* ── top bar ── */}
               <div className="mb-5 flex flex-wrap items-center gap-3">
                 <select
                   value={scheduleProviderFilter}
@@ -24007,7 +24022,7 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ schedule table (doctors as rows, time slots as columns) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+              {/* ── schedule table (doctors as rows, time slots as columns) ── */}
               <div className="overflow-auto rounded-[24px] border border-[#414E36]/08" style={{ maxHeight: '600px' }}>
                 <table className="border-collapse" style={{ minWidth: `${180 + RAW_SLOTS.length * 140}px` }}>
                   <thead className="sticky top-0 z-20">
@@ -24035,7 +24050,7 @@ export default function AdminPage() {
                           {/* time-slot cells */}
                           {RAW_SLOTS.map((raw, si) => {
                             const cellKey = `${doc}-${si}`;
-                            // Skip ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â this cell is consumed by an earlier colspan
+                            // Skip — this cell is consumed by an earlier colspan
                             if (blocked.has(cellKey)) return null;
 
                             const cells = bookingMap[raw]?.[doc] ?? [];
@@ -24068,7 +24083,7 @@ export default function AdminPage() {
                                       return (
                                         <div
                                           key={b.id}
-                                          title={`${b.name} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ${svcName} (${b.status})`}
+                                          title={`${b.name} — ${svcName} (${b.status})`}
                                           className="flex min-w-[130px] flex-1 flex-col justify-center gap-1 rounded-2xl bg-[#414E36]/10 px-3 py-2 ring-1 ring-[#414E36]/20"
                                         >
                                           <div className="flex items-center gap-1.5">
@@ -24076,14 +24091,14 @@ export default function AdminPage() {
                                             <p className="truncate text-xs font-semibold text-[#1F251A]">{b.name}</p>
                                           </div>
                                           <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]">{b.phone}</p>
-                                          <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]/60 capitalize">{svcName} Ãƒâ€šÃ‚Â· {b.status}</p>
+                                          <p className="truncate pl-3.5 text-[10px] text-[#5A6A51]/60 capitalize">{svcName} · {b.status}</p>
                                         </div>
                                       );
                                     })}
                                     {hiddenCount > 0 && (
                                       <button
                                         type="button"
-                                        title={`${hiddenCount} more booking${hiddenCount > 1 ? 's' : ''} for ${doc} on ${scheduleDateLabel} ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â view in list`}
+                                        title={`${hiddenCount} more booking${hiddenCount > 1 ? 's' : ''} for ${doc} on ${scheduleDateLabel} — view in list`}
                                         onClick={() => {
                                           setDocFilter(doc);
                                           setDateFilter(scheduleDateStr);
@@ -24134,7 +24149,7 @@ export default function AdminPage() {
 
             </div>
 
-            {loading && <p>Loading requestsÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</p>}
+            {loading && <p>Loading requests…</p>}
             {!loading && requests.length === 0 && (
               <p className="rounded-3xl border border-[#414E36]/10 bg-[#EDF1EC] p-6 text-[#5A6A51]">
                 No pending reservation requests at the moment.
@@ -24158,7 +24173,7 @@ export default function AdminPage() {
                           Service: {service ? service.en : `Service #${req.serviceId}`}
                         </p>
                         <p className="mt-1 text-xs text-[#5A6A51]">
-                          {req.email} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {req.phone} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === req.branchId)?.name_en || "Default/All"}</span>
+                          {req.email} • {req.phone} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === req.branchId)?.name_en || "Default/All"}</span>
                         </p>
                       </div>
                       <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#414E36]">
@@ -24172,7 +24187,7 @@ export default function AdminPage() {
                       </p>
                       <p className="mt-2 text-sm text-[#414E36]">
                         {req.date}
-                        {req.requestedTime ? ` ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ requested ${req.requestedTime}` : ""}
+                        {req.requestedTime ? ` • requested ${req.requestedTime}` : ""}
                       </p>
                     </div>
                     <div className="rounded-3xl bg-[#FBFBF9] p-4">
@@ -24483,8 +24498,8 @@ export default function AdminPage() {
                          }}
                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                        >
-                         <option value="in_person">In Person / Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â©</option>
-                         <option value="online">Online / ÃƒËœÃ‚Â£Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â </option>
+                         <option value="in_person">In Person / في العيادة</option>
+                         <option value="online">Online / أونلاين</option>
                        </select>
                      </div>
                      
@@ -25072,7 +25087,7 @@ export default function AdminPage() {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Email</p>
-                              <p className="mt-0.5 break-all font-semibold">{viewingBooking.email || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</p>
+                              <p className="mt-0.5 break-all font-semibold">{viewingBooking.email || "—"}</p>
                             </div>
                             <div>
                               <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Phone</p>
@@ -25104,7 +25119,7 @@ export default function AdminPage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Provider</p>
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-[#C4AE7C]/20 flex items-center justify-center text-[#414E36] font-bold">
-                        {(viewingBooking.doctorName || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â").split(' ').map((n: string) => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()}
+                        {(viewingBooking.doctorName || "—").split(' ').map((n: string) => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()}
                       </div>
                       <div>
                         <p className="font-bold text-[#1F251A] text-sm">
@@ -25112,7 +25127,7 @@ export default function AdminPage() {
                         </p>
                         {viewingBooking.doctorName && (
                           <div className="flex items-center gap-1 text-[#C4AE7C] mt-0.5">
-                            {"ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦".repeat(5)}
+                            {"★".repeat(5)}
                             <span className="text-xs text-[#5A6A51] ml-1">(5.0)</span>
                           </div>
                         )}
@@ -25353,7 +25368,7 @@ export default function AdminPage() {
               <div>
                 <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Quick actions</p>
                 <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">
-                  Today's Bookings ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  Today's Bookings • {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </h3>
               </div>
               <button
@@ -25399,7 +25414,7 @@ export default function AdminPage() {
                         <div>
                           <p className="font-bold text-[#1F251A]">{r.name}</p>
                           <p className="text-xs text-[#5A6A51] mt-1">
-                            {service ? service.en : `Service #${r.serviceId}`} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {r.timeSlot ? `@ ${r.timeSlot}` : 'Time not specified'}
+                            {service ? service.en : `Service #${r.serviceId}`} • {r.timeSlot ? `@ ${r.timeSlot}` : 'Time not specified'}
                           </p>
                         </div>
                         <span className="rounded-full bg-[#C4AE7C]/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[#414E36]">
@@ -25749,8 +25764,8 @@ export default function AdminPage() {
                       const showOnline = allowedType === "both" || allowedType === "online";
                       return (
                         <>
-                          {showInClinic && <option value="in_person">In Person / Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â©</option>}
-                          {showOnline && <option value="online">Online / ÃƒËœÃ‚Â£Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â </option>}
+                          {showInClinic && <option value="in_person">In Person / في العيادة</option>}
+                          {showOnline && <option value="online">Online / أونلاين</option>}
                         </>
                       );
                     })()}
@@ -25924,7 +25939,7 @@ export default function AdminPage() {
                         <div>
                           <p className="font-bold text-[#1F251A]">{r.name}</p>
                           <p className="text-xs text-[#5A6A51] mt-1">
-                            {service ? service.en : `Service #${r.serviceId}`} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""} ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}</span>
+                            {service ? service.en : `Service #${r.serviceId}`} • {r.date} {r.timeSlot ? `@ ${r.timeSlot}` : r.requestedTime ? `@ ${r.requestedTime}` : ""} • <span className="font-semibold text-[#414E36]">{branches.find(b => b.id === r.branchId)?.name_en || "Default/All"}</span>
                           </p>
                           {r.doctorName && (
                             <p className="text-xs text-[#C4AE7C] mt-0.5 font-semibold">
@@ -26044,8 +26059,8 @@ export default function AdminPage() {
                     if (check.isValid) {
                       return (
                         <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/70 px-4 py-2 text-xs text-[#1F251A] font-semibold flex items-center justify-between min-h-[42px]">
-                          <span>{check.age} yrs ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ DOB: {check.dobFormatted}</span>
-                          <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ National ID</span>
+                          <span>{check.age} yrs • DOB: {check.dobFormatted}</span>
+                          <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">✓ National ID</span>
                         </div>
                       );
                     }
@@ -26094,7 +26109,7 @@ export default function AdminPage() {
                               : "bg-[#414E36]/5 text-[#414E36] border-transparent hover:bg-[#414E36]/10"
                           }`}
                         >
-                          {b.name_en} {isSelected ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" : "+"}
+                          {b.name_en} {isSelected ? "✓" : "+"}
                         </button>
                       );
                     })}
@@ -26111,7 +26126,7 @@ export default function AdminPage() {
                           <div className="flex items-center justify-between w-full">
                             <span className="text-sm font-semibold text-[#1F251A]">{displayDate}</span>
                             <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full border border-[#414E36]/15 flex items-center gap-1">
-                              ÃƒÂ¢Ã…Â¡Ã‚Â¡ Auto from 1st Booking
+                              ⚡ Auto from 1st Booking
                             </span>
                           </div>
                         );
@@ -26541,7 +26556,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ EXPORT CUSTOMERS MODAL ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+      {/* ── EXPORT CUSTOMERS MODAL ── */}
       {showExportCustomersModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
@@ -26629,7 +26644,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ IMPORT CUSTOMERS MODAL ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+      {/* ── IMPORT CUSTOMERS MODAL ── */}
       {showImportCustomersModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto"
@@ -26684,7 +26699,7 @@ export default function AdminPage() {
                       <div>
                         <p className="text-sm font-semibold text-[#1F251A]">{importFile.name}</p>
                         <p className="text-xs text-[#5A6A51]">
-                          {(importFile.size / 1024).toFixed(1)} KB ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ {importRows.length} rows found
+                          {(importFile.size / 1024).toFixed(1)} KB • {importRows.length} rows found
                         </p>
                       </div>
                     </div>
@@ -26831,7 +26846,7 @@ export default function AdminPage() {
       )}
 
 
-      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ DELETE CUSTOMER CONFIRMATION MODAL ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+      {/* ── DELETE CUSTOMER CONFIRMATION MODAL ── */}
       {deleteCustomerTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
           <div className="w-full max-w-md rounded-2xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
@@ -26871,7 +26886,7 @@ export default function AdminPage() {
       )}
 
 
-      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Setup Password Modal (shown after accepting invite or password reset) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+      {/* ── Setup Password Modal (shown after accepting invite or password reset) ── */}
       {showSetupPasswordModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="relative w-full max-w-md mx-4 rounded-3xl bg-white shadow-2xl overflow-hidden">
@@ -26899,7 +26914,7 @@ export default function AdminPage() {
                     </svg>
                   </div>
                   <p className="text-green-700 font-semibold text-base">{setupSuccess}</p>
-                  <p className="text-sm text-[#5A6A51]">You will be redirected automaticallyÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</p>
+                  <p className="text-sm text-[#5A6A51]">You will be redirected automatically…</p>
                 </div>
               ) : (
                 <form onSubmit={handleSetupPassword} className="space-y-5">
@@ -26920,22 +26935,22 @@ export default function AdminPage() {
                   <div className="mt-2 text-xs space-y-1 font-semibold text-gray-500">
                     <div className="flex items-center gap-1.5">
                       <span className={setupPassword.length >= 8 ? "text-green-600" : ""}>
-                        {setupPassword.length >= 8 ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" : "ÃƒÂ¢Ã¢â‚¬â€Ã¢â‚¬Â¹"} At least 8 characters
+                        {setupPassword.length >= 8 ? "✓" : "○"} At least 8 characters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" : "ÃƒÂ¢Ã¢â‚¬â€Ã¢â‚¬Â¹"} Uppercase & lowercase letters
+                        {/[A-Z]/.test(setupPassword) && /[a-z]/.test(setupPassword) ? "✓" : "○"} Uppercase & lowercase letters
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/\d/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/\d/.test(setupPassword) ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" : "ÃƒÂ¢Ã¢â‚¬â€Ã¢â‚¬Â¹"} At least one number
+                        {/\d/.test(setupPassword) ? "✓" : "○"} At least one number
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={/[^A-Za-z0-9]/.test(setupPassword) ? "text-green-600" : ""}>
-                        {/[^A-Za-z0-9]/.test(setupPassword) ? "ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“" : "ÃƒÂ¢Ã¢â‚¬â€Ã¢â‚¬Â¹"} At least one special character (e.g. @$!%*?&#)
+                        {/[^A-Za-z0-9]/.test(setupPassword) ? "✓" : "○"} At least one special character (e.g. @$!%*?&#)
                       </span>
                     </div>
                   </div>
@@ -26972,7 +26987,7 @@ export default function AdminPage() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                         </svg>
-                        Setting passwordÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦
+                        Setting password…
                       </span>
                     ) : "Confirm & Access Dashboard"}
                   </button>
@@ -26983,7 +26998,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PAYMENT SETTLEMENT MODAL ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+      {/* ── PAYMENT SETTLEMENT MODAL ── */}
       {checkoutBooking && (
         (() => {
           // 1. Calculate service cost
@@ -27073,14 +27088,14 @@ export default function AdminPage() {
                 <div className="space-y-4 text-sm text-[#414E36]">
                   {/* Customer Information */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">Customer / ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¶</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51] mb-1">Customer / المريض</p>
                     <p className="font-bold text-[#1F251A]">{checkoutBooking.name}</p>
                     <p className="text-xs text-[#5A6A51] mt-0.5">{checkoutBooking.phone}</p>
                   </div>
 
                   {/* Services Invoice details */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-[#EDF1EC]/30 p-4 space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-1">Services List / ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-1">Services List / الخدمات</p>
                     {bookingServicesList.map((svc: any, idx: number) => (
                       <div key={idx} className="flex justify-between font-medium">
                         <span className="text-[#1F251A]">{svc.name}</span>
@@ -27088,7 +27103,7 @@ export default function AdminPage() {
                       </div>
                     ))}
                     <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
-                      <span>Total Cost / ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â </span>
+                      <span>Total Cost / الإجمالي</span>
                       <span>{totalCost} EGP</span>
                     </div>
                   </div>
@@ -27099,7 +27114,7 @@ export default function AdminPage() {
                       <div>
                         <p className="font-bold text-[#1F251A] flex items-center gap-1.5">
                           <span className="inline-block h-2 w-2 rounded-full bg-[#C4AE7C]"></span>
-                          Use Customer Wallet / ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³ÃƒËœÃ‚ÂªÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â­Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â¸ÃƒËœÃ‚Â©
+                          Use Customer Wallet / استخدام المحفظة
                         </p>
                         <p className="text-xs text-[#5A6A51] mt-0.5">Available balance: {walletBalance} EGP</p>
                       </div>
@@ -27118,7 +27133,7 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-[#5A6A51] mb-1">
-                        Net Due / ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â·Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¨
+                        Net Due / المبلغ المستحق
                       </label>
                       <div className="relative">
                         <input
@@ -27131,7 +27146,7 @@ export default function AdminPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-[#5A6A51] mb-1">
-                        Amount Paid / ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¯Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¹
+                        Amount Paid / المبلغ المدفوع
                       </label>
                       <div className="relative">
                         <input
@@ -27151,7 +27166,7 @@ export default function AdminPage() {
                   {changeAmount > 0 && (
                     <div className="rounded-2xl border border-green-200 bg-green-50/50 p-4 space-y-3">
                       <div className="flex justify-between font-bold text-green-800 text-sm">
-                        <span>Change / ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â </span>
+                        <span>Change / الباقي</span>
                         <span>{changeAmount} EGP</span>
                       </div>
                       <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -27162,7 +27177,7 @@ export default function AdminPage() {
                           className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
                         />
                         <span className="text-xs font-semibold text-[#1F251A]">
-                          Put change in customer's wallet / ÃƒËœÃ‚Â­Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â¸ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â  Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â­Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â¸ÃƒËœÃ‚Â©
+                          Put change in customer's wallet / أضف الباقي إلى محفظة المريض
                         </span>
                       </label>
                     </div>
@@ -27170,7 +27185,7 @@ export default function AdminPage() {
 
                   {remainingAmount > 0 && (
                     <div className="rounded-2xl border border-red-200 bg-red-50/50 p-4 flex justify-between font-bold text-red-800 text-sm">
-                      <span>Outstanding Balance / ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â  ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â </span>
+                      <span>Outstanding Balance / الرصيد المستحق</span>
                       <span>{remainingAmount} EGP</span>
                     </div>
                   )}
@@ -27210,7 +27225,7 @@ export default function AdminPage() {
         })()
       )}
 
-      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ BOOKING INVOICE MODAL ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+      {/* ── BOOKING INVOICE MODAL ── */}
       {invoiceBooking && (
         (() => {
           // 1. Calculate service cost
@@ -27219,7 +27234,7 @@ export default function AdminPage() {
             const s = localServices.find(srv => srv.id === id);
             return {
               name: s?.en || `Service #${id}`,
-              nameAr: s?.ar || `ÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â© #${id}`,
+              nameAr: s?.ar || `خدمة #${id}`,
               price: s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500
             };
           });
@@ -27272,12 +27287,12 @@ export default function AdminPage() {
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2 border-b pb-1">Billed To</p>
                       <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name}</p>
                       <p className="text-[#5A6A51] mt-1"><strong>Phone:</strong> {invoiceBooking.phone}</p>
-                      <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</p>
+                      <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
                     </div>
                     <div className="bg-white rounded-2xl border border-gray-100 p-4">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2 border-b pb-1">Booking Details</p>
-                      <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</p>
-                      <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â"}</p>
+                      <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
+                      <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
                       <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
                     </div>
                   </div>
