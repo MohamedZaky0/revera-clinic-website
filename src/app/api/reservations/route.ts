@@ -196,13 +196,23 @@ export async function POST(req: Request) {
       if (svc) {
         let targetBranchName: string | null = null;
         if (branchId) {
-          const { data: bObj } = await supabaseServer
+          // Two bugs lived here, and together they meant branch pricing was never applied
+          // server-side (RISK-011): the filter was `.eq('id', Number(branchId))` against a
+          // uuid column, which is always NaN, and it selected a `name` column that does not
+          // exist — branches has name_en / name_ar. The query error was discarded, which is
+          // why it stayed invisible.
+          const { data: bObj, error: branchErr } = await supabaseServer
             .from('branches')
-            .select('name')
-            .eq('id', Number(branchId))
+            .select('name_en, name_ar')
+            .eq('id', branchId)
             .maybeSingle();
-          if (bObj) {
-            targetBranchName = bObj.name;
+
+          if (branchErr) {
+            console.error('Branch lookup for pricing failed:', branchErr.message);
+          } else if (bObj) {
+            targetBranchName = bObj.name_en || bObj.name_ar || null;
+          } else {
+            console.warn('No branch found for pricing lookup:', branchId);
           }
         }
 

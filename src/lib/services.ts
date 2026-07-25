@@ -126,25 +126,64 @@ export const CATEGORY_LABELS: Record<Category, { en: string; ar: string }> = {
   osteopathy: { en: "Osteopathy & Nutrition", ar: "تقويم العظام والتغذية" },
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type BranchLike = { id: number | string; name?: string; name_en?: string; name_ar?: string };
+
+/**
+ * Resolve whatever the caller passed — a branch id or a branch name — to the branch NAME,
+ * which is what `branchPricing[].name` is keyed by.
+ *
+ * This previously did:
+ *
+ *     if (typeof v === "string" && isNaN(Number(v))) targetBranchName = v;
+ *
+ * Branch ids are UUIDs, and a UUID is a non-numeric string, so the UUID itself was used as
+ * the branch name and never matched any `branchPricing` entry. The `branchesList` lookup
+ * underneath was unreachable for UUID ids, and it compared `Number(b.id) === Number(v)` —
+ * `NaN === NaN`, false — so it would not have matched either. Between the two,
+ * branch-specific pricing has never been applied anywhere in the app. See RISK-011.
+ */
+function resolveBranchName(
+  branchNameOrId?: string | number | null,
+  branchesList?: BranchLike[] | null
+): string | null {
+  if (branchNameOrId === undefined || branchNameOrId === null) return null;
+
+  const key = String(branchNameOrId).trim();
+  if (!key) return null;
+
+  if (branchesList && branchesList.length > 0) {
+    // Ids are UUIDs — compare as strings, never through Number().
+    const byId = branchesList.find((b) => String(b.id) === key);
+    if (byId) return byId.name || byId.name_en || byId.name_ar || null;
+
+    // The caller may equally have passed a name already.
+    const lower = key.toLowerCase();
+    const byName = branchesList.find(
+      (b) =>
+        b.name?.toLowerCase() === lower ||
+        b.name_en?.toLowerCase() === lower ||
+        b.name_ar?.toLowerCase() === lower
+    );
+    if (byName) return byName.name || byName.name_en || byName.name_ar || null;
+  }
+
+  // With no list to resolve against, only a plain name is usable. A UUID or a numeric id is
+  // an identifier we cannot translate, and must not be passed off as a name.
+  if (UUID_RE.test(key) || !isNaN(Number(key))) return null;
+
+  return key;
+}
+
 export function getEffectiveServicePrice(
   service: { price?: number; branchPricing?: any[] | null } | null | undefined,
   branchNameOrId?: string | number | null,
-  branchesList?: Array<{ id: number | string; name?: string; name_en?: string; name_ar?: string }> | null
+  branchesList?: BranchLike[] | null
 ): number {
   if (!service) return 0;
 
-  let targetBranchName: string | null = null;
-  if (branchNameOrId !== undefined && branchNameOrId !== null) {
-    if (typeof branchNameOrId === "string" && isNaN(Number(branchNameOrId))) {
-      targetBranchName = branchNameOrId;
-    } else if (branchesList && branchesList.length > 0) {
-      const bId = Number(branchNameOrId);
-      const bObj = branchesList.find((b) => Number(b.id) === bId);
-      if (bObj) {
-        targetBranchName = bObj.name || bObj.name_en || bObj.name_ar || null;
-      }
-    }
-  }
+  const targetBranchName = resolveBranchName(branchNameOrId, branchesList);
 
   let bpItem: any = null;
   if (targetBranchName && service.branchPricing && Array.isArray(service.branchPricing)) {
@@ -203,7 +242,7 @@ export interface ServicePriceDetails {
 export function getServicePriceDetails(
   service: { price?: number; branchPricing?: any[] | null } | null | undefined,
   branchNameOrId?: string | number | null,
-  branchesList?: Array<{ id: number | string; name?: string; name_en?: string; name_ar?: string }> | null
+  branchesList?: BranchLike[] | null
 ): ServicePriceDetails {
   const result: ServicePriceDetails = {
     basePrice: 0,
@@ -213,18 +252,7 @@ export function getServicePriceDetails(
 
   if (!service) return result;
 
-  let targetBranchName: string | null = null;
-  if (branchNameOrId !== undefined && branchNameOrId !== null) {
-    if (typeof branchNameOrId === "string" && isNaN(Number(branchNameOrId))) {
-      targetBranchName = branchNameOrId;
-    } else if (branchesList && branchesList.length > 0) {
-      const bId = Number(branchNameOrId);
-      const bObj = branchesList.find((b) => Number(b.id) === bId);
-      if (bObj) {
-        targetBranchName = bObj.name || bObj.name_en || bObj.name_ar || null;
-      }
-    }
-  }
+  const targetBranchName = resolveBranchName(branchNameOrId, branchesList);
 
   let bpItem: any = null;
   if (targetBranchName && service.branchPricing && Array.isArray(service.branchPricing)) {

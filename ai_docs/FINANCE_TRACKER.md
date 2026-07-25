@@ -70,8 +70,8 @@ would be confidently wrong, which is worse than absent (DEC-019).
 |---|---|---|---|---|
 | 0.0 | Fix the migration pipeline — see below | `WIP` | Claude | `see below` |
 | 0.1 | Verify live DB against migrations | `DONE` | Claude | `1c3d151` |
-| 0.2 | Fix server-side branch pricing | `TODO` | — | — |
-| 0.3 | Fix client-side branch pricing | `TODO` | — | — |
+| 0.2 | Fix server-side branch pricing | `DONE` | Claude | `see 0.2/0.3 below` |
+| 0.3 | Fix client-side branch pricing | `DONE` | Claude | `see 0.2/0.3 below` |
 | 0.4 | Fix double stock deduction | `TODO` | — | — |
 | 0.5 | Fix `customers.outstanding` never decrementing | `TODO` | — | — |
 | 0.6 | Fix `product_sales` route column mapping | `DONE` | Claude | `23e0e5e`, `8108b82` |
@@ -208,9 +208,30 @@ backfill them and record the decision here.
 
 ---
 
-### 0.2 / 0.3 — Branch pricing has never worked (RISK-011)
+### 0.2 / 0.3 — Branch pricing has never worked (RISK-011) — DONE
 
-Two independent bugs. Both must be fixed; either alone leaves pricing broken.
+**Fixed.** Both bugs, plus a third found while fixing them.
+
+- **Client** (`src/lib/services.ts`): added a shared `resolveBranchName()` helper, now used by both
+  `getEffectiveServicePrice` and `getServicePriceDetails`, which carried identical copies of the
+  broken logic. It resolves an id by **string** comparison against `branchesList` (ids are UUIDs;
+  the old code used `Number(b.id) === Number(key)`, i.e. `NaN === NaN`), falls back to matching a
+  name in `name` / `name_en` / `name_ar`, and — critically — returns `null` rather than pretending
+  a UUID or a numeric id is a branch name.
+- **Server** (`src/app/api/reservations/route.ts`): `.eq('id', branchId)` instead of
+  `Number(branchId)`, and `select('name_en, name_ar')` instead of a `name` column that does not
+  exist.
+- **Third bug:** the branch lookup discarded its Supabase `error`. That is why a query against a
+  non-existent column stayed silent. It is now logged, as is a branch id that resolves to nothing.
+
+**Verified end to end:** `branchPricing[].name` is written as `b.name_en`
+(`admin/page.tsx:1561`), and `resolveBranchName` returns `name_en` for a `Branch` — which has no
+`name` field — so both sides key on the same string.
+
+**Regression check:** `npx tsx scratch/pricecheck.ts` — 10 cases, all passing. Meaningful rather
+than decorative: the first case returned 800 instead of 1200 before the fix.
+
+**Original diagnosis, kept for reference:**
 
 **Server** — `src/app/api/reservations/route.ts:198-206`
 ```

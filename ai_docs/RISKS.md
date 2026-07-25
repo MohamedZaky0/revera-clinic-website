@@ -253,7 +253,17 @@ Any revenue report built on this is not reproducible.
 ## RISK-011: Branch-Specific Pricing Has Never Been Applied
 
 **Severity:** High · **Type:** Correctness / Revenue
-**Found:** 2026-07-25
+**Found:** 2026-07-25 · **RESOLVED 2026-07-25**
+
+**Fix:** a shared `resolveBranchName()` in `src/lib/services.ts` compares ids as strings and refuses
+to treat a UUID as a name; the server query uses `.eq('id', branchId)` with `select('name_en,
+name_ar')` and no longer discards its error. Regression check: `npx tsx scratch/pricecheck.ts`.
+
+**Note for anyone reading historical revenue:** every price ever charged before this fix used the
+`isDefault` entry or `services.price`, never a branch-specific price. Any backfill of historical
+invoices (PROPOSAL-002 Phase 1) must not retroactively apply branch pricing that was never charged.
+
+Original diagnosis below.
 
 Two independent bugs, both silent:
 - **Server** (`src/app/api/reservations/route.ts:198-206`): queries
