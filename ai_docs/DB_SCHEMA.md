@@ -789,18 +789,21 @@ the table is empty. Previously (2026-07-21 to 2026-07-25) POST/PATCH only wrote
 - Persistent patient records are stored in the `customers` table, and connected to `reservations` via `customer_id`.
 - No `staff` table. Providers are stored with minimal fields (name, services list, rating) plus payroll/schedule fields added later.
 - No `shifts` or `availability` table for providers. Availability is calculated by scanning reservations.
-- **RLS — verified against the live dev database 2026-07-25.** RLS is **disabled** on `branches`,
-  `categories`, `customers`, `page_settings`, `provider_attendance`, `providers`, `reservations`,
-  `rooms`, `service_rooms`, `services`, `doctor_payroll`, `provider_schedule_audit_logs`.
-  It is **enabled** (with permissive "allow all" policies, so functionally open) on `roles`,
-  `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_products`,
-  `inventory_devices`, `product_sales`, `device_maintenance_history`, `admin_roles`.
+- **RLS — `20260722140000_enable_row_level_security.sql` was applied to the dev database on
+  2026-07-25.** RLS is now **enabled on every table in `public`**.
 
-  **`supabase/migrations/20260722140000_enable_row_level_security.sql` has NOT been applied.**
-  It would enable RLS on every public table; the live database shows otherwise. An earlier edit to
-  this file on 2026-07-25 claimed "all 28 tables have RLS on" — that was inferred from reading the
-  migration file rather than measured, and was wrong. Do not infer applied state from the presence
-  of a migration file in this repo; see RISK-020.
+  A subset — `roles`, `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`,
+  `inventory_products`, `inventory_devices`, `product_sales`, `device_maintenance_history`,
+  `admin_roles` — also carries permissive "allow all" policies, so it is functionally open.
+  **Every other table has RLS on with no policies at all: service-role-only.** Any code path
+  reaching for the anon key will silently receive zero rows.
+
+  **History, because this entry has been wrong before.** Until 2026-07-25 this migration had never
+  been run, and RLS was off on `reservations`, `customers`, `services`, `providers`, `branches` and
+  others. An earlier edit on that same day claimed "all 28 tables have RLS on" — inferred from the
+  migration file existing rather than measured, and wrong at the time. It is true now only because
+  the migration was actually executed. **Do not infer applied state from a migration file in this
+  repo; measure it.** See RISK-020.
 - `reservations.branch_id` is nullable — reservations without a branch are treated as "no branch" and are filtered separately.
 - `reservations.date` is stored as `text`, not a native `date` column.
 - Still genuinely mock UI (no table exists): consultation notes, treatment plans, before/after photos, Finances Dashboard aggregate reporting, Refunds, Shipping. See `PROJECT.md` and `RISKS.md` RISK-005 for the current, corrected list.

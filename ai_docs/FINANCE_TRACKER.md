@@ -74,7 +74,7 @@ would be confidently wrong, which is worse than absent (DEC-019).
 | 0.3 | Fix client-side branch pricing | `TODO` | — | — |
 | 0.4 | Fix double stock deduction | `TODO` | — | — |
 | 0.5 | Fix `customers.outstanding` never decrementing | `TODO` | — | — |
-| 0.6 | Fix `product_sales` route column mapping | `NEEDS-DB` | Claude | see below |
+| 0.6 | Fix `product_sales` route column mapping | `DONE` | Claude | `23e0e5e`, `8108b82` |
 | 0.7 | Add `provider_id` FK to `reservations` | `TODO` | — | — |
 | 0.8 | Add `services.duration_minutes` numeric | `TODO` | — | — |
 | 0.9 | Correct `ai_docs` drift | `DONE` | Claude | `9b4c3e7`, `3cf1c8a`, `1c3d151` |
@@ -153,12 +153,38 @@ It now fails loudly, logging the error code and the payload keys.
 **Push in this order.** The first three are additive and safe; the RLS one is not, and had a
 blocker that is now cleared.
 
+**All four were run against the dev database on 2026-07-25 via the SQL Editor and reported
+success.** Recorded from the operator's report, not from a schema re-query — see the verification
+query below and tick it off once confirmed.
+
 | # | Migration | Ran? | Against | Notes |
 |---|---|---|---|---|
-| 1 | `20260725160000_add_customer_id_to_product_sales.sql` | ☐ | — | Additive. Until run, POS sales keep failing into the blob (RISK-014) |
-| 2 | `20260725170000_ensure_reservation_status_check.sql` | ☐ | — | Restates the status CHECK. Run this **before** taking any new deposit booking — the fallback that used to hide a stale constraint has been removed |
-| 3 | `20260725120000_backfill_medical_and_product_balance_tables.sql` | ☐ | — | Additive. Creates the 3 missing tables; until then those routes run on JSON-file fallback |
-| 4 | `20260722140000_enable_row_level_security.sql` | ☐ | — | **Read the warning below before running.** Enables RLS on all public tables, most with no policies |
+| 1 | `20260725160000_add_customer_id_to_product_sales.sql` | ✅ 2026-07-25 | dev | Unblocks RISK-014 — POS sales now persist to `product_sales` |
+| 2 | `20260725170000_ensure_reservation_status_check.sql` | ✅ 2026-07-25 | dev | `pending_deposit` accepted; safe now that the silent fallback is gone |
+| 3 | `20260725120000_backfill_medical_and_product_balance_tables.sql` | ✅ 2026-07-25 | dev | The 3 missing tables now exist; those routes are off JSON fallback |
+| 4 | `20260722140000_enable_row_level_security.sql` | ✅ 2026-07-25 | dev | RLS now on for every public table |
+
+**Confirm with a re-query before trusting the above:**
+```sql
+select tablename, rowsecurity from pg_tables
+where schemaname = 'public' order by tablename;   -- expect rowsecurity = true everywhere
+
+select count(*) from information_schema.columns
+where table_name = 'product_sales' and column_name = 'customer_id';   -- expect 1
+
+select table_name from information_schema.tables
+where table_schema = 'public'
+  and table_name in ('medical_records','medical_reports','customer_product_balances');  -- expect 3
+```
+
+**Post-run regression check — required, since RLS on `public` is new:**
+Bookings · Customers · Services · Inventory · Employees. Every read must now go through an API
+route using the service role. Anything that returns empty or fails is a table being read with the
+anon key and must be moved server-side.
+
+**Still outstanding:** sales written before the fix are sitting in `page_settings`
+(key `product_sales_history`) and have not been migrated into `product_sales`. Decide whether to
+backfill them and record the decision here.
 
 > ### The RLS migration had a blocker — now cleared, but verify before running
 >

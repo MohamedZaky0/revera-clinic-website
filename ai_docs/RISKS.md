@@ -315,7 +315,10 @@ updates, and two products sharing a name deduct the wrong item.
 ## RISK-014: Every POS Sale Fails To Write, And Sales History Reads Back Empty
 
 **Severity:** High · **Type:** Data loss
-**Found:** 2026-07-25 · **CONFIRMED against the live dev database 2026-07-25**
+**Found:** 2026-07-25 · **RESOLVED 2026-07-25** — route fixed in `23e0e5e`, migration
+`20260725160000` applied to dev the same day. Sales now persist to `product_sales`.
+**Outstanding:** sales recorded before the fix are still in `page_settings`
+(key `product_sales_history`) and have not been migrated in — see `FINANCE_TRACKER.md`.
 
 The live `product_sales` table matches its migration exactly. **The route is what is wrong** —
 `src/app/api/inventory/products/sales/route.ts:101-115` inserts column names that do not exist:
@@ -453,20 +456,28 @@ so it cannot currently express "admins may not see finance" without being change
 
 ---
 
-## RISK-019: RLS Is Off On The Patient-Data Tables
+## RISK-019: RLS Coverage
 
-**Severity:** Medium · **Type:** Security
-**Found:** 2026-07-25 · **Verified against the live dev database**
+**Severity:** Low (was Medium) · **Type:** Security
+**Found:** 2026-07-25 · **Largely resolved 2026-07-25**
 
-RLS is **disabled** on `reservations`, `customers`, `services`, `providers`, `branches`,
-`categories`, `page_settings`, `provider_attendance`, `rooms`, `service_rooms`, `doctor_payroll`,
-`provider_schedule_audit_logs` — i.e. on the tables holding patient identities, bookings and
-doctor pay. It is enabled, but with permissive "allow all" policies, on `roles`,
+Until 2026-07-25, RLS was **disabled** on `reservations`, `customers`, `services`, `providers`,
+`branches`, `categories`, `page_settings`, `provider_attendance`, `rooms`, `service_rooms`,
+`doctor_payroll` and `provider_schedule_audit_logs` — the tables holding patient identities,
+bookings and doctor pay — because `20260722140000_enable_row_level_security.sql` had never been run.
+
+**That migration was applied to dev on 2026-07-25.** RLS is now on for every table in `public`.
+
+A prerequisite had to be fixed first: `src/app/admin/page.tsx` wrote to `customers` directly from
+the browser with the anon key, which enabling RLS would have turned into a silent no-op that still
+reported success. That write moved server-side into `POST /api/inventory/products/sales` in
+`8108b82`, and no client component reads or writes a Supabase table any more.
+
+**Residual risk:** the subset carrying permissive "allow all" policies (`roles`,
 `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`,
-`device_maintenance_history`, `admin_roles`. Neither state provides real row-level protection.
-
-`20260722140000_enable_row_level_security.sql` would fix the first group — **it has never been
-applied** (RISK-020).
+`device_maintenance_history`, `admin_roles`) is functionally open — salary and inventory data is
+readable with the anon key. Those policies should be tightened or dropped, since every access path
+now goes through the service role anyway.
 
 **Hazards for new work:**
 - That migration is a one-shot `DO` block, not a trigger. Any table created after it runs has RLS
