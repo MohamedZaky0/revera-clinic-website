@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
-import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot, getEffectiveServicePrice } from "@/lib/services";
+import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, normaliseTo24hSlot, getEffectiveServicePrice } from "@/lib/services";
 import { 
   getServiceToggles, 
   setServiceToggle, 
@@ -3826,7 +3826,7 @@ export default function AdminPage() {
     };
  
     const startNew = timeToMinutes(timeSlotStr);
-    const durationNew = targetService ? getDurationInMinutes(targetService.duration) : 30;
+    const durationNew = getServiceDurationMinutes(targetService);
     const endNew = startNew + durationNew;
  
     if (doctor.workingDaysHours) {
@@ -3882,7 +3882,7 @@ export default function AdminPage() {
         if (res.date === dateStr && res.timeSlot) {
           const startRes = timeToMinutes(res.timeSlot);
           const resService = localServices.find((s) => s.id === res.serviceId);
-          const durationRes = resService ? getDurationInMinutes(resService.duration) : 30;
+          const durationRes = getServiceDurationMinutes(resService);
           const endRes = startRes + durationRes;
 
           if (startNew < endRes && startRes < endNew) {
@@ -6829,7 +6829,7 @@ export default function AdminPage() {
 
   function getUnavailableSlots(approvedBookings: Req[], targetServiceId: number, end?: string): string[] {
     const svc = localServices.find(s => s.id === targetServiceId);
-    const targetDuration = getDurationInMinutes(svc?.duration);
+    const targetDuration = getServiceDurationMinutes(svc);
     const targetSlotsNeeded = Math.ceil(targetDuration / 15);
     
     const occupied = new Array(ALL_15MIN_SLOTS.length).fill(false);

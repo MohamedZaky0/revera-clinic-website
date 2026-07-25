@@ -90,8 +90,8 @@ would be confidently wrong, which is worse than absent (DEC-019).
 | 0.4 | Fix double stock deduction | `DONE` | Claude | `see 0.4 below` |
 | 0.5 | Fix `customers.outstanding` never decrementing | `DONE` | Claude | `see 0.5 below` |
 | 0.6 | Fix `product_sales` route column mapping | `DONE` | Claude | `23e0e5e`, `8108b82` |
-| 0.7 | Add `provider_id` FK to `reservations` | `TODO` | — | — |
-| 0.8 | Add `services.duration_minutes` numeric | `TODO` | — | — |
+| 0.7 | Add `provider_id` FK to `reservations` | `NEEDS-DB` | Claude | `see 0.7/0.8 below` |
+| 0.8 | Add `services.duration_minutes` numeric | `NEEDS-DB` | Claude | `see 0.7/0.8 below` |
 | 0.9 | Correct `ai_docs` drift | `DONE` | Claude | `9b4c3e7`, `3cf1c8a`, `1c3d151` |
 | 0.10 | Protect money-mutating API routes | `TODO` | — | — |
 
@@ -415,16 +415,43 @@ and translate at the DB boundary with mappers — do not rename fields in the UI
 
 ---
 
-### 0.7 / 0.8 — Schema additions for finance
+### 0.7 / 0.8 — Schema additions for finance — code merged, `NEEDS-DB`
 
-- **0.7** `reservations.provider_id` uuid FK → `providers.id`, backfilled from `doctor_name`.
-  Keep `doctor_name` as a denormalized snapshot. Doctor cost attribution is currently a
-  lowercased string match (`hr/doctor-payroll/route.ts:172`) — a rename silently detaches history
-  (RISK-015).
-- **0.8** `services.duration_minutes` numeric, backfilled from the free-text `duration`.
-  `getDurationInMinutes` (`src/lib/services.ts:1-34`) falls back to 30 minutes for anything it
-  cannot parse, and every seeded service has a NULL duration — so **every capacity number today
-  assumes 30 minutes for every service.**
+> **ACTION REQUIRED — run against dev:**
+> `supabase/migrations/20260725180000_add_provider_id_and_duration_minutes.sql`
+> Both columns are additive, so nothing breaks before it runs — the code simply keeps using the
+> old paths. **Mark this `DONE` once run, naming the database.**
+
+**0.7 — `reservations.provider_id`** uuid FK → `providers.id ON DELETE SET NULL`, indexed,
+backfilled from `doctor_name`.
+
+- `doctor_name` stays as a **denormalised snapshot** on purpose: it is what was recorded at the
+  time, and an invoice must not change because a provider row was edited later.
+- `resolveProviderId()` in the reservations route populates it on **create, approve and update**.
+- It resolves only when the name matches **exactly one** provider. No match or an ambiguous match
+  leaves NULL and logs — a wrong link misattributes doctor cost silently, which is worse than a
+  visible gap. The backfill uses the same rule.
+- Doctor payroll still matches on the name string (`hr/doctor-payroll/route.ts:172`). Switching it
+  to `provider_id` is follow-up work, not part of this task.
+
+**0.8 — `services.duration_minutes`** integer, CHECK `> 0 AND <= 1440`, backfilled by parsing
+`duration` with the same rules as `getDurationInMinutes()`.
+
+- New `getServiceDurationMinutes(service)` in `src/lib/services.ts` prefers the numeric column and
+  falls back to parsing the text. **All 9 call sites now use it** — availability, reservations,
+  admin and BookingModal.
+- `duration_minutes` added to `ServiceItem`, and to the three server-side `select`s that previously
+  fetched only `duration`.
+- The backfill leaves NULL where the text was absent or unparseable rather than writing a
+  30-minute guess. A NULL is visible; a wrong number is not.
+
+> **Why this mattered:** `duration` is unvalidated free text and `getDurationInMinutes` silently
+> returns 30 for anything it cannot parse — so "45" or "1 hr" quietly became a 30-minute session.
+> Every seeded service had no duration at all, so **every capacity and room-utilisation figure so
+> far assumed 30 minutes for every service.** Phase 5 capacity analysis and the room-minutes
+> overhead allocation (DEC-015) both depend on this being real.
+
+**Original diagnosis, kept for reference:**
 
 ---
 

@@ -33,6 +33,31 @@ export function getDurationInMinutes(duration: string | null | undefined): numbe
   return 30; // default fallback
 }
 
+/**
+ * Session length in minutes for a service.
+ *
+ * Prefers the numeric `duration_minutes` column and only falls back to parsing the
+ * free-text `duration` when it is absent. Prefer this over calling getDurationInMinutes()
+ * on `.duration` directly.
+ *
+ * `duration` is free text with no constraint and no write-side validation, and
+ * getDurationInMinutes silently returns 30 for anything it cannot parse — so a typo like
+ * "45" or "1 hr" quietly became a 30-minute session, and every seeded service had no
+ * duration at all. Capacity analysis (PROPOSAL-002 Phase 5) and the room-minutes overhead
+ * allocation (DEC-015) both need this to be real.
+ *
+ * Still returns 30 when nothing is available, so callers keep a usable number — but that
+ * fallback should get rarer as duration_minutes is populated.
+ */
+export function getServiceDurationMinutes(
+  service: { duration_minutes?: number | null; duration?: string | null } | null | undefined
+): number {
+  if (!service) return 30;
+  const numeric = Number(service.duration_minutes);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  return getDurationInMinutes(service.duration);
+}
+
 export const ALL_15MIN_SLOTS: string[] = (() => {
   const slots: string[] = [];
   for (let h = 9; h <= 21; h++) {
@@ -74,7 +99,14 @@ export interface ServiceItem {
   price?: number;
   createdAt?: string;
   sortOrder?: number;
+  /** Free-text legacy field, e.g. "1:30 Hours" or "30 mins". Prefer duration_minutes. */
   duration?: string;
+  /**
+   * Session length in minutes. Added 2026-07-25 (task 0.8) because `duration` is
+   * unvalidated free text that silently parsed to 30 for anything unexpected.
+   * Read it via getServiceDurationMinutes(), never directly.
+   */
+  duration_minutes?: number | null;
   descriptionEn?: string;
   descriptionAr?: string;
   isShared?: boolean;

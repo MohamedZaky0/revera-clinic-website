@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { getDurationInMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot, getEffectiveServicePrice } from '@/lib/services';
+import { getServiceDurationMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot, getEffectiveServicePrice } from '@/lib/services';
 import { computeSettledBalances } from '@/lib/billing';
 
 /**
@@ -42,7 +42,42 @@ function mapRow(r: Record<string, any>) {
     createdByEmployeeId: r.created_by_employee_id ?? null,
     services: r.services || null,
     doctorName: r.doctor_name ?? null,
+    providerId: r.provider_id ?? null,
   };
+}
+
+/**
+ * Resolve a doctor's display name to a providers.id.
+ *
+ * doctor_name stays on the reservation as a denormalised snapshot — it is what was recorded
+ * at the time, and an invoice should not change because a provider row was later edited.
+ * provider_id is the durable link: attributing doctor cost by lowercased string match
+ * (src/app/api/hr/doctor-payroll/route.ts) silently detaches all history on any rename,
+ * typo or title prefix. See RISK-015.
+ *
+ * Returns null when the name matches no provider, or more than one — a wrong link
+ * misattributes cost silently, so an ambiguous name is left unlinked rather than guessed.
+ */
+async function resolveProviderId(doctorName?: string | null): Promise<string | null> {
+  const name = (doctorName || '').trim();
+  if (!name) return null;
+
+  const { data, error } = await supabaseServer
+    .from('providers')
+    .select('id, name')
+    .ilike('name', name);
+
+  if (error) {
+    console.error('Provider lookup failed for doctor_name:', name, error.message);
+    return null;
+  }
+  if (!data || data.length !== 1) {
+    if (data && data.length > 1) {
+      console.warn('Ambiguous doctor_name matched multiple providers, left unlinked:', name);
+    }
+    return null;
+  }
+  return data[0].id;
 }
 
 export async function GET(req: Request) {
@@ -271,6 +306,7 @@ export async function POST(req: Request) {
       amount_paid: initialAmountPaid,
       amount_left: initialAmountLeft,
       doctor_name: doctorName || null,
+      provider_id: await resolveProviderId(doctorName),
       is_manual: isManualBooking,
       rooms: compRoomIds,
       created_by_employee_id: createdByEmployeeId || null,
@@ -379,13 +415,13 @@ export async function PATCH(req: Request) {
         // Fetch target service duration
         const { data: targetSvc, error: svcError } = await supabaseServer
           .from('services')
-          .select('duration')
+          .select('duration, duration_minutes')
           .eq('id', target.service_id)
           .single();
 
         if (svcError) throw svcError;
 
-        const targetDuration = targetSvc?.duration ? getDurationInMinutes(targetSvc.duration) : 30;
+        const targetDuration = getServiceDurationMinutes(targetSvc);
         const targetSlotsCount = Math.ceil(targetDuration / 15);
 
         const normSlot = normaliseTo24hSlot(timeSlot);
@@ -407,14 +443,14 @@ export async function PATCH(req: Request) {
         // Fetch all service durations to calculate overlap
         const { data: allSvcs, error: allSvcsError } = await supabaseServer
           .from('services')
-          .select('id, duration');
+          .select('id, duration, duration_minutes');
 
         if (allSvcsError) throw allSvcsError;
 
         const durationMap = new Map<number, number>();
         if (allSvcs) {
           allSvcs.forEach((s: any) => {
-            durationMap.set(s.id, getDurationInMinutes(s.duration));
+            durationMap.set(s.id, getServiceDurationMinutes(s));
           });
         }
 
@@ -503,6 +539,7 @@ export async function PATCH(req: Request) {
           status: 'approved',
           time_slot: timeSlot,
           doctor_name: doctorName || null,
+          provider_id: await resolveProviderId(doctorName),
           room_id: chosenRoomId,
           rooms: serviceCompRoomIds
         })
@@ -527,7 +564,11 @@ export async function PATCH(req: Request) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (notes !== undefined) updates.notes = notes;
-      if (doctorName !== undefined) updates.doctor_name = doctorName;
+      if (doctorName !== undefined) {
+        updates.doctor_name = doctorName;
+        // Keep the durable link in step with the snapshot name.
+        updates.provider_id = await resolveProviderId(doctorName);
+      }
       if (sessionType !== undefined) updates.session_type = sessionType;
       if (amountPaid !== undefined) updates.amount_paid = amountPaid;
       if (amountLeft !== undefined) updates.amount_left = amountLeft;

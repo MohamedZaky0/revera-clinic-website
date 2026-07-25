@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { getDurationInMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot } from '@/lib/services';
+import { getServiceDurationMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot } from '@/lib/services';
 
 function formatDate(d: Date) {
   const y = d.getFullYear();
@@ -26,7 +26,7 @@ async function fetchCachedServices() {
   if (cachedServices && now < cachedServicesExpiry) {
     return cachedServices;
   }
-  const { data } = await supabaseServer.from('services').select('id, duration');
+  const { data } = await supabaseServer.from('services').select('id, duration, duration_minutes');
   cachedServices = data || [];
   cachedServicesExpiry = now + CACHE_TTL;
   return cachedServices;
@@ -133,15 +133,15 @@ export async function GET(req: Request) {
     const dbServices = (await fetchCachedServices()) || [];
     const servicesMap = new Map<number, number>();
     for (const s of dbServices) {
-      servicesMap.set(s.id, getDurationInMinutes(s.duration));
+      servicesMap.set(s.id, getServiceDurationMinutes(s));
     }
 
     let targetDuration = 30; // default 30 mins
     let selectedServiceNameEn = '';
     if (serviceId) {
       const selectedSvc = dbServices.find((s: any) => s.id === Number(serviceId));
-      if (selectedSvc && selectedSvc.duration) {
-        targetDuration = getDurationInMinutes(selectedSvc.duration);
+      if (selectedSvc && (selectedSvc.duration_minutes || selectedSvc.duration)) {
+        targetDuration = getServiceDurationMinutes(selectedSvc);
         try {
           const { data: fullSvc } = await supabaseServer
             .from('services')

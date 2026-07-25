@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cachedFetch, prefetchUrl } from "@/lib/fetchCache";
-import { Category, ServiceItem, ALL_15MIN_SLOTS, getDurationInMinutes, normaliseTo24hSlot } from "@/lib/services";
+import { Category, ServiceItem, ALL_15MIN_SLOTS, getServiceDurationMinutes, normaliseTo24hSlot } from "@/lib/services";
 import { 
   getServiceToggles, 
   isServiceActive, 
@@ -556,7 +556,7 @@ export function BookingModal() {
     if (!selectedDate || !selectedTime || !selectedService) return [];
 
     const startNew = timeToMinutes(selectedTime);
-    const durationNew = getDurationInMinutes(selectedService.duration);
+    const durationNew = getServiceDurationMinutes(selectedService);
     const endNew = startNew + durationNew;
 
     const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -625,7 +625,7 @@ export function BookingModal() {
           if (res.timeSlot) {
             const startRes = timeToMinutes(res.timeSlot);
             const resService = dynamicServices.find((s) => s.id === res.serviceId);
-            const durationRes = getDurationInMinutes(resService?.duration);
+            const durationRes = getServiceDurationMinutes(resService);
             const endRes = startRes + durationRes;
 
             if (startNew < endRes && startRes < endNew) {

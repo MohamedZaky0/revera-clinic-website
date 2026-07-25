@@ -160,7 +160,8 @@ API routes that query them.
 | ~~`origin`~~ | — | **DOES NOT EXIST.** Verified absent from the live dev database 2026-07-25, and created by no migration. `20260709154350_add_reservation_source.sql` adds `is_manual`, not `origin`, despite its filename. Row kept struck through so it is not silently re-added. |
 | `is_manual` | boolean | Default false — true when created by staff in admin rather than via public booking |
 | ~~`cancelled_reason`~~ | — | **DOES NOT EXIST.** Verified absent from the live dev database 2026-07-25, created by no migration, and referenced nowhere in `src/` outside these docs. Row kept struck through so it is not silently re-added. |
-| `doctor_name` | text | Assigned doctor name, nullable |
+| `doctor_name` | text | Assigned doctor name, nullable. **Denormalised snapshot** — kept deliberately so an invoice does not change when a provider row is later edited. Do not use it for attribution; use `provider_id`. |
+| `provider_id` | UUID | FK → providers.id ON DELETE SET NULL, nullable. **Added 2026-07-25** by `20260725180000_add_provider_id_and_duration_minutes.sql`. The durable doctor link. Resolved from `doctor_name` on create, approve and update; left NULL when the name matches no provider or more than one, since a wrong link misattributes cost silently. Indexed. See RISK-015. |
 | `amount_paid` | numeric | Default 0 |
 | `amount_left` | numeric | nullable |
 | `branch_id` | UUID | FK → branches.id, nullable |
@@ -202,7 +203,8 @@ read-only `/api/availability`. An admin can double-book a doctor from the panel.
 | `unit` | text | 'session', etc. |
 | `price` | numeric | Default 0 |
 | `sort_order` | integer | |
-| `duration` | text | e.g., '1:00 Hours', '30 mins' |
+| `duration` | text | **Legacy free text**, e.g. '1:00 Hours', '30 mins'. No constraint, no write-side validation. Kept for back-compat; prefer `duration_minutes`. |
+| `duration_minutes` | integer | nullable, CHECK `> 0 AND <= 1440`. **Added 2026-07-25** by `20260725180000_add_provider_id_and_duration_minutes.sql`, backfilled by parsing `duration`. Read it via `getServiceDurationMinutes()` in `src/lib/services.ts`, which prefers this and falls back to parsing the text. Left NULL where the text was absent or unparseable — a NULL is visible, a wrong number is not. |
 | `description_en` | text | nullable |
 | `description_ar` | text | nullable |
 | `is_shared` | boolean | Default false |
