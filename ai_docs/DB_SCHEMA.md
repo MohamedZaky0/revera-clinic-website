@@ -421,10 +421,9 @@ separate from `hr_payroll`.
 Unique constraint on `(provider_id, month)`. Confirmed wired to real reads/writes via
 `/api/hr/doctor-payroll`.
 
-**RLS corrected 2026-07-25:** this migration disables RLS at `:26`, but
-`20260722140000_enable_row_level_security.sql` later re-enables it for every public table. RLS is
-**on** with **no policies** — service-role-only. Re-running the older file would silently turn it
-back off (RISK-019).
+**RLS verified 2026-07-25:** RLS is **off** on this table in the live dev database, matching this
+migration's `DISABLE` at `:26`. The later `20260722140000_enable_row_level_security.sql` has not
+been applied (RISK-020).
 
 **Caution:** rows here are not an immutable ledger. `PATCH /api/hr/doctor-payroll:258-315`
 recomputes `completed_services_count`, `total_commission_earned` and `net_salary` on **any** patch,
@@ -779,17 +778,18 @@ the table is empty. Previously (2026-07-21 to 2026-07-25) POST/PATCH only wrote
 - Persistent patient records are stored in the `customers` table, and connected to `reservations` via `customer_id`.
 - No `staff` table. Providers are stored with minimal fields (name, services list, rating) plus payroll/schedule fields added later.
 - No `shifts` or `availability` table for providers. Availability is calculated by scanning reservations.
-- **RLS — corrected 2026-07-25.** The previous claim that "most tables have RLS disabled" is wrong.
-  `supabase/migrations/20260722140000_enable_row_level_security.sql:11` loops every table in
-  `pg_tables` where `schemaname='public'` and enables RLS unconditionally. **All 28 tables have RLS
-  on.** A subset (`roles`, `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`,
-  `inventory_*`, `product_sales`) additionally has permissive "allow all" policies — functionally
-  open, since those policies don't restrict by role. The other **15 tables have RLS on and zero
-  policies**, making them service-role-only: `branches`, `categories`, `services`, `providers`,
-  `provider_attendance`, `customers`, `reservations`, `rooms`, `service_rooms`, `page_settings`,
-  `doctor_payroll`, `provider_schedule_audit_logs`, `medical_records`, `medical_reports`,
-  `customer_product_balances`. See RISK-019 for two hazards this creates for new tables and for
-  re-running older migrations.
+- **RLS — verified against the live dev database 2026-07-25.** RLS is **disabled** on `branches`,
+  `categories`, `customers`, `page_settings`, `provider_attendance`, `providers`, `reservations`,
+  `rooms`, `service_rooms`, `services`, `doctor_payroll`, `provider_schedule_audit_logs`.
+  It is **enabled** (with permissive "allow all" policies, so functionally open) on `roles`,
+  `employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_products`,
+  `inventory_devices`, `product_sales`, `device_maintenance_history`, `admin_roles`.
+
+  **`supabase/migrations/20260722140000_enable_row_level_security.sql` has NOT been applied.**
+  It would enable RLS on every public table; the live database shows otherwise. An earlier edit to
+  this file on 2026-07-25 claimed "all 28 tables have RLS on" — that was inferred from reading the
+  migration file rather than measured, and was wrong. Do not infer applied state from the presence
+  of a migration file in this repo; see RISK-020.
 - `reservations.branch_id` is nullable — reservations without a branch are treated as "no branch" and are filtered separately.
 - `reservations.date` is stored as `text`, not a native `date` column.
 - Still genuinely mock UI (no table exists): consultation notes, treatment plans, before/after photos, Finances Dashboard aggregate reporting, Refunds, Shipping. See `PROJECT.md` and `RISKS.md` RISK-005 for the current, corrected list.

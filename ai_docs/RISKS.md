@@ -2,8 +2,12 @@
 
 > **Last Updated:** 2026-07-25
 > **Previous content was for a different project — discarded entirely**
-> RISK-010 … RISK-019 were found by the 2026-07-25 finance discovery audit and are the
+> RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
+>
+> **RISK-020 is the one to read first.** The `supabase/migrations/` folder does not describe any
+> live database, and the two databases in use have diverged. Verify schema against the live DB
+> before relying on any statement in `DB_SCHEMA.md`, including the ones marked "verified".
 
 ---
 
@@ -428,32 +432,85 @@ so it cannot currently express "admins may not see finance" without being change
 
 ---
 
-## RISK-019: RLS Is Enabled With Zero Policies On 15 Tables, And Can Be Silently Re-Disabled
+## RISK-019: RLS Is Off On The Patient-Data Tables
 
-**Severity:** Medium · **Type:** Security / Availability
-**Found:** 2026-07-25
+**Severity:** Medium · **Type:** Security
+**Found:** 2026-07-25 · **Verified against the live dev database**
 
-`20260722140000_enable_row_level_security.sql:11` loops every `public` table and enables RLS
-unconditionally. 15 tables now have RLS on and **no policies at all** — `branches`, `categories`,
-`services`, `providers`, `provider_attendance`, `customers`, `reservations`, `rooms`,
-`service_rooms`, `page_settings`, `doctor_payroll`, `provider_schedule_audit_logs`,
-`medical_records`, `medical_reports`, `customer_product_balances`. They are service-role-only.
+RLS is **disabled** on `reservations`, `customers`, `services`, `providers`, `branches`,
+`categories`, `page_settings`, `provider_attendance`, `rooms`, `service_rooms`, `doctor_payroll`,
+`provider_schedule_audit_logs` — i.e. on the tables holding patient identities, bookings and
+doctor pay. It is enabled, but with permissive "allow all" policies, on `roles`,
+`employee_accounts`, `hr_*`, `employee_notes`, `prescriptions`, `inventory_*`, `product_sales`,
+`device_maintenance_history`, `admin_roles`. Neither state provides real row-level protection.
 
-This is invisible today because no code path uses the anon client, but any new route reaching for
-the anon key will silently return `[]` with no error.
+`20260722140000_enable_row_level_security.sql` would fix the first group — **it has never been
+applied** (RISK-020).
 
-**Two hazards for new work:**
-- The migration is a one-shot `DO` block, not a trigger. A table created **after** it has RLS
+**Hazards for new work:**
+- That migration is a one-shot `DO` block, not a trigger. Any table created after it runs has RLS
   **off** unless its own migration enables it explicitly (the 20260725120000 backfill does this by
   hand at `:77-79`). A finance migration must do the same.
 - `supabase/migrations/README.md` instructs operators to re-run scripts in filename order.
-  Re-running `20260715202003_add_provider_payroll.sql:26` (`ALTER TABLE doctor_payroll DISABLE ROW
-  LEVEL SECURITY`) **after** the enable migration silently turns RLS back off. Same class of hazard
-  for the `DISABLE` statements throughout `full_migration.sql`.
+  Re-running `20260715202003_add_provider_payroll.sql:26`
+  (`ALTER TABLE doctor_payroll DISABLE ROW LEVEL SECURITY`) after the enable migration would
+  silently turn RLS back off. Same hazard for the `DISABLE` statements throughout
+  `full_migration.sql`.
+- `20260705141244_setup_supabase_schema.sql` sorts **after** `..._141242_full_migration.sql` but is
+  an older, narrower version of the same schema. Harmless only because everything is
+  `IF NOT EXISTS`. Treat `full_migration.sql` as authoritative.
 
-Also note `20260705141244_setup_supabase_schema.sql` sorts **after** `..._141242_full_migration.sql`
-but is an older, narrower version of the same schema. It is harmless only because everything is
-`IF NOT EXISTS`. Treat `full_migration.sql` as authoritative; do not use `141244` as a reference.
+---
+
+## RISK-020: Migrations Are Not Tracked As Applied, And Two Databases Have Diverged
+
+**Severity:** Critical · **Type:** Operational / Data integrity
+**Found:** 2026-07-25 · **Verified by querying both live databases**
+
+There is no migration state tracking. `supabase/migrations/README.md` instructs operators to paste
+SQL by hand into the Supabase SQL Editor, so whether a migration ran depends on someone remembering.
+There is no Supabase CLI in this repo (no `config.toml`, no local stack), so `supabase db push`,
+generated types and automated rollback are all unavailable.
+
+**The result: a file existing in `supabase/migrations/` proves nothing about any database.**
+Two Supabase projects are in use and their schemas have diverged badly.
+
+| | dev/test DB | main DB |
+|---|---|---|
+| Tables | 26 | 19 |
+| Schema current through | ~2026-07-20 | **~2026-07-05** |
+
+**Absent from the dev DB** (the 2026-07-25 backfill migration was committed in `237dbec` but never
+run): `medical_records`, `medical_reports`, `customer_product_balances`.
+
+**Absent from the main DB** — 8 tables the application code actively reads and writes:
+`prescriptions`, `doctor_payroll`, `employee_notes`, `provider_schedule_audit_logs`,
+`inventory_products`, `product_sales`, `inventory_devices`, `device_maintenance_history`.
+
+`reservations` on the main DB is also missing three columns the code writes to — `service_ids`,
+`created_by_employee_id`, `is_manual` — so on that database multi-service bookings cannot be
+persisted and employee revenue attribution is silently dropped. Its `date` column is a real `date`
+type there, not the `text` the migrations declare, which is further evidence the two databases were
+built by different paths.
+
+**This class of failure stayed hidden because the code swallows it.**
+`src/app/api/reservations/route.ts:274-305` retries a failed insert after deleting
+`created_by_employee_id`, then retries again after also deleting `doctor_name`, then reports
+success. A missing column produces a booking with silently dropped attribution and no error
+anywhere.
+
+**Undocumented tables found in the live databases, created by no migration and absent from this
+file:** `admin_roles` (both databases) and `employees` (main only).
+
+**Required before any Finance work:**
+1. Establish which database is authoritative for production patient data.
+2. Take a full live-schema snapshot of each and reconcile it against `supabase/migrations/`.
+3. Adopt migration state tracking — at minimum a `schema_migrations` table recording applied
+   filenames, ideally the Supabase CLI.
+4. Remove the silent-fallback insert chain in `reservations/route.ts`; let schema errors surface.
+
+A finance module built on the assumption that the migrations folder describes the live database
+would be built on a false premise.
 
 ---
 
