@@ -1065,6 +1065,120 @@ Unique `(service_id, product_id)`. Product-role eligibility is validated in the 
 
 Unique `(service_id, device_id)`. Checkout adds `lamp_replacement_cost / max_pulses_limit × pulses_per_session` to the invoice line COGS snapshot.
 
+## Phase 3 — Overheads, Assets, Liabilities (PROPOSAL-002)
+
+**Added 2026-07-26 (tasks 3.1–3.7).** Schema-only — no library or endpoint reads/writes these
+tables yet (tasks 3.8–3.13 remain `TODO`). All seven tables live-verified on dev: every `CHECK`
+constraint rejects the invalid value it names, every `ON DELETE` behavior (`RESTRICT`/`SET NULL`/
+`CASCADE`) fires exactly as designed, and the `expenses.recurring_id` FK deferred in task 3.2 was
+confirmed to actually exist by deleting a `recurring_expenses` row and observing the referencing
+`expenses` row's `recurring_id` become `NULL`.
+
+### `expense_categories`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `name` | text | NOT NULL |
+| `kind` | text | CHECK IN (`'fixed'`, `'variable'`) — every row created under `expenses`/`recurring_expenses` is fixed overhead by construction of this module's scope (DEC-015); `kind` keeps the category tree self-describing rather than expressing a distinction enforced elsewhere |
+| `parent_id` | UUID | Self-FK → expense_categories.id ON DELETE SET NULL, nullable — lets e.g. "Utilities" have children "Electricity"/"Water" without a second table |
+| `created_at` | timestamptz | Default now() |
+
+### `expenses`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `category_id` | UUID | FK → expense_categories.id **ON DELETE RESTRICT** — deliberately not `SET NULL` like most FKs in this schema, so deleting a category that still has expenses against it fails loudly instead of silently stripping rows out of every category-grouped report |
+| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable |
+| `incurred_on` | date | NOT NULL |
+| `amount` | numeric | CHECK `> 0` |
+| `vendor` | text | nullable |
+| `note` | text | nullable |
+| `recurring_id` | UUID | FK → recurring_expenses.id ON DELETE SET NULL, nullable — added by `20260726170200_create_recurring_expenses.sql` since that table didn't exist when `expenses` was created; live-verified as an enforced FK, not just a bare column |
+| `is_opening` | boolean | Default false — DEC-024's opening-balance flag (prepaid/accrued expenses at go-live) |
+| `created_at` | timestamptz | Default now() |
+
+### `recurring_expenses`
+
+Template table for indefinitely-recurring costs (rent, utilities, software licenses —
+PROPOSALS.md setup-data item 2), separate from the dated `expenses` rows a future "generate due"
+step (task 3.10) will create from it — the same definition-table/instance-table split
+`packages`/`customer_packages` already uses.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `category_id` | UUID | FK → expense_categories.id ON DELETE RESTRICT |
+| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable |
+| `amount` | numeric | CHECK `> 0` |
+| `cadence` | text | CHECK IN (`'monthly'`, `'quarterly'`, `'yearly'`) |
+| `next_due_on` | date | NOT NULL |
+| `active` | boolean | Default true |
+| `created_at` | timestamptz | Default now() |
+
+### `fixed_assets`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable |
+| `category` | text | CHECK IN (`'furniture'`, `'medical_device'`, `'it'`, `'leasehold_improvement'`) — DEC-017's fixed, product-defined list, unlike `expense_categories`' free-form tree |
+| `name` | text | NOT NULL |
+| `purchased_on` | date | NOT NULL |
+| `cost` | numeric | CHECK `>= 0` — the asset's purchase cost, **distinct from** `inventory_devices.lamp_replacement_cost` (task 2.7): this is what the whole device cost to buy, that is what its consumable lamp costs to replace. Do not conflate the two |
+| `useful_life_months` | integer | CHECK `> 0` |
+| `salvage_value` | numeric | Default 0 |
+| `status` | text | Default `'active'`, CHECK IN (`'active'`, `'disposed'`, `'fully_depreciated'`) |
+| `device_id` | text | FK → inventory_devices.id ON DELETE SET NULL, nullable — DEC-017: "a laser is simultaneously an operational device and a depreciating asset" |
+| `is_opening` | boolean | Default false — DEC-024: "assets with accumulated depreciation to date" |
+| `created_at` | timestamptz | Default now() |
+
+### `depreciation_entries`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `asset_id` | UUID | FK → fixed_assets.id ON DELETE CASCADE |
+| `period` | text | `'YYYY-MM'`, matching this schema's app-formatted-string-key convention |
+| `amount` | numeric | Default 0 — the amount posted for this period |
+| `book_value_after` | numeric | Default 0 — stored, not recomputed on read, so a report never has to replay an asset's full depreciation history to answer "what is this worth today" |
+| `is_opening` | boolean | Default false |
+| `created_at` | timestamptz | Default now() |
+
+Unique `(asset_id, period)` — makes double-posting the same asset's depreciation for the same
+month structurally impossible, not just discouraged.
+
+### `loans`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `lender` | text | NOT NULL |
+| `principal` | numeric | CHECK `> 0` — always the loan's **original** amount, even for an opening/pre-existing loan; DEC-024's "remaining balance, not original principal" requirement is expressed as the *first row* of that loan's `loan_schedule`, not a second column here |
+| `annual_rate` | numeric | Default 0 |
+| `term_months` | integer | CHECK `> 0` |
+| `started_on` | date | NOT NULL |
+| `installment` | numeric | Default 0 |
+| `is_opening` | boolean | Default false |
+| `created_at` | timestamptz | Default now() |
+
+### `loan_schedule`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `loan_id` | UUID | FK → loans.id ON DELETE CASCADE |
+| `period` | text | `'YYYY-MM'` |
+| `installment` | numeric | Default 0 |
+| `interest_part` | numeric | Default 0 — the real P&L expense |
+| `principal_part` | numeric | Default 0 — a balance-sheet movement (the liability shrinking), **not** an expense; reporting the whole `installment` as a cost would overstate expenses every month a loan is paid down |
+| `balance_after` | numeric | Default 0 |
+| `is_opening` | boolean | Default false |
+| `created_at` | timestamptz | Default now() |
+
+Unique `(loan_id, period)`.
+
 ## Notes on Schema Gaps
 
 - Persistent patient records are stored in the `customers` table, and connected to `reservations` via `customer_id`.

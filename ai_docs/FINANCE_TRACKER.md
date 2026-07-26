@@ -1936,13 +1936,13 @@ commission-from-snapshots, the `completed`-only status-filter narrowing).
 
 | ID | Task | Depends on | Status | Owner | Commit |
 |---|---|---|---|---|---|
-| 3.1 | Migration: `expense_categories` table | — | `TODO` | — | — |
-| 3.2 | Migration: `expenses` table | 3.1 | `TODO` | — | — |
-| 3.3 | Migration: `recurring_expenses` table | 3.1 | `TODO` | — | — |
-| 3.4 | Migration: `fixed_assets` table | — | `TODO` | — | — |
-| 3.5 | Migration: `depreciation_entries` table | 3.4 | `TODO` | — | — |
-| 3.6 | Migration: `loans` table | — | `TODO` | — | — |
-| 3.7 | Migration: `loan_schedule` table | 3.6 | `TODO` | — | — |
+| 3.1 | Migration: `expense_categories` table | — | `DONE` | Claude | `20260726170000`, live-verified |
+| 3.2 | Migration: `expenses` table | 3.1 | `DONE` | Claude | `20260726170100`, live-verified |
+| 3.3 | Migration: `recurring_expenses` table | 3.1 | `DONE` | Claude | `20260726170200`, live-verified |
+| 3.4 | Migration: `fixed_assets` table | — | `DONE` | Claude | `20260726170300`, live-verified |
+| 3.5 | Migration: `depreciation_entries` table | 3.4 | `DONE` | Claude | `20260726170400`, live-verified |
+| 3.6 | Migration: `loans` table | — | `DONE` | Claude | `20260726170500`, live-verified |
+| 3.7 | Migration: `loan_schedule` table | 3.6 | `DONE` | Claude | `20260726170600`, live-verified |
 | 3.8 | Library: `src/lib/depreciation.ts` — straight-line depreciation + loan amortization (pure functions) | 3.4–3.7 (schema shape only) | `TODO` | — | — |
 | 3.9 | Regression checks for 3.8 | 3.8 | `TODO` | — | — |
 | 3.10 | New endpoints: expenses CRUD + recurring-expense generation | 3.1–3.3 | `TODO` | — | — |
@@ -2235,6 +2235,23 @@ month it is paying down a loan.
 (plus the deferred FK from 3.3) added and nothing else; re-run every prior phase's `scratch/*.ts`
 regression scripts to confirm nothing upstream was disturbed — same verify pattern as tasks 1.6
 and the 2.1–2.8 group verify.
+
+**DONE, live-verified 2026-07-26.** All 7 migrations (`20260726170000`–`20260726170600`) applied
+to linked dev via `supabase db push --linked`; `supabase migration list --linked` shows local and
+remote matching exactly through `20260726170600`. Every `CHECK` constraint tested directly and
+confirmed to reject its invalid value (`expense_categories.kind`, `expenses.amount`,
+`recurring_expenses.cadence`, `fixed_assets.category`, `loans.principal`); every `ON DELETE`
+behavior confirmed by direct test — `expense_categories.parent_id` and `expenses.recurring_id`
+both correctly `SET NULL`, `expenses.category_id` correctly `RESTRICT`s (blocks the delete),
+`depreciation_entries`/`loan_schedule` both correctly `CASCADE` when their parent
+asset/loan is deleted; both `UNIQUE (asset_id, period)` and `UNIQUE (loan_id, period)` confirmed to
+reject a duplicate post. **Most importantly, the deferred `expenses.recurring_id` FK backfill
+(task 3.3) was confirmed to actually exist**, not just assumed from reading the migration file —
+deleting a `recurring_expenses` row and observing the referencing `expenses` row's `recurring_id`
+become `NULL` is the only way to prove a deferred FK constraint landed, exactly per this file's own
+standing rule ("never state applied state you have not measured"). All test fixtures cleaned up;
+zero residual rows in any of the 7 tables. **Schema only — no library or endpoint exists yet**
+(tasks 3.8–3.13 remain `TODO`).
 
 ---
 
