@@ -197,7 +197,7 @@ Updates a reservation. Supports three modes:
 
 **Generic update (includes checkout/wallet adjustments):** `{ status?, notes?, doctorName?, sessionType?, amountPaid?, amountLeft?, walletDeposit?, walletWithdrawal? }`
 - Requires a staff bearer token and updates any combination of those fields
-- Transitioning to status `'completed'` triggers patient balance ledger calculations
+- Transitioning to status `'completed'` triggers patient balance ledger calculations and an additive invoice, invoice-line, and payment write; the pre-existing reservation and customer balance updates remain unchanged
 
 **Public deposit self-report exception:** A booking in `pending_deposit` may be updated without a
 staff token only with `{ status: "pending", amountPaid, amountLeft, notes? }`. This supports the
@@ -223,6 +223,40 @@ For each date: counts approved bookings, calculates whether at least one contigu
 of free 15-minute slots exists to fit the service's duration. Uses branch-specific service hours if available.
 
 **Response:** Array of `{ date, approvedCount, approvedSlots, isAvailable }`
+
+---
+
+## GET /api/inventory/products/sales
+
+Requires a staff bearer token. Returns product-sale history.
+
+**Response:** `{ success: true, sales: ProductSaleRecord[] }`
+
+---
+
+## POST /api/inventory/products/sales
+
+Requires a staff bearer token. Records a retail product sale, deducts stock, and updates the existing customer spend scalar.
+
+**Body:** `{ product_id, product_name?, product_sku?, customer_id, customer_name?, customer_mobile?, customer_email?, quantity, unit_price?, total_amount?, branch_name?, sold_by?, payment_method?, notes? }`
+
+Required: `product_id`, `customer_id`, and positive `quantity`.
+
+After a successful native `product_sales` insert, the route additively attempts to create one issued product invoice, invoice line, and payment row. A ledger-write failure is logged and does not roll back or fail the established POS sale path.
+
+**Response:** `{ success: true, sale: ProductSaleRecord, sales: ProductSaleRecord[] }`
+
+---
+
+## POST /api/packages/sell
+
+Requires a staff bearer token. Sells an active package to an existing customer.
+
+**Body:** `{ customerId, packageId, branchId? }`
+
+The requested branch must match the package's branch when the package is branch-restricted. The route creates an issued package invoice, one package invoice line, one cash payment, a `customer_packages` entitlement expiring after the package's `validity_days`, and one `customer_package_items` entitlement per configured package item.
+
+**Response:** `{ invoice, customerPackage, packageItems }`, status 201.
 
 ---
 

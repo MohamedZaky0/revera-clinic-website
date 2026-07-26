@@ -507,6 +507,11 @@ routes:**
 5. New tables must **explicitly enable RLS** in their own migration. The blanket enable migration
    is a one-shot `DO` block, not a trigger, and has not been applied anyway.
 6. Update this file in the same commit as the change it describes.
+7. **Update the matching manual-test checklist in the same commit as every micro-task.** Use
+   `FINANCE_PHASE_1_MANUAL_TESTS.md`, `FINANCE_PHASE_2_MANUAL_TESTS.md`,
+   `FINANCE_PHASE_3_MANUAL_TESTS.md`, `FINANCE_PHASE_4_MANUAL_TESTS.md`, or
+   `FINANCE_PHASE_5_MANUAL_TESTS.md`; record the test date, environment, IDs/fixture, and result
+   after each manual verification. A phase is not fully tested until its checklist is complete.
 
 ---
 
@@ -585,9 +590,9 @@ routes:**
 | 1.7 | Library: `src/lib/ledger.ts` — invoice/line/payment builders (pure functions) | 1.1–1.4 (schema shape only, no runtime dependency) | `DONE` | Claude | `see 1.7-1.9 below` |
 | 1.8 | Library: `src/lib/packages.ts` — deferred-revenue recognition math (pure functions) | 1.5, 1.6 (schema shape only) | `DONE` | Claude | `see 1.7-1.9 below` |
 | 1.9 | Regression checks for 1.7 and 1.8 | 1.7, 1.8 | `DONE` | Claude | `see 1.7-1.9 below` |
-| 1.10 | Wire booking checkout (`PATCH /api/reservations`, `status: 'completed'`) to dual-write an invoice | 1.1–1.4, 1.7 | `WIP` — code written, statically verified, **not exercised against a live checkout** | Claude | `see 1.10 below` |
-| 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `TODO` — not started | — | — |
-| 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `TODO` | — | — |
+| 1.10 | Wire booking checkout (`PATCH /api/reservations`, `status: 'completed'`) to dual-write an invoice | 1.1–1.4, 1.7 | `DONE` | Claude | `aed3793` |
+| 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `WIP` — code written; pending live POS verification | Claude | — |
+| 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `WIP` — code written; pending live package-sale verification | Claude | — | — |
 | 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `TODO` | — | — |
 | 1.14 | `src/lib/customerBalances.ts` — derive `outstanding`/`spent_amount`/`wallet_balance` from the ledger + reconciliation endpoint | 1.1–1.4, 1.10, 1.11 | `TODO` | — | — |
 | 1.15 | Opening-balance import (DEC-024) | 1.1, 1.3, 1.4, 1.6 | `TODO` | — | — |
@@ -937,16 +942,18 @@ regresses.
 - `npx tsc --noEmit` clean, `npx eslint` clean, and all five `scratch/*.ts` regression scripts
   (`pricecheck`, `billingcheck`, `identitycheck`, `phase1ledgercheck`, `phase1packagecheck`)
   still pass — these test the pure functions this code calls, not this route in isolation.
+- **Live dev checkout verified 2026-07-26:** completing reservation
+  `2e03f8ea-e88d-4923-8b1c-5a27e0efeb3d` created issued invoice `INV-000001`, two service lines
+  (`100 + 120 = 220`), and one cash payment of `100`. The post-checkout reservation reports
+  `amount_paid = 100` and the customer reports `spent_amount = 100`; together with the separate
+  settlement and ledger-write paths in the handler, this confirms the ledger write did not replace
+  the existing settlement path.
 
-**NOT done — this is why the row is `WIP`, not `DONE`:**
-- **Never exercised against the live checkout flow.** No test runner exists in this project and
-  this environment cannot click through the admin panel in a browser. Nobody has confirmed that
-  completing a real booking actually produces a correct `invoices` + `invoice_lines` + `payments`
-  row in the dev database, or that `reservations.amount_paid` / `customers.spent_amount` are
-  unchanged from before this task — which is the entire point of "dual-write, additive only."
-  **Do this before marking 1.10 `DONE`:** complete a real booking checkout (or as close to
-  end-to-end as available tooling allows) and verify both halves — the ledger rows exist AND the
-  pre-existing values are untouched.
+**Follow-up observations (do not block completion):**
+- The verified booking's legacy `amount_left = 900` and customer `outstanding = 1860` do not match
+  its new ledger-derived unpaid amount (`220 − 100 = 120`). This is an expected two-sources-of-truth
+  observation before task 1.14's cutover, not a reason to mutate the old scalars here; retain it as
+  reconciliation evidence for 1.14.
 - `received_by_employee_id` on both the initial payment and the later-payment path is currently
   always `null` — the PATCH body carries no "who is processing this checkout" field today
   (`createdByEmployeeId` is a different thing, the booking's original creator). Attributing
@@ -987,37 +994,46 @@ behavior — this task must be provably zero-regression on the existing path.
 
 ---
 
-## 1.11 — Wire POS sale to dual-write an invoice
+## 1.11 — Wire POS sale to dual-write an invoice — WIP, needs live verification
+
+**Done:** `POST /api/inventory/products/sales` now writes an issued invoice, one product line, and
+one payment row after the native `product_sales` insert succeeds. It uses the authenticated staff
+member's `employee_accounts.id` for `received_by_employee_id`, resolves `branch_name` to the
+optional branch UUID, and maps the existing POS payment method into the payments-table enum. The
+invoice write is additive and best-effort: the established product-sale, stock-deduction, and
+`addToCustomerSpend` paths continue unchanged if it fails. `API_CONTRACT.md` documents the side
+effect.
+
+**Not done:** it has not been exercised against a live POS sale. Do not mark this task `DONE` until
+a staff sale produces matching `product_sales`, `invoices`, `invoice_lines`, and `payments` rows,
+and stock/customer-spend behavior is confirmed unchanged.
 
 **Depends on 1.1–1.4, 1.7.** **Where:** `src/app/api/inventory/products/sales/route.ts`, the
 `POST` handler, after the existing `product_sales` insert (`mapSaleToDbRow`/`insertedDb`).
 
-**What:** same dual-write pattern as 1.10 — one invoice, one `line_type: 'product'` line, one
-payment row per POS sale — additive, does not touch the existing `product_sales` write or the
-`addToCustomerSpend` call from task 0.6/RISK-016.
-
-**Update `API_CONTRACT.md`:** note the side effect, same as 1.10.
-
-**Verify:** same standard as 1.10 — a POS sale still behaves exactly as after task 0.6, plus now
-also produces a ledger row.
+**Verify:** run a real POS sale against dev and confirm the additive ledger rows use the expected
+product, quantity, unit price, customer, optional branch, payment method, and receiving employee.
 
 ---
 
-## 1.12 — New endpoint: sell a package
+## 1.12 — New endpoint: sell a package — WIP, needs live verification
 
-**Depends on 1.5, 1.6, 1.8.** **Where:** new `src/app/api/packages/sell/route.ts` (or fold into
-an existing customer/POS route if that reads more naturally once you're looking at the actual
-call sites — use judgement, but document the choice in `API_CONTRACT.md` either way).
+**Done:** `POST /api/packages/sell` is staff-only and accepts `customerId`, `packageId`, and an
+optional `branchId`. It validates the active package, customer, package-item quantities, and any
+branch restriction; creates the package invoice, line, payment, package entitlement, and one
+entitlement item per configured package service. It derives invoice totals from the configured
+package price/tax rate and sets package expiry from `validity_days`. The endpoint cleans up its
+newly-created package/invoice records when a later write fails. `API_CONTRACT.md` documents the
+request and response.
 
-**What:** `POST` body: `customerId`, `packageId`, `branchId?`. Creates: an `invoice` +
-`invoice_line` (`line_type: 'package'`) for the sale, a `payments` row, a `customer_packages` row
-(`price_paid`, `expires_at = now() + validity_days`), and one `customer_package_items` row per
-`package_items` entry (`qty_total = qty_remaining = package_items.qty`, `qty_used = 0`).
+**Not done:** it has not been exercised against a live package sale. Do not mark this task `DONE`
+until one sale creates the expected invoice, payment, customer-package, and entitlement-item rows,
+with the configured branch restriction and expiry verified.
+
+**Depends on 1.5, 1.6, 1.8.** **Where:** `src/app/api/packages/sell/route.ts`.
+
 **Books cash received, not revenue** — the invoice line's `line_total` is the sale amount, but
 per DEC-023 no portion of it is "earned" yet; that only happens in 1.13, per session delivered.
-
-**Update `DB_SCHEMA.md`:** none. **Update `API_CONTRACT.md`:** document the new endpoint fully
-(request/response shape), matching the existing style in that file for other endpoints.
 
 ---
 

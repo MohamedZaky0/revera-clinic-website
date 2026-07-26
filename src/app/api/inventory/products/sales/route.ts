@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { deductInventoryStock } from '@/app/api/inventory/products/route';
 import { requireStaffAccess } from '@/lib/access';
+import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
 
 export const dynamic = 'force-dynamic';
 
@@ -193,6 +194,92 @@ async function saveSalesData(payload: { sales: ProductSaleRecord[] }) {
     });
 }
 
+function toPaymentMethod(method?: string): 'cash' | 'card' | 'wallet' | 'instapay' | 'transfer' {
+  switch (method?.trim().toLowerCase()) {
+    case 'card':
+    case 'credit card':
+    case 'debit card':
+      return 'card';
+    case 'wallet':
+      return 'wallet';
+    case 'instapay':
+      return 'instapay';
+    case 'transfer':
+    case 'bank transfer':
+      return 'transfer';
+    default:
+      return 'cash';
+  }
+}
+
+async function resolveBranchId(branchName?: string): Promise<string | null> {
+  const normalizedName = branchName?.trim();
+  if (!normalizedName) return null;
+
+  const { data: englishMatch, error: englishError } = await supabaseServer
+    .from('branches')
+    .select('id')
+    .eq('name_en', normalizedName)
+    .maybeSingle();
+  if (englishError) throw englishError;
+  if (englishMatch) return englishMatch.id;
+
+  const { data: arabicMatch, error: arabicError } = await supabaseServer
+    .from('branches')
+    .select('id')
+    .eq('name_ar', normalizedName)
+    .maybeSingle();
+  if (arabicError) throw arabicError;
+  return arabicMatch?.id ?? null;
+}
+
+async function writePosSaleInvoice(sale: ProductSaleRecord, receivedByEmployeeId: string | null): Promise<void> {
+  const line = buildInvoiceLine({
+    lineType: 'product',
+    description: sale.product_name,
+    qty: sale.quantity,
+    unitPrice: sale.unit_price,
+    productId: sale.product_id,
+  });
+  const totals = buildInvoiceTotals([line]);
+  const branchId = await resolveBranchId(sale.branch_name);
+
+  const { data: seqValue, error: seqError } = await supabaseServer.rpc('next_invoice_no');
+  if (seqError) throw seqError;
+
+  const { data: invoice, error: invoiceError } = await supabaseServer
+    .from('invoices')
+    .insert({
+      invoice_no: formatInvoiceNo(Number(seqValue)),
+      customer_id: sale.customer_id,
+      branch_id: branchId,
+      subtotal: totals.subtotal,
+      discount_total: totals.discountTotal,
+      grand_total: totals.grandTotal,
+      status: 'issued',
+    })
+    .select('id')
+    .single();
+  if (invoiceError) throw invoiceError;
+
+  const { error: lineError } = await supabaseServer
+    .from('invoice_lines')
+    .insert({ ...line, invoice_id: invoice.id });
+  if (lineError) throw lineError;
+
+  if (sale.total_amount > 0) {
+    const { error: paymentError } = await supabaseServer
+      .from('payments')
+      .insert({
+        invoice_id: invoice.id,
+        amount: sale.total_amount,
+        method: toPaymentMethod(sale.payment_method),
+        received_by_employee_id: receivedByEmployeeId,
+      });
+    if (paymentError) throw paymentError;
+  }
+}
+
 export async function GET(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
@@ -270,6 +357,12 @@ export async function POST(req: Request) {
     await addToCustomerSpend(customer_id, newSale.total_amount);
 
     if (!dbInsertErr && insertedDb) {
+      try {
+        await writePosSaleInvoice(newSale, access.access.employee.id);
+      } catch (ledgerError) {
+        console.error('Failed to write POS sale invoice:', ledgerError);
+      }
+
       const allSales = await getStoredSalesData();
       return NextResponse.json({
         success: true,

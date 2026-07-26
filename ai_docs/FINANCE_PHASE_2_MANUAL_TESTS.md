@@ -1,0 +1,27 @@
+# Phase 2 Manual Test Checklist — Cost of Delivery
+
+> **Living document.** Update this checklist in the same commit as each 2.x task. Execute schema checks against linked dev, then record an evidence row before a task becomes `DONE`.
+
+## Evidence log
+
+| Date | Task | Environment | Evidence | Result |
+|---|---|---|---|---|
+
+## Per-task checklist
+
+- [ ] **2.1 Product role:** Verify existing products default to `retail`; reject any role outside `retail`, `consumable`, or `both`.
+- [ ] **2.2 Service consumables:** Create a service recipe; confirm duplicate service/product rows fail and deleting a service cleans up its recipe.
+- [ ] **2.3 Consumption entries:** Record standard and edited consumption; verify snapshots do not change when current product cost changes.
+- [ ] **2.4 Stock movements:** Insert `in` and `out` movements for each allowed reason; reject zero/negative quantities and invalid directions.
+- [ ] **2.5 Suppliers:** Create/edit/delete a supplier; verify purchase references retain their intended integrity behavior.
+- [ ] **2.6 Purchases and lines:** Record a supplier purchase with multiple lines; verify totals, due-date handling, and product references.
+- [ ] **2.7 Device lamp cost:** Set a replacement cost and validate the existing pulse-limit denominator is correct for a real device.
+- [ ] **2.8 Provider commission configuration:** Validate commission type/base constraints and reject invalid contract combinations.
+- [ ] **2.9 Costing library:** Run its regression script; hand-check recipe, pulse, and fixed/percentage commission scenarios.
+- [ ] **2.10 Regression suite:** Record all passing Phase 2 scratch checks.
+- [ ] **2.11 Checkout costing:** Complete a booking with a recipe and commission; verify consumption entries, stock movements, COGS snapshot, commission snapshot, and no duplicate legacy stock deduction.
+- [ ] **2.12 Stock cutover:** Reconcile every tested product's legacy stock with stock-movement sum before switching reads; verify sales, consumption, purchase, adjustment, and shrinkage all affect the derived value.
+- [ ] **2.13 Purchase endpoint:** POST a purchase; confirm purchase/lines, inbound movement, and weighted-average cost are correct with a hand calculation.
+- [ ] **2.14 Payroll provider link:** Rename a provider after completed sessions; verify payroll still attributes historic commission by `provider_id`.
+- [ ] **2.15 Device pulse costing:** Complete a device-backed service; confirm correct pulse deduction and cost snapshot, including a no-device service costing zero.
+- [ ] **2.16 Contract rollup:** Confirm every new route/side effect is documented and each completed row has evidence.
