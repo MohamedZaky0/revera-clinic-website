@@ -232,18 +232,20 @@ export function AuthModal() {
           const emailVal = session.user.email;
           let customer = null;
 
+          const authHeaders = { Authorization: `Bearer ${session.access_token}` };
+
           try {
             if (phone) {
               let localMobile = phone;
               if (phone.startsWith("+20")) {
                 localMobile = "0" + phone.slice(3);
               }
-              const res = await fetch(`/api/customers?mobile=${localMobile}`);
+              const res = await fetch(`/api/customers?mobile=${localMobile}`, { headers: authHeaders });
               if (res.ok) customer = await res.json();
             }
 
             if (!customer && emailVal) {
-              const res = await fetch(`/api/customers?email=${emailVal}`);
+              const res = await fetch(`/api/customers?email=${emailVal}`, { headers: authHeaders });
               if (res.ok) customer = await res.json();
             }
 
@@ -362,8 +364,9 @@ export function AuthModal() {
       return;
     }
 
+    let verifiedAccessToken: string | undefined;
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      const { data, error } = await supabase.auth.verifyOtp({
         phone: e164Phone,
         token: otp,
         type: "sms",
@@ -374,6 +377,7 @@ export function AuthModal() {
         return;
       }
       verifiedSuccess = true;
+      verifiedAccessToken = data.session?.access_token;
     } catch (err: any) {
       setOtpError(err.message || "Verification failed. Please try again.");
       setVerifying(false);
@@ -385,7 +389,9 @@ export function AuthModal() {
         sessionStorage.setItem("customer_login_in_progress", "true");
       }
       try {
-        const res = await fetch(`/api/customers?mobile=${localPhone}`);
+        const res = await fetch(`/api/customers?mobile=${localPhone}`, {
+          headers: verifiedAccessToken ? { Authorization: `Bearer ${verifiedAccessToken}` } : {}
+        });
         if (res.ok) {
           const customer = await res.json();
           if (customer) {
@@ -492,7 +498,9 @@ export function AuthModal() {
           return;
         }
 
-        const res = await fetch(`/api/customers?email=${emailInput}`);
+        const res = await fetch(`/api/customers?email=${emailInput}`, {
+          headers: data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}
+        });
         if (res.ok) {
           const customer = await res.json();
           if (customer) {
@@ -566,9 +574,15 @@ export function AuthModal() {
     };
 
     try {
+      const { data: sessionData } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
       const res = await fetch("/api/customers", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(sessionData.session?.access_token
+            ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+            : {})
+        },
         body: JSON.stringify(payload),
       });
 

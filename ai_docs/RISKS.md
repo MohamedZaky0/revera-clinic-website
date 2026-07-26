@@ -468,19 +468,37 @@ Notable traps inside it:
 
 ## RISK-018: The Money-Mutating API Routes Are Unauthenticated
 
-**Severity:** High → Medium · **Type:** Security
-**Found:** 2026-07-25 · **PARTIALLY resolved through 2026-07-26** — see
-`FINANCE_TRACKER.md` 0.10 for the remaining scope.
+**Severity:** High → Low · **Type:** Security
+**Found:** 2026-07-25 · **RESOLVED 2026-07-26** — see `FINANCE_TRACKER.md` 0.10 for the full
+per-route breakdown and every verification step.
 
-**Fixed:** `DELETE /api/reservations` now requires admin; `POST /api/inventory/products/sales`
-now requires staff, with both real callers updated to send an auth header. `PATCH /api/reservations`
-now requires staff for every approval, rejection, checkout, lifecycle, note, or booking-edit action;
-the only unauthenticated exception is the strictly shaped public deposit self-report for a
-`pending_deposit` booking.
+**Fixed:**
+- `DELETE /api/reservations` → admin-only.
+- `PATCH /api/reservations` → staff-only for every approval, rejection, checkout, lifecycle, note
+  or booking-edit action; the only unauthenticated exception is the strictly shaped public deposit
+  self-report for a `pending_deposit` booking (a body containing exactly
+  `{status, amountPaid, amountLeft, notes}`), which is the one legitimate anonymous write this
+  route must keep accepting (RISK-003 — patients have no separate login).
+- `POST /api/inventory/products/sales`, all of `/api/inventory/products`,
+  `/api/inventory/devices` (+ `reset-pulses`), and `/api/customers/products` → staff-only.
+  Verified no patient-facing caller exists for any of these.
+- **`/api/customers` GET/POST → authenticated with per-identity scoping, not a blanket staff
+  gate.** Patients call this route directly for OTP login and profile self-service, so it needed
+  scoping rather than a lockout. A patient caller may only read or write **their own** record —
+  enforced by `isOwnIdentity()` in `src/lib/customerIdentity.ts`, using the new
+  `customers.auth_user_id` link where present and falling back to normalized phone / email for
+  rows that predate it. Without this, a caller who was merely "any authenticated user" could read
+  or overwrite another patient's profile by guessing a mobile number — an IDOR that a naive fix
+  would have introduced. Financial fields (`spent_amount`, `outstanding`, `wallet_balance`) are
+  never patient-writable regardless of request body content. `DELETE /api/customers` stays
+  admin-only.
+- **A real near-miss during this fix, worth recording:** an earlier attempt in the same session
+  gated `/api/customers` GET/POST behind a blanket `requireStaffAccess` with no caller updates —
+  which would have 403'd every patient login and registration had it shipped. Caught by checking
+  actual caller code before trusting the change, not by assumption.
 
-**Still open:** `/api/customers` cannot be staff-gated wholesale because patients call it for OTP
-login and self-service; it needs per-field/identity scoping. The inventory and customer-product
-routes still need their own authorization review.
+Regression checks: `npx tsx scratch/identitycheck.ts` (10 cases incl. the IDOR case),
+plus `scratch/pricecheck.ts` and `scratch/billingcheck.ts` still passing.
 
 Original diagnosis below.
 

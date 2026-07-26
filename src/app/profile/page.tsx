@@ -7,6 +7,19 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { supabase } from "@/lib/supabaseClient";
+
+/**
+ * GET/POST /api/customers requires an authenticated caller (staff or the patient's own
+ * Supabase Auth session — RISK-018 / FINANCE_TRACKER 0.10). This page has no live
+ * onAuthStateChange listener; `getSession()` reads the session the `supabase` client already
+ * persisted from AuthModal's login flow.
+ */
+async function authHeaders(): Promise<Record<string, string>> {
+  if (!supabase) return {};
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {};
+}
 import {
   User,
   Phone,
@@ -83,7 +96,8 @@ export default function ProfilePage() {
     setLoadingProfile(true);
     try {
       // 1. Fetch latest profile details from database
-      const res = await fetch(`/api/customers?mobile=${sessionUser.mobile}`);
+      const headers = await authHeaders();
+      const res = await fetch(`/api/customers?mobile=${sessionUser.mobile}`, { headers });
       if (res.ok) {
         const customer = await res.json();
         if (customer) {
@@ -173,7 +187,7 @@ export default function ProfilePage() {
     try {
       const res = await fetch("/api/customers", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
         body: JSON.stringify(payload)
       });
 

@@ -2580,7 +2580,9 @@ export default function AdminPage() {
     }
     // Verify that the email is not registered as a customer
     try {
-      const checkRes = await fetch(`/api/customers?email=${encodeURIComponent(emailToSign)}`);
+      const checkRes = await fetch(`/api/customers?email=${encodeURIComponent(emailToSign)}`, {
+        headers: { Authorization: `Bearer ${session?.access_token || ""}` }
+      });
       if (checkRes.ok) {
         const customer = await checkRes.json();
         if (customer) {
@@ -3340,7 +3342,10 @@ export default function AdminPage() {
   const fetchInventoryDevices = useCallback(async () => {
     try {
       setInventoryDevicesLoading(true);
-      const res = await fetch("/api/inventory/devices");
+      if (!session?.access_token) return;
+      const res = await fetch("/api/inventory/devices", {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setInventoryDevices(data.devices || []);
@@ -3351,7 +3356,7 @@ export default function AdminPage() {
     } finally {
       setInventoryDevicesLoading(false);
     }
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     if (activeNav === "Inventory") {
@@ -3389,7 +3394,10 @@ export default function AdminPage() {
   const fetchInventoryProducts = useCallback(async () => {
     try {
       setInventoryProductsLoading(true);
-      const res = await fetch("/api/inventory/products");
+      if (!session?.access_token) return;
+      const res = await fetch("/api/inventory/products", {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setInventoryProducts(data.products || []);
@@ -3399,7 +3407,7 @@ export default function AdminPage() {
     } finally {
       setInventoryProductsLoading(false);
     }
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     if (activeNav === "Inventory" || activeNav === "Products" || activeNav === "Point of Sale" || activeNav === "Customers" || viewingCustomerProfile) {
@@ -3490,7 +3498,7 @@ export default function AdminPage() {
       };
       const res = await fetch("/api/inventory/products", {
         method: editingProduct ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify(payload),
       });
       if (res.ok) {
@@ -3511,7 +3519,10 @@ export default function AdminPage() {
   const handleDeleteProduct = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete product "${name}"?`)) return;
     try {
-      const res = await fetch(`/api/inventory/products?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/inventory/products?id=${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session?.access_token || ""}` }
+      });
       if (res.ok) {
         await fetchInventoryProducts();
       } else {
@@ -3541,7 +3552,10 @@ export default function AdminPage() {
   const fetchProductSalesHistory = useCallback(async () => {
     try {
       setProductSalesLoading(true);
-      const res = await fetch("/api/inventory/products/sales");
+      if (!session?.access_token) return;
+      const res = await fetch("/api/inventory/products/sales", {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setProductSalesHistory(data.sales || []);
@@ -3551,7 +3565,7 @@ export default function AdminPage() {
     } finally {
       setProductSalesLoading(false);
     }
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     if (activeNav === "Inventory" || activeNav === "Products" || viewingCustomerProfile?.id) {
@@ -3562,7 +3576,10 @@ export default function AdminPage() {
   const fetchCustomerProductBalances = useCallback(async (customerId: string) => {
     try {
       setLoadingCustomerProducts(true);
-      const res = await fetch(`/api/customers/products?customer_id=${encodeURIComponent(customerId)}`);
+      if (!session?.access_token) return;
+      const res = await fetch(`/api/customers/products?customer_id=${encodeURIComponent(customerId)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setCustomerProductBalances(data.balances || []);
@@ -3572,7 +3589,7 @@ export default function AdminPage() {
     } finally {
       setLoadingCustomerProducts(false);
     }
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     if (viewingCustomerProfile?.id) {
@@ -3586,7 +3603,7 @@ export default function AdminPage() {
       setSavingUsageLog(true);
       const res = await fetch("/api/customers/products", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({
           balance_id: logUsageModalBalance.id,
           quantity_used: Number(logUsageQty),
@@ -3617,7 +3634,7 @@ export default function AdminPage() {
       const totalAmt = Number(selectedAddProductUnitPrice || 0) * Number(selectedAddProductQty || 1);
       const res = await fetch("/api/customers/products", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({
           customer_id: viewingCustomerProfile.id,
           customer_name: viewingCustomerProfile.name || '',
@@ -3764,7 +3781,7 @@ export default function AdminPage() {
       // 4. Update Customer Product Balance
       await fetch("/api/customers/products", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({
           customer_id: targetPatient.id,
           customer_name: targetPatient.name,
@@ -5917,7 +5934,17 @@ export default function AdminPage() {
   function fetchCustomers() {
     setLoadingCustomers(true);
     fetchCustomerAvatars();
-    cachedFetch("/api/customers", 4000)
+    if (!session?.access_token) {
+      setLoadingCustomers(false);
+      return;
+    }
+    fetch("/api/customers", {
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         if (Array.isArray(data)) {
           setDbCustomers(data);
@@ -6235,7 +6262,7 @@ export default function AdminPage() {
       try {
         const response = await fetch("/api/customers", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authenticatedJsonHeaders,
           body: JSON.stringify({
             name: mapped.name,
             mobile: mapped.mobile,
@@ -6358,7 +6385,7 @@ export default function AdminPage() {
 
     fetch("/api/customers", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authenticatedJsonHeaders,
       body: JSON.stringify(payload),
     })
       .then(async (res) => {
@@ -6804,6 +6831,7 @@ export default function AdminPage() {
     setDeletingCustomer(true);
     fetch(`/api/customers?id=${id}`, {
       method: "DELETE",
+      headers: { Authorization: `Bearer ${session?.access_token || ""}` }
     })
       .then(async (res) => {
         const data = await res.json();
@@ -6950,7 +6978,9 @@ export default function AdminPage() {
     
     if (/^01[0-9]{9}$/.test(cleaned)) {
       try {
-        const res = await fetch(`/api/customers?mobile=${cleaned}`);
+        const res = await fetch(`/api/customers?mobile=${cleaned}`, {
+          headers: { Authorization: `Bearer ${session?.access_token || ""}` }
+        });
         if (res.ok) {
           const customer = await res.json();
           if (customer) {
@@ -18134,7 +18164,7 @@ export default function AdminPage() {
                       const method = editingDevice ? "PUT" : "POST";
                       const res = await fetch("/api/inventory/devices", {
                         method,
-                        headers: { "Content-Type": "application/json" },
+                        headers: authenticatedJsonHeaders,
                         body: JSON.stringify(payload)
                       });
 
@@ -18652,7 +18682,7 @@ export default function AdminPage() {
                     try {
                       const res = await fetch("/api/inventory/devices", {
                         method: "PUT",
-                        headers: { "Content-Type": "application/json" },
+                        headers: authenticatedJsonHeaders,
                         body: JSON.stringify({
                           id: selectedDeviceForPulses.id,
                           current_pulse_count: countVal
@@ -18786,7 +18816,7 @@ export default function AdminPage() {
                     try {
                       const res = await fetch(`/api/inventory/devices/${selectedDeviceForReset.id}/reset-pulses`, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: authenticatedJsonHeaders,
                         body: JSON.stringify({
                           reason: resetReason,
                           performedBy: resetPerformedBy,

@@ -90,12 +90,15 @@ would be confidently wrong, which is worse than absent (DEC-019).
 | 0.7 | Add `provider_id` FK to `reservations` | `DONE` | Claude | verified against dev schema dump 2026-07-26 |
 | 0.8 | Add `services.duration_minutes` numeric | `DONE` | Claude | verified against dev schema dump 2026-07-26 |
 | 0.9 | Correct `ai_docs` drift | `DONE` | Claude | `9b4c3e7`, `3cf1c8a`, `1c3d151` |
-| 0.10 | Protect money-mutating API routes | `PARTIAL` | Claude | `see 0.10 below` |
+| 0.10 | Protect money-mutating API routes | `DONE` | Claude | `see 0.10 below` |
 
-**Phase 0 summary:** 0.7 and 0.8 are verified complete; 0.10's reservation authorization pass is
-complete, while customer and inventory-route scoping remains open. The dev migration baseline is
-adopted and replay-verified. The remaining 0.0 task is a separate main-database schema review and
-cutover to that baseline.
+**Phase 0 summary:** 10 of 11 tasks `DONE`. 0.10 is complete — reservations, customers (with
+per-identity scoping for patients), and every admin-only inventory/product-balance route are all
+authenticated, with every caller verified to send the right token. The dev migration baseline is
+adopted, replay-verified, and its bookkeeping matches the live database exactly (a drift where
+`20260726000100` was applied live but not recorded was found and repaired during this session — see
+0.0). The only remaining task is 0.0(f): a separate main-database schema review and cutover to the
+baseline, deferred because `main` is not live and this is real, distinct work.
 
 ---
 
@@ -123,6 +126,18 @@ shadow replay applies it and finds no schema diff.
 `admin_roles` is present in dev, has no migration or application caller, and is documented in
 `DB_SCHEMA.md`. `employees` remains observed only in main and needs a direct main-schema review
 before main is reconciled.
+
+**Drift found and repaired 2026-07-26 (second pass).** A new migration,
+`20260726000100_add_customer_auth_user_id.sql`, had been applied directly to the live dev database
+but `supabase migration list --linked` still showed it as unrecorded (`remote: ""`) — the exact
+class of bug this task exists to prevent, caught immediately because it was checked rather than
+assumed. Confirmed via `supabase db diff --linked`: a shadow database with both migrations applied
+produces **no diff** against the live remote schema, meaning the schema change was already live;
+only the bookkeeping was missing. Repaired with
+`supabase migration repair --status applied 20260726000100` (safe here specifically because the
+migration is idempotent — `IF NOT EXISTS` throughout — so no risk of a duplicate-apply error).
+`supabase migration list --linked` now shows both `20260726000000` and `20260726000100` matching
+local and remote exactly.
 
 **(b) — what was removed and why.** `src/app/api/reservations/route.ts` previously retried a failed
 insert after deleting `is_manual` and `created_by_employee_id`, then again after also deleting
@@ -410,19 +425,63 @@ backfilled from `doctor_name`.
 - This secures approval, rejection, checkout, lifecycle transitions, notes, service edits and
   employee-attribution updates without breaking the public booking payment flow.
 
-**Still open:**
-- `/api/customers` is untouched because patients call it directly (`AuthModal.tsx` self-lookup
-  during OTP login and `profile/page.tsx` self-service); it requires per-field/identity scoping,
-  not a blanket staff gate.
-- `GET /api/inventory/products/sales`, all of `/api/inventory/products`, and all of
-  `/api/customers/products` remain unreviewed for this task.
+**Completed 2026-07-26, second pass — `/api/customers` and the remaining inventory/product-balance
+routes:**
 
-**Verification remaining before closing the wider authorization work:**
-1. Manually exercise the full admin booking lifecycle: create, approve, reject, checkout, edit,
-   and restore.
-2. Confirm the public deposit declaration transitions only its own `pending_deposit` booking to
-   `pending`.
-3. Decide the scoping model for `/api/customers`.
+- **`/api/customers` GET/POST now require authentication, with per-identity scoping — not a
+  blanket staff gate.** Patients call this route directly (no separate patient login exists;
+  `AuthModal.tsx` self-lookup during OTP login, `profile/page.tsx` self-service), so a blanket
+  `requireStaffAccess` would 403 every patient. **This was caught mid-fix**: an earlier attempt in
+  this session did exactly that — gated both methods behind `requireStaffAccess` without updating
+  any caller — which would have broken patient login/registration entirely had it shipped. Fixed
+  properly instead:
+  - `classifyCaller()` tries `requireStaffAccess` first; on a 403 (valid session, not staff) it
+    falls back to `requireAuthenticatedUser` (any valid Supabase session) rather than rejecting.
+  - A **patient caller is scoped to their own record only**, via `isOwnIdentity()` in the new
+    `src/lib/customerIdentity.ts`. This matters: naively allowing "any authenticated user" through
+    would let one patient read or overwrite another patient's profile — including debt, wallet
+    balance and address — by guessing or brute-forcing a mobile number (IDOR). `isOwnIdentity()`
+    prefers the new `customers.auth_user_id` link once a row has one, and falls back to normalized
+    phone / lowercased email for the rows that predate it (every row today) — see
+    `20260726000100_add_customer_auth_user_id.sql`. `GET` backfills `auth_user_id` the first time
+    ownership is confirmed, so later lookups no longer depend on string matching.
+  - A patient may look up or write **only their own** record: `GET` with no `mobile`/`email`
+    (the full customer list) is staff-only; a lookup for someone else's identity returns `null`
+    rather than their data; `POST` with an `id` requires the existing row to resolve to the caller,
+    and `POST` without an `id` requires the submitted `mobile`/`email` to match the caller.
+  - **Financial fields are never patient-writable.** `spent_amount`, `outstanding` and
+    `wallet_balance` are only taken from the request body on the staff path; a patient POST cannot
+    set or clear their own debt or wallet balance no matter what the body contains.
+  - All 7 patient-facing call sites across `AuthModal.tsx` (4) and `profile/page.tsx` (2 + a new
+    `authHeaders()` helper, since that page has no live session listener and reads the persisted
+    session via `supabase.auth.getSession()`) now send `Authorization: Bearer <token>`.
+  - Regression check: `npx tsx scratch/identitycheck.ts` — 10 cases, all passing, including the
+    IDOR case (an unrelated customer's phone/email must never match).
+- **`DELETE /api/customers`** → `requireAdministratorAccess` (unchanged from the first pass).
+- **`requireAuthenticatedUser`** added to `src/lib/access.ts` — "some valid Supabase session",
+  without the staff/`employee_accounts` lookup `requireStaffAccess` does. This is the primitive
+  patient-facing routes need; routes with no patient caller should keep using `requireStaffAccess`.
+- **`/api/inventory/products` (GET/POST/PUT/DELETE), `/api/inventory/devices` (GET/POST/PUT),
+  `/api/inventory/devices/[id]/reset-pulses` (POST), `/api/customers/products`
+  (GET/POST/PATCH)** → all `requireStaffAccess`. Verified **no patient-facing caller exists for
+  any of these** (grepped every public-facing component and page), so a blanket staff gate is safe
+  and correct here, unlike `/api/customers`. Verified all ~17 admin call sites across these five
+  route groups already send `Authorization` (most via the `authenticatedJsonHeaders` helper).
+
+**Verification done before closing this task:**
+1. `npx tsc --noEmit` and `npx eslint` on every touched file — clean (pre-existing warnings/errors
+   elsewhere in `admin/page.tsx` and `profile/page.tsx` confirmed via `git stash` to predate this
+   work).
+2. `npx tsx scratch/pricecheck.ts`, `scratch/billingcheck.ts`, `scratch/identitycheck.ts` — all pass.
+3. Grepped every current call site of every touched route to confirm headers match what each route
+   now requires — not just the sites a given commit's diff happened to touch.
+
+**Still open, deliberately out of scope for this task:**
+- `GET /api/inventory/products/sales` and `GET /api/customers` (the full-list branch) stay
+  staff-scoped but their own callers were reviewed only for the routes' *mutating* methods; a wider
+  audit of every `GET` in the app was not undertaken.
+- Manually click through the full admin booking lifecycle (create → approve → reject → checkout →
+  edit) and the patient OTP login/registration flow in a browser — not possible in this pass.
 
 **Original diagnosis, kept for reference:**
 

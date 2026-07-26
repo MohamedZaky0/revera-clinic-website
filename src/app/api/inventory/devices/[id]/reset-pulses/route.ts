@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireStaffAccess } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,9 @@ async function saveInventoryData(payload: any) {
 }
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const { id } = await context.params;
     const body = await req.json();

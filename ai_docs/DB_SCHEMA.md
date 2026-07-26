@@ -154,6 +154,7 @@ no application code reads or writes it; do not use it until its purpose is decid
 | `address` | text | Detailed address string, nullable |
 | `referral` | text | Referral source, nullable |
 | `occupation` | text | Job title/occupation, nullable |
+| `auth_user_id` | UUID | FK → `auth.users.id` ON DELETE SET NULL, unique, nullable. **Added 2026-07-26** by `20260726000100_add_customer_auth_user_id.sql`. The durable link between a patient's Supabase Auth session and their customer row — see RISK-018. `GET /api/customers` backfills it the first time a lookup confirms ownership via phone/email match, so rows created before this migration get linked lazily rather than in a batch. Not the same column as `employee_accounts.auth_user_id`, a separate FK for staff. |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 

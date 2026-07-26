@@ -1,31 +1,69 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireAdministratorAccess, requireAuthenticatedUser, requireStaffAccess } from '@/lib/access';
+import { isOwnIdentity } from '@/lib/customerIdentity';
+
+/**
+ * This route has two legitimate caller populations: staff (reception/admin, full access)
+ * and patients (self-lookup / self-registration during OTP login — AuthModal.tsx,
+ * profile/page.tsx). There is no patient login separate from Supabase Auth, so a patient
+ * caller here is "authenticated but not staff", not "unauthenticated" — a blanket
+ * requireStaffAccess check would 403 every patient. See RISK-018 / FINANCE_TRACKER 0.10.
+ */
+type Caller =
+  | { kind: 'staff' }
+  | { kind: 'patient'; user: { id: string; email?: string | null; phone?: string | null } }
+  | { kind: 'unauthenticated'; error: string; status: 401 | 403 | 500 };
+
+async function classifyCaller(req: Request): Promise<Caller> {
+  const staffResult = await requireStaffAccess(req);
+  if (!('error' in staffResult)) return { kind: 'staff' };
+  if (staffResult.status === 401) {
+    return { kind: 'unauthenticated', error: staffResult.error, status: staffResult.status };
+  }
+  // 403 ("Staff access is required") or 500 here still means the bearer token was a
+  // valid Supabase session — re-check as a plain authenticated user before rejecting.
+  const userResult = await requireAuthenticatedUser(req);
+  if ('error' in userResult) {
+    return { kind: 'unauthenticated', error: userResult.error, status: userResult.status };
+  }
+  return { kind: 'patient', user: userResult.user };
+}
 
 export async function GET(req: Request) {
+  const caller = await classifyCaller(req);
+  if (caller.kind === 'unauthenticated') {
+    return NextResponse.json({ error: caller.error }, { status: caller.status });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const mobile = searchParams.get('mobile');
     const email = searchParams.get('email');
 
-    if (mobile) {
-      const { data, error } = await supabaseServer
-        .from('customers')
-        .select('*')
-        .eq('mobile', mobile)
-        .maybeSingle();
-
-      if (error) throw error;
-      return NextResponse.json(data || null);
+    if (caller.kind === 'patient' && !mobile && !email) {
+      // The unfiltered branch below returns every customer — never for a patient caller.
+      return NextResponse.json({ error: 'Staff access is required.' }, { status: 403 });
     }
 
-    if (email) {
-      const { data, error } = await supabaseServer
-        .from('customers')
-        .select('*')
-        .eq('email', email)
-        .maybeSingle();
-
+    if (mobile || email) {
+      let query = supabaseServer.from('customers').select('*');
+      query = mobile ? query.eq('mobile', mobile) : query.eq('email', email!);
+      const { data, error } = await query.maybeSingle();
       if (error) throw error;
+
+      if (caller.kind === 'patient') {
+        if (!isOwnIdentity(caller.user, data)) {
+          // A patient guessing another patient's mobile/email must not see their record.
+          return NextResponse.json(null);
+        }
+        if (data && !data.auth_user_id) {
+          // Backfill now that ownership is confirmed, so future lookups are exact
+          // (auth_user_id) rather than re-derived from phone/email string matching.
+          await supabaseServer.from('customers').update({ auth_user_id: caller.user.id }).eq('id', data.id);
+        }
+      }
+
       return NextResponse.json(data || null);
     }
 
@@ -43,6 +81,11 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const caller = await classifyCaller(req);
+  if (caller.kind === 'unauthenticated') {
+    return NextResponse.json({ error: caller.error }, { status: caller.status });
+  }
+
   let body: any;
   try {
     body = await req.json();
@@ -66,7 +109,6 @@ export async function POST(req: Request) {
     building_no,
     floor_no,
     note,
-    // new demographic fields
     age,
     national_id,
     address,
@@ -76,6 +118,31 @@ export async function POST(req: Request) {
 
   if (!name || !mobile) {
     return NextResponse.json({ error: 'Name and Mobile number are required' }, { status: 400 });
+  }
+
+  let existing: { id: string; auth_user_id: string | null; mobile: string | null; email: string | null } | null = null;
+  if (id) {
+    const { data, error } = await supabaseServer
+      .from('customers')
+      .select('id, auth_user_id, mobile, email')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    existing = data;
+  }
+
+  if (caller.kind === 'patient') {
+    // A patient may only write their own record — by id when editing, or by matching
+    // identity when creating. Without this, any authenticated patient could overwrite
+    // another patient's profile by passing their id, or register a profile impersonating
+    // someone else's phone/email.
+    const owns = id ? isOwnIdentity(caller.user, existing) : isOwnIdentity(caller.user, { mobile, email });
+    if (!owns) {
+      return NextResponse.json(
+        { error: 'You may only create or edit your own profile.' },
+        { status: 403 }
+      );
+    }
   }
 
   if (email) {
@@ -95,22 +162,18 @@ export async function POST(req: Request) {
     }
   }
 
-  const customerData = {
+  const customerData: Record<string, any> = {
     name,
     mobile,
     gender: gender || null,
     email: email || null,
     active: active ?? true,
-    spent_amount: Number(spent_amount || 0),
-    outstanding: Number(outstanding || 0),
-    wallet_balance: Number(wallet_balance || 0),
     area: area || null,
     location_name: location_name || null,
     street_name: street_name || null,
     building_no: building_no || null,
     floor_no: floor_no || null,
     note: note || null,
-    // new demographic fields
     age: age ? Number(age) : null,
     national_id: national_id || null,
     address: address || null,
@@ -119,10 +182,21 @@ export async function POST(req: Request) {
     updated_at: new Date().toISOString()
   };
 
+  if (caller.kind === 'patient') {
+    // Financial fields are never patient-writable, regardless of what the request body
+    // contains — a patient must not be able to set their own wallet_balance or erase
+    // outstanding debt by POSTing arbitrary values. Keep whatever is already stored.
+    customerData.auth_user_id = caller.user.id;
+  } else {
+    // Staff path — unchanged from before this endpoint required authentication.
+    customerData.spent_amount = Number(spent_amount || 0);
+    customerData.outstanding = Number(outstanding || 0);
+    customerData.wallet_balance = Number(wallet_balance || 0);
+  }
+
   try {
     let result;
     if (id) {
-      // Update existing customer
       const { data, error } = await supabaseServer
         .from('customers')
         .update(customerData)
@@ -133,11 +207,13 @@ export async function POST(req: Request) {
       if (error) throw error;
       result = data;
     } else {
-      // Insert new customer
       const { data, error } = await supabaseServer
         .from('customers')
         .insert({
           ...customerData,
+          spent_amount: caller.kind === 'staff' ? Number(spent_amount || 0) : 0,
+          outstanding: caller.kind === 'staff' ? Number(outstanding || 0) : 0,
+          wallet_balance: caller.kind === 'staff' ? Number(wallet_balance || 0) : 0,
           registration_date: new Date().toISOString(),
           created_at: new Date().toISOString()
         })
@@ -151,7 +227,6 @@ export async function POST(req: Request) {
     return NextResponse.json(result, { status: id ? 200 : 201 });
   } catch (err: any) {
     console.error('POST /api/customers error:', err);
-    // Handle uniqueness constraint violations gracefully
     if (err.code === '23505') {
       const field = err.message?.includes('mobile') ? 'Mobile number' : 'Email address';
       return NextResponse.json({ error: `${field} already exists for another customer.` }, { status: 400 });
@@ -161,6 +236,11 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
@@ -185,7 +265,7 @@ export async function DELETE(req: Request) {
           perPage: 1000
         });
         if (!listError && users) {
-          const authUser = users.find((u: any) => 
+          const authUser = users.find((u: any) =>
             (customer.email && u.email?.toLowerCase() === customer.email.toLowerCase()) ||
             (customer.mobile && u.phone === customer.mobile) ||
             (customer.mobile && u.phone === `+20${customer.mobile.startsWith('0') ? customer.mobile.slice(1) : customer.mobile}`)

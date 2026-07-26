@@ -768,3 +768,59 @@ project.
 - The baseline reproduces the current schema, not historical data or the reasons for every old
   change. The archived files and this decision preserve that context.
 
+---
+
+## DEC-029: `/api/customers` Scopes Patients To Their Own Record Instead Of A Blanket Staff Gate
+
+**Date:** 2026-07-26
+**Status:** Decided — active
+
+**Context:**
+RISK-018 required authenticating every money-adjacent API route, including `/api/customers`. But
+this route has two genuinely different caller populations: staff (reception/admin, full access) and
+**patients**, who call it directly for OTP self-lookup (`AuthModal.tsx`) and profile self-service
+(`profile/page.tsx`). There is no separate patient login — a patient's only credential is their
+Supabase Auth session from OTP verification.
+
+A blanket `requireStaffAccess` gate was written first and would have shipped: it compiled, and
+nothing in the type system or a cursory read flagged the problem. It was caught only by checking
+what actually calls this route — none of the six patient call sites send a staff token, and none
+of them are staff, so every one would 403. That would have broken login and registration entirely.
+
+The next-simplest fix — swap to "any authenticated Supabase user may read/write" — has a different
+failure mode: it would let **one patient read or overwrite another patient's record**, including
+debt, wallet balance and address, by guessing or brute-forcing a mobile number. An authenticated
+caller is not the same thing as an authorized one.
+
+**Chosen Option:**
+- `classifyCaller()` (`src/app/api/customers/route.ts`) tries `requireStaffAccess` first; a 403
+  ("valid session, not staff") falls through to the new `requireAuthenticatedUser`
+  (`src/lib/access.ts`) rather than rejecting, distinguishing "unauthenticated" from
+  "authenticated, not staff."
+- A patient caller is scoped to **their own record only**, via `isOwnIdentity()` in the new
+  `src/lib/customerIdentity.ts`. Ownership prefers the durable `customers.auth_user_id` link
+  (added by `20260726000100_add_customer_auth_user_id.sql`) and falls back to normalized phone /
+  lowercased email for the rows that predate that column — i.e. every row today.
+  `GET` backfills `auth_user_id` the first time ownership is confirmed, so the fallback path
+  narrows over time rather than being needed forever.
+- The full customer list (`GET` with no `mobile`/`email`) is staff-only. A patient's lookup for an
+  identity that resolves to someone else returns `null`, not that person's data.
+- Financial fields (`spent_amount`, `outstanding`, `wallet_balance`) are accepted from the request
+  body only on the staff path — a patient POST cannot set or clear their own debt or wallet balance
+  regardless of what the body contains.
+
+**Reason:**
+- The two failure modes above — lockout and IDOR — are both worse than the status quo (fully open).
+  Scoping by identity is the only option that closes the security gap without breaking the product.
+- Using `auth_user_id` where available rather than always string-matching phone/email is more
+  robust (Egyptian mobile numbers appear in the codebase in at least two formats — see
+  `normalizeEgyptMobile`) and is the direction the schema should move in regardless.
+
+**Trade-offs:**
+- Two auth helper calls in the failure path (`requireStaffAccess` then `requireAuthenticatedUser`)
+  for every non-staff request — an accepted cost on a low-traffic self-service endpoint.
+- `isOwnIdentity()`'s phone/email fallback is inherently weaker than the FK match; a patient whose
+  phone number is later reassigned to someone else (a real telecom scenario) could theoretically
+  match an old unlinked row. This narrows automatically as `auth_user_id` backfills, and does not
+  apply to any row already linked.
+

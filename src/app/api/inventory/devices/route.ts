@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireStaffAccess } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -184,7 +185,10 @@ function calculateDeviceStatus(current: number, t1: number, t2: number): 'Optima
   return 'Optimal';
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const data = await getStoredInventoryData();
     const devices = (data.devices || []).map((dev: any) => {
@@ -211,6 +215,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const body = await req.json();
     const { name, model, serial_number, category, branch_id, initial_pulse_count, warning_threshold_1, maintenance_threshold_2, notes } = body;
@@ -260,6 +267,9 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const body = await req.json();
     const { id, name, model, serial_number, category, branch_id, current_pulse_count, warning_threshold_1, maintenance_threshold_2, status, notes } = body;

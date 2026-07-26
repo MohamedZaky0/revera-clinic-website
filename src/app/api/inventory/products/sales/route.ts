@@ -193,7 +193,12 @@ async function saveSalesData(payload: { sales: ProductSaleRecord[] }) {
     });
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const data = await getStoredSalesData();
     return NextResponse.json({ success: true, sales: data.sales || [] });

@@ -11,6 +11,25 @@ export type AccessResult =
   | { access: StaffAccess }
   | { error: string; status: 401 | 403 | 500 };
 
+export type AuthenticatedUserResult =
+  | { user: { id: string; email?: string | null; phone?: string | null } }
+  | { error: string; status: 401 | 500 };
+
+export async function requireAuthenticatedUser(req: Request): Promise<AuthenticatedUserResult> {
+  try {
+    const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "").trim();
+    if (!token) return { error: "Authentication is required.", status: 401 };
+
+    const { data: authData, error: authError } = await supabaseServer.auth.getUser(token);
+    if (authError || !authData.user) return { error: "Invalid or expired session.", status: 401 };
+
+    return { user: authData.user };
+  } catch (error) {
+    console.error("Authentication verification failed:", error);
+    return { error: "Unable to verify authentication.", status: 500 };
+  }
+}
+
 export async function requireStaffAccess(req: Request): Promise<AccessResult> {
   try {
     const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "").trim();

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireStaffAccess } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
@@ -263,7 +264,12 @@ export async function deductInventoryStock(productIdOrName: string, quantityToDe
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const data = await getStoredProductsData();
     return NextResponse.json({
@@ -276,6 +282,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await req.json();
     const {
@@ -341,6 +352,11 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await req.json();
     const {
@@ -407,6 +423,11 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
