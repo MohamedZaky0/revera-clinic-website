@@ -688,6 +688,49 @@ the employee notes panel as a staff `admin`/`superadmin` account before closing 
 
 ---
 
+## RISK-022: A Non-Existent `customer_id` On A POS Sale Silently Loses Stock With No Discoverable Record
+
+**Severity:** High · **Type:** Data integrity / RISK-014 regression
+**Found:** 2026-07-26 (manually verifying `FINANCE_TRACKER.md` task 1.11 against deployed dev) ·
+**RESOLVED 2026-07-26**
+
+**How it was found:** deliberately testing task 1.11's "force a ledger-write failure, confirm the
+POS sale itself still succeeds" checklist item, using a syntactically valid but non-existent
+`customer_id`. The Phase 1 ledger dual-write did fail as expected — but so did something the
+checklist wasn't asking about: the **native `product_sales` insert itself** failed too, silently.
+
+**Root cause:** `product_sales.customer_id` has a foreign key to `customers.id`
+(`20260725160000_add_customer_id_to_product_sales.sql`). `mapSaleToDbRow()` in
+`src/app/api/inventory/products/sales/route.ts` passes whatever `customer_id` the request sends
+straight through with no existence check first. A stale or mistyped `customer_id` (e.g. a customer
+record that was later deleted, or a typo from a barcode/manual-entry error) violates that FK, and
+the insert fails with Postgres error `23503` — **exactly RISK-014's original failure signature**,
+just triggered by a different input than the column-name mismatch RISK-014 fixed.
+
+**Consequence, confirmed live against dev (`sale-1785071843480-pbysm`,
+`sale-1785071922006-nni32`):**
+1. `deductInventoryStock()` runs **unconditionally** after the insert attempt, regardless of
+   whether it succeeded — stock left the building for real.
+2. The failed native insert falls through to the `page_settings` blob (the same fallback RISK-014
+   already established), and the API still responds `{success: true}` to the cashier.
+3. `getStoredSalesData()`'s read path trusts the native `product_sales` table **exclusively** once
+   it has any rows at all, never merging the blob back in — so once a clinic has made even one
+   real sale, every sale that falls into this trap becomes **permanently invisible** in sales
+   history and any report built on `product_sales`. Reproduced twice in a row against dev; not a
+   one-off blip. Verified by direct insert reproduction: `product_sales_customer_id_fkey` violation
+   (`23503`), `Key (customer_id)=(...) is not present in table "customers".`
+
+**Fix:** `POST /api/inventory/products/sales` now verifies `customer_id` resolves to a real
+`customers` row **before** touching stock or attempting any write, returning a clean `404` instead
+of silently degrading. Restores the intended RISK-014 behavior ("surface the reason rather than
+failing over silently") for this specific trigger.
+
+**Verify:** `npx tsc --noEmit` / `npx eslint` clean. POST with a non-existent `customer_id` now
+returns `404` before any stock or ledger write happens; a real `customer_id` still sells normally
+(re-verified against dev — see `FINANCE_PHASE_1_MANUAL_TESTS.md` task 1.11 evidence).
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:

@@ -346,6 +346,27 @@ export async function POST(req: Request) {
       );
     }
 
+    // Verify the customer actually exists before touching stock or writing anything. Without
+    // this, a mistyped/stale customer_id violates product_sales.customer_id's FK constraint,
+    // which made the native insert fail and fall through to the page_settings blob — the exact
+    // RISK-014 failure mode, just triggered by a different input. Once the native table has any
+    // rows, getStoredSalesData() trusts it exclusively and never merges the blob back in, so that
+    // sale becomes permanently invisible in sales history — while deductInventoryStock still runs
+    // unconditionally below, so stock is genuinely lost with no discoverable record. Found and
+    // fixed 2026-07-26 while manually verifying task 1.11 — see FINANCE_PHASE_1_MANUAL_TESTS.md.
+    const { data: customerExists, error: customerCheckErr } = await supabaseServer
+      .from('customers')
+      .select('id')
+      .eq('id', customer_id)
+      .maybeSingle();
+    if (customerCheckErr) throw customerCheckErr;
+    if (!customerExists) {
+      return NextResponse.json(
+        { success: false, error: `Customer '${customer_id}' does not exist.` },
+        { status: 404 }
+      );
+    }
+
     const newSale: ProductSaleRecord = {
       id: generateSaleId(),
       product_id,

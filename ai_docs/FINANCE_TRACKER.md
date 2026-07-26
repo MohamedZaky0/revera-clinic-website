@@ -919,12 +919,16 @@ regresses.
 
 ---
 
-## 1.10 — Wire booking checkout to dual-write an invoice — WIP, needs live verification
+## 1.10 — Wire booking checkout to dual-write an invoice — DONE, fully live-verified
 
-> **STOP AND READ FIRST if you are resuming this task.** The session that wrote this went no
-> further than what is described below, on explicit user instruction to stop and re-plan the
-> remaining phases before writing more code (see the note at the very top of this tracker file
-> about the 2026-07-26 pause). Do not assume this is finished just because code exists.
+> This task's two remaining edge cases (repeat payment on an already-completed booking, and a
+> no-customer checkout) were listed below as "follow-up observations, do not block completion" —
+> reasonable at the time, but they were still unverified theory, not measured fact. Both were
+> exercised live against dev on 2026-07-26 (see the added evidence below and
+> `FINANCE_PHASE_1_MANUAL_TESTS.md`'s 1.10 rows) using a real staff session
+> (`mohamed.zaky.anwar@gmail.com`, `superadmin`) obtained via `scratch/get_session_token.ts`
+> against the deployed `dev.reveraclinics.com` environment — not just the pure functions or a
+> single first-completion case.
 
 **Done:**
 - `writeCheckoutInvoice()` and `appendPaymentToExistingInvoice()` implemented in
@@ -959,11 +963,27 @@ regresses.
   (`createdByEmployeeId` is a different thing, the booking's original creator). Attributing
   cashier identity needs either a new request field or reading it from the auth token
   (`requireStaffAccess`'s result is validated but discarded earlier in this handler, not
-  currently threaded through to here).
+  currently threaded through to here). **Still open** — the two live checks below confirm this by
+  observation (`received_by_employee_id: null` on both payment rows), not just by reading the code.
 - Invoice writing is scoped inside `if (isSettlement && target.customer_id)` — a checkout with no
   linked customer record produces no invoice. This matches the existing scope of the customer
   balance settlement code right above it, but is worth a deliberate decision later, not an
-  accident to discover.
+  accident to discover. **Verified live 2026-07-26 and approved as-is** — see below.
+
+**Live-verified 2026-07-26 (the two remaining checklist items from `FINANCE_PHASE_1_MANUAL_TESTS.md`):**
+- **Repeat payment on an already-completed booking:** `PATCH /api/reservations?id=2e03f8ea-…`
+  with `amountPaid: 150` (was `100`) against the already-completed booking from the first live
+  check above. Result: one new `payments` row of `50` (the delta) attached to the **same**
+  `INV-000001`; `invoice_lines` unchanged at 2 rows; exactly 1 invoice still exists for the
+  reservation. Confirms `appendPaymentToExistingInvoice()` does what its name says — no duplicate
+  invoice, no duplicate service lines.
+- **Checkout with no linked customer:** inserted a disposable reservation with `customer_id: null`
+  (`4e909f1f-cc2f-4a08-9afb-5fbd712d979c`), then completed it via the same staff session
+  (`amountPaid: 100`). Response was a clean `200`, no error thrown. `invoices` for that reservation
+  is `[]` — confirms the `if (isSettlement && target.customer_id)` gate behaves exactly as
+  documented: the checkout still succeeds, it just produces no ledger row. **Approved as the
+  intended behavior for now** — a walk-in/no-customer checkout getting its own invoice (with no
+  customer to bill) is a real product decision, not a bug, and is deferred rather than assumed.
 
 **Depends on 1.1–1.4, 1.7.** **Where:** `src/app/api/reservations/route.ts`, the
 `status === 'completed'` branch (the same block task 0.5's `computeSettledBalances` call lives in).

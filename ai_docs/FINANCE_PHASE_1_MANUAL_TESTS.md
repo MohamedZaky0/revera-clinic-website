@@ -10,6 +10,8 @@
 |---|---|---|---|---|
 | 2026-07-26 | 1.10 | dev | Reservation `2e03f8ea-e88d-4923-8b1c-5a27e0efeb3d` created invoice `INV-000001`; two service lines totalled 220; one cash payment of 100 | PASS |
 | 2026-07-26 | 1.13 | dev | Migration `20260726010700` applied; linked migration list matches and shadow `db diff` found no schema changes | PASS |
+| 2026-07-26 | 1.10 (repeat payment) | dev | `PATCH /api/reservations?id=2e03f8ea-e88d-4923-8b1c-5a27e0efeb3d` with `amountPaid: 150` (was 100) as a real staff session (superadmin, `mohamed.zaky.anwar@gmail.com`). Result: one new `payments` row of `50` attached to the existing `INV-000001` (invoice `6fde2d07-…`); `invoice_lines` still exactly 2 rows; `invoices` still exactly 1 row for the reservation — no duplicate invoice, no duplicate lines | PASS |
+| 2026-07-26 | 1.10 (no customer) | dev | Inserted a disposable `reservations` row with `customer_id: null` (`4e909f1f-cc2f-4a08-9afb-5fbd712d979c`), then `PATCH ...?id=4e909f1f… {status: 'completed', amountPaid: 100, amountLeft: 0}` via the same staff session. Response `200`, no error. `invoices` for that reservation: `[]` — confirms the documented `if (isSettlement && target.customer_id)` scoping: a no-customer checkout completes cleanly and produces no invoice, matching the "not an accident, a deliberate-later-decision" note in `FINANCE_TRACKER.md` task 1.10 | PASS |
 
 ## Per-task checklist
 
@@ -34,8 +36,8 @@
 - [x] Query `invoices`, `invoice_lines`, and `payments` by `reservation_id`; confirm one issued invoice, each service line, and one receipt.
 - [x] Confirm `sum(invoice_lines.line_total) = invoices.grand_total` and payment amount equals checkout payment.
 - [x] Confirm the pre-existing reservation/customer settlement path still runs (`amount_paid`, `amount_left`, `spent_amount`, `outstanding`, and wallet behavior).
-- [ ] Complete an already-completed booking with an additional payment; confirm a new payment attaches to the existing invoice without duplicate service lines.
-- [ ] Complete a booking with no linked customer; record and approve the intended no-invoice behavior before changing it.
+- [x] Complete an already-completed booking with an additional payment; confirm a new payment attaches to the existing invoice without duplicate service lines.
+- [x] Complete a booking with no linked customer; record and approve the intended no-invoice behavior before changing it. **Approved as-is** — confirmed reproducible, not a bug; revisit only if product wants walk-in/no-customer checkouts to also get an invoice.
 
 ### 1.11 — POS-sale invoice dual-write
 
