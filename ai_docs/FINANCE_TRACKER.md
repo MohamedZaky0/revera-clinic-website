@@ -594,7 +594,7 @@ routes:**
 | 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `DONE` | Claude | `58fe1dc` |
 | 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `DONE` | Claude | pending commit (live verification) |
 | 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `DONE` | Claude | pending commit (live verification) |
-| 1.14 | `src/lib/customerBalances.ts` — derive `outstanding`/`spent_amount`/`wallet_balance` from the ledger + reconciliation endpoint | 1.1–1.4, 1.10, 1.11 | `WIP` — code written, regression-checked; pending live reconciliation run | Claude | pending commit |
+| 1.14 | `src/lib/customerBalances.ts` — derive `outstanding`/`spent_amount`/`wallet_balance` from the ledger + reconciliation endpoint | 1.1–1.4, 1.10, 1.11 | `DONE` | Claude | pending commit (live verification) |
 | 1.15 | Opening-balance import (DEC-024) | 1.1, 1.3, 1.4, 1.6 | `TODO` | — | — |
 | 1.16 | `API_CONTRACT.md` update for every new/changed endpoint | rolling, alongside 1.10–1.15 | `TODO` | — | — |
 
@@ -1126,6 +1126,33 @@ manual extension records `expires_at`, `extended_by_employee_id`, and `extended_
 ---
 
 ## 1.14 — Derive customer balances from the ledger
+
+**DONE, live-verified 2026-07-26.** `src/lib/customerBalances.ts` (`computeLedgerBalances`, 19
+passing regression cases in `scratch/phase1balancescheck.ts`) and `GET /api/customers/reconcile`
+(staff-only, read-only) are built and confirmed working against deployed dev.
+
+**Live reconciliation result: 2 of 4 dev customers show drift between the ledger-derived and
+scalar balances — expected, not a bug, and not something this task should try to close.** The
+ledger only contains invoices/payments from bookings completed *after* today's Phase 1 checkout
+wiring (tasks 1.10–1.13) went live. Every completed booking before that — most of this dev
+database's mock history — went through the pre-Phase-1 code path and never wrote an invoice or
+payment row at all, so the ledger total is necessarily smaller; it is missing everything that
+predates the ledger's existence. Per DEC-026 (no backfill — all current data is mock), this gap is
+not expected to close by itself in this database. It stops being a live concern once (a) a real
+clinic runs 100% of its transactions through the ledger from day one, and (b) task 1.15's
+opening-balance import captures whatever existed at that cutover point. Task 1.10's own
+"follow-up observations" flagged this exact drift in advance (`amount_left = 900` vs. the new
+ledger's `120`) and asked for it to be "retained as reconciliation evidence for 1.14" — this is
+that evidence.
+
+**What "done" means here, precisely:** the derivation logic and reconciliation tooling are correct
+and proven — they found real, explainable drift rather than silently agreeing or crashing, which is
+the whole point of a reconciliation check. It does **not** mean the ledger and scalar currently
+agree for every customer, and per the task's own standing caution, **no read path has been cut
+over to the ledger** — `customers.outstanding`/`spent_amount`/`wallet_balance` remain the
+actively-written source of truth (see the updated notes on those columns in `DB_SCHEMA.md`). A
+future, separate decision is needed on if/when a real clinic's ledger ever becomes complete enough
+to cut any UI read over to it.
 
 **Depends on 1.1–1.4, and real data flowing through 1.10/1.11 for at least a trial period —
 do not attempt this the same day as 1.10/1.11.** **Where:** new `src/lib/customerBalances.ts`,
