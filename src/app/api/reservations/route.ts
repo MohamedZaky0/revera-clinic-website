@@ -141,70 +141,85 @@ async function applyCheckoutCosting(params: {
     ((inventoryDevicesResult.data || []) as CostingDevice[]).map((device) => [device.id, device])
   );
 
+  // Each line is costed independently and failures are isolated per line — a bad
+  // service_devices rating (e.g. max_pulses_limit still at its 0 default) or a recipe pointing at
+  // a still-retail-only product must not silently zero out cogs_snapshot/commission_snapshot for
+  // every other, correctly-configured line on the same invoice. The whole booking's costing being
+  // best-effort (writeCheckoutInvoice's caller) is a separate, coarser safety net for total
+  // failure (e.g. the DB being unreachable) — it must not also be the mechanism that turns one
+  // line's bad data into every line's missing data.
   for (const invoiceLine of invoiceLines) {
     if (!invoiceLine.service_id) continue;
-    const recipes = (recipesResult.data || []).filter((recipe: any) => Number(recipe.service_id) === Number(invoiceLine.service_id));
-    const entries: ConsumptionDraft[] = recipes.map((recipe: any): ConsumptionDraft => {
-      const product = products.get(recipe.product_id);
-      if (!product || !['consumable', 'both'].includes(product.role)) {
-        throw new Error(`Recipe product ${recipe.product_id} must have role consumable or both.`);
+    try {
+      const recipes = (recipesResult.data || []).filter((recipe: any) => Number(recipe.service_id) === Number(invoiceLine.service_id));
+      const entries: ConsumptionDraft[] = recipes.map((recipe: any): ConsumptionDraft => {
+        const product = products.get(recipe.product_id);
+        if (!product || !['consumable', 'both'].includes(product.role)) {
+          throw new Error(`Recipe product ${recipe.product_id} must have role consumable or both.`);
+        }
+        const override = consumptionOverrides[String(invoiceLine.service_id)]?.[recipe.product_id];
+        const qty = override === undefined ? Number(recipe.standard_qty) : Number(override);
+        if (!Number.isFinite(qty) || qty < 0) throw new Error(`Invalid consumed quantity for product ${recipe.product_id}.`);
+        return {
+          productId: recipe.product_id,
+          qty,
+          unitCostSnapshot: Number(product.cost_price || 0),
+          wasEdited: override !== undefined && qty !== Number(recipe.standard_qty),
+        };
+      });
+
+      const { data: insertedEntries, error: entriesError } = entries.length > 0
+        ? await supabaseServer.from('consumption_entries').insert(entries.map((entry: ConsumptionDraft) => ({
+            reservation_id: reservationId,
+            product_id: entry.productId,
+            qty: entry.qty,
+            unit_cost_snapshot: entry.unitCostSnapshot,
+            was_edited: entry.wasEdited,
+          }))).select('id, product_id, qty, unit_cost_snapshot')
+        : { data: [], error: null };
+      if (entriesError) throw entriesError;
+
+      const stockRows = (insertedEntries || []).filter((entry: any) => Number(entry.qty) > 0).map((entry: any) => ({
+        product_id: entry.product_id,
+        direction: 'out',
+        qty: entry.qty,
+        unit_cost: entry.unit_cost_snapshot,
+        reason: 'consumption',
+        ref_id: entry.id,
+      }));
+      if (stockRows.length > 0) {
+        const { error: stockError } = await supabaseServer.from('stock_movements').insert(stockRows);
+        if (stockError) throw stockError;
       }
-      const override = consumptionOverrides[String(invoiceLine.service_id)]?.[recipe.product_id];
-      const qty = override === undefined ? Number(recipe.standard_qty) : Number(override);
-      if (!Number.isFinite(qty) || qty < 0) throw new Error(`Invalid consumed quantity for product ${recipe.product_id}.`);
-      return {
-        productId: recipe.product_id,
-        qty,
-        unitCostSnapshot: Number(product.cost_price || 0),
-        wasEdited: override !== undefined && qty !== Number(recipe.standard_qty),
-      };
-    });
 
-    const { data: insertedEntries, error: entriesError } = entries.length > 0
-      ? await supabaseServer.from('consumption_entries').insert(entries.map((entry: ConsumptionDraft) => ({
-          reservation_id: reservationId,
-          product_id: entry.productId,
-          qty: entry.qty,
-          unit_cost_snapshot: entry.unitCostSnapshot,
-          was_edited: entry.wasEdited,
-        }))).select('id, product_id, qty, unit_cost_snapshot')
-      : { data: [], error: null };
-    if (entriesError) throw entriesError;
+      const materialCost = consumptionCost(entries.map(({ qty, unitCostSnapshot }: ConsumptionDraft) => ({ qty, unitCostSnapshot })));
+      const deviceCost = (devicesResult.data || [])
+        .filter((device: any) => Number(device.service_id) === Number(invoiceLine.service_id))
+        .reduce((total: number, serviceDevice: any) => {
+          const device = devices.get(serviceDevice.device_id);
+          if (!device) throw new Error(`Service device ${serviceDevice.device_id} was not found.`);
+          return total + costPerPulse(Number(device.lamp_replacement_cost || 0), Number(device.max_pulses_limit)) * Number(serviceDevice.pulses_per_session);
+        }, 0);
+      const cogsSnapshot = Math.round((materialCost + deviceCost + Number.EPSILON) * 100) / 100;
+      const provider = providerResult.data as any;
+      const commissionBase = provider?.commission_base === 'net_of_materials'
+        ? Math.max(0, Number(invoiceLine.line_total) - cogsSnapshot)
+        : Number(invoiceLine.line_total);
+      const commissionSnapshot = provider
+        ? computeCommission(commissionBase, provider.commission_type, Number(provider.commission_value || 0), Number(provider.commission_fixed_component || 0))
+        : 0;
 
-    const stockRows = (insertedEntries || []).filter((entry: any) => Number(entry.qty) > 0).map((entry: any) => ({
-      product_id: entry.product_id,
-      direction: 'out',
-      qty: entry.qty,
-      unit_cost: entry.unit_cost_snapshot,
-      reason: 'consumption',
-      ref_id: entry.id,
-    }));
-    if (stockRows.length > 0) {
-      const { error: stockError } = await supabaseServer.from('stock_movements').insert(stockRows);
-      if (stockError) throw stockError;
+      const { error: updateError } = await supabaseServer.from('invoice_lines')
+        .update({ cogs_snapshot: cogsSnapshot, commission_snapshot: commissionSnapshot })
+        .eq('id', invoiceLine.id);
+      if (updateError) throw updateError;
+    } catch (lineError) {
+      console.error(
+        `Failed to cost invoice line ${invoiceLine.id} (service ${invoiceLine.service_id}) — leaving cogs_snapshot/commission_snapshot NULL for this line only:`,
+        lineError,
+        '| reservation:', reservationId
+      );
     }
-
-    const materialCost = consumptionCost(entries.map(({ qty, unitCostSnapshot }: ConsumptionDraft) => ({ qty, unitCostSnapshot })));
-    const deviceCost = (devicesResult.data || [])
-      .filter((device: any) => Number(device.service_id) === Number(invoiceLine.service_id))
-      .reduce((total: number, serviceDevice: any) => {
-        const device = devices.get(serviceDevice.device_id);
-        if (!device) throw new Error(`Service device ${serviceDevice.device_id} was not found.`);
-        return total + costPerPulse(Number(device.lamp_replacement_cost || 0), Number(device.max_pulses_limit)) * Number(serviceDevice.pulses_per_session);
-      }, 0);
-    const cogsSnapshot = Math.round((materialCost + deviceCost + Number.EPSILON) * 100) / 100;
-    const provider = providerResult.data as any;
-    const commissionBase = provider?.commission_base === 'net_of_materials'
-      ? Math.max(0, Number(invoiceLine.line_total) - cogsSnapshot)
-      : Number(invoiceLine.line_total);
-    const commissionSnapshot = provider
-      ? computeCommission(commissionBase, provider.commission_type, Number(provider.commission_value || 0), Number(provider.commission_fixed_component || 0))
-      : 0;
-
-    const { error: updateError } = await supabaseServer.from('invoice_lines')
-      .update({ cogs_snapshot: cogsSnapshot, commission_snapshot: commissionSnapshot })
-      .eq('id', invoiceLine.id);
-    if (updateError) throw updateError;
   }
 }
 

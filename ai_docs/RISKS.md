@@ -396,25 +396,41 @@ into it; the reset-pulses route writes only to `page_settings`
 
 ## RISK-015: Doctor Cost Attribution Depends On A Name String
 
-**Severity:** Medium-High · **Type:** Data integrity
-**Found:** 2026-07-25
+**Severity:** Medium-High → Low (name-matching part) · **Type:** Data integrity
+**Found:** 2026-07-25 · **Name-string attribution and monthly-aggregate-only commission RESOLVED
+2026-07-26 — see `FINANCE_TRACKER.md` task 2.14. Three compounding issues below remain open.**
 
-`reservations.doctor_name` is free text (`full_migration.sql:228`); there is no `provider_id` FK.
-Doctor payroll attributes revenue by case-insensitive string equality against `providers.name`
-(`src/app/api/hr/doctor-payroll/route.ts:172`). A rename, a typo, a title prefix, or two doctors
-sharing a name silently detaches historical commission with no error.
+**Fix:** `src/app/api/hr/doctor-payroll/route.ts`'s three match sites (`GET`, `POST`, `PATCH`) now
+filter reservations by `r.provider_id === prov.id` instead of a case-insensitive
+`doctor_name`/`providers.name` string comparison — a rename can no longer silently detach a
+doctor's historical commission. Commission is also no longer re-derived live from
+`amount_paid + amount_left`; it sums the real per-reservation `invoice_lines.commission_snapshot`
+values Phase 2's checkout costing (tasks 2.11/2.15) now writes at completion time, computed via
+`computeCommission()` (task 2.9) against each provider's configured `commission_type` /
+`commission_base` (task 2.8) — commission is now an inspectable per-session number, not only a
+monthly total. A reservation whose `provider_id` is `NULL` (task 0.7: the name matched zero or
+more than one provider) is simply excluded from payroll, which is more honest than a fuzzy
+string fallback silently re-attaching it to the wrong doctor.
 
-Compounding issues in the same area:
-- Commission exists **only** as a monthly aggregate; there is no per-reservation commission row.
-- Commission is computed on **billed** price (`amount_paid + amount_left`), i.e. accrual —
-  a doctor earns full commission on a booking where only a deposit was paid
-  (`doctor-payroll/route.ts:182`). Must not be netted directly against a cash-basis revenue view.
-- `doctor_payroll` PATCH recomputes and overwrites **already-Paid** records (`:258-315`),
-  so it cannot be treated as an immutable ledger.
-- A doctor who is also an employee appears in **both** `hr_payroll` and `doctor_payroll`
-  for the same month (`src/app/api/employees/route.ts:174-206`) — naive summation double-counts.
-- `hr_payroll.achieved_revenue` holds a **count**, not revenue, when
-  `target_type_snapshot='reservations'` (`hr/payroll/route.ts:111`). Summing the column is nonsense.
+**Not fixed by this — the three compounding issues below are still open:**
+- Commission is still computed on **billed**, accrual-basis price via `invoice_lines.line_total`
+  (now snapshotted rather than re-derived, but still accrual, not cash) — must not be netted
+  directly against a cash-basis revenue view (RISK-016).
+- `doctor_payroll` PATCH still recomputes and overwrites **already-Paid** records (`:258-315`),
+  so it still cannot be treated as an immutable ledger.
+- A doctor who is also an employee still appears in **both** `hr_payroll` and `doctor_payroll`
+  for the same month (`src/app/api/employees/route.ts:174-206`) — naive summation still
+  double-counts.
+- `hr_payroll.achieved_revenue` still holds a **count**, not revenue, when
+  `target_type_snapshot='reservations'` (`hr/payroll/route.ts:111`) — summing it is still nonsense.
+
+Original diagnosis below, kept for reference.
+
+`reservations.doctor_name` is free text (`full_migration.sql:228`); there was no `provider_id` FK
+at the time this risk was found. Doctor payroll attributed revenue by case-insensitive string
+equality against `providers.name` (`src/app/api/hr/doctor-payroll/route.ts:172`). A rename, a
+typo, a title prefix, or two doctors sharing a name silently detached historical commission with
+no error.
 
 ---
 

@@ -23,7 +23,7 @@
 - [x] **2.10 Regression suite:** Passing output recorded in the evidence log.
 - [ ] **2.11 Checkout costing:** Complete a booking with a recipe and commission; verify consumption entries, stock movements, COGS snapshot, commission snapshot, and no duplicate legacy stock deduction.
 - [ ] **2.12 Stock cutover:** Reconcile every tested product's legacy stock with stock-movement sum before switching reads; verify sales, consumption, purchase, adjustment, and shrinkage all affect the derived value.
-- [ ] **2.13 Purchase endpoint:** POST a purchase; confirm purchase/lines, inbound movement, and weighted-average cost are correct with a hand calculation.
+- [ ] **2.13 Purchase endpoint:** POST a purchase; confirm `purchases`/`purchase_lines` and one inbound `stock_movements` row per line, with `total` matching a hand calculation of `Σ qty × unitCost`. **Note:** as implemented, this endpoint does not touch `inventory_products.cost_price` or compute a weighted-average cost — per `FINANCE_TRACKER.md` task 2.13, that is explicitly out of scope here (`stock_movements` only) and deferred to task 2.12's stock-quantity cutover, which itself doesn't cover `cost_price` either. If a weighted-average `cost_price` update is wanted before then, that's new scope to add to 2.13, not something to expect from the current code.
 - [ ] **2.14 Payroll provider link:** Rename a provider after completed sessions; verify payroll still attributes historic commission by `provider_id`.
 - [ ] **2.15 Device pulse costing:** Complete a device-backed service; confirm correct pulse deduction and cost snapshot, including a no-device service costing zero.
 - [ ] **2.16 Contract rollup:** Confirm every new route/side effect is documented and each completed row has evidence.

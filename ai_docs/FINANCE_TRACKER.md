@@ -1637,6 +1637,18 @@ internal computation change, document only what actually changes in the response
 confirm their historical commission still attributes correctly via `provider_id` where it did not
 before this fix.
 
+**Implementation note (2026-07-26, code review):** landed in `4339a99` largely as specified, with
+one consequence worth naming explicitly since it wasn't called out in that commit — all three
+match sites also narrowed their status filter from `status IN ('approved', 'completed')` to
+`status = 'completed'` only. This is not scope creep, it's a forced consequence of the commission
+source change: `invoice_lines.commission_snapshot` is only ever written at checkout completion
+(task 2.11/2.15), so an `approved`-but-not-yet-`completed` reservation has no snapshot to sum and
+would otherwise count toward `completed_services_count` at zero commission, understating the
+per-doctor average. Flagging here because it changes what current-month payroll shows for any
+reservation sitting in `approved` — RISKS.md's RISK-015 entry has been updated to reference this
+task; see there for the resolved/still-open split. `RISKS.md` — mark that update's own commit here
+once this task's row is closed.
+
 ---
 
 ## 2.15 — Migration: `service_devices`; wire device pulse cost into checkout
@@ -1703,6 +1715,20 @@ same convention as every other additive task in this tracker.
 `cogs_snapshot` on the matching `invoice_lines` row equals `consumptionCost(...) +
 costPerPulse(...) × pulses_per_session` exactly, and that `inventory_devices.remaining_pulses` is
 unchanged by this task specifically.
+
+**Implementation note (2026-07-26, code review + fix):** the initial `4339a99` implementation
+wrapped all of `applyCheckoutCosting()` — every invoice line's consumption entries, stock
+movements, and cost/commission snapshot writes — inside the single `try/catch` `writeCheckoutInvoice`
+already used to keep costing failures from failing the checkout itself (task 1.10's non-fatal
+pattern). That meant one bad line — a `service_devices` row pointing at a device still at its
+`max_pulses_limit = 0` default (the column's default value, so a very likely real state for any
+device whose rating hasn't been entered yet), or a recipe referencing a product still at its
+`role = 'retail'` default (task 2.1) — would throw out of the whole function and leave
+`cogs_snapshot`/`commission_snapshot` `NULL` for **every** line on that invoice, not just the
+misconfigured one. Fixed same-day by moving the `try/catch` inside the per-line loop: each
+invoice line is now costed and failure-isolated independently, so a bad device rating or an
+unready recipe only blanks that one line, and every correctly-configured line on the same
+checkout still gets its real `cogs_snapshot`/`commission_snapshot`.
 
 ---
 
