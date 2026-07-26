@@ -593,7 +593,7 @@ routes:**
 | 1.10 | Wire booking checkout (`PATCH /api/reservations`, `status: 'completed'`) to dual-write an invoice | 1.1–1.4, 1.7 | `DONE` | Claude | `aed3793` |
 | 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `DONE` | Claude | `58fe1dc` |
 | 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `DONE` | Claude | pending commit (live verification) |
-| 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `WIP` — migration applied to dev; pending live endpoint verification | Claude | — |
+| 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `DONE` | Claude | pending commit (live verification) |
 | 1.14 | `src/lib/customerBalances.ts` — derive `outstanding`/`spent_amount`/`wallet_balance` from the ledger + reconciliation endpoint | 1.1–1.4, 1.10, 1.11 | `TODO` | — | — |
 | 1.15 | Opening-balance import (DEC-024) | 1.1, 1.3, 1.4, 1.6 | `TODO` | — | — |
 | 1.16 | `API_CONTRACT.md` update for every new/changed endpoint | rolling, alongside 1.10–1.15 | `TODO` | — | — |
@@ -1083,7 +1083,7 @@ per DEC-023 no portion of it is "earned" yet; that only happens in 1.13, per ses
 
 ---
 
-## 1.13 — New endpoint: consume a package session — WIP, needs live verification
+## 1.13 — New endpoint: consume a package session — DONE, fully live-verified
 
 **Implementation update (2026-07-26):** recognition is a durable
 `package_revenue_recognitions` event, never a second customer-facing invoice. The new
@@ -1093,8 +1093,18 @@ that the completed reservation belongs to the same customer and includes the ent
 calling it; `POST /api/packages/extend` records a manual future expiry and the responsible employee.
 The new unique item/reservation pair prevents duplicate consumption. The migration was applied to
 linked dev on 2026-07-26; `supabase migration list --linked` matches local/remote through
-`20260726010700`, and `supabase db diff --linked` found no schema changes. Live endpoint flows must
-still be tested before this task can be marked `DONE`.
+`20260726010700`, and `supabase db diff --linked` found no schema changes.
+
+**Live-verified 2026-07-26** against deployed dev with a real staff session — see
+`FINANCE_PHASE_1_MANUAL_TESTS.md` for full evidence. A 3-session, 900 EGP package consumed across
+3 completed reservations recognised exactly `300 + 300 + 300 = 900`, matching the cumulative-then-
+subtract math the RPC uses (the same anti-drift technique task 1.8/1.9 already proved out for the
+pure-function version); `qty_remaining` decremented correctly each time and the package flipped to
+`fully_used` on the last session. All three "safe rejection" cases confirmed live: exhausted
+(`"Customer package is not active"`), expired (`"Customer package has expired"`), and wrong
+customer (`"Reservation does not belong to this package customer."`). Manual extend confirmed:
+`expires_at`, `status: 'active'`, `extended_by_employee_id`, and `extended_at` all set correctly on
+a previously-expired package.
 
 **Depends on 1.12.** **Where:** new route, or a new action on an existing one — again use
 judgement on the exact shape, document the choice.
