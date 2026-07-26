@@ -1,8 +1,8 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-07-20
+> **Last Updated:** 2026-07-26
 > **Base:** Next.js App Router API routes under `/app/api/`
-> **Auth:** Browser login form exists, but `/api/*` routes do not validate tokens/middleware; all routes use the Supabase service role key server-side
+> **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, and product-sales mutations); coverage is not yet universal. All routes use the Supabase service role key server-side
 > **Previous content was for a different project — discarded entirely**
 
 ---
@@ -196,8 +196,12 @@ Updates a reservation. Supports three modes:
 - Sets status to 'rejected'
 
 **Generic update (includes checkout/wallet adjustments):** `{ status?, notes?, doctorName?, sessionType?, amountPaid?, amountLeft?, walletDeposit?, walletWithdrawal? }`
-- Updates any combination of those fields
+- Requires a staff bearer token and updates any combination of those fields
 - Transitioning to status `'completed'` triggers patient balance ledger calculations
+
+**Public deposit self-report exception:** A booking in `pending_deposit` may be updated without a
+staff token only with `{ status: "pending", amountPaid, amountLeft, notes? }`. This supports the
+public booking payment-declaration flow; every other PATCH shape requires staff access.
 
 **Response:** Updated reservation
 

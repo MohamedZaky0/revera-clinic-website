@@ -13,7 +13,7 @@
 | Styling | Tailwind CSS v4 + shadcn/ui + CSS custom properties |
 | Database | Supabase (PostgreSQL) |
 | Storage | Supabase primary; local JSON fallback (`data/`) for providers + page_settings |
-| Auth (admin) | Supabase Auth (email + password). Login form rendered in-page; session checked on mount via `supabase.auth.getSession()`. Employee role + permissions fetched from `employee_accounts` + `roles` tables via `/api/auth/me`. Hardcoded bypass: `superadmin@revera.com` → full permissions, no DB lookup. **Note:** `/api/*` routes are unprotected on the server side; the gate is browser-only. |
+| Auth (admin) | Supabase Auth (email + password). Login form rendered in-page; session checked on mount via `supabase.auth.getSession()`. Employee role + permissions fetched from `employee_accounts` + `roles` tables via `/api/auth/me`. Hardcoded bypass: `superadmin@revera.com` → full permissions, no DB lookup. **Note:** selected sensitive mutation routes validate bearer tokens server-side, but authorization coverage is not yet universal; the browser gate alone is not sufficient. |
 | Auth (patient) | Phone/OTP modal — UI-only; OTP is `setTimeout`-simulated, no real SMS |
 | i18n | Custom `LanguageContext` (EN/AR, RTL/LTR) |
 | Icons | lucide-react |

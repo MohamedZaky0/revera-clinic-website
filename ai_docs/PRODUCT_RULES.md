@@ -126,12 +126,12 @@ without filtering by visible/active.
 `/admin` **does** have a Supabase email/password login gate (see "Admin login and role lookup"
 below, and DEC-010). This entry predated it and contradicted the rest of this file.
 
-**The accurate statement:** `src/middleware.ts:5` enforces a Supabase bearer token, but only for 4
-hardcoded route prefixes, and it only proves the caller is *some* valid Supabase user — not that
-they are staff. Only 2 of 34 API route files call `requireStaffAccess` / `requireAdministratorAccess`
-(`/api/roles`, `/api/employees`). The money-mutating routes — `/api/reservations` PATCH,
-`/api/inventory/products/sales`, `/api/inventory/products`, `/api/customers` — are **unauthenticated**.
-See RISK-018.
+**The accurate statement:** selected sensitive API mutations validate a bearer token in their
+handlers. `PATCH /api/reservations` requires `requireStaffAccess` except for its narrowly scoped
+public deposit self-report; `DELETE /api/reservations` requires an administrator; and payroll,
+roles, employees, and product-sales mutations have route-level checks. Coverage is not universal:
+`/api/customers`, inventory, and customer-product routes still require their own authorization
+review. See RISK-018.
 
 ---
 
@@ -148,7 +148,7 @@ Deletes all rows from the reservations table. No soft-delete. No confirmation be
 - Login uses Supabase Auth email/password.
 - `superadmin@revera.com` bypasses employee lookup and receives full permissions.
 - All other users: session token sent to `/api/auth/me`, which looks up `employee_accounts` + `roles` and returns `permissions` array.
-- **No server-side token validation on `/api/*` routes.**
+- Server-side token validation is partial; sensitive routes must enforce it in their handlers.
 
 ---
 

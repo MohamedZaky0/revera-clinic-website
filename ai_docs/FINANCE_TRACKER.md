@@ -473,34 +473,27 @@ backfilled from `doctor_name`.
   `fetchProductSalesHistory` sends no auth header either, and protecting `GET` too was out of
   scope for this pass.
 
-**Found, NOT done — this is the important part:**
-- `PATCH /api/reservations` is **still unauthenticated**, and that was a deliberate revert, not
-  an oversight. It has a genuine unauthenticated caller — a patient self-declares their deposit
-  payment from `BookingModal.tsx` (there is no patient login, RISK-003) via
-  `status:'pending'` + `amountPaid`/`amountLeft`/`notes` while the row is `pending_deposit`.
-  Every other shape through this handler — approve, reject, complete, reassign doctor/services —
-  is staff-only and is **not currently checked**.
-  A staff gate on the non-self-report shapes was written and tested, then reverted: **none of
-  the ~15 admin call sites** in `src/app/admin/page.tsx` that PATCH this route send an
-  `Authorization` header today (confirmed by grep). Shipping the gate would have 401'd every
-  approve, reject, checkout and booking edit in the admin panel — a severe regression, worse
-  than the gap it closes.
-- `/api/customers` is untouched for the same reason, one level worse: **patients** call it
-  directly (`AuthModal.tsx` self-lookup during OTP login, `profile/page.tsx` self-service), so it
-  cannot be staff-gated wholesale at all — it needs per-field or per-branch scoping, not a
-  blanket check.
-- `GET /api/inventory/products/sales`, and all of `/api/inventory/products` and
-  `/api/customers/products`, are unreviewed for this task.
+**Completed 2026-07-26:**
+- All admin `PATCH /api/reservations` callers now send the authenticated session token.
+- `PATCH /api/reservations` now calls `requireStaffAccess` for every mutation except the narrow
+  public deposit declaration from `BookingModal.tsx`: only a `pending_deposit` row may receive
+  `{ status: 'pending', amountPaid, amountLeft, notes? }` without a staff token.
+- This secures approval, rejection, checkout, lifecycle transitions, notes, service edits and
+  employee-attribution updates without breaking the public booking payment flow.
 
-**To finish this properly:**
-1. Add `Authorization: Bearer ${session.access_token}` to all ~15 `PATCH /api/reservations`
-   call sites in `admin/page.tsx` (same pattern as the two sales-route fixes above).
-2. Re-add the `isPatientDepositSelfReport` gate that was written and reverted — it is still in
-   git history in this commit's parent if you want the starting shape — using `requireStaffAccess`
-   for every non-self-report PATCH.
-3. Decide the scoping for `/api/customers` — it cannot be a blanket staff gate.
-4. Test the admin panel's full booking lifecycle (create, approve, reject, checkout, edit) end to
-   end before considering this task complete, since no test run was possible in this pass.
+**Still open:**
+- `/api/customers` is untouched because patients call it directly (`AuthModal.tsx` self-lookup
+  during OTP login and `profile/page.tsx` self-service); it requires per-field/identity scoping,
+  not a blanket staff gate.
+- `GET /api/inventory/products/sales`, all of `/api/inventory/products`, and all of
+  `/api/customers/products` remain unreviewed for this task.
+
+**Verification remaining before closing the wider authorization work:**
+1. Manually exercise the full admin booking lifecycle: create, approve, reject, checkout, edit,
+   and restore.
+2. Confirm the public deposit declaration transitions only its own `pending_deposit` booking to
+   `pending`.
+3. Decide the scoping model for `/api/customers`.
 
 **Original diagnosis, kept for reference:**
 

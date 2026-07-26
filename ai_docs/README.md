@@ -98,10 +98,10 @@ After that, check task-specific files:
 - Billing metrics: overall billing analytics reports are mock (but individual customer ledgers, and now Payroll/Inventory/POS, are real — corrected 2026-07-21)
 - All marketing: WhatsApp is external `wa.me` links only; no campaigns or templates
 - Notification templates
-- Full RBAC enforcement on API routes (browser login gate exists, but `/api/*` routes don't validate tokens)
+- Full RBAC enforcement on API routes (selected sensitive routes validate bearer tokens, but coverage is not universal)
 
 ### Critical Gaps (do not assume these work)
-- **API routes have no auth validation** — browser login gate exists, but direct HTTP calls to `/api/*` are unprotected (RISK-002 partially resolved)
+- **API authorization is incomplete** — selected sensitive mutation routes validate tokens, but direct calls to unreviewed routes remain unprotected (RISK-018)
 - **Patient OTP auth is simulated** — no SMS sent, no user created (RISK-003)
 - Doctor shifts and availability — not built; derived only from existing bookings
 - Waitlist — not built

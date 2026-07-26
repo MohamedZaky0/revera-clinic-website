@@ -639,6 +639,10 @@ export default function AdminPage() {
   const { isRTL } = useLanguage();
   // Auth state
   const [session, setSession] = useState<any>(null);
+  const authenticatedJsonHeaders = {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${session?.access_token || ""}`
+  };
   // Inactivity Settings State
   const [inactivityThreshold, setInactivityThreshold] = useState<number>(30);
   const [inactivityCountdown, setInactivityCountdown] = useState<number>(10);
@@ -6922,7 +6926,7 @@ export default function AdminPage() {
       {
         method: "PATCH",
         body: JSON.stringify({ action: "approve", timeSlot: slot, doctorName }),
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
       }
     );
     const json = await res.json();
@@ -7013,7 +7017,7 @@ export default function AdminPage() {
       if (newPatientStatus === 'approved') {
         await fetch(`/api/reservations?id=${created.id}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: authenticatedJsonHeaders,
           body: JSON.stringify({
             action: "approve",
             timeSlot: newPatientTimeSlot,
@@ -7023,7 +7027,7 @@ export default function AdminPage() {
       } else if (newPatientStatus === 'rejected') {
         await fetch(`/api/reservations?id=${created.id}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: authenticatedJsonHeaders,
           body: JSON.stringify({
             action: "reject",
           }),
@@ -7061,7 +7065,7 @@ export default function AdminPage() {
       {
         method: "PATCH",
         body: JSON.stringify({ status: viewingBooking.status, notes: newNotes }),
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
       }
     );
     if (!res.ok) {
@@ -24234,7 +24238,7 @@ export default function AdminPage() {
                             {
                               method: "PATCH",
                               body: JSON.stringify({ action: "reject" }),
-                              headers: { "Content-Type": "application/json" },
+                              headers: authenticatedJsonHeaders,
                             }
                           );
                           fetchRequests();
@@ -24496,7 +24500,7 @@ export default function AdminPage() {
                            const newType = e.target.value;
                            await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                              method: "PATCH",
-                             headers: { "Content-Type": "application/json" },
+                             headers: authenticatedJsonHeaders,
                              body: JSON.stringify({ sessionType: newType })
                            });
                            setViewingBooking(prev => prev ? { ...prev, sessionType: newType } : null);
@@ -24559,7 +24563,7 @@ export default function AdminPage() {
                                 try {
                                   const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                                     method: "PATCH",
-                                    headers: { "Content-Type": "application/json" },
+                                    headers: authenticatedJsonHeaders,
                                     body: JSON.stringify({ serviceIds: updatedIds }),
                                   });
                                   if (res.ok) {
@@ -24596,7 +24600,7 @@ export default function AdminPage() {
                             try {
                               const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                                 method: "PATCH",
-                                headers: { "Content-Type": "application/json" },
+                                headers: authenticatedJsonHeaders,
                                 body: JSON.stringify({ serviceIds: updatedServiceIds }),
                               });
                               if (res.ok) {
@@ -24874,7 +24878,7 @@ export default function AdminPage() {
                           if (await showConfirm(`Mark deposit of EGP ${depVal} as paid? This will move the booking to Pending.`)) {
                             const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                               method: 'PATCH',
-                              headers: { 'Content-Type': 'application/json' },
+                              headers: authenticatedJsonHeaders,
                               body: JSON.stringify({
                                 status: 'pending',
                                 amountPaid: depVal,
@@ -24922,7 +24926,7 @@ export default function AdminPage() {
                             if (await showConfirm("Are you sure you want to reject this request?")) {
                               await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                                 method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: authenticatedJsonHeaders,
                                 body: JSON.stringify({ action: 'reject' }),
                               });
                               setViewingBooking(null);
@@ -24986,7 +24990,7 @@ export default function AdminPage() {
                                 try {
                                   const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                                     method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
+                                    headers: authenticatedJsonHeaders,
                                     body: JSON.stringify({ status: 'confirmed' })
                                   });
                                   if (res.ok) {
@@ -25019,7 +25023,7 @@ export default function AdminPage() {
                               try {
                                 const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                                   method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
+                                  headers: authenticatedJsonHeaders,
                                   body: JSON.stringify({ status: 'confirmed' })
                                 });
                                 if (res.ok) {
@@ -25041,7 +25045,7 @@ export default function AdminPage() {
                             try {
                               const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                                   method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
+                                  headers: authenticatedJsonHeaders,
                                   body: JSON.stringify({ status: 'started' })
                               });
                               if (res.ok) {
@@ -25269,7 +25273,7 @@ export default function AdminPage() {
                           if (await showConfirm("Are you sure you want to cancel this booking?")) {
                             const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
                               method: "PATCH",
-                              headers: { "Content-Type": "application/json" },
+                              headers: authenticatedJsonHeaders,
                               body: JSON.stringify({ action: "reject" }),
                             });
                             if (res.ok) {
@@ -25343,7 +25347,7 @@ export default function AdminPage() {
                               onClick={async () => {
                                 await fetch(`/api/reservations?id=${r.id}`, {
                                   method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
+                                  headers: authenticatedJsonHeaders,
                                   body: JSON.stringify({ status: 'pending' })
                                 });
                                 fetchRequests();
@@ -27037,7 +27041,7 @@ export default function AdminPage() {
             try {
               const res = await fetch(`/api/reservations?id=${checkoutBooking.id}`, {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
+                headers: authenticatedJsonHeaders,
                 body: JSON.stringify({
                   status: "completed",
                   amountPaid: amountPaidNum,

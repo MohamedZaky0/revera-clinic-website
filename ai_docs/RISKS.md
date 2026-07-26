@@ -469,19 +469,18 @@ Notable traps inside it:
 ## RISK-018: The Money-Mutating API Routes Are Unauthenticated
 
 **Severity:** High → Medium · **Type:** Security
-**Found:** 2026-07-25 · **PARTIALLY resolved 2026-07-25** — see `FINANCE_TRACKER.md` 0.10 for the
-full breakdown, including what was deliberately reverted and why.
+**Found:** 2026-07-25 · **PARTIALLY resolved through 2026-07-26** — see
+`FINANCE_TRACKER.md` 0.10 for the remaining scope.
 
 **Fixed:** `DELETE /api/reservations` now requires admin; `POST /api/inventory/products/sales`
-now requires staff, with both real callers updated to send an auth header.
+now requires staff, with both real callers updated to send an auth header. `PATCH /api/reservations`
+now requires staff for every approval, rejection, checkout, lifecycle, note, or booking-edit action;
+the only unauthenticated exception is the strictly shaped public deposit self-report for a
+`pending_deposit` booking.
 
-**Still open, and this is the significant part:** `PATCH /api/reservations` — the route that
-approves, rejects, completes and settles bookings — remains unauthenticated. A staff gate was
-written and tested, then reverted, because none of the ~15 admin call sites that PATCH this route
-currently send an `Authorization` header; shipping the gate would have 401'd the entire booking
-workflow. `/api/customers` is untouched for a related reason: patients call it directly for OTP
-login and self-service, so it cannot be staff-gated without per-field scoping. See the tracker for
-the exact remaining steps.
+**Still open:** `/api/customers` cannot be staff-gated wholesale because patients call it for OTP
+login and self-service; it needs per-field/identity scoping. The inventory and customer-product
+routes still need their own authorization review.
 
 Original diagnosis below.
 
