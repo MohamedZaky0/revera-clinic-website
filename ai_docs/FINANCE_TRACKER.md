@@ -1211,7 +1211,7 @@ Close this out last.
 | 2.11 | Checkout recipe consumption and invoice cost/commission snapshots | 1.10, 2.2, 2.3, 2.9 | `DONE` | Claude | pending commit (live verification) |
 | 2.12 | Cut `stock_quantity` over to derive from `stock_movements` | 2.4, 2.11 | `BLOCKED` — requires a trial period of reconciled movement data | — | — |
 | 2.13 | `POST /api/purchases` | 2.5, 2.6 | `DONE` | Claude | pending commit (live verification) |
-| 2.14 | Doctor payroll uses `provider_id` | 0.7, 2.8, 2.9 | `WIP` — durable identity fix implemented; pending snapshot/live verification | Claude | pending commit |
+| 2.14 | Doctor payroll uses `provider_id` | 0.7, 2.8, 2.9 | `DONE` | Claude | pending commit (live verification) |
 | 2.15 | `service_devices` and checkout pulse cost | 2.7, 2.9, 2.11 | `DONE` | Claude | pending commit (live verification) |
 | 2.16 | `API_CONTRACT.md` rollup for Phase 2 | rolling | `WIP` — current endpoints documented; close after verification | Claude | pending commit |
 
@@ -1675,6 +1675,13 @@ stock quantity increased by exactly the purchased qty.
 ---
 
 ## 2.14 — Doctor payroll: match by `provider_id`, not `doctor_name` string
+
+**DONE, live-verified 2026-07-26** against deployed dev — see `FINANCE_PHASE_2_MANUAL_TESTS.md`.
+A disposable provider with one completed, commission-snapshotted booking reported
+`calculated_commission: 25` via `GET /api/hr/doctor-payroll`; after renaming the provider, the
+same `id` still reported the identical `calculated_commission: 25` and `reservations_count: 1` —
+RISK-015's core claim (a rename can no longer silently detach commission) confirmed under a real
+rename, not just by reading the code.
 
 **Depends on 0.7 (the `provider_id` FK already exists and is populated on create/approve/update),
 2.8 (commission constraints), 2.9 (commission math).** **Where:**
