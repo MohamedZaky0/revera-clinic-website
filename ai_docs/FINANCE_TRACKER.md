@@ -1210,7 +1210,7 @@ Close this out last.
 | 2.10 | Regression checks for 2.9 | 2.9 | `DONE` | Claude | pending commit |
 | 2.11 | Checkout recipe consumption and invoice cost/commission snapshots | 1.10, 2.2, 2.3, 2.9 | `DONE` | Claude | pending commit (live verification) |
 | 2.12 | Cut `stock_quantity` over to derive from `stock_movements` | 2.4, 2.11 | `BLOCKED` — requires a trial period of reconciled movement data | — | — |
-| 2.13 | `POST /api/purchases` | 2.5, 2.6 | `WIP` — implemented; pending live verification | Claude | pending commit |
+| 2.13 | `POST /api/purchases` | 2.5, 2.6 | `DONE` | Claude | pending commit (live verification) |
 | 2.14 | Doctor payroll uses `provider_id` | 0.7, 2.8, 2.9 | `WIP` — durable identity fix implemented; pending snapshot/live verification | Claude | pending commit |
 | 2.15 | `service_devices` and checkout pulse cost | 2.7, 2.9, 2.11 | `DONE` | Claude | pending commit (live verification) |
 | 2.16 | `API_CONTRACT.md` rollup for Phase 2 | rolling | `WIP` — current endpoints documented; close after verification | Claude | pending commit |
@@ -1649,6 +1649,12 @@ path.
 ---
 
 ## 2.13 — New endpoint: record a purchase
+
+**DONE, live-verified 2026-07-26** against deployed dev with a real staff session — see
+`FINANCE_PHASE_2_MANUAL_TESTS.md`. A 2-line purchase produced `total: 1240` (exact hand-check),
+one `'in'` `stock_movements` row per line, and confirmed `inventory_products.stock_quantity`/
+`cost_price` are untouched by this route (deferred to 2.12/future scope, as documented below).
+Unauthenticated `POST` correctly `401`s.
 
 **Depends on 2.5, 2.6.** **Where:** new `src/app/api/purchases/route.ts`.
 
