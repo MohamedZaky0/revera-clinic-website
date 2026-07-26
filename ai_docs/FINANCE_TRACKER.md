@@ -523,20 +523,38 @@ routes:**
 
 # Phase 1 — Financial Ledger Spine
 
-> ## ⏸ PAUSED 2026-07-26 — read this before doing anything else in Phase 1+
+> ## ✅ Phase 2–5 now broken into micro-tasks (2026-07-26) — read this before writing code
 >
-> On explicit user instruction, code execution stopped after task 1.10 (checkout invoice
-> dual-write — see that section for its exact unfinished state) mid-way through. **The next
-> session's first job is NOT to keep writing Phase 1 code.** It is to break Phase 2, 3, 4 and 5
+> The pause note below (kept, struck through, for the reasoning) asked for Phase 2, 3, 4 and 5 to
+> be broken into the same kind of tracked micro-tasks Phase 1 already had, before any more
+> implementation code is written. That breakdown is now done — see "Phase 2 — Cost of Delivery",
+> "Phase 3 — Overheads, Assets, Liabilities", "Phase 4 — Reporting Engine + UI" and "Phase 5 —
+> Capacity & Optimization" below. **Code execution may now resume**, picking up wherever it is
+> genuinely needed most — which may still be finishing 1.10's live verification (see that section)
+> rather than starting Phase 2 tasks in strict numeric order. Dependency columns in each phase's
+> task table say what must exist first; they do not mandate a stricter order beyond that.
+>
+> **Note on how this section came to exist:** two sessions independently wrote this same Phase 2–5
+> breakdown in parallel from the same starting point and both tried to push. The version merged
+> into this file is primarily the more detailed of the two, plus one addition grafted in from the
+> other during reconciliation — task 2.15 (`service_devices`), which closes a real gap: task 2.9's
+> `costPerPulse()` was defined in both drafts but never actually called anywhere without it. If a
+> task here references something that seems to assume a different numbering than you expected,
+> this merge is why — the task table and dependency columns are the source of truth, not memory of
+> either original draft.
+>
+> ~~On explicit user instruction, code execution stopped after task 1.10 (checkout invoice
+> dual-write — see that section for its exact unfinished state) mid-way through. The next
+> session's first job is NOT to keep writing Phase 1 code. It is to break Phase 2, 3, 4 and 5
 > into the same kind of tracked micro-tasks this file already has for Phase 1 — see each phase's
-> outline in `PROPOSALS.md` for the starting material. **Only once all five phases are broken down
-> this way should code execution resume**, picking up wherever it is genuinely needed most (which
-> may still be finishing 1.10's live verification — see that section — not necessarily Phase 2).
+> outline in `PROPOSALS.md` for the starting material. Only once all five phases are broken down
+> this way should code execution resume, picking up wherever it is genuinely needed most (which
+> may still be finishing 1.10's live verification — see that section — not necessarily Phase 2).~~
 >
 > This mirrors why Phase 0 was broken into 0.0–0.10 before any of it was touched, and why Phase 1
-> was broken into 1.1–1.16 before this session wrote a single migration: planning the whole unit
+> was broken into 1.1–1.16 before that session wrote a single migration: planning the whole unit
 > first is what let each individual task stay small, reviewable, and safe to hand to a different
-> model without re-deriving context. Do the same for 2–5 before writing more implementation code.
+> model without re-deriving context.
 
 > **Status as of 2026-07-26: WIP.** Broken into micro-tasks below so any model — a fresh
 > session, a different AI, a human — can pick up exactly one task, know precisely what file to
@@ -1113,7 +1131,8 @@ Close this out last.
 | 2.12 | Cut `stock_quantity` over to be derived from `stock_movements` | 2.4, 2.11 | `TODO` | — | — |
 | 2.13 | New endpoint: record a purchase (`POST /api/purchases`) | 2.5, 2.6 | `TODO` | — | — |
 | 2.14 | Doctor payroll: match by `provider_id`, not `doctor_name` string | 0.7, 2.8, 2.9 | `TODO` | — | — |
-| 2.15 | `API_CONTRACT.md` rollup for Phase 2 | rolling, alongside 2.11–2.14 | `TODO` | — | — |
+| 2.15 | Migration: `service_devices` table; wire device pulse cost into checkout (merge addition — closes a gap where `costPerPulse` was defined but never called) | 2.7, 2.9, 2.11 | `TODO` | — | — |
+| 2.16 | `API_CONTRACT.md` rollup for Phase 2 | rolling, alongside 2.11–2.15 | `TODO` | — | — |
 
 **Same "additive, then cutover" discipline as Phase 1.** 2.11 is additive — it populates the two
 columns Phase 1 deliberately left `NULL` (see task 1.2's note) without touching anything else on
@@ -1484,6 +1503,9 @@ services:
    has real data flowing through it, mirroring exactly how task 1.14 is separated from 1.10/1.11.
 4. Compute `cogs_snapshot = consumptionCost(...)` (task 2.9) and write it onto the corresponding
    `invoice_lines` row — this is the `NULL` column task 1.2 deliberately left for Phase 2 to fill.
+   **Materials only at this point** — task 2.15 extends this same block to add device pulse cost
+   into the same `cogs_snapshot` value; do not treat this step's output as the line's final cost
+   until 2.15 has also landed.
 5. Resolve the booking's `provider_id` (already populated by task 0.7's `resolveProviderId()`),
    look up that provider's `commission_type`/`commission_value`/`commission_base` (task 2.8), and
    write `computeCommission(...)` onto `invoice_lines.commission_snapshot`.
@@ -1590,9 +1612,76 @@ before this fix.
 
 ---
 
-## 2.15 — `API_CONTRACT.md` rollup
+## 2.15 — Migration: `service_devices`; wire device pulse cost into checkout
 
-Not a separate implementation task — a checklist to run once 2.11–2.14 are done, confirming every
+**Added during a merge of two independently-written breakdowns of this same phase (2026-07-26) —
+not in either original draft, flagged explicitly rather than silently folded in.** Task 2.9 defines
+`costPerPulse(lampReplacementCost, ratedPulses)` and task 2.7 adds the `lamp_replacement_cost`
+input it needs, but **no table anywhere records which service uses which device, or how many
+pulses a session consumes** — without that link, `costPerPulse()` has no way to know it should run
+for a given service line, and task 2.11's checkout wiring only ever calls `consumptionCost()`
+(materials). Verified by grep: the only file touching `inventory_devices.total_pulses` /
+`remaining_pulses` / `max_pulses_limit` is the admin devices route itself (manual edits and pulse
+resets) — nothing in `src/` ties a pulse count to a reservation today. Left unaddressed, every
+laser/device-based service's `cogs_snapshot` (task 2.11) would silently exclude its device cost
+forever, understating true margin for exactly the services this module exists to get right.
+
+**Depends on 2.7 (`lamp_replacement_cost`), 2.9 (`costPerPulse`), 2.11 (the checkout block this
+task extends).** **Where:** `supabase/migrations/<timestamp>_create_service_devices.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS public.service_devices (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  service_id          bigint NOT NULL REFERENCES public.services(id) ON DELETE CASCADE,
+  device_id           text NOT NULL REFERENCES public.inventory_devices(id) ON DELETE CASCADE,
+  pulses_per_session  integer NOT NULL CHECK (pulses_per_session > 0),
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (service_id, device_id)
+);
+
+CREATE INDEX IF NOT EXISTS service_devices_service_id_idx ON public.service_devices (service_id);
+
+ALTER TABLE public.service_devices ENABLE ROW LEVEL SECURITY;
+```
+
+**Why this mirrors `service_consumables` (task 2.2) exactly:** same shape, same reasoning — a
+recipe of "this service standardly uses N pulses of this device." A service that uses no laser
+device simply has no row here, and its pulse cost is 0, same as a service with no
+`service_consumables` rows having no material cost.
+
+**Checkout wiring, additive to task 2.11's block, same file
+(`src/app/api/reservations/route.ts`):** for each completed service line with a matching
+`service_devices` row, call `costPerPulse(device.lamp_replacement_cost, device.max_pulses_limit) ×
+pulses_per_session` and **add** it into that line's `cogs_snapshot` alongside
+`consumptionCost(...)` — both feed the same column, not two separate ones, since `cogs_snapshot` is
+defined (task 1.2) as the line's total cost of goods, materials and device wear together. Does
+**not** decrement `inventory_devices.remaining_pulses` — that stays exactly where task 2.12 left
+it (unmutated by anything in this phase), consistent with the dual-write discipline every other
+2.x write-path task follows: this task only adds a `cogs_snapshot` contribution, it does not touch
+pulse-count bookkeeping.
+
+**Open question this task surfaces, not answered here:** a session's *actual* pulse count could
+differ from the standard recipe (a longer session, an equipment retry), same as consumables' DEC-016
+edit-at-completion pattern. **Not built in this pass** — `pulses_per_session` is treated as fixed at
+checkout. If staff need to log an actual pulse count per session, that needs its own
+`device_consumption_entries`-shaped table, analogous to `consumption_entries` (task 2.3); revisit
+if this turns out to matter in practice.
+
+**Update `DB_SCHEMA.md`:** add `### service_devices` alongside the other Phase 2 tables, and a note
+on the existing `cogs_snapshot` row (Phase 1 section) that it includes device pulse cost as of this
+task, not materials alone. **Update `API_CONTRACT.md`:** note the extended checkout side effect,
+same convention as every other additive task in this tracker.
+
+**Verify:** complete a real booking for a service with a `service_devices` row; confirm
+`cogs_snapshot` on the matching `invoice_lines` row equals `consumptionCost(...) +
+costPerPulse(...) × pulses_per_session` exactly, and that `inventory_devices.remaining_pulses` is
+unchanged by this task specifically.
+
+---
+
+## 2.16 — `API_CONTRACT.md` rollup
+
+Not a separate implementation task — a checklist to run once 2.11–2.15 are done, confirming every
 new/changed endpoint from this phase is documented there. Close this out last, same pattern as
 task 1.16.
 
@@ -2028,7 +2117,7 @@ verifies the endpoint actually calls it correctly end to end) and the final peri
 
 ## 3.13 — `API_CONTRACT.md` rollup
 
-Checklist task, same pattern as 1.16/2.15 — confirm every new/changed Phase 3 endpoint is
+Checklist task, same pattern as 1.16/2.16 — confirm every new/changed Phase 3 endpoint is
 documented. Close this out last.
 
 ---
