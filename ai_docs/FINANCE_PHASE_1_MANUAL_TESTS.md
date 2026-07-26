@@ -83,5 +83,5 @@
 
 ### 1.16 — Contract rollup
 
-- [ ] Confirm every Phase 1 endpoint and side effect is described in `API_CONTRACT.md`.
-- [ ] Confirm every completed task above has dated evidence and that the tracker status/commit hash agree.
+- [x] Confirm every Phase 1 endpoint and side effect is described in `API_CONTRACT.md`. **Found and fixed a real gap:** `PATCH /api/reservations` was split across two disconnected entries in the file; consolidated into one.
+- [x] Confirm every completed task above has dated evidence and that the tracker status/commit hash agree. Backfilled every remaining `pending commit` placeholder in `FINANCE_TRACKER.md`'s Phase 1 task table with real commit hashes. **1.15 remains genuinely `TODO`** (deliberately deferred by user decision, not forgotten) — this rollup runs against 1.1–1.14's actual completed state rather than waiting on it.

@@ -195,9 +195,11 @@ Updates a reservation. Supports three modes:
 **Reject:** `{ action: "reject" }`
 - Sets status to 'rejected'
 
-**Generic update (includes checkout/wallet adjustments):** `{ status?, notes?, doctorName?, sessionType?, amountPaid?, amountLeft?, walletDeposit?, walletWithdrawal? }`
+**Generic update (includes checkout/wallet adjustments):** `{ status?, notes?, doctorName?, sessionType?, amountPaid?, amountLeft?, walletDeposit?, walletWithdrawal?, consumptionOverrides? }`
 - Requires a staff bearer token and updates any combination of those fields
 - Transitioning to status `'completed'` triggers patient balance ledger calculations and an additive invoice, invoice-line, and payment write; the pre-existing reservation and customer balance updates remain unchanged
+- A later `amountPaid` change on an already-`completed` reservation appends one more payment row to that reservation's existing invoice, rather than creating a duplicate invoice or duplicate service lines
+- `consumptionOverrides` (optional, shaped as `{ [serviceId]: { [productId]: qty } }`, task 2.11): when the completed booking's services have configured `service_consumables`/`service_devices` recipes, the additive Phase 2 side effects create `consumption_entries`/`stock_movements` rows and snapshot material + device pulse COGS and provider commission onto the corresponding `invoice_lines`. A per-line costing failure (e.g. an unconfigured device rating) is logged and leaves only that line's `cogs_snapshot`/`commission_snapshot` `NULL` — it does not affect other lines on the same checkout or fail the checkout itself
 
 **Public deposit self-report exception:** A booking in `pending_deposit` may be updated without a
 staff token only with `{ status: "pending", amountPaid, amountLeft, notes? }`. This supports the
@@ -240,11 +242,16 @@ Requires a staff bearer token. Records a retail product sale, deducts stock, and
 
 **Body:** `{ product_id, product_name?, product_sku?, customer_id, customer_name?, customer_mobile?, customer_email?, quantity, unit_price?, total_amount?, branch_name?, sold_by?, payment_method?, notes? }`
 
-Required: `product_id`, `customer_id`, and positive `quantity`.
+Required: `product_id`, `customer_id`, and positive `quantity`. **Updated 2026-07-26 (RISK-022 fix):**
+`customer_id` must resolve to an existing `customers` row, checked **before** any stock or ledger
+write — a non-existent `customer_id` now returns `404` rather than silently deducting stock and
+losing the sale record (`product_sales.customer_id` has an FK; a bad id previously failed that
+insert only, fell back to a `page_settings` blob, and still reported success).
 
 After a successful native `product_sales` insert, the route additively attempts to create one issued product invoice, invoice line, and payment row. A ledger-write failure is logged and does not roll back or fail the established POS sale path.
 
-**Response:** `{ success: true, sale: ProductSaleRecord, sales: ProductSaleRecord[] }`
+**Response:** `{ success: true, sale: ProductSaleRecord, sales: ProductSaleRecord[] }` (`200`), or
+`{ success: false, error }` (`404` for a non-existent customer, `400` for missing/invalid required fields)
 
 ---
 
@@ -269,12 +276,6 @@ Requires a staff bearer token.
 Creates one purchase, its lines, and matching inbound `stock_movements`. `total` is derived on the server from the lines; all referenced products and an optional supplier must exist.
 
 **Response:** `{ purchase, lines }`, status 201.
-
----
-
-## PATCH /api/reservations?id=<reservation-id>
-
-When a staff checkout transitions a reservation to `completed`, it may include optional `consumptionOverrides` shaped as `{ [serviceId]: { [productId]: qty } }`. The existing checkout ledger side effects remain unchanged. When recipes/devices are configured, the additive Phase 2 side effects create consumption and stock-movement records and snapshot material/device COGS plus provider commission on invoice lines. A costing failure is logged without failing checkout.
 
 ---
 
@@ -517,6 +518,48 @@ Employee self check-out — records `check_out_time` for the employee's attendan
 **Body:** `{ employeeId }`
 
 **Response:** Updated `hr_attendance` row
+
+---
+
+## GET /api/hr/doctor-payroll
+
+Requires HR access (`verifyHrAccess`). Returns every stored `doctor_payroll` row, enriched with the
+provider's current name/specialty and a freshly-computed commission for the row's month.
+
+**Updated 2026-07-26 (task 2.14):** completed-reservation matching and commission are now
+attributed via `provider_id` (`reservations.provider_id === providers.id`), not a case-insensitive
+`doctor_name` string match — a provider rename no longer detaches historical commission (RISK-015).
+`calculated_commission` sums real per-reservation `invoice_lines.commission_snapshot` values (task
+2.11/2.15's checkout costing) rather than re-deriving commission live from `amount_paid +
+amount_left`. Only reservations with `status: 'completed'` count (narrowed from
+`'approved' OR 'completed'` — a necessary consequence, since `commission_snapshot` only exists once
+checkout completes an invoice line).
+
+**Response:** array of
+`{ id, provider_id, month, fixed_salary, commission_type, commission_value, status, doctor: { id, name, specialty, employee_id }, fixed_salary_snapshot, commission_type_snapshot, commission_value_snapshot, reservations_count, calculated_commission, total_reservations_value, net_salary }`
+
+---
+
+## POST /api/hr/doctor-payroll
+
+Requires HR access. Runs payroll for a given `month`, inserting one `doctor_payroll` row per
+active provider using the same `provider_id`-based commission attribution as `GET` above.
+
+**Body:** `{ month }` (`'YYYY-MM'`)
+
+**Response:** Inserted `doctor_payroll` rows
+
+---
+
+## PATCH /api/hr/doctor-payroll
+
+Requires HR access. Updates one `doctor_payroll` row by `id`. If `total_commission_earned` is not
+explicitly supplied, it is recalculated the same way as `GET`/`POST` (`provider_id`-based, summed
+from `commission_snapshot`) before being locked in.
+
+**Body:** `{ id, fixed_salary?, total_commission_earned?, status?, ... }`
+
+**Response:** Updated `doctor_payroll` row
 
 ---
 

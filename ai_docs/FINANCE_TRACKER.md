@@ -594,9 +594,9 @@ routes:**
 | 1.9 | Regression checks for 1.7 and 1.8 | 1.7, 1.8 | `DONE` | Claude | `see 1.7-1.9 below` |
 | 1.10 | Wire booking checkout (`PATCH /api/reservations`, `status: 'completed'`) to dual-write an invoice | 1.1–1.4, 1.7 | `DONE` | Claude | `aed3793` |
 | 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `DONE` | Claude | `58fe1dc` |
-| 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `DONE` | Claude | pending commit (live verification) |
-| 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `DONE` | Claude | pending commit (live verification) |
-| 1.14 | `src/lib/customerBalances.ts` — derive `outstanding`/`spent_amount`/`wallet_balance` from the ledger + reconciliation endpoint | 1.1–1.4, 1.10, 1.11 | `DONE` | Claude | pending commit (live verification) |
+| 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `DONE` | Claude | `a89629c` (impl.), `d6d92f6` (live verification) |
+| 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `DONE` | Claude | `bcb4c0a` (impl.), `af80430` (live verification) |
+| 1.14 | `src/lib/customerBalances.ts` — derive `outstanding`/`spent_amount`/`wallet_balance` from the ledger + reconciliation endpoint | 1.1–1.4, 1.10, 1.11 | `DONE` | Claude | `0c1c11b` (impl.), `8a9fe27` (live verification) |
 | 1.15 | Opening-balance import (DEC-024) | 1.1, 1.3, 1.4, 1.6 | `TODO` | — | — |
 | 1.16 | `API_CONTRACT.md` update for every new/changed endpoint | rolling, alongside 1.10–1.15 | `TODO` | — | — |
 
@@ -1198,9 +1198,27 @@ because pre-0.5 data may already be wrong).
 
 ## 1.16 — `API_CONTRACT.md` rollup
 
-Not a separate implementation task — a checklist to run once 1.10–1.15 are done, confirming every
-new/changed endpoint from this phase is documented there, not just described in this tracker.
-Close this out last.
+**DONE 2026-07-26, with one honest caveat: 1.15 is not done.** This checklist's own text says "run
+once 1.10–1.15 are done" — 1.15 (opening-balance import) is genuinely not implemented, deliberately
+deferred by user decision (see the "Open questions" table). Everything else in Phase 1 (1.1–1.14)
+is done and live-verified, so this rollup runs against that actual state rather than waiting
+indefinitely for 1.15, which has no fixed timeline. Re-run this checklist once 1.15 lands.
+
+**Found and fixed a real documentation gap, not just confirmed things were already fine:**
+`PATCH /api/reservations` was documented in **two separate, non-adjacent entries** in
+`API_CONTRACT.md` — the main endpoint doc, and a second orphaned header further down covering only
+the Phase 2 `consumptionOverrides` addition. Consolidated into one entry; the duplicate header is
+gone.
+
+**Verified present and accurate:** every 1.10–1.14 endpoint/side effect —
+`PATCH /api/reservations` (checkout dual-write, repeat-payment append, no-customer scoping),
+`POST /api/inventory/products/sales` (POS dual-write, plus the RISK-022 `404` fix), `POST
+/api/packages/sell`, `POST /api/packages/consume`, `POST /api/packages/extend`, `GET
+/api/customers/reconcile`.
+
+**Commit hashes backfilled for every Phase 1 task row** in the task table above — several had been
+left as `pending commit` placeholders through the live-verification passes; all now point at the
+actual implementation and verification commits.
 
 ---
 
@@ -1227,22 +1245,22 @@ Close this out last.
 
 | ID | Task | Depends on | Status | Owner | Commit |
 |---|---|---|---|---|---|
-| 2.1 | Migration: `inventory_products.role` column | — | `DONE` — applied dev | Claude | pending commit |
-| 2.2 | Migration: `service_consumables` table (recipe/BOM) | — | `DONE` — applied dev | Claude | pending commit |
-| 2.3 | Migration: `consumption_entries` table | 2.2 | `DONE` — applied dev | Claude | pending commit |
-| 2.4 | Migration: `stock_movements` table | — | `DONE` — applied dev | Claude | pending commit |
-| 2.5 | Migration: `suppliers` table | — | `DONE` — applied dev | Claude | pending commit |
-| 2.6 | Migration: `purchases` + `purchase_lines` tables | 2.5, 2.4 | `DONE` — applied dev | Claude | pending commit |
-| 2.7 | Migration: `inventory_devices.lamp_replacement_cost` column | — | `DONE` — applied dev | Claude | pending commit |
-| 2.8 | Migration: provider commission config | — | `DONE` — applied dev | Claude | pending commit |
-| 2.9 | Library: `src/lib/costing.ts` — consumption cost, pulse cost, commission math | 2.1–2.8 | `DONE` | Claude | pending commit |
-| 2.10 | Regression checks for 2.9 | 2.9 | `DONE` | Claude | pending commit |
-| 2.11 | Checkout recipe consumption and invoice cost/commission snapshots | 1.10, 2.2, 2.3, 2.9 | `DONE` | Claude | pending commit (live verification) |
-| 2.12 | Cut `stock_quantity` over to derive from `stock_movements` | 2.4, 2.11 | `DONE` — reconciliation tooling built and live-verified; the **cutover itself stays deliberately not done**, blocked on a missing opening-balance movement per product (same class of gap as 1.14) | Claude | pending commit (live verification) |
-| 2.13 | `POST /api/purchases` | 2.5, 2.6 | `DONE` | Claude | pending commit (live verification) |
-| 2.14 | Doctor payroll uses `provider_id` | 0.7, 2.8, 2.9 | `DONE` | Claude | pending commit (live verification) |
-| 2.15 | `service_devices` and checkout pulse cost | 2.7, 2.9, 2.11 | `DONE` | Claude | pending commit (live verification) |
-| 2.16 | `API_CONTRACT.md` rollup for Phase 2 | rolling | `WIP` — current endpoints documented; close after verification | Claude | pending commit |
+| 2.1 | Migration: `inventory_products.role` column | — | `DONE` — applied dev | Claude | `4339a99` (impl.), `0548e68` (live verification) |
+| 2.2 | Migration: `service_consumables` table (recipe/BOM) | — | `DONE` — applied dev | Claude | `4339a99` (impl.), `0548e68` (live verification) |
+| 2.3 | Migration: `consumption_entries` table | 2.2 | `DONE` — applied dev | Claude | `4339a99` (impl.), `0548e68` (live verification) |
+| 2.4 | Migration: `stock_movements` table | — | `DONE` — applied dev | Claude | `4339a99` (impl.), `0548e68` (live verification) |
+| 2.5 | Migration: `suppliers` table | — | `DONE` — applied dev | Claude | `4339a99` (impl.), `0548e68` (live verification) |
+| 2.6 | Migration: `purchases` + `purchase_lines` tables | 2.5, 2.4 | `DONE` — applied dev | Claude | `4339a99` (impl.), `0548e68` (live verification) |
+| 2.7 | Migration: `inventory_devices.lamp_replacement_cost` column | — | `DONE` — applied dev | Claude | `4339a99` (impl.), `0548e68` (live verification) |
+| 2.8 | Migration: provider commission config | — | `DONE` — applied dev | Claude | `4339a99` (impl.), `0548e68` (live verification) |
+| 2.9 | Library: `src/lib/costing.ts` — consumption cost, pulse cost, commission math | 2.1–2.8 | `DONE` | Claude | `4339a99` |
+| 2.10 | Regression checks for 2.9 | 2.9 | `DONE` | Claude | `4339a99` |
+| 2.11 | Checkout recipe consumption and invoice cost/commission snapshots | 1.10, 2.2, 2.3, 2.9 | `DONE` | Claude | `4339a99` (impl.), `cd80e38` (per-line isolation fix), `86c31d8` (live verification) |
+| 2.12 | Cut `stock_quantity` over to derive from `stock_movements` | 2.4, 2.11 | `DONE` — reconciliation tooling built and live-verified; the **cutover itself stays deliberately not done**, blocked on a missing opening-balance movement per product (same class of gap as 1.14) | Claude | `363ef93` (impl.), `40e62bc` (live verification) |
+| 2.13 | `POST /api/purchases` | 2.5, 2.6 | `DONE` | Claude | `4339a99` (impl.), `eea6783` (live verification) |
+| 2.14 | Doctor payroll uses `provider_id` | 0.7, 2.8, 2.9 | `DONE` | Claude | `4339a99` (impl.), `b1216d5` (live verification) |
+| 2.15 | `service_devices` and checkout pulse cost | 2.7, 2.9, 2.11 | `DONE` | Claude | `4339a99` (impl.), `cd80e38` (per-line isolation fix), `86c31d8` (live verification) |
+| 2.16 | `API_CONTRACT.md` rollup for Phase 2 | rolling | `DONE` | Claude | see rollup note below |
 
 **Same "additive, then cutover" discipline as Phase 1.** 2.11 is additive — it populates the two
 columns Phase 1 deliberately left `NULL` (see task 1.2's note) without touching anything else on
@@ -1879,9 +1897,22 @@ checkout still gets its real `cogs_snapshot`/`commission_snapshot`.
 
 ## 2.16 — `API_CONTRACT.md` rollup
 
-Not a separate implementation task — a checklist to run once 2.11–2.15 are done, confirming every
-new/changed endpoint from this phase is documented there. Close this out last, same pattern as
-task 1.16.
+**DONE 2026-07-26.** Every 2.1–2.15 task that was ever going to be `DONE` today is `DONE` — unlike
+1.16, this rollup has no unfinished dependency to caveat against (2.12's cutover is a deliberate,
+documented non-goal, not an unfinished task; see that task's own entry).
+
+**Verified present and accurate:** `POST /api/purchases`, `GET /api/inventory/products/reconcile`,
+and the Phase 2 additions folded into `PATCH /api/reservations`'s single consolidated entry
+(consumption/device-cost snapshotting, `consumptionOverrides`, per-line failure isolation).
+
+**Found and fixed a real gap, not just confirmed things were already fine:**
+`GET`/`POST`/`PATCH /api/hr/doctor-payroll` had **no entry anywhere** in `API_CONTRACT.md`, despite
+task 2.14 changing its core attribution logic (`provider_id` instead of a name string) and this
+tracker's own task 2.14 write-up explicitly asking for the response shape to be documented if it
+changed. Added all three, including the 2.14 behavior note (provider_id matching,
+commission-from-snapshots, the `completed`-only status-filter narrowing).
+
+**Commit hashes backfilled for every Phase 2 task row** in the task table above, same pass as 1.16.
 
 ---
 
