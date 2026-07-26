@@ -1,9 +1,10 @@
 # supabase/migrations — How to Run
 
-> **Last Updated:** 2026-07-25
-> **Status: mid-transition.** The Supabase CLI is now configured (`supabase/config.toml`), but the
-> project has not been linked and no baseline has been pulled yet. Until step 2 below is done,
-> migrations are still applied by hand. See `ai_docs/FINANCE_TRACKER.md` task 0.0.
+> **Last Updated:** 2026-07-26
+> **Status: mid-transition.** The Supabase CLI is configured and linked to the dev database. Its
+> migration history was reconciled with the 32 confirmed applied local migrations on 2026-07-26.
+> A clean baseline has not been created yet: `db pull` cannot replay the legacy migration order in
+> its shadow database. See `ai_docs/FINANCE_TRACKER.md` task 0.0.
 
 ---
 
@@ -65,6 +66,12 @@ it. `supabase/.gitignore` already excludes `.env.local` and `.env.*.local`.
 
 ### 2. One-time for the repo — establish the baseline (NOT DONE YET)
 
+> **Current blocker:** `npx supabase db pull --schema public` reaches shadow-database provisioning
+> but fails because `20260624015717_customers_schema.sql` alters `reservations` before any legacy
+> migration creates it. Do not retry it until the legacy sequence is replaced by a clean baseline.
+> A direct `npx supabase db dump --linked --schema public` succeeded on 2026-07-26 and is the
+> trustworthy source for that baseline.
+
 ```bash
 npx supabase db pull --schema public
 ```
@@ -73,8 +80,9 @@ This generates a migration **from the live database**, which is the only trustwo
 the schema. Do this against **dev**, since it is the more current of the two.
 
 Then:
-1. Review the generated file — it will include `admin_roles` and `employees`, which are undocumented.
-   Decide whether they are live or dead before keeping them.
+1. Review the clean baseline generated from the direct dump. It includes `admin_roles`, which is
+   live in dev but has no migration; `employees` is observed only in main and is not in the dev dump.
+   Decide the purpose of either table before keeping it.
 2. Move the 30 legacy hand-written files to `supabase/migrations/_legacy/` for history. Do **not**
    delete them; several document decisions that are not obvious from the schema alone.
 3. Update `ai_docs/DB_SCHEMA.md` to match the pulled baseline exactly.
@@ -103,14 +111,15 @@ Still by hand: Dashboard → **SQL Editor → New Query**, paste, run, confirm i
 database you ran it against. A migration that is committed but not run is worse than one that does
 not exist, because it looks done.
 
-### Pending, not yet run against dev
+### Confirmed applied against dev
 
-| Migration | Effect until run |
+| Migration | Verified effect |
 |---|---|
-| `20260722140000_enable_row_level_security.sql` | RLS off on the patient-data tables |
-| `20260725120000_backfill_medical_and_product_balance_tables.sql` | 3 tables missing; routes on JSON fallback |
-| `20260725160000_add_customer_id_to_product_sales.sql` | POS sales still fail into the `page_settings` blob (RISK-014) |
-| `20260725170000_ensure_reservation_status_check.sql` | `pending_deposit` may be rejected — and the fallback that used to hide this has been removed, so it will now fail loudly |
+| `20260722140000_enable_row_level_security.sql` | RLS enabled on public tables |
+| `20260725120000_backfill_medical_and_product_balance_tables.sql` | `medical_records`, `medical_reports`, and `customer_product_balances` exist |
+| `20260725160000_add_customer_id_to_product_sales.sql` | `product_sales.customer_id` exists |
+| `20260725170000_ensure_reservation_status_check.sql` | `pending_deposit` is accepted |
+| `20260725180000_add_provider_id_and_duration_minutes.sql` | `reservations.provider_id` and `services.duration_minutes` exist with their constraint/index support |
 
 ---
 

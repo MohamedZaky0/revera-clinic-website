@@ -560,10 +560,11 @@ already scheduled:
 
 Fixing this is far cheaper now, before production exists, than at any later point.
 
-There is no migration state tracking. `supabase/migrations/README.md` instructs operators to paste
-SQL by hand into the Supabase SQL Editor, so whether a migration ran depends on someone remembering.
-There is no Supabase CLI in this repo (no `config.toml`, no local stack), so `supabase db push`,
-generated types and automated rollback are all unavailable.
+The Supabase CLI is linked to dev and the migration history was reconciled on 2026-07-26: all 32
+confirmed local migrations are recorded in `supabase_migrations.schema_migrations`. The clean
+baseline is still blocked because `db pull` cannot provision a shadow database from the out-of-order
+legacy sequence. Until that sequence is replaced with a baseline generated from a direct dev schema
+dump, new provisioning and main-database reconciliation remain operational risks.
 
 **The result: a file existing in `supabase/migrations/` proves nothing about any database.**
 Two Supabase projects are in use and their schemas have diverged badly.
@@ -573,8 +574,9 @@ Two Supabase projects are in use and their schemas have diverged badly.
 | Tables | 26 | 19 |
 | Schema current through | ~2026-07-20 | **~2026-07-05** |
 
-**Absent from the dev DB** (the 2026-07-25 backfill migration was committed in `237dbec` but never
-run): `medical_records`, `medical_reports`, `customer_product_balances`.
+**Verified present in the dev DB on 2026-07-26:** `medical_records`, `medical_reports`,
+`customer_product_balances`, `product_sales.customer_id`, `reservations.provider_id`, and
+`services.duration_minutes`. This verification came from a direct linked dev schema dump.
 
 **Absent from the main DB** — 8 tables the application code actively reads and writes:
 `prescriptions`, `doctor_payroll`, `employee_notes`, `provider_schedule_audit_logs`,

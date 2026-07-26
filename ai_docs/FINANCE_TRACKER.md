@@ -39,9 +39,10 @@ Production has never gone live (confirmed 2026-07-25). Consequences:
 
 ## Ground truth you must not assume (read before touching schema)
 
-**A migration file existing in `supabase/migrations/` proves nothing about any database.**
-There is no migration state tracking; SQL is pasted by hand into the Supabase SQL Editor.
-This has already caused one wrong doc entry — see RISK-020. **Always verify against the live DB:**
+**A migration file existing in `supabase/migrations/` does not by itself prove database state.**
+The linked dev database now tracks all 32 confirmed migrations in
+`supabase_migrations.schema_migrations`, but every schema claim must still be verified against the
+live DB. This has already caused one wrong doc entry — see RISK-020.
 
 ```sql
 select table_name, column_name, data_type, column_default
@@ -50,12 +51,12 @@ where table_schema = 'public' and table_name = '<table>'
 order by ordinal_position;
 ```
 
-### Live database state, verified 2026-07-25
+### Live database state — dev re-verified 2026-07-26; main remains the 2026-07-25 snapshot
 
 | | dev DB | main DB |
 |---|---|---|
-| Tables | 26 | 19 |
-| Schema current through | ~2026-07-20 | **~2026-07-05** |
+| Migration history | All 32 local migrations recorded | Not reconciled |
+| Schema evidence | Direct linked `db dump` | **2026-07-25 snapshot** |
 | `reservations.date` type | `text` | **`date`** |
 | `reservations.service_ids` | present | **absent** |
 | `reservations.created_by_employee_id` | present | **absent** |
@@ -64,15 +65,11 @@ order by ordinal_position;
 **Production is not live yet** — no real patient data is at risk today. The divergence bites at
 merge time and at every new clinic (DEC-001 = one Supabase project per client).
 
-**Migrations known NOT to have been applied to the dev DB:**
-
-| Migration | Effect of it being unapplied |
-|---|---|
-| `20260722140000_enable_row_level_security.sql` | RLS is off on `reservations`, `customers`, `services`, `providers`, `branches`, `page_settings` and others |
-| `20260725120000_backfill_medical_and_product_balance_tables.sql` | `medical_records`, `medical_reports`, `customer_product_balances` do not exist; those routes are silently running on JSON-file fallback |
-
-**Tables that exist live but are in no migration and no doc:** `admin_roles` (both DBs),
-`employees` (main only). Do not assume they are unused before checking.
+**Confirmed in the dev schema dump:** RLS is enabled, `medical_records`, `medical_reports`,
+`customer_product_balances`, `product_sales.customer_id`, `reservations.provider_id`, and
+`services.duration_minutes` exist. `admin_roles` also exists in dev but has no migration; it is now
+documented in `DB_SCHEMA.md`. `employees` remains observed only in main and has not been
+re-queried.
 
 ---
 
@@ -90,15 +87,15 @@ would be confidently wrong, which is worse than absent (DEC-019).
 | 0.4 | Fix double stock deduction | `DONE` | Claude | `see 0.4 below` |
 | 0.5 | Fix `customers.outstanding` never decrementing | `DONE` | Claude | `see 0.5 below` |
 | 0.6 | Fix `product_sales` route column mapping | `DONE` | Claude | `23e0e5e`, `8108b82` |
-| 0.7 | Add `provider_id` FK to `reservations` | `NEEDS-DB` | Claude | `see 0.7/0.8 below` |
-| 0.8 | Add `services.duration_minutes` numeric | `NEEDS-DB` | Claude | `see 0.7/0.8 below` |
+| 0.7 | Add `provider_id` FK to `reservations` | `DONE` | Claude | verified against dev schema dump 2026-07-26 |
+| 0.8 | Add `services.duration_minutes` numeric | `DONE` | Claude | verified against dev schema dump 2026-07-26 |
 | 0.9 | Correct `ai_docs` drift | `DONE` | Claude | `9b4c3e7`, `3cf1c8a`, `1c3d151` |
 | 0.10 | Protect money-mutating API routes | `PARTIAL` | Claude | `see 0.10 below` |
 
-**Phase 0 summary at end of this session:** 9 of 11 tasks done or partially done. Two pending
-migrations need running against dev (0.7/0.8's file, on top of the four from earlier — see the
-checklist above). 0.10 needs the ~15-call-site fix described below before it can close. 0.0 needs
-`supabase db pull` to establish the baseline, which needs the database password.
+**Phase 0 summary:** 0.7 and 0.8 are verified complete; 0.10's reservation authorization pass is
+complete, while customer and inventory-route scoping remains open. 0.0 is blocked on replacing the
+out-of-order legacy migration sequence with a clean baseline generated from the direct dev dump;
+`db pull` cannot build its shadow database from the existing sequence.
 
 ---
 
@@ -106,53 +103,28 @@ checklist above). 0.10 needs the ~15-call-site fix described below before it can
 
 | Step | Status |
 |---|---|
-| a. Supabase CLI configured (`supabase init`, generic `project_id`) | `DONE` |
+| a. Supabase CLI configured and linked to dev | `DONE` |
 | b. Silent-fallback insert chain removed | `DONE` |
-| c. Migration `README.md` rewritten with the CLI runbook | `DONE` |
-| d. **`supabase link` + `supabase db pull` to establish the baseline** | `TODO` — needs credentials |
-| e. Move the 30 legacy files to `_legacy/`, update `DB_SCHEMA.md` to the baseline | `TODO` — blocked on (d) |
-| f. Bring the main DB up to the baseline | `TODO` — blocked on (e) |
+| c. Dev migration history reconciled with all 32 confirmed local migrations | `DONE` |
+| d. Direct linked dev schema dump captured and verified | `DONE` |
+| e. Replace the out-of-order legacy sequence with a reviewed clean baseline from that dump | `TODO` — `db pull` shadow replay is blocked by the legacy ordering |
+| f. Bring the main DB up to the clean baseline and verify parity | `TODO` — blocked on (e) |
 
-**(d) is yours to run — it needs the database password, which I must not handle.**
+**Measured 2026-07-26:** `supabase migration repair --status applied` recorded all 32 local
+migrations in the linked dev project's `supabase_migrations.schema_migrations`. The subsequent
+`supabase migration list --linked` showed an exact local/remote match.
 
-`link` succeeded. `db pull` then failed with *"The remote database's migration history does not
-match local files"*, which is expected: the CLI has never been used on this project, so the remote
-`supabase_migrations.schema_migrations` table is empty while 31 files exist locally.
+`npx supabase db pull --schema public` still cannot create a baseline because its shadow database
+replays the legacy files and fails at `20260624015717_customers_schema.sql`: it alters
+`reservations` before a migration creates that table. A direct `npx supabase db dump --linked
+--schema public` succeeded instead and was used to verify the dev schema.
 
-> ### Do NOT run the repair commands the CLI printed
->
-> It offers to mark **all 31** migrations as `applied`. **Four of them have not been applied** — we
-> measured this. Marking them applied would make `db push` skip them forever, permanently locking in
-> the drift and hiding it again. That is the exact failure this task exists to eliminate.
+**Next:** review that direct dump into one clean baseline, move the legacy migration files to
+`_legacy/`, then reconcile main against the baseline. Do not retry `db pull` until the legacy
+sequence is no longer active.
 
-**Mark applied only the 27 that genuinely ran** (everything up to and including the 2026-07-20
-inventory schema — verified by the presence of their tables and columns in the live dev DB):
-
-```bash
-for v in 20260624015717 20260625001607 20260625002536 20260626073345 20260626081049 \
-         20260626081641 20260626214919 20260626215946 20260705141242 20260705141243 \
-         20260705141244 20260705171941 20260705180607 20260706081326 20260706090122 \
-         20260706091942 20260706174841 20260707132614 20260709154350 20260711204540 \
-         20260712003001 20260712230858 20260713172113 20260715202002 20260715202003 \
-         20260719162731 20260720164008 ; do
-  npx supabase migration repair --status applied "$v"
-done
-```
-
-**Leave these four out** — they must remain unapplied so `db push` picks them up:
-`20260722140000` · `20260725120000` · `20260725160000` · `20260725170000`
-
-Then:
-```bash
-npx supabase db pull --schema public   # baseline from the live database
-```
-
-> One caveat on `20260711204540` (adds `pending_deposit` to the status CHECK): we never confirmed it
-> ran. It is in the repair list anyway because `20260725170000` restates that constraint
-> unconditionally and *is* in the push set — so the constraint ends up correct either way.
-
-When reviewing the pulled baseline, decide what `admin_roles` and `employees` are — they exist live,
-in no migration and in no doc.
+`admin_roles` is present in dev, has no migration or application caller, and is now documented in
+`DB_SCHEMA.md`. `employees` remains observed only in main and needs a direct main-schema review.
 
 **(b) — what was removed and why.** `src/app/api/reservations/route.ts` previously retried a failed
 insert after deleting `is_manual` and `created_by_employee_id`, then again after also deleting
@@ -163,66 +135,25 @@ API response still told the UI a deposit was due. This is the mechanism that kep
 
 It now fails loudly, logging the error code and the payload keys.
 
-> **Consequence to expect:** if the dev database's `reservations_status_check` constraint predates
-> `20260711204540`, deposit bookings will now **fail visibly** instead of being silently downgraded.
-> `20260725170000_ensure_reservation_status_check.sql` restates the constraint with all eight
-> statuses and is the fix. Run it together with the others below.
+### Applied and verified in dev
 
-### Migrations pending — run these against dev, then update this table
+The direct dev dump confirms these migrations' effects:
 
-**Push in this order.** The first three are additive and safe; the RLS one is not, and had a
-blocker that is now cleared.
+| Migration | Verified effect |
+|---|---|
+| `20260722140000_enable_row_level_security.sql` | RLS enabled on public tables |
+| `20260725120000_backfill_medical_and_product_balance_tables.sql` | `medical_records`, `medical_reports`, and `customer_product_balances` exist |
+| `20260725160000_add_customer_id_to_product_sales.sql` | `product_sales.customer_id` exists |
+| `20260725170000_ensure_reservation_status_check.sql` | `pending_deposit` is accepted by `reservations_status_check` |
+| `20260725180000_add_provider_id_and_duration_minutes.sql` | `reservations.provider_id`, its foreign key/index, and `services.duration_minutes` with its check exist |
 
-**All four were run against the dev database on 2026-07-25 via the SQL Editor and reported
-success.** Recorded from the operator's report, not from a schema re-query — see the verification
-query below and tick it off once confirmed.
+**Follow-up verification:** manually exercise Bookings, Customers, Services, Inventory, and
+Employees through API-backed screens. With RLS enabled, any direct anon-key table access will return
+zero rows or fail and must be moved server-side.
 
-| # | Migration | Ran? | Against | Notes |
-|---|---|---|---|---|
-| 1 | `20260725160000_add_customer_id_to_product_sales.sql` | ✅ 2026-07-25 | dev | Unblocks RISK-014 — POS sales now persist to `product_sales` |
-| 2 | `20260725170000_ensure_reservation_status_check.sql` | ✅ 2026-07-25 | dev | `pending_deposit` accepted; safe now that the silent fallback is gone |
-| 3 | `20260725120000_backfill_medical_and_product_balance_tables.sql` | ✅ 2026-07-25 | dev | The 3 missing tables now exist; those routes are off JSON fallback |
-| 4 | `20260722140000_enable_row_level_security.sql` | ✅ 2026-07-25 | dev | RLS now on for every public table |
-
-**Confirm with a re-query before trusting the above:**
-```sql
-select tablename, rowsecurity from pg_tables
-where schemaname = 'public' order by tablename;   -- expect rowsecurity = true everywhere
-
-select count(*) from information_schema.columns
-where table_name = 'product_sales' and column_name = 'customer_id';   -- expect 1
-
-select table_name from information_schema.tables
-where table_schema = 'public'
-  and table_name in ('medical_records','medical_reports','customer_product_balances');  -- expect 3
-```
-
-**Post-run regression check — required, since RLS on `public` is new:**
-Bookings · Customers · Services · Inventory · Employees. Every read must now go through an API
-route using the service role. Anything that returns empty or fails is a table being read with the
-anon key and must be moved server-side.
-
-**Still outstanding:** sales written before the fix are sitting in `page_settings`
-(key `product_sales_history`) and have not been migrated into `product_sales`. Decide whether to
-backfill them and record the decision here.
-
-> ### The RLS migration had a blocker — now cleared, but verify before running
->
-> `src/app/admin/page.tsx` used to write to `customers` **directly from the browser** with the anon
-> key (`supabase.from("customers").update({ spent_amount })`). Enabling RLS on `customers` with no
-> policies would have made that update affect zero rows **while still reporting success** — silent
-> data loss, exactly the class of bug this phase exists to remove.
->
-> That write is now server-side in `POST /api/inventory/products/sales`. There is no remaining
-> `.from(...)` table access in any client component — confirm before running step 4:
-> ```bash
-> grep -rnE "\.from\(['\"]" src/ --include=*.tsx
-> ```
-> This should return nothing. If it returns a real call, fix it first.
->
-> After running step 4, most tables have RLS on with **zero policies**, i.e. service-role-only.
-> Every read must go through an API route. Re-test the admin panel end to end.
-
+**Still outstanding:** sales written before the POS fix remain in `page_settings` under
+`product_sales_history`; DEC-026 says all existing data is mock, so decide whether to discard rather
+than backfill them.
 **Verify 0.0 complete when:** a fresh Supabase project can be provisioned with one command, and
 `supabase_migrations.schema_migrations` lists every applied file.
 
@@ -420,12 +351,12 @@ and translate at the DB boundary with mappers — do not rename fields in the UI
 
 ---
 
-### 0.7 / 0.8 — Schema additions for finance — code merged, `NEEDS-DB`
+### 0.7 / 0.8 — Schema additions for finance — DONE
 
-> **ACTION REQUIRED — run against dev:**
-> `supabase/migrations/20260725180000_add_provider_id_and_duration_minutes.sql`
-> Both columns are additive, so nothing breaks before it runs — the code simply keeps using the
-> old paths. **Mark this `DONE` once run, naming the database.**
+`20260725180000_add_provider_id_and_duration_minutes.sql` was run against the linked **dev**
+database and verified from a live schema dump on 2026-07-26. The dump confirms both columns, the
+`reservations_provider_id_fkey` foreign key, `reservations_provider_id_idx`, and
+`services_duration_minutes_check`.
 
 **0.7 — `reservations.provider_id`** uuid FK → `providers.id ON DELETE SET NULL`, indexed,
 backfilled from `doctor_name`.
