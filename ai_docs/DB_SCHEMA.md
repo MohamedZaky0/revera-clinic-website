@@ -140,9 +140,9 @@ no application code reads or writes it; do not use it until its purpose is decid
 | `number_of_bookings` | integer | Count of bookings, default 0 |
 | `registration_date` | timestamptz | Date of registration, default now() |
 | `active` | boolean | Is customer active, default true |
-| `spent_amount` | numeric | Total spent amount, default 0 |
-| `outstanding` | numeric | Outstanding patient debt, default 0 |
-| `wallet_balance` | numeric | Customer wallet credit balance, default 0 |
+| `spent_amount` | numeric | Total spent amount, default 0. **Still the actively-written source of truth** (task 0.5's `computeSettledBalances`, POS/package `addToCustomerSpend`-style calls) — no read path has cut over to the ledger yet. **Added 2026-07-26** (task 1.14): `src/lib/customerBalances.ts` computes the same figure fresh from `invoices`/`payments`, and `GET /api/customers/reconcile` (staff-only) reports any drift between the two per customer — a comparison tool, not a replacement. |
+| `outstanding` | numeric | Outstanding patient debt, default 0. Same caveat as `spent_amount` above — still independently written; the task 1.14 ledger-derived equivalent is comparison-only for now. |
+| `wallet_balance` | numeric | Customer wallet credit balance, default 0. Same caveat as `spent_amount` above. |
 | `area` | text | Address area, nullable |
 | `location_name` | text | location name, nullable |
 | `street_name` | text | Street name, nullable |

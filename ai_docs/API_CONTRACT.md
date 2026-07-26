@@ -334,6 +334,36 @@ Deletes a customer profile record. Nullifies references in `reservations` to pre
 
 ---
 
+## GET /api/customers/reconcile
+
+**Staff-only** (`requireStaffAccess`). PROPOSAL-002 Phase 1, task 1.14 — read-only, writes nothing.
+For every customer, derives `outstanding`/`spent`/`wallet` fresh from `invoices`/`payments`/
+`wallet_txns` (`src/lib/customerBalances.ts`) and compares against the currently-authoritative
+`customers.outstanding`/`spent_amount`/`wallet_balance` scalars, flagging any mismatch. This is a
+comparison tool proving the ledger-derived numbers agree with the delta-maintained scalars — no
+read path has cut over to trusting the ledger's numbers yet; see the note on those three columns in
+`DB_SCHEMA.md`.
+
+**Response:**
+```json
+{
+  "customersChecked": 12,
+  "discrepancyCount": 1,
+  "allMatched": false,
+  "discrepancies": [
+    {
+      "customerId": "…",
+      "customerName": "…",
+      "ledger": { "outstanding": 120, "spent": 100, "wallet": 0, "walletClamped": false },
+      "scalar": { "outstanding": 1860, "spent": 100, "wallet": 0 },
+      "matches": false
+    }
+  ]
+}
+```
+
+---
+
 ## GET /api/clinic-settings?key={key}
 
 Alias for `/api/page-settings` — returns the `value` JSONB for the given key.
