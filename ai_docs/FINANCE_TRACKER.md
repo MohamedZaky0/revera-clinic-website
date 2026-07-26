@@ -1208,11 +1208,11 @@ Close this out last.
 | 2.8 | Migration: provider commission config | — | `DONE` — applied dev | Claude | pending commit |
 | 2.9 | Library: `src/lib/costing.ts` — consumption cost, pulse cost, commission math | 2.1–2.8 | `DONE` | Claude | pending commit |
 | 2.10 | Regression checks for 2.9 | 2.9 | `DONE` | Claude | pending commit |
-| 2.11 | Checkout recipe consumption and invoice cost/commission snapshots | 1.10, 2.2, 2.3, 2.9 | `WIP` — implemented; pending live verification | Claude | pending commit |
+| 2.11 | Checkout recipe consumption and invoice cost/commission snapshots | 1.10, 2.2, 2.3, 2.9 | `DONE` | Claude | pending commit (live verification) |
 | 2.12 | Cut `stock_quantity` over to derive from `stock_movements` | 2.4, 2.11 | `BLOCKED` — requires a trial period of reconciled movement data | — | — |
 | 2.13 | `POST /api/purchases` | 2.5, 2.6 | `WIP` — implemented; pending live verification | Claude | pending commit |
 | 2.14 | Doctor payroll uses `provider_id` | 0.7, 2.8, 2.9 | `WIP` — durable identity fix implemented; pending snapshot/live verification | Claude | pending commit |
-| 2.15 | `service_devices` and checkout pulse cost | 2.7, 2.9, 2.11 | `WIP` — implemented; pending live verification | Claude | pending commit |
+| 2.15 | `service_devices` and checkout pulse cost | 2.7, 2.9, 2.11 | `DONE` | Claude | pending commit (live verification) |
 | 2.16 | `API_CONTRACT.md` rollup for Phase 2 | rolling | `WIP` — current endpoints documented; close after verification | Claude | pending commit |
 
 **Same "additive, then cutover" discipline as Phase 1.** 2.11 is additive — it populates the two
@@ -1566,6 +1566,14 @@ DEC-018 lists `none` as a valid configured state, e.g. a salaried doctor with no
 
 ## 2.11 — Wire booking checkout to consume the recipe and snapshot cost/commission
 
+**DONE, live-verified 2026-07-26** against deployed dev with a real staff session and a real
+multi-service booking — see `FINANCE_PHASE_2_MANUAL_TESTS.md` for full evidence
+(`cogs_snapshot: 250`, `commission_snapshot: 150`, matched hand-computed values exactly; one
+`consumption_entries` + one `stock_movements` row, both correct). This same live test doubles as
+verification for the per-line failure-isolation fix from earlier code review (see that task's own
+implementation note) — a deliberately-broken second line on the same booking left only its own
+`cogs_snapshot`/`commission_snapshot` `NULL`, without affecting the first line's correct values.
+
 **Depends on 1.10, 2.2, 2.3, 2.9.** **Where:** `src/app/api/reservations/route.ts`, the same
 `status === 'completed'` settlement block task 1.10's `writeCheckoutInvoice()` lives in — this
 task extends that function, it does not add a new one.
@@ -1708,6 +1716,11 @@ once this task's row is closed.
 ---
 
 ## 2.15 — Migration: `service_devices`; wire device pulse cost into checkout
+
+**DONE, live-verified 2026-07-26** against deployed dev — see `FINANCE_PHASE_2_MANUAL_TESTS.md`.
+A service with `pulses_per_session: 1000` on a device with `lamp_replacement_cost: 5000` /
+`max_pulses_limit: 100000` correctly contributed `50` to `cogs_snapshot` (`costPerPulse(5000,
+100000) × 1000`), summed with materials cost into the same column exactly as designed.
 
 **Added during a merge of two independently-written breakdowns of this same phase (2026-07-26) —
 not in either original draft, flagged explicitly rather than silently folded in.** Task 2.9 defines
