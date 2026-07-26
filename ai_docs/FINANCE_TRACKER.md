@@ -523,6 +523,21 @@ routes:**
 
 # Phase 1 — Financial Ledger Spine
 
+> ## ⏸ PAUSED 2026-07-26 — read this before doing anything else in Phase 1+
+>
+> On explicit user instruction, code execution stopped after task 1.10 (checkout invoice
+> dual-write — see that section for its exact unfinished state) mid-way through. **The next
+> session's first job is NOT to keep writing Phase 1 code.** It is to break Phase 2, 3, 4 and 5
+> into the same kind of tracked micro-tasks this file already has for Phase 1 — see each phase's
+> outline in `PROPOSALS.md` for the starting material. **Only once all five phases are broken down
+> this way should code execution resume**, picking up wherever it is genuinely needed most (which
+> may still be finishing 1.10's live verification — see that section — not necessarily Phase 2).
+>
+> This mirrors why Phase 0 was broken into 0.0–0.10 before any of it was touched, and why Phase 1
+> was broken into 1.1–1.16 before this session wrote a single migration: planning the whole unit
+> first is what let each individual task stay small, reviewable, and safe to hand to a different
+> model without re-deriving context. Do the same for 2–5 before writing more implementation code.
+
 > **Status as of 2026-07-26: WIP.** Broken into micro-tasks below so any model — a fresh
 > session, a different AI, a human — can pick up exactly one task, know precisely what file to
 > touch and why, and leave the tracker in a state where the next task is equally clear. Do not
@@ -552,8 +567,8 @@ routes:**
 | 1.7 | Library: `src/lib/ledger.ts` — invoice/line/payment builders (pure functions) | 1.1–1.4 (schema shape only, no runtime dependency) | `DONE` | Claude | `see 1.7-1.9 below` |
 | 1.8 | Library: `src/lib/packages.ts` — deferred-revenue recognition math (pure functions) | 1.5, 1.6 (schema shape only) | `DONE` | Claude | `see 1.7-1.9 below` |
 | 1.9 | Regression checks for 1.7 and 1.8 | 1.7, 1.8 | `DONE` | Claude | `see 1.7-1.9 below` |
-| 1.10 | Wire booking checkout (`PATCH /api/reservations`, `status: 'completed'`) to dual-write an invoice | 1.1–1.4, 1.7 | `TODO` | — | — |
-| 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `TODO` | — | — |
+| 1.10 | Wire booking checkout (`PATCH /api/reservations`, `status: 'completed'`) to dual-write an invoice | 1.1–1.4, 1.7 | `WIP` — code written, statically verified, **not exercised against a live checkout** | Claude | `see 1.10 below` |
+| 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `TODO` — not started | — | — |
 | 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `TODO` | — | — |
 | 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `TODO` | — | — |
 | 1.14 | `src/lib/customerBalances.ts` — derive `outstanding`/`spent_amount`/`wallet_balance` from the ledger + reconciliation endpoint | 1.1–1.4, 1.10, 1.11 | `TODO` | — | — |
@@ -881,7 +896,49 @@ regresses.
 
 ---
 
-## 1.10 — Wire booking checkout to dual-write an invoice
+## 1.10 — Wire booking checkout to dual-write an invoice — WIP, needs live verification
+
+> **STOP AND READ FIRST if you are resuming this task.** The session that wrote this went no
+> further than what is described below, on explicit user instruction to stop and re-plan the
+> remaining phases before writing more code (see the note at the very top of this tracker file
+> about the 2026-07-26 pause). Do not assume this is finished just because code exists.
+
+**Done:**
+- `writeCheckoutInvoice()` and `appendPaymentToExistingInvoice()` implemented in
+  `src/app/api/reservations/route.ts`, called from the settlement block, additive only —
+  confirmed by reading the diff that `computeSettledBalances` and the existing
+  `reservations.amount_paid`/`customers.spent_amount` writes are byte-for-byte unchanged.
+- A new migration, `20260726010600_create_next_invoice_no_rpc.sql`, wrapping `nextval()` in a
+  `next_invoice_no()` RPC — PostgREST cannot call the built-in `nextval()` directly, and reading
+  "last invoice_no + 1" client-side would race under concurrent checkouts. Applied to dev and
+  verified with `npx supabase db diff --linked` (no schema changes found).
+- Distinguishes first-time completion (writes a full invoice + service lines + payment) from a
+  later debt payment on an already-completed booking (appends one more `payments` row to the
+  *existing* invoice for that reservation, found by `reservation_id`, rather than creating a
+  second invoice with duplicate service lines).
+- `npx tsc --noEmit` clean, `npx eslint` clean, and all five `scratch/*.ts` regression scripts
+  (`pricecheck`, `billingcheck`, `identitycheck`, `phase1ledgercheck`, `phase1packagecheck`)
+  still pass — these test the pure functions this code calls, not this route in isolation.
+
+**NOT done — this is why the row is `WIP`, not `DONE`:**
+- **Never exercised against the live checkout flow.** No test runner exists in this project and
+  this environment cannot click through the admin panel in a browser. Nobody has confirmed that
+  completing a real booking actually produces a correct `invoices` + `invoice_lines` + `payments`
+  row in the dev database, or that `reservations.amount_paid` / `customers.spent_amount` are
+  unchanged from before this task — which is the entire point of "dual-write, additive only."
+  **Do this before marking 1.10 `DONE`:** complete a real booking checkout (or as close to
+  end-to-end as available tooling allows) and verify both halves — the ledger rows exist AND the
+  pre-existing values are untouched.
+- `received_by_employee_id` on both the initial payment and the later-payment path is currently
+  always `null` — the PATCH body carries no "who is processing this checkout" field today
+  (`createdByEmployeeId` is a different thing, the booking's original creator). Attributing
+  cashier identity needs either a new request field or reading it from the auth token
+  (`requireStaffAccess`'s result is validated but discarded earlier in this handler, not
+  currently threaded through to here).
+- Invoice writing is scoped inside `if (isSettlement && target.customer_id)` — a checkout with no
+  linked customer record produces no invoice. This matches the existing scope of the customer
+  balance settlement code right above it, but is worth a deliberate decision later, not an
+  accident to discover.
 
 **Depends on 1.1–1.4, 1.7.** **Where:** `src/app/api/reservations/route.ts`, the
 `status === 'completed'` branch (the same block task 0.5's `computeSettledBalances` call lives in).

@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabaseServer';
 import { getServiceDurationMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot, getEffectiveServicePrice } from '@/lib/services';
 import { computeSettledBalances } from '@/lib/billing';
 import { requireAdministratorAccess, requireStaffAccess } from '@/lib/access';
+import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -79,6 +80,143 @@ async function resolveProviderId(doctorName?: string | null): Promise<string | n
     return null;
   }
   return data[0].id;
+}
+
+/**
+ * PROPOSAL-002 Phase 1, task 1.10. Dual-write: additive only. Called from the checkout
+ * settlement block after reservations.amount_paid / customers.spent_amount have already been
+ * written exactly as they were before this task — nothing existing is removed or changed.
+ * A failure here must never fail the checkout itself; the caller wraps this in its own
+ * try/catch and only logs. See ai_docs/FINANCE_TRACKER.md task 1.10 for why: a checkout that
+ * silently breaks because ledger-writing broke would be a worse regression than the one this
+ * phase is fixing.
+ *
+ * Prices are re-resolved server-side from serviceIds — never trust a client-supplied total for
+ * what gets stored (RISK-010). This mirrors the POST handler's own branch-price resolution
+ * above, since src/lib/services.ts's resolveBranchName() is not exported and a UUID branch_id
+ * cannot be used directly as a branch name (see task 0.2/0.3).
+ */
+async function writeCheckoutInvoice(params: {
+  reservationId: string;
+  customerId: string | null;
+  branchId: string | null;
+  providerId: string | null;
+  serviceIds: number[];
+  amountPaid: number;
+  receivedByEmployeeId?: string | null;
+}): Promise<void> {
+  const { reservationId, customerId, branchId, providerId, serviceIds, amountPaid, receivedByEmployeeId } = params;
+  if (serviceIds.length === 0) return;
+
+  let targetBranchName: string | null = null;
+  if (branchId) {
+    const { data: bObj, error: branchErr } = await supabaseServer
+      .from('branches')
+      .select('name_en, name_ar')
+      .eq('id', branchId)
+      .maybeSingle();
+    if (branchErr) {
+      console.error('Invoice branch lookup failed:', branchErr.message);
+    } else if (bObj) {
+      targetBranchName = bObj.name_en || bObj.name_ar || null;
+    }
+  }
+
+  const { data: services, error: svcErr } = await supabaseServer
+    .from('services')
+    .select('id, en, price, branch_pricing')
+    .in('id', serviceIds);
+  if (svcErr) throw svcErr;
+  if (!services || services.length === 0) return;
+
+  const lines = services.map((svc: any) =>
+    buildInvoiceLine({
+      lineType: 'service',
+      description: svc.en || `Service #${svc.id}`,
+      qty: 1,
+      unitPrice: getEffectiveServicePrice(
+        { price: svc.price !== null ? Number(svc.price) : 0, branchPricing: svc.branch_pricing },
+        targetBranchName
+      ),
+      serviceId: svc.id,
+      providerId: providerId ?? undefined,
+    })
+  );
+
+  const totals = buildInvoiceTotals(lines);
+
+  // Atomic — public.next_invoice_no() wraps nextval(invoice_no_seq) server-side
+  // (20260726010600_create_next_invoice_no_rpc.sql). PostgREST has no generic way to call the
+  // built-in nextval() directly, and reading "last invoice_no + 1" client-side would race
+  // under concurrent checkouts and violate invoices.invoice_no's UNIQUE constraint.
+  const { data: seqValue, error: seqErr } = await supabaseServer.rpc('next_invoice_no');
+  if (seqErr) throw seqErr;
+  const invoiceNo = formatInvoiceNo(Number(seqValue));
+
+  const { data: invoice, error: invoiceErr } = await supabaseServer
+    .from('invoices')
+    .insert({
+      invoice_no: invoiceNo,
+      reservation_id: reservationId,
+      customer_id: customerId,
+      branch_id: branchId,
+      subtotal: totals.subtotal,
+      discount_total: totals.discountTotal,
+      grand_total: totals.grandTotal,
+      status: 'issued',
+    })
+    .select('id')
+    .single();
+  if (invoiceErr) throw invoiceErr;
+
+  const { error: linesErr } = await supabaseServer.from('invoice_lines').insert(
+    lines.map((line: ReturnType<typeof buildInvoiceLine>) => ({ ...line, invoice_id: invoice.id }))
+  );
+  if (linesErr) throw linesErr;
+
+  if (amountPaid > 0) {
+    const { error: paymentErr } = await supabaseServer.from('payments').insert({
+      invoice_id: invoice.id,
+      amount: amountPaid,
+      method: 'cash',
+      received_by_employee_id: receivedByEmployeeId || null,
+    });
+    if (paymentErr) throw paymentErr;
+  }
+}
+
+/**
+ * A later payment against a booking that was already completed (paying down outstanding debt —
+ * task 0.5's settlement math supports this, but no admin UI triggers it yet, per
+ * ai_docs/FINANCE_TRACKER.md RISK-012). Adds one more `payments` row to the invoice this
+ * reservation already has, rather than creating a second invoice with duplicate service lines.
+ * If no invoice exists yet for this reservation (e.g. it was completed before task 1.10 shipped),
+ * this is a silent no-op — there is nothing to attach the payment to, and creating a bare invoice
+ * with no line items would misrepresent what was actually sold.
+ */
+async function appendPaymentToExistingInvoice(
+  reservationId: string,
+  amount: number,
+  receivedByEmployeeId?: string | null
+): Promise<void> {
+  if (amount <= 0) return;
+
+  const { data: invoice, error: findErr } = await supabaseServer
+    .from('invoices')
+    .select('id')
+    .eq('reservation_id', reservationId)
+    .eq('status', 'issued')
+    .maybeSingle();
+  if (findErr) throw findErr;
+  if (!invoice) return;
+
+  const { error: paymentErr } = await supabaseServer.from('payments').insert({
+    invoice_id: invoice.id,
+    amount,
+    method: 'cash',
+    received_by_employee_id: receivedByEmployeeId || null,
+  });
+  if (paymentErr) throw paymentErr;
 }
 
 export async function GET(req: Request) {
@@ -662,6 +800,39 @@ export async function PATCH(req: Request) {
           }
         } catch (custErr) {
           console.error("Failed to update customer wallet balance:", custErr);
+        }
+
+        // PROPOSAL-002 Phase 1, task 1.10 — additive dual-write, isolated in its own try/catch
+        // deliberately separate from the balance-settlement try/catch above. A failure here must
+        // never fail the checkout or roll back the customer balance update that already
+        // succeeded; it is logged and reconciled later, not treated as fatal. See
+        // ai_docs/FINANCE_TRACKER.md task 1.10.
+        try {
+          const wasAlreadyCompleted = target.status === 'completed';
+          const newPaidAmount = amountPaid !== undefined ? Number(amountPaid) : Number(target.amount_paid || 0);
+          const oldPaidAmount = Number(target.amount_paid || 0);
+          const paymentDelta = wasAlreadyCompleted ? newPaidAmount - oldPaidAmount : newPaidAmount;
+
+          if (!wasAlreadyCompleted && status === 'completed') {
+            const serviceIds: number[] =
+              Array.isArray(updated.service_ids) && updated.service_ids.length > 0
+                ? updated.service_ids
+                : updated.service_id
+                  ? [updated.service_id]
+                  : [];
+            await writeCheckoutInvoice({
+              reservationId: id,
+              customerId: target.customer_id,
+              branchId: updated.branch_id ?? null,
+              providerId: updated.provider_id ?? null,
+              serviceIds,
+              amountPaid: Math.max(0, paymentDelta),
+            });
+          } else if (wasAlreadyCompleted && paymentDelta > 0) {
+            await appendPaymentToExistingInvoice(id, paymentDelta);
+          }
+        } catch (invoiceErr) {
+          console.error('Failed to write Phase 1 invoice (dual-write, non-fatal):', invoiceErr, '| reservation:', id);
         }
       }
 
