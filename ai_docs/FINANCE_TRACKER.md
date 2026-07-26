@@ -593,7 +593,7 @@ routes:**
 | 1.10 | Wire booking checkout (`PATCH /api/reservations`, `status: 'completed'`) to dual-write an invoice | 1.1–1.4, 1.7 | `DONE` | Claude | `aed3793` |
 | 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `WIP` — code written; pending live POS verification | Claude | — |
 | 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `WIP` — code written; pending live package-sale verification | Claude | — | — |
-| 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `TODO` | — | — |
+| 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `WIP` — migration applied to dev; pending live endpoint verification | Claude | — |
 | 1.14 | `src/lib/customerBalances.ts` — derive `outstanding`/`spent_amount`/`wallet_balance` from the ledger + reconciliation endpoint | 1.1–1.4, 1.10, 1.11 | `TODO` | — | — |
 | 1.15 | Opening-balance import (DEC-024) | 1.1, 1.3, 1.4, 1.6 | `TODO` | — | — |
 | 1.16 | `API_CONTRACT.md` update for every new/changed endpoint | rolling, alongside 1.10–1.15 | `TODO` | — | — |
@@ -1037,26 +1037,35 @@ per DEC-023 no portion of it is "earned" yet; that only happens in 1.13, per ses
 
 ---
 
-## 1.13 — New endpoint: consume a package session
+## 1.13 — New endpoint: consume a package session — WIP, needs live verification
+
+**Implementation update (2026-07-26):** recognition is a durable
+`package_revenue_recognitions` event, never a second customer-facing invoice. The new
+`20260726010700_create_package_revenue_recognitions.sql` migration adds the event ledger and
+transactional `consume_customer_package_session(...)` RPC. `POST /api/packages/consume` verifies
+that the completed reservation belongs to the same customer and includes the entitled service before
+calling it; `POST /api/packages/extend` records a manual future expiry and the responsible employee.
+The new unique item/reservation pair prevents duplicate consumption. The migration was applied to
+linked dev on 2026-07-26; `supabase migration list --linked` matches local/remote through
+`20260726010700`, and `supabase db diff --linked` found no schema changes. Live endpoint flows must
+still be tested before this task can be marked `DONE`.
 
 **Depends on 1.12.** **Where:** new route, or a new action on an existing one — again use
 judgement on the exact shape, document the choice.
 
-**What:** given a `customer_package_items` row and a delivered session, decrement
-`qty_remaining` / increment `qty_used`, and recognise
-`recognisedRevenuePerSession(price_paid, qty_total)` of revenue for that one session (exactly how
-this "recognition" is recorded — a new invoice? a note on the original invoice? — needs a decision
-at implementation time; the safest default given DEC-014's "management accounting, not
-bookkeeping" stance is a small revenue-recognition record referencing the original
-`customer_package_items` row, not a second customer-facing invoice). Also implement the manual
-per-customer **extend** action here (DEC-025): sets a new `expires_at` on `customer_packages`,
-records `extended_by_employee_id`/`extended_at`, available regardless of the package's
-`on_expiry` default.
+**What:** consume one entitled service session only after its matching reservation is completed.
+The transactional RPC increments `qty_used`, decrements `qty_remaining`, creates one
+`package_revenue_recognitions` event, and marks the package `fully_used` when no entitlement remains.
+It calculates each event as the delta between complement-safe recognised totals, so final-session
+rounding can never over-recognise the package price. The manual extend endpoint sets a future
+`expires_at`, restores an expired package to active, and records the staff member/time.
 
 **Update `API_CONTRACT.md`.**
 
-**Verify:** the invariant from 1.9's package test case, now end-to-end: sell a 6-session package
-for 1000, consume 2, confirm recognised + deferred still sum to 1000.
+**Verify:** after applying the migration, sell a 6-session package for 1000 EGP, consume two
+completed matching reservations, and confirm recognised plus deferred remains exactly 1000. Reject
+duplicate, expired, exhausted, customer-mismatched, and service-mismatched consumption; verify a
+manual extension records `expires_at`, `extended_by_employee_id`, and `extended_at`.
 
 ---
 

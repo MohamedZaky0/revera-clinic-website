@@ -975,6 +975,26 @@ Caught by `scratch/phase1packagecheck.ts` on the first implementation attempt.
 
 ---
 
+### `package_revenue_recognitions`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `customer_package_id` | UUID | FK → customer_packages.id ON DELETE CASCADE |
+| `customer_package_item_id` | UUID | FK → customer_package_items.id ON DELETE CASCADE |
+| `reservation_id` | UUID | FK → reservations.id ON DELETE RESTRICT; one row per delivered package service session |
+| `recognised_at` | timestamptz | Default now() |
+| `recognised_amount` | numeric | Non-negative amount released from deferred revenue |
+| `reason` | text | Default `'session'`, CHECK IN (`'session'`, `'expiry_breakage'`) |
+| `recognised_by_employee_id` | UUID | FK → employee_accounts.id ON DELETE SET NULL |
+| `created_at` | timestamptz | Default now() |
+
+Unique `(customer_package_item_id, reservation_id)` prevents consuming the same entitlement for the
+same delivered reservation more than once. This is a management-accounting event record, not a
+second customer-facing invoice; it records the revenue release required by DEC-023.
+
+---
+
 ## Notes on Schema Gaps
 
 - Persistent patient records are stored in the `customers` table, and connected to `reservations` via `customer_id`.

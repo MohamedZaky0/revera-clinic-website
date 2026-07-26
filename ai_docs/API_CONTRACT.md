@@ -260,6 +260,30 @@ The requested branch must match the package's branch when the package is branch-
 
 ---
 
+## POST /api/packages/consume
+
+Requires a staff bearer token. Consumes one entitled package service from a completed reservation.
+
+**Body:** `{ customerPackageItemId, reservationId }`
+
+The reservation must be completed, belong to the entitlement's customer, and include the entitled service. The route atomically increments `qty_used`, decrements `qty_remaining`, creates one `package_revenue_recognitions` event, and marks the customer package `fully_used` when no sessions remain. A duplicate item/reservation consumption is rejected.
+
+**Response:** `{ consumption }`
+
+---
+
+## POST /api/packages/extend
+
+Requires a staff bearer token. Manually extends an active or expired customer package.
+
+**Body:** `{ customerPackageId, expiresAt }`
+
+`expiresAt` must be a future timestamp. The package becomes active and records the extending employee and time.
+
+**Response:** `{ customerPackage }`
+
+---
+
 ## GET /api/customers
 
 Returns all customers, or a single customer matching the queried params.

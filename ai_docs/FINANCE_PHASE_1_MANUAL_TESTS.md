@@ -9,6 +9,7 @@
 | Date | Task | Environment | Evidence | Result |
 |---|---|---|---|---|
 | 2026-07-26 | 1.10 | dev | Reservation `2e03f8ea-e88d-4923-8b1c-5a27e0efeb3d` created invoice `INV-000001`; two service lines totalled 220; one cash payment of 100 | PASS |
+| 2026-07-26 | 1.13 | dev | Migration `20260726010700` applied; linked migration list matches and shadow `db diff` found no schema changes | PASS |
 
 ## Per-task checklist
 
@@ -54,7 +55,7 @@
 
 ### 1.13 — Consume package session and recognise revenue
 
-- [ ] Before implementation, record the selected durable revenue-recognition table/record and its audit fields here.
+- [x] **Design selected:** `package_revenue_recognitions` is the durable management-accounting event ledger. It records the customer package, entitlement item, delivered reservation, timestamp, recognised amount, reason, and staff identity; its unique item/reservation pair prevents duplicate recognition.
 - [ ] Consume one entitled session as staff; confirm exactly one entitlement item decrements/increments and no second customer-facing invoice is created.
 - [ ] Verify the recognition amount is the pro-rata amount; after several sessions, verify recognised plus deferred equals `price_paid` exactly.
 - [ ] Try consuming after all sessions are used, after expiry, and for another customer's entitlement; confirm safe rejection.

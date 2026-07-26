@@ -43,6 +43,7 @@ check('deferred balance at 0 remaining', deferredBalance(pricePaid, 0, totalSess
 // 2b. Nothing delivered yet: the whole price is deferred, none recognised.
 check('deferred balance at full remaining === price_paid', deferredBalance(pricePaid, totalSessions, totalSessions), pricePaid);
 check('recognised so far at 0 delivered', recognisedRevenueSoFar(pricePaid, 0, totalSessions), 0);
+check('recognised so far at full delivery equals price_paid', recognisedRevenueSoFar(pricePaid, totalSessions, totalSessions), pricePaid);
 
 // 3. Zero-session package must throw, not divide by zero.
 let threw = false;

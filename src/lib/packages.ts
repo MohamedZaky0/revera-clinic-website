@@ -58,6 +58,7 @@ export function deferredBalance(pricePaid: number, qtyRemaining: number, qtyTota
  */
 export function recognisedRevenueSoFar(pricePaid: number, qtyUsed: number, qtyTotal: number): number {
   if (qtyUsed <= 0) return 0;
+  if (qtyUsed >= qtyTotal) return round2(pricePaid);
   const perSession = recognisedRevenuePerSession(pricePaid, qtyTotal);
   return round2(perSession * qtyUsed);
 }

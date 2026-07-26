@@ -824,3 +824,26 @@ caller is not the same thing as an authorized one.
   match an old unlinked row. This narrows automatically as `auth_user_id` backfills, and does not
   apply to any row already linked.
 
+---
+
+## DEC-030: Package Session Delivery Is Recorded as a Revenue-Recognition Event
+
+**Date:** 2026-07-26
+**Status:** Decided — active
+
+**Context:** Package cash is invoiced at sale time but remains deferred revenue under DEC-023.
+Delivering a package session must release the earned amount without creating a duplicate
+customer-facing sale or leaving a mutable, unauditable balance on `customer_package_items`.
+
+**Chosen Option:** `package_revenue_recognitions` records one immutable management-accounting event
+per consumed entitlement item and completed reservation. It stores the recognised amount, timestamp,
+reason, and staff identity; the unique `(customer_package_item_id, reservation_id)` constraint
+prevents duplicate revenue recognition. `customer_package_items` remains the session-count source of
+truth. A transactional RPC changes both the entitlement counts and recognition event together.
+
+**Trade-offs:**
+- A small table and transactional RPC add more schema than a mutable invoice annotation, but protect
+  against duplicate session delivery and rounding drift.
+- Breakage is represented by the same event ledger with `reason = 'expiry_breakage'`; its scheduled
+  expiry-processing flow remains separate follow-up work.
+
