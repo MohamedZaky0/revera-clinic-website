@@ -592,7 +592,7 @@ routes:**
 | 1.9 | Regression checks for 1.7 and 1.8 | 1.7, 1.8 | `DONE` | Claude | `see 1.7-1.9 below` |
 | 1.10 | Wire booking checkout (`PATCH /api/reservations`, `status: 'completed'`) to dual-write an invoice | 1.1–1.4, 1.7 | `DONE` | Claude | `aed3793` |
 | 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `DONE` | Claude | `58fe1dc` |
-| 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `WIP` — code written; pending live package-sale verification | Claude | — | — |
+| 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `DONE` | Claude | pending commit (live verification) |
 | 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `WIP` — migration applied to dev; pending live endpoint verification | Claude | — |
 | 1.14 | `src/lib/customerBalances.ts` — derive `outstanding`/`spent_amount`/`wallet_balance` from the ledger + reconciliation endpoint | 1.1–1.4, 1.10, 1.11 | `TODO` | — | — |
 | 1.15 | Opening-balance import (DEC-024) | 1.1, 1.3, 1.4, 1.6 | `TODO` | — | — |
@@ -1050,7 +1050,7 @@ product, quantity, unit price, customer, optional branch, payment method, and re
 
 ---
 
-## 1.12 — New endpoint: sell a package — WIP, needs live verification
+## 1.12 — New endpoint: sell a package — DONE, fully live-verified
 
 **Done:** `POST /api/packages/sell` is staff-only and accepts `customerId`, `packageId`, and an
 optional `branchId`. It validates the active package, customer, package-item quantities, and any
@@ -1060,9 +1060,21 @@ package price/tax rate and sets package expiry from `validity_days`. The endpoin
 newly-created package/invoice records when a later write fails. `API_CONTRACT.md` documents the
 request and response.
 
-**Not done:** it has not been exercised against a live package sale. Do not mark this task `DONE`
-until one sale creates the expected invoice, payment, customer-package, and entitlement-item rows,
-with the configured branch restriction and expiry verified.
+**Live-verified 2026-07-26** against deployed dev with a real staff session — see
+`FINANCE_PHASE_1_MANUAL_TESTS.md` for full evidence. Covered: the happy path (2-item package,
+correct invoice/line/payment/`customer_packages`/`customer_package_items`, `expires_at` exact),
+unrestricted-package-uses-request-branch, restricted-package-uses-own-branch, and all five
+rejection cases (inactive, missing customer, empty package, zero-qty item, mismatched restricted
+branch) — each a clean error with zero partial records (verified by direct DB inspection after
+every rejection attempt, not just trusting the HTTP response).
+
+**Found, not fixed — minor schema-hardening gap:** `package_items.qty` has no DB-level
+`CHECK (qty > 0)`, unlike every comparable quantity column elsewhere in Phase 1/2
+(`service_consumables.standard_qty`, `stock_movements.qty`, etc.). The zero-qty rejection this
+task's checklist requires is enforced only by this one route's own `item.qty <= 0` check. Not a
+live bug — no other write path creates `package_items` today — but should get a `CHECK` constraint
+before a second caller (an admin CRUD UI, an import script) exists and might not carry the same
+validation.
 
 **Depends on 1.5, 1.6, 1.8.** **Where:** `src/app/api/packages/sell/route.ts`.
 
