@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireAdministratorAccess } from '@/lib/access';
 
 export async function GET(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   const url = new URL(req.url);
   const employeeId = url.searchParams.get('employeeId');
 
@@ -56,6 +60,9 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   try {
     const { employeeId, note, createdBy } = await req.json();
 
@@ -97,6 +104,9 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });
+
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
 

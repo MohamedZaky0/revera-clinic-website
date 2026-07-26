@@ -648,6 +648,46 @@ would be built on a false premise.
 
 ---
 
+## RISK-021: `/api/employees` Callers Were Missing Bearer Tokens, And `/api/employees/notes` Had No Server-Side Role Check At All
+
+**Severity:** Medium → Resolved · **Type:** Security / Broken feature
+**Found:** 2026-07-26 (user-reported: "Provision Employee Credentials" 401'd with
+"Unauthorized: Authentication required for administrative endpoint") · **RESOLVED 2026-07-26**
+
+**Two distinct bugs, found while fixing the reported one:**
+
+1. **Nine `fetch('/api/employees'...)`/`fetch('/api/employees/notes'...)` call sites in
+   `admin/page.tsx`** (create employee, delete employee, resend invitation, change role, edit own
+   profile, the second create-employee form, employee note create/delete/list) sent no
+   `Authorization` header at all, while `src/middleware.ts` requires one for the `/api/employees`
+   prefix (added independently of this session's finance work — see DEC-010/RISK-002). Every one
+   of those actions 401'd with the exact message reported. Two other call sites in the same file
+   (`:19404`, `:27466` before this fix) already sent the header correctly, which is what made this
+   an inconsistency rather than a wholesale missing feature — the working pattern existed, it just
+   wasn't applied everywhere. Fixed by adding `Authorization: Bearer ${session?.access_token || ''}`
+   to all nine, matching the two working examples.
+2. **`/api/employees/notes` (GET/POST/DELETE) called no auth helper at all** — unlike
+   `/api/employees` itself, which calls `requireAdministratorAccess`. The middleware fix above only
+   proves the caller has *some* valid Supabase session; `/api/employees/notes` had nothing checking
+   that session belonged to staff, let alone an administrator. A patient's own OTP session (the only
+   kind of Supabase session a non-staff person can hold — see RISK-003/DEC-029) would have passed
+   the middleware and been able to read or write internal employee notes. Found only because fixing
+   bug 1 required reading this route's handlers to confirm what they actually enforce; not part of
+   the original report. Fixed by adding the same `requireAdministratorAccess` gate `/api/employees`
+   itself uses, to all three methods.
+
+**Reason this wasn't a money route and so is a Medium, not the Critical severity RISK-018's money
+routes carry:** employee notes are internal HR content, not a financial mutation. Still a real
+IDOR-shaped gap — any authenticated non-staff user could read/write another party's HR notes — not
+a cosmetic issue.
+
+**Verify:** `npx tsc --noEmit` and `npx eslint` clean (5 pre-existing `prefer-const` errors at
+`admin/page.tsx:768,1566` confirmed unrelated via `git stash` — present before and after this fix).
+Manually exercise Provision Employee Credentials (create, delete, resend invite, role change) and
+the employee notes panel as a staff `admin`/`superadmin` account before closing this row.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:

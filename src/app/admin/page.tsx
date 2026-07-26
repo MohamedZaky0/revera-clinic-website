@@ -1105,7 +1105,9 @@ export default function AdminPage() {
       setLoadingEmployeeBookings(true);
       try {
         const [notesRes, bookingsRes] = await Promise.all([
-          fetch(`/api/employees/notes?employeeId=${viewingEmployee.id}`),
+          fetch(`/api/employees/notes?employeeId=${viewingEmployee.id}`, {
+            headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+          }),
           fetch(`/api/reservations?createdByEmployeeId=${viewingEmployee.id}`)
         ]);
 
@@ -2672,7 +2674,10 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/employees', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify({
           email: newEmployeeEmail.trim().toLowerCase(),
           name: newEmployeeName.trim(),
@@ -2701,7 +2706,8 @@ export default function AdminPage() {
     if (!(await showConfirm("Are you sure you want to delete this employee account? They will lose access to the admin panel immediately."))) return;
     try {
       const res = await fetch(`/api/employees?id=${encodeURIComponent(id)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
       });
       if (res.ok) {
         clearFetchCache();
@@ -2720,7 +2726,10 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/employees', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify({ id }),
       });
       if (res.ok) {
@@ -3098,7 +3107,10 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/employees', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify({ id, roleName: newRole }),
       });
       if (res.ok) {
@@ -5314,7 +5326,10 @@ export default function AdminPage() {
 
       const res = await fetch("/api/employees", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify({
           id: profileEmployee.id,
           name: profileName.trim(),
@@ -19438,7 +19453,10 @@ export default function AdminPage() {
                             }
                             const res = await fetch("/api/employees", {
                               method: "POST",
-                              headers: { "Content-Type": "application/json" },
+                              headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${session?.access_token || ''}`,
+                              },
                               body: JSON.stringify({
                                 email: newEmployeeEmail.trim().toLowerCase(),
                                 name: newEmployeeName.trim(),
@@ -21052,7 +21070,10 @@ export default function AdminPage() {
                                       onClick={async () => {
                                         if (confirm("Are you sure you want to delete this note?")) {
                                           try {
-                                            const res = await fetch(`/api/employees/notes?id=${note.id}`, { method: "DELETE" });
+                                            const res = await fetch(`/api/employees/notes?id=${note.id}`, {
+                                              method: "DELETE",
+                                              headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+                                            });
                                             if (res.ok) {
                                               setViewingEmployeeNotes(prev => prev.filter(n => n.id !== note.id));
                                             } else {
@@ -21090,7 +21111,10 @@ export default function AdminPage() {
                                   try {
                                     const res = await fetch("/api/employees/notes", {
                                       method: "POST",
-                                      headers: { "Content-Type": "application/json" },
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                        Authorization: `Bearer ${session?.access_token || ''}`,
+                                      },
                                       body: JSON.stringify({
                                         employeeId: viewingEmployee.id,
                                         note: newEmployeeNoteText.trim(),
