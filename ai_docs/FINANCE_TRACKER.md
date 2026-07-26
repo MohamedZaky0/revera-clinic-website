@@ -1238,7 +1238,7 @@ Close this out last.
 | 2.9 | Library: `src/lib/costing.ts` — consumption cost, pulse cost, commission math | 2.1–2.8 | `DONE` | Claude | pending commit |
 | 2.10 | Regression checks for 2.9 | 2.9 | `DONE` | Claude | pending commit |
 | 2.11 | Checkout recipe consumption and invoice cost/commission snapshots | 1.10, 2.2, 2.3, 2.9 | `DONE` | Claude | pending commit (live verification) |
-| 2.12 | Cut `stock_quantity` over to derive from `stock_movements` | 2.4, 2.11 | `BLOCKED` — requires a trial period of reconciled movement data | — | — |
+| 2.12 | Cut `stock_quantity` over to derive from `stock_movements` | 2.4, 2.11 | `DONE` — reconciliation tooling built and live-verified; the **cutover itself stays deliberately not done**, blocked on a missing opening-balance movement per product (same class of gap as 1.14) | Claude | pending commit (live verification) |
 | 2.13 | `POST /api/purchases` | 2.5, 2.6 | `DONE` | Claude | pending commit (live verification) |
 | 2.14 | Doctor payroll uses `provider_id` | 0.7, 2.8, 2.9 | `DONE` | Claude | pending commit (live verification) |
 | 2.15 | `service_devices` and checkout pulse cost | 2.7, 2.9, 2.11 | `DONE` | Claude | pending commit (live verification) |
@@ -1651,6 +1651,40 @@ just the new one.
 ---
 
 ## 2.12 — Cut `stock_quantity` over to derive from `stock_movements`
+
+**DONE (tooling), live-verified 2026-07-26 — the actual cutover remains not done, deliberately.**
+`src/lib/inventoryBalances.ts` (`computeDerivedStockQuantity`, 6 passing regression cases in
+`scratch/phase2stockcheck.ts`, deliberately **not** clamped at 0 — a negative derived value is
+diagnostic, not something to hide) and `GET /api/inventory/products/reconcile` (staff-only,
+read-only) are built and confirmed working against deployed dev.
+
+**Live reconciliation result: both real products in dev show drift, for the identical structural
+reason task 1.14 found for customer balances.** `stock_movements` was only ever populated by
+today's Phase 2 work (tasks 2.11's consumption entries, 2.13's purchases, and the POS-sale dual
+write from task 1.11) — no movement row exists anywhere for whatever quantity a product held
+*before* that instrumentation went live. A derived sum can only ever reconstruct history from the
+point movements started being recorded; it structurally cannot reconstruct a pre-existing balance
+that was never written as a movement. Concretely: product "k" showed `scalar: 8, derived: -2` (the
+`-2` is a real, verified `stock_movements` row from today's task 1.11 POS-sale test — the missing
+piece is an opening `+10` movement for however that product's stock arrived in the first place,
+which was never recorded); product "z" showed `scalar: 10, derived: 0` (zero real movements
+remain for it after test-fixture cleanup, so there is nothing at all to derive from yet).
+
+**This is exactly DEC-024's opening-balance concept, applied to inventory specifically** —
+PROPOSAL-002's setup-data list already names "inventory on hand at cost (physical count)" as an
+opening-balance item. The cutover this task describes only becomes safe once either (a) an opening
+`stock_movements` row (`reason: 'opening'`, `is_opening: true`) is written per product representing
+its balance at the moment tracking began, or (b) a real clinic's actual DEC-024 opening-balance
+import happens at go-live. **Not built here** — deliberately deferred alongside the broader
+opening-balance work (task 1.15) per the same 2026-07-26 user decision logged in the "Open
+questions" table above, rather than seeded ad hoc as a side effect of this task.
+
+**What "done" means here, precisely — identical framing to task 1.14:** the derivation logic and
+reconciliation tooling are correct and proven; they found real, explainable drift rather than
+silently agreeing. It does **not** mean `stock_quantity` and the derived value currently agree, and
+per this task's own standing caution, **no write path has been changed** — `deductInventoryStock`
+and every other existing stock-mutating caller keep writing `stock_quantity` directly exactly as
+before (see the updated note on that column in `DB_SCHEMA.md`).
 
 **Depends on 2.4, and real data flowing through 2.11 for at least a trial period — do not attempt
 this the same day as 2.11, mirroring task 1.14's identical caution relative to 1.10/1.11.**

@@ -607,7 +607,7 @@ prescriptions (diagnosis/medications/follow-up) got a real table.
 | `category` | text | nullable |
 | `price` | numeric | Default 0 — selling price |
 | `cost_price` | numeric | Default 0 — purchase price |
-| `stock_quantity` | integer | Default 0; still mutated by the legacy inventory route until Phase 2.12 reconciles and cuts reads over to `stock_movements` |
+| `stock_quantity` | integer | Default 0. **Still the actively-written source of truth** (`deductInventoryStock` in `/api/inventory/products`, POS sale deduction, task 0.4) — no read path has cut over to `stock_movements` yet. **Added 2026-07-26** (task 2.12): `src/lib/inventoryBalances.ts` computes the movement-derived equivalent, and `GET /api/inventory/products/reconcile` (staff-only) reports drift per product. **Live-checked 2026-07-26: every product currently shows drift**, because `stock_movements` was only ever populated by today's Phase 2 work — no movement row exists for whatever quantity a product held before that, so a derived sum can never reconstruct pre-ledger stock. The cutover this column's own note used to promise does not happen until that gap is closed (an opening `stock_movements` row per product, DEC-024's inventory-at-cost opening-balance concept — not yet built) or a real clinic starts with an actual opening-balance import. See `FINANCE_TRACKER.md` task 2.12 for the full reasoning, which mirrors task 1.14's identical finding for `customers.outstanding` etc. |
 | `role` | text | Default `'retail'`, CHECK IN (`'retail'`, `'consumable'`, `'both'`) — determines whether this product may appear in a service recipe |
 | `min_stock_alert` | integer | Default 5 |
 | `unit` | text | Default `'pcs'` |

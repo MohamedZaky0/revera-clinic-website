@@ -364,6 +364,35 @@ read path has cut over to trusting the ledger's numbers yet; see the note on tho
 
 ---
 
+## GET /api/inventory/products/reconcile
+
+**Staff-only** (`requireStaffAccess`). PROPOSAL-002 Phase 2, task 2.12 — read-only, writes nothing.
+For every product, derives `stock_quantity` fresh from `stock_movements`
+(`src/lib/inventoryBalances.ts`) and compares against the currently-authoritative
+`inventory_products.stock_quantity` scalar, flagging any mismatch. Same comparison-only role as
+`GET /api/customers/reconcile` (task 1.14) — no read path has cut over to trusting the derived
+value yet; see the note on `stock_quantity` in `DB_SCHEMA.md`.
+
+**Response:**
+```json
+{
+  "productsChecked": 2,
+  "discrepancyCount": 2,
+  "allMatched": false,
+  "discrepancies": [
+    {
+      "productId": "…",
+      "productName": "k",
+      "derived": -2,
+      "scalar": 8,
+      "matches": false
+    }
+  ]
+}
+```
+
+---
+
 ## GET /api/clinic-settings?key={key}
 
 Alias for `/api/page-settings` — returns the `value` JSONB for the given key.
