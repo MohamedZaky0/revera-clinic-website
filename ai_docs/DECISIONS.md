@@ -742,3 +742,29 @@ makes ownership unclear, and further slows targeted work.
 - New feature delivery may require creating a small module boundary first, which is accepted to stop
   the legacy file from growing and to make the staged extraction safe.
 
+---
+
+## DEC-028: Dev Schema Baseline Replaces the Legacy Migration Sequence
+
+**Date:** 2026-07-26
+**Status:** Decided — active
+
+**Context:**
+The 32 hand-authored migrations were out of order and could not provision a Supabase CLI shadow
+database: the first customer migration altered `reservations` before any migration created it. The
+linked dev database was the verified source of truth, while main remains a separate reconciliation
+project.
+
+**Chosen Option:**
+- Use the direct dev schema dump as `20260726000000_dev_schema_baseline.sql`.
+- Archive the 32 prior scripts in `supabase/migrations/_legacy/`; they preserve history but are not
+  active migrations and must never be executed again.
+- Replace the linked dev database's migration-history entries with the sole baseline entry.
+- Treat a `db pull` shadow replay with "No schema changes found" as successful baseline validation.
+
+**Trade-offs:**
+- Main cannot receive an automatic incremental migration chain from dev; it requires a direct schema
+  review and deliberate cutover to the baseline.
+- The baseline reproduces the current schema, not historical data or the reasons for every old
+  change. The archived files and this decision preserve that context.
+

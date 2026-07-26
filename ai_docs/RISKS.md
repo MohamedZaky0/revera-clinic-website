@@ -560,11 +560,10 @@ already scheduled:
 
 Fixing this is far cheaper now, before production exists, than at any later point.
 
-The Supabase CLI is linked to dev and the migration history was reconciled on 2026-07-26: all 32
-confirmed local migrations are recorded in `supabase_migrations.schema_migrations`. The clean
-baseline is still blocked because `db pull` cannot provision a shadow database from the out-of-order
-legacy sequence. Until that sequence is replaced with a baseline generated from a direct dev schema
-dump, new provisioning and main-database reconciliation remain operational risks.
+The Supabase CLI is linked to dev, whose migration history now contains only the active
+`20260726000000` baseline. A direct dev dump generated that baseline, and `db pull` replayed it in a
+shadow database with no schema diff. New dev-based provisioning is now reproducible; the remaining
+operational risk is reviewing main directly and cutting it over to the same baseline.
 
 **The result: a file existing in `supabase/migrations/` proves nothing about any database.**
 Two Supabase projects are in use and their schemas have diverged badly.

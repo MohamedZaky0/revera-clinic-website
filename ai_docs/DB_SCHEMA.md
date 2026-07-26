@@ -5,9 +5,10 @@
 > **Audited from:** `supabase/migrations/*.sql`, live API routes, and a direct linked dev schema dump on 2026-07-26
 > **Previous content was for a different project — discarded entirely**
 
-Migration history (run manually via Supabase SQL Editor, see `supabase/migrations/README.md`)
-lives in `supabase/migrations/`. This file is the current-state reference; that folder is the
-change log. Keep both in sync — see "When to Update These Docs" in `ai_docs/README.md`.
+`supabase/migrations/20260726000000_dev_schema_baseline.sql` is the active dev schema baseline.
+The prior scripts live under `supabase/migrations/_legacy/` as history only. This file is the
+current-state reference; keep it synchronized with future active migrations — see
+`supabase/migrations/README.md`.
 
 ---
 

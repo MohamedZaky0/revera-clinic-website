@@ -55,7 +55,7 @@ order by ordinal_position;
 
 | | dev DB | main DB |
 |---|---|---|
-| Migration history | All 32 local migrations recorded | Not reconciled |
+| Migration history | `20260726000000` baseline recorded | Not reconciled |
 | Schema evidence | Direct linked `db dump` | **2026-07-25 snapshot** |
 | `reservations.date` type | `text` | **`date`** |
 | `reservations.service_ids` | present | **absent** |
@@ -93,9 +93,9 @@ would be confidently wrong, which is worse than absent (DEC-019).
 | 0.10 | Protect money-mutating API routes | `PARTIAL` | Claude | `see 0.10 below` |
 
 **Phase 0 summary:** 0.7 and 0.8 are verified complete; 0.10's reservation authorization pass is
-complete, while customer and inventory-route scoping remains open. 0.0 is blocked on replacing the
-out-of-order legacy migration sequence with a clean baseline generated from the direct dev dump;
-`db pull` cannot build its shadow database from the existing sequence.
+complete, while customer and inventory-route scoping remains open. The dev migration baseline is
+adopted and replay-verified. The remaining 0.0 task is a separate main-database schema review and
+cutover to that baseline.
 
 ---
 
@@ -105,26 +105,24 @@ out-of-order legacy migration sequence with a clean baseline generated from the 
 |---|---|
 | a. Supabase CLI configured and linked to dev | `DONE` |
 | b. Silent-fallback insert chain removed | `DONE` |
-| c. Dev migration history reconciled with all 32 confirmed local migrations | `DONE` |
+| c. Dev migration history replaced with the active baseline entry | `DONE` |
 | d. Direct linked dev schema dump captured and verified | `DONE` |
-| e. Replace the out-of-order legacy sequence with a reviewed clean baseline from that dump | `TODO` — `db pull` shadow replay is blocked by the legacy ordering |
-| f. Bring the main DB up to the clean baseline and verify parity | `TODO` — blocked on (e) |
+| e. Replace the out-of-order legacy sequence with a reviewed clean baseline from that dump | `DONE` — `20260726000000_dev_schema_baseline.sql`; shadow replay has no diff |
+| f. Bring the main DB up to the clean baseline and verify parity | `TODO` — requires separate main database review and cutover |
 
-**Measured 2026-07-26:** `supabase migration repair --status applied` recorded all 32 local
-migrations in the linked dev project's `supabase_migrations.schema_migrations`. The subsequent
-`supabase migration list --linked` showed an exact local/remote match.
+**Measured 2026-07-26:** `supabase migration repair` replaced the 32 legacy dev history entries
+with `20260726000000`. `supabase migration list --linked` shows that baseline as the sole matching
+local and remote entry. `npx supabase db pull --schema public` provisions a shadow database, applies
+the baseline, and finds no schema diff; its non-zero "No schema changes found" result is the CLI's
+expected no-op outcome.
 
-`npx supabase db pull --schema public` still cannot create a baseline because its shadow database
-replays the legacy files and fails at `20260624015717_customers_schema.sql`: it alters
-`reservations` before a migration creates that table. A direct `npx supabase db dump --linked
---schema public` succeeded instead and was used to verify the dev schema.
+The dump is now the reviewed `20260726000000_dev_schema_baseline.sql`; the 32 legacy files are
+archived under `_legacy/`, and linked dev migration metadata records only the baseline. The CLI
+shadow replay applies it and finds no schema diff.
 
-**Next:** review that direct dump into one clean baseline, move the legacy migration files to
-`_legacy/`, then reconcile main against the baseline. Do not retry `db pull` until the legacy
-sequence is no longer active.
-
-`admin_roles` is present in dev, has no migration or application caller, and is now documented in
-`DB_SCHEMA.md`. `employees` remains observed only in main and needs a direct main-schema review.
+`admin_roles` is present in dev, has no migration or application caller, and is documented in
+`DB_SCHEMA.md`. `employees` remains observed only in main and needs a direct main-schema review
+before main is reconciled.
 
 **(b) — what was removed and why.** `src/app/api/reservations/route.ts` previously retried a failed
 insert after deleting `is_manual` and `created_by_employee_id`, then again after also deleting
