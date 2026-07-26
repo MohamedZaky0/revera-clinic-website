@@ -518,3 +518,543 @@ routes:**
 | Cutover date for exact data | End of Phase 2 | Decide nearer the time; should be the first day of a month (DEC-020) |
 | Currency configuration | Phase 4 | `EGP` is a hardcoded string throughout; belongs in `src/config/client.ts` per PROPOSAL-001 |
 | Whether `admin_roles` / `employees` tables are live or dead | Phase 0.0 | Unknown — found in the live DBs, in no migration and no doc |
+
+---
+
+# Phase 1 — Financial Ledger Spine
+
+> **Status as of 2026-07-26: WIP.** Broken into micro-tasks below so any model — a fresh
+> session, a different AI, a human — can pick up exactly one task, know precisely what file to
+> touch and why, and leave the tracker in a state where the next task is equally clear. Do not
+> skip ahead: later tasks depend on earlier ones existing, and the dependency column says which.
+>
+> **Read before starting any 1.x task:** `PROPOSALS.md` → PROPOSAL-002 Phase 1 (the target shape) ·
+> `DECISIONS.md` → DEC-021 (tax-inclusive pricing), DEC-023 (packages/deferred revenue), DEC-024
+> (opening balances), DEC-025 (package expiry), DEC-026 (no backfill — all current data is mock).
+>
+> **Ground rule carried over from Phase 0, non-negotiable here too:** every schema task updates
+> `DB_SCHEMA.md` **in the same commit** (CLAUDE.md hard rule 6). Every new table **explicitly
+> enables RLS with no policies** (service-role-only) — money tables are never touched from the
+> browser. Never mark a row `DONE` without having run `npx tsc --noEmit`, `npx eslint` on the
+> touched files, and (where pure logic was added) a `scratch/*.ts` regression script, exactly the
+> pattern used throughout Phase 0.
+
+## Phase 1 task table
+
+| ID | Task | Depends on | Status | Owner | Commit |
+|---|---|---|---|---|---|
+| 1.1 | Migration: `invoices` table | — | `TODO` | — | — |
+| 1.2 | Migration: `invoice_lines` table | 1.1 | `TODO` | — | — |
+| 1.3 | Migration: `payments` table | 1.1 | `TODO` | — | — |
+| 1.4 | Migration: `wallet_txns` table | 1.1 | `TODO` | — | — |
+| 1.5 | Migration: `packages` + `package_items` tables | — | `TODO` | — | — |
+| 1.6 | Migration: `customer_packages` + `customer_package_items` tables, backfill `invoice_lines.package_id` FK | 1.2, 1.5 | `TODO` | — | — |
+| 1.7 | Library: `src/lib/ledger.ts` — invoice/line/payment builders (pure functions) | 1.1–1.4 (schema shape only, no runtime dependency) | `TODO` | — | — |
+| 1.8 | Library: `src/lib/packages.ts` — deferred-revenue recognition math (pure functions) | 1.5, 1.6 (schema shape only) | `TODO` | — | — |
+| 1.9 | Regression checks for 1.7 and 1.8 | 1.7, 1.8 | `TODO` | — | — |
+| 1.10 | Wire booking checkout (`PATCH /api/reservations`, `status: 'completed'`) to dual-write an invoice | 1.1–1.4, 1.7 | `TODO` | — | — |
+| 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `TODO` | — | — |
+| 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `TODO` | — | — |
+| 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `TODO` | — | — |
+| 1.14 | `src/lib/customerBalances.ts` — derive `outstanding`/`spent_amount`/`wallet_balance` from the ledger + reconciliation endpoint | 1.1–1.4, 1.10, 1.11 | `TODO` | — | — |
+| 1.15 | Opening-balance import (DEC-024) | 1.1, 1.3, 1.4, 1.6 | `TODO` | — | — |
+| 1.16 | `API_CONTRACT.md` update for every new/changed endpoint | rolling, alongside 1.10–1.15 | `TODO` | — | — |
+
+**"Dual-write" in 1.10/1.11 means additive, not a cutover.** The existing `amount_paid` /
+`amount_left` / `customers.spent_amount` writes keep running exactly as today; the new ledger
+tables get written to *in parallel*. Nothing existing can regress, because nothing existing is
+being removed yet. The cutover — making the old columns *derived* instead of independently
+written — is 1.14, done only once the ledger has been proven correct by real data flowing through
+1.10/1.11. This mirrors how `20260725160000` added `product_sales.customer_id` without touching
+any existing column, and how the reservations PATCH gate in 0.10 was reverted and rebuilt rather
+than shipped half-working — small reversible steps, not a flag-day rewrite of money-handling code.
+
+---
+
+## 1.1 — Migration: `invoices`
+
+**What:** new table, the anchor every other Phase 1 table hangs off.
+**Where:** `supabase/migrations/<timestamp>_create_invoices.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS public.invoices (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_no      text UNIQUE NOT NULL,
+  reservation_id  uuid REFERENCES public.reservations(id) ON DELETE SET NULL,
+  customer_id     uuid REFERENCES public.customers(id) ON DELETE SET NULL,
+  branch_id       uuid REFERENCES public.branches(id) ON DELETE SET NULL,
+  issued_at       timestamptz NOT NULL DEFAULT now(),
+  subtotal        numeric NOT NULL DEFAULT 0,
+  discount_total  numeric NOT NULL DEFAULT 0,
+  grand_total     numeric NOT NULL DEFAULT 0,
+  status          text NOT NULL DEFAULT 'issued' CHECK (status IN ('draft','issued','void')),
+  is_opening      boolean NOT NULL DEFAULT false,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.invoice_no_seq START 1;
+
+CREATE INDEX IF NOT EXISTS invoices_customer_id_idx ON public.invoices (customer_id);
+CREATE INDEX IF NOT EXISTS invoices_reservation_id_idx ON public.invoices (reservation_id);
+CREATE INDEX IF NOT EXISTS invoices_issued_at_idx ON public.invoices (issued_at);
+
+ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
+```
+
+**Why `reservation_id` is nullable:** a retail-only POS sale (no booking involved) still needs an
+invoice. Why `grand_total` has no separate tax column: DEC-021 — prices are stored tax-inclusive
+with `tax_rate` on the *line*, not the invoice; a tax split is always derivable
+(`tax = gross × rate / (1 + rate)`) without needing it stored redundantly at invoice level.
+`invoice_no` is generated in application code as `'INV-' || lpad(nextval(...)::text, 6, '0')` —
+keep the sequence in SQL (gap-free-enough, no race condition) but the formatting in TypeScript,
+matching this codebase's existing style of app-generated human-readable IDs (`REP-<timestamp>`,
+`sale-<timestamp>-<rand>`) rather than a Postgres-side formatting function.
+
+**Update `DB_SCHEMA.md` in the same commit:** add an `### invoices` section under a new
+`## Phase 1 — Financial Ledger` heading (create it if this is the first Phase 1 table documented),
+following the exact column-table format used for every other table in that file.
+
+**Verify:** `npx supabase db diff --linked` after running the migration shows only this table added.
+Mark `DONE` here and give the commit hash; mark `NEEDS-DB` if the migration file is written but not
+yet run against dev, and say so explicitly — do not leave the row ambiguous.
+
+---
+
+## 1.2 — Migration: `invoice_lines`
+
+**Depends on 1.1.** **Where:** `supabase/migrations/<timestamp>_create_invoice_lines.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS public.invoice_lines (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id           uuid NOT NULL REFERENCES public.invoices(id) ON DELETE CASCADE,
+  line_type            text NOT NULL CHECK (line_type IN ('service','product','package')),
+  service_id           bigint REFERENCES public.services(id) ON DELETE SET NULL,
+  product_id           text REFERENCES public.inventory_products(id) ON DELETE SET NULL,
+  package_id           uuid,  -- FK added in 1.6, once public.packages exists
+  description          text NOT NULL,
+  qty                  numeric NOT NULL DEFAULT 1,
+  unit_price           numeric NOT NULL DEFAULT 0,
+  discount             numeric NOT NULL DEFAULT 0,
+  tax_rate             numeric NOT NULL DEFAULT 0,
+  line_total           numeric NOT NULL DEFAULT 0,
+  cogs_snapshot        numeric,
+  commission_snapshot  numeric,
+  provider_id          uuid REFERENCES public.providers(id) ON DELETE SET NULL,
+  created_at           timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS invoice_lines_invoice_id_idx ON public.invoice_lines (invoice_id);
+CREATE INDEX IF NOT EXISTS invoice_lines_provider_id_idx ON public.invoice_lines (provider_id);
+
+ALTER TABLE public.invoice_lines ENABLE ROW LEVEL SECURITY;
+```
+
+**Why `package_id` has no FK constraint yet:** `public.packages` does not exist until 1.5/1.6, and
+migrations run in order — this is the same pattern used for `product_sales.customer_id`
+(`20260725160000`), added by `ALTER TABLE` once the referenced table exists. **Task 1.6 must add
+the FK constraint** (`ALTER TABLE invoice_lines ADD CONSTRAINT ... FOREIGN KEY (package_id)
+REFERENCES packages(id) ON DELETE SET NULL`) — do not forget this or the column is silently
+unenforced forever.
+
+**Why `cogs_snapshot`/`commission_snapshot` are nullable, not `NOT NULL DEFAULT 0`:** Phase 1 alone
+cannot populate them correctly — COGS needs Phase 2's `service_consumables` recipe and
+commission needs a doctor's contract terms applied at issue time. A `NULL` here honestly says "not
+yet costed," which is different from a `0` meaning "this line genuinely has no cost." Do not
+default these to 0 in 1.10/1.11; leave them `NULL` until Phase 2 wires real values in.
+
+**Update `DB_SCHEMA.md`:** add `### invoice_lines` under the same Phase 1 heading, and note the
+FK caveat above so nobody "fixes" the missing constraint by mistake before 1.6.
+
+---
+
+## 1.3 — Migration: `payments`
+
+**Depends on 1.1.** **Where:** `supabase/migrations/<timestamp>_create_payments.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS public.payments (
+  id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id               uuid NOT NULL REFERENCES public.invoices(id) ON DELETE CASCADE,
+  received_at              timestamptz NOT NULL DEFAULT now(),
+  amount                   numeric NOT NULL,
+  method                   text NOT NULL DEFAULT 'cash'
+                             CHECK (method IN ('cash','card','wallet','instapay','transfer')),
+  received_by_employee_id  uuid REFERENCES public.employee_accounts(id) ON DELETE SET NULL,
+  reference                text,
+  is_opening               boolean NOT NULL DEFAULT false,
+  created_at               timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS payments_invoice_id_idx ON public.payments (invoice_id);
+CREATE INDEX IF NOT EXISTS payments_received_at_idx ON public.payments (received_at);
+
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+```
+
+**Why this table exists at all — the thing it fixes:** today `reservations.amount_paid` is one
+mutable number, so a booking paid in two installments (a deposit, then the remainder weeks later)
+can never show *when* each part was paid or *how* (cash vs card vs wallet). `payments` is one row
+per receipt. `SUM(amount) WHERE invoice_id = X` reconstructs the running total; the individual rows
+give the history that a single column structurally cannot.
+
+**Update `DB_SCHEMA.md`:** add `### payments`.
+
+---
+
+## 1.4 — Migration: `wallet_txns`
+
+**Depends on 1.1.** **Where:** `supabase/migrations/<timestamp>_create_wallet_txns.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS public.wallet_txns (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id  uuid NOT NULL REFERENCES public.customers(id) ON DELETE CASCADE,
+  occurred_at  timestamptz NOT NULL DEFAULT now(),
+  direction    text NOT NULL CHECK (direction IN ('in','out')),
+  amount       numeric NOT NULL CHECK (amount > 0),
+  reason       text NOT NULL,
+  invoice_id   uuid REFERENCES public.invoices(id) ON DELETE SET NULL,
+  is_opening   boolean NOT NULL DEFAULT false,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS wallet_txns_customer_id_idx ON public.wallet_txns (customer_id);
+
+ALTER TABLE public.wallet_txns ENABLE ROW LEVEL SECURITY;
+```
+
+**Why this fixes RISK-012/016 permanently, not just patches it:** `customers.wallet_balance` is
+today overwritten with a computed scalar on every checkout (fixed to use deltas in `billing.ts`,
+task 0.5) — but top-ups, spends and change-deposits are still indistinguishable after the write.
+`wallet_txns` is one row per movement; `wallet_balance` becomes `SUM(CASE WHEN direction='in' THEN
+amount ELSE -amount END)`, auditable and reconstructable, not just correctly-computed-going-forward.
+
+**Update `DB_SCHEMA.md`:** add `### wallet_txns`.
+
+---
+
+## 1.5 — Migration: `packages` + `package_items`
+
+**No dependency on 1.1–1.4** (can be done in parallel with them).
+**Where:** `supabase/migrations/<timestamp>_create_packages.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS public.packages (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name             text NOT NULL,
+  branch_id        uuid REFERENCES public.branches(id) ON DELETE SET NULL,
+  price            numeric NOT NULL DEFAULT 0,
+  tax_rate         numeric NOT NULL DEFAULT 0,
+  validity_days    integer NOT NULL DEFAULT 90,
+  on_expiry        text NOT NULL DEFAULT 'extend'
+                     CHECK (on_expiry IN ('recognise_revenue','extend')),
+  extension_days   integer,
+  active           boolean NOT NULL DEFAULT true,
+  created_at       timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.package_items (
+  package_id  uuid NOT NULL REFERENCES public.packages(id) ON DELETE CASCADE,
+  service_id  bigint NOT NULL REFERENCES public.services(id) ON DELETE CASCADE,
+  qty         integer NOT NULL DEFAULT 1,
+  PRIMARY KEY (package_id, service_id)
+);
+
+ALTER TABLE public.packages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.package_items ENABLE ROW LEVEL SECURITY;
+```
+
+**`branch_id` nullable** = package sellable at every branch when unset, matching how `providers`
+and `reservations` already treat a null branch as "not branch-restricted."
+**`on_expiry`/`extension_days`** implement DEC-025 (breakage-vs-extend) as a per-package default;
+task 1.13's per-customer manual extend action overrides this default when used.
+
+**Update `DB_SCHEMA.md`:** add `### packages` and `### package_items`.
+
+---
+
+## 1.6 — Migration: `customer_packages` + `customer_package_items`, backfill the `invoice_lines.package_id` FK
+
+**Depends on 1.2, 1.5.** **Where:** `supabase/migrations/<timestamp>_create_customer_packages.sql`
+
+```sql
+CREATE TABLE IF NOT EXISTS public.customer_packages (
+  id                        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id               uuid NOT NULL REFERENCES public.customers(id) ON DELETE CASCADE,
+  package_id                uuid REFERENCES public.packages(id) ON DELETE SET NULL,
+  invoice_id                uuid REFERENCES public.invoices(id) ON DELETE SET NULL,
+  purchased_at              timestamptz NOT NULL DEFAULT now(),
+  expires_at                timestamptz,
+  price_paid                numeric NOT NULL DEFAULT 0,
+  status                    text NOT NULL DEFAULT 'active'
+                              CHECK (status IN ('active','expired','fully_used')),
+  is_opening                boolean NOT NULL DEFAULT false,
+  extended_by_employee_id   uuid REFERENCES public.employee_accounts(id) ON DELETE SET NULL,
+  extended_at               timestamptz,
+  created_at                timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.customer_package_items (
+  id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_package_id    uuid NOT NULL REFERENCES public.customer_packages(id) ON DELETE CASCADE,
+  service_id             bigint NOT NULL REFERENCES public.services(id) ON DELETE CASCADE,
+  qty_total              integer NOT NULL DEFAULT 0,
+  qty_used               integer NOT NULL DEFAULT 0,
+  qty_remaining          integer NOT NULL DEFAULT 0,
+  created_at             timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS customer_packages_customer_id_idx ON public.customer_packages (customer_id);
+CREATE INDEX IF NOT EXISTS cpi_customer_package_id_idx ON public.customer_package_items (customer_package_id);
+
+ALTER TABLE public.customer_packages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customer_package_items ENABLE ROW LEVEL SECURITY;
+
+-- Backfill the FK deferred in 1.2, now that packages exists.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'invoice_lines_package_id_fkey'
+  ) THEN
+    ALTER TABLE public.invoice_lines
+      ADD CONSTRAINT invoice_lines_package_id_fkey
+      FOREIGN KEY (package_id) REFERENCES public.packages(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+```
+
+**Update `DB_SCHEMA.md`:** add `### customer_packages` and `### customer_package_items`; edit the
+`invoice_lines.package_id` row to remove the "FK added later" caveat now that it's true.
+
+**Verify all of 1.1–1.6 together:** `npx supabase db diff --linked` shows exactly these 8 tables
+added and nothing else; re-run `npx tsx scratch/pricecheck.ts`, `billingcheck.ts`, `identitycheck.ts`
+to confirm nothing in Phase 0's work was disturbed (none of these migrations touch existing tables,
+so this should trivially pass — running it is the check that it actually is trivial).
+
+---
+
+## 1.7 — Library: `src/lib/ledger.ts`
+
+**Depends on 1.1–1.4 (schema shape, not runtime — this is pure TypeScript, no DB calls).**
+
+**What:** pure, testable functions — no `supabaseServer` calls inside this file. Route handlers
+call these to compute *what to write*, then do the actual `insert` themselves. This mirrors
+`src/lib/billing.ts` (`computeSettledBalances`) and `src/lib/customerIdentity.ts` (`isOwnIdentity`)
+from Phase 0 — pure functions are what `scratch/*.ts` can actually test without a live database.
+
+**Functions to write:**
+```ts
+formatInvoiceNo(seqValue: number): string
+  // 'INV-' + zero-padded 6-digit seqValue. Formatting only — the seq itself comes from
+  // invoice_no_seq via a DB round-trip in the route, not from this pure function.
+
+buildInvoiceLine(input: {
+  lineType: 'service' | 'product' | 'package';
+  description: string; qty: number; unitPrice: number; discount?: number; taxRate?: number;
+  serviceId?: number; productId?: string; packageId?: string; providerId?: string;
+}): InvoiceLineDraft
+  // line_total = qty * unitPrice - (discount ?? 0), clamped to >= 0.
+
+buildInvoiceTotals(lines: InvoiceLineDraft[]): { subtotal: number; discountTotal: number; grandTotal: number }
+  // subtotal = sum of (qty * unitPrice); discountTotal = sum of discounts;
+  // grandTotal = sum of line_total. Round once at the end, not per line, to avoid
+  // cent-level drift between subtotal/discount/grandTotal not adding up.
+
+taxPortion(grossAmount: number, taxRate: number): number
+  // gross * rate / (1 + rate) — DEC-021's derivation formula. Used only for display/reporting,
+  // never for storage (grand_total is already the source of truth).
+```
+
+**Update `DB_SCHEMA.md`:** none — this is a library file, not a schema change.
+
+**Verify:** write alongside 1.9 (the regression script covers both 1.7 and 1.8 together, since
+package math in 1.8 calls `buildInvoiceLine`/`buildInvoiceTotals` from this file).
+
+---
+
+## 1.8 — Library: `src/lib/packages.ts`
+
+**Depends on 1.5, 1.6 (schema shape only).**
+
+**Functions to write, implementing the formulas in `PROPOSALS.md` Phase 1 exactly:**
+```ts
+recognisedRevenuePerSession(pricePaid: number, totalSessions: number): number
+  // pricePaid / totalSessions. totalSessions must be > 0 — throw, don't silently divide by zero
+  // (a package with zero sessions is a data error, not a valid state).
+
+deferredBalance(pricePaid: number, qtyRemaining: number, qtyTotal: number): number
+  // pricePaid * qtyRemaining / qtyTotal — the liability figure for one customer_package_items row.
+  // Sum across a customer's rows for their total deferred balance.
+
+isExpired(expiresAt: string | Date | null, asOf: Date): boolean
+
+resolveExpiry(pkg: { onExpiry: 'recognise_revenue' | 'extend'; extensionDays?: number | null },
+              customerPackage: { expiresAt: string | null }):
+              { action: 'recognise_revenue' } | { action: 'extend'; newExpiresAt: string }
+  // Implements DEC-025's default policy. The manual per-customer override (task 1.13) calls
+  // this only to get the DEFAULT; a manual extend bypasses it entirely by design.
+```
+
+**Verify:** covered by 1.9.
+
+---
+
+## 1.9 — Regression checks for 1.7/1.8
+
+**Depends on 1.7, 1.8.** **Where:** `scratch/ledgercheck.ts`, `scratch/packagecheck.ts`
+(or one combined `scratch/phase1check.ts` — either is fine, match whichever the prior scratch
+scripts' granularity suggests feels right at the time; `pricecheck.ts`/`billingcheck.ts`/
+`identitycheck.ts` were kept separate per concern, so keep these separate too for consistency).
+
+**Minimum cases to cover** (mirrors the rigor of `billingcheck.ts`'s 15 cases and
+`identitycheck.ts`'s 10):
+- Invoice totals: multiple lines, a discount, rounding does not drift subtotal vs grand_total.
+- Package: 6-session package, 1000 paid, 2 delivered → recognised = 333.33×2, deferred = 666.67×4
+  (verify the two numbers sum back to 1000 — this is the single most important invariant in the
+  whole phase, and the one most likely to have an off-by-one or rounding bug).
+- Package expiry: `on_expiry: 'recognise_revenue'` past `expires_at` → `resolveExpiry` returns
+  breakage; `on_expiry: 'extend'` → returns a new date; a manual extend bypasses both.
+- `deferredBalance` at `qty_remaining = 0` → 0 (fully delivered, no liability left).
+- `recognisedRevenuePerSession` with `totalSessions = 0` → throws, does not return `Infinity` or
+  silently divide by zero.
+
+**Update `DB_SCHEMA.md`:** none.
+
+---
+
+## 1.10 — Wire booking checkout to dual-write an invoice
+
+**Depends on 1.1–1.4, 1.7.** **Where:** `src/app/api/reservations/route.ts`, the
+`status === 'completed'` branch (the same block task 0.5's `computeSettledBalances` call lives in).
+
+**What:** when a booking transitions to `completed`, additionally:
+1. Build invoice lines from `serviceIds`/`service_id` and their resolved price
+   (`getEffectiveServicePrice`, task 0.2/0.3's fixed version), via `buildInvoiceLine`.
+2. `INSERT` into `invoices` (with `reservation_id`, `customer_id`, `branch_id`), then
+   `invoice_lines`, then a `payments` row for `amountPaid` if positive.
+3. **Do not remove or change** the existing `computeSettledBalances` call or the
+   `reservations.amount_paid`/`amount_left` writes — those keep running exactly as before. This
+   step is additive only, per the dual-write note at the top of this Phase 1 section.
+4. Wrap the ledger writes so a failure **does not fail the checkout itself** — log the error and
+   return the existing checkout response unchanged; a missing invoice can be reconciled later, but
+   a checkout that silently fails because ledger-writing broke would be a new, worse regression
+   than the one this phase is fixing. (This tension — ledger writes should eventually be
+   authoritative, not best-effort — is exactly why 1.14's cutover is a separate, later step done
+   only once this has been proven reliable.)
+
+**Update `DB_SCHEMA.md`:** none (no schema change). **Update `API_CONTRACT.md`** to note that a
+completed checkout now also produces an invoice — document the response shape if it changes (it
+should not; this is a side effect, not a new field).
+
+**Verify:** complete a real booking checkout against dev (or as close to end-to-end as this
+environment allows) and confirm a matching `invoices`/`invoice_lines`/`payments` row exists,
+*and* confirm `reservations.amount_paid` and `customers.spent_amount` are unchanged from Phase 0's
+behavior — this task must be provably zero-regression on the existing path.
+
+---
+
+## 1.11 — Wire POS sale to dual-write an invoice
+
+**Depends on 1.1–1.4, 1.7.** **Where:** `src/app/api/inventory/products/sales/route.ts`, the
+`POST` handler, after the existing `product_sales` insert (`mapSaleToDbRow`/`insertedDb`).
+
+**What:** same dual-write pattern as 1.10 — one invoice, one `line_type: 'product'` line, one
+payment row per POS sale — additive, does not touch the existing `product_sales` write or the
+`addToCustomerSpend` call from task 0.6/RISK-016.
+
+**Update `API_CONTRACT.md`:** note the side effect, same as 1.10.
+
+**Verify:** same standard as 1.10 — a POS sale still behaves exactly as after task 0.6, plus now
+also produces a ledger row.
+
+---
+
+## 1.12 — New endpoint: sell a package
+
+**Depends on 1.5, 1.6, 1.8.** **Where:** new `src/app/api/packages/sell/route.ts` (or fold into
+an existing customer/POS route if that reads more naturally once you're looking at the actual
+call sites — use judgement, but document the choice in `API_CONTRACT.md` either way).
+
+**What:** `POST` body: `customerId`, `packageId`, `branchId?`. Creates: an `invoice` +
+`invoice_line` (`line_type: 'package'`) for the sale, a `payments` row, a `customer_packages` row
+(`price_paid`, `expires_at = now() + validity_days`), and one `customer_package_items` row per
+`package_items` entry (`qty_total = qty_remaining = package_items.qty`, `qty_used = 0`).
+**Books cash received, not revenue** — the invoice line's `line_total` is the sale amount, but
+per DEC-023 no portion of it is "earned" yet; that only happens in 1.13, per session delivered.
+
+**Update `DB_SCHEMA.md`:** none. **Update `API_CONTRACT.md`:** document the new endpoint fully
+(request/response shape), matching the existing style in that file for other endpoints.
+
+---
+
+## 1.13 — New endpoint: consume a package session
+
+**Depends on 1.12.** **Where:** new route, or a new action on an existing one — again use
+judgement on the exact shape, document the choice.
+
+**What:** given a `customer_package_items` row and a delivered session, decrement
+`qty_remaining` / increment `qty_used`, and recognise
+`recognisedRevenuePerSession(price_paid, qty_total)` of revenue for that one session (exactly how
+this "recognition" is recorded — a new invoice? a note on the original invoice? — needs a decision
+at implementation time; the safest default given DEC-014's "management accounting, not
+bookkeeping" stance is a small revenue-recognition record referencing the original
+`customer_package_items` row, not a second customer-facing invoice). Also implement the manual
+per-customer **extend** action here (DEC-025): sets a new `expires_at` on `customer_packages`,
+records `extended_by_employee_id`/`extended_at`, available regardless of the package's
+`on_expiry` default.
+
+**Update `API_CONTRACT.md`.**
+
+**Verify:** the invariant from 1.9's package test case, now end-to-end: sell a 6-session package
+for 1000, consume 2, confirm recognised + deferred still sum to 1000.
+
+---
+
+## 1.14 — Derive customer balances from the ledger
+
+**Depends on 1.1–1.4, and real data flowing through 1.10/1.11 for at least a trial period —
+do not attempt this the same day as 1.10/1.11.** **Where:** new `src/lib/customerBalances.ts`,
+plus a reconciliation endpoint (e.g. `POST /api/customers/reconcile` or per-customer on read).
+
+**What:** pure functions computing `outstanding`/`spent_amount`/`wallet_balance` from
+`SUM()` queries over `invoices`/`payments`/`wallet_txns`, matching the intent of
+`computeSettledBalances` (task 0.5) but sourced from the ledger instead of applied as deltas to a
+stored scalar. **This is the cutover** — once trusted, this replaces the direct writes in 0.5's
+settlement code and in 1.10/1.11's `addToCustomerSpend`-style calls. Until this task, those direct
+writes are still the source of truth; do not read from the ledger for anything user-facing before
+this task is done and verified, or the two sources of truth can disagree silently.
+
+**Update `DB_SCHEMA.md`:** note on the `customers` table that `outstanding`/`spent_amount`/
+`wallet_balance` are now derived-and-cached (or fully computed on read — decide which at
+implementation time and document it), not independently written.
+
+**Verify:** for every customer in dev, the ledger-derived balance must equal the
+delta-maintained scalar balance before cutover — write this comparison as a one-off script, not a
+permanent regression check (it's a migration-correctness check, not ongoing behavior).
+
+---
+
+## 1.15 — Opening-balance import (DEC-024)
+
+**Depends on 1.1, 1.3, 1.4, 1.6.** **Where:** new admin-only endpoint or a one-time script —
+this runs once per clinic at setup, not routinely, so a script under `scratch/` invoked manually
+by staff/an operator is defensible instead of a full UI, at least for the first clinic.
+
+**What:** for each opening balance (cash, patient receivables, wallet credit, undelivered package
+sessions, supplier payables, asset book values, loan remaining balances — the full list is in
+`PROPOSALS.md`'s "Data a clinic must supply at setup"), write into the **same ledgers** as normal
+operation with `is_opening = true` and a shared `as_of` date. **Patient receivables must come from
+a physical audit, never from the current `customers.outstanding` column** — DEC-024 is explicit
+that column is not trustworthy as verified opening data (RISK-012's legacy, even after the 0.5 fix,
+because pre-0.5 data may already be wrong).
+
+**Update `DB_SCHEMA.md` and `API_CONTRACT.md`** if a real endpoint is built rather than a script.
+
+---
+
+## 1.16 — `API_CONTRACT.md` rollup
+
+Not a separate implementation task — a checklist to run once 1.10–1.15 are done, confirming every
+new/changed endpoint from this phase is documented there, not just described in this tracker.
+Close this out last.
