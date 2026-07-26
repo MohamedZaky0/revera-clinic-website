@@ -260,6 +260,24 @@ The requested branch must match the package's branch when the package is branch-
 
 ---
 
+## POST /api/purchases
+
+Requires a staff bearer token.
+
+**Body:** `{ supplierId?, purchasedAt?, lines: [{ productId, qty, unitCost }], paid?, dueDate? }`
+
+Creates one purchase, its lines, and matching inbound `stock_movements`. `total` is derived on the server from the lines; all referenced products and an optional supplier must exist.
+
+**Response:** `{ purchase, lines }`, status 201.
+
+---
+
+## PATCH /api/reservations?id=<reservation-id>
+
+When a staff checkout transitions a reservation to `completed`, it may include optional `consumptionOverrides` shaped as `{ [serviceId]: { [productId]: qty } }`. The existing checkout ledger side effects remain unchanged. When recipes/devices are configured, the additive Phase 2 side effects create consumption and stock-movement records and snapshot material/device COGS plus provider commission on invoice lines. A costing failure is logged without failing checkout.
+
+---
+
 ## POST /api/packages/consume
 
 Requires a staff bearer token. Consumes one entitled package service from a completed reservation.

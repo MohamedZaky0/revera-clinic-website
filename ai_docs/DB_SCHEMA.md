@@ -268,6 +268,8 @@ read-only `/api/availability`. An admin can double-book a doctor from the panel.
 | `fixed_salary` | numeric | Default 0 |
 | `commission_type` | text | Default `'none'` |
 | `commission_value` | numeric | Default 0 |
+| `commission_base` | text | Default `'gross'`, CHECK IN (`'gross'`, `'net_of_materials'`) |
+| `commission_fixed_component` | numeric | Default 0 — fixed component when `commission_type = 'both'` |
 | `created_at` | timestamptz | |
 
 ---
@@ -605,7 +607,8 @@ prescriptions (diagnosis/medications/follow-up) got a real table.
 | `category` | text | nullable |
 | `price` | numeric | Default 0 — selling price |
 | `cost_price` | numeric | Default 0 — purchase price |
-| `stock_quantity` | integer | Default 0 |
+| `stock_quantity` | integer | Default 0; still mutated by the legacy inventory route until Phase 2.12 reconciles and cuts reads over to `stock_movements` |
+| `role` | text | Default `'retail'`, CHECK IN (`'retail'`, `'consumable'`, `'both'`) — determines whether this product may appear in a service recipe |
 | `min_stock_alert` | integer | Default 5 |
 | `unit` | text | Default `'pcs'` |
 | `status` | text | Default `'In Stock'` |
@@ -685,6 +688,7 @@ POS Orders view) — see RISK-017.
 | `total_pulses` | integer | Default 0 |
 | `remaining_pulses` | integer | Default 0 |
 | `max_pulses_limit` | integer | Default 0 |
+| `lamp_replacement_cost` | numeric | Default 0 — consumable lamp/handpiece replacement cost, distinct from the device asset purchase cost; used for Phase 2 pulse-cost snapshots |
 | `last_maintenance_date` | timestamptz | nullable |
 | `next_maintenance_date` | timestamptz | nullable |
 | `created_at` | timestamptz | |
@@ -994,6 +998,72 @@ same delivered reservation more than once. This is a management-accounting event
 second customer-facing invoice; it records the revenue release required by DEC-023.
 
 ---
+
+## Phase 2 — Cost of Delivery (PROPOSAL-002)
+
+### `service_consumables`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `service_id` | bigint | FK → services.id ON DELETE CASCADE |
+| `product_id` | text | FK → inventory_products.id ON DELETE CASCADE |
+| `standard_qty` | numeric | Positive standard recipe quantity |
+| `created_at` | timestamptz | Default now() |
+
+Unique `(service_id, product_id)`. Product-role eligibility is validated in the checkout writer because it cannot be expressed with a simple SQL CHECK.
+
+### `consumption_entries`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `reservation_id` | UUID | FK → reservations.id ON DELETE CASCADE |
+| `product_id` | text | FK → inventory_products.id ON DELETE RESTRICT |
+| `qty` | numeric | Actual non-negative consumed quantity |
+| `unit_cost_snapshot` | numeric | Non-negative cost at checkout |
+| `was_edited` | boolean | Actual quantity differs from the service recipe |
+| `created_at` | timestamptz | Default now() |
+
+### `stock_movements`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `product_id` | text | FK → inventory_products.id ON DELETE CASCADE |
+| `occurred_at` | timestamptz | Default now() |
+| `direction` | text | CHECK IN (`'in'`, `'out'`) |
+| `qty` | numeric | Positive quantity |
+| `unit_cost` | numeric | Non-negative cost snapshot |
+| `reason` | text | CHECK IN (`'purchase'`, `'sale'`, `'consumption'`, `'adjustment'`, `'opening'`) |
+| `ref_id` | text | Polymorphic source ID; text supports legacy text `product_sales.id` and UUID source rows |
+
+### `suppliers`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `name` | text | NOT NULL |
+| `contact` | text | nullable |
+| `payment_terms` | text | nullable |
+| `active` | boolean | Default true |
+| `created_at` | timestamptz | Default now() |
+
+### `purchases` and `purchase_lines`
+
+`purchases` records supplier, purchase timestamp, total, paid amount, due date, opening-balance flag, and creation time. `purchase_lines` has a UUID primary key, a cascading purchase FK, a restrict-on-delete product FK, positive `qty`, non-negative `unit_cost`, and creation time. Purchase lines create inbound `stock_movements` through `POST /api/purchases`.
+
+### `service_devices`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `service_id` | bigint | FK → services.id ON DELETE CASCADE |
+| `device_id` | text | FK → inventory_devices.id ON DELETE CASCADE |
+| `pulses_per_session` | integer | Positive standard pulse count |
+| `created_at` | timestamptz | Default now() |
+
+Unique `(service_id, device_id)`. Checkout adds `lamp_replacement_cost / max_pulses_limit × pulses_per_session` to the invoice line COGS snapshot.
 
 ## Notes on Schema Gaps
 

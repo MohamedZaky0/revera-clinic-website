@@ -4,6 +4,7 @@ import { getServiceDurationMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot, getEffe
 import { computeSettledBalances } from '@/lib/billing';
 import { requireAdministratorAccess, requireStaffAccess } from '@/lib/access';
 import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
+import { computeCommission, consumptionCost, costPerPulse } from '@/lib/costing';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -96,6 +97,117 @@ async function resolveProviderId(doctorName?: string | null): Promise<string | n
  * above, since src/lib/services.ts's resolveBranchName() is not exported and a UUID branch_id
  * cannot be used directly as a branch name (see task 0.2/0.3).
  */
+async function applyCheckoutCosting(params: {
+  reservationId: string;
+  providerId: string | null;
+  serviceIds: number[];
+  invoiceLines: Array<{ id: string; service_id: number | null; line_total: number }>;
+  consumptionOverrides?: Record<string, Record<string, number>>;
+}): Promise<void> {
+  const { reservationId, providerId, serviceIds, invoiceLines, consumptionOverrides = {} } = params;
+  if (serviceIds.length === 0) return;
+
+  const [recipesResult, devicesResult, providerResult] = await Promise.all([
+    supabaseServer.from('service_consumables').select('service_id, product_id, standard_qty').in('service_id', serviceIds),
+    supabaseServer.from('service_devices').select('service_id, pulses_per_session, device_id').in('service_id', serviceIds),
+    providerId
+      ? supabaseServer.from('providers').select('commission_type, commission_value, commission_fixed_component, commission_base').eq('id', providerId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+  if (recipesResult.error) throw recipesResult.error;
+  if (devicesResult.error) throw devicesResult.error;
+  if (providerResult.error) throw providerResult.error;
+
+  const productIds = Array.from(new Set((recipesResult.data || []).map((recipe: any) => recipe.product_id)));
+  const deviceIds = Array.from(new Set((devicesResult.data || []).map((device: any) => device.device_id)));
+  const [productsResult, inventoryDevicesResult] = await Promise.all([
+    productIds.length > 0
+      ? supabaseServer.from('inventory_products').select('id, cost_price, role').in('id', productIds)
+      : Promise.resolve({ data: [], error: null }),
+    deviceIds.length > 0
+      ? supabaseServer.from('inventory_devices').select('id, lamp_replacement_cost, max_pulses_limit').in('id', deviceIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (productsResult.error) throw productsResult.error;
+  if (inventoryDevicesResult.error) throw inventoryDevicesResult.error;
+
+  type CostingProduct = { id: string; cost_price: number | null; role: string };
+  type CostingDevice = { id: string; lamp_replacement_cost: number | null; max_pulses_limit: number | null };
+  type ConsumptionDraft = { productId: string; qty: number; unitCostSnapshot: number; wasEdited: boolean };
+  const products = new Map<string, CostingProduct>(
+    ((productsResult.data || []) as CostingProduct[]).map((product) => [product.id, product])
+  );
+  const devices = new Map<string, CostingDevice>(
+    ((inventoryDevicesResult.data || []) as CostingDevice[]).map((device) => [device.id, device])
+  );
+
+  for (const invoiceLine of invoiceLines) {
+    if (!invoiceLine.service_id) continue;
+    const recipes = (recipesResult.data || []).filter((recipe: any) => Number(recipe.service_id) === Number(invoiceLine.service_id));
+    const entries: ConsumptionDraft[] = recipes.map((recipe: any): ConsumptionDraft => {
+      const product = products.get(recipe.product_id);
+      if (!product || !['consumable', 'both'].includes(product.role)) {
+        throw new Error(`Recipe product ${recipe.product_id} must have role consumable or both.`);
+      }
+      const override = consumptionOverrides[String(invoiceLine.service_id)]?.[recipe.product_id];
+      const qty = override === undefined ? Number(recipe.standard_qty) : Number(override);
+      if (!Number.isFinite(qty) || qty < 0) throw new Error(`Invalid consumed quantity for product ${recipe.product_id}.`);
+      return {
+        productId: recipe.product_id,
+        qty,
+        unitCostSnapshot: Number(product.cost_price || 0),
+        wasEdited: override !== undefined && qty !== Number(recipe.standard_qty),
+      };
+    });
+
+    const { data: insertedEntries, error: entriesError } = entries.length > 0
+      ? await supabaseServer.from('consumption_entries').insert(entries.map((entry: ConsumptionDraft) => ({
+          reservation_id: reservationId,
+          product_id: entry.productId,
+          qty: entry.qty,
+          unit_cost_snapshot: entry.unitCostSnapshot,
+          was_edited: entry.wasEdited,
+        }))).select('id, product_id, qty, unit_cost_snapshot')
+      : { data: [], error: null };
+    if (entriesError) throw entriesError;
+
+    const stockRows = (insertedEntries || []).filter((entry: any) => Number(entry.qty) > 0).map((entry: any) => ({
+      product_id: entry.product_id,
+      direction: 'out',
+      qty: entry.qty,
+      unit_cost: entry.unit_cost_snapshot,
+      reason: 'consumption',
+      ref_id: entry.id,
+    }));
+    if (stockRows.length > 0) {
+      const { error: stockError } = await supabaseServer.from('stock_movements').insert(stockRows);
+      if (stockError) throw stockError;
+    }
+
+    const materialCost = consumptionCost(entries.map(({ qty, unitCostSnapshot }: ConsumptionDraft) => ({ qty, unitCostSnapshot })));
+    const deviceCost = (devicesResult.data || [])
+      .filter((device: any) => Number(device.service_id) === Number(invoiceLine.service_id))
+      .reduce((total: number, serviceDevice: any) => {
+        const device = devices.get(serviceDevice.device_id);
+        if (!device) throw new Error(`Service device ${serviceDevice.device_id} was not found.`);
+        return total + costPerPulse(Number(device.lamp_replacement_cost || 0), Number(device.max_pulses_limit)) * Number(serviceDevice.pulses_per_session);
+      }, 0);
+    const cogsSnapshot = Math.round((materialCost + deviceCost + Number.EPSILON) * 100) / 100;
+    const provider = providerResult.data as any;
+    const commissionBase = provider?.commission_base === 'net_of_materials'
+      ? Math.max(0, Number(invoiceLine.line_total) - cogsSnapshot)
+      : Number(invoiceLine.line_total);
+    const commissionSnapshot = provider
+      ? computeCommission(commissionBase, provider.commission_type, Number(provider.commission_value || 0), Number(provider.commission_fixed_component || 0))
+      : 0;
+
+    const { error: updateError } = await supabaseServer.from('invoice_lines')
+      .update({ cogs_snapshot: cogsSnapshot, commission_snapshot: commissionSnapshot })
+      .eq('id', invoiceLine.id);
+    if (updateError) throw updateError;
+  }
+}
+
 async function writeCheckoutInvoice(params: {
   reservationId: string;
   customerId: string | null;
@@ -103,9 +215,10 @@ async function writeCheckoutInvoice(params: {
   providerId: string | null;
   serviceIds: number[];
   amountPaid: number;
+  consumptionOverrides?: Record<string, Record<string, number>>;
   receivedByEmployeeId?: string | null;
 }): Promise<void> {
-  const { reservationId, customerId, branchId, providerId, serviceIds, amountPaid, receivedByEmployeeId } = params;
+  const { reservationId, customerId, branchId, providerId, serviceIds, amountPaid, consumptionOverrides, receivedByEmployeeId } = params;
   if (serviceIds.length === 0) return;
 
   let targetBranchName: string | null = null;
@@ -169,10 +282,22 @@ async function writeCheckoutInvoice(params: {
     .single();
   if (invoiceErr) throw invoiceErr;
 
-  const { error: linesErr } = await supabaseServer.from('invoice_lines').insert(
+  const { data: invoiceLines, error: linesErr } = await supabaseServer.from('invoice_lines').insert(
     lines.map((line: ReturnType<typeof buildInvoiceLine>) => ({ ...line, invoice_id: invoice.id }))
-  );
+  ).select('id, service_id, line_total');
   if (linesErr) throw linesErr;
+
+  try {
+    await applyCheckoutCosting({
+      reservationId,
+      providerId,
+      serviceIds,
+      invoiceLines: invoiceLines || [],
+      consumptionOverrides,
+    });
+  } catch (costingError) {
+    console.error('Failed to write Phase 2 checkout costing (non-fatal):', costingError, '| reservation:', reservationId);
+  }
 
   if (amountPaid > 0) {
     const { error: paymentErr } = await supabaseServer.from('payments').insert({
@@ -492,7 +617,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId } = body;
+    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides } = body;
 
     const { data: target, error: findError } = await supabaseServer
       .from('reservations')
@@ -827,6 +952,7 @@ export async function PATCH(req: Request) {
               providerId: updated.provider_id ?? null,
               serviceIds,
               amountPaid: Math.max(0, paymentDelta),
+              consumptionOverrides,
             });
           } else if (wasAlreadyCompleted && paymentDelta > 0) {
             await appendPaymentToExistingInvoice(id, paymentDelta);

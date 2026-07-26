@@ -6,6 +6,8 @@
 
 | Date | Task | Environment | Evidence | Result |
 |---|---|---|---|---|
+| 2026-07-26 | 2.1–2.8, 2.15 | dev | Migrations `20260726010800`–`20260726011600` applied; linked migration list matches and shadow `db diff` found no schema changes | PASS |
+| 2026-07-26 | 2.9–2.10 | local | `npx.cmd tsx scratch/phase2costingcheck.ts` passed all material, pulse, and commission cases | PASS |
 
 ## Per-task checklist
 
@@ -17,8 +19,8 @@
 - [ ] **2.6 Purchases and lines:** Record a supplier purchase with multiple lines; verify totals, due-date handling, and product references.
 - [ ] **2.7 Device lamp cost:** Set a replacement cost and validate the existing pulse-limit denominator is correct for a real device.
 - [ ] **2.8 Provider commission configuration:** Validate commission type/base constraints and reject invalid contract combinations.
-- [ ] **2.9 Costing library:** Run its regression script; hand-check recipe, pulse, and fixed/percentage commission scenarios.
-- [ ] **2.10 Regression suite:** Record all passing Phase 2 scratch checks.
+- [x] **2.9 Costing library:** `scratch/phase2costingcheck.ts` covers material, pulse, fixed, percentage, both, none, and invalid-input scenarios.
+- [x] **2.10 Regression suite:** Passing output recorded in the evidence log.
 - [ ] **2.11 Checkout costing:** Complete a booking with a recipe and commission; verify consumption entries, stock movements, COGS snapshot, commission snapshot, and no duplicate legacy stock deduction.
 - [ ] **2.12 Stock cutover:** Reconcile every tested product's legacy stock with stock-movement sum before switching reads; verify sales, consumption, purchase, adjustment, and shrinkage all affect the derived value.
 - [ ] **2.13 Purchase endpoint:** POST a purchase; confirm purchase/lines, inbound movement, and weighted-average cost are correct with a hand calculation.

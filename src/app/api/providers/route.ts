@@ -49,7 +49,7 @@ export async function GET() {
         .or('department.ilike.%doc%,role_name.ilike.%doc%')
     ]);
 
-    let providersData = providersRes.data || [];
+    const providersData = providersRes.data || [];
 
     // Auto-sync any Doctor employees missing from providers table
     if (docEmployeesRes.data && docEmployeesRes.data.length > 0) {
@@ -146,7 +146,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue } = body;
+  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent } = body;
   
   let finalBranchId = branchId || null;
   if (workingDaysHours && typeof workingDaysHours === 'object') {
@@ -174,6 +174,8 @@ export async function POST(req: Request) {
     fixed_salary: fixedSalary ? Number(fixedSalary) : 0,
     commission_type: commissionType || 'none',
     commission_value: commissionValue ? Number(commissionValue) : 0,
+    commission_base: commissionBase || 'gross',
+    commission_fixed_component: commissionFixedComponent ? Number(commissionFixedComponent) : 0,
   };
 
   const authHeader = req.headers.get('Authorization') || '';
@@ -270,7 +272,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue } = body;
+  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent } = body;
   const updates: Record<string, any> = {};
   if (name !== undefined) updates.name = name;
   if (services !== undefined) updates.services = services;
@@ -301,6 +303,8 @@ export async function PATCH(req: Request) {
   if (fixedSalary !== undefined) updates.fixed_salary = Number(fixedSalary || 0);
   if (commissionType !== undefined) updates.commission_type = commissionType;
   if (commissionValue !== undefined) updates.commission_value = Number(commissionValue || 0);
+  if (commissionBase !== undefined) updates.commission_base = commissionBase;
+  if (commissionFixedComponent !== undefined) updates.commission_fixed_component = Number(commissionFixedComponent || 0);
 
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace('Bearer ', '').trim();

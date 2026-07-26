@@ -2,6 +2,33 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyHrAccess } from '@/lib/auth';
 
+async function getCommissionSnapshots(reservationIds: string[]): Promise<Map<string, number>> {
+  if (reservationIds.length === 0) return new Map();
+
+  const { data: invoices, error: invoicesError } = await supabaseServer
+    .from('invoices')
+    .select('id, reservation_id')
+    .in('reservation_id', reservationIds);
+  if (invoicesError) throw invoicesError;
+
+  const invoiceIds = (invoices || []).map((invoice: any) => invoice.id);
+  if (invoiceIds.length === 0) return new Map();
+
+  const { data: invoiceLines, error: linesError } = await supabaseServer
+    .from('invoice_lines')
+    .select('invoice_id, commission_snapshot')
+    .in('invoice_id', invoiceIds);
+  if (linesError) throw linesError;
+
+  const reservationByInvoice = new Map<string, string>((invoices || []).map((invoice: any) => [String(invoice.id), String(invoice.reservation_id)]));
+  const snapshots = new Map<string, number>();
+  for (const line of invoiceLines || []) {
+    const reservationId = reservationByInvoice.get(line.invoice_id);
+    if (reservationId) snapshots.set(reservationId, (snapshots.get(reservationId) || 0) + Number(line.commission_snapshot || 0));
+  }
+  return snapshots;
+}
+
 export async function GET(req: Request) {
   const auth = await verifyHrAccess(req);
   if (auth.error) {
@@ -35,16 +62,16 @@ export async function GET(req: Request) {
     let allReservations: any[] = [];
     if (months.length > 0) {
       const [resResult, servicesResult] = await Promise.all([
-        supabaseServer.from('reservations').select('doctor_name, status, date, amount_paid, amount_left, service_id'),
-        supabaseServer.from('services').select('id, price')
+        supabaseServer.from('reservations').select('id, provider_id, status, date, amount_paid, amount_left, service_id'),
+        supabaseServer.from('services').select('id, price'),
       ]);
 
       if (!resResult.error && resResult.data) {
         const servicesMap = new Map((servicesResult.data || []).map((s: any) => [s.id, s.price]));
         allReservations = resResult.data
           .filter((r: any) => {
-            const isApprovedOrCompleted = r.status === 'approved' || r.status === 'completed';
-            if (!isApprovedOrCompleted || !r.date) return false;
+            const isCompleted = r.status === 'completed';
+            if (!isCompleted || !r.date) return false;
             const rMonth = r.date.slice(0, 7);
             return months.includes(rMonth);
           })
@@ -54,6 +81,8 @@ export async function GET(req: Request) {
           }));
       }
     }
+
+    const commissionSnapshots = await getCommissionSnapshots(allReservations.map((reservation: any) => reservation.id));
 
     const mapped = (payroll || []).map((pay: any) => {
       const prov = providerMap.get(pay.provider_id) || {};
@@ -67,9 +96,9 @@ export async function GET(req: Request) {
 
       // Filter reservations for this doctor and month
       const docReservations = allReservations.filter((r: any) => {
-        const isDocMatch = r.doctor_name && r.doctor_name.trim().toLowerCase() === doc.name.trim().toLowerCase();
+        const isProviderMatch = r.provider_id === doc.id;
         const isMonthMatch = r.date && r.date.startsWith(pay.month);
-        return isDocMatch && isMonthMatch;
+        return isProviderMatch && isMonthMatch;
       });
 
       const totalBookingValue = docReservations.reduce((sum: number, r: any) => {
@@ -83,12 +112,7 @@ export async function GET(req: Request) {
 
       let calculatedCommission = 0;
       docReservations.forEach((res: any) => {
-        if (commissionType === 'fixed') {
-          calculatedCommission += commissionValue;
-        } else if (commissionType === 'percentage') {
-          const resPrice = Number(res.amount_paid || 0) + Number(res.amount_left || 0) || Number(res.services?.price || 0);
-          calculatedCommission += resPrice * (commissionValue / 100);
-        }
+        calculatedCommission += commissionSnapshots.get(res.id) || 0;
       });
 
       calculatedCommission = Math.round(calculatedCommission * 100) / 100;
@@ -130,7 +154,7 @@ export async function POST(req: Request) {
     // 1. Fetch all active providers/doctors
     const { data: providers, error: provErr } = await supabaseServer
       .from('providers')
-      .select('id, name, fixed_salary, commission_type, commission_value');
+      .select('id, name, fixed_salary, commission_type, commission_value, commission_fixed_component');
 
     if (provErr) throw provErr;
     if (!providers || providers.length === 0) {
@@ -141,7 +165,7 @@ export async function POST(req: Request) {
     const [resResult, servicesResult] = await Promise.all([
       supabaseServer
         .from('reservations')
-        .select('doctor_name, status, date, amount_paid, amount_left, service_id')
+        .select('provider_id, status, date, amount_paid, amount_left, service_id')
         .like('date', `${month}-%`),
       supabaseServer
         .from('services').select('id, price')
@@ -154,34 +178,27 @@ export async function POST(req: Request) {
     const servicesMap = new Map((servicesResult.data || []).map((s: any) => [s.id, s.price]));
     const activeReservations = (resResult.data || [])
       .filter((r: any) => {
-        return r.status === 'approved' || r.status === 'completed';
+        return r.status === 'completed';
       })
       .map((r: any) => ({
         ...r,
         services: r.service_id ? { price: servicesMap.get(r.service_id) || 0 } : null
       }));
 
+    const commissionSnapshots = await getCommissionSnapshots(activeReservations.map((reservation: any) => reservation.id));
+
     // 3. Calculate completed services and commissions per doctor
     const inserts = providers.map((prov: any) => {
       const fixedSalary = Number(prov.fixed_salary || 0);
       const commissionType = prov.commission_type || 'none';
       const commissionValue = Number(prov.commission_value || 0);
-
-      // Filter reservations for this specific doctor by name
-      const doctorReservations = activeReservations.filter((r: any) => {
-        return r.doctor_name && r.doctor_name.trim().toLowerCase() === prov.name.trim().toLowerCase();
-      });
+      const doctorReservations = activeReservations.filter((r: any) => r.provider_id === prov.id);
 
       const completedCount = doctorReservations.length;
       let totalCommission = 0;
 
       doctorReservations.forEach((res: any) => {
-        if (commissionType === 'fixed') {
-          totalCommission += commissionValue;
-        } else if (commissionType === 'percentage') {
-          const resPrice = Number(res.amount_paid || 0) + Number(res.amount_left || 0) || Number(res.services?.price || 0);
-          totalCommission += resPrice * (commissionValue / 100);
-        }
+        totalCommission += commissionSnapshots.get(res.id) || 0;
       });
 
       // Round to 2 decimal places
@@ -248,7 +265,7 @@ export async function PATCH(req: Request) {
       }
     }
 
-    let finalFixed = fixed_salary !== undefined ? Number(fixed_salary) : Number(current.fixed_salary);
+    const finalFixed = fixed_salary !== undefined ? Number(fixed_salary) : Number(current.fixed_salary);
     let finalComm = total_commission_earned !== undefined ? Number(total_commission_earned) : Number(current.total_commission_earned);
 
     if (fixed_salary !== undefined) updates.fixed_salary = finalFixed;
@@ -256,46 +273,23 @@ export async function PATCH(req: Request) {
 
     // Dynamically calculate and lock in real counts/commission/net if not explicitly supplied
     try {
-      const { data: prov } = await supabaseServer
-        .from('providers')
-        .select('name')
-        .eq('id', current.provider_id)
-        .maybeSingle();
-
-      if (prov) {
-        const [resResult, servicesResult] = await Promise.all([
-          supabaseServer
-            .from('reservations')
-            .select('doctor_name, status, date, amount_paid, amount_left, service_id')
-            .like('date', `${current.month}-%`),
-          supabaseServer
-            .from('services').select('id, price')
-        ]);
+      if (current.provider_id) {
+        const resResult = await supabaseServer
+          .from('reservations')
+          .select('id, provider_id, status, date')
+          .like('date', `${current.month}-%`);
 
         if (resResult.data && !resResult.error) {
-          const servicesMap = new Map((servicesResult.data || []).map((s: any) => [s.id, s.price]));
           const activeRes = resResult.data.filter((r: any) => {
-            const isApprovedOrCompleted = r.status === 'approved' || r.status === 'completed';
-            const isDocMatch = r.doctor_name && r.doctor_name.trim().toLowerCase() === prov.name.trim().toLowerCase();
-            return isApprovedOrCompleted && isDocMatch;
+            const isCompleted = r.status === 'completed';
+            return isCompleted && r.provider_id === current.provider_id;
           });
 
           const completedCount = activeRes.length;
-          let totalCommission = 0;
-
-          activeRes.forEach((res: any) => {
-            const commType = current.commission_type;
-            const commVal = Number(current.commission_value || 0);
-
-            if (commType === 'fixed') {
-              totalCommission += commVal;
-            } else if (commType === 'percentage') {
-              const resPrice = Number(res.amount_paid || 0) + Number(res.amount_left || 0) || Number(servicesMap.get(res.service_id) || 0);
-              totalCommission += resPrice * (commVal / 100);
-            }
-          });
-
-          totalCommission = Math.round(totalCommission * 100) / 100;
+          const commissionSnapshots = await getCommissionSnapshots(activeRes.map((reservation: any) => reservation.id));
+          const totalCommission = Math.round(activeRes.reduce((total: number, reservation: any) => {
+            return total + (commissionSnapshots.get(reservation.id) || 0);
+          }, 0) * 100) / 100;
           
           updates.completed_services_count = completedCount;
           if (total_commission_earned === undefined) {

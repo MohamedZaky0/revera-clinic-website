@@ -233,6 +233,25 @@ async function resolveBranchId(branchName?: string): Promise<string | null> {
   return arabicMatch?.id ?? null;
 }
 
+async function writePosSaleStockMovement(sale: ProductSaleRecord): Promise<void> {
+  const { data: product, error: productError } = await supabaseServer
+    .from('inventory_products')
+    .select('cost_price')
+    .eq('id', sale.product_id)
+    .maybeSingle();
+  if (productError) throw productError;
+
+  const { error } = await supabaseServer.from('stock_movements').insert({
+    product_id: sale.product_id,
+    direction: 'out',
+    qty: sale.quantity,
+    unit_cost: Number(product?.cost_price || 0),
+    reason: 'sale',
+    ref_id: sale.id,
+  });
+  if (error) throw error;
+}
+
 async function writePosSaleInvoice(sale: ProductSaleRecord, receivedByEmployeeId: string | null): Promise<void> {
   const line = buildInvoiceLine({
     lineType: 'product',
@@ -358,9 +377,12 @@ export async function POST(req: Request) {
 
     if (!dbInsertErr && insertedDb) {
       try {
-        await writePosSaleInvoice(newSale, access.access.employee.id);
+        await Promise.all([
+          writePosSaleInvoice(newSale, access.access.employee.id),
+          writePosSaleStockMovement(newSale),
+        ]);
       } catch (ledgerError) {
-        console.error('Failed to write POS sale invoice:', ledgerError);
+        console.error('Failed to write POS finance dual-write:', ledgerError);
       }
 
       const allSales = await getStoredSalesData();

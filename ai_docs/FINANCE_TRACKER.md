@@ -1142,22 +1142,22 @@ Close this out last.
 
 | ID | Task | Depends on | Status | Owner | Commit |
 |---|---|---|---|---|---|
-| 2.1 | Migration: `inventory_products.role` column | — | `TODO` | — | — |
-| 2.2 | Migration: `service_consumables` table (recipe/BOM) | — | `TODO` | — | — |
-| 2.3 | Migration: `consumption_entries` table | 2.2 | `TODO` | — | — |
-| 2.4 | Migration: `stock_movements` table | — | `TODO` | — | — |
-| 2.5 | Migration: `suppliers` table | — | `TODO` | — | — |
-| 2.6 | Migration: `purchases` + `purchase_lines` tables | 2.5, 2.4 (FK to stock_movements ref) | `TODO` | — | — |
-| 2.7 | Migration: `inventory_devices.lamp_replacement_cost` column | — | `TODO` | — | — |
-| 2.8 | Migration: `providers.commission_type` CHECK constraint + `commission_base` column | — | `TODO` | — | — |
-| 2.9 | Library: `src/lib/costing.ts` — consumption cost, pulse cost, commission math (pure functions) | 2.1–2.8 (schema shape only) | `TODO` | — | — |
-| 2.10 | Regression checks for 2.9 | 2.9 | `TODO` | — | — |
-| 2.11 | Wire booking checkout to consume the recipe, write `consumption_entries`, populate `invoice_lines.cogs_snapshot`/`commission_snapshot` | 1.10, 2.2, 2.3, 2.9 | `TODO` | — | — |
-| 2.12 | Cut `stock_quantity` over to be derived from `stock_movements` | 2.4, 2.11 | `TODO` | — | — |
-| 2.13 | New endpoint: record a purchase (`POST /api/purchases`) | 2.5, 2.6 | `TODO` | — | — |
-| 2.14 | Doctor payroll: match by `provider_id`, not `doctor_name` string | 0.7, 2.8, 2.9 | `TODO` | — | — |
-| 2.15 | Migration: `service_devices` table; wire device pulse cost into checkout (merge addition — closes a gap where `costPerPulse` was defined but never called) | 2.7, 2.9, 2.11 | `TODO` | — | — |
-| 2.16 | `API_CONTRACT.md` rollup for Phase 2 | rolling, alongside 2.11–2.15 | `TODO` | — | — |
+| 2.1 | Migration: `inventory_products.role` column | — | `DONE` — applied dev | Claude | pending commit |
+| 2.2 | Migration: `service_consumables` table (recipe/BOM) | — | `DONE` — applied dev | Claude | pending commit |
+| 2.3 | Migration: `consumption_entries` table | 2.2 | `DONE` — applied dev | Claude | pending commit |
+| 2.4 | Migration: `stock_movements` table | — | `DONE` — applied dev | Claude | pending commit |
+| 2.5 | Migration: `suppliers` table | — | `DONE` — applied dev | Claude | pending commit |
+| 2.6 | Migration: `purchases` + `purchase_lines` tables | 2.5, 2.4 | `DONE` — applied dev | Claude | pending commit |
+| 2.7 | Migration: `inventory_devices.lamp_replacement_cost` column | — | `DONE` — applied dev | Claude | pending commit |
+| 2.8 | Migration: provider commission config | — | `DONE` — applied dev | Claude | pending commit |
+| 2.9 | Library: `src/lib/costing.ts` — consumption cost, pulse cost, commission math | 2.1–2.8 | `DONE` | Claude | pending commit |
+| 2.10 | Regression checks for 2.9 | 2.9 | `DONE` | Claude | pending commit |
+| 2.11 | Checkout recipe consumption and invoice cost/commission snapshots | 1.10, 2.2, 2.3, 2.9 | `WIP` — implemented; pending live verification | Claude | pending commit |
+| 2.12 | Cut `stock_quantity` over to derive from `stock_movements` | 2.4, 2.11 | `BLOCKED` — requires a trial period of reconciled movement data | — | — |
+| 2.13 | `POST /api/purchases` | 2.5, 2.6 | `WIP` — implemented; pending live verification | Claude | pending commit |
+| 2.14 | Doctor payroll uses `provider_id` | 0.7, 2.8, 2.9 | `WIP` — durable identity fix implemented; pending snapshot/live verification | Claude | pending commit |
+| 2.15 | `service_devices` and checkout pulse cost | 2.7, 2.9, 2.11 | `WIP` — implemented; pending live verification | Claude | pending commit |
+| 2.16 | `API_CONTRACT.md` rollup for Phase 2 | rolling | `WIP` — current endpoints documented; close after verification | Claude | pending commit |
 
 **Same "additive, then cutover" discipline as Phase 1.** 2.11 is additive — it populates the two
 columns Phase 1 deliberately left `NULL` (see task 1.2's note) without touching anything else on
@@ -1305,10 +1305,12 @@ a quantity changed. `stock_movements` is one row per event; `stock_quantity` bec
 over to. This also gives weighted-average cost and a shrinkage-reconciliation trail, both named
 explicitly in PROPOSALS.md Phase 2.
 
-**Why `ref_id` has no FK constraint:** it points at whichever row caused the movement —
-`purchase_lines.id`, `product_sales.id`, or `consumption_entries.id` depending on `reason` — a
-polymorphic reference SQL cannot express as one FK. Do not add a constraint here; validate the
-reference shape in application code if it is ever needed for a join.
+**Why `ref_id` has no FK constraint and is `text`:** it points at whichever row caused the
+movement — `purchase_lines.id`, `product_sales.id`, or `consumption_entries.id` depending on
+`reason` — a polymorphic reference SQL cannot express as one FK. It is `text`, rather than the
+original sketch's `uuid`, because the legacy `product_sales.id` is text (`sale-...`) while new
+purchase and consumption IDs are UUIDs. Do not add a constraint here; validate the reference shape
+in application code if it is ever needed for a join.
 
 **Update `DB_SCHEMA.md`:** add `### stock_movements`, and add a note under the existing
 `### inventory_products` entry that `stock_quantity` is mutated in place **until task 2.12**, at

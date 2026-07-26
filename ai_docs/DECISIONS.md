@@ -847,3 +847,20 @@ truth. A transactional RPC changes both the entitlement counts and recognition e
 - Breakage is represented by the same event ledger with `reason = 'expiry_breakage'`; its scheduled
   expiry-processing flow remains separate follow-up work.
 
+---
+
+## DEC-031: Stock-Movement References Use Text for Legacy POS Compatibility
+
+**Date:** 2026-07-26
+**Status:** Decided — active
+
+**Context:** Phase 2 stock movements are caused by new UUID rows (`purchase_lines`,
+`consumption_entries`) and legacy POS rows whose `product_sales.id` values are text such as
+`'sale-<timestamp>-<random>'`.
+
+**Chosen Option:** `stock_movements.ref_id` is an unconstrained text polymorphic reference. Writers
+store the source row's ID as text and rely on `reason` to identify its source table.
+
+**Trade-offs:** A database FK cannot validate these heterogeneous sources, but forcing UUID would
+silently exclude POS movements or require an unnecessary legacy identifier migration.
+
