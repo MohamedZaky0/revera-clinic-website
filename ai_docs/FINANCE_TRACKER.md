@@ -314,17 +314,15 @@ prior value. Re-firing the same PATCH does not change any balance twice.
 
 ---
 
-### 0.6 — `product_sales` route column mapping (RISK-014) — code merged, `NEEDS-DB`
+### 0.6 — `product_sales` route column mapping (RISK-014) — DONE
 
-> **ACTION REQUIRED — run this migration against the dev database:**
-> `supabase/migrations/20260725160000_add_customer_id_to_product_sales.sql`
-> Until it is run, POS inserts still fail and still fall through to `page_settings` — i.e. no
-> regression, but no fix either. **Change this row to `DONE` once it has been run, and say which
-> database it was run against.**
->
-> Also still open after this: sales already sitting in the `page_settings` blob
-> (key `product_sales_history`) have not been migrated into the table. Decide whether to backfill
-> them or leave them, and record the decision here.
+`20260725160000_add_customer_id_to_product_sales.sql` was run against dev on 2026-07-25 (confirmed
+in the applied-migrations checklist above). POS sales now persist to `product_sales` correctly.
+
+**Still open, low priority:** sales recorded before this fix are sitting in the `page_settings`
+blob (key `product_sales_history`) and have never been migrated into the table. Given all current
+data is mock (DEC-026), this is not worth doing — it only matters if real pre-fix sales data
+existed, which it does not.
 
 **What was changed** (`src/app/api/inventory/products/sales/route.ts`):
 - `mapSaleToDbRow` / `mapDbRowToSale` translate between the API contract and the real columns.
