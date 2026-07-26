@@ -102,6 +102,7 @@ import {
   Loader2,
 } from "lucide-react";
 import RoomsManagerView from "@/components/RoomsManagerView";
+import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
 
@@ -16091,10 +16092,8 @@ export default function AdminPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                {/* Left Column: Booking Rules */}
-                <div className="lg:col-span-7 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-                  <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">Booking Rules</h3>
+              <div className="max-w-4xl rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
+                <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">Booking Rules</h3>
                   <div className="grid gap-6 md:grid-cols-2">
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
@@ -16262,99 +16261,16 @@ export default function AdminPage() {
                     </label>
                   </div>
                 </div>
-
-                {/* Right Column: Terms & Conditions Editor */}
-                <div className="lg:col-span-5 rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">Terms & Conditions Editor</h3>
-                    <p className="text-xs text-[#5A6A51] mt-1.5 leading-relaxed">
-                      Write the booking, cancellation, refund, and privacy policies patients must review and agree to. Leave empty to disable the gate.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5">
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Terms & Conditions Text</label>
-                      <button
-                        type="button"
-                        onClick={() => setActiveInfoFeature({
-                          title: "Terms & Conditions Text",
-                          description: "Write the booking policies, clinic guidelines, refund rules, and terms that patients must review and agree to on Step 5 of the checkout modal. Leaving this field completely empty will automatically hide the terms checkbox gate during booking."
-                        })}
-                        className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                        title="Click for info"
-                      >
-                        <Info size={13} />
-                      </button>
-                    </div>
-                    <textarea
-                      rows={14}
-                      value={termsText}
-                      onChange={(e) => setTermsText(e.target.value)}
-                      placeholder={"By proceeding with this booking, you agree to our terms and conditions:\n\n• Deposits are non-refundable within 24 hours of the appointment.\n• Please arrive 10 minutes before your scheduled time.\n• Revera reserves the right to cancel or reschedule appointments.\n\nFor more information, contact us at +20 103 559 5691."}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] resize-y leading-relaxed font-mono"
-                    />
-                    <p className="text-[10px] text-[#8A9A81]">
-                      This text is displayed on Step 4 of the reservation modal. If empty, the checkbox gate will be hidden.
-                    </p>
-                  </div>
-                </div>
               </div>
-            </div>
           )}
 
           {activeNav === "Terms & Conditions" && (
-            <div className="space-y-6">
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-4xl font-semibold text-[#1F251A]">Terms & Conditions</h2>
-                  <p className="mt-2 text-sm text-[#5A6A51]">Configure booking policies, guidelines, and terms agreement required during patient checkout.</p>
-                </div>
-                <button
-                  onClick={handleSaveBookingSettings}
-                  disabled={savingBookingSettings}
-                  className="rounded-3xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 shadow-md"
-                >
-                  {savingBookingSettings ? "Saving..." : "Save Terms & Conditions"}
-                </button>
-              </div>
-
-              <div className="rounded-[40px] bg-white p-8 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6 max-w-4xl">
-                <div>
-                  <h3 className="text-xl font-bold text-[#1F251A] border-b border-gray-100 pb-3">Terms & Conditions Editor</h3>
-                  <p className="text-xs text-[#5A6A51] mt-1.5 leading-relaxed">
-                    Write the booking, cancellation, refund, and privacy policies patients must review and agree to. Leave empty to disable the gate.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Terms & Conditions Text</label>
-                    <button
-                      type="button"
-                      onClick={() => setActiveInfoFeature({
-                        title: "Terms & Conditions Text",
-                        description: "Write the booking policies, clinic guidelines, refund rules, and terms that patients must review and agree to on Step 5 of the checkout modal. Leaving this field completely empty will automatically hide the terms checkbox gate during booking."
-                      })}
-                      className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
-                      title="Click for info"
-                    >
-                      <Info size={13} />
-                    </button>
-                  </div>
-                  <textarea
-                    rows={16}
-                    value={termsText}
-                    onChange={(e) => setTermsText(e.target.value)}
-                    placeholder={"By proceeding with this booking, you agree to our terms and conditions:\n\n• Deposits are non-refundable within 24 hours of the appointment.\n• Please arrive 10 minutes before your scheduled time.\n• Revera reserves the right to cancel or reschedule appointments.\n\nFor more information, contact us at +20 103 559 5691."}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] resize-y leading-relaxed font-mono"
-                  />
-                  <p className="text-[10px] text-[#8A9A81]">
-                    This text is displayed on the reservation modal. If empty, the checkbox gate will be hidden.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <TermsManagerView
+              termsText={termsText}
+              setTermsText={setTermsText}
+              handleSaveBookingSettings={handleSaveBookingSettings}
+              savingBookingSettings={savingBookingSettings}
+            />
           )}
 
           {activeNav === "Deposit Settings" && (

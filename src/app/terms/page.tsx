@@ -148,15 +148,7 @@ export default function TermsPage() {
         {/* Top Header Bar */}
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-6 mb-8">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E2EBE2] text-[#385438] group-hover:scale-105 transition">
-              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                <path d="M17 8C8 10 59 16.17 3.82 21.34L5.71 22L7.58 20.35C12.7 15.5 17 8 17 8Z"/>
-                <path d="M12 3C6.5 3 2 7.5 2 13C2 15.5 3 17.8 4.6 19.5L12 12L19.4 19.5C21 17.8 22 15.5 22 13C22 7.5 17.5 3 12 3Z"/>
-              </svg>
-            </div>
-            <span className="text-sm font-bold tracking-wider text-[#2D522D] uppercase">
-              {isAr ? "عيادة ريفيرا" : "REVERA CLINIC"}
-            </span>
+            <img src="/images/main_logo.png" alt="Revera logo" className="h-9 w-auto object-contain group-hover:scale-105 transition" />
           </Link>
 
           {/* Language Switcher */}
@@ -178,8 +170,8 @@ export default function TermsPage() {
 
         {/* Header Title Section */}
         <div className="flex items-start gap-4 mb-8">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#2D522D] text-white shadow-md">
-            <FileText size={26} />
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#EEF5EE] p-2 border border-[#414E36]/15 shadow-sm">
+            <img src="/images/main_logo.png" alt="Revera logo" className="h-10 w-auto object-contain" />
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
