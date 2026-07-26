@@ -1944,8 +1944,8 @@ commission-from-snapshots, the `completed`-only status-filter narrowing).
 | 3.5 | Migration: `depreciation_entries` table | 3.4 | `DONE` | Claude | `20260726170400`, live-verified |
 | 3.6 | Migration: `loans` table | — | `DONE` | Claude | `20260726170500`, live-verified |
 | 3.7 | Migration: `loan_schedule` table | 3.6 | `DONE` | Claude | `20260726170600`, live-verified |
-| 3.8 | Library: `src/lib/depreciation.ts` — straight-line depreciation + loan amortization (pure functions) | 3.4–3.7 (schema shape only) | `TODO` | — | — |
-| 3.9 | Regression checks for 3.8 | 3.8 | `TODO` | — | — |
+| 3.8 | Library: `src/lib/depreciation.ts` — straight-line depreciation + loan amortization (pure functions) | 3.4–3.7 (schema shape only) | `DONE` | Claude | pending commit |
+| 3.9 | Regression checks for 3.8 | 3.8 | `DONE` | Claude | pending commit |
 | 3.10 | New endpoints: expenses CRUD + recurring-expense generation | 3.1–3.3 | `TODO` | — | — |
 | 3.11 | New endpoints: fixed assets CRUD + monthly depreciation posting | 3.4, 3.5, 3.8 | `TODO` | — | — |
 | 3.12 | New endpoints: loans CRUD + schedule generation | 3.6, 3.7, 3.8 | `TODO` | — | — |
@@ -2256,7 +2256,7 @@ zero residual rows in any of the 7 tables. **Schema only — no library or endpo
 
 ---
 
-## 3.8 — Library: `src/lib/depreciation.ts`
+## 3.8 — Library: `src/lib/depreciation.ts` — DONE
 
 **Depends on 3.4–3.7 for schema shape only.** **Where:** new `src/lib/depreciation.ts`, same pure-
 function-only convention as `ledger.ts`/`packages.ts`/`costing.ts`.
@@ -2265,7 +2265,8 @@ function-only convention as `ledger.ts`/`packages.ts`/`costing.ts`.
 - `monthlyDepreciation(cost: number, salvageValue: number, usefulLifeMonths: number): number` —
   straight-line: `(cost − salvage) / useful_life_months` (DEC-017, PROPOSALS.md Phase 3). Throws
   on `usefulLifeMonths <= 0`, same convention as every other divide-by-input function in this
-  codebase (`recognisedRevenuePerSession`, `costPerPulse`).
+  codebase (`recognisedRevenuePerSession`, `costPerPulse`). Also throws if `salvageValue > cost`
+  (an asset can't be worth more scrapped than it cost new).
 - `bookValueAfter(cost: number, accumulatedDepreciation: number): number` — clamped so it never
   goes below `salvageValue` (an asset fully depreciated stops depreciating further — needed so a
   monthly posting job run past an asset's useful life does not keep subtracting).
@@ -2273,20 +2274,45 @@ function-only convention as `ledger.ts`/`packages.ts`/`costing.ts`.
   number; principalPart: number; balanceAfter: number}` — standard amortization: interest on the
   outstanding balance for the period, the remainder of the installment reduces principal.
 
+**Spec correction found while implementing, not silently applied — `bookValueAfter` gained a third
+parameter, `salvageValue`.** The spec above (and this section, until now) listed its signature as
+`bookValueAfter(cost, accumulatedDepreciation)`, but its own description says the result must
+clamp at `salvageValue` — the function cannot do that without being told what the floor is, and
+task 3.9's own regression check explicitly asserts the clamp. Implemented as
+`bookValueAfter(cost, accumulatedDepreciation, salvageValue)` instead of silently defaulting the
+floor to `0`. Same class of correction task 1.8 made for `deferredBalance`, documented rather than
+hidden.
+
+**`amortizeLoanPayment` also clamps its final period:** if `installment` would overshoot the
+`balance` remaining (the last payment of a loan), `principalPart` is capped at the outstanding
+balance itself — not at `balance − interestPart` — since interest is a separate charge on top of
+paying off principal, and `balanceAfter` is clamped at exactly `0` rather than going negative.
+`annualRate` is a whole-number percentage (e.g. `12` for 12%), matching every other rate-shaped
+field in this codebase (`providers.commission_value`), not a fraction.
+
 **Update `DB_SCHEMA.md`:** none (library only).
 
 ---
 
-## 3.9 — Regression checks for 3.8
+## 3.9 — Regression checks for 3.8 — DONE
 
-**Depends on 3.8.** **Where:** new `scratch/phase3depreciationcheck.ts`.
+**Depends on 3.8.** **Where:** new `scratch/phase3depreciationcheck.ts`, 19 cases, all passing.
 
-**What:** assert `monthlyDepreciation` matches the formula for a known cost/salvage/life triple;
-`bookValueAfter` clamps at `salvageValue` and does not go negative past full depreciation; a
-simulated full amortization schedule for a sample loan sums `principalPart` across every period to
-exactly the original `principal` (the same "must sum to the whole by construction" invariant task
-1.9's `phase1packagecheck.ts` caught a real bug on — apply the same complement-based-sum discipline
-here rather than trusting independently-rounded per-period figures to add up).
+**What:** asserts `monthlyDepreciation` matches the formula for a known cost/salvage/life triple
+(plus the `usefulLifeMonths <= 0` and `salvageValue > cost` throw cases); `bookValueAfter` clamps
+at `salvageValue` and does not go negative past full depreciation; a single hand-checked
+amortization period (`interestPart`/`principalPart`/`balanceAfter` all verified independently); the
+final-period overshoot clamp; and — the specific invariant this task's own text asked for — two
+full simulated amortization schedules (a zero-rate loan and a nonzero-rate loan) both confirming
+`Σ principalPart` across every period equals the balance actually paid down, exactly.
+
+**Real caveat found and worked around while writing the nonzero-rate schedule test, worth
+recording:** summing 24 periods' already-rounded `principalPart` values with plain JS `+=`
+introduced ~1e-11 floating-point drift (binary floats can't exactly represent most decimal
+fractions) — the per-period arithmetic itself has zero drift; only naive accumulation across many
+periods does. Fixed by rounding the accumulated sum before comparing, not each intermediate value.
+Any real caller summing many periods for a report (a future `GET /api/finance/pnl`-style endpoint)
+will hit the identical issue and needs the identical fix.
 
 **Update `DB_SCHEMA.md`:** none.
 
