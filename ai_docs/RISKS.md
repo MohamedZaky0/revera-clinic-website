@@ -729,6 +729,20 @@ failing over silently") for this specific trigger.
 returns `404` before any stock or ledger write happens; a real `customer_id` still sells normally
 (re-verified against dev — see `FINANCE_PHASE_1_MANUAL_TESTS.md` task 1.11 evidence).
 
+**A second, related bug found while reproducing this, NOT fixed here — the `page_settings`
+fallback itself silently discards its own history.** `POST`'s fallback branch computes what to
+write as `[newSale, ...(await getStoredSalesData()).sales]` — but `getStoredSalesData()` prefers
+the **native** table once it has any rows, so on every failed insert this overwrites the whole
+blob with `[thisSale, ...nativeRows]`, discarding any previously-accumulated fallback entries from
+earlier failed inserts. Confirmed live: 5 sequential ghost-customer POSTs each deducted stock
+(`stock_quantity` dropped by exactly 5), but only the **last** one's entry survived in the blob —
+the other 4 were silently overwritten by each other, one at a time. This RISK-022 fix (validating
+`customer_id` up front) prevents this specific trigger from ever reaching that broken path again,
+but the fallback write logic itself is still broken for any *other* reason a `product_sales` insert
+might fail (a bad `product_id`, a transient DB error, a future schema change) — worth its own pass
+if the fallback path is meant to be a real safety net rather than effectively "keep only the most
+recent failure."
+
 ---
 
 ## PROPOSALS.md Reference

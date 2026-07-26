@@ -591,7 +591,7 @@ routes:**
 | 1.8 | Library: `src/lib/packages.ts` — deferred-revenue recognition math (pure functions) | 1.5, 1.6 (schema shape only) | `DONE` | Claude | `see 1.7-1.9 below` |
 | 1.9 | Regression checks for 1.7 and 1.8 | 1.7, 1.8 | `DONE` | Claude | `see 1.7-1.9 below` |
 | 1.10 | Wire booking checkout (`PATCH /api/reservations`, `status: 'completed'`) to dual-write an invoice | 1.1–1.4, 1.7 | `DONE` | Claude | `aed3793` |
-| 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `WIP` — code written; pending live POS verification | Claude | — |
+| 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `DONE` | Claude | `58fe1dc` |
 | 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `WIP` — code written; pending live package-sale verification | Claude | — | — |
 | 1.13 | New endpoint: consume a package session, recognise revenue pro-rata | 1.12 | `WIP` — migration applied to dev; pending live endpoint verification | Claude | — |
 | 1.14 | `src/lib/customerBalances.ts` — derive `outstanding`/`spent_amount`/`wallet_balance` from the ledger + reconciliation endpoint | 1.1–1.4, 1.10, 1.11 | `TODO` | — | — |
@@ -1014,7 +1014,7 @@ behavior — this task must be provably zero-regression on the existing path.
 
 ---
 
-## 1.11 — Wire POS sale to dual-write an invoice — WIP, needs live verification
+## 1.11 — Wire POS sale to dual-write an invoice — DONE, fully live-verified
 
 **Done:** `POST /api/inventory/products/sales` now writes an issued invoice, one product line, and
 one payment row after the native `product_sales` insert succeeds. It uses the authenticated staff
@@ -1024,9 +1024,23 @@ invoice write is additive and best-effort: the established product-sale, stock-d
 `addToCustomerSpend` paths continue unchanged if it fails. `API_CONTRACT.md` documents the side
 effect.
 
-**Not done:** it has not been exercised against a live POS sale. Do not mark this task `DONE` until
-a staff sale produces matching `product_sales`, `invoices`, `invoice_lines`, and `payments` rows,
-and stock/customer-spend behavior is confirmed unchanged.
+**Live-verified 2026-07-26** against deployed dev (`dev.reveraclinics.com`) using a real staff
+session — see `FINANCE_PHASE_1_MANUAL_TESTS.md` for the full evidence. A real sale (qty 2, branch
+name, card payment) produced exactly the expected `product_sales`/`stock_movements`/`invoices`/
+`invoice_lines`/`payments` rows, with `received_by_employee_id` correctly attributed to the real
+signed-in staff member — notably **better** than the reservations-checkout path (task 1.10), where
+that field is still always `null`.
+
+**Found and fixed RISK-022 while testing this task's last checklist item** ("force a ledger-write
+failure, confirm the native sale still succeeds"): a non-existent `customer_id` didn't just fail
+the ledger dual-write — it failed the **native** `product_sales` insert too (an FK violation),
+silently fell through to the `page_settings` blob while still reporting `success: true`, and
+deducted real stock for a sale that then became permanently invisible in sales history. Fixed by
+validating `customer_id` exists before any write, in the same commit as this verification. See
+`RISKS.md` RISK-022 for the full writeup, including a second, related-but-unfixed bug found in the
+process (the `page_settings` fallback silently discards its own prior entries on repeated
+failures — not triggerable via this specific path anymore, but still broken for other causes of a
+failed native insert).
 
 **Depends on 1.1–1.4, 1.7.** **Where:** `src/app/api/inventory/products/sales/route.ts`, the
 `POST` handler, after the existing `product_sales` insert (`mapSaleToDbRow`/`insertedDb`).

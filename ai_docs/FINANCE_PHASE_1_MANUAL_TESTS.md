@@ -12,6 +12,8 @@
 | 2026-07-26 | 1.13 | dev | Migration `20260726010700` applied; linked migration list matches and shadow `db diff` found no schema changes | PASS |
 | 2026-07-26 | 1.10 (repeat payment) | dev | `PATCH /api/reservations?id=2e03f8ea-e88d-4923-8b1c-5a27e0efeb3d` with `amountPaid: 150` (was 100) as a real staff session (superadmin, `mohamed.zaky.anwar@gmail.com`). Result: one new `payments` row of `50` attached to the existing `INV-000001` (invoice `6fde2d07-…`); `invoice_lines` still exactly 2 rows; `invoices` still exactly 1 row for the reservation — no duplicate invoice, no duplicate lines | PASS |
 | 2026-07-26 | 1.10 (no customer) | dev | Inserted a disposable `reservations` row with `customer_id: null` (`4e909f1f-cc2f-4a08-9afb-5fbd712d979c`), then `PATCH ...?id=4e909f1f… {status: 'completed', amountPaid: 100, amountLeft: 0}` via the same staff session. Response `200`, no error. `invoices` for that reservation: `[]` — confirms the documented `if (isSettlement && target.customer_id)` scoping: a no-customer checkout completes cleanly and produces no invoice, matching the "not an accident, a deliberate-later-decision" note in `FINANCE_TRACKER.md` task 1.10 | PASS |
+| 2026-07-26 | 1.11 | dev | `POST /api/inventory/products/sales`, product `prod-1784586429059-627` (qty 2, unit 700, branch `New Cairo Branch`, method `Card`), real customer `ad17a8b0-…`. `stock_quantity` 10→8 (exactly once); `customers.spent_amount` 150→1550 (unchanged `addToCustomerSpend` behavior); native `product_sales` row correct; one `stock_movements` `'out'` row (`unit_cost` = live `cost_price`); new invoice `INV-000002` (`reservation_id: null`), one `product` line (qty 2, unit 700, total 1400), one `payments` row (`amount: 1400`, `method: 'card'` — correctly mapped from `"Card"`, `received_by_employee_id` = the real signed-in employee, unlike the reservations checkout path where it's still always `null`) | PASS |
+| 2026-07-26 | 1.11 (ledger-write-failure isolation) | dev | Sold to a syntactically-valid but non-existent `customer_id`. **Found RISK-022** in the process: this didn't just fail the ledger dual-write as intended — the native `product_sales` insert itself failed (`product_sales_customer_id_fkey`, `23503`), fell through to the `page_settings` blob, deducted stock anyway, and reported `success: true`; the sale then became permanently invisible in sales history once the native table had other rows. Fixed same-day in `58fe1dc` (customer existence check before any write); re-verified after the fix deployed: same request now returns `404` before touching stock or any table | PASS (after fix) |
 
 ## Per-task checklist
 
@@ -41,11 +43,11 @@
 
 ### 1.11 — POS-sale invoice dual-write
 
-- [ ] Sell one in-stock product through the staff POS flow.
-- [ ] Confirm one native `product_sales` row, stock reduced exactly once, and existing `customers.spent_amount` behavior remains unchanged.
-- [ ] Confirm one product invoice line has the sold product, quantity, unit price, and total; confirm the payment method and receiving employee are correct.
-- [ ] Repeat using a branch name and a non-cash supported payment method; confirm the invoice branch and payment enum mapping.
-- [ ] Force or inspect a ledger-write failure only in dev; confirm the native POS sale still succeeds and the failure is logged.
+- [x] Sell one in-stock product through the staff POS flow.
+- [x] Confirm one native `product_sales` row, stock reduced exactly once, and existing `customers.spent_amount` behavior remains unchanged.
+- [x] Confirm one product invoice line has the sold product, quantity, unit price, and total; confirm the payment method and receiving employee are correct.
+- [x] Repeat using a branch name and a non-cash supported payment method; confirm the invoice branch and payment enum mapping. (Tested together with the item above, in one sale.)
+- [x] Force or inspect a ledger-write failure only in dev; confirm the native POS sale still succeeds and the failure is logged. **Found and fixed RISK-022** in the process (see evidence log) — the native sale did *not* still succeed for this trigger; a nonexistent `customer_id` broke the native insert itself, not just the ledger dual-write. Now rejected upfront with a `404` instead.
 
 ### 1.12 — Package sale endpoint
 
