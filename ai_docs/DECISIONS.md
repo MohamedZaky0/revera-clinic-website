@@ -721,11 +721,15 @@ operating on the finished system; everything before that is discarded, not migra
 ---
 
 ## DEC-027: Modular Admin Sections Are Mandatory
+=======
+## DEC-014: Added settings.terms Granular Permission for Booking Terms & Conditions
+>>>>>>> 9ab558a (feat: add settings.terms permission and public terms agreement gate)
 
 **Date:** 2026-07-26
 **Status:** Decided — active
 
 **Context:**
+<<<<<<< HEAD
 `src/app/admin/page.tsx` is a large legacy client component containing Booking, Customer, Doctor,
 and many other section implementations. Adding new sections to that file increases regression risk,
 makes ownership unclear, and further slows targeted work.
@@ -863,4 +867,18 @@ store the source row's ID as text and rely on `reason` to identify its source ta
 
 **Trade-offs:** A database FK cannot validate these heterogeneous sources, but forcing UUID would
 silently exclude POS movements or require an unnecessary legacy identifier migration.
+---
+
+## DEC-032: Added settings.terms Granular Permission for Booking Terms & Conditions
+
+**Date:** 2026-07-26
+**Status:** Decided — active
+
+**Context:**
+The admin panel required granular permission control specifically for managing booking Terms & Conditions (`settings.terms`), granting administrators individual control over access to clinic terms editing independently of general booking settings.
+
+**Chosen Option:**
+- Added `settings.terms` key to `ALL_PERMISSIONS` and included it by default in `Super Admin`, `Admin`, and `Clinic Manager` role templates.
+- Registered `"Terms & Conditions": "settings.terms"` in admin settings router, sub-navigation array, role checking helpers, and UI conditional views in `src/app/admin/page.tsx`.
+
 

@@ -121,6 +121,7 @@ export function BookingModal() {
   const [clinicWhatsapp, setClinicWhatsapp] = useState(CLIENT.phoneTel);
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [termsText, setTermsText] = useState("");
+  const [hasTerms, setHasTerms] = useState(true);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
 
@@ -332,6 +333,15 @@ export function BookingModal() {
         }
         if (data && data.footer && Array.isArray(data.footer.serviceHours)) {
           setServiceHours(data.footer.serviceHours);
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/terms?active_only=true')
+      .then(res => res.json())
+      .then(data => {
+        if (data.terms && Array.isArray(data.terms)) {
+          setHasTerms(data.terms.length > 0);
         }
       })
       .catch(() => {});
@@ -1246,8 +1256,8 @@ Attached is my payment transaction receipt photo.`;
                   )}
                 </div>
 
-                {/* Terms & Conditions Gate - Image 1 Style */}
-                {termsText.trim() && depositPercentage === 0 && (
+                {/* Terms & Conditions Gate - Image 2 Style */}
+                {(hasTerms || termsText.trim() !== "") && depositPercentage === 0 && (
                   <div className="mb-5 text-left" dir={isRTL ? "rtl" : "ltr"}>
                     <div className="rounded-2xl border border-gray-200/90 bg-white p-5 space-y-4 shadow-2xs">
                       {/* Header: Shield Icon + TERMS & CONDITIONS */}
@@ -1321,7 +1331,7 @@ Attached is my payment transaction receipt photo.`;
 
                 <button
                   onClick={handleConfirm}
-                  disabled={isCreatingReservation || (depositPercentage === 0 && termsText.trim() !== "" && !acceptedTerms)}
+                  disabled={isCreatingReservation || (depositPercentage === 0 && (hasTerms || termsText.trim() !== "") && !acceptedTerms)}
                   className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isCreatingReservation ? (

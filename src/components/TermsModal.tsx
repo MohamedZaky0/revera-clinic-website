@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   FileText, 
   ShieldCheck, 
@@ -9,9 +9,21 @@ import {
   Mail, 
   Globe, 
   X, 
-  ExternalLink,
   ChevronDown
 } from "lucide-react";
+
+interface TermItem {
+  id: string;
+  sort_order: number;
+  title_en: string;
+  title_ar: string;
+  content_en: string;
+  content_ar: string;
+  link_text_en?: string;
+  link_text_ar?: string;
+  link_url?: string;
+  is_active: boolean;
+}
 
 interface TermsModalProps {
   isOpen: boolean;
@@ -19,143 +31,129 @@ interface TermsModalProps {
   defaultLang?: "en" | "ar";
 }
 
+const DEFAULT_TERMS: TermItem[] = [
+  {
+    id: "1",
+    sort_order: 1,
+    title_en: "Acceptance of Terms",
+    title_ar: "قبول الشروط",
+    content_en: "By using Revera Clinic's website or services, you agree to be bound by these Terms & Conditions and all applicable laws and regulations.",
+    content_ar: "باستخدامك لموقع أو خدمات عيادة ريفيرا، فإنك توافق على الالتزام بهذه الشروط والأحكام وجميع القوانين واللوائح المعمول بها.",
+    is_active: true
+  },
+  {
+    id: "2",
+    sort_order: 2,
+    title_en: "Use of Services",
+    title_ar: "استخدام الخدمات",
+    content_en: "You agree to use our services only for lawful purposes and in accordance with our policies. You must provide accurate and complete information when booking or registering.",
+    content_ar: "تتوافق على استخدام خدماتنا فقط لأغراض قانونية ووفقاً لسياساتنا. يجب عليك تقديم معلومات دقيقة وكاملة عند الحجز أو التسجيل.",
+    is_active: true
+  },
+  {
+    id: "3",
+    sort_order: 3,
+    title_en: "Appointments & Bookings",
+    title_ar: "المواعيد والحجوزات",
+    content_en: "All appointments are subject to availability and confirmation. Please arrive on time. Late arrivals may result in shortened or rescheduled appointments.",
+    content_ar: "جميع المواعيد تخضع للتوافر والتأكيد. يرجى الحضور في الموعد المحدد. قد يؤدي التأخير إلى تقصير مدة الجلسة أو إعادة جدولتها.",
+    is_active: true
+  },
+  {
+    id: "4",
+    sort_order: 4,
+    title_en: "Cancellations & Rescheduling",
+    title_ar: "الإلغاء وإعادة الجدولة",
+    content_en: "You can cancel or reschedule your appointment through our website or by contacting us. Please review our cancellation policy for more details.",
+    content_ar: "يمكنك إلغاء أو إعادة جدولة موعدك من خلال موقعنا أو بالاتصال بنا. يرجى مراجعة سياسة الإلغاء الخاصة بنا للمزيد من التفاصيل.",
+    link_text_en: "cancellation policy",
+    link_text_ar: "سياسة الإلغاء",
+    link_url: "/terms#cancellation",
+    is_active: true
+  },
+  {
+    id: "5",
+    sort_order: 5,
+    title_en: "Payments & Refunds",
+    title_ar: "المدفوعات واسترداد الأموال",
+    content_en: "Certain services may require advance payment. Refund eligibility depends on our refund policy. We accept payments through the methods displayed at checkout.",
+    content_ar: "قد تتطلب بعض الخدمات الدفع المسبق. تعتمد أهليّة الاسترداد على سياسة الاسترداد الخاصة بنا. نقبل الدفع عبر الطرق الموضحة عند الدفع.",
+    link_text_en: "refund policy",
+    link_text_ar: "سياسة الاسترداد",
+    link_url: "/terms#refund",
+    is_active: true
+  },
+  {
+    id: "6",
+    sort_order: 6,
+    title_en: "User Responsibilities",
+    title_ar: "مسؤوليات المستخدم",
+    content_en: "You are responsible for maintaining the confidentiality of your information and account details. You agree not to misuse our services or attempt unauthorized access.",
+    content_ar: "أنت مسؤول عن الحفاظ على سرية معلوماتك وبيانات حسابك. وتتعهد بعدم إساءة استخدام خدماتنا أو محاولة الوصول غير المصرح به.",
+    is_active: true
+  },
+  {
+    id: "7",
+    sort_order: 7,
+    title_en: "Limitation of Liability",
+    title_ar: "تحديد المسؤولية",
+    content_en: "Revera Clinic is not liable for any indirect or incidental damages resulting from the use of our services. Our total liability shall not exceed the amount paid for the service.",
+    content_ar: "عيادة ريفيرا غير مسؤولة عن أي أضرار غير مباشرة أو عرضية ناتجة عن استخدام خدماتنا. لا تتجاوز مسؤوليتنا الإجمالية المبلغ المدفوع مقابل الخدمة.",
+    is_active: true
+  },
+  {
+    id: "8",
+    sort_order: 8,
+    title_en: "Changes to Terms",
+    title_ar: "التغييرات في الشروط",
+    content_en: "We may update these Terms & Conditions from time to time. Continued use of our services after changes means you accept the updated terms.",
+    content_ar: "قد نقوم بتحديث هذه الشروط والأحكام من وقت لآخر. استمرارك في استخدام خدماتنا بعد التغييرات يعني قبولك للشروط المحدثة.",
+    is_active: true
+  },
+  {
+    id: "9",
+    sort_order: 9,
+    title_en: "Contact Us",
+    title_ar: "اتصل بنا",
+    content_en: "If you have any questions about these Terms & Conditions, please contact us:",
+    content_ar: "إذا كانت لديك أي أسئلة حول هذه الشروط والأحكام، يرجى الاتصال بنا:",
+    is_active: true
+  }
+];
+
 export default function TermsModal({ isOpen, onClose, defaultLang = "en" }: TermsModalProps) {
   const [lang, setLang] = useState<"en" | "ar">(defaultLang);
+  const [terms, setTerms] = useState<TermItem[]>(DEFAULT_TERMS);
+
+  useEffect(() => {
+    setLang(defaultLang);
+  }, [defaultLang]);
+
+  useEffect(() => {
+    if (isOpen) {
+      async function loadTerms() {
+        try {
+          const res = await fetch('/api/terms?active_only=true');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.terms && data.terms.length > 0) {
+              setTerms(data.terms);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load terms in modal:', e);
+        }
+      }
+      loadTerms();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const isAr = lang === "ar";
-
-  const content = {
-    en: {
-      brand: "REVERA CLINIC",
-      title: "Terms & Conditions",
-      subtitle: "Please read these terms carefully before using our services.",
-      lastUpdated: "Last updated: July 17, 2025",
-      trustNotice: "Your trust is important to us. We are committed to protecting your information and providing a safe and professional experience.",
-      rights: "© 2025 Revera Clinic. All rights reserved.",
-      secure: "Secure & Encrypted",
-      contactPhone: "0100 123 4567",
-      contactEmail: "support@reveraclinic.com",
-      contactWeb: "www.reveraclinic.com",
-      sections: [
-        {
-          num: 1,
-          title: "Acceptance of Terms",
-          text: "By using Revera Clinic's website or services, you agree to be bound by these Terms & Conditions and all applicable laws and regulations."
-        },
-        {
-          num: 2,
-          title: "Use of Services",
-          text: "You agree to use our services only for lawful purposes and in accordance with our policies. You must provide accurate and complete information when booking or registering."
-        },
-        {
-          num: 3,
-          title: "Appointments & Bookings",
-          text: "All appointments are subject to availability and confirmation. Please arrive on time. Late arrivals may result in shortened or rescheduled appointments."
-        },
-        {
-          num: 4,
-          title: "Cancellations & Rescheduling",
-          text: "You can cancel or reschedule your appointment through our website or by contacting us. Please review our ",
-          linkText: "cancellation policy",
-          postText: " for more details."
-        },
-        {
-          num: 5,
-          title: "Payments & Refunds",
-          text: "Certain services may require advance payment. Refund eligibility depends on our ",
-          linkText: "refund policy",
-          postText: ". We accept payments through the methods displayed at checkout."
-        },
-        {
-          num: 6,
-          title: "User Responsibilities",
-          text: "You are responsible for maintaining the confidentiality of your information and account details. You agree not to misuse our services or attempt unauthorized access."
-        },
-        {
-          num: 7,
-          title: "Limitation of Liability",
-          text: "Revera Clinic is not liable for any indirect or incidental damages resulting from the use of our services. Our total liability shall not exceed the amount paid for the service."
-        },
-        {
-          num: 8,
-          title: "Changes to Terms",
-          text: "We may update these Terms & Conditions from time to time. Continued use of our services after changes means you accept the updated terms."
-        },
-        {
-          num: 9,
-          title: "Contact Us",
-          text: "If you have any questions about these Terms & Conditions, please contact us:"
-        }
-      ]
-    },
-    ar: {
-      brand: "عيادة ريفيرا",
-      title: "الشروط والأحكام",
-      subtitle: "يرجى قراءة هذه الشروط بعناية قبل استخدام خدماتنا.",
-      lastUpdated: "آخر تحديث: 17 يوليو 2025",
-      trustNotice: "ثقتكم تهمنا كثيراً. نحن ملتزمون بحماية معلوماتكم وتقديم تجربة آمنة واحترافية.",
-      rights: "© 2025 عيادة ريفيرا. جميع الحقوق محفوظة.",
-      secure: "آمن ومشفّر",
-      contactPhone: "0100 123 4567",
-      contactEmail: "support@reveraclinic.com",
-      contactWeb: "www.reveraclinic.com",
-      sections: [
-        {
-          num: 1,
-          title: "قبول الشروط",
-          text: "باستخدامك لموقع أو خدمات عيادة ريفيرا، فإنك توافق على الالتزام بهذه الشروط والأحكام وجميع القوانين واللوائح المعمول بها."
-        },
-        {
-          num: 2,
-          title: "استخدام الخدمات",
-          text: "تتوافق على استخدام خدماتنا فقط لأغراض قانونية ووفقاً لسياساتنا. يجب عليك تقديم معلومات دقيقة وكاملة عند الحجز أو التسجيل."
-        },
-        {
-          num: 3,
-          title: "المواعيد والحجوزات",
-          text: "جميع المواعيد تخضع للتوافر والتأكيد. يرجى الحضور في الموعد المحدد. قد يؤدي التأخير إلى تقصير مدة الجلسة أو إعادة جدولتها."
-        },
-        {
-          num: 4,
-          title: "الإلغاء وإعادة الجدولة",
-          text: "يمكنك إلغاء أو إعادة جدولة موعدك من خلال موقعنا أو بالاتصال بنا. يرجى مراجعة ",
-          linkText: "سياسة الإلغاء",
-          postText: " الخاصة بنا للمزيد من التفاصيل."
-        },
-        {
-          num: 5,
-          title: "المدفوعات واسترداد الأموال",
-          text: "قد تتطلب بعض الخدمات الدفع المسبق. تعتمد أهليّة الاسترداد على ",
-          linkText: "سياسة الاسترداد",
-          postText: " الخاصة بنا. نقبل الدفع عبر الطرق الموضحة عند الدفع."
-        },
-        {
-          num: 6,
-          title: "مسؤوليات المستخدم",
-          text: "أنت مسؤول عن الحفاظ على سرية معلوماتك وبيانات حسابك. وتتعهد بعدم إساءة استخدام خدماتنا أو محاولة الوصول غير المصرح به."
-        },
-        {
-          num: 7,
-          title: "تحديد المسؤولية",
-          text: "عيادة ريفيرا غير مسؤولة عن أي أضرار غير مباشرة أو عرضية ناتجة عن استخدام خدماتنا. لا تتجاوز مسؤوليتنا الإجمالية المبلغ المدفوع مقابل الخدمة."
-        },
-        {
-          num: 8,
-          title: "التغييرات في الشروط",
-          text: "قد نقوم بتحديث هذه الشروط والأحكام من وقت لآخر. استمرارك في استخدام خدماتنا بعد التغييرات يعني قبولك للشروط المحدثة."
-        },
-        {
-          num: 9,
-          title: "اتصل بنا",
-          text: "إذا كانت لديك أي أسئلة حول هذه الشروط والأحكام، يرجى الاتصال بنا:"
-        }
-      ]
-    }
-  };
-
-  const t = content[lang];
+  const contactPhone = "0100 123 4567";
+  const contactEmail = "support@reveraclinic.com";
+  const contactWeb = "www.reveraclinic.com";
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 p-3 sm:p-6 backdrop-blur-xs overflow-y-auto animate-fadeIn">
@@ -166,7 +164,7 @@ export default function TermsModal({ isOpen, onClose, defaultLang = "en" }: Term
         {/* Close Button */}
         <button
           onClick={onClose}
-          className={`absolute top-6 ${isAr ? "left-6" : "right-6"} rounded-full p-2.5 text-gray-400 hover:bg-[#E2EBE2] hover:text-[#1F251A] transition`}
+          className={`absolute top-6 ${isAr ? "left-6" : "right-6"} rounded-full p-2.5 text-gray-400 hover:bg-[#E2EBE2] hover:text-[#1F251A] transition cursor-pointer`}
           aria-label="Close"
         >
           <X size={20} />
@@ -181,11 +179,13 @@ export default function TermsModal({ isOpen, onClose, defaultLang = "en" }: Term
                 <path d="M12 3C6.5 3 2 7.5 2 13C2 15.5 3 17.8 4.6 19.5L12 12L19.4 19.5C21 17.8 22 15.5 22 13C22 7.5 17.5 3 12 3Z"/>
               </svg>
             </div>
-            <span className="text-sm font-bold tracking-wider text-[#2D522D] uppercase">{t.brand}</span>
+            <span className="text-sm font-bold tracking-wider text-[#2D522D] uppercase">
+              {isAr ? "عيادة ريفيرا" : "REVERA CLINIC"}
+            </span>
           </div>
 
           {/* Language Switcher */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pr-8 sm:pr-0">
             <div className="relative inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-2xs">
               <Globe size={14} className={isAr ? "ml-1.5 text-gray-500" : "mr-1.5 text-gray-500"} />
               <select
@@ -207,53 +207,66 @@ export default function TermsModal({ isOpen, onClose, defaultLang = "en" }: Term
             <FileText size={26} />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">{t.title}</h1>
-            <p className="mt-1 text-xs sm:text-sm text-gray-600 font-normal">{t.subtitle}</p>
-            <p className="mt-1 text-[11px] text-gray-400 font-medium">{t.lastUpdated}</p>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+              {isAr ? "الشروط والأحكام" : "Terms & Conditions"}
+            </h1>
+            <p className="mt-1 text-xs sm:text-sm text-gray-600 font-normal">
+              {isAr ? "يرجى قراءة هذه الشروط بعناية قبل استخدام خدماتنا." : "Please read these terms carefully before using our services."}
+            </p>
+            <p className="mt-1 text-[11px] text-gray-400 font-medium">
+              {isAr ? "آخر تحديث: 17 يوليو 2025" : "Last updated: July 17, 2025"}
+            </p>
           </div>
         </div>
 
         {/* Main Terms Container Card */}
         <div className="rounded-3xl border border-gray-200/90 bg-white p-6 sm:p-8 shadow-xs space-y-6">
-          {t.sections.map((section) => (
-            <div key={section.num} className="flex items-start gap-4 pb-5 border-b border-gray-100 last:border-b-0 last:pb-0">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E2EBE2] text-[#2D522D] font-bold text-xs sm:text-sm">
-                {section.num}
-              </div>
-              <div className="space-y-1.5 pt-0.5">
-                <h3 className="text-sm sm:text-base font-bold text-gray-900">{section.title}</h3>
-                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed font-normal">
-                  {section.text}
-                  {section.linkText && (
-                    <span className="text-[#2D522D] font-semibold underline underline-offset-2 cursor-pointer hover:opacity-80 mx-1">
-                      {section.linkText}
-                    </span>
-                  )}
-                  {section.postText && section.postText}
-                </p>
+          {terms.map((item, idx) => {
+            const num = idx + 1;
+            const title = isAr ? (item.title_ar || item.title_en) : item.title_en;
+            const content = isAr ? (item.content_ar || item.content_en) : item.content_en;
+            const linkText = isAr ? item.link_text_ar : item.link_text_en;
+            const isContactSection = title.toLowerCase().includes("contact") || title.includes("اتصل");
 
-                {/* Contact Us Sub-info inside Section 9 */}
-                {section.num === 9 && (
-                  <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-semibold text-[#2D522D] pt-2">
-                    <a href={`tel:${t.contactPhone}`} className="flex items-center gap-1.5 hover:underline bg-[#F2F7F2] px-3 py-1.5 rounded-full border border-[#D5E3D5]">
-                      <Phone size={13} />
-                      <span>{t.contactPhone}</span>
-                    </a>
-                    <span className="text-gray-300 hidden sm:inline">|</span>
-                    <a href={`mailto:${t.contactEmail}`} className="flex items-center gap-1.5 hover:underline bg-[#F2F7F2] px-3 py-1.5 rounded-full border border-[#D5E3D5]">
-                      <Mail size={13} />
-                      <span>{t.contactEmail}</span>
-                    </a>
-                    <span className="text-gray-300 hidden sm:inline">|</span>
-                    <a href={`https://${t.contactWeb}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:underline bg-[#F2F7F2] px-3 py-1.5 rounded-full border border-[#D5E3D5]">
-                      <Globe size={13} />
-                      <span>{t.contactWeb}</span>
-                    </a>
-                  </div>
-                )}
+            return (
+              <div key={item.id || idx} className="flex items-start gap-4 pb-5 border-b border-gray-100 last:border-b-0 last:pb-0">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E2EBE2] text-[#2D522D] font-bold text-xs sm:text-sm">
+                  {num}
+                </div>
+                <div className="space-y-1.5 pt-0.5 w-full">
+                  <h3 className="text-sm sm:text-base font-bold text-gray-900">{title}</h3>
+                  <p className="text-xs sm:text-sm text-gray-600 leading-relaxed font-normal">
+                    {content}{" "}
+                    {linkText && (
+                      <a href={item.link_url || "#"} className="text-[#2D522D] font-semibold underline underline-offset-2 hover:opacity-80 mx-1">
+                        {linkText}
+                      </a>
+                    )}
+                  </p>
+
+                  {/* Contact Us Sub-info inside Contact section */}
+                  {isContactSection && (
+                    <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-semibold text-[#2D522D] pt-2">
+                      <a href={`tel:${contactPhone}`} className="flex items-center gap-1.5 hover:underline bg-[#F2F7F2] px-3 py-1.5 rounded-full border border-[#D5E3D5]">
+                        <Phone size={13} />
+                        <span>{contactPhone}</span>
+                      </a>
+                      <span className="text-gray-300 hidden sm:inline">|</span>
+                      <a href={`mailto:${contactEmail}`} className="flex items-center gap-1.5 hover:underline bg-[#F2F7F2] px-3 py-1.5 rounded-full border border-[#D5E3D5]">
+                        <Mail size={13} />
+                        <span>{contactEmail}</span>
+                      </a>
+                      <span className="text-gray-300 hidden sm:inline">|</span>
+                      <a href={`https://${contactWeb}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:underline bg-[#F2F7F2] px-3 py-1.5 rounded-full border border-[#D5E3D5]">
+                        <Globe size={13} />
+                        <span>{contactWeb}</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Bottom Trust Banner */}
@@ -261,15 +274,19 @@ export default function TermsModal({ isOpen, onClose, defaultLang = "en" }: Term
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#DBE8DB]">
             <ShieldCheck size={20} className="text-[#2D522D]" />
           </div>
-          <p className="font-medium leading-relaxed">{t.trustNotice}</p>
+          <p className="font-medium leading-relaxed">
+            {isAr 
+              ? "ثقتكم تهمنا كثيراً. نحن ملتزمون بحماية معلوماتكم وتقديم تجربة آمنة واحترافية." 
+              : "Your trust is important to us. We are committed to protecting your information and providing a safe and professional experience."}
+          </p>
         </div>
 
         {/* Bottom Footer */}
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 pt-4 border-t border-gray-200/60 font-medium">
-          <p>{t.rights}</p>
+          <p>{isAr ? "© 2025 عيادة ريفيرا. جميع الحقوق محفوظة." : "© 2025 Revera Clinic. All rights reserved."}</p>
           <div className="flex items-center gap-1.5 text-gray-600 font-semibold">
             <Lock size={14} className="text-[#2D522D]" />
-            <span>{t.secure}</span>
+            <span>{isAr ? "آمن ومشفّر" : "Secure & Encrypted"}</span>
           </div>
         </div>
       </div>
