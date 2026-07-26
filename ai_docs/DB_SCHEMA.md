@@ -805,6 +805,171 @@ the table is empty. Previously (2026-07-21 to 2026-07-25) POST/PATCH only wrote
 
 ---
 
+## Phase 1 — Financial Ledger (PROPOSAL-002)
+
+Added 2026-07-26. See `ai_docs/PROPOSALS.md` PROPOSAL-002 Phase 1 for the design rationale and
+`ai_docs/FINANCE_TRACKER.md` "Phase 1 — Financial Ledger Spine" for the task-by-task build log.
+As of this writing these tables exist and are **schema-only** — task 1.10 onward wires the
+application to actually write to them; nothing reads or writes these tables yet.
+
+### `invoices`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `invoice_no` | text | Unique. App-formatted as `'INV-' + zero-padded invoice_no_seq value` |
+| `reservation_id` | UUID | FK → reservations.id ON DELETE SET NULL, nullable — a retail-only POS sale has no booking |
+| `customer_id` | UUID | FK → customers.id ON DELETE SET NULL, nullable |
+| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable |
+| `issued_at` | timestamptz | Default now() |
+| `subtotal` | numeric | Default 0 |
+| `discount_total` | numeric | Default 0 |
+| `grand_total` | numeric | Default 0 — **tax-inclusive** (DEC-021); no separate tax column, always derivable via `tax = gross × rate / (1 + rate)` using each line's `tax_rate` |
+| `status` | text | Default `'issued'`, CHECK IN (`'draft'`, `'issued'`, `'void'`) |
+| `is_opening` | boolean | Default false — DEC-024 opening-balance import flag |
+| `created_at` | timestamptz | |
+
+Also creates `invoice_no_seq` (a plain sequence backing `invoice_no` formatting).
+
+**Written once, never updated** (except a status flip to `'void'`) — this is the entire reason
+this table exists instead of more columns on `reservations`. See RISK-010.
+
+---
+
+### `invoice_lines`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `invoice_id` | UUID | FK → invoices.id ON DELETE CASCADE |
+| `line_type` | text | CHECK IN (`'service'`, `'product'`, `'package'`) |
+| `service_id` | bigint | FK → services.id ON DELETE SET NULL, nullable |
+| `product_id` | text | FK → inventory_products.id ON DELETE SET NULL, nullable |
+| `package_id` | UUID | FK → packages.id ON DELETE SET NULL, nullable. Constraint added by `20260726010500_create_customer_packages.sql`, not the table's own migration — `packages` did not exist yet when `invoice_lines` was created |
+| `description` | text | NOT NULL |
+| `qty` | numeric | Default 1 |
+| `unit_price` | numeric | Default 0 — tax-inclusive |
+| `discount` | numeric | Default 0 |
+| `tax_rate` | numeric | Default 0 |
+| `line_total` | numeric | Default 0 — tax-inclusive, after discount |
+| `cogs_snapshot` | numeric | **Nullable, not defaulted to 0.** Not populated until Phase 2 (`service_consumables`); NULL means "not yet costed," distinct from a real zero-cost line |
+| `commission_snapshot` | numeric | **Nullable**, same reasoning — needs a doctor's contract terms applied at issue time (Phase 2) |
+| `provider_id` | UUID | FK → providers.id ON DELETE SET NULL, nullable |
+| `created_at` | timestamptz | |
+
+---
+
+### `payments`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `invoice_id` | UUID | FK → invoices.id ON DELETE CASCADE |
+| `received_at` | timestamptz | Default now() |
+| `amount` | numeric | NOT NULL |
+| `method` | text | Default `'cash'`, CHECK IN (`'cash'`, `'card'`, `'wallet'`, `'instapay'`, `'transfer'`) |
+| `received_by_employee_id` | UUID | FK → employee_accounts.id ON DELETE SET NULL, nullable |
+| `reference` | text | nullable, free text |
+| `is_opening` | boolean | Default false |
+| `created_at` | timestamptz | |
+
+One row per receipt — replaces the single mutable `reservations.amount_paid` scalar as the
+source of truth for "how much has been paid and when." `SUM(amount) WHERE invoice_id = X`
+reconstructs the total.
+
+---
+
+### `wallet_txns`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `customer_id` | UUID | FK → customers.id ON DELETE CASCADE |
+| `occurred_at` | timestamptz | Default now() |
+| `direction` | text | CHECK IN (`'in'`, `'out'`) |
+| `amount` | numeric | CHECK `> 0` — sign is carried by `direction`, not the value |
+| `reason` | text | NOT NULL |
+| `invoice_id` | UUID | FK → invoices.id ON DELETE SET NULL, nullable |
+| `is_opening` | boolean | Default false |
+| `created_at` | timestamptz | |
+
+One row per wallet movement. `customers.wallet_balance` becomes
+`SUM(CASE WHEN direction='in' THEN amount ELSE -amount END)` once task 1.14 cuts reads over to
+this table — see RISK-012 / RISK-016.
+
+---
+
+### `packages`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `name` | text | NOT NULL |
+| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable — null means sellable at every branch |
+| `price` | numeric | Default 0 — tax-inclusive |
+| `tax_rate` | numeric | Default 0 |
+| `validity_days` | integer | Default 90 |
+| `on_expiry` | text | Default `'extend'`, CHECK IN (`'recognise_revenue'`, `'extend'`) — DEC-025's per-package default |
+| `extension_days` | integer | nullable, used when `on_expiry = 'extend'` |
+| `active` | boolean | Default true |
+| `created_at` | timestamptz | |
+
+---
+
+### `package_items`
+
+| Column | Type | Notes |
+|---|---|---|
+| `package_id` | UUID | FK → packages.id ON DELETE CASCADE |
+| `service_id` | bigint | FK → services.id ON DELETE CASCADE |
+| `qty` | integer | Default 1 |
+
+Composite primary key `(package_id, service_id)`. The package's content list — "6 laser sessions"
+= one row with `qty = 6` and the laser service's id.
+
+---
+
+### `customer_packages`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `customer_id` | UUID | FK → customers.id ON DELETE CASCADE |
+| `package_id` | UUID | FK → packages.id ON DELETE SET NULL, nullable |
+| `invoice_id` | UUID | FK → invoices.id ON DELETE SET NULL, nullable — the invoice from the sale |
+| `purchased_at` | timestamptz | Default now() |
+| `expires_at` | timestamptz | nullable — `purchased_at + packages.validity_days` at sale time |
+| `price_paid` | numeric | Default 0 |
+| `status` | text | Default `'active'`, CHECK IN (`'active'`, `'expired'`, `'fully_used'`) |
+| `is_opening` | boolean | Default false |
+| `extended_by_employee_id` | UUID | FK → employee_accounts.id ON DELETE SET NULL, nullable — DEC-025's manual extend audit trail |
+| `extended_at` | timestamptz | nullable |
+| `created_at` | timestamptz | |
+
+One row per package a patient bought. `price_paid` is the deferred-revenue basis — see
+`customer_package_items` below for the per-service breakdown that basis is allocated across.
+
+---
+
+### `customer_package_items`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `customer_package_id` | UUID | FK → customer_packages.id ON DELETE CASCADE |
+| `service_id` | bigint | FK → services.id ON DELETE CASCADE |
+| `qty_total` | integer | Default 0 |
+| `qty_used` | integer | Default 0 |
+| `qty_remaining` | integer | Default 0 |
+| `created_at` | timestamptz | |
+
+Deferred liability for one row = `customer_packages.price_paid × qty_remaining / qty_total`
+(`deferredBalance()` in `src/lib/packages.ts`). Revenue recognised per session delivered =
+`customer_packages.price_paid / qty_total` (`recognisedRevenuePerSession()`), decrementing
+`qty_remaining` and incrementing `qty_used` — see DEC-023.
+
+---
+
 ## Notes on Schema Gaps
 
 - Persistent patient records are stored in the `customers` table, and connected to `reservations` via `customer_id`.
