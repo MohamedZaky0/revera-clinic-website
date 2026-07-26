@@ -543,15 +543,15 @@ routes:**
 
 | ID | Task | Depends on | Status | Owner | Commit |
 |---|---|---|---|---|---|
-| 1.1 | Migration: `invoices` table | — | `TODO` | — | — |
-| 1.2 | Migration: `invoice_lines` table | 1.1 | `TODO` | — | — |
-| 1.3 | Migration: `payments` table | 1.1 | `TODO` | — | — |
-| 1.4 | Migration: `wallet_txns` table | 1.1 | `TODO` | — | — |
-| 1.5 | Migration: `packages` + `package_items` tables | — | `TODO` | — | — |
-| 1.6 | Migration: `customer_packages` + `customer_package_items` tables, backfill `invoice_lines.package_id` FK | 1.2, 1.5 | `TODO` | — | — |
-| 1.7 | Library: `src/lib/ledger.ts` — invoice/line/payment builders (pure functions) | 1.1–1.4 (schema shape only, no runtime dependency) | `TODO` | — | — |
-| 1.8 | Library: `src/lib/packages.ts` — deferred-revenue recognition math (pure functions) | 1.5, 1.6 (schema shape only) | `TODO` | — | — |
-| 1.9 | Regression checks for 1.7 and 1.8 | 1.7, 1.8 | `TODO` | — | — |
+| 1.1 | Migration: `invoices` table | — | `DONE` | Claude | `864d750` |
+| 1.2 | Migration: `invoice_lines` table | 1.1 | `DONE` | Claude | `864d750` |
+| 1.3 | Migration: `payments` table | 1.1 | `DONE` | Claude | `864d750` |
+| 1.4 | Migration: `wallet_txns` table | 1.1 | `DONE` | Claude | `864d750` |
+| 1.5 | Migration: `packages` + `package_items` tables | — | `DONE` | Claude | `864d750` |
+| 1.6 | Migration: `customer_packages` + `customer_package_items` tables, backfill `invoice_lines.package_id` FK | 1.2, 1.5 | `DONE` | Claude | `864d750` |
+| 1.7 | Library: `src/lib/ledger.ts` — invoice/line/payment builders (pure functions) | 1.1–1.4 (schema shape only, no runtime dependency) | `DONE` | Claude | `see 1.7-1.9 below` |
+| 1.8 | Library: `src/lib/packages.ts` — deferred-revenue recognition math (pure functions) | 1.5, 1.6 (schema shape only) | `DONE` | Claude | `see 1.7-1.9 below` |
+| 1.9 | Regression checks for 1.7 and 1.8 | 1.7, 1.8 | `DONE` | Claude | `see 1.7-1.9 below` |
 | 1.10 | Wire booking checkout (`PATCH /api/reservations`, `status: 'completed'`) to dual-write an invoice | 1.1–1.4, 1.7 | `TODO` | — | — |
 | 1.11 | Wire POS sale (`POST /api/inventory/products/sales`) to dual-write an invoice | 1.1–1.4, 1.7 | `TODO` | — | — |
 | 1.12 | New endpoint: sell a package (`POST /api/packages/sell` or similar) | 1.5, 1.6, 1.8 | `TODO` | — | — |
@@ -834,92 +834,50 @@ so this should trivially pass — running it is the check that it actually is tr
 
 ---
 
-## 1.7 — Library: `src/lib/ledger.ts`
+## 1.7 — Library: `src/lib/ledger.ts` — DONE
 
-**Depends on 1.1–1.4 (schema shape, not runtime — this is pure TypeScript, no DB calls).**
-
-**What:** pure, testable functions — no `supabaseServer` calls inside this file. Route handlers
-call these to compute *what to write*, then do the actual `insert` themselves. This mirrors
-`src/lib/billing.ts` (`computeSettledBalances`) and `src/lib/customerIdentity.ts` (`isOwnIdentity`)
-from Phase 0 — pure functions are what `scratch/*.ts` can actually test without a live database.
-
-**Functions to write:**
-```ts
-formatInvoiceNo(seqValue: number): string
-  // 'INV-' + zero-padded 6-digit seqValue. Formatting only — the seq itself comes from
-  // invoice_no_seq via a DB round-trip in the route, not from this pure function.
-
-buildInvoiceLine(input: {
-  lineType: 'service' | 'product' | 'package';
-  description: string; qty: number; unitPrice: number; discount?: number; taxRate?: number;
-  serviceId?: number; productId?: string; packageId?: string; providerId?: string;
-}): InvoiceLineDraft
-  // line_total = qty * unitPrice - (discount ?? 0), clamped to >= 0.
-
-buildInvoiceTotals(lines: InvoiceLineDraft[]): { subtotal: number; discountTotal: number; grandTotal: number }
-  // subtotal = sum of (qty * unitPrice); discountTotal = sum of discounts;
-  // grandTotal = sum of line_total. Round once at the end, not per line, to avoid
-  // cent-level drift between subtotal/discount/grandTotal not adding up.
-
-taxPortion(grossAmount: number, taxRate: number): number
-  // gross * rate / (1 + rate) — DEC-021's derivation formula. Used only for display/reporting,
-  // never for storage (grand_total is already the source of truth).
-```
-
-**Update `DB_SCHEMA.md`:** none — this is a library file, not a schema change.
-
-**Verify:** write alongside 1.9 (the regression script covers both 1.7 and 1.8 together, since
-package math in 1.8 calls `buildInvoiceLine`/`buildInvoiceTotals` from this file).
+Implemented as planned: `formatInvoiceNo`, `buildInvoiceLine`, `buildInvoiceTotals`, `taxPortion`.
+One deviation worth noting — `buildInvoiceLine` **throws** on `qty <= 0` or `unitPrice < 0` rather
+than silently accepting them, matching the "throw on nonsense input" convention `computeSettledBalances`
+(task 0.5) and `resolveBranchName` (task 0.2/0.3) already established.
 
 ---
 
-## 1.8 — Library: `src/lib/packages.ts`
+## 1.8 — Library: `src/lib/packages.ts` — DONE
 
-**Depends on 1.5, 1.6 (schema shape only).**
+Implemented with one addition beyond the original plan and one corrected formula:
 
-**Functions to write, implementing the formulas in `PROPOSALS.md` Phase 1 exactly:**
-```ts
-recognisedRevenuePerSession(pricePaid: number, totalSessions: number): number
-  // pricePaid / totalSessions. totalSessions must be > 0 — throw, don't silently divide by zero
-  // (a package with zero sessions is a data error, not a valid state).
+- **Added `recognisedRevenueSoFar(pricePaid, qtyUsed, qtyTotal)`** — not in the original spec.
+  Needed once `deferredBalance` was rewritten (see below) to be its counterpart.
+- **`deferredBalance` does NOT use the formula originally specified here**
+  (`pricePaid * qtyRemaining / qtyTotal`). That formula rounds independently from
+  `recognisedRevenuePerSession` and can drift by a cent — caught by the regression check in 1.9
+  on the very first run (see below). `deferredBalance` now computes the **complement**:
+  `pricePaid − recognisedRevenueSoFar(...)`, which guarantees the two numbers always sum to
+  `pricePaid` exactly, by construction rather than by hoping two roundings cancel out.
+- `resolveExpiry`'s second parameter is `currentExpiresAt: Date`, not a `customerPackage` object
+  — simpler, and the caller already has the date without needing to pass a wrapper object.
 
-deferredBalance(pricePaid: number, qtyRemaining: number, qtyTotal: number): number
-  // pricePaid * qtyRemaining / qtyTotal — the liability figure for one customer_package_items row.
-  // Sum across a customer's rows for their total deferred balance.
-
-isExpired(expiresAt: string | Date | null, asOf: Date): boolean
-
-resolveExpiry(pkg: { onExpiry: 'recognise_revenue' | 'extend'; extensionDays?: number | null },
-              customerPackage: { expiresAt: string | null }):
-              { action: 'recognise_revenue' } | { action: 'extend'; newExpiresAt: string }
-  // Implements DEC-025's default policy. The manual per-customer override (task 1.13) calls
-  // this only to get the DEFAULT; a manual extend bypasses it entirely by design.
-```
-
-**Verify:** covered by 1.9.
+**Update `DB_SCHEMA.md`:** the `customer_package_items` section's formula note was rewritten to
+describe the complement-based approach and explain why the naive one is wrong.
 
 ---
 
-## 1.9 — Regression checks for 1.7/1.8
+## 1.9 — Regression checks for 1.7/1.8 — DONE
 
-**Depends on 1.7, 1.8.** **Where:** `scratch/ledgercheck.ts`, `scratch/packagecheck.ts`
-(or one combined `scratch/phase1check.ts` — either is fine, match whichever the prior scratch
-scripts' granularity suggests feels right at the time; `pricecheck.ts`/`billingcheck.ts`/
-`identitycheck.ts` were kept separate per concern, so keep these separate too for consistency).
+`scratch/phase1ledgercheck.ts` (13 cases) and `scratch/phase1packagecheck.ts` (15 cases),
+kept as two files per the established one-concern-per-script convention.
 
-**Minimum cases to cover** (mirrors the rigor of `billingcheck.ts`'s 15 cases and
-`identitycheck.ts`'s 10):
-- Invoice totals: multiple lines, a discount, rounding does not drift subtotal vs grand_total.
-- Package: 6-session package, 1000 paid, 2 delivered → recognised = 333.33×2, deferred = 666.67×4
-  (verify the two numbers sum back to 1000 — this is the single most important invariant in the
-  whole phase, and the one most likely to have an off-by-one or rounding bug).
-- Package expiry: `on_expiry: 'recognise_revenue'` past `expires_at` → `resolveExpiry` returns
-  breakage; `on_expiry: 'extend'` → returns a new date; a manual extend bypasses both.
-- `deferredBalance` at `qty_remaining = 0` → 0 (fully delivered, no liability left).
-- `recognisedRevenuePerSession` with `totalSessions = 0` → throws, does not return `Infinity` or
-  silently divide by zero.
+**This is not a formality — the package check caught a real bug on its first run.** The initial
+`deferredBalance` implementation (`pricePaid * qtyRemaining / qtyTotal`, exactly as originally
+specified in this tracker) produced, for a 1000 EGP / 6-session package with 2 sessions delivered:
+`recognised = round(166.67 × 2) = 333.34` and `deferred = round(1000 × 4/6) = 666.67`, summing to
+**1000.01** — one cent created from nowhere. Fixed by deriving `deferredBalance` as the complement
+of `recognisedRevenueSoFar` instead of computing it independently; see 1.8 above. The corrected
+check now asserts `recognised + deferred === price_paid` exactly and would fail loudly if this
+regresses.
 
-**Update `DB_SCHEMA.md`:** none.
+**Update `DB_SCHEMA.md`:** done as part of 1.8's entry above.
 
 ---
 

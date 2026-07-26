@@ -963,10 +963,15 @@ One row per package a patient bought. `price_paid` is the deferred-revenue basis
 | `qty_remaining` | integer | Default 0 |
 | `created_at` | timestamptz | |
 
-Deferred liability for one row = `customer_packages.price_paid × qty_remaining / qty_total`
-(`deferredBalance()` in `src/lib/packages.ts`). Revenue recognised per session delivered =
-`customer_packages.price_paid / qty_total` (`recognisedRevenuePerSession()`), decrementing
-`qty_remaining` and incrementing `qty_used` — see DEC-023.
+Revenue recognised per session delivered = `customer_packages.price_paid / qty_total`
+(`recognisedRevenuePerSession()` in `src/lib/packages.ts`), decrementing `qty_remaining` and
+incrementing `qty_used` — see DEC-023. Deferred liability for one row is **not** an independent
+`price_paid × qty_remaining / qty_total` — that formula rounds separately from the recognised
+side and can drift by a cent (e.g. a 1000/6 package: 2 sessions recognised independently rounds
+to 333.34, 4 remaining independently rounds to 666.67, summing to 1000.01, not 1000). Instead
+`deferredBalance()` computes the **complement** of `recognisedRevenueSoFar()`
+(`price_paid − recognised_so_far`), guaranteeing the two always sum to `price_paid` exactly.
+Caught by `scratch/phase1packagecheck.ts` on the first implementation attempt.
 
 ---
 
