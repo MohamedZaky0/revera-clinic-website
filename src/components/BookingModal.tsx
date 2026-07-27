@@ -1207,8 +1207,8 @@ Attached is my payment transaction receipt photo.`;
                   )}
                 </div>
 
-                {/* Terms & Conditions Gate */}
-                {(hasTerms || termsText.trim() !== "") && (
+                {/* Terms & Conditions Gate (Step 2 fallback when no payment step required) */}
+                {(hasTerms || termsText.trim() !== "") && depositPercentage === 0 && (
                   <div className="mb-5 text-left" dir={isRTL ? "rtl" : "ltr"}>
                     <div className="rounded-2xl border border-gray-200/90 bg-white p-5 space-y-4 shadow-2xs">
                       <div className="flex items-center gap-2 text-[#2D522D] font-bold text-xs tracking-wider uppercase">
@@ -1278,7 +1278,7 @@ Attached is my payment transaction receipt photo.`;
 
                 <button
                   onClick={handleConfirm}
-                  disabled={isCreatingReservation || ((hasTerms || termsText.trim() !== "") && !acceptedTerms)}
+                  disabled={isCreatingReservation || (depositPercentage === 0 && (hasTerms || termsText.trim() !== "") && !acceptedTerms)}
                   className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
                 >
                   {isCreatingReservation ? (
