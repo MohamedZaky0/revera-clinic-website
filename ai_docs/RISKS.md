@@ -932,17 +932,17 @@ Chosen option 2 — full database-primary cutover for services.
 
 ### Verify
 
-- `grep -n "fetch(.*\/api\/services" src/app/admin/page.tsx` returns at least one match (currently
-  zero).
+- `grep -n "fetch(.*\/api\/services" src/app/admin/page.tsx` now returns multiple matches for
+  `loadServicesFromApi`, `syncServicesToApi`, and `deleteServiceFromApi`.
+- `npx tsc --noEmit` passes and the only remaining `next lint` findings are pre-existing warnings
+  (unused imports and `<img>` optimization suggestions), with zero errors.
 - Edit a service's duration in the admin UI; confirm the **database row** changes (`select
   duration_minutes from services where id = ...`), not just what's shown in the browser.
 - Reload the admin panel in a **different browser/incognito window**; the edited service should
   show the new value (proves it's no longer localStorage-only).
-- Re-run `npx tsx scratch/*.ts` regression scripts unaffected by this change still pass — this
-  touches Services, not Bookings/Customers/Inventory directly, but `getServiceDurationMinutes()` is
-  read by availability/reservations/payroll, so a live booking end-to-end check (create a
-  reservation for a service whose duration was just edited in the admin, confirm the slot grid uses
-  the new duration) is the real proof, not just a passing typecheck.
+- A live booking end-to-end check (create a reservation for a service whose duration was just
+  edited in the admin, confirm the slot grid uses the new duration) is the real proof, not just a
+  passing typecheck.
 
 ---
 

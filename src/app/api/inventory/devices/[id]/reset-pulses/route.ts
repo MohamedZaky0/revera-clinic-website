@@ -42,8 +42,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     }
 
     const data = await getStoredInventoryData();
-    let devices = data.devices || [];
-    let history = data.history || [];
+    const devices = data.devices || [];
+    const history = data.history || [];
 
     const index = devices.findIndex((d: any) => d.id === id);
 

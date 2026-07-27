@@ -411,7 +411,7 @@ export async function PUT(req: Request) {
     }
 
     const data = await getStoredProductsData();
-    let products = data.products || [];
+    const products = data.products || [];
     const index = products.findIndex((p) => p.id === id);
 
     if (index === -1) {
@@ -468,7 +468,7 @@ export async function DELETE(req: Request) {
     }
 
     const data = await getStoredProductsData();
-    let products = data.products || [];
+    const products = data.products || [];
     const filtered = products.filter((p) => p.id !== id);
 
     await saveProductsData({ products: filtered });

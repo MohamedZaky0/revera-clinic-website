@@ -74,23 +74,6 @@ export default function ProfilePage() {
   const [services, setServices] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
 
-  // Fetch localstorage user on mount
-  useEffect(() => {
-    const stored = localStorage.getItem("revera_user");
-    if (stored) {
-      try {
-        const u = JSON.parse(stored);
-        setUser(u);
-        setFullName(u.name || "");
-        setEmail(u.email || "");
-        setMobileAndPreloadData(u);
-      } catch (err) {
-        console.error("Failed to parse user session:", err);
-      }
-    }
-    setLoadingAuth(false);
-  }, []);
-
   const setMobileAndPreloadData = async (sessionUser: any) => {
     if (!sessionUser?.mobile) return;
     setLoadingProfile(true);
@@ -126,6 +109,23 @@ export default function ProfilePage() {
       setLoadingBookings(false);
     }
   };
+
+  // Fetch localstorage user on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("revera_user");
+    if (stored) {
+      try {
+        const u = JSON.parse(stored);
+        setUser(u);
+        setFullName(u.name || "");
+        setEmail(u.email || "");
+        setMobileAndPreloadData(u);
+      } catch (err) {
+        console.error("Failed to parse user session:", err);
+      }
+    }
+    setLoadingAuth(false);
+  }, []);
 
   // Fetch reference lists (services and branches)
   useEffect(() => {

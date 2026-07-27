@@ -1527,7 +1527,7 @@ export default function AdminPage() {
     setServiceImageUrl(svc.img || "");
     setServicePrice(svc.price ?? 0);
     
-    if (svc.branchPricing && svc.branchPricing.length > 0) {
+    if (Array.isArray(svc.branchPricing) && svc.branchPricing.length > 0) {
       setServiceBranchPricing(svc.branchPricing);
     } else {
       const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
@@ -1557,7 +1557,7 @@ export default function AdminPage() {
     }> = [];
 
     localServices.forEach(service => {
-      if (service.branchPricing) {
+      if (Array.isArray(service.branchPricing)) {
         service.branchPricing.forEach(bp => {
           if (bp.promotion) {
             list.push({
@@ -1606,7 +1606,7 @@ export default function AdminPage() {
     const updatedServices = localServices.map(svc => {
       if (serviceIdsToUpdate.includes(svc.id)) {
         // Build branchPricing: use existing or create entry from global branches
-        const bpArray = svc.branchPricing && svc.branchPricing.length > 0
+        const bpArray = Array.isArray(svc.branchPricing) && svc.branchPricing.length > 0
           ? [...svc.branchPricing]
           : branches.map(b => ({ name: b.name_en, price: svc.price ?? 0, visible: true, status: true, isDefault: false }));
 
@@ -1647,7 +1647,7 @@ export default function AdminPage() {
   const handleDeletePromotion = async (serviceId: number, branchName: string) => {
     const updatedServices = localServices.map(svc => {
       if (svc.id === serviceId) {
-        const updatedBranchPricing = (svc.branchPricing || []).map(bp => {
+        const updatedBranchPricing = (Array.isArray(svc.branchPricing) ? svc.branchPricing : []).map(bp => {
           if (bp.name.toLowerCase() === branchName.toLowerCase()) {
             const { promotion, ...rest } = bp;
             return rest;
@@ -1669,7 +1669,7 @@ export default function AdminPage() {
   const handleTogglePromotion = async (serviceId: number, branchName: string, currentEnabled: boolean) => {
     const updatedServices = localServices.map(svc => {
       if (svc.id === serviceId) {
-        const updatedBranchPricing = (svc.branchPricing || []).map(bp => {
+        const updatedBranchPricing = (Array.isArray(svc.branchPricing) ? svc.branchPricing : []).map(bp => {
           if (bp.name.toLowerCase() === branchName.toLowerCase() && bp.promotion) {
             return {
               ...bp,
@@ -8464,7 +8464,7 @@ export default function AdminPage() {
                                           <span className="font-medium text-[#C4AE7C]">EGP {svc.price ?? 0}</span>
                                         </td>
                                         <td className="px-5 py-3 text-xs text-[#5A6A51] max-w-[200px] truncate">
-                                          {svc.branchPricing && svc.branchPricing.length > 0 ? (
+                                          {Array.isArray(svc.branchPricing) && svc.branchPricing.length > 0 ? (
                                             svc.branchPricing.map((bp) => (
                                               <div key={bp.name} className="flex items-center gap-1.5 mb-0.5 text-[11px]">
                                                 <span className="font-medium text-[#1F251A]">{bp.name}:</span>
@@ -9437,7 +9437,7 @@ export default function AdminPage() {
                                   const names = new Set<string>();
                                   promoServiceIds.forEach(id => {
                                     const svc = localServices.find(s => s.id === id);
-                                    (svc?.branchPricing || []).forEach(bp => names.add(bp.name));
+                                    (Array.isArray(svc?.branchPricing) ? svc.branchPricing : []).forEach(bp => names.add(bp.name));
                                   });
                                   return Array.from(names);
                                 })();
@@ -9546,7 +9546,7 @@ export default function AdminPage() {
                             <div className="text-xs font-bold text-[#414E36] mb-1">Preview Selling Price by Branch / معاينة السعر حسب الفرع:</div>
                             <div className="max-h-24 overflow-y-auto space-y-1.5 pr-1">
                               {branchesToPreview.map(branchName => {
-                                const selectedBp = (selectedSvc.branchPricing || []).find(bp => bp.name.toLowerCase() === branchName.toLowerCase());
+                                const selectedBp = (Array.isArray(selectedSvc.branchPricing) ? selectedSvc.branchPricing : []).find(bp => bp.name.toLowerCase() === branchName.toLowerCase());
                                 const basePrice = selectedBp ? selectedBp.price : (selectedSvc.price || 0);
                                 const calcPrice = promoType === "percentage"
                                   ? basePrice * (1 - promoValue / 100)

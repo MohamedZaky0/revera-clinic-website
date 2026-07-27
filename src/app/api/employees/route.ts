@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     // Fetch auth users using the service_role client to check email_confirmed_at
     const { data: authData, error: authError } = await supabaseServer.auth.admin.listUsers();
     
-    let confirmedMap = new Map<string, string | null>();
+    const confirmedMap = new Map<string, string | null>();
     if (!authError && authData?.users) {
       authData.users.forEach((u: any) => {
         if (u.id) {

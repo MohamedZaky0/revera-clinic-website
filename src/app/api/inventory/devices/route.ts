@@ -279,7 +279,7 @@ export async function PUT(req: Request) {
     }
 
     const data = await getStoredInventoryData();
-    let devices = data.devices || [];
+    const devices = data.devices || [];
     const index = devices.findIndex((d: any) => d.id === id);
 
     if (index === -1) {
