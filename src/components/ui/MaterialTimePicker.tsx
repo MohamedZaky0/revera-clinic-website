@@ -1,32 +1,26 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Keyboard, Clock, AlertCircle } from "lucide-react";
+import React, { useMemo } from "react";
+import { Clock, Check } from "lucide-react";
 
 interface MaterialTimePickerProps {
-  selectedTime: string | null; // e.g. "07:00 AM" or "02:30 PM"
+  selectedTime: string | null; // e.g. "09:00 AM" or "02:30 PM"
   onSelectTime: (time: string) => void;
   availableSlots?: string[]; // array of available 12h time strings e.g. ["09:00 AM", "09:15 AM", ...]
   takenSlots?: string[]; // 24h slots e.g. ["09:00", "09:15"]
   isRTL?: boolean;
 }
 
-function parseTime12h(timeStr: string | null): { hour: number; minute: number; ampm: "AM" | "PM" } {
-  if (!timeStr) return { hour: 9, minute: 0, ampm: "AM" };
+function normaliseTo24hSlot(timeStr: string): string {
   const parts = timeStr.trim().split(" ");
-  const ampm = parts[1]?.toUpperCase() === "PM" ? "PM" : "AM";
-  const [hhStr, mmStr] = (parts[0] || "09:00").split(":");
-  let hour = parseInt(hhStr, 10) || 9;
-  const minute = parseInt(mmStr, 10) || 0;
-  if (hour > 12) hour = hour % 12;
-  if (hour === 0) hour = 12;
-  return { hour, minute, ampm };
-}
-
-function format12h(hour: number, minute: number, ampm: "AM" | "PM"): string {
-  const hh = String(hour === 0 ? 12 : hour).padStart(2, "0");
-  const mm = String(minute).padStart(2, "0");
-  return `${hh}:${mm} ${ampm}`;
+  if (parts.length < 2) return timeStr;
+  const [hhStr, mmStr] = parts[0].split(":");
+  let hh = parseInt(hhStr, 10);
+  const mm = parseInt(mmStr, 10);
+  const ampm = parts[1].toUpperCase();
+  if (ampm === "PM" && hh < 12) hh += 12;
+  if (ampm === "AM" && hh === 12) hh = 0;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
 export function MaterialTimePicker({
@@ -36,361 +30,165 @@ export function MaterialTimePicker({
   takenSlots = [],
   isRTL = false,
 }: MaterialTimePickerProps) {
-  const initial = useMemo(() => parseTime12h(selectedTime), [selectedTime]);
+  // Group slots into Morning, Afternoon, Evening
+  const groupedSlots = useMemo(() => {
+    const morning: string[] = [];
+    const afternoon: string[] = [];
+    const evening: string[] = [];
 
-  const [hour, setHour] = useState<number>(initial.hour);
-  const [minute, setMinute] = useState<number>(initial.minute);
-  const [ampm, setAmpm] = useState<"AM" | "PM">(initial.ampm);
-  const [clockMode, setClockMode] = useState<"hours" | "minutes">("hours");
-  const [inputMode, setInputMode] = useState<"clock" | "slots">("clock");
-
-  const dialRef = useRef<HTMLDivElement>(null);
-
-  // Derive sets of available hours & minutes for currently active period/hour
-  const availableHoursForPeriod = useMemo(() => {
-    const hoursSet = new Set<number>();
     availableSlots.forEach((slot) => {
-      const { hour: h, ampm: period } = parseTime12h(slot);
-      if (period === ampm) {
-        hoursSet.add(h);
+      const slot24 = normaliseTo24hSlot(slot);
+      const [hhStr] = slot24.split(":");
+      const hh = parseInt(hhStr, 10);
+
+      if (hh < 12) {
+        morning.push(slot);
+      } else if (hh < 17) {
+        afternoon.push(slot);
+      } else {
+        evening.push(slot);
       }
     });
-    return hoursSet;
-  }, [availableSlots, ampm]);
 
-  const availableMinutesForHour = useMemo(() => {
-    const minutesSet = new Set<number>();
-    availableSlots.forEach((slot) => {
-      const { hour: h, minute: m, ampm: period } = parseTime12h(slot);
-      if (period === ampm && h === hour) {
-        minutesSet.add(m);
-      }
-    });
-    return minutesSet;
-  }, [availableSlots, ampm, hour]);
-
-  const hasAmSlots = useMemo(() => {
-    return availableSlots.some((slot) => parseTime12h(slot).ampm === "AM");
+    return { morning, afternoon, evening };
   }, [availableSlots]);
-
-  const hasPmSlots = useMemo(() => {
-    return availableSlots.some((slot) => parseTime12h(slot).ampm === "PM");
-  }, [availableSlots]);
-
-  // Sync internal state when selectedTime prop updates externally
-  useEffect(() => {
-    const p = parseTime12h(selectedTime);
-    setHour(p.hour);
-    setMinute(p.minute);
-    setAmpm(p.ampm);
-  }, [selectedTime]);
-
-  // Auto-switch to available AM or PM period if currently selected period has no slots
-  useEffect(() => {
-    if (availableSlots.length > 0) {
-      if (ampm === "AM" && !hasAmSlots && hasPmSlots) {
-        setAmpm("PM");
-      } else if (ampm === "PM" && !hasPmSlots && hasAmSlots) {
-        setAmpm("AM");
-      }
-    }
-  }, [availableSlots, ampm, hasAmSlots, hasPmSlots]);
-
-  const formattedCurrent = useMemo(() => {
-    return format12h(hour, minute, ampm);
-  }, [hour, minute, ampm]);
-
-  const isCurrentTimeValid = useMemo(() => {
-    if (availableSlots.length === 0) return true;
-    return availableSlots.includes(formattedCurrent);
-  }, [availableSlots, formattedCurrent]);
-
-  const updateTime = (h: number, m: number, period: "AM" | "PM") => {
-    const formatted = format12h(h, m, period);
-    onSelectTime(formatted);
-  };
-
-  const handleHourSelect = (h: number) => {
-    setHour(h);
-    updateTime(h, minute, ampm);
-    setClockMode("minutes");
-  };
-
-  const handleMinuteSelect = (m: number) => {
-    setMinute(m);
-    updateTime(hour, m, ampm);
-  };
-
-  const handleAmpmToggle = (period: "AM" | "PM") => {
-    setAmpm(period);
-    updateTime(hour, minute, period);
-  };
-
-  // Math for clock hand pointer angle
-  const hourAngle = useMemo(() => {
-    return (hour % 12) * 30; // 360 / 12 = 30 deg
-  }, [hour]);
-
-  const minuteAngle = useMemo(() => {
-    return minute * 6; // 360 / 60 = 6 deg
-  }, [minute]);
-
-  const activeAngle = clockMode === "hours" ? hourAngle : minuteAngle;
-
-  // Handle dial mouse/touch clicks
-  const handleDialClick = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    if (!dialRef.current) return;
-    const rect = dialRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
-
-    const dx = clientX - centerX;
-    const dy = clientY - centerY;
-
-    let deg = (Math.atan2(dy, dx) * (180 / Math.PI)) + 90;
-    if (deg < 0) deg += 360;
-
-    if (clockMode === "hours") {
-      let selectedH = Math.round(deg / 30);
-      if (selectedH === 0) selectedH = 12;
-
-      // Check if hour is available
-      if (availableSlots.length === 0 || availableHoursForPeriod.has(selectedH)) {
-        handleHourSelect(selectedH);
-      }
-    } else {
-      let selectedM = Math.round(deg / 6);
-      if (selectedM === 60) selectedM = 0;
-      const roundedM = Math.round(selectedM / 15) * 15 % 60;
-      handleMinuteSelect(roundedM);
-    }
-  };
-
-  const hoursList = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  const minutesList = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
   return (
     <div
       className="w-full max-w-md rounded-[28px] p-5 shadow-xs transition-all"
       style={{
-        backgroundColor: "#EDF1EC", // Revera light brand background (secondary token)
+        backgroundColor: "#EDF1EC", // Revera secondary brand background
         border: "1px solid rgba(65, 78, 54, 0.18)",
       }}
       dir={isRTL ? "rtl" : "ltr"}
     >
       {/* Header Label */}
-      <p className="text-xs font-semibold tracking-wide mb-3" style={{ color: "#5A6A51" }}>
-        {isRTL ? "اختر الوقت" : "Select time"}
-      </p>
-
-      {/* Digital Display Header (HH : MM + AM/PM) */}
-      <div className="flex items-center justify-between mb-4 px-1">
-        <div className="flex items-center gap-2.5" dir="ltr">
-          {/* Hour Box */}
-          <button
-            type="button"
-            onClick={() => setClockMode("hours")}
-            className={`flex h-16 w-20 items-center justify-center rounded-2xl text-3xl font-bold transition-all cursor-pointer ${
-              clockMode === "hours"
-                ? "bg-[#414E36] text-white ring-2 ring-[#414E36] shadow-sm"
-                : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36]"
-            }`}
-          >
-            {String(hour).padStart(2, "0")}
-          </button>
-
-          {/* Separator */}
-          <span className="text-3xl font-extrabold text-[#414E36] animate-pulse">:</span>
-
-          {/* Minute Box */}
-          <button
-            type="button"
-            onClick={() => setClockMode("minutes")}
-            className={`flex h-16 w-20 items-center justify-center rounded-2xl text-3xl font-bold transition-all cursor-pointer ${
-              clockMode === "minutes"
-                ? "bg-[#414E36] text-white ring-2 ring-[#414E36] shadow-sm"
-                : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36]"
-            }`}
-          >
-            {String(minute).padStart(2, "0")}
-          </button>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Clock size={16} className="text-[#414E36]" />
+          <h4 className="text-sm font-bold" style={{ color: "#414E36" }}>
+            {isRTL ? "اختر الوقت" : "Select time"}
+          </h4>
         </div>
-
-        {/* AM / PM Stack Toggle Pill */}
-        <div className="flex flex-col rounded-xl border border-[#414E36]/20 bg-white overflow-hidden shadow-2xs">
-          <button
-            type="button"
-            disabled={!hasAmSlots && availableSlots.length > 0}
-            onClick={() => handleAmpmToggle("AM")}
-            className={`px-3.5 py-1.5 text-xs font-bold transition-all ${
-              ampm === "AM"
-                ? "bg-[#414E36] text-white"
-                : !hasAmSlots && availableSlots.length > 0
-                ? "text-gray-400 opacity-30 cursor-not-allowed bg-gray-50"
-                : "text-[#5A6A51] hover:bg-[#414E36]/10 cursor-pointer"
-            }`}
-          >
-            AM
-          </button>
-          <div className="h-px bg-[#414E36]/15" />
-          <button
-            type="button"
-            disabled={!hasPmSlots && availableSlots.length > 0}
-            onClick={() => handleAmpmToggle("PM")}
-            className={`px-3.5 py-1.5 text-xs font-bold transition-all ${
-              ampm === "PM"
-                ? "bg-[#414E36] text-white"
-                : !hasPmSlots && availableSlots.length > 0
-                ? "text-gray-400 opacity-30 cursor-not-allowed bg-gray-50"
-                : "text-[#5A6A51] hover:bg-[#414E36]/10 cursor-pointer"
-            }`}
-          >
-            PM
-          </button>
-        </div>
+        {selectedTime && (
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#414E36] text-white flex items-center gap-1">
+            <Check size={12} />
+            {selectedTime}
+          </span>
+        )}
       </div>
 
-      {/* Warning Banner if selected time is closed / unavailable */}
-      {availableSlots.length > 0 && !isCurrentTimeValid && (
-        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-2.5 flex items-center gap-2 text-xs font-semibold text-amber-800 animate-fadeIn">
-          <AlertCircle size={16} className="shrink-0 text-amber-600" />
-          <span>
-            {isRTL 
-              ? `العيادة مغلقة في الموعد (${formattedCurrent}). يرجى اختيار موعد متاح.` 
-              : `Clinic is closed at ${formattedCurrent}. Please select an available slot.`}
-          </span>
-        </div>
-      )}
+      {/* Available Slots Grid */}
+      {availableSlots.length > 0 ? (
+        <div className="space-y-4 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+          {/* Morning Slots */}
+          {groupedSlots.morning.length > 0 && (
+            <div>
+              <p className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">
+                {isRTL ? "الصباح (قبل الظهر)" : "Morning"}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {groupedSlots.morning.map((slot) => {
+                  const isSelected = selectedTime === slot;
+                  const slot24 = normaliseTo24hSlot(slot);
+                  const isTaken = takenSlots.includes(slot24);
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      disabled={isTaken}
+                      onClick={() => !isTaken && onSelectTime(slot)}
+                      className={`rounded-xl py-2.5 px-2 text-center text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-[#414E36] text-white shadow-sm scale-[1.02]"
+                          : isTaken
+                          ? "bg-gray-200/60 text-gray-400 opacity-40 cursor-not-allowed"
+                          : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36] hover:bg-[#414E36]/10"
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-      {/* Main Body: Radial Clock vs Slots Grid */}
-      {inputMode === "clock" ? (
-        /* Radial Analog Clock Dial */
-        <div className="flex flex-col items-center justify-center py-2">
-          <div
-            ref={dialRef}
-            onClick={handleDialClick}
-            className="relative h-56 w-56 rounded-full bg-white/90 border border-[#414E36]/15 flex items-center justify-center select-none touch-none shadow-inner"
-          >
-            {/* Center Pivot Point */}
-            <div className="absolute h-3.5 w-3.5 rounded-full bg-[#414E36] z-20 shadow-xs" />
+          {/* Afternoon Slots */}
+          {groupedSlots.afternoon.length > 0 && (
+            <div>
+              <p className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">
+                {isRTL ? "الظهيرة (بعد الظهر)" : "Afternoon"}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {groupedSlots.afternoon.map((slot) => {
+                  const isSelected = selectedTime === slot;
+                  const slot24 = normaliseTo24hSlot(slot);
+                  const isTaken = takenSlots.includes(slot24);
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      disabled={isTaken}
+                      onClick={() => !isTaken && onSelectTime(slot)}
+                      className={`rounded-xl py-2.5 px-2 text-center text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-[#414E36] text-white shadow-sm scale-[1.02]"
+                          : isTaken
+                          ? "bg-gray-200/60 text-gray-400 opacity-40 cursor-not-allowed"
+                          : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36] hover:bg-[#414E36]/10"
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-            {/* Pointer Hand Vector Line */}
-            <div
-              className="absolute top-1/2 left-1/2 w-0.5 bg-[#414E36] origin-top transition-all duration-150 z-10"
-              style={{
-                height: "80px",
-                transform: `rotate(${activeAngle - 180}deg) translateX(-50%)`,
-              }}
-            />
-
-            {/* Radial Numbers */}
-            {(clockMode === "hours" ? hoursList : minutesList).map((val) => {
-              const angleDeg = clockMode === "hours" ? (val % 12) * 30 : val * 6;
-              const angleRad = (angleDeg - 90) * (Math.PI / 180);
-              const radius = 86; // px radius from center
-              const x = radius * Math.cos(angleRad);
-              const y = radius * Math.sin(angleRad);
-
-              const hVal = val === 0 ? 12 : val;
-              const isAvailable =
-                availableSlots.length === 0 ||
-                (clockMode === "hours"
-                  ? availableHoursForPeriod.has(hVal)
-                  : availableMinutesForHour.has(val));
-
-              const isSelected =
-                clockMode === "hours"
-                  ? hour === hVal
-                  : minute === val;
-
-              return (
-                <button
-                  key={val}
-                  type="button"
-                  disabled={!isAvailable}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isAvailable) return;
-                    if (clockMode === "hours") {
-                      handleHourSelect(hVal);
-                    } else {
-                      handleMinuteSelect(val);
-                    }
-                  }}
-                  className={`absolute h-8 w-8 rounded-full flex items-center justify-center text-xs transition-all z-20 ${
-                    isSelected
-                      ? "bg-[#414E36] text-white font-bold scale-110 shadow-xs cursor-pointer"
-                      : isAvailable
-                      ? "text-[#1F251A] hover:bg-[#414E36]/15 font-semibold cursor-pointer"
-                      : "text-gray-400 opacity-25 cursor-not-allowed pointer-events-none"
-                  }`}
-                  style={{
-                    transform: `translate(${x}px, ${y}px)`,
-                  }}
-                >
-                  {clockMode === "hours" ? val : String(val).padStart(2, "0")}
-                </button>
-              );
-            })}
-          </div>
+          {/* Evening Slots */}
+          {groupedSlots.evening.length > 0 && (
+            <div>
+              <p className="text-[11px] font-bold text-[#5A6A51] uppercase tracking-wider mb-2">
+                {isRTL ? "المساء" : "Evening"}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {groupedSlots.evening.map((slot) => {
+                  const isSelected = selectedTime === slot;
+                  const slot24 = normaliseTo24hSlot(slot);
+                  const isTaken = takenSlots.includes(slot24);
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      disabled={isTaken}
+                      onClick={() => !isTaken && onSelectTime(slot)}
+                      className={`rounded-xl py-2.5 px-2 text-center text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-[#414E36] text-white shadow-sm scale-[1.02]"
+                          : isTaken
+                          ? "bg-gray-200/60 text-gray-400 opacity-40 cursor-not-allowed"
+                          : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36] hover:bg-[#414E36]/10"
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        /* Available Slots Quick Grid View */
-        <div className="py-2">
-          <p className="text-xs font-semibold text-[#5A6A51] mb-2">
-            {isRTL ? "المواعيد المتاحة:" : "Available Time Slots:"}
+        <div className="py-8 text-center bg-white/60 rounded-2xl border border-[#414E36]/10">
+          <p className="text-xs text-[#5A6A51] font-medium">
+            {isRTL
+              ? "اختر تاريخاً أولاً لرؤية المواعيد المتاحة"
+              : "Select a date to view available time slots"}
           </p>
-          <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto custom-scrollbar p-1">
-            {availableSlots.length > 0 ? (
-              availableSlots.map((slot) => {
-                const isSelected = selectedTime === slot;
-                return (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => onSelectTime(slot)}
-                    className={`rounded-xl py-2 px-1 text-center text-xs font-bold transition-all cursor-pointer ${
-                      isSelected
-                        ? "bg-[#414E36] text-white shadow-xs"
-                        : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36] hover:bg-[#414E36]/5"
-                    }`}
-                  >
-                    {slot}
-                  </button>
-                );
-              })
-            ) : (
-              <p className="col-span-3 text-center text-xs text-[#5A6A51] py-6">
-                {isRTL ? "اختر تاريخاً أولاً لرؤية المواعيد" : "Select a date to view slots"}
-              </p>
-            )}
-          </div>
         </div>
       )}
-
-      {/* Mode Switcher Button Footer (Keyboard Icon on bottom left) */}
-      <div className="flex items-center justify-between pt-3 mt-2 border-t border-[#414E36]/15">
-        <button
-          type="button"
-          onClick={() => setInputMode((prev) => (prev === "clock" ? "slots" : "clock"))}
-          className="p-2 rounded-full text-[#414E36] hover:bg-[#414E36]/10 transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
-          title={inputMode === "clock" ? (isRTL ? "عرض المواعيد المتاحة" : "Switch to Available Slots") : (isRTL ? "عرض الساعة" : "Switch to Clock Dial")}
-        >
-          {inputMode === "clock" ? <Keyboard size={18} /> : <Clock size={18} />}
-          <span className="text-xs">
-            {inputMode === "clock"
-              ? (isRTL ? "قائمة المواعيد" : "Slots Grid")
-              : (isRTL ? "ساعة دائرية" : "Clock Dial")}
-          </span>
-        </button>
-
-        <div className={`text-xs font-bold ${isCurrentTimeValid ? "text-[#414E36]" : "text-amber-700"}`}>
-          {selectedTime || (isRTL ? "لم يتم تحديد وقت" : "No time selected")}
-        </div>
-      </div>
     </div>
   );
 }
