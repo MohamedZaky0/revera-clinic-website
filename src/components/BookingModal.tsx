@@ -1208,7 +1208,7 @@ Attached is my payment transaction receipt photo.`;
                 </div>
 
                 {/* Terms & Conditions Gate */}
-                {(hasTerms || termsText.trim() !== "") && depositPercentage === 0 && (
+                {(hasTerms || termsText.trim() !== "") && (
                   <div className="mb-5 text-left" dir={isRTL ? "rtl" : "ltr"}>
                     <div className="rounded-2xl border border-gray-200/90 bg-white p-5 space-y-4 shadow-2xs">
                       <div className="flex items-center gap-2 text-[#2D522D] font-bold text-xs tracking-wider uppercase">
@@ -1278,7 +1278,7 @@ Attached is my payment transaction receipt photo.`;
 
                 <button
                   onClick={handleConfirm}
-                  disabled={isCreatingReservation || (depositPercentage === 0 && (hasTerms || termsText.trim() !== "") && !acceptedTerms)}
+                  disabled={isCreatingReservation || ((hasTerms || termsText.trim() !== "") && !acceptedTerms)}
                   className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
                 >
                   {isCreatingReservation ? (
@@ -1503,17 +1503,73 @@ Attached is my payment transaction receipt photo.`;
                     placeholder={selectedDepositMethod === "wallet" ? "010xxxxxxxx" : "name@instapay"} 
                     value={customerPaymentSender}
                     onChange={(e) => setCustomerPaymentSender(e.target.value)}
-                    disabled={isPaying}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36] font-medium"
                   />
                 </div>
+
+                {/* Terms & Conditions Gate on Payment Page */}
+                {(hasTerms || termsText.trim() !== "") && (
+                  <div className="mt-4 text-left" dir={isRTL ? "rtl" : "ltr"}>
+                    <div className="rounded-2xl border border-gray-200/90 bg-white p-4 space-y-3 shadow-2xs">
+                      <div className="flex items-center gap-2 text-[#2D522D] font-bold text-xs tracking-wider uppercase">
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full border border-[#2D522D]/40 text-[#2D522D]">
+                          <ShieldCheck size={13} />
+                        </div>
+                        <span>{isRTL ? "الشروط والأحكام" : "TERMS & CONDITIONS"}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 rounded-xl border border-gray-200/80 bg-[#F4F8F4] p-2.5">
+                        <span className="text-xs text-gray-600 font-normal">
+                          {isRTL ? "يرجى قراءة الشروط والأحكام قبل إتمام الدفع." : "Please read our Terms & Conditions before paying."}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowTermsModal(true)}
+                          className="flex items-center gap-1 text-xs font-semibold text-[#2D522D] underline shrink-0 cursor-pointer"
+                        >
+                          <span>{isRTL ? "عرض" : "View"}</span>
+                          <ExternalLink size={12} />
+                        </button>
+                      </div>
+
+                      <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <div className="relative flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={acceptedTerms}
+                            onChange={(e) => setAcceptedTerms(e.target.checked)}
+                            className="peer h-4 w-4 appearance-none rounded border-2 border-gray-300 bg-white checked:border-[#2D522D] checked:bg-[#2D522D] focus:outline-none transition cursor-pointer"
+                          />
+                          <svg
+                            className="pointer-events-none absolute left-0.5 top-0.5 hidden h-3 w-3 stroke-white peer-checked:block"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth="3.5"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                        <span className="text-xs text-gray-800 font-normal">
+                          {isRTL ? "لقد قرأت وأوافق على " : "I have read and agree to the "}
+                          <button
+                            type="button"
+                            onClick={() => setShowTermsModal(true)}
+                            className="font-semibold text-[#2D522D] underline hover:opacity-80 cursor-pointer"
+                          >
+                            {isRTL ? "الشروط والأحكام" : "Terms & Conditions"}
+                          </button>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )}
 
                 {/* Submit Deposit Button */}
                 <div className="pt-2 space-y-2">
                   <button
                     type="button"
                     onClick={handlePayDeposit}
-                    disabled={isPaying}
+                    disabled={isPaying || ((hasTerms || termsText.trim() !== "") && !acceptedTerms)}
                     className="w-full justify-center rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-extrabold text-white bg-[#414E36] transition shadow-md flex items-center justify-center gap-2 hover:bg-[#2e3a26] disabled:opacity-50 cursor-pointer"
                   >
                     {isPaying ? (
