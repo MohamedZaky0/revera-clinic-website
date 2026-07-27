@@ -83,7 +83,7 @@ export function MaterialDatePicker({
     setViewDate(new Date(year, month + 1, 1));
   };
 
-  // Header display string e.g. "Mon, Aug 17"
+  // Header display string e.g. "Thu, Jul 30"
   const formattedHeaderDate = useMemo(() => {
     const target = selectedDate || today;
     return target.toLocaleDateString(isRTL ? "ar-EG" : "en-US", {
@@ -100,24 +100,24 @@ export function MaterialDatePicker({
 
   return (
     <div
-      className="w-full max-w-sm rounded-[28px] p-5 shadow-sm transition-all"
+      className="w-full max-w-md rounded-[28px] p-5 shadow-xs transition-all"
       style={{
-        backgroundColor: "#F3EFF7", // Soft MD3 container background
-        border: "1px solid rgba(65, 78, 54, 0.12)",
+        backgroundColor: "#EDF1EC", // Revera light brand background (secondary token)
+        border: "1px solid rgba(65, 78, 54, 0.18)",
       }}
       dir={isRTL ? "rtl" : "ltr"}
     >
       {/* Header Title */}
-      <p className="text-xs font-medium tracking-wide text-gray-600 mb-1">
+      <p className="text-xs font-semibold tracking-wide mb-1" style={{ color: "#5A6A51" }}>
         {isRTL ? "اختر التاريخ" : "Select date"}
       </p>
 
       {/* Main Selected Date Display with Edit Icon */}
-      <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-300/60">
-        <h2 className="text-2xl font-semibold tracking-tight text-[#1F251A]">
+      <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-[#414E36]/15">
+        <h2 className="text-2xl font-bold tracking-tight" style={{ color: "#414E36" }}>
           {formattedHeaderDate}
         </h2>
-        <div className="p-1.5 rounded-full text-gray-600 hover:bg-black/5 transition cursor-pointer">
+        <div className="p-1.5 rounded-full text-[#414E36] hover:bg-[#414E36]/10 transition cursor-pointer">
           <Edit2 size={18} />
         </div>
       </div>
@@ -125,7 +125,7 @@ export function MaterialDatePicker({
       {/* Month Switcher Navigation Bar */}
       <div className="flex items-center justify-between mb-4 px-1">
         <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold text-[#1F251A]">
+          <span className="text-sm font-bold" style={{ color: "#414E36" }}>
             {isRTL ? `${monthNamesAR[month]} ${year}` : `${monthNamesEN[month]} ${year}`}
           </span>
         </div>
@@ -134,7 +134,7 @@ export function MaterialDatePicker({
             type="button"
             onClick={handlePrevMonth}
             disabled={isPrevDisabled}
-            className="p-1.5 rounded-full text-gray-700 hover:bg-black/5 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
+            className="p-1.5 rounded-full text-[#414E36] hover:bg-[#414E36]/10 disabled:opacity-30 disabled:pointer-events-none transition cursor-pointer"
             aria-label="Previous month"
           >
             {isRTL ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -142,7 +142,7 @@ export function MaterialDatePicker({
           <button
             type="button"
             onClick={handleNextMonth}
-            className="p-1.5 rounded-full text-gray-700 hover:bg-black/5 transition cursor-pointer"
+            className="p-1.5 rounded-full text-[#414E36] hover:bg-[#414E36]/10 transition cursor-pointer"
             aria-label="Next month"
           >
             {isRTL ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
@@ -151,7 +151,7 @@ export function MaterialDatePicker({
       </div>
 
       {/* Days of Week Header */}
-      <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-600 mb-2">
+      <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold mb-2" style={{ color: "#5A6A51" }}>
         {(isRTL ? weekdaysAR : weekdaysEN).map((day, i) => (
           <div key={i} className="py-1">
             {day}
@@ -185,12 +185,12 @@ export function MaterialDatePicker({
                 onClick={() => !isDisabled && onSelectDate(item.date!)}
                 className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-medium transition-all ${
                   isSelected
-                    ? "bg-[#414E36] text-white font-bold shadow-xs scale-105"
+                    ? "bg-[#414E36] text-white font-bold shadow-sm scale-105"
                     : isToday
-                    ? "border-2 border-[#414E36] text-[#414E36] font-bold"
+                    ? "border-2 border-[#414E36] text-[#414E36] font-bold bg-white"
                     : isDisabled
-                    ? "text-gray-400 opacity-40 cursor-not-allowed"
-                    : "text-gray-800 hover:bg-[#EDF1EC] hover:text-[#414E36]"
+                    ? "text-[#414E36]/30 opacity-40 cursor-not-allowed"
+                    : "text-[#1F251A] hover:bg-[#414E36]/15 hover:text-[#414E36] font-semibold"
                 }`}
               >
                 {item.date.getDate()}

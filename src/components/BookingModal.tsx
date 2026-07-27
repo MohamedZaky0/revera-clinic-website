@@ -1055,28 +1055,24 @@ Attached is my payment transaction receipt photo.`;
                     <p className="mb-4 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
                       {isRTL ? "اختر التاريخ والوقت المناسب" : "Select Date & Time"}
                     </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                    <div className="flex flex-col items-center gap-6 w-full max-w-md mx-auto">
                       {/* Date Picker */}
-                      <div className="flex justify-center md:justify-start">
-                        <MaterialDatePicker
-                          selectedDate={selectedDate}
-                          onSelectDate={setSelectedDate}
-                          disabledDates={disabledDates}
-                          isClosedDay={(d) => getDayOperatingHours(d).start === "23:59"}
-                          isRTL={isRTL}
-                        />
-                      </div>
+                      <MaterialDatePicker
+                        selectedDate={selectedDate}
+                        onSelectDate={setSelectedDate}
+                        disabledDates={disabledDates}
+                        isClosedDay={(d) => getDayOperatingHours(d).start === "23:59"}
+                        isRTL={isRTL}
+                      />
 
                       {/* Time Picker */}
-                      <div className="flex justify-center md:justify-end">
-                        <MaterialTimePicker
-                          selectedTime={selectedTime}
-                          onSelectTime={setSelectedTime}
-                          availableSlots={filteredTimeSlots}
-                          takenSlots={takenSlots}
-                          isRTL={isRTL}
-                        />
-                      </div>
+                      <MaterialTimePicker
+                        selectedTime={selectedTime}
+                        onSelectTime={setSelectedTime}
+                        availableSlots={filteredTimeSlots}
+                        takenSlots={takenSlots}
+                        isRTL={isRTL}
+                      />
                     </div>
                   </div>
                 )}

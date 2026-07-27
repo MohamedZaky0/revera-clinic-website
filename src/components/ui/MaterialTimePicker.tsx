@@ -62,7 +62,6 @@ export function MaterialTimePicker({
   const handleHourSelect = (h: number) => {
     setHour(h);
     updateTime(h, minute, ampm);
-    // Auto switch to minutes mode after selecting hour
     setClockMode("minutes");
   };
 
@@ -100,7 +99,6 @@ export function MaterialTimePicker({
     const dx = clientX - centerX;
     const dy = clientY - centerY;
 
-    // Angle in degrees clockwise from 12 o'clock (0 deg)
     let deg = (Math.atan2(dy, dx) * (180 / Math.PI)) + 90;
     if (deg < 0) deg += 360;
 
@@ -111,7 +109,6 @@ export function MaterialTimePicker({
     } else {
       let selectedM = Math.round(deg / 6);
       if (selectedM === 60) selectedM = 0;
-      // Round to nearest 5 or 15 mins for clinic usability
       const roundedM = Math.round(selectedM / 15) * 15 % 60;
       handleMinuteSelect(roundedM);
     }
@@ -122,45 +119,45 @@ export function MaterialTimePicker({
 
   return (
     <div
-      className="w-full max-w-sm rounded-[28px] p-5 shadow-sm transition-all"
+      className="w-full max-w-md rounded-[28px] p-5 shadow-xs transition-all"
       style={{
-        backgroundColor: "#F3EFF7", // Soft MD3 container background
-        border: "1px solid rgba(65, 78, 54, 0.12)",
+        backgroundColor: "#EDF1EC", // Revera light brand background (secondary token)
+        border: "1px solid rgba(65, 78, 54, 0.18)",
       }}
       dir={isRTL ? "rtl" : "ltr"}
     >
       {/* Header Label */}
-      <p className="text-xs font-medium tracking-wide text-gray-600 mb-3">
+      <p className="text-xs font-semibold tracking-wide mb-3" style={{ color: "#5A6A51" }}>
         {isRTL ? "اختر الوقت" : "Select time"}
       </p>
 
       {/* Digital Display Header (HH : MM + AM/PM) */}
       <div className="flex items-center justify-between mb-5 px-1">
-        <div className="flex items-center gap-2" dir="ltr">
+        <div className="flex items-center gap-2.5" dir="ltr">
           {/* Hour Box */}
           <button
             type="button"
             onClick={() => setClockMode("hours")}
-            className={`flex h-16 w-20 items-center justify-center rounded-2xl text-3xl font-normal transition-all ${
+            className={`flex h-16 w-20 items-center justify-center rounded-2xl text-3xl font-bold transition-all cursor-pointer ${
               clockMode === "hours"
-                ? "bg-[#D0BCFF]/40 text-[#1D192B] ring-2 ring-[#414E36] font-semibold"
-                : "bg-white/80 text-gray-900 border border-gray-200"
+                ? "bg-[#414E36] text-white ring-2 ring-[#414E36] shadow-sm"
+                : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36]"
             }`}
           >
             {String(hour).padStart(2, "0")}
           </button>
 
           {/* Separator */}
-          <span className="text-3xl font-light text-gray-800 animate-pulse">:</span>
+          <span className="text-3xl font-extrabold text-[#414E36] animate-pulse">:</span>
 
           {/* Minute Box */}
           <button
             type="button"
             onClick={() => setClockMode("minutes")}
-            className={`flex h-16 w-20 items-center justify-center rounded-2xl text-3xl font-normal transition-all ${
+            className={`flex h-16 w-20 items-center justify-center rounded-2xl text-3xl font-bold transition-all cursor-pointer ${
               clockMode === "minutes"
-                ? "bg-[#D0BCFF]/40 text-[#1D192B] ring-2 ring-[#414E36] font-semibold"
-                : "bg-white/80 text-gray-900 border border-gray-200"
+                ? "bg-[#414E36] text-white ring-2 ring-[#414E36] shadow-sm"
+                : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36]"
             }`}
           >
             {String(minute).padStart(2, "0")}
@@ -168,26 +165,26 @@ export function MaterialTimePicker({
         </div>
 
         {/* AM / PM Stack Toggle Pill */}
-        <div className="flex flex-col rounded-xl border border-gray-300 bg-white/70 overflow-hidden shadow-2xs">
+        <div className="flex flex-col rounded-xl border border-[#414E36]/20 bg-white overflow-hidden shadow-2xs">
           <button
             type="button"
             onClick={() => handleAmpmToggle("AM")}
-            className={`px-3 py-1.5 text-xs font-bold transition-all ${
+            className={`px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
               ampm === "AM"
-                ? "bg-[#E8DEF8] text-[#1D192B]"
-                : "text-gray-600 hover:bg-black/5"
+                ? "bg-[#414E36] text-white"
+                : "text-[#5A6A51] hover:bg-[#414E36]/10"
             }`}
           >
             AM
           </button>
-          <div className="h-px bg-gray-200" />
+          <div className="h-px bg-[#414E36]/15" />
           <button
             type="button"
             onClick={() => handleAmpmToggle("PM")}
-            className={`px-3 py-1.5 text-xs font-bold transition-all ${
+            className={`px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
               ampm === "PM"
-                ? "bg-[#E8DEF8] text-[#1D192B]"
-                : "text-gray-600 hover:bg-black/5"
+                ? "bg-[#414E36] text-white"
+                : "text-[#5A6A51] hover:bg-[#414E36]/10"
             }`}
           >
             PM
@@ -202,10 +199,10 @@ export function MaterialTimePicker({
           <div
             ref={dialRef}
             onClick={handleDialClick}
-            className="relative h-56 w-56 rounded-full bg-[#E6E1E5]/70 flex items-center justify-center cursor-pointer select-none touch-none shadow-inner"
+            className="relative h-56 w-56 rounded-full bg-white/90 border border-[#414E36]/15 flex items-center justify-center cursor-pointer select-none touch-none shadow-inner"
           >
             {/* Center Pivot Point */}
-            <div className="absolute h-3 w-3 rounded-full bg-[#414E36] z-20 shadow-xs" />
+            <div className="absolute h-3.5 w-3.5 rounded-full bg-[#414E36] z-20 shadow-xs" />
 
             {/* Pointer Hand Vector Line */}
             <div
@@ -218,7 +215,6 @@ export function MaterialTimePicker({
 
             {/* Radial Numbers */}
             {(clockMode === "hours" ? hoursList : minutesList).map((val) => {
-              // Calculate positioning around 220px dial
               const angleDeg = clockMode === "hours" ? (val % 12) * 30 : val * 6;
               const angleRad = (angleDeg - 90) * (Math.PI / 180);
               const radius = 86; // px radius from center
@@ -242,10 +238,10 @@ export function MaterialTimePicker({
                       handleMinuteSelect(val);
                     }
                   }}
-                  className={`absolute h-8 w-8 rounded-full flex items-center justify-center text-xs transition-all z-20 ${
+                  className={`absolute h-8 w-8 rounded-full flex items-center justify-center text-xs transition-all z-20 cursor-pointer ${
                     isSelected
                       ? "bg-[#414E36] text-white font-bold scale-110 shadow-xs"
-                      : "text-gray-800 hover:bg-black/10 font-medium"
+                      : "text-[#1F251A] hover:bg-[#414E36]/15 font-semibold"
                   }`}
                   style={{
                     transform: `translate(${x}px, ${y}px)`,
@@ -260,10 +256,10 @@ export function MaterialTimePicker({
       ) : (
         /* Available Slots Quick Grid View */
         <div className="py-2">
-          <p className="text-[11px] font-semibold text-gray-600 mb-2">
+          <p className="text-xs font-semibold text-[#5A6A51] mb-2">
             {isRTL ? "المواعيد المتاحة:" : "Available Time Slots:"}
           </p>
-          <div className="grid grid-cols-3 gap-2 max-h-52 overflow-y-auto custom-scrollbar p-1">
+          <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto custom-scrollbar p-1">
             {availableSlots.length > 0 ? (
               availableSlots.map((slot) => {
                 const isSelected = selectedTime === slot;
@@ -272,10 +268,10 @@ export function MaterialTimePicker({
                     key={slot}
                     type="button"
                     onClick={() => onSelectTime(slot)}
-                    className={`rounded-xl py-2 px-1 text-center text-xs font-semibold transition-all ${
+                    className={`rounded-xl py-2 px-1 text-center text-xs font-bold transition-all cursor-pointer ${
                       isSelected
                         ? "bg-[#414E36] text-white shadow-xs"
-                        : "bg-white text-[#414E36] border border-gray-300 hover:border-[#414E36]"
+                        : "bg-white text-[#414E36] border border-[#414E36]/20 hover:border-[#414E36] hover:bg-[#414E36]/5"
                     }`}
                   >
                     {slot}
@@ -283,7 +279,7 @@ export function MaterialTimePicker({
                 );
               })
             ) : (
-              <p className="col-span-3 text-center text-xs text-gray-500 py-6">
+              <p className="col-span-3 text-center text-xs text-[#5A6A51] py-6">
                 {isRTL ? "اختر تاريخاً أولاً لرؤية المواعيد" : "Select a date to view slots"}
               </p>
             )}
@@ -292,22 +288,22 @@ export function MaterialTimePicker({
       )}
 
       {/* Mode Switcher Button Footer (Keyboard Icon on bottom left) */}
-      <div className="flex items-center justify-between pt-3 mt-2 border-t border-gray-300/60">
+      <div className="flex items-center justify-between pt-3 mt-2 border-t border-[#414E36]/15">
         <button
           type="button"
           onClick={() => setInputMode((prev) => (prev === "clock" ? "slots" : "clock"))}
-          className="p-2 rounded-full text-[#414E36] hover:bg-black/5 transition cursor-pointer flex items-center gap-1.5 text-xs font-medium"
+          className="p-2 rounded-full text-[#414E36] hover:bg-[#414E36]/10 transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
           title={inputMode === "clock" ? (isRTL ? "عرض المواعيد المتاحة" : "Switch to Available Slots") : (isRTL ? "عرض الساعة" : "Switch to Clock Dial")}
         >
           {inputMode === "clock" ? <Keyboard size={18} /> : <Clock size={18} />}
-          <span className="text-[11px]">
+          <span className="text-xs">
             {inputMode === "clock"
               ? (isRTL ? "قائمة المواعيد" : "Slots Grid")
               : (isRTL ? "ساعة دائرية" : "Clock Dial")}
           </span>
         </button>
 
-        <div className="text-[11px] font-semibold text-[#414E36]">
+        <div className="text-xs font-bold text-[#414E36]">
           {selectedTime || (isRTL ? "لم يتم تحديد وقت" : "No time selected")}
         </div>
       </div>
