@@ -1060,6 +1060,46 @@ confirm `current_pulse_count` increased by `pulses_per_session`.
 
 ---
 
+## RISK-028: A Repeat Booking Under The Same Phone Number Never Updated The Customer's Name/Email
+
+**Severity:** Medium · **Type:** Data integrity
+**Found:** 2026-07-27, by the user's own manual test booking not appearing findable by name in the
+Customers list · **RESOLVED 2026-07-27**
+
+**Root cause:** `POST /api/reservations`'s "Lookup or create customer profile" step
+(`src/app/api/reservations/route.ts`) matches an existing customer by **phone number only**. When
+a match is found, it incremented `number_of_bookings` — but never touched `name` or `email`. Real,
+live-queried data caught this directly: two bookings under phone `01234567890`, first as "Hamada
+Meeting" (`214321421489127@gmail.com`), later as "Test Botox Product"
+(`12842184712@gmail.com`). Both reservations correctly recorded their own name/email and correctly
+linked to the same `customer_id` — but the `customers` row itself stayed frozen as "Hamada Meeting"
+forever, because only the *first* booking under that phone ever wrote to it. Searching the
+Customers list (or the Sell Product patient picker) for "Test Botox Product" found nothing, even
+though a real, current booking for that name clearly existed — because the underlying customer
+record was never told about it.
+
+**Not a missing-customer bug — a stale-customer bug.** The customer row existed the whole time
+(confirmed via direct query); it just displayed outdated information no search for the *new* name
+would ever match.
+
+**Fix:** the update now also sets `name`/`email` to the current booking's values whenever an
+existing customer is matched by phone — the same "phone is the identity anchor, most recent booking
+wins" model `isOwnIdentity()` (DEC-029) already uses for authorization, now applied consistently to
+what gets displayed too.
+
+**Known, accepted trade-off — not fixed, inherent to phone-as-identity:** if two different real
+people genuinely share one phone number (a common household pattern), whichever books more recently
+now overwrites the other's name/email on the shared customer record. This is not a new flaw
+introduced by this fix — the system already treats one phone number as one customer identity
+everywhere else (`isOwnIdentity`, the lookup itself); this fix just makes the record's *displayed*
+fields consistent with that existing model instead of silently drifting from it.
+
+**Verify:** `npx tsc --noEmit`, `npx eslint`, `npx next build` all clean. Book twice with the same
+phone number under two different names; confirm the customer record's `name`/`email` reflect the
+second booking, not the first.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:

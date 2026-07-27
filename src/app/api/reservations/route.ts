@@ -467,7 +467,7 @@ export async function POST(req: Request) {
     try {
       const { data: customer, error: customerError } = await supabaseServer
         .from('customers')
-        .select('id, number_of_bookings')
+        .select('id, number_of_bookings, name, email')
         .eq('mobile', phone)
         .maybeSingle();
 
@@ -478,9 +478,19 @@ export async function POST(req: Request) {
       if (customer) {
         customerId = customer.id;
         const newBookings = (customer.number_of_bookings || 0) + 1;
+        // Phone is the identity anchor here (same fallback isOwnIdentity() uses), but until now
+        // only number_of_bookings refreshed on a repeat booking — name/email stayed frozen at
+        // whatever the *first* booking under this phone number entered. A patient rebooking under
+        // a corrected name (or a different family member using the same phone) would silently
+        // never see it reflected on the customer record, making them impossible to find by name
+        // in the admin's Customers list even though their booking clearly shows the new name.
         await supabaseServer
           .from('customers')
-          .update({ number_of_bookings: newBookings })
+          .update({
+            number_of_bookings: newBookings,
+            name: name || customer.name,
+            email: email || customer.email,
+          })
           .eq('id', customerId);
       } else {
         const { data: newCustomer, error: createError } = await supabaseServer
