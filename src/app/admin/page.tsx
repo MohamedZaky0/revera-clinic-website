@@ -4,14 +4,12 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
-import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, normaliseTo24hSlot, getEffectiveServicePrice } from "@/lib/services";
+import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, normaliseTo24hSlot, getEffectiveServicePrice } from "@/lib/services";
 import { 
   getServiceToggles, 
   setServiceToggle, 
   getDynamicCategories, 
-  saveDynamicCategories, 
-  getDynamicServices, 
-  saveDynamicServices,
+  saveDynamicCategories,
   LocalCategory 
 } from "@/lib/serviceStore";
 import { compressImage } from "@/lib/image";
@@ -629,6 +627,63 @@ export default function AdminPage() {
     "Content-Type": "application/json",
     "Authorization": `Bearer ${session?.access_token || ""}`
   };
+
+  // Service CRUD helpers — services are now database-primary, not localStorage (RISK-025)
+  const loadServicesFromApi = useCallback(async () => {
+    if (!session?.access_token) return;
+    try {
+      const res = await fetch("/api/services", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        console.error("Failed to load services from API:", res.status, await res.text());
+        return;
+      }
+      const data = await res.json();
+      setLocalServices(Array.isArray(data) ? data : []);
+      const storedToggles = getServiceToggles();
+      const defaults = Object.fromEntries((Array.isArray(data) ? data : []).map((s: ServiceItem) => [s.id, { visible: true, active: true }]));
+      setServiceToggles({ ...defaults, ...storedToggles });
+    } catch (err) {
+      console.error("Error loading services from API:", err);
+    }
+  }, [session?.access_token]);
+
+  const syncServicesToApi = useCallback(async (services: ServiceItem[]) => {
+    if (!session?.access_token) return null;
+    try {
+      const res = await fetch("/api/services", {
+        method: "POST",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify(services),
+      });
+      if (!res.ok) {
+        console.error("Failed to save services to API:", res.status, await res.text());
+        return null;
+      }
+      const data = await res.json();
+      return Array.isArray(data) ? data : [data];
+    } catch (err) {
+      console.error("Error saving services to API:", err);
+      return null;
+    }
+  }, [session?.access_token, authenticatedJsonHeaders]);
+
+  const deleteServiceFromApi = useCallback(async (id: number) => {
+    if (!session?.access_token) return false;
+    try {
+      const res = await fetch(`/api/services?id=${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      return res.ok;
+    } catch (err) {
+      console.error("Error deleting service from API:", err);
+      return false;
+    }
+  }, [session?.access_token]);
+
   // Inactivity Settings State
   const [inactivityThreshold, setInactivityThreshold] = useState<number>(30);
   const [inactivityCountdown, setInactivityCountdown] = useState<number>(10);
@@ -751,7 +806,7 @@ export default function AdminPage() {
     const clean = time12.trim().toUpperCase();
     const match = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
     if (!match) return "09:00";
-    let [_, hoursStr, minutesStr, ampm] = match;
+    const [_, hoursStr, minutesStr, ampm] = match;
     let hours = parseInt(hoursStr, 10);
     if (ampm === "PM" && hours < 12) hours += 12;
     if (ampm === "AM" && hours === 12) hours = 0;
@@ -1413,6 +1468,7 @@ export default function AdminPage() {
   const [serviceNameAr, setServiceNameAr] = useState("");
   const [serviceCategory, setServiceCategory] = useState("");
   const [serviceDuration, setServiceDuration] = useState("1:00 Hours");
+  const [serviceDurationMinutes, setServiceDurationMinutes] = useState<number>(60);
   const [serviceUnitType, setServiceUnitType] = useState("both");
   const [serviceDescEn, setServiceDescEn] = useState("");
   const [serviceDescAr, setServiceDescAr] = useState("");
@@ -1457,6 +1513,7 @@ export default function AdminPage() {
     setServiceNameEn(svc.en);
     setServiceNameAr(svc.ar || "");
     setServiceDuration(svc.duration || "1:00 Hours");
+    setServiceDurationMinutes(getServiceDurationMinutes(svc));
     let unitTypeVal = svc.unit || "both";
     if (unitTypeVal !== "in_clinic" && unitTypeVal !== "online" && unitTypeVal !== "both") {
       unitTypeVal = "both";
@@ -1528,7 +1585,7 @@ export default function AdminPage() {
     return "active";
   };
 
-  const handleSavePromotion = () => {
+  const handleSavePromotion = async () => {
     if ((promoServiceIds.length === 0 && !editingPromo) || promoBranchNames.length === 0) return;
 
     const promoObj = {
@@ -1549,7 +1606,7 @@ export default function AdminPage() {
     const updatedServices = localServices.map(svc => {
       if (serviceIdsToUpdate.includes(svc.id)) {
         // Build branchPricing: use existing or create entry from global branches
-        let bpArray = svc.branchPricing && svc.branchPricing.length > 0
+        const bpArray = svc.branchPricing && svc.branchPricing.length > 0
           ? [...svc.branchPricing]
           : branches.map(b => ({ name: b.name_en, price: svc.price ?? 0, visible: true, status: true, isDefault: false }));
 
@@ -1573,7 +1630,7 @@ export default function AdminPage() {
     });
 
     setLocalServices(updatedServices);
-    saveDynamicServices(updatedServices);
+    await syncServicesToApi(updatedServices);
     setShowAddPromoModal(false);
 
     // Reset form states
@@ -1587,7 +1644,7 @@ export default function AdminPage() {
     setEditingPromo(null);
   };
 
-  const handleDeletePromotion = (serviceId: number, branchName: string) => {
+  const handleDeletePromotion = async (serviceId: number, branchName: string) => {
     const updatedServices = localServices.map(svc => {
       if (svc.id === serviceId) {
         const updatedBranchPricing = (svc.branchPricing || []).map(bp => {
@@ -1606,10 +1663,10 @@ export default function AdminPage() {
     });
 
     setLocalServices(updatedServices);
-    saveDynamicServices(updatedServices);
+    await syncServicesToApi(updatedServices);
   };
 
-  const handleTogglePromotion = (serviceId: number, branchName: string, currentEnabled: boolean) => {
+  const handleTogglePromotion = async (serviceId: number, branchName: string, currentEnabled: boolean) => {
     const updatedServices = localServices.map(svc => {
       if (svc.id === serviceId) {
         const updatedBranchPricing = (svc.branchPricing || []).map(bp => {
@@ -1633,7 +1690,7 @@ export default function AdminPage() {
     });
 
     setLocalServices(updatedServices);
-    saveDynamicServices(updatedServices);
+    await syncServicesToApi(updatedServices);
   };
 
   const handleOpenEditPromo = (promo: any) => {
@@ -1648,7 +1705,7 @@ export default function AdminPage() {
     setShowAddPromoModal(true);
   };
 
-  const handleReorderServices = (draggedId: number, targetId: number) => {
+  const handleReorderServices = async (draggedId: number, targetId: number) => {
     const draggedSvc = localServices.find(s => s.id === draggedId);
     const targetSvc = localServices.find(s => s.id === targetId);
     if (!draggedSvc || !targetSvc || draggedSvc.cat !== targetSvc.cat) return;
@@ -1680,7 +1737,7 @@ export default function AdminPage() {
     });
 
     setLocalServices(sortedAllServices);
-    saveDynamicServices(sortedAllServices);
+    await syncServicesToApi(sortedAllServices);
   };
 
   // Category drag and drop states
@@ -1708,14 +1765,18 @@ export default function AdminPage() {
   function toggleCategoryExpand(cat: string) {
     setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
   }
-  function removeCategory(catKey: string) {
+  async function removeCategory(catKey: string) {
+    const removedServiceIds = localServices.filter(s => s.cat === catKey).map(s => s.id);
+
     const updatedCats = localCategories.filter(c => c.key !== catKey);
     setLocalCategories(updatedCats);
     saveDynamicCategories(updatedCats);
 
     const updatedSvcs = localServices.filter(s => s.cat !== catKey);
     setLocalServices(updatedSvcs);
-    saveDynamicServices(updatedSvcs);
+
+    await Promise.all(removedServiceIds.map(id => deleteServiceFromApi(id)));
+    await loadServicesFromApi();
 
     setExpandedCategories(prev => {
       const copy = { ...prev };
@@ -3098,20 +3159,18 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    const svcs = getDynamicServices();
     const cats = getDynamicCategories();
-    setLocalServices(svcs);
     setLocalCategories(cats);
-    
+
     // Set all categories expanded by default
     const exp: Record<string, boolean> = {};
     cats.forEach(c => { exp[c.key] = true; });
     setExpandedCategories(exp);
-
-    const storedToggles = getServiceToggles();
-    const defaults = Object.fromEntries(svcs.map((s) => [s.id, { visible: true, active: true }]));
-    setServiceToggles({ ...defaults, ...storedToggles });
   }, []);
+
+  useEffect(() => {
+    if (session?.access_token) loadServicesFromApi();
+  }, [session?.access_token, loadServicesFromApi]);
   // BRANCHES is now derived from the real branches state loaded from Supabase
 
   const hasAccessToActiveNav = useMemo(() => {
@@ -8277,6 +8336,7 @@ export default function AdminPage() {
                               setServiceNameEn("");
                               setServiceNameAr("");
                               setServiceDuration("1:00 Hours");
+                              setServiceDurationMinutes(60);
                               setServiceUnitType("both");
                               setServiceDescEn("");
                               setServiceDescAr("");
@@ -8555,11 +8615,12 @@ export default function AdminPage() {
                         Cancel
                       </button>
                       <button
-                        onClick={() => {
-                          const updated = localServices.filter(s => s.id !== deleteServiceTarget.id);
-                          setLocalServices(updated);
-                          saveDynamicServices(updated);
+                        onClick={async () => {
                           setDeleteServiceTarget(null);
+                          const ok = await deleteServiceFromApi(deleteServiceTarget.id);
+                          if (ok) {
+                            await loadServicesFromApi();
+                          }
                         }}
                         className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
                       >
@@ -8732,7 +8793,11 @@ export default function AdminPage() {
                           </label>
                           <select
                             value={serviceDuration}
-                            onChange={(e) => setServiceDuration(e.target.value)}
+                            onChange={(e) => {
+                              const text = e.target.value;
+                              setServiceDuration(text);
+                              setServiceDurationMinutes(getDurationInMinutes(text));
+                            }}
                             className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                           >
                             <option value="0:15 Hours">0:15 Hours</option>
@@ -8744,6 +8809,28 @@ export default function AdminPage() {
                             <option value="2:30 Hours">2:30 Hours</option>
                             <option value="3:00 Hours">3:00 Hours</option>
                           </select>
+                        </div>
+
+                        {/* Duration (minutes) */}
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
+                            Duration (minutes) <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={1440}
+                            value={serviceDurationMinutes}
+                            onChange={(e) => {
+                              const minutes = Number(e.target.value) || 0;
+                              setServiceDurationMinutes(minutes);
+                              const matches = ["0:15 Hours", "0:30 Hours", "0:45 Hours", "1:00 Hours", "1:30 Hours", "2:00 Hours", "2:30 Hours", "3:00 Hours"].find(
+                                (opt) => getDurationInMinutes(opt) === minutes
+                              );
+                              if (matches) setServiceDuration(matches);
+                            }}
+                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
+                          />
                         </div>
 
                         {/* Session Type */}
@@ -8897,12 +8984,19 @@ export default function AdminPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
                           if (!serviceNameEn.trim()) return;
-                          
+                          if (serviceDurationMinutes <= 0 || serviceDurationMinutes > 1440) {
+                            alert("Duration must be between 1 and 1440 minutes.");
+                            return;
+                          }
+
+                          const previousIds = new Set(localServices.map(s => s.id));
+
+                          let updatedServices: ServiceItem[];
                           if (editingService) {
                             // Edit mode
-                            const updatedServices = localServices.map(s => {
+                            updatedServices = localServices.map(s => {
                               if (s.id === editingService.id) {
                                 return {
                                   ...s,
@@ -8912,6 +9006,7 @@ export default function AdminPage() {
                                   unit: serviceUnitType.toLowerCase(),
                                   price: servicePrice,
                                   duration: serviceDuration,
+                                  duration_minutes: serviceDurationMinutes,
                                   descriptionEn: serviceDescEn.trim(),
                                   descriptionAr: serviceDescAr.trim(),
                                   sortOrder: serviceSortOrder,
@@ -8923,30 +9018,17 @@ export default function AdminPage() {
                               }
                               return s;
                             });
-                            
-                            setLocalServices(updatedServices);
-                            saveDynamicServices(updatedServices);
-
-                            const defaultBranch = serviceBranchPricing.find(b => b.isDefault);
-                            if (defaultBranch) {
-                              setServiceToggle(editingService.id, "active", defaultBranch.status);
-                              setServiceToggle(editingService.id, "visible", defaultBranch.visible);
-                              setServiceToggles(prev => ({
-                                ...prev,
-                                [editingService.id]: { visible: defaultBranch.visible, active: defaultBranch.status }
-                              }));
-                            }
                           } else {
-                            // Add mode
-                            const newId = Math.max(0, ...localServices.map(s => s.id)) + 1;
-                            const newService = {
-                              id: newId,
+                            // Add mode — let the database assign the id
+                            const newService: ServiceItem = {
+                              id: 0, // placeholder, removed by the API mapper
                               en: serviceNameEn.trim(),
                               ar: serviceNameAr.trim(),
                               cat: serviceCategory,
                               unit: serviceUnitType.toLowerCase(),
                               price: servicePrice,
                               duration: serviceDuration,
+                              duration_minutes: serviceDurationMinutes,
                               descriptionEn: serviceDescEn.trim(),
                               descriptionAr: serviceDescAr.trim(),
                               sortOrder: serviceSortOrder,
@@ -8956,23 +9038,29 @@ export default function AdminPage() {
                               branchPricing: serviceBranchPricing.map(bp => ({ ...bp, price: servicePrice })),
                               createdAt: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + " " + new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true }),
                             };
-
-                            const updatedServices = [...localServices, newService];
-                            setLocalServices(updatedServices);
-                            saveDynamicServices(updatedServices);
-
-                            const defaultBranch = serviceBranchPricing.find(b => b.isDefault);
-                            const isDefaultActive = defaultBranch ? defaultBranch.status : true;
-                            const isDefaultVisible = defaultBranch ? defaultBranch.visible : true;
-                            setServiceToggle(newId, "active", isDefaultActive);
-                            setServiceToggle(newId, "visible", isDefaultVisible);
-                            setServiceToggles(prev => ({
-                              ...prev,
-                              [newId]: { visible: isDefaultVisible, active: isDefaultActive }
-                            }));
+                            updatedServices = [...localServices, newService];
                             setExpandedCategories(prev => ({ ...prev, [serviceCategory]: true }));
                           }
-                          
+
+                          const synced = await syncServicesToApi(updatedServices);
+                          if (synced) {
+                            setLocalServices(synced);
+
+                            const savedService = editingService
+                              ? synced.find(s => s.id === editingService.id)
+                              : synced.find(s => !previousIds.has(s.id));
+
+                            const defaultBranch = serviceBranchPricing.find(b => b.isDefault);
+                            if (savedService && defaultBranch) {
+                              setServiceToggle(savedService.id, "active", defaultBranch.status);
+                              setServiceToggle(savedService.id, "visible", defaultBranch.visible);
+                              setServiceToggles(prev => ({
+                                ...prev,
+                                [savedService.id]: { visible: defaultBranch.visible, active: defaultBranch.status }
+                              }));
+                            }
+                          }
+
                           setShowAddServiceModal(false);
                         }}
                         className="rounded-lg bg-[#414E36] px-6 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"

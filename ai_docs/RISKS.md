@@ -128,9 +128,9 @@ A migration at `supabase/migrations/20260722140000_enable_row_level_security.sql
 
 ---
 
-## RISK-004: localStorage as Primary Service/Category Storage
+## RISK-004: localStorage as Primary Service/Category Storage (RESOLVED via RISK-025)
 
-**Severity:** Medium → **upgraded to High 2026-07-27, see RISK-025**
+**Severity:** Medium → **High 2026-07-27** → **Resolved 2026-07-27**
 **Type:** Data integrity
 
 **Description:**
@@ -138,12 +138,14 @@ A migration at `supabase/migrations/20260722140000_enable_row_level_security.sql
 is synced only on explicit save actions. If a user opens the admin panel on a different
 browser or clears localStorage, they lose unsaved changes. The Supabase copy may be stale.
 
-**Correction 2026-07-27 — "synced only on explicit save actions" is wrong; there is no sync at
-all.** Measured while scoping Phase 3B task 3B.2: every save path in the admin Services UI calls
-`saveDynamicServices()`, which writes **only** to `localStorage`. Zero calls to
-`POST /api/services` exist anywhere in `admin/page.tsx`. This isn't "stale until saved" — it's
-permanently disconnected. See **RISK-025** for the full measurement and consequence; this entry is
-kept for history, RISK-025 is the accurate current description.
+**Correction 2026-07-27 — "synced only on explicit save actions" was wrong; there was no sync at
+all.** Measured while scoping Phase 3B task 3B.2: every save path in the admin Services UI called
+`saveDynamicServices()`, which wrote **only** to `localStorage`. Zero calls to
+`POST /api/services` existed anywhere in `admin/page.tsx`.
+
+**Resolution:** See **RISK-025**. Services are now database-primary: admin loads from and saves to
+`/api/services`, public components fetch services from the same API, and `localStorage` is used only
+for service toggles (visible/active UI state) and dynamic categories.
 
 ---
 
@@ -810,11 +812,11 @@ normally.
 
 ---
 
-## RISK-025: The Entire Admin "Services" Screen Is a Parallel Universe — It Never Talks to the Database
+## RISK-025: The Entire Admin "Services" Screen Is a Parallel Universe — It Never Talks to the Database (RESOLVED)
 
 **Severity:** High · **Type:** Data integrity / architecture
 **Found:** 2026-07-27, while scoping Phase 3B task 3B.2 (`services.duration_minutes` UI wiring) ·
-**NOT FIXED — documented for hand-off, not resolved in this session**
+**Status:** Resolved 2026-07-27
 
 ### Summary
 
@@ -906,27 +908,29 @@ number Phase 4/5 actually uses never moved. **Any Phase 3B/4/5 work that assumes
 this from the admin panel" is unverified until this is fixed**, not just for duration —
 for every field in the Services screen.
 
-### Fix options (not yet decided — pick one before touching 3B.2)
+### Resolution
 
-1. **Scoped, minimal:** make the Edit/Add Service save handlers additionally call
-   `POST /api/services` with the full service payload (not just `duration_minutes`) as a
-   **dual-write** alongside the existing `saveDynamicServices()` call — same pattern already used
-   for `inventory_products`/`inventory_devices` (`page_settings` blob + real table, both written).
-   Does not fix "read never comes from the DB" or resolve RISK-004 generally; stops new admin edits
-   from being silently lost. Smallest safe change; localStorage stays authoritative for reads until
-   a follow-up switches that too.
-2. **Full remediation:** cut Services over to be database-primary — `admin/page.tsx` fetches from
-   `GET /api/services` on load instead of `getDynamicServices()`, and every save/delete/reorder goes
-   through the real API instead of (or in addition to, during a transition) localStorage. Real fix
-   for RISK-004, but touches the ID-generation scheme (client-side `Math.max(...)+1` vs. DB
-   identity), every one of the 9 `saveDynamicServices` call sites, and needs a decision on what
-   happens to whatever's currently sitting in each browser's localStorage per admin machine.
-3. **Do nothing yet, decide later** — acceptable only if 3B.2 (and any other Phase 3B/4/5 task that
-   assumes the admin can edit service data live) is explicitly marked blocked/unverified until one
-   of the above lands. Silently proceeding with 3B.2 as originally scoped is **not** an acceptable
-   option — see "why this matters" above.
+Chosen option 2 — full database-primary cutover for services.
 
-### Verify (whichever option is chosen)
+- `src/app/api/services/route.ts` now requires `requireStaffAccess` for `POST` and `DELETE`. The
+  `POST` upsert accepts an explicit `duration_minutes` value from the admin UI, falls back to parsing
+  the legacy `duration` string when absent, and validates the value is a finite number `> 0` and
+  `<= 1440` before any database write, returning a clear 400 instead of a raw Postgres error.
+- `src/app/admin/page.tsx` loads services on mount from `GET /api/services` instead of
+  `getDynamicServices()`, and all save/add/delete/reorder operations call `POST /api/services` or
+  `DELETE /api/services` with the bearer token from the authenticated session. The service modal now
+  exposes a numeric "Duration (minutes)" input that stays in sync with the legacy duration dropdown
+  and is included in the upsert payload.
+- Client-side integer ID generation (`Math.max(...)+1`) is replaced by the database identity column;
+  new services are sent with a placeholder id and the database returns the real id.
+- `src/components/ServicesSection.tsx`, `src/components/HomeServicesSection.tsx`, and
+  `src/components/BookingModal.tsx` now fetch services from `GET /api/services` instead of reading
+  the stale `localStorage` copy, so public-facing pages reflect admin edits.
+- Service toggles (visible/active) and dynamic categories remain in `localStorage` as UI state only;
+  the authoritative service record (price, duration, branch pricing, promotions, etc.) is now the
+  database row.
+
+### Verify
 
 - `grep -n "fetch(.*\/api\/services" src/app/admin/page.tsx` returns at least one match (currently
   zero).

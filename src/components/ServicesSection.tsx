@@ -7,7 +7,6 @@ import {
   getServiceToggles, 
   isServiceActive, 
   ServiceToggleState, 
-  getDynamicServices, 
   getDynamicCategories, 
   LocalCategory 
 } from "@/lib/serviceStore";
@@ -375,15 +374,18 @@ export function ServicesSection() {
   const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>([]);
   const [dynamicCategories, setDynamicCategories] = useState<LocalCategory[]>([]);
 
-  // Sync with admin localStorage on mount and when admin changes toggles
+  // Load services from the database; categories/toggles still sync via localStorage
   useEffect(() => {
     setServiceToggles(getServiceToggles());
-    setDynamicServices(getDynamicServices());
     setDynamicCategories(getDynamicCategories());
+
+    fetch("/api/services")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setDynamicServices(Array.isArray(data) ? data : []))
+      .catch(() => setDynamicServices([]));
 
     const handleStorage = () => {
       setServiceToggles(getServiceToggles());
-      setDynamicServices(getDynamicServices());
       setDynamicCategories(getDynamicCategories());
     };
     window.addEventListener("storage", handleStorage);

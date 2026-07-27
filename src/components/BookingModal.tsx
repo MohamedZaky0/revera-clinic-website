@@ -8,7 +8,6 @@ import {
   getServiceToggles, 
   isServiceActive, 
   ServiceToggleState, 
-  getDynamicServices, 
   getDynamicCategories, 
   LocalCategory 
 } from "@/lib/serviceStore";
@@ -81,6 +80,9 @@ export function BookingModal() {
   const [step, setStep] = useState<Step>(1);
   const [selectedCategory, setSelectedCategory] = useState<Category>("dermatology");
   const [serviceId, setServiceId] = useState<number | null>(null);
+  const [serviceToggles, setServiceToggles] = useState<ServiceToggleState>({});
+  const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>([]);
+  const [dynamicCategories, setDynamicCategories] = useState<LocalCategory[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -180,10 +182,8 @@ export function BookingModal() {
       const id = detail?.serviceId ?? null;
       setServiceId(id);
       if (id) {
-        const svcs = getDynamicServices();
-        const selected = svcs.find((service) => service.id === id);
-        const cats = getDynamicCategories();
-        setSelectedCategory(selected?.cat ?? cats[0]?.key ?? "dermatology");
+        const selected = dynamicServices.find((service) => service.id === id);
+        setSelectedCategory(selected?.cat ?? dynamicCategories[0]?.key ?? "dermatology");
         if (selected) {
           let allowedType = selected.unit?.toLowerCase() || "both";
           if (allowedType !== "both" && allowedType !== "in_clinic" && allowedType !== "online") {
@@ -196,14 +196,13 @@ export function BookingModal() {
           }
         }
       } else {
-        const cats = getDynamicCategories();
-        setSelectedCategory(cats[0]?.key ?? "dermatology");
+        setSelectedCategory(dynamicCategories[0]?.key ?? "dermatology");
       }
       setOpen(true);
     };
     window.addEventListener("open-booking", handler);
     return () => window.removeEventListener("open-booking", handler);
-  }, []);
+  }, [dynamicServices, dynamicCategories]);
 
   useEffect(() => {
     if (open) {
@@ -220,11 +219,6 @@ export function BookingModal() {
       }
     }
   }, [open]);
-
-  // Sync service toggle state from admin localStorage
-  const [serviceToggles, setServiceToggles] = useState<ServiceToggleState>({});
-  const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>([]);
-  const [dynamicCategories, setDynamicCategories] = useState<LocalCategory[]>([]);
 
   // Derived from dynamicServices — must be declared before useEffects that depend on it
   const selectedService = serviceId ? dynamicServices.find((service) => service.id === serviceId) : undefined;
@@ -250,12 +244,15 @@ export function BookingModal() {
 
   useEffect(() => {
     setServiceToggles(getServiceToggles());
-    setDynamicServices(getDynamicServices());
     setDynamicCategories(getDynamicCategories());
+
+    fetch("/api/services")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setDynamicServices(Array.isArray(data) ? data : []))
+      .catch(() => setDynamicServices([]));
 
     const handleStorage = () => {
       setServiceToggles(getServiceToggles());
-      setDynamicServices(getDynamicServices());
       setDynamicCategories(getDynamicCategories());
     };
     window.addEventListener("storage", handleStorage);

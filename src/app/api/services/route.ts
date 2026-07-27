@@ -1,5 +1,37 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
+import { requireStaffAccess } from '@/lib/access';
+
+function getDurationInMinutes(duration: string | null | undefined): number | null {
+  if (!duration) return null;
+  const cleaned = duration.toLowerCase().trim();
+
+  const matchHours = cleaned.match(/(\d+):(\d+)\s*hour/);
+  if (matchHours) {
+    const hrs = parseInt(matchHours[1], 10);
+    const mins = parseInt(matchHours[2], 10);
+    return hrs * 60 + mins;
+  }
+
+  const matchMins = cleaned.match(/(\d+)\s*min/);
+  if (matchMins) {
+    return parseInt(matchMins[1], 10);
+  }
+
+  const matchOneHour = cleaned.match(/(\d+)\s*hour/);
+  if (matchOneHour) {
+    return parseInt(matchOneHour[1], 10) * 60;
+  }
+
+  const matchHHMM = cleaned.match(/^(\d+):(\d+)$/);
+  if (matchHHMM) {
+    const hrs = parseInt(matchHHMM[1], 10);
+    const mins = parseInt(matchHHMM[2], 10);
+    return hrs * 60 + mins;
+  }
+
+  return null;
+}
 
 function fmtCreatedAt(val: unknown): string {
   if (!val) return "";
@@ -22,6 +54,7 @@ function mapServiceRow(r: any) {
     price: r.price !== null ? Number(r.price) : undefined,
     sortOrder: r.sort_order,
     duration: r.duration,
+    duration_minutes: r.duration_minutes,
     descriptionEn: r.description_en,
     descriptionAr: r.description_ar,
     isShared: r.is_shared,
@@ -34,8 +67,7 @@ function mapServiceRow(r: any) {
 }
 
 function mapServiceToDb(s: any) {
-  return {
-    id: s.id,
+  const row: Record<string, any> = {
     en: s.en,
     ar: s.ar,
     img: s.img,
@@ -44,6 +76,7 @@ function mapServiceToDb(s: any) {
     price: s.price,
     sort_order: s.sortOrder,
     duration: s.duration,
+    duration_minutes: s.duration_minutes ?? getDurationInMinutes(s.duration),
     description_en: s.descriptionEn,
     description_ar: s.descriptionAr,
     is_shared: s.isShared,
@@ -52,6 +85,8 @@ function mapServiceToDb(s: any) {
     visible: s.visible !== undefined ? s.visible : true,
     active: s.active !== undefined ? s.active : true,
   };
+  if (s.id) row.id = s.id;
+  return row;
 }
 
 export async function GET(req: Request) {
@@ -70,12 +105,27 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await req.json();
-    
+
     // Check if it's an array of services (bulk update/sync) or a single service
     const isArray = Array.isArray(body);
-    const servicesToUpsert = isArray ? body.map(mapServiceToDb) : [mapServiceToDb(body)];
+    const rawServices = isArray ? body : [body];
+
+    // Validate duration before persisting so the DB constraint never leaks as a 500
+    for (const s of rawServices) {
+      const durationMinutes = s.duration_minutes ?? getDurationInMinutes(s.duration);
+      if (typeof durationMinutes !== 'number' || !Number.isFinite(durationMinutes) || durationMinutes <= 0 || durationMinutes > 1440) {
+        return NextResponse.json({ error: 'Invalid duration. duration_minutes must be a number between 1 and 1440.' }, { status: 400 });
+      }
+    }
+
+    const servicesToUpsert = rawServices.map(mapServiceToDb);
 
     const { data, error } = await getSupabaseServer()
       .from('services')
@@ -91,6 +141,11 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
