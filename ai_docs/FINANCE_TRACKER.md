@@ -2547,8 +2547,8 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 
 | ID | Task | Depends on | Status | Owner | Commit |
 |---|---|---|---|---|---|
-| 3B.0 | Repair committed merge-conflict debris in `DECISIONS.md` (corrupts DEC-027) | — | `DONE` | Claude | pending commit |
-| 3B.1 | Create `src/components/admin/` + the first module boundary (DEC-027) | — | `DONE` | Claude | pending commit |
+| 3B.0 | Repair committed merge-conflict debris in `DECISIONS.md` (corrupts DEC-027) | — | `DONE` | Claude | ef9ecff |
+| 3B.1 | Create `src/components/admin/` + the first module boundary (DEC-027) | — | `DONE` | Claude | ef9ecff |
 | 3B.2 | `services.duration_minutes`: API read/write + numeric UI field | 3B.1 | `TODO` | — | — |
 | 3B.3 | `inventory_products.role`: API read/write + UI selector | 3B.1 | `TODO` | — | — |
 | 3B.4 | `inventory_devices.lamp_replacement_cost` + rated pulses: API + UI | 3B.1 | `TODO` | — | — |
@@ -2556,8 +2556,8 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 | 3B.6 | Service device/pulses editor (`service_devices`) + endpoint | 3B.1, 3B.4 | `TODO` | — | — |
 | 3B.7 | Doctor commission: `both` option, base, fixed component (**2 duplicate forms**) | 3B.1 | `TODO` | — | — |
 | 3B.8 | Packages admin UI + `/api/packages` CRUD endpoint | 3B.1 | `TODO` | — | — |
-| 3B.9 | Suppliers: `/api/suppliers` CRUD endpoint + real UI under Inventory | 3B.1 | `DONE` | Claude | pending commit |
-| 3B.10 | Purchases: real UI under Inventory wired to `POST /api/purchases` | 3B.9 | `DONE` | Claude | pending commit |
+| 3B.9 | Suppliers: `/api/suppliers` CRUD endpoint + real UI under Inventory | 3B.1 | `DONE` | Claude | ef9ecff |
+| 3B.10 | Purchases: real UI under Inventory wired to `POST /api/purchases` | 3B.9 | `DONE` | Claude | ef9ecff |
 | 3B.11 | Delete the orphaned Suppliers/Purchases/Batch Management mock screens | 3B.9, 3B.10 | `TODO` | — | — |
 | 3B.12 | `API_CONTRACT.md` + `DB_SCHEMA.md` rollup for Phase 3B | rolling | `TODO` | — | — |
 
