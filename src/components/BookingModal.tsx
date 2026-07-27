@@ -756,10 +756,18 @@ Attached is my payment transaction receipt photo.`;
   const filteredTimeSlots = useMemo(() => {
     if (!selectedDate) return [];
     const { start, end } = getDayOperatingHours(selectedDate);
+
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const selStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+    const isToday = selStr === todayStr;
+    const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
     return TIME_SLOTS.filter((slot) => {
       const slot24 = normaliseTo24hSlot(slot) ?? "";
       const taken = takenSlots.includes(slot24);
-      return slot24 >= start && slot24 < end && !taken;
+      const isPast = isToday && slot24 <= currentHHMM;
+      return slot24 >= start && slot24 < end && !taken && !isPast;
     });
   }, [selectedDate, getDayOperatingHours, takenSlots]);
 
