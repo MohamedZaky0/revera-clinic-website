@@ -69,7 +69,7 @@ After that, check task-specific files:
 ### What Is Actually Built and Working
 - Public website (homepage, about, services, contact, blog stub)
 - Patient Profile (`/profile`) — persistent customer profile details, wallet ledgers, and visit logs history
-- Booking modal → `reservations` table (real Supabase writes with customer_id links)
+- Booking modal (MD3 Date & Time pickers, single-step Service+Date+Time selection) → `reservations` table (real Supabase writes with customer_id links)
 - Admin booking management — calendar, list, approve/reject, full lifecycle stages, inline notes editor
 - Admin Bookings "Schedule" view — single-day grid, doctors as rows, 15-min time slots as columns
 - Booking lifecycle stages: `pending → approved → confirmed → started → completed`

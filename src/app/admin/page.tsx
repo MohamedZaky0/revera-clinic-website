@@ -4120,7 +4120,7 @@ export default function AdminPage() {
     { day: "Tuesday", dayAr: "الثلاثاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
     { day: "Wednesday", dayAr: "الأربعاء", isOpen: true, openTime: "09:00", closeTime: "20:00" },
     { day: "Thursday", dayAr: "الخميس", isOpen: true, openTime: "09:00", closeTime: "20:00" },
-    { day: "Friday", dayAr: "الجمعة", isOpen: false, openTime: "09:00", closeTime: "20:00" },
+    { day: "Friday", dayAr: "الجمعة", isOpen: true, openTime: "09:00", closeTime: "20:00" },
     { day: "Saturday", dayAr: "السبت", isOpen: true, openTime: "09:00", closeTime: "20:00" },
   ]);  const [pageSettingsLangTab, setPageSettingsLangTab] = useState<"en" | "ar">("en");
   const [aboutImage1, setAboutImage1] = useState<string>("");
@@ -4498,47 +4498,102 @@ export default function AdminPage() {
   }, [providers, localServices, serviceHours, branches]);
 
 
-  // Derive unique customers from database
+  // Derive unique customers from database AND reservations
   const customers = useMemo<Customer[]>(() => {
     const now = new Date();
     const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const list = Array.isArray(dbCustomers) ? dbCustomers : [];
+    const dbList = Array.isArray(dbCustomers) ? dbCustomers : [];
 
-    return list.map((c) => {
-      // Find if this customer has a booking in the last 2 weeks
-      const customerReservations = allReservations.filter((r) => 
+    const processedDbCustomers = dbList.map((c) => {
+      const customerReservations = allReservations.filter((r: any) => 
         (r.phone && (r.phone === c.mobile || r.phone === c.phone)) ||
-        (r.customerId && r.customerId === c.id)
+        (r.customerId && r.customerId === c.id) ||
+        (c.name && r.name && r.name.trim().toLowerCase() === c.name.trim().toLowerCase())
       );
 
-      const hasRecentBooking = customerReservations.some((r) => {
+      const hasRecentBooking = customerReservations.some((r: any) => {
         if (!r.date) return false;
         const bookingDate = new Date(String(r.date).slice(0, 10) + 'T00:00:00');
         return bookingDate >= twoWeeksAgo;
       });
 
-      // Determine active status:
-      // If explicitly set to inactive in DB, then it's inactive.
-      // Otherwise, active only if they have a booking in the last 2 weeks OR if they registered in the last 2 weeks.
+      const totalBookingsCount = Math.max(c.number_of_bookings || 0, customerReservations.length);
+      const totalSpentCalculated = customerReservations.reduce((sum: number, r: any) => {
+        if (['approved', 'confirmed', 'completed', 'started'].includes(r.status)) {
+          return sum + Number(r.price || r.totalPrice || 0);
+        }
+        return sum;
+      }, 0);
+
       const regDateStr = c.registration_date || c.created_at || now.toISOString();
       const regDate = new Date(regDateStr);
       const registeredRecently = regDate >= twoWeeksAgo;
-      const isActive = c.active !== false && (hasRecentBooking || registeredRecently);
+      const isActive = c.active !== false && (hasRecentBooking || registeredRecently || customerReservations.length > 0);
 
       return {
         ...c,
         id: c.id,
         email: c.email || "",
         name: c.name,
-        phone: c.mobile || "",
+        phone: c.mobile || c.phone || "",
         createdAt: regDateStr,
-        bookings: c.number_of_bookings || 0,
-        spent: Number(c.spent_amount || 0),
+        bookings: totalBookingsCount,
+        spent: Math.max(Number(c.spent_amount || 0), totalSpentCalculated),
         outstanding: Number(c.outstanding || 0),
         wallet: Number(c.wallet_balance || 0),
         active: isActive,
       };
     });
+
+    // Synthesize entries for any patients in allReservations who aren't in dbCustomers
+    const existingPhones = new Set(processedDbCustomers.map((c) => c.phone).filter(Boolean));
+    const existingNames = new Set(processedDbCustomers.map((c) => c.name?.trim().toLowerCase()).filter(Boolean));
+
+    const reservationDerivedCustomers: Customer[] = [];
+    allReservations.forEach((r: any) => {
+      const name = r.name || r.patient_name || r.customerName;
+      const phone = r.phone || r.mobile || r.customerPhone || "";
+      const email = r.email || r.customerEmail || "";
+
+      if (!name) return;
+      const nameKey = name.trim().toLowerCase();
+
+      if ((phone && existingPhones.has(phone)) || existingNames.has(nameKey)) {
+        return; // already covered
+      }
+
+      existingNames.add(nameKey);
+      if (phone) existingPhones.add(phone);
+
+      const patientReservations = allReservations.filter((otherR: any) =>
+        (phone && (otherR.phone === phone || otherR.mobile === phone)) ||
+        (otherR.name && otherR.name.trim().toLowerCase() === nameKey)
+      );
+
+      const totalSpent = patientReservations.reduce((sum: number, pr: any) => {
+        if (['approved', 'confirmed', 'completed', 'started'].includes(pr.status)) {
+          return sum + Number(pr.price || pr.totalPrice || 0);
+        }
+        return sum;
+      }, 0);
+
+      const regDateStr = r.createdAt || r.date || now.toISOString();
+
+      reservationDerivedCustomers.push({
+        id: r.customerId || `res-cust-${phone || Math.random().toString(36).slice(2, 9)}`,
+        name,
+        phone,
+        email,
+        createdAt: regDateStr,
+        bookings: patientReservations.length,
+        spent: totalSpent,
+        outstanding: 0,
+        wallet: 0,
+        active: true,
+      } as any);
+    });
+
+    return [...processedDbCustomers, ...reservationDerivedCustomers];
   }, [dbCustomers, allReservations]);
 
   const todaysBookingsCount = useMemo(() => {
@@ -5060,28 +5115,77 @@ export default function AdminPage() {
       }
     });
 
-    // Overlap validation between In-Clinic and Online schedules across all assigned branches
+    // Comprehensive Cross-Branch & Multi-Shift Overlap Validation
     const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    for (const bId of providerFormBranchIds) {
-      const sched = finalSchedules[bId];
-      if (!sched) continue;
-      const branchName = branches.find((b) => b.id === bId)?.name_en || bId;
+    
+    const extractShiftsForDay = (dayConfig: any) => {
+      if (!dayConfig || !dayConfig.isOpen) return [];
+      const shifts: Array<{ startMins: number; endMins: number; startStr: string; endStr: string }> = [];
+      const timeToMins = (tStr: string) => {
+        if (!tStr) return 0;
+        const [h, m] = tStr.split(":").map(Number);
+        return (h || 0) * 60 + (m || 0);
+      };
 
-      for (const day of weekdays) {
-        const inClinic = sched.in_person?.[day];
-        const online = sched.online?.[day];
-        if (inClinic && online && inClinic.isOpen && online.isOpen) {
-          const timeToMins = (tStr: string) => {
-            const [h, m] = tStr.split(":").map(Number);
-            return h * 60 + m;
-          };
-          const start1 = timeToMins(inClinic.start);
-          const end1 = timeToMins(inClinic.end);
-          const start2 = timeToMins(online.start);
-          const end2 = timeToMins(online.end);
+      if (Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
+        dayConfig.shifts.forEach((s: any) => {
+          if (s.start && s.end) {
+            shifts.push({
+              startMins: timeToMins(s.start),
+              endMins: timeToMins(s.end),
+              startStr: s.start,
+              endStr: s.end,
+            });
+          }
+        });
+      } else if (dayConfig.start && dayConfig.end) {
+        shifts.push({
+          startMins: timeToMins(dayConfig.start),
+          endMins: timeToMins(dayConfig.end),
+          startStr: dayConfig.start,
+          endStr: dayConfig.end,
+        });
+      }
+      return shifts;
+    };
 
-          if (start1 < end2 && start2 < end1) {
-            alert(`Schedule overlap detected on ${day} for branch "${branchName}"! In-Clinic hours (${inClinic.start} - ${inClinic.end}) and Online hours (${online.start} - ${online.end}) cannot overlap.`);
+    for (const day of weekdays) {
+      const dayShifts: Array<{
+        branchId: string;
+        branchName: string;
+        type: 'In-Clinic' | 'Online';
+        startMins: number;
+        endMins: number;
+        startStr: string;
+        endStr: string;
+      }> = [];
+
+      for (const bId of providerFormBranchIds) {
+        const sched = finalSchedules[bId];
+        if (!sched) continue;
+        const branchName = branches.find((b) => b.id === bId)?.name_en || bId;
+
+        // In-Clinic shifts
+        const inClinicShifts = extractShiftsForDay(sched.in_person?.[day]);
+        inClinicShifts.forEach((s) => {
+          dayShifts.push({ branchId: bId, branchName, type: 'In-Clinic', ...s });
+        });
+
+        // Online shifts
+        const onlineShifts = extractShiftsForDay(sched.online?.[day]);
+        onlineShifts.forEach((s) => {
+          dayShifts.push({ branchId: bId, branchName, type: 'Online', ...s });
+        });
+      }
+
+      // Check all pairs of shifts for overlap on this day
+      for (let i = 0; i < dayShifts.length; i++) {
+        for (let j = i + 1; j < dayShifts.length; j++) {
+          const s1 = dayShifts[i];
+          const s2 = dayShifts[j];
+
+          if (s1.startMins < s2.endMins && s2.startMins < s1.endMins) {
+            alert(`Schedule overlap detected on ${day}!\nDoctor cannot be scheduled at "${s1.branchName}" (${s1.type}: ${s1.startStr} - ${s1.endStr}) and "${s2.branchName}" (${s2.type}: ${s2.startStr} - ${s2.endStr}) at the same time.`);
             return;
           }
         }
@@ -5774,10 +5878,11 @@ export default function AdminPage() {
       });
       if (res.ok) {
         const updatedBranch = await res.json();
-        setBranches(prev => prev.map(b => b.id === updatedBranch.id ? updatedBranch : b));
+        setBranches(prev => prev.map(b => (b.id === updatedBranch.id || b.id === selectedBranchForHoursId) ? { ...b, ...updatedBranch, service_hours: serviceHours } : b));
         alert("Branch service hours saved successfully!");
       } else {
-        alert("Failed to save branch service hours.");
+        const errJson = await res.json().catch(() => ({}));
+        alert(`Failed to save branch service hours: ${errJson.error || res.statusText || 'Unknown error'}`);
       }
     } catch (err) {
       console.error("handleSaveBranchServiceHours error:", err);
@@ -6022,13 +6127,11 @@ export default function AdminPage() {
   const fetchCustomers = useCallback(() => {
     setLoadingCustomers(true);
     fetchCustomerAvatars();
-    if (!session?.access_token) {
-      setLoadingCustomers(false);
-      return;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
     }
-    fetch("/api/customers", {
-      headers: { Authorization: `Bearer ${session.access_token}` }
-    })
+    fetch("/api/customers", { headers })
       .then((res) => {
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         return res.json();
@@ -8003,6 +8106,174 @@ export default function AdminPage() {
                             />
                           </div>
                         )}
+                      </div>
+                    </div>
+
+                    {/* Weekly Working Schedule */}
+                    <div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Weekly Working Days & Hours (Shifts)</label>
+                          {providerFormBranchIds.length > 1 && (
+                            <div className="mt-1.5 flex items-center gap-2">
+                              <span className="text-xs text-[#5A6A51]">Configure branch schedule:</span>
+                              <select
+                                value={providerFormSelectedScheduleBranchId}
+                                onChange={(e) => handleScheduleBranchChange(e.target.value)}
+                                className="rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-xs text-[#1F251A] font-semibold outline-none focus:border-[#C4AE7C] shadow-sm cursor-pointer"
+                              >
+                                {providerFormBranchIds.map((bId) => {
+                                  const br = branches.find((b) => b.id === bId);
+                                  return (
+                                    <option key={bId} value={bId}>
+                                      {br ? br.name_en : bId}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex rounded-lg border border-[#414E36]/15 p-0.5 bg-gray-50 text-[10px] font-bold self-start sm:self-auto shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setProviderFormScheduleTab("in_person")}
+                            className={`px-3 py-1 rounded transition-colors ${
+                              providerFormScheduleTab === "in_person"
+                                ? "bg-[#414E36] text-white"
+                                : "text-[#5A6A51] hover:text-[#414E36]"
+                            }`}
+                          >
+                            In-Clinic
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setProviderFormScheduleTab("online")}
+                            className={`px-3 py-1 rounded transition-colors ${
+                              providerFormScheduleTab === "online"
+                                ? "bg-[#414E36] text-white"
+                                : "text-[#5A6A51] hover:text-[#414E36]"
+                            }`}
+                          >
+                            Online
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                        {(() => {
+                          const activeSched = providerFormScheduleTab === "in_person" ? providerFormWorkingDaysHours : providerFormOnlineWorkingDaysHours;
+                          const setActiveSched = providerFormScheduleTab === "in_person" ? setProviderFormWorkingDaysHours : setProviderFormOnlineWorkingDaysHours;
+
+                          return Object.keys(activeSched).map((day) => {
+                            const sched = activeSched[day];
+                            return (
+                              <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
+                                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={sched.isOpen}
+                                    onChange={(e) => {
+                                      setActiveSched({
+                                        ...activeSched,
+                                        [day]: { ...sched, isOpen: e.target.checked }
+                                      });
+                                    }}
+                                    className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                                  />
+                                  <span className="text-xs font-bold text-[#414E36] w-24">{day}</span>
+                                </label>
+
+                                {sched.isOpen ? (
+                                  <div className="flex flex-col gap-2 w-full sm:w-auto">
+                                    {/* Shifts list */}
+                                    {((sched.shifts && sched.shifts.length > 0) ? sched.shifts : [{ start: sched.start || "09:00", end: sched.end || "17:00" }]).map((shft: any, shiftIdx: number) => (
+                                      <div key={shiftIdx} className="flex items-center gap-2">
+                                        <input
+                                          type="time"
+                                          value={shft.start}
+                                          onChange={(e) => {
+                                            const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                            currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], start: e.target.value };
+                                            setActiveSched({
+                                              ...activeSched,
+                                              [day]: {
+                                                ...sched,
+                                                start: currentShifts[0].start,
+                                                end: currentShifts[0].end,
+                                                shifts: currentShifts
+                                              }
+                                            });
+                                          }}
+                                          className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                                        />
+                                        <span className="text-xs text-[#5A6A51]">to</span>
+                                        <input
+                                          type="time"
+                                          value={shft.end}
+                                          onChange={(e) => {
+                                            const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                            currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], end: e.target.value };
+                                            setActiveSched({
+                                              ...activeSched,
+                                              [day]: {
+                                                ...sched,
+                                                start: currentShifts[0].start,
+                                                end: currentShifts[0].end,
+                                                shifts: currentShifts
+                                              }
+                                            });
+                                          }}
+                                          className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                                        />
+                                        {shiftIdx > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                              const filteredShifts = currentShifts.filter((_: any, i: number) => i !== shiftIdx);
+                                              setActiveSched({
+                                                ...activeSched,
+                                                [day]: {
+                                                  ...sched,
+                                                  start: filteredShifts[0].start,
+                                                  end: filteredShifts[0].end,
+                                                  shifts: filteredShifts
+                                                }
+                                              });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 transition cursor-pointer"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                        const newShifts = [...currentShifts, { start: "09:00", end: "17:00" }];
+                                        setActiveSched({
+                                          ...activeSched,
+                                          [day]: {
+                                            ...sched,
+                                            shifts: newShifts
+                                          }
+                                        });
+                                      }}
+                                      className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] transition flex items-center gap-1 mt-1 cursor-pointer"
+                                    >
+                                      <Plus size={12} /> Add Shift
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400 italic">Off / Closed</span>
+                                )}
+                              </div>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
 
