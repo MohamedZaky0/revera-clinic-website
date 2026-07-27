@@ -4,6 +4,9 @@ import { requireStaffAccess } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
+export type ProductRole = 'retail' | 'consumable' | 'both';
+const PRODUCT_ROLES: ProductRole[] = ['retail', 'consumable', 'both'];
+
 export interface ProductItem {
   id: string;
   name: string;
@@ -17,6 +20,8 @@ export interface ProductItem {
   stock_quantity: number;
   min_reorder_quantity: number;
   status: 'Active' | 'Inactive' | 'Out of Stock' | 'Discontinued';
+  /** DEC-021: whether this product is sold to patients, consumed in services, or both. */
+  role: ProductRole;
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -36,6 +41,7 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
     stock_quantity: 42,
     min_reorder_quantity: 10,
     status: 'Active',
+    role: 'retail',
     notes: 'Allergan Botox 100 Units vial for facial rejuvenation.',
     created_at: '2026-01-10T08:00:00.000Z',
     updated_at: '2026-07-20T12:00:00.000Z'
@@ -53,6 +59,7 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
     stock_quantity: 15,
     min_reorder_quantity: 5,
     status: 'Active',
+    role: 'retail',
     notes: 'Premium Juvederm Ultra 1ml syringe.',
     created_at: '2026-01-12T08:00:00.000Z',
     updated_at: '2026-07-20T12:00:00.000Z'
@@ -70,6 +77,7 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
     stock_quantity: 24,
     min_reorder_quantity: 8,
     status: 'Active',
+    role: 'retail',
     notes: 'Revera clinical hydrating moisturizer for post-treatment skin.',
     created_at: '2026-01-15T08:00:00.000Z',
     updated_at: '2026-07-20T12:00:00.000Z'
@@ -87,6 +95,7 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
     stock_quantity: 12,
     min_reorder_quantity: 5,
     status: 'Active',
+    role: 'retail',
     notes: 'Broad spectrum UVA/UVB protection.',
     created_at: '2026-02-01T08:00:00.000Z',
     updated_at: '2026-07-20T12:00:00.000Z'
@@ -104,6 +113,7 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
     stock_quantity: 5,
     min_reorder_quantity: 5,
     status: 'Active',
+    role: 'retail',
     notes: 'Concentrated 1% Retinol night serum.',
     created_at: '2026-02-10T08:00:00.000Z',
     updated_at: '2026-07-20T12:00:00.000Z'
@@ -121,6 +131,7 @@ const DEFAULT_PRODUCTS: ProductItem[] = [
     stock_quantity: 0,
     min_reorder_quantity: 10,
     status: 'Out of Stock',
+    role: 'retail',
     notes: 'Sulfate-free cleanser for sensitive skin.',
     created_at: '2026-02-15T08:00:00.000Z',
     updated_at: '2026-07-20T12:00:00.000Z'
@@ -141,6 +152,7 @@ function mapDbRowToProduct(row: any): ProductItem {
     stock_quantity: Number(row.stock_quantity || 0),
     min_reorder_quantity: Number(row.min_stock_alert || 5),
     status: row.status || (Number(row.stock_quantity || 0) <= 0 ? 'Out of Stock' : 'Active'),
+    role: PRODUCT_ROLES.includes(row.role) ? row.role : 'retail',
     notes: '',
     created_at: row.created_at || new Date().toISOString(),
     updated_at: row.updated_at || new Date().toISOString()
@@ -160,6 +172,7 @@ function mapProductToDbRow(item: ProductItem) {
     min_stock_alert: Number(item.min_reorder_quantity || 5),
     unit: item.unit || 'Piece',
     status: stockQty <= 0 ? 'Out of Stock' : (item.status || 'Active'),
+    role: PRODUCT_ROLES.includes(item.role) ? item.role : 'retail',
     created_at: item.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
@@ -332,11 +345,16 @@ export async function POST(req: Request) {
       stock_quantity,
       min_reorder_quantity,
       status,
+      role,
       notes
     } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: 'Product name is required.' }, { status: 400 });
+    }
+
+    if (role !== undefined && !PRODUCT_ROLES.includes(role)) {
+      return NextResponse.json({ error: `role must be one of: ${PRODUCT_ROLES.join(', ')}.` }, { status: 400 });
     }
 
     if (purchase_price === undefined || purchase_price === null || isNaN(Number(purchase_price))) {
@@ -367,6 +385,7 @@ export async function POST(req: Request) {
       stock_quantity: stockQty,
       min_reorder_quantity: Number(min_reorder_quantity) || 5,
       status: computedStatus,
+      role: PRODUCT_ROLES.includes(role) ? role : 'retail',
       notes: notes ? String(notes).trim() : '',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -403,11 +422,16 @@ export async function PUT(req: Request) {
       stock_quantity,
       min_reorder_quantity,
       status,
+      role,
       notes
     } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Product ID is required.' }, { status: 400 });
+    }
+
+    if (role !== undefined && !PRODUCT_ROLES.includes(role)) {
+      return NextResponse.json({ error: `role must be one of: ${PRODUCT_ROLES.join(', ')}.` }, { status: 400 });
     }
 
     const data = await getStoredProductsData();
@@ -439,6 +463,7 @@ export async function PUT(req: Request) {
       stock_quantity: newStock,
       min_reorder_quantity: min_reorder_quantity !== undefined ? Number(min_reorder_quantity) : existing.min_reorder_quantity,
       status: updatedStatus,
+      role: role !== undefined ? role : existing.role,
       notes: notes !== undefined ? String(notes).trim() : existing.notes,
       updated_at: new Date().toISOString()
     };

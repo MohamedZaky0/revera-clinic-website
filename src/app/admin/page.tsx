@@ -3407,6 +3407,7 @@ export default function AdminPage() {
   const [prodMinReorder, setProdMinReorder] = useState("5");
   const [prodBranchId, setProdBranchId] = useState("");
   const [prodStatus, setProdStatus] = useState<"Active" | "Inactive" | "Out of Stock" | "Discontinued">("Active");
+  const [prodRole, setProdRole] = useState<"retail" | "consumable" | "both">("retail");
   const [prodNotes, setProdNotes] = useState("");
   const [prodSku, setProdSku] = useState("");
   const [savingProduct, setSavingProduct] = useState(false);
@@ -3533,6 +3534,7 @@ export default function AdminPage() {
     setProdMinReorder("5");
     setProdBranchId("");
     setProdStatus("Active");
+    setProdRole("retail");
     setProdNotes("");
     setProdSku(`SKU-${Date.now().toString().slice(-4)}`);
   };
@@ -3549,6 +3551,7 @@ export default function AdminPage() {
     setProdMinReorder(String(product.min_reorder_quantity ?? "5"));
     setProdBranchId(product.branch_id || "");
     setProdStatus(product.status || "Active");
+    setProdRole(product.role || "retail");
     setProdNotes(product.notes || "");
     setProdSku(product.sku || "");
     setShowAddProductModal(true);
@@ -3574,6 +3577,7 @@ export default function AdminPage() {
         min_reorder_quantity: parseInt(prodMinReorder) || 5,
         branch_id: prodBranchId || null,
         status: prodStatus,
+        role: prodRole,
         notes: prodNotes,
         sku: prodSku,
       };
@@ -18490,6 +18494,18 @@ export default function AdminPage() {
                             {b.name_en}
                           </option>
                         ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#1F251A] mb-1">Role</label>
+                      <select
+                        value={prodRole}
+                        onChange={(e) => setProdRole(e.target.value as any)}
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      >
+                        <option value="retail">Retail (sold to patients only)</option>
+                        <option value="consumable">Consumable (used in services only)</option>
+                        <option value="both">Both</option>
                       </select>
                     </div>
                   </div>

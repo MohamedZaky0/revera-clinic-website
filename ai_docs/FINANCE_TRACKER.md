@@ -2551,7 +2551,7 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 | 3B.0 | Repair committed merge-conflict debris in `DECISIONS.md` (corrupts DEC-027) | — | `DONE` | Claude | ef9ecff |
 | 3B.1 | Create `src/components/admin/` + the first module boundary (DEC-027) | — | `DONE` | Claude | ef9ecff |
 | 3B.2 | `services.duration_minutes`: API read/write + numeric UI field | 3B.1 | `DONE` | Claude | RISK-025 resolved: admin Services screen now loads/saves via `/api/services`; `duration_minutes` read/written by the route and editable as a numeric minutes field in the service modal |
-| 3B.3 | `inventory_products.role`: API read/write + UI selector | 3B.1 | `TODO` | — | — |
+| 3B.3 | `inventory_products.role`: API read/write + UI selector | 3B.1 | `DONE` | Claude | pending commit |
 | 3B.4 | `inventory_devices.lamp_replacement_cost` + rated pulses: API + UI | 3B.1 | `TODO` | — | — |
 | 3B.5 | Service consumables recipe editor (`service_consumables`) + endpoint | 3B.1, 3B.3 | `TODO` | — | — |
 | 3B.6 | Service device/pulses editor (`service_devices`) + endpoint | 3B.1, 3B.4 | `TODO` | — | — |
@@ -2700,6 +2700,23 @@ product (inviting nonsense recipes) or shows nothing.
 
 **Verify:** set a product to `consumable`; confirm it persists; confirm it then appears in 3B.5's
 recipe picker and a `retail`-only product does not.
+
+**Done 2026-07-27.** `src/app/api/inventory/products/route.ts` — added `ProductRole` type and a
+`PRODUCT_ROLES` allowlist (`retail`/`consumable`/`both`, matching the live CHECK constraint exactly
+— confirmed via the migration file `20260726010800_add_inventory_products_role.sql`, not assumed).
+`role` added to both mappers, both POST and PUT validate it against the allowlist and 400 on an
+invalid value, PUT preserves the existing role when not sent, and the 6 `DEFAULT_PRODUCTS` seed
+rows were given an explicit `role: 'retail'` (required once the field became non-optional on
+`ProductItem` — TypeScript caught all 6 immediately).
+
+`admin/page.tsx` — added a "Role" selector (labelled with the DEC-021 meaning, not just the raw
+value: "Retail (sold to patients only)" / "Consumable (used in services only)" / "Both") next to
+Assigned Branch in the Add/Edit Product modal, wired through `resetProductForm`,
+`openEditProductModal`, and the save payload.
+
+**Verified:** `npx tsc --noEmit`, `npx eslint`, and `npx next build` all clean. **Not yet done:
+live browser verification** (set a product to `consumable`, confirm it round-trips) — per this
+file's convention 8, still outstanding before this row should be treated as fully proven.
 
 ---
 
