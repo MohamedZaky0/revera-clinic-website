@@ -311,6 +311,26 @@ Each item requires a positive `standardQty` and no duplicate `productId` within 
 
 ---
 
+## GET /api/service-devices?serviceId={id}
+
+Requires a staff bearer token. Returns which devices are attached to a service and their `pulses_per_session`, with each device's name embedded.
+
+**Response:** `{ deviceLinks: [{ service_id, device_id, pulses_per_session, inventory_devices: { name } }] }`
+
+---
+
+## POST /api/service-devices
+
+Requires a staff bearer token. Replaces every device attached to a service — deletes existing `service_devices` rows for `serviceId`, then inserts the given `items` (empty array detaches all devices).
+
+**Body:** `{ serviceId, items: [{ deviceId, pulsesPerSession }] }`
+
+Each item requires a positive whole-number `pulsesPerSession` and no duplicate `deviceId` within the same request. Every referenced device must exist in `inventory_devices`.
+
+**Response:** `{ success: true }`
+
+---
+
 ## GET /api/suppliers
 
 Requires a staff bearer token. Returns every row in `suppliers`, ordered by `name`.

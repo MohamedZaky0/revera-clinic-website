@@ -102,6 +102,7 @@ import {
 import RoomsManagerView from "@/components/RoomsManagerView";
 import SupplierManagementScreen from "@/components/admin/inventory/SupplierManagementScreen";
 import ServiceRecipeEditor from "@/components/admin/services/ServiceRecipeEditor";
+import ServiceDeviceEditor from "@/components/admin/services/ServiceDeviceEditor";
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
@@ -9249,7 +9250,10 @@ export default function AdminPage() {
                       </div>
 
                       {editingService && (
-                        <ServiceRecipeEditor serviceId={editingService.id} authHeaders={authenticatedJsonHeaders} />
+                        <>
+                          <ServiceRecipeEditor serviceId={editingService.id} authHeaders={authenticatedJsonHeaders} />
+                          <ServiceDeviceEditor serviceId={editingService.id} authHeaders={authenticatedJsonHeaders} />
+                        </>
                       )}
 
                     </div>

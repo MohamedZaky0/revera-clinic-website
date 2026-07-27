@@ -2554,7 +2554,7 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 | 3B.3 | `inventory_products.role`: API read/write + UI selector | 3B.1 | `DONE` | Claude | pending commit |
 | 3B.4 | `inventory_devices.lamp_replacement_cost` + rated pulses: API + UI | 3B.1 | `DONE` | Claude | pending commit |
 | 3B.5 | Service consumables recipe editor (`service_consumables`) + endpoint | 3B.1, 3B.3 | `DONE` | Claude | pending commit |
-| 3B.6 | Service device/pulses editor (`service_devices`) + endpoint | 3B.1, 3B.4 | `TODO` | — | — |
+| 3B.6 | Service device/pulses editor (`service_devices`) + endpoint | 3B.1, 3B.4 | `DONE` | Claude | pending commit |
 | 3B.7 | Doctor commission: `both` option, base, fixed component (**2 duplicate forms**) | 3B.1 | `TODO` | — | — |
 | 3B.8 | Packages admin UI + `/api/packages` CRUD endpoint | 3B.1 | `TODO` | — | — |
 | 3B.9 | Suppliers: `/api/suppliers` CRUD endpoint + real UI under Inventory | 3B.1 | `DONE` | Claude | ef9ecff |
@@ -2838,6 +2838,21 @@ a list of quantities).
 
 **Verify:** attach a device at a known pulses-per-session; complete a booking; confirm the device
 cost snapshot equals `costPerPulse × pulses_per_session` exactly.
+
+**Done 2026-07-27.** `src/app/api/service-devices/route.ts` — same `GET ?serviceId=` /
+delete-then-insert `POST` shape as 3B.5's `/api/service-consumables`, but for
+`service_devices`: `pulsesPerSession` must be a positive whole number (a device delivers whole
+pulses, not fractional), and every referenced device must exist in `inventory_devices` — no
+role-style eligibility check here, devices have no role concept.
+
+`src/components/admin/services/ServiceDeviceEditor.tsx` — same list-editor shape as
+`ServiceRecipeEditor` (device instead of product, whole-number pulses instead of a decimal qty),
+inserted into the same Edit Service modal right after the consumables recipe editor, same
+`editingService`-only gate.
+
+**Verified:** `npx tsc --noEmit`, `npx eslint`, `npx next build` all clean. **Not yet done: the
+full checkout verify** — attach a device, complete a booking, confirm the resulting device-cost
+snapshot equals `costPerPulse × pulses_per_session` exactly.
 
 ---
 
