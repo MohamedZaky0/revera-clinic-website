@@ -1006,6 +1006,60 @@ persist and display correctly rather than resetting to defaults.
 
 ---
 
+## RISK-027: Completing a Booking Charged Material/Device Cost Without Ever Deducting The Stock Or Pulses That Caused It
+
+**Severity:** High · **Type:** Data integrity
+**Found:** 2026-07-27, by the user manually completing a real test booking (service "Skin Care
+Treatments" with a "Hamada Botox" consumable in its recipe) and noticing the product's stock count
+never moved · **RESOLVED 2026-07-27**
+
+**Root cause:** `applyCheckoutCosting` in `src/app/api/reservations/route.ts` — the function that
+runs when a booking's status transitions to `completed` — correctly computes and snapshots
+`invoice_lines.cogs_snapshot` from the service's `service_consumables` recipe (3B.5) and
+`service_devices` pulse links (3B.6), and correctly writes `consumption_entries` and a
+`stock_movements` ledger row (`direction: 'out', reason: 'consumption'`) for each material used.
+**It never called anything that actually decremented `inventory_products.stock_quantity`** — the
+scalar every admin screen (Products Catalog, Stock Valuation, Low Stock Alerts, the notification
+bell) actually reads. Exactly the same story on the device side: the function reads
+`lamp_replacement_cost`/`max_pulses_limit` to charge the session for device wear, but never
+incremented `inventory_devices.current_pulse_count` — so a device could be charged for pulses
+whose count it would never itself register, `RISK-026`'s maintenance thresholds never advancing no
+matter how many sessions ran.
+
+**Why this is the same class of bug as `RISK-025`/task 3B.10, not a new kind of mistake:** this
+codebase's `stock_movements`/ledger tables were built (Phase 2) as an audit trail alongside the
+directly-written scalars (`stock_quantity`, `current_pulse_count`) — not yet a replacement for them
+(task 2.12 is explicitly comparison-only). Every write path needs its own call to the scalar-owning
+helper; the purchases (restock) side of this exact gap was found and fixed in task 3B.10
+(`restockInventoryProduct`). Checkout consumption and device-pulse consumption had the identical gap
+on the *consuming* side, just never exercised until this session's recipe/device editors (3B.5/3B.6)
+made it possible to configure a recipe and actually test a real booking against it — which is
+exactly how the user found it.
+
+**Fix:**
+- `src/app/api/reservations/route.ts` now calls the existing `deductInventoryStock()` (already used
+  by POS sales, `src/app/api/inventory/products/route.ts`) once per consumption entry, immediately
+  after the `stock_movements` row is written.
+- Added a new exported `incrementDevicePulses()` in `src/app/api/inventory/devices/route.ts`
+  (mirroring `restockInventoryProduct`'s shape) and call it once per `service_devices` link, after
+  computing that line's device cost. Recomputes `warning_1_notified`/`warning_2_notified`/`status`
+  the same way the device PUT handler does, so a session that pushes a device past its threshold
+  is reflected immediately, not just on the next manual pulse update.
+- Both loops are sequential, not `Promise.all` — same reasoning as `restockInventoryProduct`:
+  these are read-modify-write operations over the whole catalog/device list, so two rows for the
+  same product/device in one booking would race and lose an update.
+- Both calls stay inside the existing per-invoice-line `try`/`catch` — a failure here still only
+  leaves that one line's `cogs_snapshot` `NULL`, not every line on the booking (the isolation
+  `applyCheckoutCosting` already had for exactly this reason).
+
+**Verify:** `npx tsc --noEmit`, `npx eslint`, `npx next build` all clean. Define a recipe for a
+service, note a product's current stock, complete a real booking for that service, and confirm the
+product's `stock_quantity` decreased by exactly the recipe's `standard_qty` (not just that
+`consumption_entries`/`stock_movements` got a row). Same check for a service with a device link —
+confirm `current_pulse_count` increased by `pulses_per_session`.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:

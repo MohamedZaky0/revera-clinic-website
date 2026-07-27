@@ -206,6 +206,44 @@ function calculateDeviceStatus(current: number, t1: number, t2: number): 'Optima
   return 'Optimal';
 }
 
+// Helper to advance a device's pulse counter when a booking that uses it completes checkout
+// (task 2.15 / RISK-027). applyCheckoutCosting in /api/reservations already reads
+// lamp_replacement_cost/max_pulses_limit to compute the session's device cost, but until now
+// nothing incremented the device's own counter — the cost was charged without the pulses that
+// caused it ever being recorded, so a device could sail past its rated maintenance limit with
+// the admin's pulse tracker still showing it as brand new.
+export async function incrementDevicePulses(deviceId: string, pulsesToAdd: number) {
+  try {
+    if (!pulsesToAdd || pulsesToAdd <= 0) return;
+
+    const data = await getStoredInventoryData();
+    const devices = data.devices || [];
+    const index = devices.findIndex((d: any) => d.id === deviceId);
+    if (index === -1) return;
+
+    const existing = devices[index];
+    const newCurrent = (Number(existing.current_pulse_count) || 0) + Number(pulsesToAdd);
+    const newLifetime = (Number(existing.total_lifetime_pulses) || 0) + Number(pulsesToAdd);
+    const t1 = Number(existing.warning_threshold_1) || 80000;
+    const t2 = Number(existing.maintenance_threshold_2) || 100000;
+    const computedStatus = existing.status === 'Out of Service' ? 'Out of Service' : calculateDeviceStatus(newCurrent, t1, t2);
+
+    devices[index] = {
+      ...existing,
+      current_pulse_count: newCurrent,
+      total_lifetime_pulses: newLifetime,
+      warning_1_notified: newCurrent >= t1,
+      warning_2_notified: newCurrent >= t2,
+      status: computedStatus,
+      updated_at: new Date().toISOString()
+    };
+
+    await saveInventoryData({ ...data, devices });
+  } catch (err) {
+    console.error('Error incrementing device pulses:', err);
+  }
+}
+
 export async function GET(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) return NextResponse.json({ error: access.error }, { status: access.status });

@@ -5,6 +5,8 @@ import { computeSettledBalances } from '@/lib/billing';
 import { requireAdministratorAccess, requireStaffAccess } from '@/lib/access';
 import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
 import { computeCommission, consumptionCost, costPerPulse } from '@/lib/costing';
+import { deductInventoryStock } from '@/app/api/inventory/products/route';
+import { incrementDevicePulses } from '@/app/api/inventory/devices/route';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -190,17 +192,37 @@ async function applyCheckoutCosting(params: {
       if (stockRows.length > 0) {
         const { error: stockError } = await supabaseServer.from('stock_movements').insert(stockRows);
         if (stockError) throw stockError;
+
+        // stock_movements is a ledger, not what inventory_products.stock_quantity actually reads
+        // from (task 2.12 — no read path has cut over yet). Without this, a service consuming
+        // materials at checkout would log the consumption but never actually reduce the number
+        // shown in Products Catalog — the same gap task 3B.10 found and fixed on the purchases
+        // (restock) side. Sequential, not Promise.all, for the same reason restockInventoryProduct
+        // is: it's a read-modify-write of the whole catalog, so two rows for the same product in
+        // this line would race.
+        for (const row of stockRows) {
+          await deductInventoryStock(row.product_id, Number(row.qty));
+        }
       }
 
       const materialCost = consumptionCost(entries.map(({ qty, unitCostSnapshot }: ConsumptionDraft) => ({ qty, unitCostSnapshot })));
-      const deviceCost = (devicesResult.data || [])
-        .filter((device: any) => Number(device.service_id) === Number(invoiceLine.service_id))
+      const serviceDevicesForLine = (devicesResult.data || [])
+        .filter((device: any) => Number(device.service_id) === Number(invoiceLine.service_id));
+      const deviceCost = serviceDevicesForLine
         .reduce((total: number, serviceDevice: any) => {
           const device = devices.get(serviceDevice.device_id);
           if (!device) throw new Error(`Service device ${serviceDevice.device_id} was not found.`);
           return total + costPerPulse(Number(device.lamp_replacement_cost || 0), Number(device.max_pulses_limit)) * Number(serviceDevice.pulses_per_session);
         }, 0);
       const cogsSnapshot = Math.round((materialCost + deviceCost + Number.EPSILON) * 100) / 100;
+
+      // Charging the session for pulse-based device cost without ever advancing the device's own
+      // pulse counter meant a device could sail past its rated maintenance limit while the admin's
+      // tracker still showed it as new (RISK-027). Sequential for the same read-modify-write
+      // reason as the stock deductions above.
+      for (const serviceDevice of serviceDevicesForLine) {
+        await incrementDevicePulses(serviceDevice.device_id, Number(serviceDevice.pulses_per_session));
+      }
       const provider = providerResult.data as any;
       const commissionBase = provider?.commission_base === 'net_of_materials'
         ? Math.max(0, Number(invoiceLine.line_total) - cogsSnapshot)

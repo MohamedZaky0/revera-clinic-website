@@ -2816,10 +2816,13 @@ recommendation for this task — built fresh instead). Product picker only offer
 Service modal in `admin/page.tsx`, gated on `editingService` (a new, unsaved service has no id to
 attach a recipe to yet).
 
-**Verified:** `npx tsc --noEmit`, `npx eslint`, `npx next build` all clean. **Not yet done: the
-full checkout verify** — define a recipe, complete a booking for that service, confirm
-`invoice_lines.cogs_snapshot` is non-null and matches the hand-computed sum. This needs an actual
-booking flow exercised end-to-end, not just the editor UI.
+**Verified:** `npx tsc --noEmit`, `npx eslint`, `npx next build` all clean. **The full checkout
+verify found a real bug — see RISK-027.** The user defined a recipe and completed a real booking;
+`cogs_snapshot`/`consumption_entries`/`stock_movements` all worked, but the product's
+`stock_quantity` never actually decreased — the same "ledger written, scalar never touched" gap
+task 3B.10 found on the purchases side. Fixed by calling the existing `deductInventoryStock()` per
+consumption entry in `applyCheckoutCosting`. Re-verify: complete another booking and confirm
+`stock_quantity` now drops by exactly `standard_qty`.
 
 ---
 
@@ -2850,9 +2853,13 @@ role-style eligibility check here, devices have no role concept.
 inserted into the same Edit Service modal right after the consumables recipe editor, same
 `editingService`-only gate.
 
-**Verified:** `npx tsc --noEmit`, `npx eslint`, `npx next build` all clean. **Not yet done: the
-full checkout verify** — attach a device, complete a booking, confirm the resulting device-cost
-snapshot equals `costPerPulse × pulses_per_session` exactly.
+**Verified:** `npx tsc --noEmit`, `npx eslint`, `npx next build` all clean. **Same gap as 3B.5,
+fixed together — see RISK-027.** `applyCheckoutCosting` charged sessions for device pulse cost but
+never incremented `inventory_devices.current_pulse_count`, so a device could be billed for wear it
+would never itself register. Fixed with a new `incrementDevicePulses()` in
+`src/app/api/inventory/devices/route.ts`, called once per `service_devices` link at checkout.
+Re-verify: attach a device, complete a booking, confirm `current_pulse_count` increased by
+`pulses_per_session` and the device-cost snapshot still equals `costPerPulse × pulses_per_session`.
 
 ---
 
