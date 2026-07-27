@@ -5053,28 +5053,77 @@ export default function AdminPage() {
       }
     });
 
-    // Overlap validation between In-Clinic and Online schedules across all assigned branches
+    // Comprehensive Cross-Branch & Multi-Shift Overlap Validation
     const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    for (const bId of providerFormBranchIds) {
-      const sched = finalSchedules[bId];
-      if (!sched) continue;
-      const branchName = branches.find((b) => b.id === bId)?.name_en || bId;
+    
+    const extractShiftsForDay = (dayConfig: any) => {
+      if (!dayConfig || !dayConfig.isOpen) return [];
+      const shifts: Array<{ startMins: number; endMins: number; startStr: string; endStr: string }> = [];
+      const timeToMins = (tStr: string) => {
+        if (!tStr) return 0;
+        const [h, m] = tStr.split(":").map(Number);
+        return (h || 0) * 60 + (m || 0);
+      };
 
-      for (const day of weekdays) {
-        const inClinic = sched.in_person?.[day];
-        const online = sched.online?.[day];
-        if (inClinic && online && inClinic.isOpen && online.isOpen) {
-          const timeToMins = (tStr: string) => {
-            const [h, m] = tStr.split(":").map(Number);
-            return h * 60 + m;
-          };
-          const start1 = timeToMins(inClinic.start);
-          const end1 = timeToMins(inClinic.end);
-          const start2 = timeToMins(online.start);
-          const end2 = timeToMins(online.end);
+      if (Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
+        dayConfig.shifts.forEach((s: any) => {
+          if (s.start && s.end) {
+            shifts.push({
+              startMins: timeToMins(s.start),
+              endMins: timeToMins(s.end),
+              startStr: s.start,
+              endStr: s.end,
+            });
+          }
+        });
+      } else if (dayConfig.start && dayConfig.end) {
+        shifts.push({
+          startMins: timeToMins(dayConfig.start),
+          endMins: timeToMins(dayConfig.end),
+          startStr: dayConfig.start,
+          endStr: dayConfig.end,
+        });
+      }
+      return shifts;
+    };
 
-          if (start1 < end2 && start2 < end1) {
-            alert(`Schedule overlap detected on ${day} for branch "${branchName}"! In-Clinic hours (${inClinic.start} - ${inClinic.end}) and Online hours (${online.start} - ${online.end}) cannot overlap.`);
+    for (const day of weekdays) {
+      const dayShifts: Array<{
+        branchId: string;
+        branchName: string;
+        type: 'In-Clinic' | 'Online';
+        startMins: number;
+        endMins: number;
+        startStr: string;
+        endStr: string;
+      }> = [];
+
+      for (const bId of providerFormBranchIds) {
+        const sched = finalSchedules[bId];
+        if (!sched) continue;
+        const branchName = branches.find((b) => b.id === bId)?.name_en || bId;
+
+        // In-Clinic shifts
+        const inClinicShifts = extractShiftsForDay(sched.in_person?.[day]);
+        inClinicShifts.forEach((s) => {
+          dayShifts.push({ branchId: bId, branchName, type: 'In-Clinic', ...s });
+        });
+
+        // Online shifts
+        const onlineShifts = extractShiftsForDay(sched.online?.[day]);
+        onlineShifts.forEach((s) => {
+          dayShifts.push({ branchId: bId, branchName, type: 'Online', ...s });
+        });
+      }
+
+      // Check all pairs of shifts for overlap on this day
+      for (let i = 0; i < dayShifts.length; i++) {
+        for (let j = i + 1; j < dayShifts.length; j++) {
+          const s1 = dayShifts[i];
+          const s2 = dayShifts[j];
+
+          if (s1.startMins < s2.endMins && s2.startMins < s1.endMins) {
+            alert(`Schedule overlap detected on ${day}!\nDoctor cannot be scheduled at "${s1.branchName}" (${s1.type}: ${s1.startStr} - ${s1.endStr}) and "${s2.branchName}" (${s2.type}: ${s2.startStr} - ${s2.endStr}) at the same time.`);
             return;
           }
         }
