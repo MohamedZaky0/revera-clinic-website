@@ -173,7 +173,7 @@ no application code reads or writes it; do not use it until its purpose is decid
 | `email` | text | Patient email |
 | `phone` | text | Patient phone |
 | `notes` | text | Patient notes, default '' |
-| `status` | text | `'pending_deposit'`, `'pending'`, `'approved'`, `'confirmed'`, `'started'`, `'completed'`, `'cancelled'`, `'rejected'` — enforced via CHECK constraint `reservations_status_check` |
+| `status` | text | `'pending_deposit'`, `'pending'`, `'approved'`, `'confirmed'`, `'started'`, `'completed'`, `'cancelled'`, `'rejected'`, `'no_show'`, `'postponed'` — enforced via CHECK constraint `reservations_status_check`. `no_show`/`postponed` added 2026-07-28 by `20260728000000_add_no_show_and_postponed_reservation_status.sql` (RISK-029): `cancelled` refunds the deposit to the patient's wallet, `no_show` forfeits it (added to `customers.spent_amount`), `postponed` moves no money at all — see `POST /api/reservations` PATCH `action: 'cancel' | 'no_show' | 'postpone'`. |
 | `time_slot` | text | Assigned 15-min slot (e.g., '09:00'), nullable — set on approve |
 | `session_type` | text | Default `'in_person'` |
 | ~~`origin`~~ | — | **DOES NOT EXIST.** Verified absent from the live dev database 2026-07-25, and created by no migration. `20260709154350_add_reservation_source.sql` adds `is_manual`, not `origin`, despite its filename. Row kept struck through so it is not silently re-added. |
@@ -188,6 +188,7 @@ no application code reads or writes it; do not use it until its purpose is decid
 | `room_id` | UUID | FK → rooms.id, nullable |
 | `rooms` | uuid[] | Array of room IDs for multi-room bookings, default `{}` |
 | `created_by_employee_id` | UUID | FK → employee_accounts.id, nullable — who created the booking (for HR revenue-target attribution) |
+| `follow_up_date` | date | nullable. **Added 2026-07-28** by `20260728000100_add_reservations_follow_up_date.sql`. Only meaningful when `status = 'postponed'` and no new date/time is known yet — a reminder for staff to check back, not a real slot. Cleared once the booking is actually rescheduled (`date`/`time_slot` updated, status leaves `postponed`). |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
@@ -270,6 +271,7 @@ read-only `/api/availability`. An admin can double-book a doctor from the panel.
 | `commission_value` | numeric | Default 0 |
 | `commission_base` | text | Default `'gross'`, CHECK IN (`'gross'`, `'net_of_materials'`) |
 | `commission_fixed_component` | numeric | Default 0 — fixed component when `commission_type = 'both'` |
+| `service_commissions` | JSONB | Default `[]` — per-service commission overrides (`{ service, serviceId?, type, value }[]`); fallback to global commission fields when a service is not listed |
 | `created_at` | timestamptz | |
 
 ---

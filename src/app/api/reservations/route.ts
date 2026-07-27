@@ -48,6 +48,7 @@ function mapRow(r: Record<string, any>) {
     services: r.services || null,
     doctorName: r.doctor_name ?? null,
     providerId: r.provider_id ?? null,
+    followUpDate: r.follow_up_date ?? null,
   };
 }
 
@@ -113,7 +114,7 @@ async function applyCheckoutCosting(params: {
     supabaseServer.from('service_consumables').select('service_id, product_id, standard_qty').in('service_id', serviceIds),
     supabaseServer.from('service_devices').select('service_id, pulses_per_session, device_id').in('service_id', serviceIds),
     providerId
-      ? supabaseServer.from('providers').select('commission_type, commission_value, commission_fixed_component, commission_base').eq('id', providerId).maybeSingle()
+      ? supabaseServer.from('providers').select('commission_type, commission_value, commission_fixed_component, commission_base, service_commissions').eq('id', providerId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ]);
   if (recipesResult.error) throw recipesResult.error;
@@ -227,8 +228,17 @@ async function applyCheckoutCosting(params: {
       const commissionBase = provider?.commission_base === 'net_of_materials'
         ? Math.max(0, Number(invoiceLine.line_total) - cogsSnapshot)
         : Number(invoiceLine.line_total);
-      const commissionSnapshot = provider
-        ? computeCommission(commissionBase, provider.commission_type, Number(provider.commission_value || 0), Number(provider.commission_fixed_component || 0))
+
+      const serviceCommission = provider && Array.isArray(provider.service_commissions)
+        ? provider.service_commissions.find((sc: any) => sc.serviceId && Number(sc.serviceId) === Number(invoiceLine.service_id))
+        : null;
+
+      const effectiveCommissionType = serviceCommission?.type || provider?.commission_type || 'none';
+      const effectiveCommissionValue = serviceCommission
+        ? Number(serviceCommission.value || 0)
+        : Number(provider?.commission_value || 0);
+      const commissionSnapshot = provider && effectiveCommissionType !== 'none'
+        ? computeCommission(commissionBase, effectiveCommissionType as any, effectiveCommissionValue, Number(provider.commission_fixed_component || 0))
         : 0;
 
       const { error: updateError } = await supabaseServer.from('invoice_lines')
@@ -664,7 +674,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides } = body;
+    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides, date: newDate, followUpDate } = body;
 
     const { data: target, error: findError } = await supabaseServer
       .from('reservations')
@@ -692,7 +702,7 @@ export async function PATCH(req: Request) {
       }
     }
 
-    if (target.status === 'started' && (action === 'reject' || status === 'cancelled' || status === 'rejected')) {
+    if (target.status === 'started' && (action === 'reject' || action === 'cancel' || action === 'no_show' || status === 'cancelled' || status === 'rejected')) {
       return NextResponse.json({ error: 'Cannot cancel a booking that has already started.' }, { status: 400 });
     }
 
@@ -887,7 +897,107 @@ export async function PATCH(req: Request) {
       if (updateError) throw updateError;
       return NextResponse.json(mapRow(updated));
 
-    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined) {
+    } else if (action === 'cancel' || action === 'no_show') {
+      // RISK-029's deposit-refund/forfeit policy. Driven entirely by the reservation's actual
+      // amount_paid — not a clinic-level "deposits enabled" flag. A clinic with deposits turned
+      // off (depositPercentage 0) will simply never have amount_paid > 0 on a non-completed
+      // booking, so this becomes a no-op automatically; no per-clinic customization needed.
+      if (target.status === 'completed') {
+        return NextResponse.json({ error: 'Cannot cancel or mark no-show on a completed booking.' }, { status: 400 });
+      }
+      // Idempotent: re-firing the same action on an already-cancelled/no_show booking must not
+      // refund or forfeit the deposit a second time.
+      if (target.status === 'cancelled' || target.status === 'no_show') {
+        return NextResponse.json(mapRow(target));
+      }
+
+      const depositPaid = Number(target.amount_paid) || 0;
+      const newStatus = action === 'cancel' ? 'cancelled' : 'no_show';
+
+      if (depositPaid > 0 && target.customer_id) {
+        const { data: customer, error: custReadError } = await supabaseServer
+          .from('customers')
+          .select('wallet_balance, spent_amount')
+          .eq('id', target.customer_id)
+          .maybeSingle();
+        if (custReadError) throw custReadError;
+
+        if (customer) {
+          if (action === 'cancel') {
+            // Cancelled in advance: give the deposit back as wallet credit (matches the existing
+            // checkout "change" pattern — store credit, not a claim this system can pay out cash).
+            const { error: custUpdateError } = await supabaseServer
+              .from('customers')
+              .update({ wallet_balance: Number(customer.wallet_balance || 0) + depositPaid })
+              .eq('id', target.customer_id);
+            if (custUpdateError) throw custUpdateError;
+          } else {
+            // No-show: the clinic keeps the deposit as a cancellation fee — recognise it as
+            // real spend now, since completion (which normally does this) will never happen.
+            const { error: custUpdateError } = await supabaseServer
+              .from('customers')
+              .update({ spent_amount: Number(customer.spent_amount || 0) + depositPaid })
+              .eq('id', target.customer_id);
+            if (custUpdateError) throw custUpdateError;
+          }
+        }
+      }
+
+      const { data: updated, error: updateError } = await supabaseServer
+        .from('reservations')
+        .update({
+          status: newStatus,
+          // Cancel: nothing is owed and nothing remains paid on the booking (it was refunded).
+          // No-show: the deposit stays on record as amount_paid (it was kept, not refunded), but
+          // no further balance is owed for a service that was never delivered.
+          amount_paid: action === 'cancel' ? 0 : target.amount_paid,
+          amount_left: 0,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      return NextResponse.json(mapRow(updated));
+
+    } else if (action === 'postpone') {
+      // Two distinct paths, same action — the front desk usually doesn't know which one it'll
+      // be until the patient answers the phone:
+      // 1. A new date/time is already known: this is just a reschedule. No money moves, no
+      //    'postponed' limbo — the booking keeps whatever active status it already had.
+      // 2. Not known yet: status becomes 'postponed' with a follow-up reminder date, and the old
+      //    date/time_slot are left as-is (stale, ignored while postponed) until path 1 happens
+      //    later for this same booking.
+      if (target.status === 'completed' || target.status === 'cancelled' || target.status === 'no_show') {
+        return NextResponse.json({ error: 'Cannot postpone a booking that is completed, cancelled, or a no-show.' }, { status: 400 });
+      }
+
+      const updates: Record<string, any> = {};
+      if (newDate) {
+        updates.date = newDate;
+        if (timeSlot) updates.time_slot = timeSlot;
+        updates.follow_up_date = null;
+        if (target.status === 'postponed') {
+          updates.status = 'approved';
+        }
+      } else if (followUpDate) {
+        updates.status = 'postponed';
+        updates.follow_up_date = followUpDate;
+      } else {
+        return NextResponse.json({ error: 'Either a new date or a follow-up date is required.' }, { status: 400 });
+      }
+
+      const { data: updated, error: updateError } = await supabaseServer
+        .from('reservations')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      return NextResponse.json(mapRow(updated));
+
+    } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (notes !== undefined) updates.notes = notes;
@@ -907,6 +1017,8 @@ export async function PATCH(req: Request) {
         }
       }
       if (createdByEmployeeId !== undefined) updates.created_by_employee_id = createdByEmployeeId || null;
+      if (newDate !== undefined) updates.date = newDate;
+      if (newDate !== undefined && timeSlot) updates.time_slot = timeSlot;
 
       const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')

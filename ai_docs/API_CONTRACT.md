@@ -195,7 +195,21 @@ Updates a reservation. Supports three modes:
 **Reject:** `{ action: "reject" }`
 - Sets status to 'rejected'
 
-**Generic update (includes checkout/wallet adjustments):** `{ status?, notes?, doctorName?, sessionType?, amountPaid?, amountLeft?, walletDeposit?, walletWithdrawal?, consumptionOverrides? }`
+**Cancel:** `{ action: "cancel" }`
+- Requires a staff bearer token. Blocked once the booking is `completed`; idempotent (re-firing on an already-`cancelled`/`no_show` booking is a no-op).
+- Refunds any deposit already paid (`amount_paid`) to `customers.wallet_balance`, then sets the reservation's `amount_paid`/`amount_left` to 0 and status to `'cancelled'` (RISK-029). Does nothing if `amount_paid` is 0 (e.g. no deposit was ever collected).
+
+**No-show:** `{ action: "no_show" }`
+- Same guards as Cancel. Forfeits any deposit already paid — adds it to `customers.spent_amount` instead of refunding it — sets `amount_left` to 0 (nothing further owed for an undelivered service), and status to `'no_show'`. `amount_paid` is left as-is (it was kept, not refunded).
+
+**Postpone:** `{ action: "postpone", date?, timeSlot?, followUpDate? }`
+- Requires a staff bearer token. Blocked if the booking is `completed`, `cancelled`, or `no_show`.
+- If `date` is given: this is a real reschedule — updates `date` (and `time_slot` if `timeSlot` is also given), clears `follow_up_date`, and returns the booking to `'approved'` if it was `'postponed'`. No money moves.
+- Else if `followUpDate` is given: sets status to `'postponed'` and stores `follow_up_date` as a reminder — the existing `date`/`time_slot` are left untouched but should be treated as stale until the booking is actually rescheduled via the path above.
+- One of `date` or `followUpDate` is required.
+
+**Generic update (includes checkout/wallet adjustments):** `{ status?, notes?, doctorName?, sessionType?, amountPaid?, amountLeft?, walletDeposit?, walletWithdrawal?, consumptionOverrides?, date? }`
+- `date` (paired with `timeSlot`) reschedules the booking directly, independent of the `postpone` action above — this is the general-purpose "edit booking date/time" path.
 - Requires a staff bearer token and updates any combination of those fields
 - Transitioning to status `'completed'` triggers patient balance ledger calculations and an additive invoice, invoice-line, and payment write; the pre-existing reservation and customer balance updates remain unchanged
 - A later `amountPaid` change on an already-`completed` reservation appends one more payment row to that reservation's existing invoice, rather than creating a duplicate invoice or duplicate service lines

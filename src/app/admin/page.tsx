@@ -130,6 +130,7 @@ type Req = {
   roomId?: string | null;
   rooms?: string[];
   createdByEmployeeId?: string | null;
+  followUpDate?: string | null;
 };
 
 function getStatusBadgeClass(status: string): string {
@@ -150,6 +151,10 @@ function getStatusBadgeClass(status: string): string {
       return 'bg-red-50 text-red-700 border border-red-200/50';
     case 'pending_deposit':
       return 'bg-purple-50 text-purple-700 border border-purple-200/50';
+    case 'no_show':
+      return 'bg-orange-50 text-orange-700 border border-orange-200/50';
+    case 'postponed':
+      return 'bg-yellow-50 text-yellow-700 border border-yellow-200/50';
     case 'pending':
     default:
       return 'bg-amber-50 text-amber-700 border border-amber-200/50';
@@ -1302,6 +1307,15 @@ export default function AdminPage() {
   const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(true);
   const [savingCheckout, setSavingCheckout] = useState<boolean>(false);
   const [invoiceBooking, setInvoiceBooking] = useState<any>(null);
+
+  // Postpone modal state (RISK-029 follow-up) — two modes: reschedule now (real date/time known)
+  // or follow-up later (status becomes 'postponed', no date/time change yet).
+  const [postponeBooking, setPostponeBooking] = useState<any>(null);
+  const [postponeMode, setPostponeMode] = useState<"reschedule" | "followup">("reschedule");
+  const [postponeNewDate, setPostponeNewDate] = useState("");
+  const [postponeNewTime, setPostponeNewTime] = useState("");
+  const [postponeFollowUpDate, setPostponeFollowUpDate] = useState("");
+  const [savingPostpone, setSavingPostpone] = useState(false);
 
   const [custName, setCustName] = useState("");
   const [custMobile, setCustMobile] = useState("");
@@ -25172,6 +25186,73 @@ export default function AdminPage() {
                     </div>
                   )}
 
+                  {!['completed', 'cancelled', 'rejected', 'no_show', 'started'].includes(viewingBooking.status) && hasPermission("bookings.edit") && (
+                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Other Actions</p>
+                      {viewingBooking.status === 'postponed' && viewingBooking.followUpDate && (
+                        <p className="text-xs text-[#5A6A51] mb-3">
+                          Follow up around <strong>{viewingBooking.followUpDate}</strong> to reschedule.
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setPostponeBooking(viewingBooking);
+                            setPostponeMode("reschedule");
+                            setPostponeNewDate(viewingBooking.date || "");
+                            setPostponeNewTime(viewingBooking.timeSlot || "");
+                            setPostponeFollowUpDate("");
+                          }}
+                          className="flex-1 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] py-2 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                        >
+                          Postpone
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!(await showConfirm("Cancel this booking? Any deposit paid will be refunded to the patient's wallet."))) return;
+                            const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                              method: 'PATCH',
+                              headers: authenticatedJsonHeaders,
+                              body: JSON.stringify({ action: 'cancel' }),
+                            });
+                            if (res.ok) {
+                              setViewingBooking(null);
+                              fetchAllReservations();
+                              fetchCustomers();
+                            } else {
+                              const err = await res.json();
+                              alert(err.error || "Failed to cancel booking.");
+                            }
+                          }}
+                          className="flex-1 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] py-2 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!(await showConfirm("Mark this booking as a no-show? Any deposit paid will be forfeited as a cancellation fee, not refunded."))) return;
+                            const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                              method: 'PATCH',
+                              headers: authenticatedJsonHeaders,
+                              body: JSON.stringify({ action: 'no_show' }),
+                            });
+                            if (res.ok) {
+                              setViewingBooking(null);
+                              fetchAllReservations();
+                              fetchCustomers();
+                            } else {
+                              const err = await res.json();
+                              alert(err.error || "Failed to mark booking as no-show.");
+                            }
+                          }}
+                          className="flex-1 rounded-xl border border-rose-200 bg-rose-50 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition"
+                        >
+                          No Show
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Customer Information */}
                   {(() => {
                     const customerRecord = dbCustomers.find(c => c.id === viewingBooking.customerId || c.phone === viewingBooking.phone);
@@ -25553,7 +25634,7 @@ export default function AdminPage() {
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Status</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {['All', 'approved', 'pending', 'rejected', 'pending_deposit'].map(st => (
+                  {['All', 'approved', 'pending', 'rejected', 'pending_deposit', 'postponed', 'no_show'].map(st => (
                     <button
                       key={st}
                       onClick={() => setStatusFilter(st)}
@@ -25563,7 +25644,7 @@ export default function AdminPage() {
                           : 'border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#f7f6f2]'
                       }`}
                     >
-                      {st === 'approved' ? 'Approved' : st === 'pending' ? 'Pending' : st === 'rejected' ? 'Rejected' : st === 'pending_deposit' ? 'Pending Deposit' : 'All'}
+                      {st === 'approved' ? 'Approved' : st === 'pending' ? 'Pending' : st === 'rejected' ? 'Rejected' : st === 'pending_deposit' ? 'Pending Deposit' : st === 'postponed' ? 'Postponed' : st === 'no_show' ? 'No Show' : 'All'}
                     </button>
                   ))}
                 </div>
@@ -27095,6 +27176,119 @@ export default function AdminPage() {
                   </button>
                 </form>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── POSTPONE BOOKING MODAL ── */}
+      {postponeBooking && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Reschedule</p>
+                <h3 className="text-xl font-bold text-[#1F251A] mt-1">Postpone Booking</h3>
+              </div>
+              <button
+                onClick={() => setPostponeBooking(null)}
+                className="rounded-full bg-[#F2EFE9] p-2 text-[#414E36] transition hover:bg-[#e4e0d6]"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex gap-2 rounded-2xl border border-[#414E36]/10 bg-white p-1">
+                <button
+                  type="button"
+                  onClick={() => setPostponeMode("reschedule")}
+                  className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${postponeMode === "reschedule" ? "bg-[#414E36] text-white" : "text-[#414E36]"}`}
+                >
+                  I know the new date
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostponeMode("followup")}
+                  className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${postponeMode === "followup" ? "bg-[#414E36] text-white" : "text-[#414E36]"}`}
+                >
+                  Not sure yet
+                </button>
+              </div>
+
+              {postponeMode === "reschedule" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#5A6A51] mb-1">New Date</label>
+                    <input
+                      type="date"
+                      value={postponeNewDate}
+                      onChange={(e) => setPostponeNewDate(e.target.value)}
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#5A6A51] mb-1">New Time</label>
+                    <select
+                      value={postponeNewTime}
+                      onChange={(e) => setPostponeNewTime(e.target.value)}
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                    >
+                      <option value="">Select time</option>
+                      {ALL_15MIN_SLOTS.map((slot) => (
+                        <option key={slot} value={slot}>{slot}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-bold text-[#5A6A51] mb-1">Follow Up Around</label>
+                  <input
+                    type="date"
+                    value={postponeFollowUpDate}
+                    onChange={(e) => setPostponeFollowUpDate(e.target.value)}
+                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  />
+                  <p className="text-[11px] text-[#8A9A81] mt-1.5">
+                    The booking will be marked Postponed with no confirmed date until you come back and reschedule it.
+                  </p>
+                </div>
+              )}
+
+              <button
+                disabled={savingPostpone || (postponeMode === "reschedule" ? !postponeNewDate : !postponeFollowUpDate)}
+                onClick={async () => {
+                  setSavingPostpone(true);
+                  try {
+                    const payload =
+                      postponeMode === "reschedule"
+                        ? { action: "postpone", date: postponeNewDate, timeSlot: postponeNewTime || undefined }
+                        : { action: "postpone", followUpDate: postponeFollowUpDate };
+                    const res = await fetch(`/api/reservations?id=${postponeBooking.id}`, {
+                      method: "PATCH",
+                      headers: authenticatedJsonHeaders,
+                      body: JSON.stringify(payload),
+                    });
+                    if (res.ok) {
+                      setPostponeBooking(null);
+                      setViewingBooking(null);
+                      fetchAllReservations();
+                    } else {
+                      const err = await res.json();
+                      alert(err.error || "Failed to postpone booking.");
+                    }
+                  } catch (err) {
+                    console.error(err);
+                    alert("Error postponing booking.");
+                  } finally {
+                    setSavingPostpone(false);
+                  }
+                }}
+                className="w-full rounded-2xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
+              >
+                {savingPostpone ? "Saving..." : postponeMode === "reschedule" ? "Reschedule Booking" : "Mark as Postponed"}
+              </button>
             </div>
           </div>
         </div>

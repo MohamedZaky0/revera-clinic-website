@@ -1142,11 +1142,43 @@ pass. Live check still needed: book with a deposit, complete checkout, confirm t
 Balance Due (not full price) and `customers.spent_amount` ends up equal to the full service price,
 not just the checkout-time payment.
 
-**Not addressed here — a related, larger policy question the user raised in the same
-conversation:** what happens to the deposit on cancellation vs. a no-show (refund vs. forfeit).
-That needs a product decision (does a refund credit the wallet or something else, does a distinct
-`no_show` status need to be added to `reservations_status_check` alongside `cancelled`/`rejected`)
-before it should be implemented — deliberately scoped out of this fix, not silently skipped.
+**Follow-up, done 2026-07-28 — the deposit refund-vs-forfeit policy.** Decisions taken with the
+user: refund credits the patient's wallet (matches the existing checkout-change pattern, no real
+cash payout tracked by this system); `cancelled` and `rejected` stay separate (`rejected` = staff
+declines before commitment, no money involved, unchanged; `cancelled` = an accepted booking is
+called off after a deposit was paid, now refunds); a distinct `no_show` status was added.
+Deliberately **not** a clinic-level "deposits enabled" toggle — the refund/forfeit amount is
+whatever `amount_paid` actually is on the reservation, so a clinic with deposits disabled
+(`depositPercentage = 0`) automatically has nothing to refund or forfeit, no special-casing needed.
+
+- Migration `20260728000000_add_no_show_and_postponed_reservation_status.sql` adds `no_show` (and
+  `postponed`, see below — added together since both needed the same CHECK constraint edit) to
+  `reservations_status_check`.
+- `POST /api/reservations` PATCH gained `action: 'cancel'` (refund) and `action: 'no_show'`
+  (forfeit) — see `API_CONTRACT.md` for the exact field-level behavior. Both are idempotent and
+  blocked once a booking is `completed` or already in a terminal cancel/no-show state.
+- **A "Postponed" status was added in the same pass** (user request, same conversation): a
+  non-terminal state for "patient can't make this date, but isn't cancelling" — moves no money.
+  Two paths through one `action: 'postpone'`: a known new date/time reschedules directly (no
+  status change beyond returning to `'approved'` if it was already `'postponed'`); an unknown one
+  sets status to `'postponed'` with a `follow_up_date` reminder (new nullable column, migration
+  `20260728000100_add_reservations_follow_up_date.sql`) until staff comes back and reschedules it
+  for real.
+- Admin UI: Cancel / No Show / Postpone buttons added to the booking details drawer (available on
+  any non-`started`, non-terminal booking), plus a Postpone modal offering both paths, plus
+  `postponed`/`no_show` added to the bookings status filter and status-badge color mapping.
+
+**Adjacent gap noticed, not addressed:** `Booking Settings` already has a "Cancellation Window
+(Hours)" setting (`bookingCancelWindow`) whose own description says late cancellations "may
+forfeit their deposit" — but nothing reads this setting anywhere; `cancel` always refunds
+regardless of timing right now. Worth a future pass if the clinic actually wants late
+cancellations to behave like a no-show rather than a full refund.
+
+**Verify (this follow-up):** `npx tsc --noEmit`, `npx eslint`, `npx next build` all clean.
+Live check still needed: cancel a booking with a paid deposit and confirm the wallet credits;
+mark another as no-show and confirm `spent_amount` increases instead; postpone one via each path
+and confirm the date-known path reschedules immediately while the follow-up path leaves it
+findable under the new "Postponed" filter.
 
 ---
 
