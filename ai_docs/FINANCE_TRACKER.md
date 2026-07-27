@@ -1946,10 +1946,10 @@ commission-from-snapshots, the `completed`-only status-filter narrowing).
 | 3.7 | Migration: `loan_schedule` table | 3.6 | `DONE` | Claude | `20260726170600`, live-verified |
 | 3.8 | Library: `src/lib/depreciation.ts` — straight-line depreciation + loan amortization (pure functions) | 3.4–3.7 (schema shape only) | `DONE` | Claude | pending commit |
 | 3.9 | Regression checks for 3.8 | 3.8 | `DONE` | Claude | pending commit |
-| 3.10 | New endpoints: expenses CRUD + recurring-expense generation | 3.1–3.3 | `DONE` | Claude | pending commit |
-| 3.11 | New endpoints: fixed assets CRUD + monthly depreciation posting | 3.4, 3.5, 3.8 | `DONE` | Claude | pending commit |
-| 3.12 | New endpoints: loans CRUD + schedule generation | 3.6, 3.7, 3.8 | `DONE` | Claude | pending commit |
-| 3.13 | `API_CONTRACT.md` rollup for Phase 3 | rolling, alongside 3.10–3.12 | `DONE` | Claude | pending commit |
+| 3.10 | New endpoints: expenses CRUD + recurring-expense generation | 3.1–3.3 | `DONE` | Claude | `2c17c14` |
+| 3.11 | New endpoints: fixed assets CRUD + monthly depreciation posting | 3.4, 3.5, 3.8 | `DONE` | Claude | `2c17c14` |
+| 3.12 | New endpoints: loans CRUD + schedule generation | 3.6, 3.7, 3.8 | `DONE` | Claude | `2c17c14` |
+| 3.13 | `API_CONTRACT.md` rollup for Phase 3 | rolling, alongside 3.10–3.12 | `DONE` | Claude | `2c17c14` |
 
 ---
 
