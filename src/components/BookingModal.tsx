@@ -450,10 +450,6 @@ export function BookingModal() {
       }
     }
 
-    if (clinicClosed) {
-      return { start: "23:59", end: "23:59" }; // clinic closed
-    }
-
     let minStart = 24 * 60; // in minutes
     let maxEnd = 0; // in minutes
     let found = false;
@@ -523,6 +519,9 @@ export function BookingModal() {
       if (minStart < clinicStartMins) minStart = clinicStartMins;
       if (maxEnd > clinicEndMins) maxEnd = clinicEndMins;
     } else {
+      if (clinicClosed) {
+        return { start: "23:59", end: "23:59" };
+      }
       minStart = clinicStartMins;
       maxEnd = clinicEndMins;
     }
