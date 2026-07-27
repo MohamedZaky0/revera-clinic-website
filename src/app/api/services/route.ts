@@ -1,37 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess } from '@/lib/access';
-
-function getDurationInMinutes(duration: string | null | undefined): number | null {
-  if (!duration) return null;
-  const cleaned = duration.toLowerCase().trim();
-
-  const matchHours = cleaned.match(/(\d+):(\d+)\s*hour/);
-  if (matchHours) {
-    const hrs = parseInt(matchHours[1], 10);
-    const mins = parseInt(matchHours[2], 10);
-    return hrs * 60 + mins;
-  }
-
-  const matchMins = cleaned.match(/(\d+)\s*min/);
-  if (matchMins) {
-    return parseInt(matchMins[1], 10);
-  }
-
-  const matchOneHour = cleaned.match(/(\d+)\s*hour/);
-  if (matchOneHour) {
-    return parseInt(matchOneHour[1], 10) * 60;
-  }
-
-  const matchHHMM = cleaned.match(/^(\d+):(\d+)$/);
-  if (matchHHMM) {
-    const hrs = parseInt(matchHHMM[1], 10);
-    const mins = parseInt(matchHHMM[2], 10);
-    return hrs * 60 + mins;
-  }
-
-  return null;
-}
+import { getDurationInMinutes } from '@/lib/services';
 
 function fmtCreatedAt(val: unknown): string {
   if (!val) return "";
