@@ -763,11 +763,24 @@ Attached is my payment transaction receipt photo.`;
     });
   }, [selectedDate, getDayOperatingHours, takenSlots]);
 
+  // Auto-select first available time slot when valid slots load
+  useEffect(() => {
+    if (filteredTimeSlots.length > 0) {
+      if (!selectedTime || !filteredTimeSlots.includes(selectedTime)) {
+        setSelectedTime(filteredTimeSlots[0]);
+      }
+    } else if (selectedDate) {
+      setSelectedTime(null);
+    }
+  }, [filteredTimeSlots, selectedDate]);
+
   const canNext =
     step === 1 &&
     serviceId !== null &&
     selectedDate !== null &&
     selectedTime !== null &&
+    filteredTimeSlots.length > 0 &&
+    filteredTimeSlots.includes(selectedTime) &&
     (branches.length === 0 || sessionType === "online" || branchId !== null);
 
   const instapayQrUrl = instapayLink && instapayLink !== "https://www.instapay.eg" 

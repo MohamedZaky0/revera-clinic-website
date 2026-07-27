@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Keyboard, Clock } from "lucide-react";
+import { Keyboard, Clock, AlertCircle } from "lucide-react";
 
 interface MaterialTimePickerProps {
   selectedTime: string | null; // e.g. "07:00 AM" or "02:30 PM"
@@ -12,11 +12,11 @@ interface MaterialTimePickerProps {
 }
 
 function parseTime12h(timeStr: string | null): { hour: number; minute: number; ampm: "AM" | "PM" } {
-  if (!timeStr) return { hour: 7, minute: 0, ampm: "AM" };
+  if (!timeStr) return { hour: 9, minute: 0, ampm: "AM" };
   const parts = timeStr.trim().split(" ");
   const ampm = parts[1]?.toUpperCase() === "PM" ? "PM" : "AM";
-  const [hhStr, mmStr] = (parts[0] || "07:00").split(":");
-  let hour = parseInt(hhStr, 10) || 7;
+  const [hhStr, mmStr] = (parts[0] || "09:00").split(":");
+  let hour = parseInt(hhStr, 10) || 9;
   const minute = parseInt(mmStr, 10) || 0;
   if (hour > 12) hour = hour % 12;
   if (hour === 0) hour = 12;
@@ -46,6 +46,37 @@ export function MaterialTimePicker({
 
   const dialRef = useRef<HTMLDivElement>(null);
 
+  // Derive sets of available hours & minutes for currently active period/hour
+  const availableHoursForPeriod = useMemo(() => {
+    const hoursSet = new Set<number>();
+    availableSlots.forEach((slot) => {
+      const { hour: h, ampm: period } = parseTime12h(slot);
+      if (period === ampm) {
+        hoursSet.add(h);
+      }
+    });
+    return hoursSet;
+  }, [availableSlots, ampm]);
+
+  const availableMinutesForHour = useMemo(() => {
+    const minutesSet = new Set<number>();
+    availableSlots.forEach((slot) => {
+      const { hour: h, minute: m, ampm: period } = parseTime12h(slot);
+      if (period === ampm && h === hour) {
+        minutesSet.add(m);
+      }
+    });
+    return minutesSet;
+  }, [availableSlots, ampm, hour]);
+
+  const hasAmSlots = useMemo(() => {
+    return availableSlots.some((slot) => parseTime12h(slot).ampm === "AM");
+  }, [availableSlots]);
+
+  const hasPmSlots = useMemo(() => {
+    return availableSlots.some((slot) => parseTime12h(slot).ampm === "PM");
+  }, [availableSlots]);
+
   // Sync internal state when selectedTime prop updates externally
   useEffect(() => {
     const p = parseTime12h(selectedTime);
@@ -53,6 +84,26 @@ export function MaterialTimePicker({
     setMinute(p.minute);
     setAmpm(p.ampm);
   }, [selectedTime]);
+
+  // Auto-switch to available AM or PM period if currently selected period has no slots
+  useEffect(() => {
+    if (availableSlots.length > 0) {
+      if (ampm === "AM" && !hasAmSlots && hasPmSlots) {
+        setAmpm("PM");
+      } else if (ampm === "PM" && !hasPmSlots && hasAmSlots) {
+        setAmpm("AM");
+      }
+    }
+  }, [availableSlots, ampm, hasAmSlots, hasPmSlots]);
+
+  const formattedCurrent = useMemo(() => {
+    return format12h(hour, minute, ampm);
+  }, [hour, minute, ampm]);
+
+  const isCurrentTimeValid = useMemo(() => {
+    if (availableSlots.length === 0) return true;
+    return availableSlots.includes(formattedCurrent);
+  }, [availableSlots, formattedCurrent]);
 
   const updateTime = (h: number, m: number, period: "AM" | "PM") => {
     const formatted = format12h(h, m, period);
@@ -105,7 +156,11 @@ export function MaterialTimePicker({
     if (clockMode === "hours") {
       let selectedH = Math.round(deg / 30);
       if (selectedH === 0) selectedH = 12;
-      handleHourSelect(selectedH);
+
+      // Check if hour is available
+      if (availableSlots.length === 0 || availableHoursForPeriod.has(selectedH)) {
+        handleHourSelect(selectedH);
+      }
     } else {
       let selectedM = Math.round(deg / 6);
       if (selectedM === 60) selectedM = 0;
@@ -132,7 +187,7 @@ export function MaterialTimePicker({
       </p>
 
       {/* Digital Display Header (HH : MM + AM/PM) */}
-      <div className="flex items-center justify-between mb-5 px-1">
+      <div className="flex items-center justify-between mb-4 px-1">
         <div className="flex items-center gap-2.5" dir="ltr">
           {/* Hour Box */}
           <button
@@ -168,11 +223,14 @@ export function MaterialTimePicker({
         <div className="flex flex-col rounded-xl border border-[#414E36]/20 bg-white overflow-hidden shadow-2xs">
           <button
             type="button"
+            disabled={!hasAmSlots && availableSlots.length > 0}
             onClick={() => handleAmpmToggle("AM")}
-            className={`px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 text-xs font-bold transition-all ${
               ampm === "AM"
                 ? "bg-[#414E36] text-white"
-                : "text-[#5A6A51] hover:bg-[#414E36]/10"
+                : !hasAmSlots && availableSlots.length > 0
+                ? "text-gray-400 opacity-30 cursor-not-allowed bg-gray-50"
+                : "text-[#5A6A51] hover:bg-[#414E36]/10 cursor-pointer"
             }`}
           >
             AM
@@ -180,17 +238,32 @@ export function MaterialTimePicker({
           <div className="h-px bg-[#414E36]/15" />
           <button
             type="button"
+            disabled={!hasPmSlots && availableSlots.length > 0}
             onClick={() => handleAmpmToggle("PM")}
-            className={`px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 text-xs font-bold transition-all ${
               ampm === "PM"
                 ? "bg-[#414E36] text-white"
-                : "text-[#5A6A51] hover:bg-[#414E36]/10"
+                : !hasPmSlots && availableSlots.length > 0
+                ? "text-gray-400 opacity-30 cursor-not-allowed bg-gray-50"
+                : "text-[#5A6A51] hover:bg-[#414E36]/10 cursor-pointer"
             }`}
           >
             PM
           </button>
         </div>
       </div>
+
+      {/* Warning Banner if selected time is closed / unavailable */}
+      {availableSlots.length > 0 && !isCurrentTimeValid && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-2.5 flex items-center gap-2 text-xs font-semibold text-amber-800 animate-fadeIn">
+          <AlertCircle size={16} className="shrink-0 text-amber-600" />
+          <span>
+            {isRTL 
+              ? `العيادة مغلقة في الموعد (${formattedCurrent}). يرجى اختيار موعد متاح.` 
+              : `Clinic is closed at ${formattedCurrent}. Please select an available slot.`}
+          </span>
+        </div>
+      )}
 
       {/* Main Body: Radial Clock vs Slots Grid */}
       {inputMode === "clock" ? (
@@ -199,7 +272,7 @@ export function MaterialTimePicker({
           <div
             ref={dialRef}
             onClick={handleDialClick}
-            className="relative h-56 w-56 rounded-full bg-white/90 border border-[#414E36]/15 flex items-center justify-center cursor-pointer select-none touch-none shadow-inner"
+            className="relative h-56 w-56 rounded-full bg-white/90 border border-[#414E36]/15 flex items-center justify-center select-none touch-none shadow-inner"
           >
             {/* Center Pivot Point */}
             <div className="absolute h-3.5 w-3.5 rounded-full bg-[#414E36] z-20 shadow-xs" />
@@ -221,27 +294,38 @@ export function MaterialTimePicker({
               const x = radius * Math.cos(angleRad);
               const y = radius * Math.sin(angleRad);
 
+              const hVal = val === 0 ? 12 : val;
+              const isAvailable =
+                availableSlots.length === 0 ||
+                (clockMode === "hours"
+                  ? availableHoursForPeriod.has(hVal)
+                  : availableMinutesForHour.has(val));
+
               const isSelected =
                 clockMode === "hours"
-                  ? hour === (val === 0 ? 12 : val)
+                  ? hour === hVal
                   : minute === val;
 
               return (
                 <button
                   key={val}
                   type="button"
+                  disabled={!isAvailable}
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (!isAvailable) return;
                     if (clockMode === "hours") {
-                      handleHourSelect(val === 0 ? 12 : val);
+                      handleHourSelect(hVal);
                     } else {
                       handleMinuteSelect(val);
                     }
                   }}
-                  className={`absolute h-8 w-8 rounded-full flex items-center justify-center text-xs transition-all z-20 cursor-pointer ${
+                  className={`absolute h-8 w-8 rounded-full flex items-center justify-center text-xs transition-all z-20 ${
                     isSelected
-                      ? "bg-[#414E36] text-white font-bold scale-110 shadow-xs"
-                      : "text-[#1F251A] hover:bg-[#414E36]/15 font-semibold"
+                      ? "bg-[#414E36] text-white font-bold scale-110 shadow-xs cursor-pointer"
+                      : isAvailable
+                      ? "text-[#1F251A] hover:bg-[#414E36]/15 font-semibold cursor-pointer"
+                      : "text-gray-400 opacity-25 cursor-not-allowed pointer-events-none"
                   }`}
                   style={{
                     transform: `translate(${x}px, ${y}px)`,
@@ -303,7 +387,7 @@ export function MaterialTimePicker({
           </span>
         </button>
 
-        <div className="text-xs font-bold text-[#414E36]">
+        <div className={`text-xs font-bold ${isCurrentTimeValid ? "text-[#414E36]" : "text-amber-700"}`}>
           {selectedTime || (isRTL ? "لم يتم تحديد وقت" : "No time selected")}
         </div>
       </div>
