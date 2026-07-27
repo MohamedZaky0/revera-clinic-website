@@ -7931,6 +7931,174 @@ export default function AdminPage() {
                       </div>
                     </div>
 
+                    {/* Weekly Working Schedule */}
+                    <div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Weekly Working Days & Hours (Shifts)</label>
+                          {providerFormBranchIds.length > 1 && (
+                            <div className="mt-1.5 flex items-center gap-2">
+                              <span className="text-xs text-[#5A6A51]">Configure branch schedule:</span>
+                              <select
+                                value={providerFormSelectedScheduleBranchId}
+                                onChange={(e) => handleScheduleBranchChange(e.target.value)}
+                                className="rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-xs text-[#1F251A] font-semibold outline-none focus:border-[#C4AE7C] shadow-sm cursor-pointer"
+                              >
+                                {providerFormBranchIds.map((bId) => {
+                                  const br = branches.find((b) => b.id === bId);
+                                  return (
+                                    <option key={bId} value={bId}>
+                                      {br ? br.name_en : bId}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex rounded-lg border border-[#414E36]/15 p-0.5 bg-gray-50 text-[10px] font-bold self-start sm:self-auto shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setProviderFormScheduleTab("in_person")}
+                            className={`px-3 py-1 rounded transition-colors ${
+                              providerFormScheduleTab === "in_person"
+                                ? "bg-[#414E36] text-white"
+                                : "text-[#5A6A51] hover:text-[#414E36]"
+                            }`}
+                          >
+                            In-Clinic
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setProviderFormScheduleTab("online")}
+                            className={`px-3 py-1 rounded transition-colors ${
+                              providerFormScheduleTab === "online"
+                                ? "bg-[#414E36] text-white"
+                                : "text-[#5A6A51] hover:text-[#414E36]"
+                            }`}
+                          >
+                            Online
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                        {(() => {
+                          const activeSched = providerFormScheduleTab === "in_person" ? providerFormWorkingDaysHours : providerFormOnlineWorkingDaysHours;
+                          const setActiveSched = providerFormScheduleTab === "in_person" ? setProviderFormWorkingDaysHours : setProviderFormOnlineWorkingDaysHours;
+
+                          return Object.keys(activeSched).map((day) => {
+                            const sched = activeSched[day];
+                            return (
+                              <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
+                                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={sched.isOpen}
+                                    onChange={(e) => {
+                                      setActiveSched({
+                                        ...activeSched,
+                                        [day]: { ...sched, isOpen: e.target.checked }
+                                      });
+                                    }}
+                                    className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
+                                  />
+                                  <span className="text-xs font-bold text-[#414E36] w-24">{day}</span>
+                                </label>
+
+                                {sched.isOpen ? (
+                                  <div className="flex flex-col gap-2 w-full sm:w-auto">
+                                    {/* Shifts list */}
+                                    {((sched.shifts && sched.shifts.length > 0) ? sched.shifts : [{ start: sched.start || "09:00", end: sched.end || "17:00" }]).map((shft: any, shiftIdx: number) => (
+                                      <div key={shiftIdx} className="flex items-center gap-2">
+                                        <input
+                                          type="time"
+                                          value={shft.start}
+                                          onChange={(e) => {
+                                            const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                            currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], start: e.target.value };
+                                            setActiveSched({
+                                              ...activeSched,
+                                              [day]: {
+                                                ...sched,
+                                                start: currentShifts[0].start,
+                                                end: currentShifts[0].end,
+                                                shifts: currentShifts
+                                              }
+                                            });
+                                          }}
+                                          className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                                        />
+                                        <span className="text-xs text-[#5A6A51]">to</span>
+                                        <input
+                                          type="time"
+                                          value={shft.end}
+                                          onChange={(e) => {
+                                            const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                            currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], end: e.target.value };
+                                            setActiveSched({
+                                              ...activeSched,
+                                              [day]: {
+                                                ...sched,
+                                                start: currentShifts[0].start,
+                                                end: currentShifts[0].end,
+                                                shifts: currentShifts
+                                              }
+                                            });
+                                          }}
+                                          className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
+                                        />
+                                        {shiftIdx > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                              const filteredShifts = currentShifts.filter((_: any, i: number) => i !== shiftIdx);
+                                              setActiveSched({
+                                                ...activeSched,
+                                                [day]: {
+                                                  ...sched,
+                                                  start: filteredShifts[0].start,
+                                                  end: filteredShifts[0].end,
+                                                  shifts: filteredShifts
+                                                }
+                                              });
+                                            }}
+                                            className="text-red-500 hover:text-red-700 transition cursor-pointer"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        )}
+                                      </div>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
+                                        const newShifts = [...currentShifts, { start: "09:00", end: "17:00" }];
+                                        setActiveSched({
+                                          ...activeSched,
+                                          [day]: {
+                                            ...sched,
+                                            shifts: newShifts
+                                          }
+                                        });
+                                      }}
+                                      className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] transition flex items-center gap-1 mt-1 cursor-pointer"
+                                    >
+                                      <Plus size={12} /> Add Shift
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400 italic">Off / Closed</span>
+                                )}
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+
                     {/* Action Buttons */}
                     <div className="flex items-center gap-3 pt-4 border-t border-[#E6E9EB]">
                       <button
