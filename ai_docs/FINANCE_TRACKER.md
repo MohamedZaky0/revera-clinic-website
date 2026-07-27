@@ -533,6 +533,7 @@ routes:**
 | ~~Admin UI to configure a service's `service_consumables`/`service_devices` recipe~~ | ~~After Phase 3~~ | **CLOSED 2026-07-27 — scoped as Phase 3B.** Phase 3 is done, so the deferral condition is met. The audit this triggered found the gap is far wider than recipes alone: `duration_minutes`, `inventory_products.role`, `inventory_devices.lamp_replacement_cost`, doctor commission base/fixed-component, package definitions, and suppliers all have the same shape — column and/or endpoint exists, no UI, and in most cases the API route ignores the column too. See **Phase 3B — Configuration & Data-Entry UI** below for the full measured table and the 13 micro-tasks. The user's original reasoning (one deliberate pass across the whole admin UI, not a piecemeal addition to the Edit Service modal) is what Phase 3B is; recipes are tasks 3B.5/3B.6 within it. |
 | A General/Executive Dashboard — a landing view surfacing critical notifications (low stock, overdue payments, pending approvals, etc.) and pending decisions across the whole admin, not just per-section | After Phase 3B | **Deliberately deferred by user decision 2026-07-27** — noted while wiring low-stock alerts into the existing per-section notification bell (`admin/page.tsx`). That bell is booking- and stock-driven only and lives inside the legacy shell; a real General Dashboard is new scope (its own section, permissions, likely its own data-aggregation endpoint) and should be picked up as its own phase once Phase 3B (this file) is done, not folded into it. |
 | Extract the Inventory section (`activeNav === "Inventory"` — Clinic Devices, Products & Supplies, Suppliers/Purchases) out of `admin/page.tsx` into its own submodule, per DEC-027 | Whenever picked up — not blocking Phase 3B | **Raised by user 2026-07-27, not yet started.** Looks small (one nav section) but isn't: `inventoryProducts`/`fetchInventoryProducts` are already shared state consumed by Point of Sale and the Customer profile view too, not exclusive to the Inventory tab — DEC-027's "shared state temporarily remains in the legacy shell" caveat applies directly. Needs scoping as its own task (what's genuinely Inventory-only vs. cross-section shared state) rather than being done ad hoc alongside unrelated changes. |
+| Build a real Stock Adjustments flow (`POST /api/inventory/adjustments`-style endpoint + UI, writing `stock_movements` with `reason = 'adjustment'`) | Whenever picked up | **Found 2026-07-27 while doing task 3B.11.** The orphaned `activeNav === "Adjustments"` mock screen was deliberately left in place (not deleted) rather than either silently removing a distinct feature or leaving it undocumented — see 3B.11's Done note. `stock_movements.reason` already accepts `'adjustment'` (`DB_SCHEMA.md`); nothing else about this exists yet. |
 
 ---
 
@@ -2558,7 +2559,7 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 | 3B.8 | Packages admin UI + `/api/packages` CRUD endpoint | 3B.1 | `TODO` | — | — |
 | 3B.9 | Suppliers: `/api/suppliers` CRUD endpoint + real UI under Inventory | 3B.1 | `DONE` | Claude | ef9ecff |
 | 3B.10 | Purchases: real UI under Inventory wired to `POST /api/purchases` | 3B.9 | `DONE` | Claude | ef9ecff |
-| 3B.11 | Delete the orphaned Suppliers/Purchases/Batch Management mock screens | 3B.9, 3B.10 | `TODO` | — | — |
+| 3B.11 | Delete the orphaned Suppliers/Purchases/Batch Management mock screens | 3B.9, 3B.10 | `DONE` | Claude | pending commit |
 | 3B.12 | `API_CONTRACT.md` + `DB_SCHEMA.md` rollup for Phase 3B | rolling | `TODO` | — | — |
 
 ---
@@ -2944,6 +2945,33 @@ once.
 
 **Verify:** `npx tsc --noEmit` and `npx eslint` clean; grep returns zero references to each deleted
 constant; the real screens from 3B.9/3B.10 still render.
+
+**Done 2026-07-27.** Grepping every `activeNav === "X"` string before deleting anything (per this
+task's own warning that line numbers drift) found **two more orphaned screens the original
+2026-07-27 audit's "six screens" count missed**, both unreachable (no `SIDEBAR_ITEMS`/Settings-menu
+entry, no `setActiveNav` call anywhere):
+
+- **`activeNav === "Procurement"`** ("Procurement Log") — this was the second `MOCK_PURCHASES`
+  reference the spec above already flagged at `:12839`; it just wasn't named as its own screen.
+  Deleted along with the rest — it's the same superseded-by-3B.10 category as "Purchases" itself,
+  just a duplicate render of the same mock array.
+- **`activeNav === "Adjustments"`** ("Stock Adjustments" — damages/discrepancies/audits) — **left
+  in place, not deleted.** This one is a genuine gap, not a duplicate: `stock_movements.reason`
+  already has an `'adjustment'` value in its CHECK constraint (`DB_SCHEMA.md`), but nothing in this
+  phase built a UI or endpoint for recording one. It's out of scope for *this* task specifically
+  because "superseded by 3B.9/3B.10" doesn't apply to it — nothing built here replaces it. Worth its
+  own future task (`POST /api/inventory/adjustments` or similar + a real UI) rather than either
+  silently deleting a distinct feature or silently leaving it undocumented.
+
+Also removed `supplierSearch`/`purchaseSearch` state (`admin/page.tsx`) — dead once their only
+call sites (inside the deleted Suppliers/Purchases blocks) were gone.
+
+**Verified:** grep for `MOCK_SUPPLIERS`, `MOCK_PURCHASES`, `MOCK_BATCHES`, and each of
+`activeNav === "Suppliers"/"Purchases"/"Batch Management"/"Procurement"` all return zero matches.
+`npx tsc --noEmit` and `npx eslint` clean (same pre-existing `prefer-const` errors elsewhere,
+confirmed via `git diff` to be untouched by this change). The real Suppliers/Purchases screens
+(3B.9/3B.10) still render, unaffected — they live under `inventorySubTab === "suppliers"`, an
+entirely separate code path from the deleted `activeNav` blocks.
 
 ---
 
