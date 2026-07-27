@@ -1102,6 +1102,9 @@ second booking, not the first.
 
 ## RISK-029: Checkout Charged The Full Service Price Again, Ignoring The Deposit Already Paid
 
+**Manual test checklist:** `ai_docs/RISK_029_MANUAL_TESTS.md` — covers this fix, the cancel/no-show
+refund/forfeit policy, postpone, and RISK-027/RISK-028 checks from the same testing session.
+
 **Severity:** High · **Type:** Data integrity / money
 **Found:** 2026-07-27, by the user's own manual test — a booking with a 30%-style deposit already
 paid showed the full service price due at checkout, not the remaining balance · **RESOLVED
