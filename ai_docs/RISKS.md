@@ -745,6 +745,64 @@ recent failure."
 
 ---
 
+## RISK-023: The Patient List Could Silently Never Load, Depending On A Session Race
+
+**Severity:** Medium · **Type:** Availability / race condition
+**Found:** 2026-07-27 (user reported "Select Patient" was empty while testing the Sell Product
+flow) · **RESOLVED 2026-07-27**
+
+**Root cause:** `fetchCustomers()` (`src/app/admin/page.tsx`) was called exactly once, inside the
+component's mount-only `useEffect(() => {...}, [])`. Supabase's `session` resolves asynchronously
+(`getSession()` / `onAuthStateChange`), so this raced it: if `session?.access_token` wasn't
+populated yet at the exact moment that effect ran, `fetchCustomers` hit its own early-return guard
+and did nothing — no error, no retry, `dbCustomers` just stayed `[]` for the rest of the tab's
+lifetime. Every screen that lists or searches patients (Customers tab, and the "Select Patient"
+picker inside Sell Product) reads from `dbCustomers` via the `customers` memo, so all of them would
+silently show empty depending on how fast the browser's Supabase session happened to resolve —
+not a deterministic bug, which is why it wasn't caught earlier.
+
+**Why sales/devices/products didn't have this bug:** `fetchInventoryProducts` and
+`fetchInventoryDevices` were already `useCallback`s keyed on `[session]`, each paired with a
+`useEffect` that depends on the callback itself — so the moment `session` actually resolves, the
+callback's identity changes and the effect re-fires automatically. `fetchCustomers` was a plain
+function with no such pairing.
+
+**Fix:** Converted `fetchCustomers` to the same `useCallback(..., [session])` +
+`useEffect(() => { fetchCustomers(); }, [fetchCustomers])` pattern, and removed the now-redundant
+direct call from the original mount-only effect.
+
+**Verify:** `npx tsc --noEmit` / `npx eslint` clean. Reload `/admin` repeatedly and confirm the
+Customers list and the Sell Product "Select Patient" dropdown populate every time, not just when
+the session happens to resolve before that first effect runs.
+
+---
+
+## RISK-024: Selling More Units Than Are In Stock Was Never Rejected Server-Side
+
+**Severity:** Medium · **Type:** Data integrity
+**Found:** 2026-07-27 (user asked whether overselling was handled) · **RESOLVED 2026-07-27**
+
+**Root cause:** The admin UI blocks selling more than `selectedSellProduct.stock_quantity` shows
+(`admin/page.tsx`, `handleConfirmSellProduct`) — but that's a client-side check against a value
+that can be stale (state fetched earlier, or two staff members selling around the same time).
+`POST /api/inventory/products/sales` never independently verified quantity against current stock:
+it always recorded the sale and called `deductInventoryStock`, which clamps the result at 0 rather
+than rejecting. A bypassed or raced client check would therefore have recorded full revenue against
+a quantity the clinic never actually had, with the product simply pinned at 0 stock and no error
+anywhere.
+
+**Fix:** `POST /api/inventory/products/sales` now re-reads the product's current
+`inventory_products.stock_quantity` before writing anything, and returns `409` if the requested
+quantity exceeds it. Skips the check (rather than failing closed) if the product isn't found in the
+native table — consistent with this route's existing tolerance for the `page_settings` fallback
+covering products not yet synced to the real table.
+
+**Verify:** `npx tsc --noEmit` / `npx eslint` clean. POST a quantity greater than a product's real
+stock and confirm a `409` with no stock/customer-spend/ledger writes; a valid quantity still sells
+normally.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:

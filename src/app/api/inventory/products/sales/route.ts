@@ -367,6 +367,27 @@ export async function POST(req: Request) {
       );
     }
 
+    // Re-check current stock server-side rather than trusting the browser's cached figure.
+    // The admin UI already blocks selling more than its own (possibly stale) copy of
+    // stock_quantity shows, but until now nothing stopped it here — deductInventoryStock just
+    // clamps at 0, so a bypassed/raced client check would silently oversell: the sale would
+    // record full revenue against a quantity the clinic never actually had in stock.
+    const { data: productForStockCheck, error: stockCheckErr } = await supabaseServer
+      .from('inventory_products')
+      .select('stock_quantity')
+      .eq('id', product_id)
+      .maybeSingle();
+    if (stockCheckErr) throw stockCheckErr;
+    if (productForStockCheck && Number(productForStockCheck.stock_quantity || 0) < Number(quantity)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Only ${productForStockCheck.stock_quantity} unit(s) in stock — cannot sell ${quantity}.`
+        },
+        { status: 409 }
+      );
+    }
+
     const newSale: ProductSaleRecord = {
       id: generateSaleId(),
       product_id,

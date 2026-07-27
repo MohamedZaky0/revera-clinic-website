@@ -721,15 +721,11 @@ operating on the finished system; everything before that is discarded, not migra
 ---
 
 ## DEC-027: Modular Admin Sections Are Mandatory
-=======
-## DEC-014: Added settings.terms Granular Permission for Booking Terms & Conditions
->>>>>>> 9ab558a (feat: add settings.terms permission and public terms agreement gate)
 
 **Date:** 2026-07-26
 **Status:** Decided — active
 
 **Context:**
-<<<<<<< HEAD
 `src/app/admin/page.tsx` is a large legacy client component containing Booking, Customer, Doctor,
 and many other section implementations. Adding new sections to that file increases regression risk,
 makes ownership unclear, and further slows targeted work.
@@ -880,5 +876,47 @@ The admin panel required granular permission control specifically for managing b
 **Chosen Option:**
 - Added `settings.terms` key to `ALL_PERMISSIONS` and included it by default in `Super Admin`, `Admin`, and `Clinic Manager` role templates.
 - Registered `"Terms & Conditions": "settings.terms"` in admin settings router, sub-navigation array, role checking helpers, and UI conditional views in `src/app/admin/page.tsx`.
+
+---
+
+## DEC-033: Recording a Purchase Updates the Product's Stock and Cost Price (Last-Cost Basis)
+
+**Date:** 2026-07-27
+**Status:** Decided — active
+
+**Context:** Building the Purchases screen (task 3B.10) surfaced a gap the user caught while
+testing the flow, not something found by an audit: `inventory_products.stock_quantity` and
+`purchase_price` ("Cost Price" in the product modal) are still directly-written scalars, not yet
+derived from `stock_movements` (task 2.12 is comparison-only — see the note on `stock_quantity` in
+`DB_SCHEMA.md`). `POST /api/purchases` wrote an inbound `stock_movements` row per line but never
+touched either scalar. Result: recording a purchase would not visibly restock anything in the
+Products Catalog, and `Cost Price` would silently go stale the first time a supplier's price
+changed — while still requiring staff to re-enter a unit cost on every purchase that fed nothing
+back.
+
+**Chosen Option:**
+- `POST /api/purchases` now calls a new `restockInventoryProduct()` (`src/app/api/inventory/products/route.ts`,
+  symmetric to the existing `deductInventoryStock()` used by sales) once per line: adds `qty` to
+  `stock_quantity`, and **overwrites `purchase_price` with that line's `unit_cost`** — last-cost,
+  not a weighted average.
+- Multiple lines for the same product within one purchase are applied **sequentially**, not via
+  `Promise.all` — `restockInventoryProduct` does a read-modify-write of the whole catalog (the same
+  `page_settings` + table dual-write `deductInventoryStock` uses), so concurrent calls for the same
+  product would race and silently drop an update.
+
+**Reason:**
+- Last-cost is the simplest model that keeps `Cost Price` (and everything derived from it — margin
+  display, the Stock Valuation card) representative of what the clinic actually paid most recently,
+  without weighted-average accounting this clinic's scale doesn't need.
+- Symmetric to the existing sales-side design (task 0.4: one clear owner of a stock mutation) rather
+  than inventing a different pattern for the inbound side.
+
+**Trade-offs:**
+- Last-cost discards purchase-to-purchase price history from the product record itself — the
+  `purchases`/`purchase_lines` tables still hold the full history if it's ever needed (e.g. average
+  cost reporting), this decision only concerns what `inventory_products.purchase_price` displays.
+- `stock_quantity` is still a directly-written scalar on both the sale and purchase sides, not yet
+  cut over to being derived from `stock_movements` — this decision does not change that; it only
+  makes the purchase side consistent with how the sale side already works.
 
 

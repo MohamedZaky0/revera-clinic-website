@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireStaffAccess } from '@/lib/access';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { restockInventoryProduct } from '@/app/api/inventory/products/route';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,26 @@ type PurchaseLineInput = {
   qty: number;
   unitCost: number;
 };
+
+export async function GET(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  try {
+    const { data, error } = await supabaseServer
+      .from('purchases')
+      .select('*, suppliers(name), purchase_lines(id, product_id, qty, unit_cost, inventory_products(name))')
+      .order('purchased_at', { ascending: false });
+    if (error) throw error;
+
+    return NextResponse.json({ purchases: data || [] });
+  } catch (err: any) {
+    console.error('GET /api/purchases error:', err);
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+  }
+}
 
 export async function POST(req: Request) {
   const access = await requireStaffAccess(req);
@@ -92,6 +113,13 @@ export async function POST(req: Request) {
       }))
     );
     if (stockError) throw stockError;
+
+    // Sequential, not Promise.all: restockInventoryProduct does a read-modify-write of the whole
+    // catalog (page_settings + table dual-write, same pattern as deductInventoryStock), so two
+    // lines for the same product running concurrently would race and lose one update.
+    for (const line of normalizedLines) {
+      await restockInventoryProduct(line.productId, line.qty, line.unitCost);
+    }
 
     return NextResponse.json({ purchase, lines: purchaseLines }, { status: 201 });
   } catch (error: any) {

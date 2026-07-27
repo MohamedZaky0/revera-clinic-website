@@ -248,10 +248,14 @@ write — a non-existent `customer_id` now returns `404` rather than silently de
 losing the sale record (`product_sales.customer_id` has an FK; a bad id previously failed that
 insert only, fell back to a `page_settings` blob, and still reported success).
 
+**Updated 2026-07-27 (RISK-024 fix):** `quantity` is now also checked against the product's current
+`inventory_products.stock_quantity` before any write — selling more than is in stock returns `409`
+instead of recording the sale and letting `deductInventoryStock` silently clamp stock to 0.
+
 After a successful native `product_sales` insert, the route additively attempts to create one issued product invoice, invoice line, and payment row. A ledger-write failure is logged and does not roll back or fail the established POS sale path.
 
 **Response:** `{ success: true, sale: ProductSaleRecord, sales: ProductSaleRecord[] }` (`200`), or
-`{ success: false, error }` (`404` for a non-existent customer, `400` for missing/invalid required fields)
+`{ success: false, error }` (`404` for a non-existent customer, `409` for insufficient stock, `400` for missing/invalid required fields)
 
 ---
 
@@ -273,9 +277,61 @@ Requires a staff bearer token.
 
 **Body:** `{ supplierId?, purchasedAt?, lines: [{ productId, qty, unitCost }], paid?, dueDate? }`
 
-Creates one purchase, its lines, and matching inbound `stock_movements`. `total` is derived on the server from the lines; all referenced products and an optional supplier must exist.
+Creates one purchase, its lines, and matching inbound `stock_movements`. `total` is derived on the server from the lines; all referenced products and an optional supplier must exist. For each line, also increases that product's `stock_quantity` by `qty` and overwrites its `purchase_price` with `unitCost` (DEC-033, last-cost basis) — applied sequentially per line, not concurrently.
 
 **Response:** `{ purchase, lines }`, status 201.
+
+---
+
+## GET /api/purchases
+
+Requires a staff bearer token. Returns every row in `purchases`, newest first, with the supplier name and each line's product name embedded.
+
+**Response:** `{ purchases: Purchase[] }` — each purchase includes `suppliers: { name }` and `purchase_lines: [{ id, product_id, qty, unit_cost, inventory_products: { name } }]`.
+
+---
+
+## GET /api/suppliers
+
+Requires a staff bearer token. Returns every row in `suppliers`, ordered by `name`.
+
+**Response:** `{ suppliers: Supplier[] }`
+
+---
+
+## POST /api/suppliers
+
+Requires a staff bearer token. Creates a supplier.
+
+**Body:** `{ name, contact?, payment_terms?, active? }`
+
+Required: `name`. `active` defaults to `true`.
+
+**Response:** Created `Supplier` object, status 201.
+
+---
+
+## PUT /api/suppliers
+
+Requires a staff bearer token. Updates a supplier. Only fields present in the body are changed.
+
+**Body:** `{ id, name?, contact?, payment_terms?, active? }`
+
+Required: `id`. 404 if no supplier matches.
+
+**Response:** Updated `Supplier` object.
+
+---
+
+## DELETE /api/suppliers?id={id}
+
+Requires a staff bearer token. Deletes a supplier.
+
+**409** if any `purchases` row references this supplier (`supplier_id` is `ON DELETE SET NULL` at the
+DB level, so the route blocks the delete rather than letting it silently orphan purchase history) —
+mark the supplier inactive instead via `PUT`.
+
+**Response:** `{ success: true, id }`
 
 ---
 

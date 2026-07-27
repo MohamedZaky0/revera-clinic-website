@@ -102,6 +102,7 @@ import {
   Loader2,
 } from "lucide-react";
 import RoomsManagerView from "@/components/RoomsManagerView";
+import SupplierManagementScreen from "@/components/admin/inventory/SupplierManagementScreen";
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
@@ -1904,45 +1905,6 @@ export default function AdminPage() {
   // per-service toggle state: visible & status
   const [serviceToggles, setServiceToggles] = useState<Record<number, { visible: boolean; active: boolean }>>({});
 
-  // Synchronize dynamic bookings into notifications list
-  useEffect(() => {
-    if (!allReservations || allReservations.length === 0) return;
-
-    const latestReservations = [...allReservations]
-      .sort((a, b) => {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return timeB - timeA;
-      })
-      .slice(0, 5);
-
-    const generatedNotifications = latestReservations.map((res) => {
-      const isCancelled = res.status === "cancelled";
-      const serviceName = localServices.find((s) => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
-      const timeString = res.timeSlot || res.requestedTime || "unspecified time";
-      return {
-        id: res.id || String(Math.random()),
-        title: isCancelled ? "Appointment Cancelled" : "New Booking Received",
-        message: `${res.name || "A patient"} reserved ${serviceName} on ${res.date} at ${timeString}.`,
-        time: res.createdAt ? new Date(res.createdAt).toLocaleDateString() : "Just now",
-        read: false,
-        type: isCancelled ? "cancelled" : "booking"
-      };
-    });
-
-    setNotifications([
-      {
-        id: "system-1",
-        title: "Clinic System Active",
-        message: "Twilio SMS integration and Supabase auth are fully operational.",
-        time: "Active",
-        read: false,
-        type: "system"
-      },
-      ...generatedNotifications
-    ]);
-  }, [allReservations, localServices]);
-
   // Auth and Role Management effects & handlers
   useEffect(() => {
     if (!supabase) {
@@ -3316,7 +3278,7 @@ export default function AdminPage() {
   const [inventoryExpanded, setInventoryExpanded] = useState(false);
 
   // Inventory Devices State
-  const [inventorySubTab, setInventorySubTab] = useState<"devices" | "products">("devices");
+  const [inventorySubTab, setInventorySubTab] = useState<"devices" | "products" | "suppliers">("devices");
   const [inventoryDevices, setInventoryDevices] = useState<any[]>([]);
   const [inventoryHistory, setInventoryHistory] = useState<any[]>([]);
   const [inventoryDevicesLoading, setInventoryDevicesLoading] = useState(false);
@@ -3430,6 +3392,67 @@ export default function AdminPage() {
       fetchInventoryProducts();
     }
   }, [activeNav, viewingCustomerProfile, fetchInventoryProducts]);
+
+  // Also load once session is ready regardless of tab — the notification bell's low-stock
+  // alerts need inventoryProducts populated even if the admin never visits the Inventory tab.
+  useEffect(() => {
+    fetchInventoryProducts();
+  }, [fetchInventoryProducts]);
+
+  // Synchronize dynamic bookings and low-stock alerts into the notifications list.
+  // No early-return guard on reservations alone — a clinic with stock but no bookings yet still
+  // needs to see low-stock alerts, so this must run even when allReservations is empty.
+  useEffect(() => {
+    const latestReservations = [...(allReservations || [])]
+      .sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return timeB - timeA;
+      })
+      .slice(0, 5);
+
+    const generatedNotifications = latestReservations.map((res) => {
+      const isCancelled = res.status === "cancelled";
+      const serviceName = localServices.find((s) => s.id === res.serviceId)?.en || `Service #${res.serviceId}`;
+      const timeString = res.timeSlot || res.requestedTime || "unspecified time";
+      return {
+        id: res.id || String(Math.random()),
+        title: isCancelled ? "Appointment Cancelled" : "New Booking Received",
+        message: `${res.name || "A patient"} reserved ${serviceName} on ${res.date} at ${timeString}.`,
+        time: res.createdAt ? new Date(res.createdAt).toLocaleDateString() : "Just now",
+        read: false,
+        type: isCancelled ? "cancelled" : "booking"
+      };
+    });
+
+    // Low-stock alerts, worst-depleted first — same list the Inventory page's "Low Stock Alerts"
+    // card counts, just surfaced somewhere staff will actually see it without visiting that page.
+    const lowStockNotifications = (inventoryProducts || [])
+      .filter((p) => Number(p.stock_quantity) <= Number(p.min_reorder_quantity))
+      .sort((a, b) => Number(a.stock_quantity) - Number(b.stock_quantity))
+      .slice(0, 5)
+      .map((p) => ({
+        id: `low-stock-${p.id}`,
+        title: "Low Stock Alert",
+        message: `${p.name} has ${p.stock_quantity} ${p.unit}${Number(p.stock_quantity) === 1 ? "" : "s"} left (reorder at ${p.min_reorder_quantity}).`,
+        time: "Live",
+        read: false,
+        type: "low_stock"
+      }));
+
+    setNotifications([
+      {
+        id: "system-1",
+        title: "Clinic System Active",
+        message: "Twilio SMS integration and Supabase auth are fully operational.",
+        time: "Active",
+        read: false,
+        type: "system"
+      },
+      ...lowStockNotifications,
+      ...generatedNotifications
+    ]);
+  }, [allReservations, localServices, inventoryProducts]);
 
   const filteredInventoryProducts = useMemo(() => {
     return inventoryProducts.filter((p) => {
@@ -4571,7 +4594,6 @@ export default function AdminPage() {
   }, [customers, customerSearch, customerFilterGender, customerFilterStatus, customerFilterReferral]);
 
   useEffect(() => {
-    fetchCustomers();
     fetchPageSettings();
     fetchProviders();
     fetchRooms();
@@ -5950,7 +5972,14 @@ export default function AdminPage() {
       .catch(() => setScheduleReservations([]));
   }
 
-  function fetchCustomers() {
+  // useCallback keyed on [session]: Supabase's session resolves asynchronously, so a plain
+  // mount-only effect calling this raced it — if the session wasn't ready yet the fetch bailed
+  // out silently and nothing ever retried, leaving the patient list empty for the rest of the
+  // session (surfaced as "Select Patient" showing nothing in the Sell Product modal). Giving this
+  // a stable identity per session, paired with the effect below that depends on it, means the
+  // moment `session` actually resolves, this function's identity changes and the effect re-fires
+  // automatically — same pattern already used by fetchInventoryProducts/fetchInventoryDevices.
+  const fetchCustomers = useCallback(() => {
     setLoadingCustomers(true);
     fetchCustomerAvatars();
     if (!session?.access_token) {
@@ -5979,7 +6008,11 @@ export default function AdminPage() {
       .finally(() => {
         setLoadingCustomers(false);
       });
-  }
+  }, [session]);
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
 
   function handleExportBookingsCSV() {
     if (allReservations.length === 0) {
@@ -7571,9 +7604,11 @@ export default function AdminPage() {
                               <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${
                                 n.type === "cancelled"
                                   ? "bg-red-500"
-                                  : n.type === "system"
-                                    ? "bg-amber-500"
-                                    : "bg-green-500"
+                                  : n.type === "low_stock"
+                                    ? "bg-orange-500"
+                                    : n.type === "system"
+                                      ? "bg-amber-500"
+                                      : "bg-green-500"
                               }`} />
                               <div className="flex-1">
                                 <div className="flex items-center justify-between gap-2">
@@ -17420,6 +17455,17 @@ export default function AdminPage() {
                     {inventoryProducts.length}
                   </span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setInventorySubTab("suppliers")}
+                  className={`flex items-center gap-2 py-3 text-sm font-semibold border-b-2 transition ${
+                    inventorySubTab === "suppliers"
+                      ? "border-[#414E36] text-[#414E36]"
+                      : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
+                  }`}
+                >
+                  <Truck size={16} /> Suppliers
+                </button>
               </div>
 
               {/* TAB 1: CLINIC DEVICES */}
@@ -18103,6 +18149,13 @@ export default function AdminPage() {
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* TAB 3: SUPPLIERS & PURCHASES */}
+              {inventorySubTab === "suppliers" && (
+                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
+                  <SupplierManagementScreen authHeaders={authenticatedJsonHeaders} />
                 </div>
               )}
             </div>

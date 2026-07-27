@@ -531,6 +531,8 @@ routes:**
 | Split Phase 5's capacity/break-even/service-mix output between the Finance section and a new Reports/Data Analysis section, rather than putting all of it in Finance | Phase 4 UI (task 4.11), Phase 5 (5.9/5.10) | **Deliberately deferred by user decision 2026-07-26** — revisit after Phase 4, or after all five phases if it's still not clearly needed then. Proposed split, not yet decided: Finance = break-even revenue, maximum potential revenue, recommended service-mix allocation (planning/target numbers); a new Reports/Data Analysis section = room/doctor minutes, utilization %, no-show rate, gap-to-potential decomposition (actual/operational numbers). The underlying `/api/finance/capacity` and `/api/finance/service-mix` endpoints don't need to change either way — only which UI section presents which slice. Adding a Reports/Data Analysis section is new scope (permissions, sidebar entry, its own UI) not currently in any phase's task list. |
 | Seed a lean, broad mock dataset (not finance-only) so Phase 1/2's ledger and any future Phase 4/5 reporting UI have realistic data to show, beyond the narrow test transactions created and cleaned up during manual verification | Phase 4 UI, or later | **Deliberately deferred by user decision 2026-07-26** — same timing as the row above. Not urgent: Phase 4/5 have no UI yet to render seeded data into. Should stay modest ("enough to see features working," not a large volume) per the user's own scoping. |
 | ~~Admin UI to configure a service's `service_consumables`/`service_devices` recipe~~ | ~~After Phase 3~~ | **CLOSED 2026-07-27 — scoped as Phase 3B.** Phase 3 is done, so the deferral condition is met. The audit this triggered found the gap is far wider than recipes alone: `duration_minutes`, `inventory_products.role`, `inventory_devices.lamp_replacement_cost`, doctor commission base/fixed-component, package definitions, and suppliers all have the same shape — column and/or endpoint exists, no UI, and in most cases the API route ignores the column too. See **Phase 3B — Configuration & Data-Entry UI** below for the full measured table and the 13 micro-tasks. The user's original reasoning (one deliberate pass across the whole admin UI, not a piecemeal addition to the Edit Service modal) is what Phase 3B is; recipes are tasks 3B.5/3B.6 within it. |
+| A General/Executive Dashboard — a landing view surfacing critical notifications (low stock, overdue payments, pending approvals, etc.) and pending decisions across the whole admin, not just per-section | After Phase 3B | **Deliberately deferred by user decision 2026-07-27** — noted while wiring low-stock alerts into the existing per-section notification bell (`admin/page.tsx`). That bell is booking- and stock-driven only and lives inside the legacy shell; a real General Dashboard is new scope (its own section, permissions, likely its own data-aggregation endpoint) and should be picked up as its own phase once Phase 3B (this file) is done, not folded into it. |
+| Extract the Inventory section (`activeNav === "Inventory"` — Clinic Devices, Products & Supplies, Suppliers/Purchases) out of `admin/page.tsx` into its own submodule, per DEC-027 | Whenever picked up — not blocking Phase 3B | **Raised by user 2026-07-27, not yet started.** Looks small (one nav section) but isn't: `inventoryProducts`/`fetchInventoryProducts` are already shared state consumed by Point of Sale and the Customer profile view too, not exclusive to the Inventory tab — DEC-027's "shared state temporarily remains in the legacy shell" caveat applies directly. Needs scoping as its own task (what's genuinely Inventory-only vs. cross-section shared state) rather than being done ad hoc alongside unrelated changes. |
 
 ---
 
@@ -2545,8 +2547,8 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 
 | ID | Task | Depends on | Status | Owner | Commit |
 |---|---|---|---|---|---|
-| 3B.0 | Repair committed merge-conflict debris in `DECISIONS.md` (corrupts DEC-027) | — | `TODO` | — | — |
-| 3B.1 | Create `src/components/admin/` + the first module boundary (DEC-027) | — | `TODO` | — | — |
+| 3B.0 | Repair committed merge-conflict debris in `DECISIONS.md` (corrupts DEC-027) | — | `DONE` | Claude | pending commit |
+| 3B.1 | Create `src/components/admin/` + the first module boundary (DEC-027) | — | `DONE` | Claude | pending commit |
 | 3B.2 | `services.duration_minutes`: API read/write + numeric UI field | 3B.1 | `TODO` | — | — |
 | 3B.3 | `inventory_products.role`: API read/write + UI selector | 3B.1 | `TODO` | — | — |
 | 3B.4 | `inventory_devices.lamp_replacement_cost` + rated pulses: API + UI | 3B.1 | `TODO` | — | — |
@@ -2554,8 +2556,8 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 | 3B.6 | Service device/pulses editor (`service_devices`) + endpoint | 3B.1, 3B.4 | `TODO` | — | — |
 | 3B.7 | Doctor commission: `both` option, base, fixed component (**2 duplicate forms**) | 3B.1 | `TODO` | — | — |
 | 3B.8 | Packages admin UI + `/api/packages` CRUD endpoint | 3B.1 | `TODO` | — | — |
-| 3B.9 | Suppliers: `/api/suppliers` CRUD endpoint + real UI under Inventory | 3B.1 | `TODO` | — | — |
-| 3B.10 | Purchases: real UI under Inventory wired to `POST /api/purchases` | 3B.9 | `TODO` | — | — |
+| 3B.9 | Suppliers: `/api/suppliers` CRUD endpoint + real UI under Inventory | 3B.1 | `DONE` | Claude | pending commit |
+| 3B.10 | Purchases: real UI under Inventory wired to `POST /api/purchases` | 3B.9 | `DONE` | Claude | pending commit |
 | 3B.11 | Delete the orphaned Suppliers/Purchases/Batch Management mock screens | 3B.9, 3B.10 | `TODO` | — | — |
 | 3B.12 | `API_CONTRACT.md` + `DB_SCHEMA.md` rollup for Phase 3B | rolling | `TODO` | — | — |
 
@@ -2626,6 +2628,15 @@ Recommend the second for 3B.2/3B.3/3B.4/3B.7 (single fields in large modals) and
 **Verify:** `npx tsc --noEmit` and `npx eslint` clean; the scaffold renders inside the admin shell
 without adding state to `admin/page.tsx` (diff review is the check — a growing `useState` count in
 that file means this task failed its own purpose).
+
+**Done 2026-07-27.** `src/components/admin/inventory/SuppliersScreen.tsx` is the first submodule —
+built directly (no legacy Suppliers UI existed to extract; the `activeNav === "Suppliers"` block is
+dead mock JSX left for 3B.11). It owns its own fetch/save/delete calls against `/api/suppliers` and
+takes only `authHeaders` as a prop (the one thing it cannot derive itself — `admin/page.tsx` already
+computes `authenticatedJsonHeaders` from its session state, so the component receives that rather
+than re-deriving a Supabase session). `admin/page.tsx` gained exactly one existing-enum extension
+("suppliers" added to the pre-existing `inventorySubTab` union) and one composition line — no new
+`useState`. `npx tsc --noEmit` and `npx eslint` on both new files are clean.
 
 ---
 
@@ -2832,6 +2843,33 @@ finance mocks. Derive them server-side or omit them; do not recreate the mock's 
 **Verify:** create a supplier; confirm `POST /api/purchases` accepts it as `supplierId`; confirm the
 404 path (`'Supplier not found.'`) still fires for a bogus id.
 
+**Done 2026-07-27.** `src/app/api/suppliers/route.ts` — GET (list, ordered by name)/POST/PUT/DELETE,
+all gated by `requireStaffAccess`, querying the real `suppliers` table directly (no `page_settings`
+dual-storage fallback — unlike `inventory_products`/`inventory_devices`, this table has no legacy
+pre-migration history to fall back to). Deliberately **omitted** the mock's derived
+`totalPurchasesValue`/`outstandingBalance` fields rather than recreating them — no screen consumes
+them yet, and computing accurate sums over `purchases` is real scope belonging to whichever task
+first needs them (e.g. a supplier detail view), not this one.
+
+**One addition beyond the spec:** `DELETE` 409s ("has purchase history and cannot be deleted, mark
+it inactive instead") when any `purchases` row references the supplier. `purchases.supplier_id` is
+`ON DELETE SET NULL`, so the DB would silently orphan historical purchases from their supplier
+without this — the same "don't let a delete silently erase an audit trail" instinct behind the
+`stock_movements`/reconciliation design elsewhere in this phase.
+
+`SuppliersScreen.tsx` (built together with 3B.1, see that task's Done note) is the real UI: search,
+add/edit modal (name, contact, payment terms, active toggle), delete with confirm. Composed at
+`admin/page.tsx` under a new **third** Inventory sub-tab, `inventorySubTab === "suppliers"` — sitting
+alongside "Clinic Devices & Pulse Track" and "Products & Supplies," not inside either of them. The
+old unreachable `activeNav === "Suppliers"` mock block is untouched (that deletion is 3B.11's job,
+which explicitly depends on this task being done first).
+
+**Verified:** `npx tsc --noEmit` clean; `npx eslint` on both new files clean (0 errors/warnings —
+confirmed separately from the pre-existing `admin/page.tsx` lint backlog, which this task did not
+touch). **Not yet done: exercising create/edit/delete against the live dev database in a browser** —
+per this file's convention 8, a passing typecheck is necessary but not sufficient for UI work; that
+manual pass is still outstanding before this row should be treated as fully verified end-to-end.
+
 ---
 
 ## 3B.10 — Purchases: real UI under Inventory wired to `POST /api/purchases`
@@ -2855,6 +2893,34 @@ through the product's own flows — restocking requires a developer.
 **Verify:** record a purchase of 10 units; confirm exactly one inbound `stock_movements` row per
 line and that `GET /api/inventory/products/reconcile` shows the derived quantity increase by
 exactly 10.
+
+**Done 2026-07-27.** `GET /api/purchases` added (list, with supplier/product names embedded) —
+the original spec only asked for wiring the write side, but a history-only screen with no way to
+see past purchases isn't a usable screen; this mirrors the existing "Product Sales History" tab's
+pattern. `src/components/admin/inventory/PurchasesScreen.tsx` is the real UI — history table +
+"Record Purchase" modal (supplier, product/qty/unit-cost lines, optional paid/dueDate). The client
+only *previews* the total; the server still derives it, per the existing warning in this task's
+spec.
+
+**Bug caught during manual review before the user ever tested it, not by an automated check:** the
+user, reasoning through the product Add/Edit modal's Cost Price field, asked why they'd re-enter a
+price on every purchase if it fed nothing back. Checking confirmed a real gap — this task's
+original implementation wrote `stock_movements` but never touched
+`inventory_products.stock_quantity` or `purchase_price`, so recording a purchase would not have
+visibly restocked anything in Products Catalog. Fixed by DEC-033: `POST /api/purchases` now calls
+a new `restockInventoryProduct()` (symmetric to `deductInventoryStock`) per line, sequentially (not
+`Promise.all` — see DEC-033 for why concurrent calls for the same product would race). See DEC-033
+for the full reasoning and trade-offs (last-cost, not weighted-average).
+
+`SupplierManagementScreen.tsx` wraps 3B.9's `SuppliersScreen` and this task's `PurchasesScreen` as
+two sub-tabs under the existing "Suppliers" tab — `admin/page.tsx` still only composes one
+component at its `inventorySubTab === "suppliers"` check, unchanged from 3B.9.
+
+**Verified:** `npx tsc --noEmit` clean; `npx eslint` clean on every new/touched file (the two
+`prefer-const` errors `eslint` reports in `inventory/products/route.ts` are pre-existing, at lines
+untouched by this diff — confirmed via `git diff`). **Not yet done: live-browser verification** —
+recording a real purchase against dev data and confirming `stock_quantity` and `purchase_price`
+actually move in the Products Catalog tab.
 
 ---
 

@@ -264,6 +264,37 @@ export async function deductInventoryStock(productIdOrName: string, quantityToDe
   }
 }
 
+// Helper to increase stock and refresh cost when a purchase is recorded (task 3B.10).
+// Last-cost basis: `purchase_price` is set to the most recently paid unit cost, not a weighted
+// average — the simplest model that keeps Cost Price from going stale, appropriate at this scale.
+export async function restockInventoryProduct(productId: string, quantityReceived: number, unitCost: number) {
+  try {
+    if (!quantityReceived || quantityReceived <= 0) return;
+
+    const { products } = await getStoredProductsData();
+    if (!products || products.length === 0) return;
+
+    const targetIndex = products.findIndex((p) => p.id === productId);
+    if (targetIndex === -1) return;
+
+    const target = products[targetIndex];
+    const newStock = Number(target.stock_quantity || 0) + Number(quantityReceived);
+    const newStatus = target.status === 'Out of Stock' && newStock > 0 ? 'Active' : target.status;
+
+    products[targetIndex] = {
+      ...target,
+      stock_quantity: newStock,
+      purchase_price: Number.isFinite(unitCost) ? Number(unitCost) : target.purchase_price,
+      status: newStatus,
+      updated_at: new Date().toISOString()
+    };
+
+    await saveProductsData({ products });
+  } catch (err) {
+    console.error('Error restocking inventory product:', err);
+  }
+}
+
 export async function GET(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
