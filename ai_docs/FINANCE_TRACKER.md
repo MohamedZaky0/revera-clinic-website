@@ -1946,10 +1946,10 @@ commission-from-snapshots, the `completed`-only status-filter narrowing).
 | 3.7 | Migration: `loan_schedule` table | 3.6 | `DONE` | Claude | `20260726170600`, live-verified |
 | 3.8 | Library: `src/lib/depreciation.ts` — straight-line depreciation + loan amortization (pure functions) | 3.4–3.7 (schema shape only) | `DONE` | Claude | pending commit |
 | 3.9 | Regression checks for 3.8 | 3.8 | `DONE` | Claude | pending commit |
-| 3.10 | New endpoints: expenses CRUD + recurring-expense generation | 3.1–3.3 | `TODO` | — | — |
-| 3.11 | New endpoints: fixed assets CRUD + monthly depreciation posting | 3.4, 3.5, 3.8 | `TODO` | — | — |
-| 3.12 | New endpoints: loans CRUD + schedule generation | 3.6, 3.7, 3.8 | `TODO` | — | — |
-| 3.13 | `API_CONTRACT.md` rollup for Phase 3 | rolling, alongside 3.10–3.12 | `TODO` | — | — |
+| 3.10 | New endpoints: expenses CRUD + recurring-expense generation | 3.1–3.3 | `DONE` | Claude | pending commit |
+| 3.11 | New endpoints: fixed assets CRUD + monthly depreciation posting | 3.4, 3.5, 3.8 | `DONE` | Claude | pending commit |
+| 3.12 | New endpoints: loans CRUD + schedule generation | 3.6, 3.7, 3.8 | `DONE` | Claude | pending commit |
+| 3.13 | `API_CONTRACT.md` rollup for Phase 3 | rolling, alongside 3.10–3.12 | `DONE` | Claude | pending commit |
 
 ---
 
@@ -2318,80 +2318,157 @@ will hit the identical issue and needs the identical fix.
 
 ---
 
-## 3.10 — New endpoints: expenses CRUD + recurring-expense generation
+## 3.10 — New endpoints: expenses CRUD + recurring-expense generation — DONE
 
-**Depends on 3.1–3.3.** **Where:** new `src/app/api/expenses/route.ts` (CRUD on `expenses` and
-`expense_categories`) and a generation step for `recurring_expenses` — either a new
-`POST /api/expenses/generate-due` endpoint callable on demand, or invoked at the top of the
-expenses `GET` handler for any `recurring_expenses` row past its `next_due_on` (decide at
-implementation time; document the choice in `API_CONTRACT.md`, same latitude task 1.12/1.13 were
-given for their endpoint shape). Protect with `requireStaffAccess`.
+**Implemented as four route files, not one:** `src/app/api/expenses/categories/route.ts` (CRUD on
+`expense_categories`), `src/app/api/expenses/route.ts` (CRUD on `expenses`),
+`src/app/api/expenses/recurring/route.ts` (CRUD on `recurring_expenses` templates — necessary
+infrastructure the task's own text didn't explicitly call out a route for, since "generate due"
+presupposes templates already exist somewhere), and `src/app/api/expenses/generate-due/route.ts`
+(the generation step). All four use `requireStaffAccess`, per the task's explicit instruction (not
+left to latitude, unlike 3.11/3.12 below).
 
-**What "generate due" means:** for every `active` `recurring_expenses` row with `next_due_on <=
-today`, insert a matching `expenses` row (`recurring_id` set) and advance `next_due_on` by one
-`cadence` step. Must be idempotent against being called twice the same day — do not double-insert
-if `next_due_on` has already been advanced past today.
+**"Generate due" is deliberately one period per call, not a catch-up loop:** for every `active`
+`recurring_expenses` row with `next_due_on <=` the target date (today by default, overridable via
+`asOf` for testing), it inserts exactly one `expenses` row and advances `next_due_on` by exactly one
+`nextCadenceDate()` step (new pure function, `src/lib/expenses.ts`, day-of-month-clamping cadence
+math — regression-worthy the same way `depreciation.ts`'s date math is, so it's a separate pure
+library rather than inline route logic). This is idempotent against being called twice on a date
+where the template isn't overdue by more than one period; a template overdue by several periods
+needs several calls (e.g. a daily cron), each catching up one more period — confirmed by the exact
+scenario the task's own "trigger generation again immediately" verify step describes.
 
-**Update `DB_SCHEMA.md`:** none. **Update `API_CONTRACT.md`:** document both endpoint groups.
+**Deletion behavior:** `expense_categories` DELETE returns **409**, not a generic 500, when
+`expenses`/`recurring_expenses` still reference it (`ON DELETE RESTRICT`) — caught via Postgres
+error code `23503` and translated to a clear message, same pattern as every other RESTRICT-guarded
+delete in this codebase. `recurring_expenses` DELETE relies on the schema's own `ON DELETE SET
+NULL` for any `expenses` rows it generated — they are not deleted, only detached.
 
-**Verify:** create a monthly recurring expense with `next_due_on` in the past; trigger generation;
-confirm exactly one `expenses` row is created and `next_due_on` advances by exactly one month;
-trigger generation again immediately and confirm no duplicate row appears.
+**Update `DB_SCHEMA.md`:** none (no schema change). **Update `API_CONTRACT.md`:** all four route
+groups documented.
 
----
-
-## 3.11 — New endpoints: fixed assets CRUD + monthly depreciation posting
-
-**Depends on 3.4, 3.5, 3.8.** **Where:** new `src/app/api/assets/route.ts` (CRUD), plus a posting
-endpoint (e.g. `POST /api/assets/post-depreciation`) or script — same "script is defensible for a
-once-a-month operator action" latitude task 1.15 was given for the opening-balance import, though
-an endpoint is more likely correct here since this runs every month indefinitely, not once per
-clinic. Protect with `requireStaffAccess` (or `requireAdministratorAccess` — decide based on
-whether this should be reception-triggerable or admin-only, and document the choice).
-
-**What:** for every `active` `fixed_assets` row with no `depreciation_entries` row for the current
-`period`, compute `monthlyDepreciation()` (task 3.8) and insert one `depreciation_entries` row,
-using the prior period's `book_value_after` (or `cost` if this is the asset's first posting) as
-the basis for `bookValueAfter()`. Flip `status` to `'fully_depreciated'` once book value reaches
-`salvage_value`. Must be idempotent per asset per period — the `UNIQUE (asset_id, period)`
-constraint from task 3.5 is the backstop, but the endpoint should check first and skip rather than
-rely on a DB error to prevent double-posting.
-
-**Update `DB_SCHEMA.md`:** none. **Update `API_CONTRACT.md`:** document both endpoint groups.
-
-**Verify:** post depreciation for a sample asset twice in the same period; confirm only one
-`depreciation_entries` row exists for that asset/period pair and `book_value_after` is correct.
+**Live-verified 2026-07-27** against the dev DB via `scratch/phase3endpointcheck.ts` — see that
+task's own entry below for the full run description; category/expense/recurring CRUD, the 409
+restrict path, invalid-kind/cadence/amount rejections, and the exact "generate once, don't
+duplicate" scenario all passed with real HTTP calls through a genuine staff bearer token, plus a
+no-token (401) and authenticated-non-staff (403) denial check.
 
 ---
 
-## 3.12 — New endpoints: loans CRUD + schedule generation
+## 3.11 — New endpoints: fixed assets CRUD + monthly depreciation posting — DONE
 
-**Depends on 3.6, 3.7, 3.8.** **Where:** new `src/app/api/loans/route.ts` (CRUD on `loans`), plus
-schedule generation — on loan creation, generate the full `loan_schedule` for `term_months`
-periods using `amortizeLoanPayment()` (task 3.8) chained period over period from `principal`.
-Protect with `requireStaffAccess`/`requireAdministratorAccess` (same latitude as 3.11).
+**Decision on the staff-vs-administrator latitude the task offered:** `GET /api/assets` is
+`requireStaffAccess` (viewing is fine for anyone with finance visibility); every mutation —
+`POST`/`PATCH`/`DELETE /api/assets` and `POST /api/assets/post-depreciation` — is
+`requireAdministratorAccess`. Reasoning: assets are infrequent, high-stakes capital records where a
+wrong entry silently skews every depreciation posting and P&L figure downstream, unlike expenses
+(task 3.10, day-to-day and staff-triggerable like `purchases`). Same decision made for loans (task
+3.12) below, for the same reason.
 
-**What an opening loan's schedule looks like:** per task 3.6's note, an opening loan's schedule is
-seeded starting from the clinic's actual remaining balance as of the opening date, with earlier
-periods (before go-live) either omitted or marked `is_opening = true` as a single lump entry —
-decide at implementation time and document which, since this is the one place DEC-024's "remaining
-balance, not original principal" requirement actually gets expressed in this schema (see task
-3.6's reasoning for why `loans.principal` itself stays the true original amount).
+**Endpoint, not a script**, per the task's own reasoning: this runs every month indefinitely, not
+once per clinic like the opening-balance import.
 
-**Update `DB_SCHEMA.md`:** none. **Update `API_CONTRACT.md`:** document the endpoint and the
-opening-loan schedule-seeding behavior chosen above.
+**`PATCH /api/assets` deliberately does not allow editing `cost`/`usefulLifeMonths`/
+`salvageValue`** — only `branchId`, `name`, `status`, `deviceId`. Every already-posted
+`depreciation_entries` row was computed from the original cost-basis values; silently changing them
+after the fact would make historical postings inconsistent with the asset's current definition.
+Correct a cost-basis mistake by deleting and recreating the asset.
 
-**Verify:** create a loan; confirm the generated schedule's `principal_part` sums to exactly
-`principal` across all periods (task 3.9's regression check verifies the pure function; this
-verifies the endpoint actually calls it correctly end to end) and the final period's
-`balance_after` is 0 (or within a cent, documented if so).
+**`POST /api/assets/post-depreciation` idempotency, exactly as specified:** checks for an existing
+`depreciation_entries` row for the target period **before** inserting (the `UNIQUE (asset_id,
+period)` constraint from task 3.5 is the backstop, not the primary mechanism). Once an asset's book
+value reaches `salvage_value`, its `status` flips to `'fully_depreciated'` and — because the
+query only ever selects `status = 'active'` assets — it is silently and correctly excluded from
+every future run entirely; it never appears in either the `posted` or `skipped` list again. (This
+surfaced as a live-verification finding, not a spec assumption — see 3.11's entry in the "Live
+verification" task below for how it was confirmed rather than guessed.)
+
+**Update `DB_SCHEMA.md`:** none. **Update `API_CONTRACT.md`:** both route groups documented.
+
+**Live-verified 2026-07-27** — see the verification task's entry below. Confirmed: straight-line
+amount matches the formula exactly, same-period double-posting is skipped (not duplicated), a
+short-lived asset's book value reaches exactly its salvage value and flips status on schedule, and
+a fully-depreciated asset is untouched by every subsequent run (checked by asserting its
+`depreciation_entries` row count stays at exactly its historical count, not by asserting it appears
+in a "skipped" list it structurally cannot appear in once inactive).
 
 ---
 
-## 3.13 — `API_CONTRACT.md` rollup
+## 3.12 — New endpoints: loans CRUD + schedule generation — DONE
 
-Checklist task, same pattern as 1.16/2.16 — confirm every new/changed Phase 3 endpoint is
-documented. Close this out last.
+**Administrator-gated mutations, staff-readable GET** — same reasoning as 3.11.
+
+**Opening-loan decision, the one this task explicitly asked to be made and documented:** a single
+lump `is_opening = true` entry — `period = openingAsOf`, `installment`/`interest_part = 0`,
+`principal_part = principal - openingBalance`, `balance_after = openingBalance` — followed by
+normal amortized periods continuing from `openingBalance`. Chosen over enumerating (and
+back-dating) every pre-go-live period individually, since DEC-026 means none of that history is
+being imported anyway — there is nothing for per-period back-dated rows to represent.
+
+**Schedule is computed in memory before any database write**, then the loan row and its schedule
+rows are inserted together. If `amortizeLoanPayment()` throws (installment too low to cover a
+period's interest — the exact case task 3.8/3.9 built the throw for), the request fails with 400
+before touching the database at all — no orphaned loan row. If the schedule *insert* itself fails
+for some other reason, the just-created loan row is deleted before returning the error, for the
+same "no orphan" reason.
+
+**`PATCH /api/loans` only allows renaming `lender`.** Changing `principal`/`annualRate`/
+`termMonths`/`startedOn`/`installment` after the schedule exists would invalidate every row already
+generated from those values; regenerating on the fly isn't supported — delete and recreate instead,
+same rule 3.11 applies to an asset's cost basis.
+
+**Update `DB_SCHEMA.md`:** none. **Update `API_CONTRACT.md`:** the endpoint and the opening-loan
+seeding behavior above.
+
+**Live-verified 2026-07-27** — see the verification task's entry below. Confirmed: a 0%-rate,
+evenly-dividing loan's `principal_part` sums to exactly the principal with `balance_after = 0` on
+the final period; a too-low installment is rejected with 400 and leaves zero loan rows behind; the
+opening-loan lump entry's `balance_after`/`principal_part` match the expected values exactly, and
+every row after it carries `is_opening: false`.
+
+---
+
+## 3.13 — `API_CONTRACT.md` rollup — DONE
+
+**DONE 2026-07-27.** Every Phase 3 route from tasks 3.10–3.12 is documented:
+`GET/POST/PATCH/DELETE /api/expenses/categories`, `GET/POST/PATCH/DELETE /api/expenses`,
+`GET/POST/PATCH/DELETE /api/expenses/recurring`, `POST /api/expenses/generate-due`,
+`GET/POST/PATCH/DELETE /api/assets`, `POST /api/assets/post-depreciation`, and
+`GET/POST/PATCH/DELETE /api/loans` — 16 endpoints across 7 route files. The top-of-file "Last
+Updated" date and the auth-coverage summary line were both bumped to mention Phase 3.
+
+**Live verification, not just a documentation pass:** every one of these 16 endpoints was actually
+exercised against the dev database over real HTTP through the running dev server, not merely
+read-through-and-documented — see the dedicated live-verification write-up folded into tasks
+3.10/3.11/3.12 above and the regression script itself,
+`scratch/phase3endpointcheck.ts` (44 checks, all passing on the final run). That script:
+
+- Creates three temporary Supabase Auth users on the fly — a `superadmin` employee, a
+  `receptionist` (staff, non-admin) employee, and an authenticated user with **no**
+  `employee_accounts` row — to get genuine bearer tokens for every access tier these routes
+  actually gate on, rather than asserting the gate exists by reading the code.
+- Confirms the concrete denial paths: no token → 401; authenticated non-staff → 403 ("Staff access
+  is required"); staff-but-non-admin hitting an administrator-gated route (`/api/assets`,
+  `/api/loans` POST) → 403 ("Administrator access is required").
+- Confirms every idempotency/invariant the tracker's own task text promised: generate-due's
+  one-period-per-call behavior and non-duplication; post-depreciation's check-before-insert
+  idempotency and the fully-depreciated exclusion behavior (a live finding — see task 3.11's
+  entry); a loan schedule's `principal_part` summing exactly to `principal`; a too-low installment
+  rejected before any database write; the opening-loan lump-entry values.
+- Deletes every row and every temporary user it created, in dependency order (children before the
+  `expense_categories`/`fixed_assets`/`loans` parents `ON DELETE RESTRICT`/schema rules require).
+  **Confirmed independently after the run** — not merely assumed from the cleanup code running
+  without throwing — by querying every affected table directly and finding zero residual rows,
+  matching this file's own standing rule ("never state applied state you have not measured").
+
+**Corrections found and fixed by actually running this against the dev DB, not just written from
+the spec:** the first verification pass asserted a fully-depreciated asset would appear in
+`post-depreciation`'s `skipped` list on a later run. It does not — once `status` flips to
+`'fully_depreciated'`, the endpoint's own query (`eq('status', 'active')`) excludes it before the
+loop even begins, so it appears in neither `posted` nor `skipped`. That is correct application
+behavior, not a bug; the test's assumption was wrong, not the endpoint, and was corrected to assert
+the invariant that actually matters — no new `depreciation_entries` row gets created for that asset
+again — which is what live verification is for.
 
 ---
 

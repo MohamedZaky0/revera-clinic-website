@@ -1,8 +1,8 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-07-26
+> **Last Updated:** 2026-07-27
 > **Base:** Next.js App Router API routes under `/app/api/`
-> **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, and product-sales mutations); coverage is not yet universal. All routes use the Supabase service role key server-side
+> **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, product-sales mutations, and every Phase 3 expenses/assets/loans route); coverage is not yet universal. All routes use the Supabase service role key server-side
 > **Previous content was for a different project — discarded entirely**
 
 ---
@@ -578,3 +578,246 @@ Verifies the Bearer JWT and returns the employee's role + permissions from `empl
 Looks up the Supabase Auth email for a given `employee_id`.
 
 **Response:** `{ email }`
+
+---
+
+## GET /api/expenses/categories
+
+Requires a staff bearer token. Returns all `expense_categories` ordered by name.
+
+**Response:** `ExpenseCategory[]`
+
+---
+
+## POST /api/expenses/categories
+
+Requires a staff bearer token. Creates an expense category.
+
+**Body:** `{ name, kind: 'fixed' | 'variable', parentId? }`
+
+`parentId`, if given, must reference an existing category.
+
+**Response:** Created `ExpenseCategory`, status 201.
+
+---
+
+## PATCH /api/expenses/categories?id={id}
+
+Requires a staff bearer token. Updates `name`, `kind` and/or `parentId` (any subset).
+
+**Response:** Updated `ExpenseCategory`
+
+---
+
+## DELETE /api/expenses/categories?id={id}
+
+Requires a staff bearer token. Deletes a category. Returns **409** if any `expenses` or
+`recurring_expenses` rows still reference it (`category_id` is `ON DELETE RESTRICT`) — re-categorize
+or delete those first.
+
+**Response:** `{ success: true }`
+
+---
+
+## GET /api/expenses
+
+Requires a staff bearer token. Returns `expenses` rows, most recent first.
+
+**Query params:** `branchId?`, `categoryId?`, `from?` (incurred_on >=), `to?` (incurred_on <=)
+
+**Response:** `Expense[]`
+
+---
+
+## POST /api/expenses
+
+Requires a staff bearer token. Creates a dated expense.
+
+**Body:** `{ categoryId, incurredOn: 'YYYY-MM-DD', amount, branchId?, vendor?, note?, isOpening? }`
+
+`categoryId` (and `branchId`, if given) must reference existing rows.
+
+**Response:** Created `Expense`, status 201.
+
+---
+
+## PATCH /api/expenses?id={id}
+
+Requires a staff bearer token. Updates any subset of `categoryId`, `branchId`, `incurredOn`,
+`amount`, `vendor`, `note`.
+
+**Response:** Updated `Expense`
+
+---
+
+## DELETE /api/expenses?id={id}
+
+Requires a staff bearer token.
+
+**Response:** `{ success: true }`
+
+---
+
+## GET /api/expenses/recurring
+
+Requires a staff bearer token. Returns `recurring_expenses` templates ordered by `next_due_on`.
+
+**Query params:** `active=true` — only active templates
+
+**Response:** `RecurringExpense[]`
+
+---
+
+## POST /api/expenses/recurring
+
+Requires a staff bearer token. Creates a recurring-expense template.
+
+**Body:** `{ categoryId, amount, cadence: 'monthly' | 'quarterly' | 'yearly', nextDueOn: 'YYYY-MM-DD', branchId? }`
+
+**Response:** Created `RecurringExpense`, status 201.
+
+---
+
+## PATCH /api/expenses/recurring?id={id}
+
+Requires a staff bearer token. Updates any subset of `categoryId`, `branchId`, `amount`, `cadence`,
+`nextDueOn`, `active`.
+
+**Response:** Updated `RecurringExpense`
+
+---
+
+## DELETE /api/expenses/recurring?id={id}
+
+Requires a staff bearer token. Deleting a template sets `recurring_id` to `null` on any `expenses`
+rows it previously generated (`ON DELETE SET NULL`) rather than deleting them.
+
+**Response:** `{ success: true }`
+
+---
+
+## POST /api/expenses/generate-due
+
+Requires a staff bearer token. For every `active` `recurring_expenses` row with `next_due_on <=`
+today (or the optional `asOf` override), creates exactly one `expenses` row dated at the template's
+current `next_due_on` and advances `next_due_on` by exactly one cadence step. Deliberately one
+period per call, not a catch-up loop — safe to call twice the same day, since the first call's
+advance moves `next_due_on` into the future. A template overdue by several periods needs several
+calls (e.g. a daily cron), each catching up one more period.
+
+**Body:** `{ asOf?: 'YYYY-MM-DD' }` — defaults to today
+
+**Response:** `{ generated: Expense[], count }`
+
+---
+
+## GET /api/assets
+
+Requires a staff bearer token. Returns `fixed_assets` rows with an added `current_book_value` field
+(the latest `depreciation_entries.book_value_after` for that asset, or `cost` if none posted yet).
+
+**Query params:** `branchId?`, `category?`, `status?`
+
+**Response:** `(FixedAsset & { current_book_value: number })[]`
+
+---
+
+## POST /api/assets
+
+Requires an **administrator** bearer token (not just staff — see FINANCE_TRACKER.md task 3.11 for
+why assets/loans are administrator-gated while expenses, task 3.10, are staff-gated). Creates a
+fixed asset.
+
+**Body:** `{ category: 'furniture' | 'medical_device' | 'it' | 'leasehold_improvement', name, purchasedOn: 'YYYY-MM-DD', cost, usefulLifeMonths, salvageValue?, branchId?, deviceId?, isOpening? }`
+
+`salvageValue` cannot exceed `cost`. `deviceId`, if given, must reference an existing
+`inventory_devices` row.
+
+**Response:** Created `FixedAsset`, status 201.
+
+---
+
+## PATCH /api/assets?id={id}
+
+Requires an administrator bearer token. Updates any subset of `branchId`, `name`, `status`,
+`deviceId` only — **`cost`/`usefulLifeMonths`/`salvageValue` are not editable after creation**,
+since existing `depreciation_entries` rows were computed from those values; delete and recreate the
+asset to correct a cost-basis mistake.
+
+**Response:** Updated `FixedAsset`
+
+---
+
+## DELETE /api/assets?id={id}
+
+Requires an administrator bearer token. Cascades to the asset's `depreciation_entries`.
+
+**Response:** `{ success: true }`
+
+---
+
+## POST /api/assets/post-depreciation
+
+Requires an administrator bearer token. For every `active` fixed asset with no
+`depreciation_entries` row for the target period, posts one month of straight-line depreciation
+(`src/lib/depreciation.ts`), clamped so book value never falls below `salvage_value`, and flips
+`status` to `fully_depreciated` once it reaches that floor (at which point the asset is excluded
+from all future runs, since it's no longer `active`). Checks for an existing row before inserting
+rather than relying solely on the `UNIQUE (asset_id, period)` backstop — safe to call twice for the
+same period.
+
+**Body:** `{ period?: 'YYYY-MM' }` — defaults to the current month
+
+**Response:** `{ period, posted: DepreciationEntry[], skipped: { assetId, reason }[] }`
+
+---
+
+## GET /api/loans
+
+Requires a staff bearer token.
+
+- Without `?id=`: returns all `loans` with an added `remaining_balance` field (the latest
+  `loan_schedule.balance_after`, or `principal` if no schedule exists).
+- With `?id={id}`: returns `{ loan, schedule }` — the loan and its full `loan_schedule`, ordered by
+  period.
+
+**Response:** `(Loan & { remaining_balance: number })[]` or `{ loan, schedule }`
+
+---
+
+## POST /api/loans
+
+Requires an administrator bearer token. Creates a loan and generates its full `loan_schedule` in
+the same request, chaining `amortizeLoanPayment()` (`src/lib/depreciation.ts`) period over period.
+If `installment` can't even cover a period's interest, the schedule computation fails with 400
+**before any database write** — no orphaned loan row is left behind.
+
+**Body:** `{ lender, principal, termMonths, startedOn: 'YYYY-MM-DD', installment, annualRate? }`
+
+**Opening loan (DEC-024 — "remaining balance, not original principal"):** pass
+`isOpening: true, openingBalance, openingAsOf: 'YYYY-MM'`. `principal`/`startedOn`/`termMonths`
+stay the loan's true original terms. The schedule's first row is a single lump `is_opening: true`
+entry at `openingAsOf` (`installment/interest_part: 0`, `principal_part: principal - openingBalance`,
+`balance_after: openingBalance`) representing everything before go-live, then normal amortized
+periods continue from `openingBalance` onward. This is the "single lump entry" option — chosen over
+enumerating every pre-go-live period, since DEC-026 means none of that history is being imported.
+
+**Response:** `{ loan, schedule }`, status 201.
+
+---
+
+## PATCH /api/loans?id={id}
+
+Requires an administrator bearer token. **Only `lender` is editable.** Attempting to change
+`principal`/`annualRate`/`termMonths`/`startedOn`/`installment` is rejected with 400 — those would
+invalidate the already-generated schedule; delete and recreate the loan instead.
+
+**Response:** Updated `Loan`
+
+---
+
+## DELETE /api/loans?id={id}
+
+Requires an administrator bearer token. Cascades to the loan's `loan_schedule`.
+
+**Response:** `{ success: true }`
