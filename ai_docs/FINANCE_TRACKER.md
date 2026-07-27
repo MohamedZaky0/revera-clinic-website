@@ -2553,7 +2553,7 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 | 3B.2 | `services.duration_minutes`: API read/write + numeric UI field | 3B.1 | `DONE` | Claude | RISK-025 resolved: admin Services screen now loads/saves via `/api/services`; `duration_minutes` read/written by the route and editable as a numeric minutes field in the service modal |
 | 3B.3 | `inventory_products.role`: API read/write + UI selector | 3B.1 | `DONE` | Claude | pending commit |
 | 3B.4 | `inventory_devices.lamp_replacement_cost` + rated pulses: API + UI | 3B.1 | `DONE` | Claude | pending commit |
-| 3B.5 | Service consumables recipe editor (`service_consumables`) + endpoint | 3B.1, 3B.3 | `TODO` | — | — |
+| 3B.5 | Service consumables recipe editor (`service_consumables`) + endpoint | 3B.1, 3B.3 | `DONE` | Claude | pending commit |
 | 3B.6 | Service device/pulses editor (`service_devices`) + endpoint | 3B.1, 3B.4 | `TODO` | — | — |
 | 3B.7 | Doctor commission: `both` option, base, fixed component (**2 duplicate forms**) | 3B.1 | `TODO` | — | — |
 | 3B.8 | Packages admin UI + `/api/packages` CRUD endpoint | 3B.1 | `TODO` | — | — |
@@ -2797,6 +2797,29 @@ that indicator reads "100% uncosted" forever and the P&L's COGS line is structur
 **Verify:** define a recipe of 2 products; complete a booking for that service; confirm
 `invoice_lines.cogs_snapshot` equals the hand-computed `Σ (standard_qty × cost snapshot)` and is no
 longer `NULL`.
+
+**Done 2026-07-27.** `src/app/api/service-consumables/route.ts` — `GET ?serviceId=` (recipe rows
+with product name/unit embedded) and `POST { serviceId, items }` (delete-all-then-insert for that
+service, same pattern as the existing `/api/service-rooms`). **Server-side, not just client-filtered:**
+POST validates every referenced product exists and has `role IN ('consumable', 'both')`, rejecting
+with a 400 naming the product otherwise — `applyCheckoutCosting` (`/api/reservations`) already
+enforces this exact rule at checkout time (`recipe.product_id` role check,
+`src/app/api/reservations/route.ts:157`) and throws per-line if violated; catching it at save time
+here means a bad recipe fails loudly when someone builds it, not silently the next time a patient
+tries to book that service.
+
+`src/components/admin/services/ServiceRecipeEditor.tsx` — new self-contained component (no legacy
+recipe UI existed to extract, same situation as 3B.9/3B.10 despite 3B.1's "extract-then-edit"
+recommendation for this task — built fresh instead). Product picker only offers
+`role IN ('consumable', 'both')` products not already in the recipe; quantities editable inline;
+"Save Recipe" only enabled once something's actually changed. Inserted into the existing Edit
+Service modal in `admin/page.tsx`, gated on `editingService` (a new, unsaved service has no id to
+attach a recipe to yet).
+
+**Verified:** `npx tsc --noEmit`, `npx eslint`, `npx next build` all clean. **Not yet done: the
+full checkout verify** — define a recipe, complete a booking for that service, confirm
+`invoice_lines.cogs_snapshot` is non-null and matches the hand-computed sum. This needs an actual
+booking flow exercised end-to-end, not just the editor UI.
 
 ---
 

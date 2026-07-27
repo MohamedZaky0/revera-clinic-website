@@ -101,6 +101,7 @@ import {
 } from "lucide-react";
 import RoomsManagerView from "@/components/RoomsManagerView";
 import SupplierManagementScreen from "@/components/admin/inventory/SupplierManagementScreen";
+import ServiceRecipeEditor from "@/components/admin/services/ServiceRecipeEditor";
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
@@ -9247,8 +9248,12 @@ export default function AdminPage() {
                         </div>
                       </div>
 
+                      {editingService && (
+                        <ServiceRecipeEditor serviceId={editingService.id} authHeaders={authenticatedJsonHeaders} />
+                      )}
+
                     </div>
-                    
+
                     {/* Modal Footer */}
                     <div className="border-t border-[#414E36]/10 px-6 py-4 flex items-center justify-end gap-3 bg-[#FBFBF9] rounded-b-2xl">
                       <button

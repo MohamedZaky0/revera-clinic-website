@@ -291,6 +291,26 @@ Requires a staff bearer token. Returns every row in `purchases`, newest first, w
 
 ---
 
+## GET /api/service-consumables?serviceId={id}
+
+Requires a staff bearer token. Returns the standard consumables recipe for one service, with each product's name/unit embedded.
+
+**Response:** `{ consumables: [{ service_id, product_id, standard_qty, inventory_products: { name, unit } }] }`
+
+---
+
+## POST /api/service-consumables
+
+Requires a staff bearer token. Replaces the entire recipe for a service — deletes existing `service_consumables` rows for `serviceId`, then inserts the given `items` (empty array clears the recipe).
+
+**Body:** `{ serviceId, items: [{ productId, standardQty }] }`
+
+Each item requires a positive `standardQty` and no duplicate `productId` within the same request. Every referenced product must exist and have `role IN ('consumable', 'both')` — a `retail`-only product is rejected with a 400 naming the product, since `applyCheckoutCosting` (`/api/reservations`) enforces the same rule at checkout time and would otherwise fail bookings for this service instead of failing the save.
+
+**Response:** `{ success: true }`
+
+---
+
 ## GET /api/suppliers
 
 Requires a staff bearer token. Returns every row in `suppliers`, ordered by `name`.
