@@ -4435,47 +4435,102 @@ export default function AdminPage() {
   }, [providers, localServices, serviceHours, branches]);
 
 
-  // Derive unique customers from database
+  // Derive unique customers from database AND reservations
   const customers = useMemo<Customer[]>(() => {
     const now = new Date();
     const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const list = Array.isArray(dbCustomers) ? dbCustomers : [];
+    const dbList = Array.isArray(dbCustomers) ? dbCustomers : [];
 
-    return list.map((c) => {
-      // Find if this customer has a booking in the last 2 weeks
-      const customerReservations = allReservations.filter((r) => 
+    const processedDbCustomers = dbList.map((c) => {
+      const customerReservations = allReservations.filter((r: any) => 
         (r.phone && (r.phone === c.mobile || r.phone === c.phone)) ||
-        (r.customerId && r.customerId === c.id)
+        (r.customerId && r.customerId === c.id) ||
+        (c.name && r.name && r.name.trim().toLowerCase() === c.name.trim().toLowerCase())
       );
 
-      const hasRecentBooking = customerReservations.some((r) => {
+      const hasRecentBooking = customerReservations.some((r: any) => {
         if (!r.date) return false;
         const bookingDate = new Date(String(r.date).slice(0, 10) + 'T00:00:00');
         return bookingDate >= twoWeeksAgo;
       });
 
-      // Determine active status:
-      // If explicitly set to inactive in DB, then it's inactive.
-      // Otherwise, active only if they have a booking in the last 2 weeks OR if they registered in the last 2 weeks.
+      const totalBookingsCount = Math.max(c.number_of_bookings || 0, customerReservations.length);
+      const totalSpentCalculated = customerReservations.reduce((sum: number, r: any) => {
+        if (['approved', 'confirmed', 'completed', 'started'].includes(r.status)) {
+          return sum + Number(r.price || r.totalPrice || 0);
+        }
+        return sum;
+      }, 0);
+
       const regDateStr = c.registration_date || c.created_at || now.toISOString();
       const regDate = new Date(regDateStr);
       const registeredRecently = regDate >= twoWeeksAgo;
-      const isActive = c.active !== false && (hasRecentBooking || registeredRecently);
+      const isActive = c.active !== false && (hasRecentBooking || registeredRecently || customerReservations.length > 0);
 
       return {
         ...c,
         id: c.id,
         email: c.email || "",
         name: c.name,
-        phone: c.mobile || "",
+        phone: c.mobile || c.phone || "",
         createdAt: regDateStr,
-        bookings: c.number_of_bookings || 0,
-        spent: Number(c.spent_amount || 0),
+        bookings: totalBookingsCount,
+        spent: Math.max(Number(c.spent_amount || 0), totalSpentCalculated),
         outstanding: Number(c.outstanding || 0),
         wallet: Number(c.wallet_balance || 0),
         active: isActive,
       };
     });
+
+    // Synthesize entries for any patients in allReservations who aren't in dbCustomers
+    const existingPhones = new Set(processedDbCustomers.map((c) => c.phone).filter(Boolean));
+    const existingNames = new Set(processedDbCustomers.map((c) => c.name?.trim().toLowerCase()).filter(Boolean));
+
+    const reservationDerivedCustomers: Customer[] = [];
+    allReservations.forEach((r: any) => {
+      const name = r.name || r.patient_name || r.customerName;
+      const phone = r.phone || r.mobile || r.customerPhone || "";
+      const email = r.email || r.customerEmail || "";
+
+      if (!name) return;
+      const nameKey = name.trim().toLowerCase();
+
+      if ((phone && existingPhones.has(phone)) || existingNames.has(nameKey)) {
+        return; // already covered
+      }
+
+      existingNames.add(nameKey);
+      if (phone) existingPhones.add(phone);
+
+      const patientReservations = allReservations.filter((otherR: any) =>
+        (phone && (otherR.phone === phone || otherR.mobile === phone)) ||
+        (otherR.name && otherR.name.trim().toLowerCase() === nameKey)
+      );
+
+      const totalSpent = patientReservations.reduce((sum: number, pr: any) => {
+        if (['approved', 'confirmed', 'completed', 'started'].includes(pr.status)) {
+          return sum + Number(pr.price || pr.totalPrice || 0);
+        }
+        return sum;
+      }, 0);
+
+      const regDateStr = r.createdAt || r.date || now.toISOString();
+
+      reservationDerivedCustomers.push({
+        id: r.customerId || `res-cust-${phone || Math.random().toString(36).slice(2, 9)}`,
+        name,
+        phone,
+        email,
+        createdAt: regDateStr,
+        bookings: patientReservations.length,
+        spent: totalSpent,
+        outstanding: 0,
+        wallet: 0,
+        active: true,
+      } as any);
+    });
+
+    return [...processedDbCustomers, ...reservationDerivedCustomers];
   }, [dbCustomers, allReservations]);
 
   const todaysBookingsCount = useMemo(() => {
@@ -5953,13 +6008,11 @@ export default function AdminPage() {
   function fetchCustomers() {
     setLoadingCustomers(true);
     fetchCustomerAvatars();
-    if (!session?.access_token) {
-      setLoadingCustomers(false);
-      return;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
     }
-    fetch("/api/customers", {
-      headers: { Authorization: `Bearer ${session.access_token}` }
-    })
+    fetch("/api/customers", { headers })
       .then((res) => {
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         return res.json();
