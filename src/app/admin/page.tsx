@@ -3341,6 +3341,7 @@ export default function AdminPage() {
   const [deviceInitialPulses, setDeviceInitialPulses] = useState("0");
   const [deviceWarningThreshold1, setDeviceWarningThreshold1] = useState("80000");
   const [deviceMaintenanceThreshold2, setDeviceMaintenanceThreshold2] = useState("100000");
+  const [deviceLampReplacementCost, setDeviceLampReplacementCost] = useState("0");
   const [deviceNotes, setDeviceNotes] = useState("");
 
   // Update Pulse Count Modal state
@@ -17370,6 +17371,7 @@ export default function AdminPage() {
                         setDeviceInitialPulses("0");
                         setDeviceWarningThreshold1("80000");
                         setDeviceMaintenanceThreshold2("100000");
+                        setDeviceLampReplacementCost("0");
                         setDeviceNotes("");
                         setShowAddDeviceModal(true);
                       }}
@@ -17742,6 +17744,7 @@ export default function AdminPage() {
                                             setDeviceInitialPulses(String(dev.initial_pulse_count || 0));
                                             setDeviceWarningThreshold1(String(dev.warning_threshold_1 || 80000));
                                             setDeviceMaintenanceThreshold2(String(dev.maintenance_threshold_2 || 100000));
+                                            setDeviceLampReplacementCost(String(dev.lamp_replacement_cost ?? 0));
                                             setDeviceNotes(dev.notes || "");
                                             setShowAddDeviceModal(true);
                                           }}
@@ -18146,6 +18149,10 @@ export default function AdminPage() {
                       alert("Device Name is required.");
                       return;
                     }
+                    if (Number(deviceLampReplacementCost) < 0) {
+                      alert("Lamp Replacement Cost cannot be negative.");
+                      return;
+                    }
                     try {
                       const payload = {
                         id: editingDevice?.id,
@@ -18157,6 +18164,7 @@ export default function AdminPage() {
                         initial_pulse_count: Number(deviceInitialPulses) || 0,
                         warning_threshold_1: Number(deviceWarningThreshold1) || 80000,
                         maintenance_threshold_2: Number(deviceMaintenanceThreshold2) || 100000,
+                        lamp_replacement_cost: Number(deviceLampReplacementCost) || 0,
                         notes: deviceNotes.trim()
                       };
 
@@ -18296,6 +18304,31 @@ export default function AdminPage() {
                         />
                         <p className="text-[10px] text-[#8C9A84] mt-1">Triggers critical maintenance due notification.</p>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Lamp/Handpiece Replacement Cost */}
+                  <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#E6E9EB] space-y-3">
+                    <div className="flex items-center gap-2 text-[#414E36] font-semibold text-xs uppercase tracking-wider">
+                      <DollarSign size={14} className="text-[#414E36]" /> Lamp / Handpiece Replacement Cost
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[#5A6A51] mb-1">
+                        Replacement Cost (EGP)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={deviceLampReplacementCost}
+                        onChange={(e) => setDeviceLampReplacementCost(e.target.value)}
+                        className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                      />
+                      <p className="text-[10px] text-[#8C9A84] mt-1">
+                        Cost to replace this device&apos;s consumable lamp/handpiece once it reaches its rated
+                        pulse limit ({Number(deviceMaintenanceThreshold2 || 100000).toLocaleString()} pulses). Used to
+                        calculate the per-pulse cost of services performed on this device.
+                      </p>
                     </div>
                   </div>
 

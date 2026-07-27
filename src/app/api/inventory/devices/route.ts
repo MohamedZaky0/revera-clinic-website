@@ -96,6 +96,26 @@ const DEFAULT_HISTORY = [
   }
 ];
 
+// The real `inventory_devices` table only has `total_pulses`/`max_pulses_limit` (one ceiling) —
+// it has no `current_pulse_count`/`warning_threshold_1`/`maintenance_threshold_2` columns at all
+// (see DB_SCHEMA.md). Every other read/write site in this route and in admin/page.tsx exclusively
+// uses those blob-shape names, a holdover from before the real table existed. Without this
+// normalization, a device loaded from the real table would read as 0 pulses against 80000/100000
+// defaults no matter what it actually stored — task 3B.4 found this while verifying that
+// max_pulses_limit is genuinely settable and reflected back correctly. `warning_threshold_1` has
+// no real-table equivalent to fall back to, so it's derived as 80% of the real ceiling, matching
+// the ratio this route's own DEFAULT_DEVICES seed already used.
+function normalizeDeviceRow(d: any) {
+  const maxPulses = d.maintenance_threshold_2 ?? d.max_pulses_limit ?? 100000;
+  return {
+    ...d,
+    current_pulse_count: d.current_pulse_count ?? d.total_pulses ?? 0,
+    maintenance_threshold_2: maxPulses,
+    warning_threshold_1: d.warning_threshold_1 ?? Math.round(Number(maxPulses) * 0.8),
+    lamp_replacement_cost: Number(d.lamp_replacement_cost) || 0,
+  };
+}
+
 async function getStoredInventoryData() {
   try {
     // 1. Try querying native Supabase inventory_devices table if it has rows
@@ -110,7 +130,7 @@ async function getStoredInventoryData() {
       .order('created_at', { ascending: false });
 
     if (!dbErr && dbDevices && dbDevices.length > 0) {
-      return { devices: dbDevices, history: dbHistory || [] };
+      return { devices: dbDevices.map(normalizeDeviceRow), history: dbHistory || [] };
     }
 
     // 2. Fallback to page_settings
@@ -162,6 +182,7 @@ async function saveInventoryData(payload: any) {
         total_pulses: Number(d.current_pulse_count) || 0,
         remaining_pulses: Math.max(0, (Number(d.maintenance_threshold_2) || 100000) - (Number(d.current_pulse_count) || 0)),
         max_pulses_limit: Number(d.maintenance_threshold_2) || 100000,
+        lamp_replacement_cost: Number(d.lamp_replacement_cost) || 0,
         last_maintenance_date: d.last_maintenance_date || new Date().toISOString(),
         created_at: d.created_at || new Date().toISOString(),
         updated_at: d.updated_at || new Date().toISOString()
@@ -220,10 +241,14 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { name, model, serial_number, category, branch_id, initial_pulse_count, warning_threshold_1, maintenance_threshold_2, notes } = body;
+    const { name, model, serial_number, category, branch_id, initial_pulse_count, warning_threshold_1, maintenance_threshold_2, lamp_replacement_cost, notes } = body;
 
     if (!name) {
       return NextResponse.json({ error: 'Device name is required.' }, { status: 400 });
+    }
+
+    if (lamp_replacement_cost !== undefined && (!Number.isFinite(Number(lamp_replacement_cost)) || Number(lamp_replacement_cost) < 0)) {
+      return NextResponse.json({ error: 'lamp_replacement_cost must be a non-negative number.' }, { status: 400 });
     }
 
     const data = await getStoredInventoryData();
@@ -247,6 +272,7 @@ export async function POST(req: Request) {
       total_lifetime_pulses: initPulses,
       warning_threshold_1: t1,
       maintenance_threshold_2: t2,
+      lamp_replacement_cost: lamp_replacement_cost !== undefined ? Number(lamp_replacement_cost) : 0,
       warning_1_notified: initPulses >= t1,
       warning_2_notified: initPulses >= t2,
       last_maintenance_date: new Date().toISOString(),
@@ -272,10 +298,14 @@ export async function PUT(req: Request) {
 
   try {
     const body = await req.json();
-    const { id, name, model, serial_number, category, branch_id, current_pulse_count, warning_threshold_1, maintenance_threshold_2, status, notes } = body;
+    const { id, name, model, serial_number, category, branch_id, current_pulse_count, warning_threshold_1, maintenance_threshold_2, lamp_replacement_cost, status, notes } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Device ID is required.' }, { status: 400 });
+    }
+
+    if (lamp_replacement_cost !== undefined && (!Number.isFinite(Number(lamp_replacement_cost)) || Number(lamp_replacement_cost) < 0)) {
+      return NextResponse.json({ error: 'lamp_replacement_cost must be a non-negative number.' }, { status: 400 });
     }
 
     const data = await getStoredInventoryData();
@@ -309,6 +339,7 @@ export async function PUT(req: Request) {
       total_lifetime_pulses: newLifetime,
       warning_threshold_1: t1,
       maintenance_threshold_2: t2,
+      lamp_replacement_cost: lamp_replacement_cost !== undefined ? Number(lamp_replacement_cost) : existing.lamp_replacement_cost,
       warning_1_notified: newCurrent >= t1,
       warning_2_notified: newCurrent >= t2,
       status: computedStatus,

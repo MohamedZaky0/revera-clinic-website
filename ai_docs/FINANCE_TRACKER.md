@@ -2552,7 +2552,7 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 | 3B.1 | Create `src/components/admin/` + the first module boundary (DEC-027) | — | `DONE` | Claude | ef9ecff |
 | 3B.2 | `services.duration_minutes`: API read/write + numeric UI field | 3B.1 | `DONE` | Claude | RISK-025 resolved: admin Services screen now loads/saves via `/api/services`; `duration_minutes` read/written by the route and editable as a numeric minutes field in the service modal |
 | 3B.3 | `inventory_products.role`: API read/write + UI selector | 3B.1 | `DONE` | Claude | pending commit |
-| 3B.4 | `inventory_devices.lamp_replacement_cost` + rated pulses: API + UI | 3B.1 | `TODO` | — | — |
+| 3B.4 | `inventory_devices.lamp_replacement_cost` + rated pulses: API + UI | 3B.1 | `DONE` | Claude | pending commit |
 | 3B.5 | Service consumables recipe editor (`service_consumables`) + endpoint | 3B.1, 3B.3 | `TODO` | — | — |
 | 3B.6 | Service device/pulses editor (`service_devices`) + endpoint | 3B.1, 3B.4 | `TODO` | — | — |
 | 3B.7 | Doctor commission: `both` option, base, fixed component (**2 duplicate forms**) | 3B.1 | `TODO` | — | — |
@@ -2748,6 +2748,31 @@ prevent.
 **Verify:** set a lamp cost and rated pulses; confirm both persist to the **table** (not just the
 blob); complete a booking for a service with a device recipe and confirm the resulting
 `invoice_lines` device-cost snapshot is non-zero and matches `costPerPulse × pulses_per_session`.
+
+**Done 2026-07-27.** `lamp_replacement_cost` added to `saveInventoryData`'s DB-sync mapper (it was
+entirely missing — the real column existed since `20260726011400_add_inventory_devices_lamp_replacement_cost.sql`
+but nothing ever wrote to it), plus POST/PUT handling with non-negative validation. Confirmed
+`max_pulses_limit` ("2nd Threshold / Maintenance Due" in the UI) was already genuinely settable —
+`saveInventoryData` already mapped `maintenance_threshold_2 → max_pulses_limit` correctly.
+
+**Bigger finding while tracing the verify step, fixed in the same commit — see RISK-026.** The real
+`inventory_devices` table has no `current_pulse_count`/`warning_threshold_1`/`maintenance_threshold_2`
+columns at all (only `total_pulses`/`max_pulses_limit`), but every read site in this route and in
+`admin/page.tsx` used exclusively those blob-shape names. Once the real table has rows, every
+device's displayed pulse count and status silently reset to defaults on reload — the write worked,
+the read-back didn't, which is exactly what this task's own verify step would have caught. Fixed
+with `normalizeDeviceRow()`, backfilling blob-shape names from the real columns.
+
+`admin/page.tsx` — added a "Lamp / Handpiece Replacement Cost" field (with its own explanatory box,
+matching the existing Maintenance Alert Thresholds box's style) to the Add/Edit Device modal, wired
+through both reset paths, the edit-open populator, and the save payload, with a client-side
+non-negative check mirroring the server's.
+
+**Verified:** `npx tsc --noEmit`, `npx eslint`, `npx next build` all clean. **Not yet done: live
+browser verification** — set a lamp cost and a maintenance threshold, save, reload the page, and
+confirm both display correctly rather than resetting; the `costPerPulse × pulses_per_session`
+invoice-snapshot check needs a service with a `service_devices` recipe configured, which doesn't
+exist yet (that's 3B.6).
 
 ---
 

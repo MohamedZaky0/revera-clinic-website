@@ -946,6 +946,66 @@ Chosen option 2 — full database-primary cutover for services.
 
 ---
 
+## RISK-026: Clinic Devices Read Blob-Shape Field Names That Don't Exist On The Real Table
+
+**Severity:** High · **Type:** Data integrity
+**Found:** 2026-07-27, while doing Phase 3B task 3B.4 (`lamp_replacement_cost` + rated pulses) ·
+**RESOLVED 2026-07-27** (the specific field-name mismatch below; a related unresolved item is
+noted at the end)
+
+**Root cause:** The real `inventory_devices` table (verified against
+`supabase/migrations/20260726000000_dev_schema_baseline.sql` and
+`20260726011400_add_inventory_devices_lamp_replacement_cost.sql`, not assumed) has exactly:
+`id, name, serial_number, model, branch_name, status, total_pulses, remaining_pulses,
+max_pulses_limit, lamp_replacement_cost, last_maintenance_date, next_maintenance_date,
+created_at, updated_at`. It has **no** `current_pulse_count`, `warning_threshold_1`,
+`maintenance_threshold_2`, `initial_pulse_count`, `total_lifetime_pulses`, or `category` columns
+at all — those exist only in the legacy "blob shape" (`DEFAULT_DEVICES`, and every POST/PUT body in
+`src/app/api/inventory/devices/route.ts`), a holdover from before the real table existed.
+
+`GET /api/inventory/devices`'s status-computation step, and **every single read site in
+`admin/page.tsx`** (device list stat cards, the pulse-update modal, the reset-pulses modal, the
+Edit Device form's default values — confirmed by grepping every occurrence of
+`current_pulse_count`/`warning_threshold_1`/`maintenance_threshold_2` in that file), read
+exclusively the blob-shape names. `getStoredInventoryData()` returns raw rows straight from
+`select('*')` on the real table when it has data — so every one of those reads silently resolved to
+`undefined`, and every `Number(dev.current_pulse_count) || 0` / `|| 80000` / `|| 100000` fallback
+kicked in unconditionally. **Practical effect: as soon as the real table has any rows, every
+device's displayed pulse count reads as 0, every threshold reads as the hardcoded default, and
+status always computes as "Optimal" — regardless of what's actually stored.** This is the same
+class of bug as RISK-025 (blob/table shape divergence), just on the read side only — the *write*
+side (`saveInventoryData`'s `sqlRows` mapper) was already correctly writing to the real table's
+columns; the display just never reflected it back.
+
+**Why 3B.4 specifically surfaced this:** the task asked to "confirm `max_pulses_limit` is genuinely
+settable, not only defaulted to 100000 in code." Tracing that through found it *was* settable (the
+write path was fine) but **never displayed correctly on reload** — which would have made the task's
+own verify step fail if actually tested against live data, the same way the null-duration bug would
+have failed 3B.2's verify step if not caught first.
+
+**Fix:** added `normalizeDeviceRow()` in `src/app/api/inventory/devices/route.ts`, applied to every
+row `getStoredInventoryData()` returns from the real table. It backfills the blob-shape names from
+the real columns when absent: `current_pulse_count ← total_pulses`,
+`maintenance_threshold_2 ← max_pulses_limit`. `warning_threshold_1` has no real-table equivalent to
+fall back to at all (the real schema only ever had one ceiling, not a two-tier warning/critical
+model) — derived as 80% of the real ceiling, matching the ratio `DEFAULT_DEVICES`' own seed data
+already used.
+
+**Not fixed here, worth checking separately:** `src/app/api/inventory/devices/[id]/reset-pulses/route.ts`
+reads and writes **only** `page_settings` (the blob) — it has no `supabaseServer.from('inventory_devices')`
+call at all, unlike the main route. `DB_SCHEMA.md`'s `inventory_devices` entry states this route is
+"confirmed wired," which this session did not re-verify and now has reason to doubt (same class of
+stale-doc risk RISK-020 exists to warn about). If the real table and the blob have diverged (very
+possible, since nothing keeps them in sync on this path), resetting a device's pulse count here may
+not affect what the main route's normalized read actually shows. Flagging, not fixing — out of
+scope for 3B.4.
+
+**Verify:** `npx tsc --noEmit`, `npx eslint`, and `npx next build` all clean. Set a device's
+Maintenance Threshold 2 and Lamp Replacement Cost, save, reload the page, and confirm both values
+persist and display correctly rather than resetting to defaults.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:
