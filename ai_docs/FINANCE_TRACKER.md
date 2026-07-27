@@ -509,9 +509,14 @@ routes:**
 6. Update this file in the same commit as the change it describes.
 7. **Update the matching manual-test checklist in the same commit as every micro-task.** Use
    `FINANCE_PHASE_1_MANUAL_TESTS.md`, `FINANCE_PHASE_2_MANUAL_TESTS.md`,
-   `FINANCE_PHASE_3_MANUAL_TESTS.md`, `FINANCE_PHASE_4_MANUAL_TESTS.md`, or
-   `FINANCE_PHASE_5_MANUAL_TESTS.md`; record the test date, environment, IDs/fixture, and result
-   after each manual verification. A phase is not fully tested until its checklist is complete.
+   `FINANCE_PHASE_3_MANUAL_TESTS.md`, `FINANCE_PHASE_3B_MANUAL_TESTS.md`,
+   `FINANCE_PHASE_4_MANUAL_TESTS.md`, or `FINANCE_PHASE_5_MANUAL_TESTS.md`; record the test date,
+   environment, IDs/fixture, and result after each manual verification. A phase is not fully tested
+   until its checklist is complete.
+8. **Phase 3B is UI work, so `tsc`/`eslint`/scratch scripts are necessary but never sufficient.**
+   Every 3B task must be exercised in a browser against dev before its row is marked `DONE`, and the
+   row must say which role was logged in as. A passing typecheck proves a UI field compiles, not
+   that an operator can actually save a value with it.
 
 ---
 
@@ -525,7 +530,7 @@ routes:**
 | Whether `admin_roles` / `employees` tables are live or dead | Phase 0.0 | Unknown — found in the live DBs, in no migration and no doc |
 | Split Phase 5's capacity/break-even/service-mix output between the Finance section and a new Reports/Data Analysis section, rather than putting all of it in Finance | Phase 4 UI (task 4.11), Phase 5 (5.9/5.10) | **Deliberately deferred by user decision 2026-07-26** — revisit after Phase 4, or after all five phases if it's still not clearly needed then. Proposed split, not yet decided: Finance = break-even revenue, maximum potential revenue, recommended service-mix allocation (planning/target numbers); a new Reports/Data Analysis section = room/doctor minutes, utilization %, no-show rate, gap-to-potential decomposition (actual/operational numbers). The underlying `/api/finance/capacity` and `/api/finance/service-mix` endpoints don't need to change either way — only which UI section presents which slice. Adding a Reports/Data Analysis section is new scope (permissions, sidebar entry, its own UI) not currently in any phase's task list. |
 | Seed a lean, broad mock dataset (not finance-only) so Phase 1/2's ledger and any future Phase 4/5 reporting UI have realistic data to show, beyond the narrow test transactions created and cleaned up during manual verification | Phase 4 UI, or later | **Deliberately deferred by user decision 2026-07-26** — same timing as the row above. Not urgent: Phase 4/5 have no UI yet to render seeded data into. Should stay modest ("enough to see features working," not a large volume) per the user's own scoping. |
-| Admin UI to configure a service's `service_consumables`/`service_devices` recipe (which products/devices it consumes by default, filtered to `role IN ('consumable', 'both')`) — today the only way to create these rows is a developer inserting them directly into the database | After Phase 3 | **Deliberately deferred by user decision 2026-07-26**, surfaced while reviewing the existing Edit Service modal in the live admin panel. Real, previously-unwritten gap: Phase 1–5's task lists build the recipe *tables* and wire checkout to *read* them (tasks 2.2, 2.6/service_devices, 2.11/2.15), but no task anywhere scopes the UI to *write* them — nobody but a developer running SQL can configure a recipe today. User's explicit reasoning for deferring rather than bolting it onto the existing Edit Service modal immediately: this needs a deliberate pass across the whole admin UI to find every place a price/cost/config value should logically live, not a piecemeal addition — do it as one coherent UI pass once Phase 3 (the last set of new money tables — expenses/assets/loans) is done, so the UI design accounts for all of it at once rather than being revisited repeatedly. |
+| ~~Admin UI to configure a service's `service_consumables`/`service_devices` recipe~~ | ~~After Phase 3~~ | **CLOSED 2026-07-27 — scoped as Phase 3B.** Phase 3 is done, so the deferral condition is met. The audit this triggered found the gap is far wider than recipes alone: `duration_minutes`, `inventory_products.role`, `inventory_devices.lamp_replacement_cost`, doctor commission base/fixed-component, package definitions, and suppliers all have the same shape — column and/or endpoint exists, no UI, and in most cases the API route ignores the column too. See **Phase 3B — Configuration & Data-Entry UI** below for the full measured table and the 13 micro-tasks. The user's original reasoning (one deliberate pass across the whole admin UI, not a piecemeal addition to the Edit Service modal) is what Phase 3B is; recipes are tasks 3B.5/3B.6 within it. |
 
 ---
 
@@ -2472,8 +2477,437 @@ again — which is what live verification is for.
 
 ---
 
+# Phase 3B — Configuration & Data-Entry UI
+
+> **Why this phase exists, and why it is numbered between 3 and 4.** Phases 1–3 built every money
+> table and every endpoint the finance module needs. **None of it is reachable by a human.** A
+> 2026-07-27 audit of `src/app/admin/page.tsx` (27,606 lines) found **zero** references to
+> `duration_minutes`, `role`, `lamp_replacement_cost`, `max_pulses_limit`, `commission_base`,
+> `commission_fixed_component`, `service_consumables`, `service_devices` or `pulses_per_session`.
+> A clinic cannot be onboarded today without a developer running SQL by hand.
+>
+> This is the "one coherent UI pass" the Open questions table deferred until after Phase 3 (see
+> that row — now closed and pointing here). It was deliberately **not** bolted onto the Edit
+> Service modal piecemeal; this phase is that deliberate pass across every admin section at once.
+>
+> **Phase 4's reporting endpoints return zeros without this phase.** `invoice_lines.cogs_snapshot`
+> stays `NULL` with no recipes; `CM_per_minute` is undefined with no `duration_minutes`; doctor P&L
+> is wrong with no commission base. 4.6–4.11 are not blocked from being *written* before this phase,
+> but they cannot be *verified against real numbers* until it lands.
+>
+> **IA decision (user, 2026-07-27):** Expenses/Assets/Loans management screens live in the **Finance**
+> section (Phase 4, task 4.13 — they are permission-gated money management). Suppliers and Purchases
+> live under **Inventory** (this phase) — they are stock-replenishment workflows reception performs
+> routinely, and putting them behind `finance.*` would force a finance grant for ordinary stock work.
+>
+> **Read before starting any 3B task:** `DECISIONS.md` → DEC-027 (modular submodules are
+> mandatory — **repair it first, see 3B.0**), DEC-016 (recipe editable at completion), DEC-018
+> (commission base is explicit), DEC-021 (products have a dual role), DEC-023 (packages are
+> first-class) · `RISKS.md` → RISK-017 (dead mock JSX).
+>
+> **Ground rule, same as every phase:** no new raw hex colors and no hardcoded "Revera"
+> (CLAUDE.md rules 1–2 — the existing admin UI violates rule 1 throughout; match the rule, not the
+> surrounding code). Any schema change gets a `DB_SCHEMA.md` update in the same commit. Every new
+> endpoint goes in `API_CONTRACT.md`. **Per DEC-027, every new screen is a submodule under
+> `src/components/admin/` — that directory does not exist yet; task 3B.1 creates it.**
+
+## What the 2026-07-27 audit actually measured
+
+Verified by grep against the live working tree, not assumed. Two initial assumptions were **wrong**
+and corrected by measuring — recorded here so nobody re-derives them:
+
+| Field | DB column | API route | Admin UI | Verdict |
+|---|---|---|---|---|
+| `services.duration_minutes` | ✅ (task 0.8) | ❌ ignored on **read and write** | ❌ free text `"1:00 Hours"` | full-stack gap |
+| `service_consumables` recipe | ✅ (task 2.2) | ❌ no CRUD endpoint | ❌ | full-stack gap |
+| `service_devices.pulses_per_session` | ✅ (task 2.15) | ❌ no CRUD endpoint | ❌ | full-stack gap |
+| `inventory_products.role` | ✅ (DEC-021) | ❌ never read or written | ❌ | full-stack gap |
+| `inventory_devices.lamp_replacement_cost` | ✅ (task 2.7) | ❌ not in the route's mapper | ❌ | full-stack gap |
+| `providers.commission_base` / `_fixed_component` | ✅ | ✅ accepted already | ❌ **UI only offers none/fixed/percentage** | UI gap |
+| `packages` / `package_items` | ✅ (task 1.5) | ❌ only sell/consume/extend — **no CRUD** | ❌ | endpoint + UI gap |
+| `suppliers` | ✅ | ❌ **no `/api/suppliers` route at all** | mock only | endpoint + UI gap |
+| `purchases` | ✅ (task 2.6) | ✅ `POST /api/purchases` | mock only | UI gap |
+| `inventory_products.cost_price` | ✅ | ✅ **exposed as `purchase_price`** | ✅ **9 references** | **already done — not a gap** |
+
+**Correction worth keeping:** `cost_price` was initially called a gap because the grep used the DB
+column name; the API deliberately exposes it as `purchase_price` and the UI has always had it. The
+same class of mistake RISK-020 exists to prevent — measure the actual stack, not one layer of it.
+
+**Six orphaned mock screens found, not one.** RISK-017 catalogues only the `Finances Dashboard`
+block. In fact `activeNav === "Suppliers"`, `"Purchases"`, `"Batch Management"`,
+`"Expense Categories"`, `"Expenses"` and `"Finances Dashboard"` all render JSX that **nothing can
+ever reach**: the only `setActiveNav` call sites are the sidebar (`item.label`), the Settings
+submenu (`sub.label`), a permission-redirect effect, and one literal `setActiveNav("Bookings")`.
+None of those six strings appears in `SIDEBAR_ITEMS` or the Settings submenu list. Task 3B.11 and
+Phase 4's task 4.5 split the cleanup between them — see both.
+
+## Phase 3B task table
+
+| ID | Task | Depends on | Status | Owner | Commit |
+|---|---|---|---|---|---|
+| 3B.0 | Repair committed merge-conflict debris in `DECISIONS.md` (corrupts DEC-027) | — | `TODO` | — | — |
+| 3B.1 | Create `src/components/admin/` + the first module boundary (DEC-027) | — | `TODO` | — | — |
+| 3B.2 | `services.duration_minutes`: API read/write + numeric UI field | 3B.1 | `TODO` | — | — |
+| 3B.3 | `inventory_products.role`: API read/write + UI selector | 3B.1 | `TODO` | — | — |
+| 3B.4 | `inventory_devices.lamp_replacement_cost` + rated pulses: API + UI | 3B.1 | `TODO` | — | — |
+| 3B.5 | Service consumables recipe editor (`service_consumables`) + endpoint | 3B.1, 3B.3 | `TODO` | — | — |
+| 3B.6 | Service device/pulses editor (`service_devices`) + endpoint | 3B.1, 3B.4 | `TODO` | — | — |
+| 3B.7 | Doctor commission: `both` option, base, fixed component (**2 duplicate forms**) | 3B.1 | `TODO` | — | — |
+| 3B.8 | Packages admin UI + `/api/packages` CRUD endpoint | 3B.1 | `TODO` | — | — |
+| 3B.9 | Suppliers: `/api/suppliers` CRUD endpoint + real UI under Inventory | 3B.1 | `TODO` | — | — |
+| 3B.10 | Purchases: real UI under Inventory wired to `POST /api/purchases` | 3B.9 | `TODO` | — | — |
+| 3B.11 | Delete the orphaned Suppliers/Purchases/Batch Management mock screens | 3B.9, 3B.10 | `TODO` | — | — |
+| 3B.12 | `API_CONTRACT.md` + `DB_SCHEMA.md` rollup for Phase 3B | rolling | `TODO` | — | — |
+
+---
+
+## 3B.0 — Repair the committed merge-conflict debris in `DECISIONS.md`
+
+**No dependency. Do this first — it corrupts the decision that governs every other task here.**
+
+`ai_docs/DECISIONS.md` contains **committed** merge-conflict markers (confirmed present in `HEAD`,
+not just the working tree) at lines 724, 726 and 732 as of 2026-07-27, in an out-of-order sequence
+(`=======` before `>>>>>>>` before `<<<<<<< HEAD`) that indicates a partial manual resolution that
+was then committed.
+
+The damage: **DEC-027 ("Modular Admin Sections Are Mandatory")** has a stray
+`## DEC-014: Added settings.terms Granular Permission for Booking Terms & Conditions` header
+spliced into the middle of it, so DEC-027's own header, date, context and body are split across
+conflict markers.
+
+**No content is actually lost.** That stray DEC-014 entry is a duplicate — its real, intact copy
+lives at **DEC-032**, with the identical title. `DEC-014` is also already taken by "Finance Module
+Is Management Accounting, Not Bookkeeping". So the fix is purely deletion:
+
+1. Delete the three conflict-marker lines.
+2. Delete the stray `## DEC-014: Added settings.terms...` header line.
+3. Confirm DEC-027 reads as one coherent entry (header → Date/Status → Context → Chosen Option →
+   Trade-offs), matching every other entry's shape.
+4. Confirm `grep -c '^<<<<<<<\|^=======$\|^>>>>>>>' ai_docs/DECISIONS.md` returns 0 across the
+   whole file, not just this region.
+
+**Why this is task zero and not a footnote:** every task in this phase and in Phase 4 is required
+to "read DEC-027 before writing code." A decision that is physically unreadable cannot be complied
+with, and the next person to read it will reasonably conclude DEC-027 and DEC-014 are the same
+decision.
+
+**Verify:** the grep above returns 0; DEC numbering has no remaining duplicates other than the
+known-and-now-documented DEC-014/DEC-032 relationship.
+
+---
+
+## 3B.1 — Create `src/components/admin/` and the first module boundary
+
+**No dependency, but DEC-027 (repaired in 3B.0) is the governing decision.**
+
+**`src/components/admin/` does not exist.** Only `src/components/ui/` does. DEC-027 has been active
+since 2026-07-26 and has never actually been exercised, because no new admin section has been built
+since it was decided. This task is where it stops being aspirational.
+
+**What:** create the directory and establish the pattern the rest of this phase and all of Phase 4
+follow — a focused component per screen/editor, receiving what it needs by props, owning its own
+data fetching, exporting one top-level component that `admin/page.tsx` composes at the single point
+where its `activeNav`/modal condition is checked. **No new section-level state may be added to
+`admin/page.tsx`.**
+
+**The honest constraint to design around:** every editor this phase adds (3B.2–3B.7) is a *field
+inside an existing legacy modal*, not a new top-level section. DEC-027 says legacy sections are
+extracted "incrementally when they are touched," which these tasks do touch. Decide and record here
+which of the two applies per task, rather than deciding ad hoc nine times:
+- **Extract-then-edit** where the surrounding modal is small enough to lift wholesale.
+- **Insert a self-contained child component** (e.g. `<ServiceRecipeEditor serviceId=... />`) into
+  the legacy modal where a full extraction would be a large-bang rewrite DEC-027 explicitly forbids.
+
+Recommend the second for 3B.2/3B.3/3B.4/3B.7 (single fields in large modals) and the first for
+3B.5/3B.6/3B.8/3B.9/3B.10 (genuinely new UI surfaces).
+
+**Update `DB_SCHEMA.md`/`API_CONTRACT.md`:** none.
+
+**Verify:** `npx tsc --noEmit` and `npx eslint` clean; the scaffold renders inside the admin shell
+without adding state to `admin/page.tsx` (diff review is the check — a growing `useState` count in
+that file means this task failed its own purpose).
+
+---
+
+## 3B.2 — `services.duration_minutes`: API read/write + numeric UI field
+
+**Depends on 3B.1.**
+
+**Measured state:** `src/app/api/services/route.ts` references `duration` (free text) only, at both
+`:24` (read mapper) and `:46` (write mapper). **`duration_minutes` appears nowhere in the route.**
+The admin form uses `const [serviceDuration, setServiceDuration] = useState("1:00 Hours")` — a free
+text string. So the numeric column task 0.8 added, backfilled and wired into
+`getServiceDurationMinutes()` **can never be set from the product**.
+
+**What:**
+1. Add `duration_minutes` to the services route's read mapper and write mapper.
+2. Replace (or supplement) the free-text duration input with a **numeric minutes** input, honouring
+   the column's `CHECK (> 0 AND <= 1440)`.
+3. Keep the existing `duration` text column populated for backward compatibility — task 0.8's
+   `getServiceDurationMinutes()` already prefers the numeric column and falls back to parsing text,
+   so both staying in sync is safe; only the numeric one is authoritative.
+
+**Why this is the highest-value single field in this phase:** task 0.8's own write-up states
+"**every capacity and room-utilisation figure so far assumed 30 minutes for every service**"
+because `getDurationInMinutes` silently returns 30 for anything unparseable. Phase 4's `CM_per_minute`
+(4.7) and all of Phase 5 divide by this number. A wrong duration doesn't produce a visible error —
+it produces a confidently wrong ranking of which services are worth the clinic's chair time.
+
+**Verify:** set a service to 45 minutes in the UI; re-query the row and confirm `duration_minutes`
+is exactly 45 (not 30, not NULL); confirm `getServiceDurationMinutes()` returns 45 for it; confirm
+the `<= 1440` and `> 0` checks reject 0 and 2000 from the UI with a clear message rather than a raw
+Postgres error.
+
+---
+
+## 3B.3 — `inventory_products.role`: API read/write + UI selector
+
+**Depends on 3B.1.**
+
+**Measured state:** `grep -n 'role' src/app/api/inventory/products/route.ts` returns **zero matches**.
+The column exists per DEC-021 ("Products Have A Dual Role"); nothing reads or writes it.
+
+**What:** add `role` to the products route's mappers and a selector to the product form with the
+three DEC-021 values — **retail** (sold to patients only), **consumable** (used in services only),
+**both**. Default existing/new rows to whatever DEC-021 and the live column default specify —
+**verify the live default before choosing a UI default** rather than assuming `'retail'`.
+
+**Why 3B.5 depends on this:** the recipe editor must filter its product picker to
+`role IN ('consumable', 'both')` — the Open questions row that deferred this whole UI pass names
+that filter explicitly. Without `role` being settable, the recipe picker either shows every retail
+product (inviting nonsense recipes) or shows nothing.
+
+**Verify:** set a product to `consumable`; confirm it persists; confirm it then appears in 3B.5's
+recipe picker and a `retail`-only product does not.
+
+---
+
+## 3B.4 — `inventory_devices.lamp_replacement_cost` + rated pulses: API + UI
+
+**Depends on 3B.1.**
+
+**Measured state:** the devices route's `saveInventoryData` mapper writes `id, name, serial_number,
+model, branch_name, status, total_pulses, remaining_pulses, max_pulses_limit,
+last_maintenance_date, created_at, updated_at`. **`lamp_replacement_cost` is not among them**, so
+task 2.7's column is never written by the product.
+
+**What:** add `lamp_replacement_cost` (and confirm `max_pulses_limit` is genuinely settable, not
+only defaulted to 100000 in code) to the devices route mapper and the device form.
+
+**Two traps specific to this route, both pre-existing — do not make them worse:**
+1. It is a `page_settings`-blob-with-table-sync hybrid (`getStoredInventoryData` reads the table,
+   falls back to a JSON blob, and `saveInventoryData` writes **both**). Adding a field means adding
+   it to both paths or it will silently vanish on the fallback path.
+2. It contains **hardcoded branch UUIDs and branch names** (`'803321a0-…' ? 'New Cairo Branch' : …`)
+   — a direct CLAUDE.md rule 2 violation. Not this task's job to fix, but **do not extend it**;
+   note it for a follow-up rather than adding a third hardcoded branch.
+
+**Why:** `costPerPulse(lampReplacementCost, ratedPulses)` (task 2.9) is called by 2.15's device-cost
+snapshotting. With the cost never set, every pulse cost is 0 and laser-heavy services look
+artificially profitable — precisely the distortion DEC-015's contribution-margin model exists to
+prevent.
+
+**Verify:** set a lamp cost and rated pulses; confirm both persist to the **table** (not just the
+blob); complete a booking for a service with a device recipe and confirm the resulting
+`invoice_lines` device-cost snapshot is non-zero and matches `costPerPulse × pulses_per_session`.
+
+---
+
+## 3B.5 — Service consumables recipe editor + endpoint
+
+**Depends on 3B.1, 3B.3.** **This is the specific gap the Open questions table deferred.**
+
+**What:** a `service_consumables` CRUD endpoint (no route exists) plus a recipe editor inside the
+Edit Service surface: add/remove product rows with a `standard_qty` each, product picker filtered to
+`role IN ('consumable','both')` (hence the 3B.3 dependency).
+
+**Why it matters beyond convenience:** task 2.11 wires checkout to *read* this recipe and snapshot
+COGS onto `invoice_lines.cogs_snapshot`. Task 1.2 deliberately made that column **nullable** so
+`NULL` honestly means "not yet costed" rather than a `0` meaning "genuinely free." Today **every
+service produces `NULL`**, because no recipe can exist. Phase 4's P&L (4.6) is explicitly required
+to surface a "partially costed" indicator rather than treat `NULL` as zero — so without this task,
+that indicator reads "100% uncosted" forever and the P&L's COGS line is structurally empty.
+
+**Note on DEC-016:** the recipe is the *standard* — checkout already supports per-booking
+`consumptionOverrides` (task 2.11). This editor sets the default, it does not remove the override.
+
+**Verify:** define a recipe of 2 products; complete a booking for that service; confirm
+`invoice_lines.cogs_snapshot` equals the hand-computed `Σ (standard_qty × cost snapshot)` and is no
+longer `NULL`.
+
+---
+
+## 3B.6 — Service device / pulses-per-session editor + endpoint
+
+**Depends on 3B.1, 3B.4.**
+
+**What:** a `service_devices` CRUD endpoint plus UI to attach a device to a service with a
+`pulses_per_session` value.
+
+**Why this is separate from 3B.5 despite looking similar:** task 2.15's own write-up records that
+`costPerPulse()` was defined in Phase 2 "but never actually called anywhere without it" — the
+`service_devices` link is what connects a device's cost basis to a delivered session. It is the
+other half of a service's variable cost and has a different shape (one device + a pulse count, not
+a list of quantities).
+
+**Verify:** attach a device at a known pulses-per-session; complete a booking; confirm the device
+cost snapshot equals `costPerPulse × pulses_per_session` exactly.
+
+---
+
+## 3B.7 — Doctor commission: `both`, base, and fixed component
+
+**Depends on 3B.1.**
+
+**Measured state — and the duplication trap:** the commission form exists **twice** in
+`admin/page.tsx`, at approximately `:7908` and `:26263` (verify current lines — this file moves).
+**Both** offer only:
+```
+<option value="none">None</option>
+<option value="fixed">Fixed Amount per Service</option>
+<option value="percentage">Percentage of Service Price</option>
+```
+Meanwhile `computeCommission(gross, type, value, fixedComponent)` supports `'both'` (proven by
+`scratch/phase2costingcheck.ts`'s `computeCommission(1000,'both',10,75) === 175`), `POST/PATCH
+/api/providers` already accept `commissionBase` and `commissionFixedComponent`, and the `providers`
+table has both columns. **Only the UI is missing** — this is a UI-only task, unlike 3B.2–3B.6.
+
+**What:** add the `both` option, a `commissionBase` selector (gross vs net — DEC-018 requires the
+base be explicit), and a `commissionFixedComponent` input shown when type is `both`. **Apply to
+both form copies**, or extract one shared component and use it in both places (preferred, and
+squarely within DEC-027's "extract incrementally when touched").
+
+**Why:** DEC-018 is titled "Doctor Commission Is Configurable Per Doctor, **With An Explicit Base**."
+A percentage with an unstated base is ambiguous by construction — 10% of gross and 10% of net are
+different numbers, and doctor P&L (task 4.8) reports whichever one was silently assumed.
+
+**Verify:** configure a doctor as `both` with a fixed component; complete a booking; confirm
+`invoice_lines.commission_snapshot` matches the hand-computed figure and that
+`GET /api/hr/doctor-payroll` (which reads those snapshots per task 2.14) reflects it.
+
+---
+
+## 3B.8 — Packages admin UI + `/api/packages` CRUD endpoint
+
+**Depends on 3B.1.**
+
+**Measured state:** `src/app/api/packages/` contains **only** `sell/`, `consume/` and `extend/`.
+There is **no base CRUD route**, and no admin UI anywhere. Phase 1 tasks 1.5/1.6 built `packages`
+and `package_items`; tasks 1.12/1.13 built selling and consuming them. **Nobody can create one.**
+
+**What:** a `/api/packages` CRUD endpoint (`requireStaffAccess`, matching the Phase 3 expenses
+precedent) plus an admin UI to define a package: name, branch (nullable = all branches), price,
+tax rate, `validity_days`, `on_expiry` (`recognise_revenue` vs `extend` per DEC-025),
+`extension_days`, `active`, and the `package_items` list (service + qty).
+
+**Where it lives:** recommend under **Services**, since `package_items.service_id` makes a package a
+bundle of services and that is where an operator would look for it. Flagged rather than assumed —
+if it turns out to warrant its own sidebar entry, that is a 4-place permission-map wiring job
+(see task 4.4's warning) and should be scoped as such, not done casually.
+
+**Verify:** define a package with 2 services; sell it via the existing `POST /api/packages/sell`;
+confirm the entitlement rows (`customer_packages`, `customer_package_items`) match the definition
+exactly, and that `on_expiry`/`validity_days` are honoured by the expiry behaviour DEC-025 specifies.
+
+---
+
+## 3B.9 — Suppliers: `/api/suppliers` CRUD endpoint + real UI under Inventory
+
+**Depends on 3B.1.**
+
+**Measured state:** **no `/api/suppliers` route exists.** The `suppliers` table exists (referenced
+by `purchases.supplier_id` and validated inside `POST /api/purchases`). The admin UI has a
+`MOCK_SUPPLIERS` array of three hardcoded suppliers rendered by an **unreachable**
+`activeNav === "Suppliers"` block.
+
+**What:** build the CRUD endpoint and a real Suppliers screen under **Inventory** (per the IA
+decision at the top of this phase), as a `src/components/admin/` submodule.
+
+**Note the mock's shape is misleading** — `MOCK_SUPPLIERS` carries pre-formatted string fields like
+`totalPurchasesValue: "EGP 125,400.00"` and `outstandingBalance: "EGP 12,800.00"`. Those are
+**derived** figures (sums over `purchases`), not columns, and they are strings with a hardcoded
+currency — a CLAUDE.md rule 2 concern and the same "pre-formatted string" trap RISK-017 flags in the
+finance mocks. Derive them server-side or omit them; do not recreate the mock's shape.
+
+**Verify:** create a supplier; confirm `POST /api/purchases` accepts it as `supplierId`; confirm the
+404 path (`'Supplier not found.'`) still fires for a bogus id.
+
+---
+
+## 3B.10 — Purchases: real UI under Inventory wired to `POST /api/purchases`
+
+**Depends on 3B.9.**
+
+**Measured state:** `POST /api/purchases` is **already built and documented** (task 2.6) — it
+creates the purchase, its lines, and matching inbound `stock_movements`, deriving `total`
+server-side. There is no UI for it; `MOCK_PURCHASES` renders in an unreachable block.
+
+**What:** a real Purchases screen under Inventory: pick a supplier (3B.9), add lines
+(product + qty + unit cost), optional `paid` and `dueDate`, submit to the existing endpoint. **Do
+not compute `total` client-side and send it** — the endpoint derives it deliberately, and sending a
+client total would reintroduce exactly the class of bug task 0.4 removed (a client-computed figure
+overwriting server truth).
+
+**Why this closes a real loop:** task 2.12 made stock quantity derived from `stock_movements`.
+Purchases are the only inbound movement source. Without this UI, stock can only ever go **down**
+through the product's own flows — restocking requires a developer.
+
+**Verify:** record a purchase of 10 units; confirm exactly one inbound `stock_movements` row per
+line and that `GET /api/inventory/products/reconcile` shows the derived quantity increase by
+exactly 10.
+
+---
+
+## 3B.11 — Delete the orphaned Suppliers / Purchases / Batch Management mock screens
+
+**Depends on 3B.9, 3B.10** (the real screens must work before the dead ones are removed).
+
+**What:** delete the unreachable `activeNav === "Suppliers"`, `activeNav === "Purchases"` and
+`activeNav === "Batch Management"` blocks and their backing `MOCK_SUPPLIERS`, `MOCK_PURCHASES`,
+`MOCK_BATCHES` constants.
+
+**Scope boundary with Phase 4's task 4.5 — read both before starting either.** The six orphaned
+screens split by owner:
+- **This task:** Suppliers, Purchases, Batch Management (superseded by 3B.9/3B.10).
+- **Task 4.5:** Expense Categories, Expenses, Finances Dashboard (superseded by the Finance
+  section's real screens).
+
+`MOCK_PURCHASES` is referenced from **two** places (`:12839` in addition to the Purchases block) —
+grep before deleting, exactly as 4.5 instructs, since RISK-017's line numbers have already drifted
+once.
+
+**Verify:** `npx tsc --noEmit` and `npx eslint` clean; grep returns zero references to each deleted
+constant; the real screens from 3B.9/3B.10 still render.
+
+---
+
+## 3B.12 — `API_CONTRACT.md` + `DB_SCHEMA.md` rollup for Phase 3B
+
+Checklist task, same pattern as 1.16 / 2.16 / 3.13. Confirm every new endpoint from this phase
+(`/api/suppliers`, `/api/packages`, the `service_consumables` and `service_devices` endpoints) is
+documented, and that every route whose **mapper changed** (`/api/services`,
+`/api/inventory/products`, `/api/inventory/devices`) has its documented response shape updated —
+that second half is the one a rollup usually misses, because the endpoint list looks unchanged.
+
+Close this out last.
+
+---
+
 # Phase 4 — Reporting Engine + UI
 
+> **Sequencing note added 2026-07-27, after the Phase 3B audit.** Two adjustments to this phase's
+> task table are recommended but **not yet applied** — the table below is unchanged pending review:
+>
+> 1. **Split task 4.13.** It currently bundles nine screens whose dependencies differ sharply. The
+>    **management** screens (Expenses, Assets & Depreciation, Loans) depend only on 4.4 + 4.12 and
+>    endpoints that **already shipped** in tasks 3.10–3.12 — they are buildable immediately and are
+>    what makes Phase 3's data enterable. The **reporting** screens (P&L, Margins, Doctor/Branch
+>    P&L, Cash Flow, Aging, Budget) depend on 4.6–4.11, which are not written. Splitting these into
+>    4.13 (management) and a new 4.15 (reporting) lets the useful half ship without waiting.
+> 2. **Task 4.5's scope is smaller than its title suggests.** Phase 3B's task 3B.11 takes the
+>    Suppliers/Purchases/Batch Management orphans; 4.5 keeps Expense Categories, Expenses and
+>    Finances Dashboard. The "~4,000 lines" figure in this task's text predates that split.
+>
 > **Depends on Phase 1 (ledger data to report on) and Phase 2 (cost data for margin reporting).**
 > Phase 3's expense/asset/loan data is needed for the fully-loaded and P&L views specifically
 > (4.6, 4.11) but not for every Phase 4 task — the permission-wiring and dead-code-deletion tasks
