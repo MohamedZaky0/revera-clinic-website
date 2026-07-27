@@ -87,6 +87,18 @@ Public website bookings are tagged with `origin: 'website'` and displayed with a
 
 ---
 
+### Booking step flow & MD3 Date/Time Pickers
+**Enforced in:** `src/components/BookingModal.tsx`, `MaterialDatePicker.tsx`, `MaterialTimePicker.tsx`
+
+The public website patient booking flow is consolidated into 3 main steps (or 2 steps if deposit percentage is 0):
+1. **Service & Schedule (`Service & Schedule` / `الخدمة والموعد`)**: Combines session type selection (In-Clinic vs Online), branch selection, service category & service dropdown, and inline Material Design 3 style custom Date & Time pickers.
+   - **Date Picker (`MaterialDatePicker.tsx`)**: MD3 full month calendar with date header, month switcher (`<` `>`), weekday grid, and brand-styled day selector (`var(--cr-primary)` `#414E36`).
+   - **Time Picker (`MaterialTimePicker.tsx`)**: MD3 digital display (`HH:MM` with AM/PM toggle) paired with interactive radial analog clock dial and toggleable quick slots grid.
+2. **Confirm (`Confirm` / `تأكيد`)**: Summary of reservation, optional doctor selection, patient name/email/phone, notes, and Terms & Conditions.
+3. **Payment (`Payment` / `الدفع`)**: InstaPay / Mobile Wallet deposit submission (when deposit percentage > 0).
+
+---
+
 ### Booking lifecycle stages
 **Enforced in:** `src/app/admin/page.tsx` + `PATCH /api/reservations`
 

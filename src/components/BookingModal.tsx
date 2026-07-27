@@ -13,22 +13,12 @@ import {
   LocalCategory 
 } from "@/lib/serviceStore";
 import TermsModal from "./TermsModal";
+import { MaterialDatePicker } from "./ui/MaterialDatePicker";
+import { MaterialTimePicker } from "./ui/MaterialTimePicker";
 import { ShieldCheck, FileText, ExternalLink, Undo2 } from "lucide-react";
 import { CLIENT } from "@/config/client";
 
-type Step = 1 | 2 | 3 | 4 | 5;
-
-function getNext30Days(): Date[] {
-  const days: Date[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  for (let i = 0; i < 30; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    days.push(d);
-  }
-  return days;
-}
+type Step = 1 | 2 | 3;
 
 function to12h(slot24h: string): string {
   const [hhStr, mmStr] = slot24h.split(':');
@@ -41,14 +31,6 @@ function to12h(slot24h: string): string {
 }
 
 const TIME_SLOTS = ALL_15MIN_SLOTS.map(to12h);
-
-function to24(slot: string) {
-  // input like "12:30 PM" -> return "12:30" or "15:30"
-  const dt = new Date('1970-01-01 ' + slot);
-  const hh = String(dt.getHours()).padStart(2, '0');
-  const mm = String(dt.getMinutes()).padStart(2, '0');
-  return `${hh}:${mm}`;
-}
 
 /** Format a local Date to YYYY-MM-DD without UTC conversion */
 function toLocalDateStr(date: Date): string {
@@ -132,16 +114,14 @@ export function BookingModal() {
     const isPaymentRequired = depositPercentage > 0;
     if (isPaymentRequired) {
       return isRTL 
-        ? ["اختر الخدمة", "اختر التاريخ", "اختر الوقت", "تأكيد", "الدفع"]
-        : ["Select Service", "Select Date", "Select Time", "Confirm", "Payment"];
+        ? ["الخدمة والموعد", "تأكيد", "الدفع"]
+        : ["Service & Schedule", "Confirm", "Payment"];
     } else {
       return isRTL
-        ? ["اختر الخدمة", "اختر التاريخ", "اختر الوقت", "تأكيد"]
-        : ["Select Service", "Select Date", "Select Time", "Confirm"];
+        ? ["الخدمة والموعد", "تأكيد"]
+        : ["Service & Schedule", "Confirm"];
     }
   }, [depositPercentage, isRTL]);
-
-  const days = getNext30Days();
 
   const resetState = useCallback(() => {
     setStep(1);
@@ -347,8 +327,7 @@ export function BookingModal() {
       .catch(() => {});
   }, []);
 
-  // Prefetch 30-day availability the moment serviceId + branchId + sessionType are known
-  // — fires BEFORE the user even clicks "Next", so the calendar is warm
+  // Prefetch 30-day availability
   useEffect(() => {
     if (!serviceId) return;
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
@@ -356,11 +335,11 @@ export function BookingModal() {
     prefetchUrl(url, 30000);
   }, [serviceId, branchId, sessionType]);
 
-  // Consume the cached 30-day data when the user actually reaches step 2 (date picker)
+  // Consume cached 30-day availability
   useEffect(() => {
     if (!open || !serviceId) return;
     const branchQuery = branchId ? `&branchId=${branchId}` : "";
-    cachedFetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}&sessionType=${sessionType}`, 30000).then((data) => {
+    cachedFetch(`/api/availability?serviceId=${serviceId}&days=30${branchQuery}&sessionType=${sessionType}`).then((data) => {
       const map: Record<string, number> = {};
       if (Array.isArray(data)) {
         data.forEach((d: { date: string; approvedCount: number; isAvailable?: boolean }) => { 
@@ -373,7 +352,7 @@ export function BookingModal() {
     }).catch(()=>{});
   }, [open, serviceId, branchId, sessionType]);
 
-  // Prefetch slots for the currently selected date so step 3 renders instantly
+  // Prefetch slots for selected date
   useEffect(() => {
     if (!serviceId || !selectedDate) return;
     const date = toLocalDateStr(selectedDate);
@@ -381,7 +360,7 @@ export function BookingModal() {
     prefetchUrl(`/api/availability?date=${date}&serviceId=${serviceId}${branchQuery}&sessionType=${sessionType}`, 5000);
   }, [serviceId, selectedDate, branchId, sessionType]);
 
-  // Fetch taken time slots for a single selected date and calculate duration-based availability
+  // Fetch taken time slots for selected date
   useEffect(() => {
     let active = true;
     if (!serviceId || !selectedDate) {
@@ -428,17 +407,15 @@ export function BookingModal() {
   }, [open, handleClose]);
 
   function handleNext() {
-    if (step === 1 && serviceId !== null) setStep(2);
-    if (step === 2 && selectedDate) setStep(3);
-    if (step === 3 && selectedTime) setStep(4);
+    if (step === 1 && serviceId !== null && selectedDate !== null && selectedTime !== null) {
+      setStep(2);
+    }
   }
 
   function handleBack() {
     if (step === 2) setStep(1);
-    if (step === 3) setStep(2);
-    if (step === 4) setStep(3);
-    if (step === 5) {
-      setStep(4);
+    if (step === 3) {
+      setStep(2);
       setCreatedReservation(null);
     }
   }
@@ -560,7 +537,7 @@ export function BookingModal() {
       start: formatMins(minStart),
       end: formatMins(maxEnd)
     };
-  }, [doctors, branchId, selectedService, t, branches]);
+  }, [doctors, branchId, selectedService, t, branches, serviceHours]);
 
   const getAvailableDoctors = useCallback(() => {
     if (!selectedDate || !selectedTime || !selectedService) return [];
@@ -648,7 +625,7 @@ export function BookingModal() {
 
       return !hasOverlap;
     });
-  }, [selectedDate, selectedTime, selectedService, doctors, branchId, reservationsForDate, dynamicServices]);
+  }, [selectedDate, selectedTime, selectedService, doctors, branchId, reservationsForDate, dynamicServices, sessionType]);
 
   function handleConfirm() {
     if (!serviceId || !selectedDate || !selectedTime || !name || !email || !phone) return;
@@ -677,7 +654,7 @@ export function BookingModal() {
         setIsCreatingReservation(false);
         if (data && (data.status === 'pending_deposit' || data.requiresDeposit || depositPercentage > 0)) {
           setCreatedReservation(data);
-          setStep(5);
+          setStep(3); // Step 3 is Payment
         } else {
           setConfirmed(true);
         }
@@ -776,10 +753,22 @@ Attached is my payment transaction receipt photo.`;
     }
   });
 
+  const filteredTimeSlots = useMemo(() => {
+    if (!selectedDate) return [];
+    const { start, end } = getDayOperatingHours(selectedDate);
+    return TIME_SLOTS.filter((slot) => {
+      const slot24 = normaliseTo24hSlot(slot) ?? "";
+      const taken = takenSlots.includes(slot24);
+      return slot24 >= start && slot24 < end && !taken;
+    });
+  }, [selectedDate, getDayOperatingHours, takenSlots]);
+
   const canNext =
-    (step === 1 && serviceId !== null && (branches.length === 0 || branchId !== null)) ||
-    (step === 2 && selectedDate !== null) ||
-    (step === 3 && selectedTime !== null);
+    step === 1 &&
+    serviceId !== null &&
+    selectedDate !== null &&
+    selectedTime !== null &&
+    (branches.length === 0 || sessionType === "online" || branchId !== null);
 
   const instapayQrUrl = instapayLink && instapayLink !== "https://www.instapay.eg" 
     ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(instapayLink)}` 
@@ -802,7 +791,7 @@ Attached is my payment transaction receipt photo.`;
       aria-modal="true"
       aria-label={t.booking.title}
     >
-      <div className="modal-box" dir={isRTL ? "rtl" : "ltr"}>
+      <div className="modal-box max-w-4xl" dir={isRTL ? "rtl" : "ltr"}>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -825,7 +814,7 @@ Attached is my payment transaction receipt photo.`;
           <button
             onClick={handleClose}
             aria-label={t.booking.closeBtn}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-xl transition-colors hover:bg-gray-100"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-xl transition-colors hover:bg-gray-100 cursor-pointer"
             style={{ color: "var(--cr-accent)" }}
           >
             ×
@@ -880,7 +869,6 @@ Attached is my payment transaction receipt photo.`;
           <>
             {/* Step progress */}
             <div className="relative mb-8">
-              {/* Connecting line */}
               <div 
                 className="absolute top-4 left-0 right-0 h-0.5 bg-[#414E36]/10 -translate-y-1/2 z-0" 
                 style={{
@@ -926,13 +914,12 @@ Attached is my payment transaction receipt photo.`;
               </div>
             </div>
 
-
-            {/* Step 1: Service selection */}
+            {/* Step 1: Combined Service & Schedule (Service + Date + Time) */}
             {step === 1 && (
-              <div>
+              <div className="space-y-6">
                 {/* Session Type Switcher */}
-                <div className="mb-6">
-                  <p className="mb-3 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
+                <div>
+                  <p className="mb-2.5 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
                     {isRTL ? "نوع الجلسة" : "Session Type"}
                   </p>
                   <div className="flex rounded-3xl border border-[#414E36]/15 p-1 bg-[#F2EFE9]/30">
@@ -961,9 +948,9 @@ Attached is my payment transaction receipt photo.`;
                   </div>
                 </div>
 
-                {/* Conditional Branch Picker or Online Info */}
+                {/* Branch Picker or Online Info */}
                 {sessionType === "online" ? (
-                  <div className="mb-6 rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-4 flex items-start gap-2.5 text-xs text-[#414E36] leading-relaxed">
+                  <div className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC] p-3.5 flex items-start gap-2.5 text-xs text-[#414E36]">
                     <svg className="w-5 h-5 shrink-0 text-[#C4AE7C] mt-0.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
@@ -981,8 +968,8 @@ Attached is my payment transaction receipt photo.`;
                   </div>
                 ) : (
                   branches.length > 0 && (
-                    <div className="mb-6">
-                      <p className="mb-3 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
+                    <div>
+                      <p className="mb-2 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
                         {isRTL ? "اختر الفرع" : "Select Branch"}
                       </p>
                       <div className="flex flex-wrap gap-2">
@@ -1010,139 +997,94 @@ Attached is my payment transaction receipt photo.`;
                   )
                 )}
 
-                <p className="mb-4 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
-                  {t.booking.labels.service}
-                </p>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {dynamicCategories.map((category) => {
-                    const label = isRTL && category.ar ? category.ar : category.en;
-                    const isActive = selectedCategory === category.key;
-                    return (
-                      <button
-                        key={category.key}
-                        onClick={() => setSelectedCategory(category.key)}
-                        className="rounded-full px-4 py-2 text-xs font-semibold transition-colors"
-                        style={{
-                          backgroundColor: isActive ? "var(--cr-primary)" : "var(--cr-secondary)",
-                          color: isActive ? "var(--cr-white)" : "var(--cr-primary)",
-                          border: isActive ? "none" : "1px solid rgba(65, 78, 54, 0.18)",
-                        }}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <select
-                  value={serviceId ?? ""}
-                  onChange={(e) => setServiceId(e.target.value ? Number(e.target.value) : null)}
-                  className="cr-input"
-                  style={{
-                    appearance: "none",
-                    WebkitAppearance: "none",
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23414e36' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: isRTL ? "left 12px center" : "right 12px center",
-                    paddingRight: isRTL ? "12px" : "40px",
-                    paddingLeft: isRTL ? "40px" : "12px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <option value="" disabled>
-                    {isRTL ? "— اختر خدمة —" : "— Select a service —"}
-                  </option>
-                  {servicesForCategory.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {isRTL ? service.ar : service.en} · {service.unit}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Step 2: Date grid */}
-            {step === 2 && (
-              <div>
-                <p className="mb-4 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
-                  {t.booking.selectDate}
-                </p>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
-                  {days.map((day, i) => {
-                    const isSelected =
-                      selectedDate?.toDateString() === day.toDateString();
-                    const key = toLocalDateStr(day);
-                    const hours = getDayOperatingHours(day);
-                    const isClosed = hours.start === "23:59" && hours.end === "23:59";
-                    const isDisabled = ((disabledDates[key] ?? 0) >= 8) || isClosed;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => !isDisabled && setSelectedDate(day)}
-                        className="flex flex-col items-center rounded-xl py-2 px-1 text-center text-xs transition-colors"
-                        style={{
-                          backgroundColor: isSelected ? "var(--cr-primary)" : "var(--cr-secondary)",
-                          color: isSelected ? "var(--cr-white)" : "var(--cr-primary)",
-                          border: isSelected ? "none" : "1.5px solid var(--cr-accent)",
-                          opacity: isDisabled ? 0.45 : 1,
-                        }}
-                      >
-                        <span className="font-semibold">
-                          {day.toLocaleDateString("en-GB", { day: "2-digit" })}
-                        </span>
-                        <span className="opacity-70">
-                          {day.toLocaleDateString("en-GB", { month: "short" })}
-                        </span>
-                        <span className="opacity-60 text-[10px]">
-                          {day.toLocaleDateString("en-GB", { weekday: "short" })}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Time slots */}
-            {step === 3 && (
-              <div>
-                <p className="mb-4 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
-                  {t.booking.selectTime}
-                </p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {(() => {
-                    if (!selectedDate) return null;
-                    const { start, end } = getDayOperatingHours(selectedDate);
-                    const filteredSlots = TIME_SLOTS.filter((slot) => {
-                      const slot24 = normaliseTo24hSlot(slot) ?? "";
-                      return slot24 >= start && slot24 < end;
-                    });
-                    
-                    return filteredSlots.map((slot) => {
-                      const isSelected = selectedTime === slot;
-                      const slot24 = normaliseTo24hSlot(slot) ?? "";
-                      const taken = takenSlots.includes(slot24);
+                {/* Service Category & Selection */}
+                <div>
+                  <p className="mb-2 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
+                    {t.booking.labels.service}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {dynamicCategories.map((category) => {
+                      const label = isRTL && category.ar ? category.ar : category.en;
+                      const isActive = selectedCategory === category.key;
                       return (
                         <button
-                          key={slot}
-                          onClick={() => !taken && setSelectedTime(slot)}
-                          className="rounded-xl py-3 text-center text-sm font-medium transition-colors"
+                          key={category.key}
+                          type="button"
+                          onClick={() => setSelectedCategory(category.key)}
+                          className="rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors"
                           style={{
-                            backgroundColor: isSelected ? "var(--cr-primary)" : "var(--cr-secondary)",
-                            color: isSelected ? "var(--cr-white)" : "var(--cr-primary)",
-                            border: isSelected ? "none" : "1.5px solid var(--cr-accent)",
-                            opacity: taken ? 0.45 : 1,
+                            backgroundColor: isActive ? "var(--cr-primary)" : "var(--cr-secondary)",
+                            color: isActive ? "var(--cr-white)" : "var(--cr-primary)",
+                            border: isActive ? "none" : "1px solid rgba(65, 78, 54, 0.18)",
                           }}
                         >
-                          {slot}
+                          {label}
                         </button>
                       );
-                    });
-                  })()}
+                    })}
+                  </div>
+                  <select
+                    value={serviceId ?? ""}
+                    onChange={(e) => setServiceId(e.target.value ? Number(e.target.value) : null)}
+                    className="cr-input"
+                    style={{
+                      appearance: "none",
+                      WebkitAppearance: "none",
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23414e36' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: isRTL ? "left 12px center" : "right 12px center",
+                      paddingRight: isRTL ? "12px" : "40px",
+                      paddingLeft: isRTL ? "40px" : "12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="" disabled>
+                      {isRTL ? "— اختر خدمة —" : "— Select a service —"}
+                    </option>
+                    {servicesForCategory.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {isRTL ? service.ar : service.en} · {service.unit}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+
+                {/* Inline MD3 Date & Time Pickers */}
+                {serviceId !== null && (
+                  <div className="pt-4 border-t border-gray-200/80">
+                    <p className="mb-4 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
+                      {isRTL ? "اختر التاريخ والوقت المناسب" : "Select Date & Time"}
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                      {/* Date Picker */}
+                      <div className="flex justify-center md:justify-start">
+                        <MaterialDatePicker
+                          selectedDate={selectedDate}
+                          onSelectDate={setSelectedDate}
+                          disabledDates={disabledDates}
+                          isClosedDay={(d) => getDayOperatingHours(d).start === "23:59"}
+                          isRTL={isRTL}
+                        />
+                      </div>
+
+                      {/* Time Picker */}
+                      <div className="flex justify-center md:justify-end">
+                        <MaterialTimePicker
+                          selectedTime={selectedTime}
+                          onSelectTime={setSelectedTime}
+                          availableSlots={filteredTimeSlots}
+                          takenSlots={takenSlots}
+                          isRTL={isRTL}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
-            {/* Step 4: Confirm */}
-            {step === 4 && (
+
+            {/* Step 2: Confirm (Patient details, Doctor choice, Notes, Terms) */}
+            {step === 2 && (
               <div>
                 {/* Summary */}
                 <div
@@ -1256,11 +1198,10 @@ Attached is my payment transaction receipt photo.`;
                   )}
                 </div>
 
-                {/* Terms & Conditions Gate - Image 2 Style */}
+                {/* Terms & Conditions Gate */}
                 {(hasTerms || termsText.trim() !== "") && depositPercentage === 0 && (
                   <div className="mb-5 text-left" dir={isRTL ? "rtl" : "ltr"}>
                     <div className="rounded-2xl border border-gray-200/90 bg-white p-5 space-y-4 shadow-2xs">
-                      {/* Header: Shield Icon + TERMS & CONDITIONS */}
                       <div className="flex items-center gap-2 text-[#2D522D] font-bold text-xs tracking-wider uppercase">
                         <div className="flex h-6 w-6 items-center justify-center rounded-full border border-[#2D522D]/40 text-[#2D522D]">
                           <ShieldCheck size={14} />
@@ -1268,12 +1209,10 @@ Attached is my payment transaction receipt photo.`;
                         <span>{isRTL ? "الشروط والأحكام" : "TERMS & CONDITIONS"}</span>
                       </div>
 
-                      {/* Body text */}
                       <p className="text-xs text-gray-700 font-medium leading-relaxed">
                         {isRTL ? "بالمتابعة، فإنك توافق على الشروط والأحكام الخاصة بنا." : "By continuing, you agree to our Terms & Conditions."}
                       </p>
 
-                      {/* Inner Highlighted Pill Box */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-gray-200/80 bg-[#F4F8F4] p-3.5">
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E2EBE2] text-[#2D522D]">
@@ -1295,7 +1234,6 @@ Attached is my payment transaction receipt photo.`;
 
                       <div className="border-t border-gray-200/80 my-2" />
 
-                      {/* Custom Checkbox row */}
                       <label className="flex items-center gap-2.5 cursor-pointer select-none">
                         <div className="relative flex items-center">
                           <input
@@ -1332,7 +1270,7 @@ Attached is my payment transaction receipt photo.`;
                 <button
                   onClick={handleConfirm}
                   disabled={isCreatingReservation || (depositPercentage === 0 && (hasTerms || termsText.trim() !== "") && !acceptedTerms)}
-                  className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
                 >
                   {isCreatingReservation ? (
                     <>
@@ -1348,8 +1286,8 @@ Attached is my payment transaction receipt photo.`;
               </div>
             )}
 
-            {/* Step 5: Payment */}
-            {step === 5 && (
+            {/* Step 3: Payment (Deposit Payment) */}
+            {step === 3 && (
               <div className="space-y-4">
                 <p className="text-sm font-bold text-[#1F251A]">
                   {selectedDepositMethod === "wallet"
@@ -1377,7 +1315,7 @@ Attached is my payment transaction receipt photo.`;
                     <button
                       type="button"
                       onClick={() => setSelectedDepositMethod("instapay")}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                         selectedDepositMethod === "instapay"
                           ? "bg-white text-[#414E36] shadow-sm border border-[#414E36]/10"
                           : "text-[#5A6A51] hover:text-[#1F251A]"
@@ -1389,7 +1327,7 @@ Attached is my payment transaction receipt photo.`;
                     <button
                       type="button"
                       onClick={() => setSelectedDepositMethod("wallet")}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                         selectedDepositMethod === "wallet"
                           ? "bg-white text-[#414E36] shadow-sm border border-[#414E36]/10"
                           : "text-[#5A6A51] hover:text-[#1F251A]"
@@ -1455,7 +1393,7 @@ Attached is my payment transaction receipt photo.`;
                           setCopiedAddress(true);
                           setTimeout(() => setCopiedAddress(false), 2000);
                         }}
-                        className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                        className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition cursor-pointer"
                       >
                         {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
                       </button>
@@ -1506,7 +1444,7 @@ Attached is my payment transaction receipt photo.`;
                           setCopiedAddress(true);
                           setTimeout(() => setCopiedAddress(false), 2000);
                         }}
-                        className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+                        className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition cursor-pointer"
                       >
                         {copiedAddress ? (isRTL ? "تم النسخ!" : "Copied!") : (isRTL ? "نسخ" : "Copy")}
                       </button>
@@ -1559,129 +1497,51 @@ Attached is my payment transaction receipt photo.`;
                     disabled={isPaying}
                     className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36] font-medium"
                   />
-                  <span className="text-[10px] text-[#8A9A81] block">
-                    {selectedDepositMethod === "wallet"
-                      ? (isRTL ? "مثال: 01012345678" : "Example: 01012345678")
-                      : (isRTL ? "مثال: name@instapay أو رقم الهاتف المسجل بإنستاباي" : "Example: name@instapay or phone number registered on InstaPay")}
-                  </span>
                 </div>
 
-                {/* Terms & Conditions Gate on Payment Page - Image 1 Style */}
-                <div className="mt-5 text-left" dir={isRTL ? "rtl" : "ltr"}>
-                  <div className="rounded-2xl border border-gray-200/90 bg-white p-5 space-y-4 shadow-2xs">
-                    {/* Header: Shield Icon + TERMS & CONDITIONS */}
-                    <div className="flex items-center gap-2 text-[#2D522D] font-bold text-xs tracking-wider uppercase">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full border border-[#2D522D]/40 text-[#2D522D]">
-                        <ShieldCheck size={14} />
-                      </div>
-                      <span>{isRTL ? "الشروط والأحكام" : "TERMS & CONDITIONS"}</span>
-                    </div>
-
-                    {/* Body text */}
-                    <p className="text-xs text-gray-700 font-medium leading-relaxed">
-                      {isRTL ? "بالمتابعة، فإنك توافق على الشروط والأحكام الخاصة بنا." : "By continuing, you agree to our Terms & Conditions."}
-                    </p>
-
-                    {/* Inner Highlighted Pill Box */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-gray-200/80 bg-[#F4F8F4] p-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E2EBE2] text-[#2D522D]">
-                          <FileText size={16} />
+                {/* Submit Deposit Button */}
+                <div className="pt-2 space-y-2">
+                  <button
+                    type="button"
+                    onClick={handlePayDeposit}
+                    disabled={isPaying}
+                    className="w-full justify-center rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-extrabold text-white bg-[#414E36] transition shadow-md flex items-center justify-center gap-2 hover:bg-[#2e3a26] disabled:opacity-50 cursor-pointer"
+                  >
+                    {isPaying ? (
+                      <>
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        {isRTL ? "جاري الحفظ والتحويل..." : "Saving & Redirecting..."}
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full border-1.5 border-white">
+                          <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-4.322c1.7.925 3.328 1.459 5.166 1.46 5.485.001 9.948-4.462 9.951-9.95.002-2.658-1.031-5.158-2.906-7.037C17.228 2.275 14.73 1.24 12.072 1.24a9.957 9.957 0 0 0-9.951 9.956c-.001 1.93.513 3.567 1.492 5.093l-.999 3.65 3.743-.981zM17.476 14.398c-.329-.165-1.947-.961-2.245-1.07-.3-.109-.518-.165-.736.165-.218.329-.844 1.07-1.034 1.289-.19.217-.38.244-.709.079a8.932 8.932 0 0 1-2.736-1.688 9.842 9.842 0 0 1-1.893-2.358c-.19-.329-.02-.507.145-.671.148-.148.33-.382.495-.572.164-.19.219-.328.328-.547.11-.219.055-.41-.027-.574-.082-.164-.736-1.776-1.009-2.433-.266-.64-.539-.553-.736-.563-.19-.01-.409-.012-.627-.012s-.573.082-.873.409c-.3.329-1.145 1.12-1.145 2.732s1.173 3.17 1.336 3.389c.164.22 2.308 3.525 5.59 4.945.78.337 1.39.539 1.86.688.784.248 1.498.213 2.062.128.629-.094 1.947-.796 2.219-1.564.272-.767.272-1.424.19-1.564-.081-.138-.3-.22-.629-.385z" />
+                          </svg>
                         </div>
-                        <span className="text-xs text-gray-600 font-normal leading-normal">
-                          {isRTL ? "يرجى قراءة الشروط والأحكام بعناية قبل المتابعة." : "Please read our Terms & Conditions carefully before proceeding."}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowTermsModal(true)}
-                        className="flex items-center gap-1 text-xs font-semibold text-[#2D522D] underline underline-offset-2 hover:opacity-80 shrink-0 self-end sm:self-auto cursor-pointer"
-                      >
-                        <span>{isRTL ? "عرض الشروط والأحكام" : "View Terms & Conditions"}</span>
-                        <ExternalLink size={13} />
-                      </button>
-                    </div>
+                        <span>{isRTL ? "تأكيد وإرسال صورة التحويل" : "Confirm & Send Screenshot"}</span>
+                      </>
+                    )}
+                  </button>
 
-                    <div className="border-t border-gray-200/80 my-2" />
-
-                    {/* Custom Checkbox row */}
-                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                      <div className="relative flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={acceptedTerms}
-                          onChange={(e) => setAcceptedTerms(e.target.checked)}
-                          className="peer h-4 w-4 appearance-none rounded border-2 border-gray-300 bg-white checked:border-[#2D522D] checked:bg-[#2D522D] focus:outline-none transition cursor-pointer"
-                        />
-                        <svg
-                          className="pointer-events-none absolute left-0.5 top-0.5 hidden h-3 w-3 stroke-white peer-checked:block"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth="3.5"
-                          stroke="currentColor"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                        </svg>
-                      </div>
-                      <span className="text-xs text-gray-800 font-normal">
-                        {isRTL ? "لقد قرأت وأوافق على " : "I have read and agree to the "}
-                        <button
-                          type="button"
-                          onClick={() => setShowTermsModal(true)}
-                          className="font-semibold text-[#2D522D] underline underline-offset-2 hover:opacity-80 cursor-pointer"
-                        >
-                          {isRTL ? "الشروط والأحكام" : "Terms & Conditions"}
-                        </button>
-                      </span>
-                    </label>
-                  </div>
-
-                  {/* Buttons matching Image 1 */}
-                  <div className="mt-4 space-y-3">
-                    {/* Primary Confirm Button */}
-                    <button
-                      onClick={handlePayDeposit}
-                      disabled={isPaying || !acceptedTerms}
-                      className="w-full justify-center rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:opacity-95"
-                      style={{ backgroundColor: "#43794E" }}
-                    >
-                      {isPaying ? (
-                        <>
-                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          {isRTL ? "جاري الحفظ والتحويل..." : "Saving & Redirecting..."}
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex h-5 w-5 items-center justify-center rounded-full border-1.5 border-white">
-                            <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
-                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.835-4.322c1.7.925 3.328 1.459 5.166 1.46 5.485.001 9.948-4.462 9.951-9.95.002-2.658-1.031-5.158-2.906-7.037C17.228 2.275 14.73 1.24 12.072 1.24a9.957 9.957 0 0 0-9.951 9.956c-.001 1.93.513 3.567 1.492 5.093l-.999 3.65 3.743-.981zM17.476 14.398c-.329-.165-1.947-.961-2.245-1.07-.3-.109-.518-.165-.736.165-.218.329-.844 1.07-1.034 1.289-.19.217-.38.244-.709.079a8.932 8.932 0 0 1-2.736-1.688 9.842 9.842 0 0 1-1.893-2.358c-.19-.329-.02-.507.145-.671.148-.148.33-.382.495-.572.164-.19.219-.328.328-.547.11-.219.055-.41-.027-.574-.082-.164-.736-1.776-1.009-2.433-.266-.64-.539-.553-.736-.563-.19-.01-.409-.012-.627-.012s-.573.082-.873.409c-.3.329-1.145 1.12-1.145 2.732s1.173 3.17 1.336 3.389c.164.22 2.308 3.525 5.59 4.945.78.337 1.39.539 1.86.688.784.248 1.498.213 2.062.128.629-.094 1.947-.796 2.219-1.564.272-.767.272-1.424.19-1.564-.081-.138-.3-.22-.629-.385z" />
-                            </svg>
-                          </div>
-                          <span>{isRTL ? "تأكيد وإرسال صورة التحويل" : "Confirm & Send Screenshot"}</span>
-                        </>
-                      )}
-                    </button>
-
-                    {/* Secondary Return Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStep(4);
-                        setCreatedReservation(null);
-                      }}
-                      disabled={isPaying}
-                      className="w-full justify-center rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-semibold text-gray-800 bg-white border border-gray-300 transition flex items-center justify-center gap-2 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      <Undo2 size={16} className="text-gray-700" />
-                      <span>{isRTL ? "إلغاء والعودة" : "Cancel & Return"}</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep(2);
+                      setCreatedReservation(null);
+                    }}
+                    disabled={isPaying}
+                    className="w-full justify-center rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-semibold text-gray-800 bg-white border border-gray-300 transition flex items-center justify-center gap-2 hover:bg-gray-50 disabled:opacity-50 cursor-pointer"
+                  >
+                    <Undo2 size={16} className="text-gray-700" />
+                    <span>{isRTL ? "إلغاء والعودة" : "Cancel & Return"}</span>
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Navigation */}
-            {step < 5 && (
+            {/* Navigation buttons */}
+            {step < 3 && (
               <div
                 className={`flex mt-6 gap-3 ${
                   step === 1 ? "justify-end" : "justify-between"
@@ -1690,23 +1550,23 @@ Attached is my payment transaction receipt photo.`;
                 {step > 1 && (
                   <button
                     onClick={handleBack}
-                    className="btn-outline"
+                    className="btn-outline cursor-pointer"
                   >
                     {t.booking.backBtn}
                   </button>
                 )}
-                {step < 4 && (
+                {step === 1 && (
                   <button
                     onClick={handleNext}
                     disabled={!canNext}
-                    className="btn-primary"
+                    className="btn-primary cursor-pointer"
                     style={{ opacity: canNext ? 1 : 0.4, cursor: canNext ? "pointer" : "not-allowed" }}
                   >
-                    {t.booking.nextBtn}
+                    {isRTL ? "التالي: التأكيد" : "Next: Confirm"}
                   </button>
                 )}
               </div>
-            ) }
+            )}
           </>
         )}
       </div>
@@ -1756,7 +1616,8 @@ Attached is my payment transaction receipt photo.`;
           </div>
         </div>
       )}
-      {/* Terms & Conditions Modal overlay - Image 2 */}
+
+      {/* Terms & Conditions Modal */}
       <TermsModal 
         isOpen={showTermsModal} 
         onClose={() => setShowTermsModal(false)} 
