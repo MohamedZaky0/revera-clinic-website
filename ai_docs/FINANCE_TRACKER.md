@@ -2550,7 +2550,7 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 |---|---|---|---|---|---|
 | 3B.0 | Repair committed merge-conflict debris in `DECISIONS.md` (corrupts DEC-027) | — | `DONE` | Claude | ef9ecff |
 | 3B.1 | Create `src/components/admin/` + the first module boundary (DEC-027) | — | `DONE` | Claude | ef9ecff |
-| 3B.2 | `services.duration_minutes`: API read/write + numeric UI field | 3B.1 | `TODO` | — | — |
+| 3B.2 | `services.duration_minutes`: API read/write + numeric UI field | 3B.1 | `BLOCKED` | — | RISK-025 — Services admin screen never writes to the DB at all; see task write-up below |
 | 3B.3 | `inventory_products.role`: API read/write + UI selector | 3B.1 | `TODO` | — | — |
 | 3B.4 | `inventory_devices.lamp_replacement_cost` + rated pulses: API + UI | 3B.1 | `TODO` | — | — |
 | 3B.5 | Service consumables recipe editor (`service_consumables`) + endpoint | 3B.1, 3B.3 | `TODO` | — | — |
@@ -2669,6 +2669,18 @@ it produces a confidently wrong ranking of which services are worth the clinic's
 is exactly 45 (not 30, not NULL); confirm `getServiceDurationMinutes()` returns 45 for it; confirm
 the `<= 1440` and `> 0` checks reject 0 and 2000 from the UI with a clear message rather than a raw
 Postgres error.
+
+**BLOCKED 2026-07-27 — bigger gap found while scoping this task, not fixed here.** The above
+"Measured state" assumed the admin's Edit Service modal saves through `/api/services`. It doesn't.
+Every save/add/delete/reorder action in the admin Services screen writes **only** to
+`localStorage` via `saveDynamicServices()` — `POST /api/services` has **zero callers anywhere in
+the codebase**. Adding a numeric `duration_minutes` field to that modal as originally scoped would
+save, look correct, and **never reach the database that availability/reservations/payroll actually
+read from** — the same "confidently wrong, no visible error" failure mode this task exists to
+prevent, just relocated. Full investigation, evidence, and three fix options are in **RISK-025**
+(`RISKS.md`). This task cannot be done as originally scoped until a fix option from RISK-025 is
+chosen — **user decision pending, documented for hand-off to a separate implementation pass, not
+resolved in this session.**
 
 ---
 

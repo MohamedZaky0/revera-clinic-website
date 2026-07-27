@@ -130,13 +130,20 @@ A migration at `supabase/migrations/20260722140000_enable_row_level_security.sql
 
 ## RISK-004: localStorage as Primary Service/Category Storage
 
-**Severity:** Medium
+**Severity:** Medium → **upgraded to High 2026-07-27, see RISK-025**
 **Type:** Data integrity
 
 **Description:**
 `serviceStore.ts` reads and writes services/categories from localStorage first. Supabase
 is synced only on explicit save actions. If a user opens the admin panel on a different
 browser or clears localStorage, they lose unsaved changes. The Supabase copy may be stale.
+
+**Correction 2026-07-27 — "synced only on explicit save actions" is wrong; there is no sync at
+all.** Measured while scoping Phase 3B task 3B.2: every save path in the admin Services UI calls
+`saveDynamicServices()`, which writes **only** to `localStorage`. Zero calls to
+`POST /api/services` exist anywhere in `admin/page.tsx`. This isn't "stale until saved" — it's
+permanently disconnected. See **RISK-025** for the full measurement and consequence; this entry is
+kept for history, RISK-025 is the accurate current description.
 
 ---
 
@@ -800,6 +807,138 @@ covering products not yet synced to the real table.
 **Verify:** `npx tsc --noEmit` / `npx eslint` clean. POST a quantity greater than a product's real
 stock and confirm a `409` with no stock/customer-spend/ledger writes; a valid quantity still sells
 normally.
+
+---
+
+## RISK-025: The Entire Admin "Services" Screen Is a Parallel Universe — It Never Talks to the Database
+
+**Severity:** High · **Type:** Data integrity / architecture
+**Found:** 2026-07-27, while scoping Phase 3B task 3B.2 (`services.duration_minutes` UI wiring) ·
+**NOT FIXED — documented for hand-off, not resolved in this session**
+
+### Summary
+
+Everything a staff member does in the admin panel's **Services** section (Bookings sidebar →
+Services: add, edit, delete, reorder, toggle visible/active, edit branch pricing) is written
+**only** to the browser's `localStorage`. **None of it ever reaches the real `services` table in
+Supabase.** The real table already has a working, staff-gated-looking `POST /api/services` route —
+it is simply never called by anything. Meanwhile, `services.duration_minutes`,
+`services.price`, and every other column on that real table are what actually drive live booking
+behavior server-side (availability slot generation, reservation pricing, doctor payroll). The
+two have no path to reconcile. This makes 3B.2 as originally scoped ("add a numeric
+`duration_minutes` field to the Edit Service modal") pointless on its own: the field would save,
+look correct in the UI, and never affect a single real booking, because the modal doesn't save to
+the database at all.
+
+### Evidence (measured, not assumed — every claim below is a grep/read, not an inference)
+
+**The admin UI never calls the write API:**
+- `grep -n "fetch(.*\/api\/services" src/app/admin/page.tsx` → **zero matches.**
+- `grep -n "/api/services" src` → exactly two files: `src/app/api/services/route.ts` (the route
+  itself) and `src/app/profile/page.tsx:135` — a **`GET`** only, from the patient-facing profile
+  page. `POST /api/services` (`src/app/api/services/route.ts:72-91`) has **no caller anywhere in
+  the codebase.**
+
+**Every service mutation in the admin goes through one localStorage function, never the API:**
+`saveDynamicServices()` (`src/lib/serviceStore.ts:89-93`) is called from 9 sites in
+`admin/page.tsx` — lines 1576, 1609, 1636, 1683, 1718, 8561, 8928 (Edit Service save), 8962 (Add
+Service save) — every single one writes to `localStorage.setItem(SERVICES_KEY, ...)` and nothing
+else:
+```ts
+export function saveDynamicServices(services: ServiceItem[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(SERVICES_KEY, JSON.stringify(services));
+  window.dispatchEvent(new StorageEvent("storage", { key: SERVICES_KEY }));
+}
+```
+
+**The admin UI never reads from the database either.** `localServices` (`admin/page.tsx:1402`,
+the state every Services screen reads/edits) is populated exactly once, at
+`admin/page.tsx:3100-3104`:
+```ts
+useEffect(() => {
+  const svcs = getDynamicServices();   // reads localStorage, or seeds from the hardcoded
+  setLocalServices(svcs);               // SERVICES array in src/lib/services.ts on first run
+  ...
+}, []);
+```
+`getDynamicServices()` (`serviceStore.ts:51-86`) reads `localStorage`, and if empty, seeds from
+the **hardcoded constant array** `SERVICES` in `src/lib/services.ts` — never from
+`GET /api/services`.
+
+**New IDs are generated client-side with no relation to the real table's sequence.** Add Service
+(`admin/page.tsx:8941`): `const newId = Math.max(0, ...localServices.map(s => s.id)) + 1;` —
+a plain integer derived from whatever's currently in localStorage. The real `services.id` is a
+`bigint identity` column (`DB_SCHEMA.md`). These two ID spaces have no reason to agree; a naive
+future sync would risk overwriting an unrelated real row that happens to share a locally-generated
+ID.
+
+**The real table is what actually matters to a live booking.** All of these read the real
+`services` table server-side, independent of anything in localStorage:
+- `src/app/api/availability/route.ts:29` — `select('id, duration, duration_minutes')`, used to
+  generate bookable time slots.
+- `src/app/api/reservations/route.ts:254,396,507,712,740` — booking creation/approval/pricing.
+- `src/app/api/hr/doctor-payroll/route.ts:66,171` — `select('id, price')` for commission math.
+
+So the real table (whatever is in it right now — seeded once, or hand-edited via SQL/Supabase
+dashboard; this session did not audit how it currently got its data) governs real bookings, prices,
+and payroll, while the entire admin **Services** screen is a browser-local sandbox that looks
+exactly like a working CRUD screen and has no effect on any of that.
+
+### Why this is worse than RISK-004 as previously written
+
+RISK-004 said "Supabase is synced only on explicit save actions" — implying a save *does*
+eventually reach Supabase, just not continuously. That's not what's happening. There is no code
+path, anywhere, that syncs an admin-entered service to the database. "Synced on save" would be a
+staleness risk; "never synced" is a **silent total disconnect** — the admin can confidently believe
+they've updated a service (price, duration, category, branch pricing, visibility) and be
+completely wrong, with no error, no warning, and no way to notice short of comparing the DB
+directly.
+
+### Why this matters specifically for Phase 3B / PROPOSAL-002
+
+Task 3B.2 exists because "every capacity and room-utilisation figure so far assumed 30 minutes for
+every service" (task 0.8's own finding) and Phase 4/5's margin-per-minute math depends on
+`duration_minutes` being real. But that number is read from the **database**
+(`getServiceDurationMinutes()` queries service rows the API/DB returns). If staff "fix" a service's
+duration in the admin UI, believing they've solved the problem, nothing downstream changes — the
+number Phase 4/5 actually uses never moved. **Any Phase 3B/4/5 work that assumes "staff can correct
+this from the admin panel" is unverified until this is fixed**, not just for duration —
+for every field in the Services screen.
+
+### Fix options (not yet decided — pick one before touching 3B.2)
+
+1. **Scoped, minimal:** make the Edit/Add Service save handlers additionally call
+   `POST /api/services` with the full service payload (not just `duration_minutes`) as a
+   **dual-write** alongside the existing `saveDynamicServices()` call — same pattern already used
+   for `inventory_products`/`inventory_devices` (`page_settings` blob + real table, both written).
+   Does not fix "read never comes from the DB" or resolve RISK-004 generally; stops new admin edits
+   from being silently lost. Smallest safe change; localStorage stays authoritative for reads until
+   a follow-up switches that too.
+2. **Full remediation:** cut Services over to be database-primary — `admin/page.tsx` fetches from
+   `GET /api/services` on load instead of `getDynamicServices()`, and every save/delete/reorder goes
+   through the real API instead of (or in addition to, during a transition) localStorage. Real fix
+   for RISK-004, but touches the ID-generation scheme (client-side `Math.max(...)+1` vs. DB
+   identity), every one of the 9 `saveDynamicServices` call sites, and needs a decision on what
+   happens to whatever's currently sitting in each browser's localStorage per admin machine.
+3. **Do nothing yet, decide later** — acceptable only if 3B.2 (and any other Phase 3B/4/5 task that
+   assumes the admin can edit service data live) is explicitly marked blocked/unverified until one
+   of the above lands. Silently proceeding with 3B.2 as originally scoped is **not** an acceptable
+   option — see "why this matters" above.
+
+### Verify (whichever option is chosen)
+
+- `grep -n "fetch(.*\/api\/services" src/app/admin/page.tsx` returns at least one match (currently
+  zero).
+- Edit a service's duration in the admin UI; confirm the **database row** changes (`select
+  duration_minutes from services where id = ...`), not just what's shown in the browser.
+- Reload the admin panel in a **different browser/incognito window**; the edited service should
+  show the new value (proves it's no longer localStorage-only).
+- Re-run `npx tsx scratch/*.ts` regression scripts unaffected by this change still pass — this
+  touches Services, not Bookings/Customers/Inventory directly, but `getServiceDurationMinutes()` is
+  read by availability/reservations/payroll, so a live booking end-to-end check (create a
+  reservation for a service whose duration was just edited in the admin, confirm the slot grid uses
+  the new duration) is the real proof, not just a passing typecheck.
 
 ---
 
