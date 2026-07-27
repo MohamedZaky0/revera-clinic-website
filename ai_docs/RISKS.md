@@ -1100,6 +1100,56 @@ second booking, not the first.
 
 ---
 
+## RISK-029: Checkout Charged The Full Service Price Again, Ignoring The Deposit Already Paid
+
+**Severity:** High · **Type:** Data integrity / money
+**Found:** 2026-07-27, by the user's own manual test — a booking with a 30%-style deposit already
+paid showed the full service price due at checkout, not the remaining balance · **RESOLVED
+2026-07-27**
+
+**Root cause:** `BookingModal.tsx`'s "declare deposit paid" step already correctly writes
+`reservations.amount_paid` (deposit amount) and `amount_left` (remaining balance) when a patient
+pays their reservation deposit. But the admin's checkout modal (`admin/page.tsx`,
+`checkoutBooking` render) recomputed `totalCost` from the service's full price and used it
+directly as the amount due — it never read `checkoutBooking.amountPaid` (the deposit already on
+file) at all. Staff saw "Total Cost: 120 EGP" and were expected to collect the full amount again,
+even though the patient had already paid 36 EGP of it.
+
+**A second, deeper bug this exposed:** `computeSettledBalances` (`src/lib/billing.ts`) treats
+`amountPaid` sent on the *first* completing PATCH as the booking's **final total paid**, not a
+delta for that one payment (`spentDelta = wasCompleted ? newPaid - oldPaid : newPaid` — the
+non-completed branch uses `newPaid` directly). The old checkout code sent only what staff typed
+into "Amount Paid" at checkout — so even if a staff member manually figured out the correct
+remaining balance and collected it, the deposit portion would never be added to
+`customers.spent_amount`. The deposit money was real, collected, and recorded on the reservation
+row — but silently absent from the customer's lifetime spend.
+
+**Fix (`admin/page.tsx`, `checkoutBooking` modal):**
+- `depositAlreadyPaid = checkoutBooking.amountPaid`; `balanceDue = totalCost - depositAlreadyPaid`
+  is now what wallet deduction and "Net Due" are computed against, not the full `totalCost`.
+- The modal now shows a breakdown when a deposit exists: Total Cost, Deposit Already Paid (as a
+  negative line), Balance Due — instead of only ever showing the full price.
+- The completing PATCH now sends `amountPaid: depositAlreadyPaid + amountPaidNum` (the cumulative
+  total ever paid on the booking, matching what `computeSettledBalances` expects for a first
+  completion) instead of just what was typed at this step. `amountLeft` is unchanged in formula
+  (`remainingAmount`) — it already correctly nets out wallet deduction and this payment against
+  the deposit-adjusted balance due once `netDue` itself was fixed.
+
+**Verify:** `npx tsc --noEmit`, `npx eslint`, `npx next build` all clean.
+`npx tsx scratch/depositcheckoutcheck.ts` — 3 scenarios (full remaining payment, partial remaining
+payment leaving real debt, and a no-deposit booking behaving exactly as before), 6 assertions, all
+pass. Live check still needed: book with a deposit, complete checkout, confirm the modal shows
+Balance Due (not full price) and `customers.spent_amount` ends up equal to the full service price,
+not just the checkout-time payment.
+
+**Not addressed here — a related, larger policy question the user raised in the same
+conversation:** what happens to the deposit on cancellation vs. a no-show (refund vs. forfeit).
+That needs a product decision (does a refund credit the wallet or something else, does a distinct
+`no_show` status need to be added to `reservations_status_check` alongside `cancelled`/`rejected`)
+before it should be implemented — deliberately scoped out of this fix, not silently skipped.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:

@@ -27114,19 +27114,32 @@ export default function AdminPage() {
           });
           const totalCost = bookingServicesList.reduce((sum: number, s: any) => sum + s.price, 0);
 
+          // A deposit collected at reservation time (BookingModal's "declare deposit paid" step)
+          // is already stored on the booking as amountPaid — checkout must charge only what's
+          // left of the service price, not the full price again. RISK-029.
+          const depositAlreadyPaid = Number(checkoutBooking.amountPaid) || 0;
+          const balanceDue = Math.max(0, totalCost - depositAlreadyPaid);
+
           // 2. Fetch customer details
           const customerRecord = dbCustomers.find(c => c.id === checkoutBooking.customerId || c.phone === checkoutBooking.phone);
           const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
 
           // 3. Math calculation
-          const walletDeduction = useWalletBalance ? Math.min(walletBalance, totalCost) : 0;
-          const netDue = Math.max(0, totalCost - walletDeduction);
-          
+          const walletDeduction = useWalletBalance ? Math.min(walletBalance, balanceDue) : 0;
+          const netDue = Math.max(0, balanceDue - walletDeduction);
+
           const amountPaidNum = parseFloat(checkoutAmountPaid) || 0;
           const diff = amountPaidNum - netDue;
 
           const changeAmount = diff > 0 ? diff : 0;
           const remainingAmount = diff < 0 ? -diff : 0;
+
+          // computeSettledBalances (src/lib/billing.ts) treats amountPaid on the completing PATCH
+          // as the booking's final total paid, not a delta for just this step — it must include
+          // the deposit already collected, or that deposit silently never reaches
+          // customers.spent_amount. remainingAmount already correctly nets out wallet + this
+          // payment against the deposit-adjusted netDue, so amountLeft needs no separate formula.
+          const totalPaidIncludingDeposit = depositAlreadyPaid + amountPaidNum;
 
           const handleConfirmCheckout = async () => {
             setSavingCheckout(true);
@@ -27136,7 +27149,7 @@ export default function AdminPage() {
                 headers: authenticatedJsonHeaders,
                 body: JSON.stringify({
                   status: "completed",
-                  amountPaid: amountPaidNum,
+                  amountPaid: totalPaidIncludingDeposit,
                   amountLeft: remainingAmount,
                   walletWithdrawal: walletDeduction,
                   walletDeposit: changeAmount > 0 && depositChangeToWallet ? changeAmount : 0
@@ -27208,6 +27221,18 @@ export default function AdminPage() {
                       <span>Total Cost / الإجمالي</span>
                       <span>{totalCost} EGP</span>
                     </div>
+                    {depositAlreadyPaid > 0 && (
+                      <>
+                        <div className="flex justify-between text-xs text-[#5A6A51]">
+                          <span>Deposit already paid / العربون المدفوع</span>
+                          <span>-{depositAlreadyPaid} EGP</span>
+                        </div>
+                        <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#414E36] text-base">
+                          <span>Balance Due / المتبقي</span>
+                          <span>{balanceDue} EGP</span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Wallet Option */}
