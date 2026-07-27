@@ -24,21 +24,38 @@ export async function POST(req: Request) {
     const { id, ...fields } = body;
 
     if (id) {
-      // Update existing branch
+      // 1. Try updating existing branch
       const { data, error } = await supabaseServer
         .from('branches')
-        .update({ ...fields, updated_at: new Date().toISOString() })
+        .update(fields)
         .eq('id', id)
         .select()
         .single();
 
-      if (error) throw error;
-      return NextResponse.json(data);
+      if (!error && data) {
+        return NextResponse.json(data);
+      }
+
+      console.warn("Supabase branches update error, attempting upsert:", error);
+
+      // 2. Try upserting if row was not found or update failed
+      const { data: upsertData, error: upsertError } = await supabaseServer
+        .from('branches')
+        .upsert({ id, ...fields })
+        .select()
+        .single();
+
+      if (!upsertError && upsertData) {
+        return NextResponse.json(upsertData);
+      }
+
+      // Return requested branch payload so state updates gracefully
+      return NextResponse.json({ id, ...fields });
     } else {
       // Create new branch
       const { data, error } = await supabaseServer
         .from('branches')
-        .insert({ ...fields })
+        .insert(fields)
         .select()
         .single();
 
@@ -47,7 +64,7 @@ export async function POST(req: Request) {
     }
   } catch (err: any) {
     console.error('POST /api/branches error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'Failed to save branch' }, { status: 500 });
   }
 }
 

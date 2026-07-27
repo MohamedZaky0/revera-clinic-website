@@ -5767,10 +5767,11 @@ export default function AdminPage() {
       });
       if (res.ok) {
         const updatedBranch = await res.json();
-        setBranches(prev => prev.map(b => b.id === updatedBranch.id ? updatedBranch : b));
+        setBranches(prev => prev.map(b => (b.id === updatedBranch.id || b.id === selectedBranchForHoursId) ? { ...b, ...updatedBranch, service_hours: serviceHours } : b));
         alert("Branch service hours saved successfully!");
       } else {
-        alert("Failed to save branch service hours.");
+        const errJson = await res.json().catch(() => ({}));
+        alert(`Failed to save branch service hours: ${errJson.error || res.statusText || 'Unknown error'}`);
       }
     } catch (err) {
       console.error("handleSaveBranchServiceHours error:", err);
