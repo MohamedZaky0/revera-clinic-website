@@ -355,7 +355,7 @@ export function AboutPageIntro() {
                       }}
                       className="text-[#414E36] hover:text-[#5A6A51]"
                     >
-                      {t.aboutPage.phone}
+                      <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">{t.aboutPage.phone}</span>
                     </a>
                   </div>
                 </div>

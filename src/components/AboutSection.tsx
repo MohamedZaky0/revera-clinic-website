@@ -238,7 +238,7 @@ export function AboutSection() {
                     href={`tel:${t.about.phone.replace(/\s/g, "")}`}
                     className="text-lg font-normal text-[#414E36] font-heading hover:text-[#5A6A51] transition-colors"
                   >
-                    {t.about.phone}
+                    <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">{t.about.phone}</span>
                   </a>
                 </div>
               </div>

@@ -242,7 +242,7 @@ export function Navbar() {
                 }}
               >
                 <Phone size={18} strokeWidth={1.5} />
-                <span>{CLIENT.phoneDisplay}</span>
+                <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">{CLIENT.phoneDisplay}</span>
               </a>
             )}
 
@@ -628,7 +628,7 @@ export function Navbar() {
                 }}
               >
                 <Phone size={18} strokeWidth={1.5} />
-                <span>{CLIENT.phoneDisplay}</span>
+                <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">{CLIENT.phoneDisplay}</span>
               </a>
 
               {/* Mobile language selector */}

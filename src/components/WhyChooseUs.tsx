@@ -392,7 +392,7 @@ export function WhyChooseUs() {
                     }}
                     className="hover:text-brand-secondary hover:underline"
                   >
-                    {t.whyChooseUs.phone}
+                    <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">{t.whyChooseUs.phone}</span>
                   </a>
                 </div>
               </div>

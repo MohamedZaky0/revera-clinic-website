@@ -534,14 +534,16 @@ export function SiteFooter() {
                         style={{ fontSize: "14px", color: "rgba(255,255,255,0.85)", textDecoration: "none", fontWeight: 500 }}
                         className="hover:underline"
                       >
-                        {isRTL ? `القاهرة الجديدة: ${CLIENT.phoneDisplay}` : `New Cairo: ${CLIENT.phoneDisplay}`}
+                        <span>{isRTL ? "القاهرة الجديدة: " : "New Cairo: "}</span>
+                        <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">{CLIENT.phoneDisplay}</span>
                       </a>
                       <a
                         href="tel:+201023122323"
                         style={{ fontSize: "14px", color: "rgba(255,255,255,0.85)", textDecoration: "none", fontWeight: 500 }}
                         className="hover:underline"
                       >
-                        {isRTL ? "الشيخ زايد: (+20) 01023122323" : "Sheikh Zayed: (+20) 01023122323"}
+                        <span>{isRTL ? "الشيخ زايد: " : "Sheikh Zayed: "}</span>
+                        <span dir="ltr" className="ltr-num inline-block [direction:ltr] [unicode-bidi:isolate]">(+20) 01023122323</span>
                       </a>
                     </div>
                   </div>

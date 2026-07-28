@@ -336,6 +336,19 @@
   letter-spacing: normal !important;
 }
 
+/* ── LTR Formatting for Phone Numbers, Prices & Numeric Data in RTL Mode ── */
+[dir="rtl"] a[href^="tel:"],
+[dir="rtl"] .phone-number,
+[dir="rtl"] .ltr-num,
+[dir="rtl"] .ltr-text,
+[dir="rtl"] input[type="tel"],
+[dir="rtl"] input[type="number"] {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  display: inline-block;
+  text-align: left;
+}
+
 /* ── Buttons ─────────────────────────────────────────────────── */
 .btn-primary {
   display: inline-flex;
