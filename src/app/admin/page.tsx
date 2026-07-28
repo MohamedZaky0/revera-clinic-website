@@ -22136,9 +22136,10 @@ export default function AdminPage() {
               {hrActiveSubTab === "payroll" && (() => {
                 // Filter payroll records
                 const filtered = payrollList.filter((pay: any) => {
-                  // 0. Exclude Superadmin accounts
-                  const roleName = pay.employee_accounts?.role_name;
-                  if (roleName === "superadmin") {
+                  // 0. Exclude Superadmin and Doctor accounts (Doctors are managed in Doctor Payroll)
+                  const roleName = String(pay.employee_accounts?.role_name || "").toLowerCase();
+                  const deptName = String(pay.employee_accounts?.department || "").toLowerCase();
+                  if (roleName === "superadmin" || roleName === "doctor" || roleName === "doctors" || deptName === "doctors" || deptName === "doctor") {
                     return false;
                   }
 

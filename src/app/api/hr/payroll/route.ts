@@ -15,7 +15,14 @@ export async function GET(req: Request) {
       .order('month', { ascending: false });
 
     if (error) throw error;
-    return NextResponse.json(payroll);
+
+    const filtered = (payroll || []).filter((item: any) => {
+      const dept = String(item.employee_accounts?.department || '').trim().toLowerCase();
+      const role = String(item.employee_accounts?.role_name || '').trim().toLowerCase();
+      return dept !== 'doctors' && dept !== 'doctor' && role !== 'doctor' && role !== 'doctors';
+    });
+
+    return NextResponse.json(filtered);
   } catch (err: any) {
     console.error('GET /api/hr/payroll error:', err);
     return NextResponse.json({ error: err.message || 'Database error' }, { status: 500 });
@@ -37,12 +44,16 @@ export async function POST(req: Request) {
     // 1. Fetch all active employees including target configurations
     const { data: employees, error: empErr } = await supabaseServer
       .from('employee_accounts')
-      .select('id, role_name, salary, required_target_amount, bonus_percentage, target_type, bonus_type');
+      .select('id, role_name, department, salary, required_target_amount, bonus_percentage, target_type, bonus_type');
 
     if (empErr) throw empErr;
-    const payrollEmployees = (employees || []).filter((employee: any) => employee.role_name?.toLowerCase() !== 'superadmin');
+    const payrollEmployees = (employees || []).filter((emp: any) => {
+      const role = String(emp.role_name || '').trim().toLowerCase();
+      const dept = String(emp.department || '').trim().toLowerCase();
+      return role !== 'superadmin' && dept !== 'doctors' && dept !== 'doctor' && role !== 'doctor' && role !== 'doctors';
+    });
     if (payrollEmployees.length === 0) {
-      return NextResponse.json({ error: 'No employee accounts found to run payroll.' }, { status: 400 });
+      return NextResponse.json({ error: 'No non-doctor employee accounts found to run payroll.' }, { status: 400 });
     }
 
     // 2. Fetch all reservations with employee credit for the target month
