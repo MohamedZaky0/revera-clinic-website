@@ -197,6 +197,18 @@ These keys will need changing when forking for client #2.
 
 ---
 
+## Inventory Product Roles & Sales Restrictions
+**Enforced in:** `src/app/admin/page.tsx` and `POST /api/inventory/products/sales`
+
+- Products with `role === 'consumable'` are marked as "Consumable (used in services only)".
+- Standalone retail sale of consumable products to patients is strictly blocked:
+  - In `src/app/admin/page.tsx` products list table, the **Sell Product** action button is disabled with label `"Consumable Only"` and tooltip `"Consumable Only (Used in services only, not for retail sale)"`.
+  - In `handleOpenSellProductModal`, opening the retail POS modal is blocked with an alert.
+  - In retail product select dropdowns, consumable items are filtered out.
+  - In `POST /api/inventory/products/sales`, server-side validation checks `role === 'consumable'` and rejects the transaction with HTTP 400.
+
+---
+
 ## Customer Wallet Rules
 **Enforced in:** `PATCH /api/reservations` (checkout/settlement action)
 
