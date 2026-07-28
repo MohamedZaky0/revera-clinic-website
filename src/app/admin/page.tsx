@@ -19689,25 +19689,7 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          {/* Row 2: Fixed Salary */}
-                          <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
-                            <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#414E36]/10 pb-2 flex items-center gap-1.5">
-                              <DollarSign size={14} className="text-[#C4AE7C]" />
-                              Payroll
-                            </h4>
-                            <div className="max-w-xs">
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
-                                Fixed Salary (EGP)
-                              </label>
-                              <input
-                                type="number"
-                                placeholder="e.g. 5000"
-                                value={newEmployeeSalary}
-                                onChange={(e) => setNewEmployeeSalary(e.target.value)}
-                                className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                              />
-                            </div>
-                          </div>
+
 
                           {/* Row 3: Assigned Branches */}
                           <div>

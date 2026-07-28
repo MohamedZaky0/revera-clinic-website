@@ -222,6 +222,31 @@ export async function POST(req: Request) {
           console.warn("Could not write provider schedule audit log:", auditErr.message);
         }
       }
+      // Sync fixed_salary and related info to matching employee_accounts record
+      if (data) {
+        try {
+          const docName = data.name;
+          const docPhone = data.phone;
+          if (docName) {
+            const query = supabaseServer
+              .from('employee_accounts')
+              .select('id')
+              .or(`name.ilike.${docName}${docPhone ? `,phone.eq.${docPhone}` : ''}`);
+            const { data: matchingEmp } = await query.maybeSingle();
+            if (matchingEmp) {
+              const empUpdates: Record<string, any> = {};
+              if (fixedSalary !== undefined) empUpdates.salary = Number(fixedSalary || 0);
+              if (phone !== undefined) empUpdates.phone = phone;
+              if (nationalId !== undefined) empUpdates.national_id = nationalId;
+              if (Object.keys(empUpdates).length > 0) {
+                await supabaseServer.from('employee_accounts').update(empUpdates).eq('id', matchingEmp.id);
+              }
+            }
+          }
+        } catch (syncErr) {
+          console.error("Failed to sync provider insert to employee_accounts:", syncErr);
+        }
+      }
       return NextResponse.json(mapProvider(data), { status: 201 });
     } else {
       console.warn("Supabase providers insert error, falling back to JSON:", error);
@@ -363,6 +388,31 @@ export async function PATCH(req: Request) {
             });
         } catch (auditErr: any) {
           console.warn("Could not write provider schedule audit log:", auditErr.message);
+        }
+      }
+      // Sync fixed_salary and related info to matching employee_accounts record
+      if (data) {
+        try {
+          const docName = data.name;
+          const docPhone = data.phone;
+          if (docName) {
+            const query = supabaseServer
+              .from('employee_accounts')
+              .select('id')
+              .or(`name.ilike.${docName}${docPhone ? `,phone.eq.${docPhone}` : ''}`);
+            const { data: matchingEmp } = await query.maybeSingle();
+            if (matchingEmp) {
+              const empUpdates: Record<string, any> = {};
+              if (fixedSalary !== undefined) empUpdates.salary = Number(fixedSalary || 0);
+              if (phone !== undefined) empUpdates.phone = phone;
+              if (nationalId !== undefined) empUpdates.national_id = nationalId;
+              if (Object.keys(empUpdates).length > 0) {
+                await supabaseServer.from('employee_accounts').update(empUpdates).eq('id', matchingEmp.id);
+              }
+            }
+          }
+        } catch (syncErr) {
+          console.error("Failed to sync provider update to employee_accounts:", syncErr);
         }
       }
       return NextResponse.json(mapProvider(data));
