@@ -3256,15 +3256,15 @@ browser verification against the dev database is still outstanding.
 
 # Phase 4 — Reporting Engine + UI
 
-> **Sequencing note added 2026-07-27, after the Phase 3B audit.** Two adjustments to this phase's
-> task table are recommended but **not yet applied** — the table below is unchanged pending review:
+> **Sequencing note added 2026-07-27, after the Phase 3B audit — split applied 2026-07-29.** Task
+> 4.13 used to bundle nine screens whose dependencies differ sharply. It is now split:
 >
-> 1. **Split task 4.13.** It currently bundles nine screens whose dependencies differ sharply. The
->    **management** screens (Expenses, Assets & Depreciation, Loans) depend only on 4.4 + 4.12 and
->    endpoints that **already shipped** in tasks 3.10–3.12 — they are buildable immediately and are
->    what makes Phase 3's data enterable. The **reporting** screens (P&L, Margins, Doctor/Branch
->    P&L, Cash Flow, Aging, Budget) depend on 4.6–4.11, which are not written. Splitting these into
->    4.13 (management) and a new 4.15 (reporting) lets the useful half ship without waiting.
+> 1. **4.13 (management screens: Expenses, Assets & Depreciation, Loans)** depends only on 4.4 +
+>    4.12 and endpoints that **already shipped** in tasks 3.10–3.12 — buildable immediately, and
+>    what makes Phase 3's data enterable. **4.15 (reporting screens: P&L, Service Margins,
+>    Doctor/Branch P&L, Cash Flow, Receivables Aging, Budget vs Actual)** depends on 4.6–4.11, which
+>    are not written yet. Building 4.13 first lets the useful half ship without waiting on the
+>    reporting endpoints.
 > 2. **Task 4.5's scope is smaller than its title suggests.** Phase 3B's task 3B.11 takes the
 >    Suppliers/Purchases/Batch Management orphans; 4.5 keeps Expense Categories, Expenses and
 >    Finances Dashboard. The "~4,000 lines" figure in this task's text predates that split.
@@ -3291,10 +3291,10 @@ browser verification against the dev database is still outstanding.
 
 | ID | Task | Depends on | Status | Owner | Commit |
 |---|---|---|---|---|---|
-| 4.1 | `PERMISSION_STRUCTURE`: add `finance.*` keys | — | `TODO` | — | — |
-| 4.2 | `hasFinancePermission` helper — short-circuits on `superadmin` only | — | `TODO` | — | — |
-| 4.3 | Seed the `admin` role's permissions with `finance.*` by default | 4.1 | `TODO` | — | — |
-| 4.4 | Wire the Finance sidebar entry through all 4 permission maps, as a `src/components/admin/Finance/` module | 4.1, 4.2, DEC-027 | `TODO` | — | — |
+| 4.1 | `PERMISSION_STRUCTURE`: add `finance.*` keys | — | `DONE` | Windsurf | WAVE1 |
+| 4.2 | `hasFinancePermission` helper — short-circuits on `superadmin` only | — | `DONE` | Windsurf | WAVE1 |
+| 4.3 | Seed the `admin` role's permissions with `finance.*` by default | 4.1 | `DONE` | Windsurf | WAVE1 |
+| 4.4 | Wire the Finance sidebar entry through all 4 permission maps, as a `src/components/admin/Finance/` module | 4.1, 4.2, DEC-027 | `DONE` | Windsurf | WAVE1 |
 | 4.5 | Delete the ~4,000 lines of dead mock finance JSX | 4.4 (Finance nav must work before the old block is removed) | `TODO` | — | — |
 | 4.6 | `GET /api/finance/pnl` — monthly P&L | 1.10, 1.11, 1.14, 2.11, 3.10–3.12 | `TODO` | — | — |
 | 4.7 | `GET /api/finance/service-margin` — per-service contribution margin | 2.9, 2.11 | `TODO` | — | — |
@@ -3302,9 +3302,10 @@ browser verification against the dev database is still outstanding.
 | 4.9 | `GET /api/finance/cashflow` | 1.1–1.4, 3.10, 3.12 | `TODO` | — | — |
 | 4.10 | `GET /api/finance/receivables-aging` | 1.14 | `TODO` | — | — |
 | 4.11 | Migration: `budget_lines` table + `GET /api/finance/budget-vs-actual` | 3.1 | `TODO` | — | — |
-| 4.12 | Chart library selection + base chart components | — | `TODO` | — | — |
-| 4.13 | UI: Finance dashboard pages under `src/components/admin/Finance/` | 4.4, 4.6–4.12 | `TODO` | — | — |
+| 4.12 | Chart library selection + base chart components | — | `DONE` | Windsurf | WAVE1 |
+| 4.13 | UI: Finance **management** screens (Expenses, Assets & Depreciation, Loans) | 4.4, 4.12, 3.10–3.12 | `TODO` | — | — |
 | 4.14 | `API_CONTRACT.md` rollup for Phase 4 | rolling, alongside 4.6–4.11 | `TODO` | — | — |
+| 4.15 | UI: Finance **reporting** screens (P&L, Service Margins, Doctor/Branch P&L, Cash Flow, Receivables Aging, Budget vs Actual) | 4.4, 4.6–4.12 | `TODO` | — | — |
 
 ---
 
@@ -3653,13 +3654,49 @@ state you have not measured" convention).
 
 ---
 
-## 4.13 — UI: Finance dashboard pages
+## 4.13 — UI: Finance management screens (Expenses, Assets & Depreciation, Loans)
+
+**Depends on 4.4 (the section is reachable and permission-gated), 4.12 (chart components), 3.10–3.12
+(the endpoints these screens manage data through already shipped in Phase 3).** **No dependency on
+4.6–4.11** — this is deliberately the half of the old 4.13 that does not need any Phase 4 reporting
+endpoint, per the 2026-07-27 sequencing note. **Where:** `src/components/admin/Finance/` — one
+focused file per screen (Expenses management, Assets & Depreciation, Loans), composed under the
+Finance section's top-level component from task 4.4. Per DEC-027, none of this may be added to
+`admin/page.tsx` itself.
+
+**What:** wire each screen to its corresponding Phase 3 endpoint (expenses, fixed assets/
+depreciation, loans — tasks 3.10–3.12), using task 4.12's chart/stat-tile components where useful
+for a management screen (e.g. a total-monthly-expense stat tile), but these are primarily
+data-entry/list screens, not report views. Since this is a "non-accountant clinic owner" audience
+(DEC-014), prefer plain labels over accounting jargon throughout.
+
+**Update `DB_SCHEMA.md`:** none. **Update `API_CONTRACT.md`:** none (consumes existing documented
+Phase 3 endpoints; if a screen reveals a response-shape gap, fix the endpoint's contract doc in its
+own task's commit, not silently here).
+
+**Verify:** per this session's "test the golden path... in a browser" standard (not just
+`tsc`/`eslint`) — start the dev server, log in as a permitted role, and click through Expenses,
+Assets & Depreciation, and Loans, confirming real dev data renders and can be entered/edited, and
+the permission gate from 4.4 still holds (a revoked role cannot reach these screens by URL or
+otherwise).
+
+---
+
+## 4.14 — `API_CONTRACT.md` rollup
+
+Checklist task, same pattern as every prior phase's closing task. Covers every `/api/finance/*`
+endpoint added in 4.6–4.11. Close this out once those endpoints are documented — it does not need
+to wait on 4.13 or 4.15, since neither UI task changes the API contract.
+
+---
+
+## 4.15 — UI: Finance reporting screens (P&L, Service Margins, Doctor/Branch P&L, Cash Flow, Receivables Aging, Budget vs Actual)
 
 **Depends on 4.4 (the section is reachable and permission-gated), 4.6–4.11 (the data to render),
 4.12 (chart components).** **Where:** `src/components/admin/Finance/` — one focused file per
-screen (P&L, Service Margins, Doctor/Branch P&L, Cash Flow, Receivables Aging, Budget vs Actual,
-Expenses management, Assets & Depreciation, Loans), composed under the Finance section's top-level
-component from task 4.4. Per DEC-027, none of this may be added to `admin/page.tsx` itself.
+screen (P&L, Service Margins, Doctor/Branch P&L, Cash Flow, Receivables Aging, Budget vs Actual),
+composed under the Finance section's top-level component from task 4.4. Per DEC-027, none of this
+may be added to `admin/page.tsx` itself.
 
 **What:** wire each screen to its corresponding `/api/finance/*` endpoint from tasks 4.6–4.11, using
 task 4.12's chart components, with DEC-015's contribution-margin/fully-loaded distinction visibly
@@ -3676,12 +3713,6 @@ doc in that task's own commit, not silently here).
 `tsc`/`eslint`) — start the dev server, log in as a permitted role, and click through every screen
 this task adds, confirming real dev data renders correctly and the permission gate from 4.4 still
 holds (a revoked role cannot reach these screens by URL or otherwise).
-
----
-
-## 4.14 — `API_CONTRACT.md` rollup
-
-Checklist task, same pattern as every prior phase's closing task. Close this out last.
 
 ---
 
@@ -3992,8 +4023,10 @@ pure functions, `requireStaffAccess`/`hasFinancePermission` gated per task 4.2).
 
 **What:** per branch per day (or an aggregated range), `roomMinutes`, `doctorMinutes`,
 `bottleneckMinutes`, `bookedMinutes`, `utilization`, and a no-show rate from the task 5.1 status
-timestamps. This is the direct data source for task 4.13's capacity screen (built in Phase 4's UI
-module, since DEC-027 already established that structure — this phase adds no new UI location).
+timestamps. This is the direct data source for a capacity screen alongside task 4.15's reporting
+screens (same `src/components/admin/Finance/` module, since DEC-027 already established that
+structure — this phase adds no new UI location; see the Open Questions entry on whether capacity
+output eventually moves to a separate Reports/Data Analysis section).
 
 **Update `DB_SCHEMA.md`:** none. **Update `API_CONTRACT.md`:** document fully.
 

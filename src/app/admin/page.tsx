@@ -105,6 +105,7 @@ import ServiceRecipeEditor from "@/components/admin/services/ServiceRecipeEditor
 import ServiceDeviceEditor from "@/components/admin/services/ServiceDeviceEditor";
 import { PackageAdminPanel } from "@/components/admin/packages/PackageAdminPanel";
 import { PromotionsAdminPanel } from "@/components/admin/marketing/PromotionsAdminPanel";
+import { FinanceSection } from "@/components/admin/Finance/FinanceSection";
 import { DoctorServiceCommissionEditor, ServiceCommissionEntry, DefaultCommissionType } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
@@ -177,7 +178,7 @@ const SIDEBAR_ITEMS = [
   { label: "Marketing", icon: Megaphone, submenu: true },
   { label: "Customer Support", icon: MessageSquare, comingSoon: true },
   { label: "Reports", icon: BarChart3, comingSoon: true },
-  { label: "Finance", icon: CircleDollarSign, comingSoon: true },
+  { label: "Finance", icon: CircleDollarSign },
   { label: "Settings", icon: Settings, submenu: true },
   { label: "Logout", icon: LogOut },
 ];
@@ -453,6 +454,19 @@ const PERMISSION_STRUCTURE = [
       { key: "settings.notification", label: "Manage Notification Settings" },
       { key: "settings.queue", label: "Manage Queue Settings" },
       { key: "settings.pages", label: "Manage Pages Settings (CMS)" }
+    ]
+  },
+  {
+    category: "Finance",
+    prefix: "finance",
+    items: [
+      { key: "finance.view_pnl", label: "View P&L" },
+      { key: "finance.view_margins", label: "View Service/Doctor/Branch Margins" },
+      { key: "finance.view_cashflow", label: "View Cash Flow" },
+      { key: "finance.manage_expenses", label: "Manage Expenses & Recurring Expenses" },
+      { key: "finance.manage_assets", label: "Manage Fixed Assets & Depreciation" },
+      { key: "finance.manage_loans", label: "Manage Loans" },
+      { key: "finance.view_capacity", label: "View Capacity & Service Mix" }
     ]
   }
 ];
@@ -790,6 +804,7 @@ export default function AdminPage() {
       "customers": "Customers",
       "providers": "Doctors",
       "services": "Services",
+      "finance": "Finance",
       "settings": "Settings"
     };
     const category = permKey.split('.')[0];
@@ -818,6 +833,7 @@ export default function AdminPage() {
         "Inventory": "inventory",
         "Employees": "employees",
         "Marketing": "services",
+        "Finance": "finance",
         "Settings": "settings"
       };
       const prefix = parentScreenMap[item.label];
@@ -2027,6 +2043,7 @@ export default function AdminPage() {
             "Services": "services",
             "Promotions": "services",
             "Packages": "services",
+            "Finance": "finance",
             "Settings": "settings"
           };
           const prefix = parentScreenMap[activeNav];
@@ -3116,6 +3133,7 @@ export default function AdminPage() {
       "Services": "services",
       "Promotions": "services",
       "Packages": "services",
+      "Finance": "finance",
       "Settings": "settings"
     };
 
@@ -9501,6 +9519,11 @@ export default function AdminPage() {
           {/* ── PACKAGES VIEW ── */}
           {activeNav === "Packages" && (
             <PackageAdminPanel session={session} />
+          )}
+
+          {/* ── FINANCE VIEW ── */}
+          {activeNav === "Finance" && (
+            <FinanceSection />
           )}
 
           {/* ── ALL PRESCRIPTIONS VIEW ── */}

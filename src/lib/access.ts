@@ -74,6 +74,10 @@ export function hasStaffPermission(access: StaffAccess, permission: string) {
   return access.role === "superadmin" || access.role === "admin" || access.permissions.includes(permission);
 }
 
+export function hasFinancePermission(access: StaffAccess, permission: string) {
+  return access.role === "superadmin" || access.permissions.includes(permission);
+}
+
 export async function requireAdministratorAccess(req: Request): Promise<AccessResult> {
   const result = await requireStaffAccess(req);
   if ("error" in result) return result;
