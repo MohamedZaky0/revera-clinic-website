@@ -3291,10 +3291,10 @@ browser verification against the dev database is still outstanding.
 
 | ID | Task | Depends on | Status | Owner | Commit |
 |---|---|---|---|---|---|
-| 4.1 | `PERMISSION_STRUCTURE`: add `finance.*` keys | — | `DONE` | Windsurf | WAVE1 |
-| 4.2 | `hasFinancePermission` helper — short-circuits on `superadmin` only | — | `DONE` | Windsurf | WAVE1 |
-| 4.3 | Seed the `admin` role's permissions with `finance.*` by default | 4.1 | `DONE` | Windsurf | WAVE1 |
-| 4.4 | Wire the Finance sidebar entry through all 4 permission maps, as a `src/components/admin/Finance/` module | 4.1, 4.2, DEC-027 | `DONE` | Windsurf | WAVE1 |
+| 4.1 | `PERMISSION_STRUCTURE`: add `finance.*` keys | — | `DONE` | Windsurf | 1b747fe |
+| 4.2 | `hasFinancePermission` helper — short-circuits on `superadmin` only | — | `DONE` | Windsurf | 1b747fe |
+| 4.3 | Seed the `admin` role's permissions with `finance.*` by default | 4.1 | `DONE` | Windsurf | 1b747fe |
+| 4.4 | Wire the Finance sidebar entry through all 4 permission maps, as a `src/components/admin/Finance/` module | 4.1, 4.2, DEC-027 | `DONE` | Windsurf | 1b747fe |
 | 4.5 | Delete the ~4,000 lines of dead mock finance JSX | 4.4 (Finance nav must work before the old block is removed) | `TODO` | — | — |
 | 4.6 | `GET /api/finance/pnl` — monthly P&L | 1.10, 1.11, 1.14, 2.11, 3.10–3.12 | `TODO` | — | — |
 | 4.7 | `GET /api/finance/service-margin` — per-service contribution margin | 2.9, 2.11 | `TODO` | — | — |
@@ -3302,7 +3302,7 @@ browser verification against the dev database is still outstanding.
 | 4.9 | `GET /api/finance/cashflow` | 1.1–1.4, 3.10, 3.12 | `TODO` | — | — |
 | 4.10 | `GET /api/finance/receivables-aging` | 1.14 | `TODO` | — | — |
 | 4.11 | Migration: `budget_lines` table + `GET /api/finance/budget-vs-actual` | 3.1 | `TODO` | — | — |
-| 4.12 | Chart library selection + base chart components | — | `DONE` | Windsurf | WAVE1 |
+| 4.12 | Chart library selection + base chart components | — | `DONE` | Windsurf | 1b747fe |
 | 4.13 | UI: Finance **management** screens (Expenses, Assets & Depreciation, Loans) | 4.4, 4.12, 3.10–3.12 | `TODO` | — | — |
 | 4.14 | `API_CONTRACT.md` rollup for Phase 4 | rolling, alongside 4.6–4.11 | `TODO` | — | — |
 | 4.15 | UI: Finance **reporting** screens (P&L, Service Margins, Doctor/Branch P&L, Cash Flow, Receivables Aging, Budget vs Actual) | 4.4, 4.6–4.12 | `TODO` | — | — |
