@@ -1102,6 +1102,10 @@ second booking, not the first.
 
 ## RISK-030: Promotions Discounts Are Marketing-Only — Never Applied At Booking Or Checkout, And Business Value Is Undefined (RESOLVED)
 
+**Manual test checklist:** `ai_docs/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section 1) — also
+covers the related Packages public-display (DEC-034) and sell/redeem (DEC-035) work shipped in
+the same session.
+
 **Severity:** Medium · **Type:** Product definition / customer trust
 **Found:** 2026-07-28, while comparing the Packages admin feature (3B.8) to the Promotions nav
 tab, during a documentation pass — not a user-reported bug.
@@ -1240,6 +1244,42 @@ Live check still needed: cancel a booking with a paid deposit and confirm the wa
 mark another as no-show and confirm `spent_amount` increases instead; postpone one via each path
 and confirm the date-known path reschedules immediately while the follow-up path leaves it
 findable under the new "Postponed" filter.
+
+---
+
+## RISK-031: New Packages/Promotions Admin UI Was Added Inline To `admin/page.tsx`, Violating DEC-027
+
+**Severity:** Low · **Type:** Architecture / tech debt (not a correctness or money bug)
+**Found:** 2026-07-28, self-flagged while auditing `ai_docs/` for staleness after shipping the
+package sell/redeem/checkout feature — not a user-reported issue.
+
+**What it is:** DEC-027 ("Modular Admin Sections Are Mandatory," 2026-07-26) requires every *new*
+admin section to be built as a focused submodule under `src/components/admin/`, explicitly to stop
+`src/app/admin/page.tsx` from growing further — existing legacy sections are only extracted
+"incrementally when touched." The 2026-07-28 packages work added a genuinely new section (a
+"Packages" tab in the customer profile, its sell-package modal, a new shared
+`PatientPackagePromoBanner` component, and redemption logic inside the checkout modal) directly
+inline into `admin/page.tsx`, mirroring the pre-existing (legacy, pre-DEC-027) "Products" tab
+pattern instead of extracting a new module. `PackageAdminPanel.tsx` (the package *definitions*
+CRUD screen, built earlier in 3B.8) correctly follows DEC-027 — only this session's customer-facing
+sell/redeem/banner work does not.
+
+**Why it happened this way:** the redemption logic sits inside the existing legacy Payment
+Settlement (checkout) modal, which is itself unextracted — DEC-027 says existing sections get
+pulled out "when touched," which arguably makes this checkout change the trigger for extracting
+that modal. Given the checkout modal is the one money-critical surface in this feature (it's what
+was flagged "take care, critical feature" for), a mid-implementation extraction was judged higher-
+risk than shipping the fix in place and refactoring separately once it's verified working in the
+browser.
+
+**Consequence:** `admin/page.tsx` grew by ~550 lines in this change, working against DEC-027's
+stated goal. No functional/money risk — this is purely a maintainability debt item.
+
+**Recommended follow-up (not done here):** once the feature is verified live, extract into
+`src/components/admin/packages/`: (1) the customer-profile "Packages" tab + sell modal as their
+own component, (2) `PatientPackagePromoBanner` (already a clean, prop-driven, extractable
+function), and (3) the checkout modal's redemption logic, ideally alongside finally extracting the
+whole Payment Settlement modal into its own module per DEC-027's "extract when touched" clause.
 
 ---
 

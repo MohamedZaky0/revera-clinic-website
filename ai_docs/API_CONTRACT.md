@@ -1,6 +1,6 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-07-27
+> **Last Updated:** 2026-07-28
 > **Base:** Next.js App Router API routes under `/app/api/`
 > **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, product-sales mutations, and every Phase 3 expenses/assets/loans route); coverage is not yet universal. All routes use the Supabase service role key server-side
 > **Previous content was for a different project — discarded entirely**
@@ -273,6 +273,49 @@ After a successful native `product_sales` insert, the route additively attempts 
 
 ---
 
+## GET /api/packages
+
+Public — no auth check, same convention as `GET /api/services` (returns everything unfiltered;
+active/`showOnWebsite` filtering for the public site happens client-side in `PackagesSection.tsx`).
+Returns every package definition with its items.
+
+**Response:** `[{ id, name, nameAr, branchId, price, taxRate, validityDays, onExpiry, extensionDays, active, showOnWebsite, items: [{ id, serviceId, serviceName, serviceNameAr, qty }] }]`
+
+---
+
+## POST /api/packages
+
+Requires a staff bearer token. Creates a package definition.
+
+**Body:** `{ name, nameAr?, branchId?, price, taxRate, validityDays, onExpiry, extensionDays, active, showOnWebsite, items: [{ serviceId, qty }] }`
+
+Required: `name`, at least one item with a positive integer `qty`. `nameAr` (Added 2026-07-28,
+`20260728010000_packages_public_display_fields.sql`) has no fallback — the public site shows the
+English name in Arabic view if unset. `showOnWebsite` (same migration) is independent of `active`
+— see `packages.show_on_website` in `DB_SCHEMA.md`.
+
+**Response:** Created package object, status 201.
+
+---
+
+## PATCH /api/packages
+
+Requires a staff bearer token. Updates a package definition. `id` required in the body; replaces
+all items if an `items` array is present, otherwise leaves items unchanged.
+
+**Response:** Updated package object.
+
+---
+
+## DELETE /api/packages?id={id}
+
+Requires a staff bearer token. Refuses (`409`) if any `customer_packages` row already references
+this package — mark it inactive instead.
+
+**Response:** `{ message: 'Package deleted successfully.' }`
+
+---
+
 ## POST /api/packages/sell
 
 Requires a staff bearer token. Sells an active package to an existing customer.
@@ -442,6 +485,18 @@ Required: `name`, `mobile`. If `id` is present, updates the existing customer. O
 Deletes a customer profile record. Nullifies references in `reservations` to prevent foreign key violations, and deletes the linked account in Supabase Auth if applicable.
 
 **Response:** `{ message: "Customer deleted successfully" }`
+
+---
+
+## GET /api/customers/packages?customer_id={id}
+
+Requires a staff bearer token. Lists everything one customer has bought under the packages
+feature — `customer_packages` joined with `packages` (name/name_ar) and `customer_package_items`
+(joined with `services` for en/ar names), every status (`active`/`expired`/`fully_used`) included.
+Callers filter client-side to what they need — mirrors the "return everything, filter in the UI"
+convention already used by `GET /api/services` and `GET /api/packages`.
+
+**Response:** `{ packages: [{ id, packageId, packageName, packageNameAr, status, purchasedAt, expiresAt, pricePaid, items: [{ id, serviceId, serviceName, serviceNameAr, qtyTotal, qtyUsed, qtyRemaining }] }] }`
 
 ---
 

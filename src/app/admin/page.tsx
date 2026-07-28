@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
-import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, normaliseTo24hSlot, getEffectiveServicePrice } from "@/lib/services";
+import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
 import { 
   getServiceToggles, 
   setServiceToggle, 
@@ -626,6 +626,58 @@ const DEFAULT_HERO_SLIDES_AR = [
     image: "/images/hero/slide-3.jpg"
   }
 ];
+
+// Shows staff, wherever a patient is in view for booking/checkout, whether that patient owns
+// active packages (with remaining sessions) and/or is eligible for an active promotion on a
+// specific service — informational only here; redemption itself only happens at checkout
+// (see the Payment Settlement modal), since a package session can only be consumed against a
+// real completed reservation (DEC-023's deferred-revenue model).
+function PatientPackagePromoBanner({
+  packages,
+  promotions,
+}: {
+  packages: any[];
+  promotions: { serviceName: string; promotionText: string }[];
+}) {
+  const activeItems = packages
+    .filter((pkg: any) => pkg.status === "active" && (!pkg.expiresAt || new Date(pkg.expiresAt) >= new Date()))
+    .flatMap((pkg: any) =>
+      (pkg.items || [])
+        .filter((it: any) => it.qtyRemaining > 0)
+        .map((it: any) => ({ key: `${pkg.id}-${it.id}`, packageName: pkg.packageName, serviceName: it.serviceName || `Service #${it.serviceId}`, qtyRemaining: it.qtyRemaining }))
+    );
+
+  if (activeItems.length === 0 && promotions.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-[#C4AE7C]/30 bg-[#FBF8F0] p-4 space-y-2.5 text-xs">
+      {activeItems.length > 0 && (
+        <div>
+          <p className="font-bold text-[#414E36] uppercase tracking-wider text-[10px] mb-1.5">Active Packages</p>
+          <div className="flex flex-wrap gap-1.5">
+            {activeItems.map((it) => (
+              <span key={it.key} className="inline-flex rounded-full bg-white border border-[#C4AE7C]/40 px-2.5 py-1 font-semibold text-[#414E36]">
+                {it.packageName}: {it.serviceName} ({it.qtyRemaining} left)
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {promotions.length > 0 && (
+        <div>
+          <p className="font-bold text-[#C4AE7C] uppercase tracking-wider text-[10px] mb-1.5">Active Promotion</p>
+          <div className="flex flex-wrap gap-1.5">
+            {promotions.map((p, idx) => (
+              <span key={idx} className="inline-flex rounded-full bg-[#C4AE7C] text-white px-2.5 py-1 font-bold uppercase tracking-wide">
+                {p.serviceName}: {p.promotionText}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const { showConfirm } = useAlertConfirm();
@@ -1424,7 +1476,7 @@ export default function AdminPage() {
     }
   };
 
-  const [customerProfileTab, setCustomerProfileTab] = useState<"info" | "history" | "prescription" | "products">("info");
+  const [customerProfileTab, setCustomerProfileTab] = useState<"info" | "history" | "prescription" | "products" | "packages">("info");
   const [customerRecordsSubTab, setCustomerRecordsSubTab] = useState<"intake" | "prescriptions" | "reports">("intake");
   const [customerPrescriptions, setCustomerPrescriptions] = useState<any[]>([]);
   const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
@@ -1445,6 +1497,22 @@ export default function AdminPage() {
   const [selectedAddProductQty, setSelectedAddProductQty] = useState<number>(1);
   const [selectedAddProductUnitPrice, setSelectedAddProductUnitPrice] = useState<number>(0);
   const [addingProductToPatient, setAddingProductToPatient] = useState(false);
+
+  // Patient Packages state
+  const [customerPackagesSubTab, setCustomerPackagesSubTab] = useState<"current" | "history">("current");
+  const [customerProfilePackages, setCustomerProfilePackages] = useState<any[]>([]);
+  const [loadingCustomerPackages, setLoadingCustomerPackages] = useState(false);
+  const [showSellPackageModal, setShowSellPackageModal] = useState(false);
+  const [availablePackageOffers, setAvailablePackageOffers] = useState<any[]>([]);
+  const [selectedSellPackageId, setSelectedSellPackageId] = useState<string>("");
+  const [sellingPackage, setSellingPackage] = useState(false);
+
+  // Package/promotion awareness at booking + checkout time
+  const [bookingCustomerPackages, setBookingCustomerPackages] = useState<any[]>([]);
+  const [checkoutCustomerPackages, setCheckoutCustomerPackages] = useState<any[]>([]);
+  const [redeemedPackageItems, setRedeemedPackageItems] = useState<Record<number, string>>({});
+  const [matchedCustomerId, setMatchedCustomerId] = useState<string | null>(null);
+  const [manualBookingCustomerPackages, setManualBookingCustomerPackages] = useState<any[]>([]);
 
   // Prescription Form states
   const [rxDiagnosis, setRxDiagnosis] = useState("");
@@ -3729,6 +3797,104 @@ export default function AdminPage() {
       fetchCustomerProductBalances(viewingCustomerProfile.id);
     }
   }, [viewingCustomerProfile?.id, fetchCustomerProductBalances]);
+
+  // Shared fetch for a customer's purchased packages (customer_packages + items), reused across
+  // the profile's Packages tab, the booking detail drawer, checkout, and manual booking creation —
+  // each keeps its own state so switching which booking/profile is in view never shows stale data.
+  const fetchCustomerPackagesInto = useCallback(async (customerId: string, setter: (data: any[]) => void) => {
+    try {
+      if (!session?.access_token) return;
+      const res = await fetch(`/api/customers/packages?customer_id=${encodeURIComponent(customerId)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setter(data.packages || []);
+      }
+    } catch (err) {
+      console.error("Error fetching customer packages:", err);
+    }
+  }, [session]);
+
+  const fetchCustomerProfilePackages = useCallback(async (customerId: string) => {
+    setLoadingCustomerPackages(true);
+    await fetchCustomerPackagesInto(customerId, setCustomerProfilePackages);
+    setLoadingCustomerPackages(false);
+  }, [fetchCustomerPackagesInto]);
+
+  useEffect(() => {
+    if (viewingCustomerProfile?.id) {
+      fetchCustomerProfilePackages(viewingCustomerProfile.id);
+    }
+  }, [viewingCustomerProfile?.id, fetchCustomerProfilePackages]);
+
+  useEffect(() => {
+    if (viewingBooking?.customerId) {
+      fetchCustomerPackagesInto(viewingBooking.customerId, setBookingCustomerPackages);
+    } else {
+      setBookingCustomerPackages([]);
+    }
+  }, [viewingBooking?.customerId, fetchCustomerPackagesInto]);
+
+  useEffect(() => {
+    if (checkoutBooking?.customerId) {
+      fetchCustomerPackagesInto(checkoutBooking.customerId, setCheckoutCustomerPackages);
+    } else {
+      setCheckoutCustomerPackages([]);
+      setRedeemedPackageItems({});
+    }
+  }, [checkoutBooking?.customerId, fetchCustomerPackagesInto]);
+
+  useEffect(() => {
+    if (matchedCustomerId) {
+      fetchCustomerPackagesInto(matchedCustomerId, setManualBookingCustomerPackages);
+    } else {
+      setManualBookingCustomerPackages([]);
+    }
+  }, [matchedCustomerId, fetchCustomerPackagesInto]);
+
+  const fetchAvailablePackageOffers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/packages");
+      if (res.ok) {
+        const data = await res.json();
+        setAvailablePackageOffers(Array.isArray(data) ? data.filter((p: any) => p.active) : []);
+      }
+    } catch (err) {
+      console.error("Error fetching package offers:", err);
+    }
+  }, []);
+
+  const handleSellPackageToCustomer = async () => {
+    if (!viewingCustomerProfile?.id || !selectedSellPackageId) return;
+    const customerId = viewingCustomerProfile.id;
+    setSellingPackage(true);
+    try {
+      const res = await fetch("/api/packages/sell", {
+        method: "POST",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify({
+          customerId,
+          packageId: selectedSellPackageId,
+          branchId: null,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchCustomerProfilePackages(customerId);
+        setShowSellPackageModal(false);
+        setSelectedSellPackageId("");
+        alert(`Package sold successfully!${data.invoice?.invoice_no ? ` Invoice ${data.invoice.invoice_no}` : ""}`);
+      } else {
+        alert(data.error || "Failed to sell package.");
+      }
+    } catch (err) {
+      console.error("Error selling package:", err);
+      alert("Error selling package.");
+    } finally {
+      setSellingPackage(false);
+    }
+  };
 
   const handleSaveUsageLog = async () => {
     if (!logUsageModalBalance || !logUsageQty || logUsageQty <= 0) return;
@@ -7231,7 +7397,8 @@ export default function AdminPage() {
 
   async function handleManualPhoneChange(val: string) {
     setNewPatientPhone(val);
-    
+    setMatchedCustomerId(null);
+
     // Clean and validate Egyptian mobile number
     let cleaned = val.replace(/[^\d]/g, "");
     if (cleaned.startsWith("201") && cleaned.length === 12) {
@@ -7239,7 +7406,7 @@ export default function AdminPage() {
     } else if (cleaned.startsWith("1") && cleaned.length === 10) {
       cleaned = "0" + cleaned;
     }
-    
+
     if (/^01[0-9]{9}$/.test(cleaned)) {
       try {
         const res = await fetch(`/api/customers?mobile=${cleaned}`, {
@@ -7250,6 +7417,7 @@ export default function AdminPage() {
           if (customer) {
             if (customer.name) setNewPatientName(customer.name);
             if (customer.email) setNewPatientEmail(customer.email);
+            if (customer.id) setMatchedCustomerId(customer.id);
           }
         }
       } catch (err) {
@@ -11105,6 +11273,20 @@ export default function AdminPage() {
                       <ShoppingBag size={15} />
                       Purchased Products & Cart
                     </button>
+                    <button
+                      onClick={() => {
+                        setCustomerProfileTab("packages");
+                        fetchAvailablePackageOffers();
+                      }}
+                      className={`pb-3.5 pt-4 text-sm font-semibold border-b-2 transition-all outline-none flex items-center gap-1.5 ${
+                        customerProfileTab === "packages"
+                          ? "border-[#414E36] text-[#414E36] font-bold"
+                          : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                      }`}
+                    >
+                      <Package size={15} />
+                      Purchased Packages
+                    </button>
                   </div>
 
                   {/* Tab Content */}
@@ -11816,6 +11998,132 @@ export default function AdminPage() {
                         )}
                       </div>
                     )}
+
+                    {/* Tab 5: Packages */}
+                    {customerProfileTab === "packages" && (
+                      <div className="space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-[#414E36]/10">
+                          <div className="flex items-center gap-3">
+                            <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Purchased Packages</h4>
+                            <div className="flex bg-[#EDF1EC] p-1 rounded-xl gap-1 text-xs font-semibold">
+                              <button
+                                type="button"
+                                onClick={() => setCustomerPackagesSubTab("current")}
+                                className={`px-3 py-1 rounded-lg transition ${customerPackagesSubTab === "current" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
+                              >
+                                Active Packages
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCustomerPackagesSubTab("history")}
+                                className={`px-3 py-1 rounded-lg transition ${customerPackagesSubTab === "history" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
+                              >
+                                History
+                              </button>
+                            </div>
+                          </div>
+
+                          {(adminRole === "superadmin" || adminRole === "admin" || adminRole === "receptionist" || adminRole === "doctor") && (
+                            <button
+                              onClick={() => {
+                                setSelectedSellPackageId("");
+                                setShowSellPackageModal(true);
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm w-fit"
+                            >
+                              <Plus size={14} /> Sell Package to Patient
+                            </button>
+                          )}
+                        </div>
+
+                        {customerPackagesSubTab === "current" && (
+                          <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm">
+                            {loadingCustomerPackages ? (
+                              <div className="p-8 text-center text-sm text-[#5A6A51]">Loading purchased packages...</div>
+                            ) : customerProfilePackages.filter((p: any) => p.status === "active").length === 0 ? (
+                              <div className="p-12 text-center space-y-3">
+                                <div className="mx-auto w-12 h-12 rounded-full bg-[#EDF1EC] flex items-center justify-center text-[#414E36]">
+                                  <Package size={24} />
+                                </div>
+                                <p className="text-sm font-semibold text-[#1F251A]">No active packages</p>
+                                <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
+                                  Sell this patient a package to track their pre-paid sessions here.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedSellPackageId("");
+                                    setShowSellPackageModal(true);
+                                  }}
+                                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                                >
+                                  <Plus size={14} /> Sell Package
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="divide-y divide-[#414E36]/5">
+                                {customerProfilePackages.filter((p: any) => p.status === "active").map((pkg: any) => {
+                                  const isExpired = pkg.expiresAt && new Date(pkg.expiresAt) < new Date();
+                                  return (
+                                    <div key={pkg.id} className="p-4 space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <p className="font-bold text-[#1F251A] text-sm">{pkg.packageName}</p>
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                          isExpired ? "bg-amber-100 text-amber-800" : "bg-emerald-100/80 text-emerald-800"
+                                        }`}>
+                                          <span className={`h-1.5 w-1.5 rounded-full ${isExpired ? "bg-amber-600" : "bg-emerald-600"}`} />
+                                          {isExpired ? "Expired" : "Active"}
+                                        </span>
+                                      </div>
+                                      <p className="text-[11px] text-[#5A6A51]">
+                                        Purchased {new Date(pkg.purchasedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                                        {pkg.expiresAt && ` · Expires ${new Date(pkg.expiresAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`}
+                                        {` · EGP ${Number(pkg.pricePaid).toLocaleString()} paid`}
+                                      </p>
+                                      <div className="flex flex-wrap gap-2">
+                                        {(pkg.items || []).map((it: any) => (
+                                          <span key={it.id} className="inline-flex items-center gap-1.5 rounded-full bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-1 text-[11px] font-semibold text-[#414E36]">
+                                            {it.serviceName || `Service #${it.serviceId}`}
+                                            <span className={`font-bold ${it.qtyRemaining > 0 ? "text-emerald-700" : "text-gray-400"}`}>
+                                              {it.qtyUsed}/{it.qtyTotal} used
+                                            </span>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {customerPackagesSubTab === "history" && (
+                          <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm p-6 space-y-4">
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Expired & Fully Used Packages</h5>
+                            {customerProfilePackages.filter((p: any) => p.status !== "active").length === 0 ? (
+                              <p className="text-xs text-[#8A9A81] italic text-center py-6">No past package history for this patient.</p>
+                            ) : (
+                              <div className="space-y-3">
+                                {customerProfilePackages.filter((p: any) => p.status !== "active").map((pkg: any) => (
+                                  <div key={pkg.id} className="flex items-center justify-between rounded-xl border border-[#414E36]/10 p-3">
+                                    <div>
+                                      <p className="font-semibold text-[#1F251A] text-sm">{pkg.packageName}</p>
+                                      <p className="text-[11px] text-[#5A6A51]">
+                                        Purchased {new Date(pkg.purchasedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                                      </p>
+                                    </div>
+                                    <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-bold text-gray-500 capitalize">
+                                      {String(pkg.status).replace("_", " ")}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                     {/* Log Usage Modal */}
@@ -11993,6 +12301,88 @@ export default function AdminPage() {
                               className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
                             >
                               {addingProductToPatient ? "Adding..." : "Add to Patient Cart"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Modal: Sell Package to Patient ── */}
+                    {showSellPackageModal && viewingCustomerProfile && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 bg-black/40" onClick={() => setShowSellPackageModal(false)} />
+                        <div className="relative z-10 w-full max-w-lg bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4">
+                          <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                            <div>
+                              <h4 className="text-base font-bold text-[#1F251A]">Sell Package to Patient</h4>
+                              <p className="text-xs text-[#5A6A51]">Assign a package to {viewingCustomerProfile.name}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowSellPackageModal(false)}
+                              className="text-gray-400 hover:text-gray-600 transition"
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Select Package</label>
+                              <select
+                                value={selectedSellPackageId}
+                                onChange={(e) => setSelectedSellPackageId(e.target.value)}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                              >
+                                <option value="">-- Choose Package --</option>
+                                {availablePackageOffers.map((pkg: any) => (
+                                  <option key={pkg.id} value={pkg.id}>
+                                    {pkg.name} - EGP {Number(pkg.price).toLocaleString()} ({pkg.items?.length || 0} services)
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {selectedSellPackageId && (() => {
+                              const pkg = availablePackageOffers.find((p: any) => p.id === selectedSellPackageId);
+                              if (!pkg) return null;
+                              return (
+                                <div className="bg-[#EDF1EC]/60 p-3.5 rounded-xl space-y-2 text-xs text-[#1F251A]">
+                                  <div className="flex items-center justify-between font-semibold">
+                                    <span>Price:</span>
+                                    <span className="text-base font-bold text-[#414E36]">EGP {Number(pkg.price).toLocaleString()}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span>Validity:</span>
+                                    <span className="font-semibold">{pkg.validityDays} days</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1.5 pt-1">
+                                    {(pkg.items || []).map((it: any) => (
+                                      <span key={it.id} className="inline-flex rounded-full bg-white border border-[#414E36]/10 px-2 py-0.5 font-semibold">
+                                        {it.serviceName || `Service #${it.serviceId}`} ×{it.qty}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#414E36]/10">
+                            <button
+                              type="button"
+                              onClick={() => setShowSellPackageModal(false)}
+                              className="rounded-xl border border-[#414E36]/15 px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSellPackageToCustomer}
+                              disabled={sellingPackage || !selectedSellPackageId}
+                              className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
+                            >
+                              {sellingPackage ? "Selling..." : "Sell Package"}
                             </button>
                           </div>
                         </div>
@@ -25279,6 +25669,19 @@ export default function AdminPage() {
                     );
                   })()}
 
+                  {(() => {
+                    const svcIds = Array.isArray(viewingBooking.serviceIds)
+                      ? viewingBooking.serviceIds
+                      : (viewingBooking.serviceId ? [viewingBooking.serviceId] : []);
+                    const promos = svcIds
+                      .map((id: number) => localServices.find((s) => s.id === id))
+                      .filter(Boolean)
+                      .map((s: any) => ({ service: s, details: getServicePriceDetails(s, viewingBooking.branchId, branches) }))
+                      .filter((x: any) => x.details.hasPromotion)
+                      .map((x: any) => ({ serviceName: x.service.en, promotionText: x.details.promotionText || "" }));
+                    return <PatientPackagePromoBanner packages={bookingCustomerPackages} promotions={promos} />;
+                  })()}
+
                   {/* Provider */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#5A6A51] mb-3">Provider</p>
@@ -25833,6 +26236,17 @@ export default function AdminPage() {
                   )}
                 </div>
               </div>
+
+              {matchedCustomerId && (() => {
+                const svc = localServices.find((s) => s.id === newPatientService);
+                const promos = svc
+                  ? (() => {
+                      const details = getServicePriceDetails(svc, newPatientBranch, branches);
+                      return details.hasPromotion ? [{ serviceName: svc.en, promotionText: details.promotionText || "" }] : [];
+                    })()
+                  : [];
+                return <PatientPackagePromoBanner packages={manualBookingCustomerPackages} promotions={promos} />;
+              })()}
 
               {/* 2. Patient Name and Email side-by-side */}
               <div className="grid gap-4 sm:grid-cols-2">
@@ -27419,19 +27833,38 @@ export default function AdminPage() {
         (() => {
           // 1. Calculate service cost
           const svcIds = Array.isArray(checkoutBooking.serviceIds) ? checkoutBooking.serviceIds : [checkoutBooking.serviceId];
-          const bookingServicesList = svcIds.map((id: number) => {
-            const s = localServices.find(srv => srv.id === id);
-            return {
-              name: s?.en || `Service #${id}`,
-              price: s ? getEffectiveServicePrice(s, checkoutBooking.branchId, branches) : 500
-            };
-          });
-          const totalCost = bookingServicesList.reduce((sum: number, s: any) => sum + s.price, 0);
-
           // A deposit collected at reservation time (BookingModal's "declare deposit paid" step)
           // is already stored on the booking as amountPaid — checkout must charge only what's
           // left of the service price, not the full price again. RISK-029.
           const depositAlreadyPaid = Number(checkoutBooking.amountPaid) || 0;
+          // Package redemption is disabled once a deposit has been collected on this booking:
+          // deposits are booking-level, not per-service, so waiving a service's price after cash
+          // was already taken against it would need refund/reversal logic this feature doesn't
+          // build. Staff can still redeem on any booking with no deposit collected.
+          const redemptionAllowed = depositAlreadyPaid === 0;
+          const activeCustomerPackageItems = checkoutCustomerPackages
+            .filter((pkg: any) => pkg.status === "active" && (!pkg.expiresAt || new Date(pkg.expiresAt) >= new Date()))
+            .flatMap((pkg: any) => (pkg.items || []).map((it: any) => ({ ...it, packageName: pkg.packageName })));
+          const bookingServicesList = svcIds.map((id: number) => {
+            const s = localServices.find(srv => srv.id === id);
+            const details = s ? getServicePriceDetails(s, checkoutBooking.branchId, branches) : null;
+            const redeemableItem = redemptionAllowed
+              ? activeCustomerPackageItems.find((it: any) => it.serviceId === id && it.qtyRemaining > 0) || null
+              : null;
+            return {
+              serviceId: id,
+              name: s?.en || `Service #${id}`,
+              price: details ? details.discountedPrice : 500,
+              hasPromotion: details?.hasPromotion || false,
+              promotionText: details?.promotionText || "",
+              redeemableItem,
+            };
+          });
+          const totalCost = bookingServicesList.reduce(
+            (sum: number, s: any) => redeemedPackageItems[s.serviceId] ? sum : sum + s.price,
+            0
+          );
+
           const balanceDue = Math.max(0, totalCost - depositAlreadyPaid);
 
           // 2. Fetch customer details
@@ -27470,15 +27903,48 @@ export default function AdminPage() {
                 })
               });
               if (res.ok) {
+                // The reservation is now 'completed' server-side — only now will
+                // /api/packages/consume accept it. Fire one call per redeemed line; a failure
+                // here (e.g. a race on the last remaining session) must NOT undo the checkout
+                // that already succeeded — the booking stays completed and correctly charged
+                // for the non-redeemed amount. Surface failures so staff can reconcile manually.
+                const redeemedEntries = Object.entries(redeemedPackageItems);
+                const consumeFailures: string[] = [];
+                for (const [serviceIdStr, customerPackageItemId] of redeemedEntries) {
+                  try {
+                    const consumeRes = await fetch("/api/packages/consume", {
+                      method: "POST",
+                      headers: authenticatedJsonHeaders,
+                      body: JSON.stringify({ customerPackageItemId, reservationId: checkoutBooking.id })
+                    });
+                    if (!consumeRes.ok) {
+                      const consumeErr = await consumeRes.json();
+                      const svc = bookingServicesList.find((s: any) => String(s.serviceId) === serviceIdStr);
+                      consumeFailures.push(`${svc?.name || `Service #${serviceIdStr}`}: ${consumeErr.error || "redemption failed"}`);
+                    }
+                  } catch (consumeErr) {
+                    console.error("Error consuming package session:", consumeErr);
+                    const svc = bookingServicesList.find((s: any) => String(s.serviceId) === serviceIdStr);
+                    consumeFailures.push(`${svc?.name || `Service #${serviceIdStr}`}: redemption failed`);
+                  }
+                }
+
                 setCheckoutBooking(null);
                 setCheckoutAmountPaid("");
                 setUseWalletBalance(false);
                 setDepositChangeToWallet(true);
+                setRedeemedPackageItems({});
                 // Refresh list and details
                 fetchAllReservations();
                 fetchCustomers();
                 // Close the viewing booking drawer if open
                 setViewingBooking(null);
+
+                if (consumeFailures.length > 0) {
+                  alert(
+                    `Checkout completed and charged correctly, but package redemption failed for:\n${consumeFailures.join("\n")}\n\nPlease reconcile this patient's package balance manually.`
+                  );
+                }
               } else {
                 const err = await res.json();
                 alert(err.error || "Failed to complete checkout");
@@ -27506,6 +27972,7 @@ export default function AdminPage() {
                       setCheckoutAmountPaid("");
                       setUseWalletBalance(false);
                       setDepositChangeToWallet(true);
+                      setRedeemedPackageItems({});
                     }}
                     className="rounded-full bg-[#F2EFE9] p-2 text-[#414E36] transition hover:bg-[#e4e0d6]"
                   >
@@ -27525,12 +27992,54 @@ export default function AdminPage() {
                   {/* Services Invoice details */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-[#EDF1EC]/30 p-4 space-y-2">
                     <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-1">Services List / الخدمات</p>
-                    {bookingServicesList.map((svc: any, idx: number) => (
-                      <div key={idx} className="flex justify-between font-medium">
-                        <span className="text-[#1F251A]">{svc.name}</span>
-                        <span>{svc.price} EGP</span>
-                      </div>
-                    ))}
+                    {bookingServicesList.map((svc: any, idx: number) => {
+                      const isRedeemed = !!redeemedPackageItems[svc.serviceId];
+                      return (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex justify-between font-medium items-center gap-2">
+                            <span className="text-[#1F251A] flex items-center gap-1.5 flex-wrap">
+                              {svc.name}
+                              {svc.hasPromotion && !isRedeemed && (
+                                <span className="inline-flex rounded-full bg-[#C4AE7C] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                                  {svc.promotionText}
+                                </span>
+                              )}
+                            </span>
+                            <span className={isRedeemed ? "text-emerald-700 font-bold" : ""}>
+                              {isRedeemed ? "FREE (Package)" : `${svc.price} EGP`}
+                            </span>
+                          </div>
+                          {svc.redeemableItem && (
+                            <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] text-emerald-800 bg-emerald-50/60 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+                              <input
+                                type="checkbox"
+                                checked={isRedeemed}
+                                onChange={(e) => {
+                                  setRedeemedPackageItems((prev) => {
+                                    const next = { ...prev };
+                                    if (e.target.checked) {
+                                      next[svc.serviceId] = svc.redeemableItem.id;
+                                    } else {
+                                      delete next[svc.serviceId];
+                                    }
+                                    return next;
+                                  });
+                                }}
+                                className="h-3.5 w-3.5 rounded border-emerald-300 text-emerald-700 focus:ring-emerald-500"
+                              />
+                              <span className="font-semibold">
+                                Apply from package: {svc.redeemableItem.packageName} ({svc.redeemableItem.qtyRemaining} left)
+                              </span>
+                            </label>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {!redemptionAllowed && activeCustomerPackageItems.length > 0 && (
+                      <p className="text-[11px] text-amber-700 italic">
+                        Package redemption is unavailable — a deposit was already paid on this booking.
+                      </p>
+                    )}
                     <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
                       <span>Total Cost / الإجمالي</span>
                       <span>{totalCost} EGP</span>
@@ -27640,6 +28149,7 @@ export default function AdminPage() {
                       setCheckoutAmountPaid("");
                       setUseWalletBalance(false);
                       setDepositChangeToWallet(true);
+                      setRedeemedPackageItems({});
                     }}
                     className="rounded-xl border border-[#414E36]/15 bg-white px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
                   >

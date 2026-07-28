@@ -2561,6 +2561,8 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 | 3B.10 | Purchases: real UI under Inventory wired to `POST /api/purchases` | 3B.9 | `DONE` | Claude | ef9ecff |
 | 3B.11 | Delete the orphaned Suppliers/Purchases/Batch Management mock screens | 3B.9, 3B.10 | `DONE` | Claude | 23ea00e |
 | 3B.12 | `API_CONTRACT.md` + `DB_SCHEMA.md` rollup for Phase 3B | rolling | `TODO` | — | — |
+| 3B.13 | Packages public display on the marketing site (DEC-034) | 3B.8 | `DONE` | Claude | pending commit |
+| 3B.14 | Package sell/redeem UI + checkout redemption + patient package/promo awareness (DEC-035) | 3B.8, 3B.13 | `DONE` | Claude | pending commit |
 
 ---
 
@@ -3114,6 +3116,78 @@ documented, and that every route whose **mapper changed** (`/api/services`,
 that second half is the one a rollup usually misses, because the endpoint list looks unchanged.
 
 Close this out last.
+
+---
+
+## 3B.13 — Packages public display on the marketing site
+
+**Depends on 3B.8.**
+
+**Measured state:** 3B.8 shipped the package *definition* CRUD only. Packages had zero public
+surface — `GET /api/packages` was staff-gated, and no public page/component ever fetched it,
+unlike Promotions (which piggybacks on the already-public `GET /api/services`). Prompted by the
+user asking for packages to get the same public treatment Promotions already has.
+
+**What:** a new `PackagesSection.tsx`, mounted on `/` and `/services` right after the existing
+Services section, showing active/`show_on_website` packages with a "cheaper than buying
+separately" savings badge (à la carte total via the existing `getEffectiveServicePrice()` vs. the
+package price) and a WhatsApp-inquiry CTA (packages have no online self-serve purchase flow — see
+DEC-034). Required a small schema addition: `packages.name_ar` (bilingual parity) and
+`packages.show_on_website` (decoupled from `active`, which also gates POS sellability) —
+`20260728010000_packages_public_display_fields.sql`. `GET /api/packages` was made public to match.
+
+**Where it lives:** `src/components/PackagesSection.tsx`; mounted in `src/app/page.tsx` and
+`src/app/services/page.tsx`. Admin: `PackageAdminPanel.tsx` gained an Arabic-name field and a
+"Show on Website" checkbox.
+
+**Verify:** create a package with an Arabic name, "Show on Website" checked, priced below its
+included services' total → confirm it appears on both public pages with a savings badge and
+correct language switching; uncheck "Show on Website" → confirm it disappears publicly while
+remaining usable in admin/POS. Full checklist:
+`ai_docs/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section 2).
+
+**Done 2026-07-28.** See DEC-034. Typecheck/lint clean; end-to-end browser verification against
+the dev database is still outstanding.
+
+---
+
+## 3B.14 — Package sell/redeem UI + checkout redemption + patient package/promo awareness
+
+**Depends on 3B.8, 3B.13.**
+
+**Measured state:** the packages purchase/consumption backend (`customer_packages`,
+`customer_package_items`, `package_revenue_recognitions`, the `consume_customer_package_session`
+RPC, and `/api/packages/sell|consume|extend`) has existed since Phase 1 tasks 1.12/1.13, but
+**no UI anywhere called any of it** — staff could not sell a package to a patient, see what a
+patient already owned, or redeem a session. Prompted by the user asking how a customer would
+"buy" a package/promotion, clarified to mean surfacing this in the existing admin customer
+profile rather than building new customer-facing accounts/online payments.
+
+**What:** a new `GET /api/customers/packages?customer_id=` endpoint; a new "Packages" tab in the
+admin customer profile (mirrors the existing "Products" tab) with a "Sell Package to Patient"
+action calling the existing `POST /api/packages/sell`; a shared `PatientPackagePromoBanner`
+informing staff of a patient's active packages/promotions in the booking detail drawer and manual
+booking creation; and redemption wired into the Payment Settlement (checkout) modal — a
+per-service "Apply from package" checkbox that excludes that line from the charged total, then
+calls `POST /api/packages/consume` once the booking is confirmed `completed` (redemption can only
+target a completed reservation — see DEC-035 for why a bare decrement button wasn't an option).
+Redemption is disabled whenever the booking already has a deposit paid (v1 limitation, stated in
+DEC-035 and `PRODUCT_RULES.md`).
+
+**Where it lives:** `src/app/api/customers/packages/route.ts` (new); the rest is inline in
+`src/app/admin/page.tsx` (Packages tab, sell modal, banner integration, checkout redemption logic)
+plus the standalone `PatientPackagePromoBanner` function in the same file — **see RISK-031: this
+violates DEC-027** (new admin sections must be a `src/components/admin/` submodule) and is flagged
+there as a follow-up extraction, not fixed in this pass, given the money-critical nature of the
+checkout code touched.
+
+**Verify:** full checklist in `ai_docs/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section 3) — sell
+a package, confirm it shows active with correct remaining counts, redeem a session at checkout
+with no deposit collected, confirm `qty_remaining` decrements and a `package_revenue_recognitions`
+row is created, and confirm redemption is correctly disabled when a deposit was already paid.
+
+**Done 2026-07-28.** See DEC-035, RISK-031. Typecheck/lint clean; end-to-end browser verification
+against the dev database is still outstanding.
 
 ---
 

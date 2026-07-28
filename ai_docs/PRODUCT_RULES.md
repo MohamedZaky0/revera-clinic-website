@@ -224,7 +224,11 @@ When completing a reservation, the receptionist processes a payment settlement. 
 The following are **not currently enforced in code**:
 - Patient phone OTP verification (auth modal is UI-only, OTP is simulated)
 - Service visible/active flags filtering public service list
-- Package/session tracking (not built)
+- Package redemption on a booking that already has a deposit paid — deposits are booking-level, not
+  per-service, so waiving a service's price after cash was collected against it would need
+  refund/reversal logic that isn't built. Redemption is disabled (with an explanatory note) for any
+  checkout where `amountPaid > 0` before that checkout. (Package/session tracking itself **is**
+  built — see `customer_packages`/`customer_package_items` in `DB_SCHEMA.md`, wired to UI 2026-07-28.)
 - External Payment Gateway processing (payments are logged as cash/card settlements in the admin dashboard ledger only)
 - Automated reminders (enable_reminder flag exists on services but no sending logic found)
 - Server-side auth validation on `/api/*` routes (browser login gate only)

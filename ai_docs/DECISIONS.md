@@ -923,4 +923,91 @@ back.
   cut over to being derived from `stock_movements` — this decision does not change that; it only
   makes the purchase side consistent with how the sale side already works.
 
+---
+
+## DEC-034: Packages Get A Public Marketing Page Via A Separate Visibility Flag, Not `active`
+
+**Date:** 2026-07-28
+**Status:** Decided — active
+
+**Context:**
+Packages (DEC-023) had zero public surface — admin CRUD only. The user asked for packages to be
+shown on the public site the way Promotions already are. `packages.active` already exists and
+gates whether a package can still be sold/consumed at POS; reusing it as the "show on the
+website" flag would conflate two different questions (sellable vs. advertised).
+
+**Chosen Option:**
+- Added `packages.show_on_website` (boolean, default false) — independent of `active`. A package
+  can stay active for existing customers while no longer being publicly advertised, or vice versa.
+- Added `packages.name_ar` — the table only had one `name` column; the site is fully bilingual
+  everywhere else.
+- `GET /api/packages` was made public (no auth check), matching the existing `GET /api/services`
+  convention — return everything unfiltered, filter client-side.
+- Public display computes a "cheaper than buying separately" savings badge (à la carte total via
+  the existing `getEffectiveServicePrice()` vs. the package price) rather than storing a
+  precomputed discount — stays correct automatically if either changes.
+- No online self-serve purchase — a package can't go through the single-service `BookingModal`,
+  and building real online payment collection was out of scope. The public card's CTA opens a
+  WhatsApp inquiry instead, mirroring the deposit-payment WhatsApp flow `BookingModal` already uses.
+
+**Reason:**
+- Matches this codebase's established "separate flags for separate concerns" pattern rather than
+  overloading one boolean (the same ambiguity RISK-030 flagged for Promotions' "Enabled" toggle
+  doubling as both a marketing gate and the checkout-discount switch).
+- No new abstractions needed — `getEffectiveServicePrice`/`getServicePriceDetails` already existed
+  and were already proven correct for Promotions' pricing math.
+
+**Trade-offs:**
+- Packages sold online still don't exist — this only makes them discoverable/advertised.
+- `show_on_website` is a second flag staff must remember to set, in addition to `active`.
+
+---
+
+## DEC-035: Package Session Redemption Only Happens At Checkout, Never As A Bare Button
+
+**Date:** 2026-07-28
+**Status:** Decided — active
+
+**Context:**
+The packages purchase/consumption backend (`customer_packages`, `customer_package_items`,
+`package_revenue_recognitions`, the `consume_customer_package_session` RPC, and the
+`/api/packages/sell|consume|extend` routes) existed since DEC-023/025 but no UI anywhere called
+any of it — staff could not sell, view, or redeem a package. Wiring this up raised two open
+questions: where should "use a session" happen, and how strictly should it be gated.
+
+**Chosen Option:**
+- Redemption can **only** happen as part of completing a real booking (the Payment Settlement /
+  checkout modal), never as a free-standing "deduct" button like the Products tab's "Log Usage."
+  This is not a preference — `package_revenue_recognitions.reservation_id` has `ON DELETE
+  RESTRICT` plus a unique `(customer_package_item_id, reservation_id)` constraint, and
+  `consume_customer_package_session` itself rejects a non-completed reservation. A bare-click
+  redemption has no reservation to attach the revenue-recognition event to.
+- Staff still get **visibility** of a patient's active packages/promotions wherever a patient is
+  in view (the booking detail drawer, manual booking creation, and checkout) via a shared
+  `PatientPackagePromoBanner` component — informational there, actionable only at checkout.
+- **Redemption is disabled whenever a deposit was already collected on the booking**
+  (`amountPaid > 0` before that checkout). Deposits are booking-level, not per-service; waiving a
+  service's price after cash was already taken against it would need refund/reversal logic this
+  feature doesn't build. The UI shows an explanatory note rather than silently blocking it.
+- Sell/redeem actions stay behind `requireStaffAccess` server-side (any authenticated staff,
+  matching the existing `/api/packages/sell|consume` routes) plus the same coarse client-side
+  role-list check the Products tab already uses (`superadmin/admin/receptionist/doctor`) — no new
+  granular `hasPermission("packages.sell")`-style key was introduced.
+- A redemption call that fails **after** the completing checkout PATCH already succeeded does not
+  roll anything back — the booking stays completed and correctly charged for the non-redeemed
+  amount. Staff instead get an explicit alert naming what needs manual reconciliation.
+
+**Reason:**
+- Respects DEC-023's deferred-revenue model as designed rather than working around it.
+- A silent rollback of an already-successful checkout would be worse than a clearly-surfaced
+  manual-reconciliation case — money already changed hands correctly for everything else on that
+  booking.
+
+**Trade-offs:**
+- A booking with any deposit collected can't redeem a package this session — staff must complete
+  it as a cash/wallet payment instead. No refund-then-redeem flow exists yet.
+- No granular permission key means any staff account (not just specific roles) can sell/redeem
+  packages once past the coarse role-list gate — consistent with existing Products-tab precedent,
+  not a new gap introduced here.
+
 
