@@ -5,6 +5,7 @@ import { HeroSlider } from "@/components/HeroSlider";
 import { AboutSection } from "@/components/AboutSection";
 import { OurResults } from "@/components/OurResults";
 import { HomeServicesSection } from "@/components/HomeServicesSection";
+import { PackagesSection } from "@/components/PackagesSection";
 import { WhatWeDo } from "@/components/WhatWeDo";
 import { IntroVideo } from "@/components/IntroVideo";
 import { WhyChooseUs } from "@/components/WhyChooseUs";
@@ -34,6 +35,7 @@ export default function Home() {
         <section id="services">
           <HomeServicesSection />
         </section>
+        <PackagesSection />
         {/* <WhatWeDo /> */}
         {/* <IntroVideo /> */}
         <WhyChooseUs />

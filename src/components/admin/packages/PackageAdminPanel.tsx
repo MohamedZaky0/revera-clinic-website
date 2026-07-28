@@ -11,6 +11,7 @@ export type PackageItem = {
 export type PackageOffer = {
   id: string;
   name: string;
+  nameAr: string | null;
   branchId: string | null;
   price: number;
   taxRate: number;
@@ -18,6 +19,7 @@ export type PackageOffer = {
   onExpiry: "recognise_revenue" | "extend";
   extensionDays: number;
   active: boolean;
+  showOnWebsite: boolean;
   items: PackageItem[];
 };
 
@@ -44,6 +46,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
+    nameAr: "",
     branchId: "",
     price: "",
     taxRate: "",
@@ -51,6 +54,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
     onExpiry: "recognise_revenue" as "recognise_revenue" | "extend",
     extensionDays: "",
     active: true,
+    showOnWebsite: false,
   });
   const [items, setItems] = useState<{ serviceId: string; qty: string; id?: string }[]>([{ serviceId: "", qty: "1" }]);
 
@@ -92,6 +96,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
     setEditingId(null);
     setForm({
       name: "",
+      nameAr: "",
       branchId: "",
       price: "",
       taxRate: "",
@@ -99,6 +104,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
       onExpiry: "recognise_revenue",
       extensionDays: "",
       active: true,
+      showOnWebsite: false,
     });
     setItems([{ serviceId: "", qty: "1" }]);
   };
@@ -112,6 +118,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
     setEditingId(pkg.id);
     setForm({
       name: pkg.name,
+      nameAr: pkg.nameAr || "",
       branchId: pkg.branchId || "",
       price: String(pkg.price),
       taxRate: String(pkg.taxRate),
@@ -119,6 +126,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
       onExpiry: pkg.onExpiry,
       extensionDays: String(pkg.extensionDays),
       active: pkg.active,
+      showOnWebsite: pkg.showOnWebsite,
     });
     setItems(
       pkg.items && pkg.items.length > 0
@@ -142,6 +150,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
     const payload = {
       id: editingId || undefined,
       name: form.name.trim(),
+      nameAr: form.nameAr.trim() || null,
       branchId: form.branchId || null,
       price: Number(form.price || 0),
       taxRate: Number(form.taxRate || 0),
@@ -149,6 +158,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
       onExpiry: form.onExpiry,
       extensionDays: Number(form.extensionDays || 0),
       active: form.active,
+      showOnWebsite: form.showOnWebsite,
       items: mappedItems,
     };
     setSaving(true);
@@ -240,6 +250,7 @@ export function PackageAdminPanel({ session }: { session: any }) {
                 <th className="px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">On Expiry</th>
                 <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Items</th>
                 <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Active</th>
+                <th className="px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Website</th>
                 <th className="px-5 py-3 text-right text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Actions</th>
               </tr>
             </thead>
@@ -260,6 +271,11 @@ export function PackageAdminPanel({ session }: { session: any }) {
                   <td className="px-5 py-3 text-center">
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${pkg.active ? "bg-green-50 text-green-600" : "bg-gray-100 text-gray-500"}`}>
                       {pkg.active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-center">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${pkg.showOnWebsite ? "bg-blue-50 text-blue-600" : "bg-gray-100 text-gray-500"}`}>
+                      {pkg.showOnWebsite ? "Visible" : "Hidden"}
                     </span>
                   </td>
                   <td className="px-5 py-3 text-right">
@@ -317,6 +333,16 @@ export function PackageAdminPanel({ session }: { session: any }) {
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
                     placeholder="e.g. Summer Glow Bundle"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Package Name (Arabic)</label>
+                  <input
+                    value={form.nameAr}
+                    onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
+                    dir="rtl"
+                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm outline-none focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+                    placeholder="مثال: باقة صيفية"
                   />
                 </div>
                 <div>
@@ -401,6 +427,18 @@ export function PackageAdminPanel({ session }: { session: any }) {
                     />
                     Active
                   </label>
+                </div>
+                <div className="flex flex-col justify-end pb-2">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[#1F251A]">
+                    <input
+                      type="checkbox"
+                      checked={form.showOnWebsite}
+                      onChange={(e) => setForm({ ...form, showOnWebsite: e.target.checked })}
+                      className="h-4 w-4 rounded border-[#414E36]/20 text-[#414E36] focus:ring-[#C4AE7C]"
+                    />
+                    Show on Website
+                  </label>
+                  <span className="mt-1 text-[11px] text-[#5A6A51]">Separate from Active — controls public visibility only.</span>
                 </div>
               </div>
 

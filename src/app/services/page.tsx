@@ -3,6 +3,7 @@ import { CustomCursor } from "@/components/CustomCursor";
 import { Navbar } from "@/components/Navbar";
 import { PageHeader } from "@/components/PageHeader";
 import { ServicesSection } from "@/components/ServicesSection";
+import { PackagesSection } from "@/components/PackagesSection";
 import { TestimonialsSection } from "@/components/TestimonialsSection";
 import { HowItWorks } from "@/components/HowItWorks";
 import { WhyChooseUs } from "@/components/WhyChooseUs";
@@ -25,6 +26,7 @@ export default function ServicesPage() {
       <PageHeader pageKey="services" />
       <main>
         <ServicesSection />
+        <PackagesSection />
         <TestimonialsSection />
         <HowItWorks />
         <WhyChooseUs />

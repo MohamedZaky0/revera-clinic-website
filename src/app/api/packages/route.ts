@@ -13,6 +13,7 @@ type PackageApiItem = {
 type PackageApiPayload = {
   id?: string;
   name: string;
+  nameAr?: string | null;
   branchId?: string | null;
   price: number;
   taxRate: number;
@@ -20,6 +21,7 @@ type PackageApiPayload = {
   onExpiry: 'recognise_revenue' | 'extend';
   extensionDays: number;
   active: boolean;
+  showOnWebsite: boolean;
   items: PackageApiItem[];
 };
 
@@ -27,6 +29,7 @@ function mapDbPackage(row: any) {
   return {
     id: row.id,
     name: row.name,
+    nameAr: row.name_ar || null,
     branchId: row.branch_id,
     price: row.price !== null ? Number(row.price) : 0,
     taxRate: row.tax_rate !== null ? Number(row.tax_rate) : 0,
@@ -34,14 +37,15 @@ function mapDbPackage(row: any) {
     onExpiry: row.on_expiry || 'recognise_revenue',
     extensionDays: row.extension_days !== null ? Number(row.extension_days) : 0,
     active: row.active === true,
-    items: [] as { id?: string; serviceId: number; serviceName?: string; qty: number }[],
+    showOnWebsite: row.show_on_website === true,
+    items: [] as { id?: string; serviceId: number; serviceName?: string; serviceNameAr?: string; qty: number }[],
   };
 }
 
 function validatePackagePayload(body: any): { error?: string; data?: PackageApiPayload } {
   if (!body || typeof body !== 'object') return { error: 'Invalid request body.' };
 
-  const { name, branchId, price, taxRate, validityDays, onExpiry, extensionDays, active, items } = body;
+  const { name, nameAr, branchId, price, taxRate, validityDays, onExpiry, extensionDays, active, showOnWebsite, items } = body;
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return { error: 'Package name is required.' };
@@ -89,6 +93,7 @@ function validatePackagePayload(body: any): { error?: string; data?: PackageApiP
   return {
     data: {
       name: name.trim(),
+      nameAr: typeof nameAr === 'string' && nameAr.trim().length > 0 ? nameAr.trim() : null,
       branchId: branchId || null,
       price: parsedPrice,
       taxRate: parsedTaxRate,
@@ -96,29 +101,32 @@ function validatePackagePayload(body: any): { error?: string; data?: PackageApiP
       onExpiry,
       extensionDays: parsedExtensionDays,
       active: active === true,
+      showOnWebsite: showOnWebsite === true,
       items: mappedItems,
     },
   };
 }
 
+// Public, like GET /api/services — returns everything unfiltered; active/show_on_website
+// filtering for the marketing site happens client-side (see PackagesSection.tsx).
 export async function GET(req: Request) {
-  const access = await requireStaffAccess(req);
-  if ('error' in access) {
-    return NextResponse.json({ error: access.error }, { status: access.status });
-  }
-
   try {
     const [{ data: packages, error: packagesError }, { data: packageItems, error: itemsError }, { data: services, error: servicesError }] = await Promise.all([
       supabaseServer.from('packages').select('*').order('name', { ascending: true }),
       supabaseServer.from('package_items').select('*'),
-      supabaseServer.from('services').select('id, en'),
+      supabaseServer.from('services').select('id, en, ar'),
     ]);
 
     if (packagesError) throw packagesError;
     if (itemsError) throw itemsError;
+    if (servicesError) throw servicesError;
 
     const serviceNameMap = new Map<number, string>();
-    (services || []).forEach((s: any) => serviceNameMap.set(Number(s.id), s.en));
+    const serviceNameArMap = new Map<number, string>();
+    (services || []).forEach((s: any) => {
+      serviceNameMap.set(Number(s.id), s.en);
+      if (s.ar) serviceNameArMap.set(Number(s.id), s.ar);
+    });
 
     const mappedPackages = (packages || []).map(mapDbPackage);
     const itemsByPackage = new Map<string, typeof mappedPackages[0]['items']>();
@@ -135,6 +143,7 @@ export async function GET(req: Request) {
           id: item.id,
           serviceId: Number(item.service_id),
           serviceName: serviceNameMap.get(Number(item.service_id)) || undefined,
+          serviceNameAr: serviceNameArMap.get(Number(item.service_id)) || undefined,
           qty: Number(item.qty),
         });
       }
@@ -165,6 +174,7 @@ export async function POST(req: Request) {
       .from('packages')
       .insert({
         name: payload.name,
+        name_ar: payload.nameAr,
         branch_id: payload.branchId || null,
         price: payload.price,
         tax_rate: payload.taxRate,
@@ -172,6 +182,7 @@ export async function POST(req: Request) {
         on_expiry: payload.onExpiry,
         extension_days: payload.extensionDays,
         active: payload.active,
+        show_on_website: payload.showOnWebsite,
       })
       .select('*')
       .single();
@@ -229,6 +240,7 @@ export async function PATCH(req: Request) {
       .from('packages')
       .update({
         name: payload.name,
+        name_ar: payload.nameAr,
         branch_id: payload.branchId || null,
         price: payload.price,
         tax_rate: payload.taxRate,
@@ -236,6 +248,7 @@ export async function PATCH(req: Request) {
         on_expiry: payload.onExpiry,
         extension_days: payload.extensionDays,
         active: payload.active,
+        show_on_website: payload.showOnWebsite,
       })
       .eq('id', id)
       .select('*')

@@ -78,6 +78,12 @@ export interface Translation {
     ctaText: string;
     ctaBtn: string;
   };
+  packages: {
+    tag: string;
+    heading: string;
+    loadingText: string;
+    errorText: string;
+  };
   whatWeDo: {
     tag: string;
     heading: string;

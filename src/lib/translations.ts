@@ -88,6 +88,12 @@ export const translations: Record<"en" | "ar", Translation> = {
       ctaText: "Let's make something great work together.",
       ctaBtn: "Get Free Quote",
     },
+    packages: {
+      tag: "Packages",
+      heading: "Save more with our bundled treatment packages",
+      loadingText: "Loading our packages...",
+      errorText: "Unable to load packages at the moment. Please try again later.",
+    },
     whatWeDo: {
       tag: "what we do",
       heading: "Refined care. Visible transformation.",
@@ -453,6 +459,12 @@ export const translations: Record<"en" | "ar", Translation> = {
       freeLabel: "مجاني",
       ctaText: "لنصنع شيئاً رائعاً معاً.",
       ctaBtn: "احصل على عرض مجاني",
+    },
+    packages: {
+      tag: "الباقات",
+      heading: "وفّر أكثر مع باقاتنا العلاجية المجمّعة",
+      loadingText: "جارٍ تحميل الباقات...",
+      errorText: "تعذّر تحميل الباقات في الوقت الحالي. يرجى المحاولة مرة أخرى.",
     },
     whatWeDo: {
       tag: "ما نقدمه",

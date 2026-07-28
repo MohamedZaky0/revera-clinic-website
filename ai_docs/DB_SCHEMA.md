@@ -919,6 +919,8 @@ this table — see RISK-012 / RISK-016.
 | `extension_days` | integer | nullable, used when `on_expiry = 'extend'` |
 | `active` | boolean | Default true |
 | `created_at` | timestamptz | |
+| `name_ar` | text | nullable. **Added 2026-07-28** by `20260728010000_packages_public_display_fields.sql` — `name` has no Arabic counterpart otherwise, unlike `services.en`/`services.ar`. |
+| `show_on_website` | boolean | Default false. **Added 2026-07-28**, same migration — whether this package is advertised on the public site. Deliberately separate from `active` (which also gates whether the package can still be sold/consumed at POS): a package can stay `active` for existing customers while no longer being publicly advertised. |
 
 ---
 
