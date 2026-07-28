@@ -44,7 +44,7 @@ export async function GET(req: Request) {
       pricePaid: row.price_paid !== null ? Number(row.price_paid) : 0,
       items: (row.customer_package_items || []).map((it: any) => ({
         id: it.id,
-        serviceId: it.service_id,
+        serviceId: Number(it.service_id),
         serviceName: it.services?.en || undefined,
         serviceNameAr: it.services?.ar || undefined,
         qtyTotal: Number(it.qty_total),

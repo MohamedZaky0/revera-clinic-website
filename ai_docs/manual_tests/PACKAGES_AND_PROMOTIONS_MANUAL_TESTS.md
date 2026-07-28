@@ -15,7 +15,7 @@
 
 | Date | Check | Environment | Evidence | Result |
 |---|---|---|---|---|
-| | | | | |
+| 2026-07-28 | Section 3, live test: sold a package to a real patient (3 services), booked one of the covered services, opened checkout | dev, real admin session | "Apply from package" never appeared — no checkbox, no deposit-conflict note either, for a booking confirmed tied to the correct customer (no duplicate customer record). Root-caused to `src/app/api/customers/packages/route.ts` returning `customer_package_items.service_id` (a `bigint` column) without the `Number(...)` coercion every other reader of this column already applies (`packages/route.ts`, 4 call sites) — so `it.serviceId === id` in the checkout modal's redeemable-item match always failed on a type mismatch. Fixed: coerced in the API route, and defensively coerced both sides again at the comparison site in `admin/page.tsx`. | FAIL → fixed, pending re-test |
 
 ## Per-check list
 

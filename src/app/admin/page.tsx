@@ -27848,8 +27848,12 @@ export default function AdminPage() {
           const bookingServicesList = svcIds.map((id: number) => {
             const s = localServices.find(srv => srv.id === id);
             const details = s ? getServicePriceDetails(s, checkoutBooking.branchId, branches) : null;
+            // Number(...) on both sides — service_id is a bigint column and Supabase/PostgREST
+            // does not consistently return bigint values as JS numbers across every query shape
+            // (flat select vs. embedded/joined select); packages/route.ts already established
+            // this defensive-coercion pattern for the same column.
             const redeemableItem = redemptionAllowed
-              ? activeCustomerPackageItems.find((it: any) => it.serviceId === id && it.qtyRemaining > 0) || null
+              ? activeCustomerPackageItems.find((it: any) => Number(it.serviceId) === Number(id) && it.qtyRemaining > 0) || null
               : null;
             return {
               serviceId: id,
