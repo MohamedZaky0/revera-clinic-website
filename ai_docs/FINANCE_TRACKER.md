@@ -2555,8 +2555,8 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 | 3B.4 | `inventory_devices.lamp_replacement_cost` + rated pulses: API + UI | 3B.1 | `DONE` | Claude | pending commit |
 | 3B.5 | Service consumables recipe editor (`service_consumables`) + endpoint | 3B.1, 3B.3 | `DONE` | Claude | pending commit |
 | 3B.6 | Service device/pulses editor (`service_devices`) + endpoint | 3B.1, 3B.4 | `DONE` | Claude | pending commit |
-| 3B.7 | Doctor commission: `both` option, base, fixed component (**2 duplicate forms**) | 3B.1 | `TODO` | — | — |
-| 3B.8 | Packages admin UI + `/api/packages` CRUD endpoint | 3B.1 | `TODO` | — | — |
+| 3B.7 | Doctor commission: `both` option, base, fixed component (**2 duplicate forms**) | 3B.1 | `DONE` | Windsurf | f6bc2cb |
+| 3B.8 | Packages admin UI + `/api/packages` CRUD endpoint | 3B.1 | `DONE` | Windsurf | f6bc2cb |
 | 3B.9 | Suppliers: `/api/suppliers` CRUD endpoint + real UI under Inventory | 3B.1 | `DONE` | Claude | ef9ecff |
 | 3B.10 | Purchases: real UI under Inventory wired to `POST /api/purchases` | 3B.9 | `DONE` | Claude | ef9ecff |
 | 3B.11 | Delete the orphaned Suppliers/Purchases/Batch Management mock screens | 3B.9, 3B.10 | `DONE` | Claude | 23ea00e |
