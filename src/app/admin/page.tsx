@@ -3381,6 +3381,32 @@ export default function AdminPage() {
   const [selectedDeviceForHistory, setSelectedDeviceForHistory] = useState<any | null>(null);
   const [showDeviceHistoryModal, setShowDeviceHistoryModal] = useState(false);
 
+  // Device Audit Logs state
+  const [showDeviceAuditLogsModal, setShowDeviceAuditLogsModal] = useState(false);
+  const [deviceAuditLogs, setDeviceAuditLogs] = useState<any[]>([]);
+  const [loadingDeviceAuditLogs, setLoadingDeviceAuditLogs] = useState(false);
+  const [deviceAuditSearchQuery, setDeviceAuditSearchQuery] = useState("");
+  const [deviceAuditFilterDevice, setDeviceAuditFilterDevice] = useState("all");
+  const [deviceAuditFilterType, setDeviceAuditFilterType] = useState("all");
+
+  const fetchDeviceAuditLogs = useCallback(async () => {
+    try {
+      setLoadingDeviceAuditLogs(true);
+      const res = await fetch("/api/inventory/devices/audit-logs", {
+        headers: authenticatedJsonHeaders,
+        cache: "no-store"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDeviceAuditLogs(data || []);
+      }
+    } catch (err) {
+      console.error("fetchDeviceAuditLogs error:", err);
+    } finally {
+      setLoadingDeviceAuditLogs(false);
+    }
+  }, [authenticatedJsonHeaders]);
+
   const fetchInventoryDevices = useCallback(async () => {
     try {
       setInventoryDevicesLoading(true);
@@ -3794,6 +3820,10 @@ export default function AdminPage() {
   };
 
   const handleOpenSellProductModal = (prod: any) => {
+    if (prod?.role === "consumable") {
+      alert("Consumable products are reserved for clinic service usage and cannot be sold to patients.");
+      return;
+    }
     setSelectedSellProduct(prod);
     setSellQuantity(1);
     setSellPatientPhone("");
@@ -11895,7 +11925,7 @@ export default function AdminPage() {
                                 className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                               >
                                 <option value="">-- Choose Product / Item --</option>
-                                {inventoryProducts.map((p) => (
+                                {inventoryProducts.filter((p) => p.role !== "consumable").map((p) => (
                                   <option key={p.id} value={p.id}>
                                     {p.name} ({p.category || 'Product'}) - EGP {p.selling_price || p.price || 0}
                                   </option>
@@ -17358,26 +17388,38 @@ export default function AdminPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   {inventorySubTab === "devices" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingDevice(null);
-                        setDeviceName("");
-                        setDeviceModel("");
-                        setDeviceSerial("");
-                        setDeviceCategory("Laser Hair Removal");
-                        setDeviceBranchId(branches.length > 0 ? branches[0].id : "");
-                        setDeviceInitialPulses("0");
-                        setDeviceWarningThreshold1("80000");
-                        setDeviceMaintenanceThreshold2("100000");
-                        setDeviceLampReplacementCost("0");
-                        setDeviceNotes("");
-                        setShowAddDeviceModal(true);
-                      }}
-                      className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
-                    >
-                      <Plus size={16} /> Add Device
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          fetchDeviceAuditLogs();
+                          setShowDeviceAuditLogsModal(true);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/30 bg-white px-4 py-2.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EBF0E6] shadow-sm"
+                      >
+                        <ClipboardList size={15} /> Audit Logs
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingDevice(null);
+                          setDeviceName("");
+                          setDeviceModel("");
+                          setDeviceSerial("");
+                          setDeviceCategory("Laser Hair Removal");
+                          setDeviceBranchId(branches.length > 0 ? branches[0].id : "");
+                          setDeviceInitialPulses("0");
+                          setDeviceWarningThreshold1("80000");
+                          setDeviceMaintenanceThreshold2("100000");
+                          setDeviceLampReplacementCost("0");
+                          setDeviceNotes("");
+                          setShowAddDeviceModal(true);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-2.5 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
+                      >
+                        <Plus size={15} /> Add Device
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -18003,11 +18045,11 @@ export default function AdminPage() {
                                           <button
                                             type="button"
                                             onClick={() => handleOpenSellProductModal(prod)}
-                                            disabled={prod.stock_quantity <= 0}
+                                            disabled={prod.stock_quantity <= 0 || prod.role === 'consumable'}
                                             className="inline-flex items-center gap-1 rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 disabled:cursor-not-allowed"
-                                            title={prod.stock_quantity <= 0 ? "Out of Stock" : "Sell Product"}
+                                            title={prod.role === 'consumable' ? 'Consumable Only (Used in services only, not for retail sale)' : prod.stock_quantity <= 0 ? 'Out of Stock' : 'Sell Product'}
                                           >
-                                            <Tag size={13} /> Sell Product
+                                            <Tag size={13} /> {prod.role === 'consumable' ? 'Consumable Only' : 'Sell Product'}
                                           </button>
                                           <button
                                             type="button"
@@ -18177,6 +18219,7 @@ export default function AdminPage() {
                       if (res.ok) {
                         setShowAddDeviceModal(false);
                         fetchInventoryDevices();
+                        fetchDeviceAuditLogs();
                         alert(editingDevice ? "Device updated successfully!" : "Device registered successfully!");
                       } else {
                         const err = await res.json();
@@ -18737,6 +18780,7 @@ export default function AdminPage() {
                         setShowUpdatePulsesModal(false);
                         setSelectedDeviceForPulses(null);
                         fetchInventoryDevices();
+                        fetchDeviceAuditLogs();
 
                         if (updated.status === "Maintenance Due") {
                           alert("⚠️ Maintenance Due! Counter has reached or exceeded the 2nd maintenance threshold.");
@@ -18872,6 +18916,7 @@ export default function AdminPage() {
                         setShowResetPulsesModal(false);
                         setSelectedDeviceForReset(null);
                         fetchInventoryDevices();
+                        fetchDeviceAuditLogs();
                         alert("Counter reset successfully! Maintenance logged and alert cycle restarted.");
                       } else {
                         const err = await res.json();
@@ -26504,6 +26549,194 @@ export default function AdminPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Device Audit Logs Modal */}
+      {showDeviceAuditLogsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
+          <div className="w-full max-w-5xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="mb-4 flex items-center justify-between border-b border-[#414E36]/10 pb-4 shrink-0">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-[#5A6A51] font-bold">Inventory Audit History</p>
+                <h3 className="mt-1 text-2xl font-semibold text-[#1F251A] flex items-center gap-2">
+                  <Gauge size={22} className="text-[#414E36]" /> Clinic Device Audit &amp; Maintenance Logs
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={fetchDeviceAuditLogs}
+                  className="rounded-full bg-[#EBF0E6] p-2.5 text-[#414E36] transition hover:bg-[#d8e3d2]"
+                  title="Refresh Audit Logs"
+                >
+                  <RotateCcw size={18} className={loadingDeviceAuditLogs ? "animate-spin" : ""} />
+                </button>
+                <button
+                  onClick={() => setShowDeviceAuditLogsModal(false)}
+                  className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter controls bar */}
+            <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-[#E6E9EB]">
+              <div className="relative flex-1">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8C9A84]" />
+                <input
+                  type="text"
+                  placeholder="Search logs by device, serial number, reason, performed by..."
+                  value={deviceAuditSearchQuery}
+                  onChange={(e) => setDeviceAuditSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-[#E6E9EB] bg-[#FBFBF9] pl-9 pr-3 py-2 text-xs text-[#1F251A] placeholder-[#8C9A84] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={deviceAuditFilterDevice}
+                  onChange={(e) => setDeviceAuditFilterDevice(e.target.value)}
+                  className="rounded-xl border border-[#E6E9EB] bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                >
+                  <option value="all">All Devices</option>
+                  {inventoryDevices.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={deviceAuditFilterType}
+                  onChange={(e) => setDeviceAuditFilterType(e.target.value)}
+                  className="rounded-xl border border-[#E6E9EB] bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                >
+                  <option value="all">All Action Types</option>
+                  <option value="Pulse Reset">Pulse Reset / Maintenance</option>
+                  <option value="Device Created">Device Created</option>
+                  <option value="Device Updated">Device Updated</option>
+                  <option value="Status Changed">Status Changed</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Logs List Content */}
+            <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+              {loadingDeviceAuditLogs ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                  <span className="h-8 w-8 animate-spin rounded-full border-4 border-[#414E36] border-t-transparent" />
+                  <p className="text-xs text-[#5A6A51] font-semibold">Loading Device Audit Logs...</p>
+                </div>
+              ) : (() => {
+                const filteredLogs = deviceAuditLogs.filter((log) => {
+                  const matchDevice = deviceAuditFilterDevice === "all" || log.device_id === deviceAuditFilterDevice;
+                  const matchType = deviceAuditFilterType === "all" || 
+                    (log.type || log.action_type || "").toLowerCase().includes(deviceAuditFilterType.toLowerCase());
+                  const query = deviceAuditSearchQuery.toLowerCase().trim();
+                  const matchQuery = !query || 
+                    (log.device_name || "").toLowerCase().includes(query) ||
+                    (log.reason || "").toLowerCase().includes(query) ||
+                    (log.notes || "").toLowerCase().includes(query) ||
+                    (log.performed_by || "").toLowerCase().includes(query);
+                  return matchDevice && matchType && matchQuery;
+                });
+
+                if (filteredLogs.length === 0) {
+                  return (
+                    <div className="text-center py-20 text-[#5A6A51] italic text-sm bg-white rounded-2xl border border-[#E6E9EB]">
+                      No device audit logs found matching your filters.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {filteredLogs.map((log) => {
+                      const actionType = log.type || log.action_type || "Pulse Reset";
+                      const isReset = actionType.toLowerCase().includes("reset") || actionType.toLowerCase().includes("maintenance");
+                      const isCreated = actionType.toLowerCase().includes("create");
+                      const isStatus = actionType.toLowerCase().includes("status");
+
+                      let badgeClass = "bg-purple-100 text-purple-700 border-purple-200";
+                      if (isReset) badgeClass = "bg-indigo-100 text-indigo-700 border-indigo-200";
+                      else if (isCreated) badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-200";
+                      else if (isStatus) badgeClass = "bg-rose-100 text-rose-700 border-rose-200";
+                      else badgeClass = "bg-amber-100 text-amber-700 border-amber-200";
+
+                      return (
+                        <div key={log.id} className="rounded-2xl border border-[#414E36]/15 bg-white p-4 shadow-sm hover:border-[#414E36]/30 transition space-y-3">
+                          {/* Card Header */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E6E9EB] pb-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <span className="font-bold text-[#1F251A] text-sm flex items-center gap-1.5">
+                                <Gauge size={14} className="text-[#414E36]" /> {log.device_name}
+                              </span>
+                              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${badgeClass}`}>
+                                {actionType}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-[#5A6A51]">
+                              <span className="font-mono text-[11px] bg-[#F7F7F9] px-2 py-0.5 rounded-md border border-[#E6E9EB]">
+                                {new Date(log.date || log.created_at).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Card Details Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                            <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#E6E9EB]">
+                              <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Pulses &amp; Counter</p>
+                              {log.starting_pulse_count !== undefined || log.ending_pulse_count !== undefined ? (
+                                <p className="font-mono text-[#1F251A]">
+                                  {Number(log.starting_pulse_count || 0).toLocaleString()} → <strong className="text-[#414E36]">{Number(log.ending_pulse_count || 0).toLocaleString()}</strong>
+                                  {log.pulses_delivered !== undefined && log.pulses_delivered > 0 && (
+                                    <span className="ml-1 text-[11px] text-indigo-600 font-semibold">({log.pulses_delivered.toLocaleString()} delivered)</span>
+                                  )}
+                                </p>
+                              ) : (
+                                <p className="text-[#5A6A51] italic text-[11px]">N/A or Configuration update</p>
+                              )}
+                            </div>
+
+                            <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#E6E9EB]">
+                              <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Reason / Action Summary</p>
+                              <p className="font-medium text-[#1F251A]">{log.reason || log.notes || "Routine Operation"}</p>
+                            </div>
+
+                            <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#E6E9EB]">
+                              <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Performed By</p>
+                              <p className="font-semibold text-[#414E36]">{log.performed_by || "Clinic Admin"}</p>
+                            </div>
+                          </div>
+
+                          {log.notes && log.notes !== log.reason && (
+                            <div className="text-[11px] text-[#5A6A51] bg-[#EDF1EC]/40 p-2.5 rounded-xl border border-[#414E36]/10">
+                              <strong className="text-[#414E36]">Notes:</strong> {log.notes}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-[#414E36]/10 pt-4 mt-4 shrink-0 flex items-center justify-between">
+              <span className="text-xs text-[#5A6A51] font-medium">
+                Total Audit Log Entries: <strong>{deviceAuditLogs.length}</strong>
+              </span>
+              <button
+                onClick={() => setShowDeviceAuditLogsModal(false)}
+                className="rounded-3xl border border-[#414E36]/20 bg-[#fff] px-8 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
+              >
+                Close Audit Logs
+              </button>
+            </div>
           </div>
         </div>
       )}

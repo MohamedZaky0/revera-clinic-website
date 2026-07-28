@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireStaffAccess } from '@/lib/access';
 
+import { recordDeviceAuditLog } from './audit-logs/route';
+
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_DEVICES = [
@@ -323,6 +325,17 @@ export async function POST(req: Request) {
     devices.unshift(newDevice);
     await saveInventoryData({ ...data, devices });
 
+    await recordDeviceAuditLog({
+      device_id: newId,
+      device_name: String(name).trim(),
+      type: 'Device Created',
+      performed_by: 'Clinic Admin',
+      reason: `New device '${name}' registered in inventory. Serial: ${serial_number || 'N/A'}, Model: ${model || 'N/A'}, Max Pulses: ${t2}`,
+      notes: `Initial pulse count: ${initPulses}. Replacement cost: EGP ${lamp_replacement_cost || 0}`,
+      starting_pulse_count: initPulses,
+      ending_pulse_count: initPulses
+    });
+
     return NextResponse.json(newDevice, { status: 201 });
   } catch (err: any) {
     console.error('POST /api/inventory/devices error:', err);
@@ -387,6 +400,31 @@ export async function PUT(req: Request) {
 
     devices[index] = updatedDevice;
     await saveInventoryData({ ...data, devices });
+
+    const changes: string[] = [];
+    if (existing.status !== computedStatus) changes.push(`Status: ${existing.status} → ${computedStatus}`);
+    if (existing.current_pulse_count !== newCurrent) changes.push(`Pulse count: ${existing.current_pulse_count} → ${newCurrent}`);
+    if (existing.warning_threshold_1 !== t1) changes.push(`Warning Threshold 1: ${existing.warning_threshold_1} → ${t1}`);
+    if (existing.maintenance_threshold_2 !== t2) changes.push(`Max Pulses: ${existing.maintenance_threshold_2} → ${t2}`);
+    if (existing.lamp_replacement_cost !== updatedDevice.lamp_replacement_cost) changes.push(`Lamp Cost: EGP ${existing.lamp_replacement_cost || 0} → EGP ${updatedDevice.lamp_replacement_cost}`);
+    if (existing.model !== updatedDevice.model) changes.push(`Model: ${existing.model || 'N/A'} → ${updatedDevice.model}`);
+    if (existing.serial_number !== updatedDevice.serial_number) changes.push(`Serial: ${existing.serial_number || 'N/A'} → ${updatedDevice.serial_number}`);
+    if (existing.category !== updatedDevice.category) changes.push(`Category: ${existing.category || 'N/A'} → ${updatedDevice.category}`);
+    if (existing.name !== updatedDevice.name) changes.push(`Name: '${existing.name}' → '${updatedDevice.name}'`);
+
+    const changeSummary = changes.length > 0 ? changes.join('; ') : 'Device details updated.';
+
+    await recordDeviceAuditLog({
+      device_id: existing.id,
+      device_name: updatedDevice.name,
+      type: existing.status !== computedStatus ? 'Status Changed' : 'Device Updated',
+      performed_by: 'Clinic Admin',
+      reason: changeSummary,
+      notes: notes !== undefined ? String(notes).trim() : existing.notes,
+      starting_pulse_count: existing.current_pulse_count,
+      ending_pulse_count: newCurrent,
+      pulses_added: pulseDiff > 0 ? pulseDiff : 0
+    });
 
     return NextResponse.json(updatedDevice);
   } catch (err: any) {
