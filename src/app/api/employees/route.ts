@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess } from '@/lib/access';
+import { normalizeServiceCommissions } from '@/lib/providerCommissions';
 
 export async function GET(req: Request) {
   const access = await requireAdministratorAccess(req);
@@ -184,6 +185,9 @@ export async function POST(req: Request) {
           fixed_salary: salary ? Number(salary) : 0,
           commission_type: body.commission_type || 'none',
           commission_value: body.commission_value ? Number(body.commission_value) : 0,
+          commission_base: body.commission_base || 'gross',
+          commission_fixed_component: body.commission_fixed_component ? Number(body.commission_fixed_component) : 0,
+          service_commissions: normalizeServiceCommissions(body.service_commissions),
           working_days_hours: body.workingDaysHours || null,
           bookings_count: 0,
           more_count: Math.max(0, (body.services || []).length - 2)
@@ -324,6 +328,9 @@ export async function PATCH(req: Request) {
             ...(body.workingDaysHours !== undefined ? { working_days_hours: body.workingDaysHours } : {}),
             ...(body.commission_type !== undefined ? { commission_type: body.commission_type } : {}),
             ...(body.commission_value !== undefined ? { commission_value: Number(body.commission_value) } : {}),
+            ...(body.commission_base !== undefined ? { commission_base: body.commission_base } : {}),
+            ...(body.commission_fixed_component !== undefined ? { commission_fixed_component: Number(body.commission_fixed_component) } : {}),
+            ...(body.service_commissions !== undefined ? { service_commissions: normalizeServiceCommissions(body.service_commissions) } : {}),
             ...(docPhone !== undefined ? { phone: docPhone } : {}),
             ...(docNationalId !== undefined ? { national_id: docNationalId } : {}),
             ...(docBranchId !== undefined ? { branch_id: docBranchId || null } : {}),
@@ -344,6 +351,9 @@ export async function PATCH(req: Request) {
               fixed_salary: docSalary ? Number(docSalary) : 0,
               commission_type: body.commission_type || 'none',
               commission_value: body.commission_value ? Number(body.commission_value) : 0,
+              commission_base: body.commission_base || 'gross',
+              commission_fixed_component: body.commission_fixed_component ? Number(body.commission_fixed_component) : 0,
+              service_commissions: normalizeServiceCommissions(body.service_commissions),
               working_days_hours: body.workingDaysHours || null,
               bookings_count: 0,
               more_count: Math.max(0, (body.services || []).length - 2)

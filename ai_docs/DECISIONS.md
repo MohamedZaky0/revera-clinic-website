@@ -408,10 +408,14 @@ restricts it. Any unexpected value falls through both branches in the payroll ca
 silently yields commission 0.
 
 **Chosen Option:**
-Each doctor is configured independently: fixed per session, percentage, or both combined.
-The **commission base** becomes explicit and stored (gross service price vs. net after materials)
-rather than implied. Commission is computed and **snapshotted per invoice line**, not re-derived
-monthly from a name-string match.
+Each doctor has a **default commission** (fixed per session, percentage, or both combined) plus an
+**editable per-service override** list in `providers.service_commissions`. The default is editable and
+acts as the fallback when a service has no explicit override. The **commission base** remains global
+per doctor (gross service price vs. net after materials) because it is a contract-level policy, not a
+per-service one. Per-service overrides store only `type` (`none`/`fixed`/`percentage`) and `value`;
+`fixed` means a flat EGP amount per session, `percentage` means a percent of the resolved base.
+Commission is computed and **snapshotted per invoice line**, not re-derived monthly from a
+name-string match.
 
 **Reason:**
 - Different doctors at the same clinic genuinely have different contracts.

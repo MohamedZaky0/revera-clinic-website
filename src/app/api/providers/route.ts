@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { normalizeServiceCommissions } from '@/lib/providerCommissions';
 import fs from 'fs';
 import path from 'path';
 
@@ -29,8 +30,12 @@ function mapProvider(p: Record<string, any>, bookingsCount: number = 0) {
     fixedSalary: p.fixed_salary ? Number(p.fixed_salary) : 0,
     commissionType: p.commission_type || 'none',
     commissionValue: p.commission_value ? Number(p.commission_value) : 0,
+    commissionBase: p.commission_base || 'gross',
+    commissionFixedComponent: p.commission_fixed_component ? Number(p.commission_fixed_component) : 0,
+    serviceCommissions: Array.isArray(p.service_commissions) ? p.service_commissions : [],
   };
 }
+
  
 export async function GET() {
   try {
@@ -146,7 +151,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent } = body;
+  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent, serviceCommissions } = body;
   
   let finalBranchId = branchId || null;
   if (workingDaysHours && typeof workingDaysHours === 'object') {
@@ -176,6 +181,7 @@ export async function POST(req: Request) {
     commission_value: commissionValue ? Number(commissionValue) : 0,
     commission_base: commissionBase || 'gross',
     commission_fixed_component: commissionFixedComponent ? Number(commissionFixedComponent) : 0,
+    service_commissions: normalizeServiceCommissions(serviceCommissions),
   };
 
   const authHeader = req.headers.get('Authorization') || '';
@@ -248,7 +254,8 @@ export async function POST(req: Request) {
       startDate: startDate || null,
       fixedSalary: fixedSalary ? Number(fixedSalary) : 0,
       commissionType: commissionType || 'none',
-      commissionValue: commissionValue ? Number(commissionValue) : 0
+      commissionValue: commissionValue ? Number(commissionValue) : 0,
+      serviceCommissions: normalizeServiceCommissions(serviceCommissions)
     };
     list.push(localNew);
     fs.mkdirSync(path.dirname(JSON_FILE_PATH), { recursive: true });
@@ -272,7 +279,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent } = body;
+  const { name, services, rating, more, image, phone, gender, age, specialty, nationalId, workingDaysHours, branchId, startDate, fixedSalary, commissionType, commissionValue, commissionBase, commissionFixedComponent, serviceCommissions } = body;
   const updates: Record<string, any> = {};
   if (name !== undefined) updates.name = name;
   if (services !== undefined) updates.services = services;
@@ -305,6 +312,7 @@ export async function PATCH(req: Request) {
   if (commissionValue !== undefined) updates.commission_value = Number(commissionValue || 0);
   if (commissionBase !== undefined) updates.commission_base = commissionBase;
   if (commissionFixedComponent !== undefined) updates.commission_fixed_component = Number(commissionFixedComponent || 0);
+  if (serviceCommissions !== undefined) updates.service_commissions = normalizeServiceCommissions(serviceCommissions);
 
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace('Bearer ', '').trim();

@@ -2893,6 +2893,31 @@ different numbers, and doctor P&L (task 4.8) reports whichever one was silently 
 `invoice_lines.commission_snapshot` matches the hand-computed figure and that
 `GET /api/hr/doctor-payroll` (which reads those snapshots per task 2.14) reflects it.
 
+**Done 2026-07-28.** Updated both commission form copies in `src/app/admin/page.tsx`
+(provider modal and employee modal doctor section) to expose `both` (Fixed + Percentage),
+a `commission_base` selector (`gross` / `net_of_materials`), and a `commission_fixed_component`
+input. Both forms load and save `commissionBase` and `commissionFixedComponent`, and the
+employee PATCH/POST payloads now include these fields. Backend endpoints `/api/providers` and
+`/api/employees` already persisted the fields, so the change is UI/payload-only.
+
+**Superseded same day.** Added per-service commission overrides (DEC-018 update): migration
+`20260727000000_add_provider_service_commissions.sql` adds `providers.service_commissions jsonb`
+(confirmed applied on the dev DB by direct REST query, not just present as a migration file).
+`src/lib/providerCommissions.ts` holds the shared `ServiceCommissionEntry` type and
+`normalizeServiceCommissions` validator, used by both `/api/providers` and `/api/employees` to
+persist/return `serviceCommissions` (camelCase) / `service_commissions` (snake_case). Replaced the
+three duplicated "Select Services Offered" + "Payroll & Commission Settings" block pairs in
+`admin/page.tsx` (main provider modal, employee modal doctor section, second provider form copy)
+with the previously-unwired `src/components/admin/services/DoctorServiceCommissionEditor.tsx`
+component (default commission box + per-service type/value override list + add-service picker),
+keeping Fixed Salary as a standalone input above it. Added `providerFormServiceCommissions` /
+`newEmployeeServiceCommissions` state (reset on add, populated from `provider.serviceCommissions`
+/ matched provider on edit) and wired `serviceCommissions` / `service_commissions` into every
+provider and employee POST/PATCH save payload — previously the client never sent this field even
+though both API routes already accepted it. Typecheck and lint clean; end-to-end browser
+verification (create/edit with mixed per-service commission types, then a real booking checking
+`invoice_lines.commission_snapshot` per service) is still outstanding.
+
 ---
 
 ## 3B.8 — Packages admin UI + `/api/packages` CRUD endpoint
@@ -2916,6 +2941,15 @@ if it turns out to warrant its own sidebar entry, that is a 4-place permission-m
 **Verify:** define a package with 2 services; sell it via the existing `POST /api/packages/sell`;
 confirm the entitlement rows (`customer_packages`, `customer_package_items`) match the definition
 exactly, and that `on_expiry`/`validity_days` are honoured by the expiry behaviour DEC-025 specifies.
+
+**Done 2026-07-28.** Created `src/app/api/packages/route.ts` with `requireStaffAccess`-gated
+GET/POST/PATCH/DELETE, validating package attributes (`name`, optional `branch_id`, `price`, `tax_rate`,
+`validity_days`, `on_expiry`, `extension_days`, `active`) and atomically replacing `package_items` on
+update. Added `PackageAdminPanel.tsx` under `src/components/admin/packages/` and composed it into
+`admin/page.tsx` under the existing **Services** tab → **Package Offers** tab. The UI lets operators
+add/edit packages, pick the branch, set price/tax/validity/expiry behaviour, and manage the included
+service quantities. Typecheck and lint clean; end-to-end browser verification against the dev database is
+still outstanding.
 
 ---
 

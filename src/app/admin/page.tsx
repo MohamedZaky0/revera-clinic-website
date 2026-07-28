@@ -103,6 +103,8 @@ import RoomsManagerView from "@/components/RoomsManagerView";
 import SupplierManagementScreen from "@/components/admin/inventory/SupplierManagementScreen";
 import ServiceRecipeEditor from "@/components/admin/services/ServiceRecipeEditor";
 import ServiceDeviceEditor from "@/components/admin/services/ServiceDeviceEditor";
+import { PackageAdminPanel } from "@/components/admin/packages/PackageAdminPanel";
+import { DoctorServiceCommissionEditor, ServiceCommissionEntry, DefaultCommissionType } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
@@ -932,6 +934,9 @@ export default function AdminPage() {
   const [newEmployeeRating, setNewEmployeeRating] = useState("5");
   const [newEmployeeCommissionType, setNewEmployeeCommissionType] = useState("none");
   const [newEmployeeCommissionValue, setNewEmployeeCommissionValue] = useState("0");
+  const [newEmployeeCommissionBase, setNewEmployeeCommissionBase] = useState<"gross" | "net_of_materials">("gross");
+  const [newEmployeeCommissionFixedComponent, setNewEmployeeCommissionFixedComponent] = useState("0");
+  const [newEmployeeServiceCommissions, setNewEmployeeServiceCommissions] = useState<ServiceCommissionEntry[]>([]);
   const [newEmployeeScheduleTab, setNewEmployeeScheduleTab] = useState<"in_person" | "online">("in_person");
   const [newEmployeeBranchIds, setNewEmployeeBranchIds] = useState<string[]>([]);
   const [newEmployeeWorkingDaysHours, setNewEmployeeWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; shifts?: Array<{ start: string; end: string }> }>>({
@@ -4074,6 +4079,9 @@ export default function AdminPage() {
   const [providerFormFixedSalary, setProviderFormFixedSalary] = useState("0");
   const [providerFormCommissionType, setProviderFormCommissionType] = useState("none");
   const [providerFormCommissionValue, setProviderFormCommissionValue] = useState("0");
+  const [providerFormCommissionBase, setProviderFormCommissionBase] = useState<"gross" | "net_of_materials">("gross");
+  const [providerFormCommissionFixedComponent, setProviderFormCommissionFixedComponent] = useState("0");
+  const [providerFormServiceCommissions, setProviderFormServiceCommissions] = useState<ServiceCommissionEntry[]>([]);
   const [providerFormSelectedServices, setProviderFormSelectedServices] = useState<string[]>([]);
   const [providerFormImage, setProviderFormImage] = useState("");
   const [providerFormPhone, setProviderFormPhone] = useState("");
@@ -4971,6 +4979,9 @@ export default function AdminPage() {
     setProviderFormFixedSalary("0");
     setProviderFormCommissionType("none");
     setProviderFormCommissionValue("0");
+    setProviderFormCommissionBase("gross");
+    setProviderFormCommissionFixedComponent("0");
+    setProviderFormServiceCommissions([]);
     setProviderFormSelectedServices([]);
     setProviderFormImage("");
     setProviderFormPhone("");
@@ -5028,6 +5039,9 @@ export default function AdminPage() {
     setProviderFormFixedSalary(String(provider.fixedSalary || 0));
     setProviderFormCommissionType(provider.commissionType || "none");
     setProviderFormCommissionValue(String(provider.commissionValue || 0));
+    setProviderFormCommissionBase(provider.commissionBase || "gross");
+    setProviderFormCommissionFixedComponent(String(provider.commissionFixedComponent || 0));
+    setProviderFormServiceCommissions(Array.isArray(provider.serviceCommissions) ? provider.serviceCommissions : []);
 
     const rawSched = provider.workingDaysHours || {};
     
@@ -5234,7 +5248,10 @@ export default function AdminPage() {
       startDate: getDoctorFirstReservationDate(providerFormName, allReservations) || providerFormStartDate || null,
       fixedSalary: Number(providerFormFixedSalary || 0),
       commissionType: providerFormCommissionType,
-      commissionValue: Number(providerFormCommissionValue || 0)
+      commissionValue: Number(providerFormCommissionValue || 0),
+      commissionBase: providerFormCommissionBase,
+      commissionFixedComponent: Number(providerFormCommissionFixedComponent || 0),
+      serviceCommissions: providerFormServiceCommissions
     };
 
     const isEdit = providerModalMode === "edit";
@@ -8055,80 +8072,32 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* Services Offered */}
-                    <div>
-                      <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Select Services Offered</label>
-                      <div className="max-h-[220px] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2">
-                        {allServicesList.map((svc) => {
-                          const isChecked = providerFormSelectedServices.includes(svc.en);
-                          return (
-                            <label key={svc.id} className="flex items-center gap-3 cursor-pointer select-none py-1 hover:bg-gray-50 rounded px-1">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setProviderFormSelectedServices([...providerFormSelectedServices, svc.en]);
-                                  } else {
-                                    setProviderFormSelectedServices(providerFormSelectedServices.filter(s => s !== svc.en));
-                                  }
-                                }}
-                                className="h-4.5 w-4.5 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
-                              />
-                              <div className="text-sm text-[#1F251A]">
-                                <span className="font-medium">{svc.en}</span>
-                                {svc.ar && <span className="text-gray-400 text-xs ml-1.5">({svc.ar})</span>}
-                              </div>
-                            </label>
-                          );
-                        })}
-                      </div>
+                    {/* Services & Commission */}
+                    <div className="max-w-xs">
+                      <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Fixed Salary (EGP)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 5000"
+                        value={providerFormFixedSalary}
+                        onChange={(e) => setProviderFormFixedSalary(e.target.value)}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                      />
                     </div>
-
-                    {/* Payroll & Commission */}
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-4">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#414E36] border-b border-[#414E36]/10 pb-2">
-                        Payroll &amp; Commission Settings
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Fixed Salary (EGP)</label>
-                          <input
-                            type="number"
-                            placeholder="e.g. 5000"
-                            value={providerFormFixedSalary}
-                            onChange={(e) => setProviderFormFixedSalary(e.target.value)}
-                            className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Commission Type</label>
-                          <select
-                            value={providerFormCommissionType}
-                            onChange={(e) => setProviderFormCommissionType(e.target.value)}
-                            className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                          >
-                            <option value="none">None</option>
-                            <option value="fixed">Fixed Amount per Service</option>
-                            <option value="percentage">Percentage of Service Price</option>
-                          </select>
-                        </div>
-                        {providerFormCommissionType !== "none" && (
-                          <div>
-                            <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
-                              {providerFormCommissionType === "fixed" ? "Fixed Amount (EGP)" : "Percentage (%)"}
-                            </label>
-                            <input
-                              type="number"
-                              placeholder={providerFormCommissionType === "fixed" ? "e.g. 150" : "e.g. 10"}
-                              value={providerFormCommissionValue}
-                              onChange={(e) => setProviderFormCommissionValue(e.target.value)}
-                              className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    <DoctorServiceCommissionEditor
+                      allServices={allServicesList}
+                      services={providerFormSelectedServices}
+                      commissions={providerFormServiceCommissions}
+                      defaultType={providerFormCommissionType as DefaultCommissionType}
+                      defaultValue={providerFormCommissionValue}
+                      defaultBase={providerFormCommissionBase}
+                      defaultFixedComponent={providerFormCommissionFixedComponent}
+                      onServicesChange={setProviderFormSelectedServices}
+                      onCommissionsChange={setProviderFormServiceCommissions}
+                      onDefaultTypeChange={setProviderFormCommissionType}
+                      onDefaultValueChange={setProviderFormCommissionValue}
+                      onDefaultBaseChange={setProviderFormCommissionBase}
+                      onDefaultFixedComponentChange={setProviderFormCommissionFixedComponent}
+                    />
 
                     {/* Weekly Working Schedule */}
                     <div>
@@ -8533,6 +8502,11 @@ export default function AdminPage() {
                 ))}
               </div>
 
+              {serviceTab === "Package Offers" ? (
+                <PackageAdminPanel session={session} />
+              ) : (
+              <>
+
               {/* Search */}
               <div className="mb-5 flex items-center gap-3">
                 <div className="relative max-w-xs flex-1">
@@ -8840,6 +8814,7 @@ export default function AdminPage() {
                   Expand All
                 </button>
               </div>
+              </>)}
 
               {/* ── DELETE CATEGORY CONFIRMATION MODAL ── */}
               {deleteCategoryTarget && (
@@ -19096,6 +19071,9 @@ export default function AdminPage() {
                     setNewEmployeeRating("5");
                     setNewEmployeeCommissionType("none");
                     setNewEmployeeCommissionValue("0");
+                    setNewEmployeeCommissionBase("gross");
+                    setNewEmployeeCommissionFixedComponent("0");
+                    setNewEmployeeServiceCommissions([]);
                     setNewEmployeeScheduleTab("in_person");
                     setNewEmployeeBranchIds(branches.length > 0 ? [branches[0].id] : []);
                     const defaultDays = {
@@ -19321,6 +19299,11 @@ export default function AdminPage() {
                                           setNewEmployeeSpecialty(matchProv?.specialty || "");
                                           setNewEmployeeSelectedServices(matchProv?.services || []);
                                           setNewEmployeeRating(String(matchProv?.rating || 5));
+                                          setNewEmployeeCommissionType(matchProv?.commissionType || "none");
+                                          setNewEmployeeCommissionValue(String(matchProv?.commissionValue || 0));
+                                          setNewEmployeeCommissionBase((matchProv?.commissionBase as "gross" | "net_of_materials") || "gross");
+                                          setNewEmployeeCommissionFixedComponent(String(matchProv?.commissionFixedComponent || 0));
+                                          setNewEmployeeServiceCommissions(Array.isArray(matchProv?.serviceCommissions) ? matchProv.serviceCommissions : []);
                                           let bIds: string[] = [];
                                           if (matchProv?.workingDaysHours?.branch_ids && Array.isArray(matchProv.workingDaysHours.branch_ids)) {
                                             bIds = matchProv.workingDaysHours.branch_ids;
@@ -19483,6 +19466,9 @@ export default function AdminPage() {
                                 rating: Number(newEmployeeRating || 5),
                                 commission_type: newEmployeeCommissionType,
                                 commission_value: Number(newEmployeeCommissionValue || 0),
+                                commission_base: newEmployeeCommissionBase,
+                                commission_fixed_component: Number(newEmployeeCommissionFixedComponent || 0),
+                                service_commissions: newEmployeeServiceCommissions,
                                 workingDaysHours: {
                                   branch_ids: newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId],
                                   branch_schedules: compiledBranchSchedules
@@ -19533,6 +19519,9 @@ export default function AdminPage() {
                                 rating: Number(newEmployeeRating || 5),
                                 commission_type: newEmployeeCommissionType,
                                 commission_value: Number(newEmployeeCommissionValue || 0),
+                                commission_base: newEmployeeCommissionBase,
+                                commission_fixed_component: Number(newEmployeeCommissionFixedComponent || 0),
+                                service_commissions: newEmployeeServiceCommissions,
                                 workingDaysHours: {
                                   branch_ids: newEmployeeBranchIds.length > 0 ? newEmployeeBranchIds : [newEmployeeBranchId],
                                   branch_schedules: compiledBranchSchedules
@@ -19700,55 +19689,23 @@ export default function AdminPage() {
                             </div>
                           </div>
 
-                          {/* Row 2: Payroll & Commission Settings */}
+                          {/* Row 2: Fixed Salary */}
                           <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
                             <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#414E36]/10 pb-2 flex items-center gap-1.5">
                               <DollarSign size={14} className="text-[#C4AE7C]" />
-                              Payroll &amp; Commission Settings
+                              Payroll
                             </h4>
-                            <div className="grid gap-4 sm:grid-cols-3">
-                              <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
-                                  Fixed Salary (EGP)
-                                </label>
-                                <input
-                                  type="number"
-                                  placeholder="e.g. 5000"
-                                  value={newEmployeeSalary}
-                                  onChange={(e) => setNewEmployeeSalary(e.target.value)}
-                                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
-                                  Commission Type
-                                </label>
-                                <select
-                                  value={newEmployeeCommissionType}
-                                  onChange={(e) => setNewEmployeeCommissionType(e.target.value)}
-                                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] cursor-pointer"
-                                >
-                                  <option value="none">None</option>
-                                  <option value="fixed">Fixed Amount per Service</option>
-                                  <option value="percentage">Percentage of Service Price</option>
-                                </select>
-                              </div>
-
-                              {newEmployeeCommissionType !== "none" && (
-                                <div>
-                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
-                                    {newEmployeeCommissionType === "fixed" ? "Fixed Amount (EGP)" : "Percentage (%)"}
-                                  </label>
-                                  <input
-                                    type="number"
-                                    placeholder={newEmployeeCommissionType === "fixed" ? "e.g. 150" : "e.g. 20"}
-                                    value={newEmployeeCommissionValue}
-                                    onChange={(e) => setNewEmployeeCommissionValue(e.target.value)}
-                                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                                  />
-                                </div>
-                              )}
+                            <div className="max-w-xs">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">
+                                Fixed Salary (EGP)
+                              </label>
+                              <input
+                                type="number"
+                                placeholder="e.g. 5000"
+                                value={newEmployeeSalary}
+                                onChange={(e) => setNewEmployeeSalary(e.target.value)}
+                                className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                              />
                             </div>
                           </div>
 
@@ -20007,34 +19964,22 @@ export default function AdminPage() {
                             })()}
                           </div>
 
-                          {/* Row 5: Select Services Offered */}
-                          <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2">
-                              Select Services Offered
-                            </label>
-                            <div className="max-h-[180px] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-3 space-y-1.5">
-                              {allServicesList.map((svc) => {
-                                const isChecked = newEmployeeSelectedServices.includes(svc.en);
-                                return (
-                                  <label key={svc.id} className="flex items-center gap-2.5 cursor-pointer select-none py-1 px-1.5 hover:bg-gray-50 rounded">
-                                    <input
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setNewEmployeeSelectedServices([...newEmployeeSelectedServices, svc.en]);
-                                        } else {
-                                          setNewEmployeeSelectedServices(newEmployeeSelectedServices.filter(s => s !== svc.en));
-                                        }
-                                      }}
-                                      className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
-                                    />
-                                    <span className="text-xs text-[#1F251A] font-medium">{svc.en} {svc.ar ? `(${svc.ar})` : ''}</span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </div>
+                          {/* Row 5: Services & Commission */}
+                          <DoctorServiceCommissionEditor
+                            allServices={allServicesList}
+                            services={newEmployeeSelectedServices}
+                            commissions={newEmployeeServiceCommissions}
+                            defaultType={newEmployeeCommissionType as DefaultCommissionType}
+                            defaultValue={newEmployeeCommissionValue}
+                            defaultBase={newEmployeeCommissionBase}
+                            defaultFixedComponent={newEmployeeCommissionFixedComponent}
+                            onServicesChange={setNewEmployeeSelectedServices}
+                            onCommissionsChange={setNewEmployeeServiceCommissions}
+                            onDefaultTypeChange={setNewEmployeeCommissionType}
+                            onDefaultValueChange={setNewEmployeeCommissionValue}
+                            onDefaultBaseChange={setNewEmployeeCommissionBase}
+                            onDefaultFixedComponentChange={setNewEmployeeCommissionFixedComponent}
+                          />
                         </div>
                       )}
 
@@ -20582,6 +20527,12 @@ export default function AdminPage() {
                           setNewEmployeeAdditionalFiles(additionalList);
                           setNewEmployeeRequiredTargetAmount(String(viewingEmployee.requiredTargetAmount || 0));
                           setNewEmployeeBonusPercentage(String(viewingEmployee.bonusPercentage || 0));
+                          const matchProv2 = providers.find(p => (p.name && viewingEmployee.name && p.name.trim().toLowerCase() === viewingEmployee.name.trim().toLowerCase()) || (p.phone && viewingEmployee.phone && p.phone === viewingEmployee.phone));
+                          setNewEmployeeCommissionType(matchProv2?.commissionType || "none");
+                          setNewEmployeeCommissionValue(String(matchProv2?.commissionValue || 0));
+                          setNewEmployeeCommissionBase((matchProv2?.commissionBase as "gross" | "net_of_materials") || "gross");
+                          setNewEmployeeCommissionFixedComponent(String(matchProv2?.commissionFixedComponent || 0));
+                          setNewEmployeeServiceCommissions(Array.isArray(matchProv2?.serviceCommissions) ? matchProv2.serviceCommissions : []);
                           setViewingEmployee(null);
                           setIsEditingEmployeeModalOpen(true);
                         }}
@@ -26351,84 +26302,34 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Services Offered */}
-              <div>
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-2">Select Services Offered</label>
-                <div className="max-h-[22vh] overflow-y-auto rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-2">
-                  {allServicesList.map((svc) => {
-                    const isChecked = providerFormSelectedServices.includes(svc.en);
-                    return (
-                      <label key={svc.id} className="flex items-center gap-3 cursor-pointer select-none py-1 hover:bg-gray-50 rounded px-1">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setProviderFormSelectedServices([...providerFormSelectedServices, svc.en]);
-                            } else {
-                              setProviderFormSelectedServices(providerFormSelectedServices.filter(s => s !== svc.en));
-                            }
-                          }}
-                          className="h-4.5 w-4.5 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
-                        />
-                        <div className="text-sm text-[#1F251A]">
-                          <span className="font-medium">{svc.en}</span>
-                          {svc.ar && <span className="text-gray-400 text-xs ml-1.5">({svc.ar})</span>}
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
+              {/* Services & Commission */}
+              <div className="max-w-xs">
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
+                  Fixed Salary (EGP)
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g. 5000"
+                  value={providerFormFixedSalary}
+                  onChange={(e) => setProviderFormFixedSalary(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                />
               </div>
-
-              {/* Payroll & Commission Settings */}
-              <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#414E36] border-b border-[#414E36]/10 pb-2">
-                  Payroll & Commission Settings
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
-                      Fixed Salary (EGP)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 5000"
-                      value={providerFormFixedSalary}
-                      onChange={(e) => setProviderFormFixedSalary(e.target.value)}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
-                      Commission Type
-                    </label>
-                    <select
-                      value={providerFormCommissionType}
-                      onChange={(e) => setProviderFormCommissionType(e.target.value)}
-                      className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                    >
-                      <option value="none">None</option>
-                      <option value="fixed">Fixed Amount per Service</option>
-                      <option value="percentage">Percentage of Service Price</option>
-                    </select>
-                  </div>
-                  {providerFormCommissionType !== "none" && (
-                    <div>
-                      <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
-                        {providerFormCommissionType === "fixed" ? "Fixed Amount (EGP)" : "Percentage (%)"}
-                      </label>
-                      <input
-                        type="number"
-                        placeholder={providerFormCommissionType === "fixed" ? "e.g. 150" : "e.g. 10"}
-                        value={providerFormCommissionValue}
-                        onChange={(e) => setProviderFormCommissionValue(e.target.value)}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
+              <DoctorServiceCommissionEditor
+                allServices={allServicesList}
+                services={providerFormSelectedServices}
+                commissions={providerFormServiceCommissions}
+                defaultType={providerFormCommissionType as DefaultCommissionType}
+                defaultValue={providerFormCommissionValue}
+                defaultBase={providerFormCommissionBase}
+                defaultFixedComponent={providerFormCommissionFixedComponent}
+                onServicesChange={setProviderFormSelectedServices}
+                onCommissionsChange={setProviderFormServiceCommissions}
+                onDefaultTypeChange={setProviderFormCommissionType}
+                onDefaultValueChange={setProviderFormCommissionValue}
+                onDefaultBaseChange={setProviderFormCommissionBase}
+                onDefaultFixedComponentChange={setProviderFormCommissionFixedComponent}
+              />
 
               {/* Weekly Working Schedule */}
               <div>
