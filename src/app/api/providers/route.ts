@@ -10,6 +10,27 @@ const JSON_FILE_PATH = path.join(process.cwd(), 'data', 'providers.json');
 
 const DEFAULT_PROVIDERS: any[] = [];
 
+async function findMatchingEmployeeId(name: string, phone?: string | null): Promise<string | null> {
+  const { data: byName } = await supabaseServer
+    .from('employee_accounts')
+    .select('id')
+    .ilike('name', name)
+    .limit(1)
+    .maybeSingle();
+  if (byName) return byName.id;
+
+  if (phone) {
+    const { data: byPhone } = await supabaseServer
+      .from('employee_accounts')
+      .select('id')
+      .eq('phone', phone)
+      .limit(1)
+      .maybeSingle();
+    if (byPhone) return byPhone.id;
+  }
+  return null;
+}
+
 function mapProvider(p: Record<string, any>, bookingsCount: number = 0) {
   return {
     id: p.id,
@@ -228,18 +249,14 @@ export async function POST(req: Request) {
           const docName = data.name;
           const docPhone = data.phone;
           if (docName) {
-            const query = supabaseServer
-              .from('employee_accounts')
-              .select('id')
-              .or(`name.ilike.${docName}${docPhone ? `,phone.eq.${docPhone}` : ''}`);
-            const { data: matchingEmp } = await query.maybeSingle();
-            if (matchingEmp) {
+            const matchingEmpId = await findMatchingEmployeeId(docName, docPhone);
+            if (matchingEmpId) {
               const empUpdates: Record<string, any> = {};
               if (fixedSalary !== undefined) empUpdates.salary = Number(fixedSalary || 0);
               if (phone !== undefined) empUpdates.phone = phone;
               if (nationalId !== undefined) empUpdates.national_id = nationalId;
               if (Object.keys(empUpdates).length > 0) {
-                await supabaseServer.from('employee_accounts').update(empUpdates).eq('id', matchingEmp.id);
+                await supabaseServer.from('employee_accounts').update(empUpdates).eq('id', matchingEmpId);
               }
             }
           }
@@ -396,18 +413,14 @@ export async function PATCH(req: Request) {
           const docName = data.name;
           const docPhone = data.phone;
           if (docName) {
-            const query = supabaseServer
-              .from('employee_accounts')
-              .select('id')
-              .or(`name.ilike.${docName}${docPhone ? `,phone.eq.${docPhone}` : ''}`);
-            const { data: matchingEmp } = await query.maybeSingle();
-            if (matchingEmp) {
+            const matchingEmpId = await findMatchingEmployeeId(docName, docPhone);
+            if (matchingEmpId) {
               const empUpdates: Record<string, any> = {};
               if (fixedSalary !== undefined) empUpdates.salary = Number(fixedSalary || 0);
               if (phone !== undefined) empUpdates.phone = phone;
               if (nationalId !== undefined) empUpdates.national_id = nationalId;
               if (Object.keys(empUpdates).length > 0) {
-                await supabaseServer.from('employee_accounts').update(empUpdates).eq('id', matchingEmp.id);
+                await supabaseServer.from('employee_accounts').update(empUpdates).eq('id', matchingEmpId);
               }
             }
           }
