@@ -74,6 +74,13 @@
       quick succession from two tabs) → confirm the checkout still completes and charges
       correctly, and staff see a clear alert naming the failed redemption rather than a silent
       failure or a rolled-back checkout.
+- [ ] After redeeming, open that same patient's profile → Booking History tab → confirm the
+      "Paid" column shows "0 EGP" plus a small "via {package name} (bought {date})" note, instead
+      of an unexplained zero — this should stay accurate even if the package definition is later
+      edited or deactivated, since it's sourced from `package_revenue_recognitions`, not the live
+      package record.
+- [ ] In the checkout modal's "Change" section (overpayment), confirm "Put change in customer's
+      wallet" is **unchecked by default** — staff must opt in, not opt out.
 
 ### 4. Phone normalization + existing-patient picker (RISK-032)
 

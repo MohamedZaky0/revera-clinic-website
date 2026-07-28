@@ -1361,7 +1361,7 @@ export default function AdminPage() {
   const [checkoutBooking, setCheckoutBooking] = useState<any>(null);
   const [checkoutAmountPaid, setCheckoutAmountPaid] = useState<string>("");
   const [useWalletBalance, setUseWalletBalance] = useState<boolean>(false);
-  const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(true);
+  const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(false);
   const [savingCheckout, setSavingCheckout] = useState<boolean>(false);
   const [invoiceBooking, setInvoiceBooking] = useState<any>(null);
 
@@ -1513,6 +1513,9 @@ export default function AdminPage() {
   const [redeemedPackageItems, setRedeemedPackageItems] = useState<Record<number, string>>({});
   const [matchedCustomerId, setMatchedCustomerId] = useState<string | null>(null);
   const [manualBookingCustomerPackages, setManualBookingCustomerPackages] = useState<any[]>([]);
+  // Which of this customer's past reservations were paid for by redeeming a package session —
+  // so Booking History can show *why* a visit shows 0 EGP paid, and which package/purchase date.
+  const [customerPackageRedemptions, setCustomerPackageRedemptions] = useState<any[]>([]);
 
   // Prescription Form states
   const [rxDiagnosis, setRxDiagnosis] = useState("");
@@ -3829,6 +3832,29 @@ export default function AdminPage() {
       fetchCustomerProfilePackages(viewingCustomerProfile.id);
     }
   }, [viewingCustomerProfile?.id, fetchCustomerProfilePackages]);
+
+  const fetchCustomerPackageRedemptions = useCallback(async (customerId: string) => {
+    try {
+      if (!session?.access_token) return;
+      const res = await fetch(`/api/customers/package-redemptions?customer_id=${encodeURIComponent(customerId)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCustomerPackageRedemptions(data.redemptions || []);
+      }
+    } catch (err) {
+      console.error("Error fetching customer package redemptions:", err);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (viewingCustomerProfile?.id) {
+      fetchCustomerPackageRedemptions(viewingCustomerProfile.id);
+    } else {
+      setCustomerPackageRedemptions([]);
+    }
+  }, [viewingCustomerProfile?.id, fetchCustomerPackageRedemptions]);
 
   useEffect(() => {
     if (viewingBooking?.customerId) {
@@ -11435,6 +11461,7 @@ export default function AdminPage() {
                                   const serviceCost = localServices.find(s => s.id === res.serviceId)?.price ?? pricesMap[res.serviceId] ?? 500;
                                   const spent = res.amountPaid ?? 0;
                                   const left = res.amountLeft !== undefined && res.amountLeft !== null ? res.amountLeft : Math.max(0, serviceCost - spent);
+                                  const redemptions = customerPackageRedemptions.filter((r: any) => r.reservationId === res.id);
                                   return (
                                     <tr key={res.id} className="hover:bg-[#F9F9F7]">
                                       <td className="px-4 py-3">
@@ -11443,7 +11470,15 @@ export default function AdminPage() {
                                       </td>
                                       <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
                                       <td className="px-4 py-3">{res.doctorName || "—"}</td>
-                                      <td className="px-4 py-3 text-right font-medium text-green-700">{spent} EGP</td>
+                                      <td className="px-4 py-3 text-right font-medium text-green-700">
+                                        {spent} EGP
+                                        {redemptions.map((r: any, idx: number) => (
+                                          <span key={idx} className="block text-[9px] font-semibold text-[#C4AE7C] mt-0.5 whitespace-nowrap">
+                                            via {r.packageName}
+                                            {r.packagePurchasedAt && ` (bought ${new Date(r.packagePurchasedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})`}
+                                          </span>
+                                        ))}
+                                      </td>
                                       <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
                                       <td className="px-4 py-3 text-center">
                                         <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusClass}`}>
@@ -28013,7 +28048,7 @@ export default function AdminPage() {
                 setCheckoutBooking(null);
                 setCheckoutAmountPaid("");
                 setUseWalletBalance(false);
-                setDepositChangeToWallet(true);
+                setDepositChangeToWallet(false);
                 setRedeemedPackageItems({});
                 // Refresh list and details
                 fetchAllReservations();
@@ -28052,7 +28087,7 @@ export default function AdminPage() {
                       setCheckoutBooking(null);
                       setCheckoutAmountPaid("");
                       setUseWalletBalance(false);
-                      setDepositChangeToWallet(true);
+                      setDepositChangeToWallet(false);
                       setRedeemedPackageItems({});
                     }}
                     className="rounded-full bg-[#F2EFE9] p-2 text-[#414E36] transition hover:bg-[#e4e0d6]"
@@ -28229,7 +28264,7 @@ export default function AdminPage() {
                       setCheckoutBooking(null);
                       setCheckoutAmountPaid("");
                       setUseWalletBalance(false);
-                      setDepositChangeToWallet(true);
+                      setDepositChangeToWallet(false);
                       setRedeemedPackageItems({});
                     }}
                     className="rounded-xl border border-[#414E36]/15 bg-white px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
