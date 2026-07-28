@@ -157,8 +157,15 @@ export async function POST(req: Request) {
       .select('id, name, fixed_salary, commission_type, commission_value, commission_fixed_component');
 
     if (provErr) throw provErr;
-    if (!providers || providers.length === 0) {
-      return NextResponse.json({ error: 'No doctors found to run payroll.' }, { status: 400 });
+
+    const isValidUuid = (str: any) =>
+      typeof str === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(str).trim());
+
+    const validProviders = (providers || []).filter((prov: any) => isValidUuid(prov?.id));
+
+    if (validProviders.length === 0) {
+      return NextResponse.json({ error: 'No valid doctor profiles found to run payroll.' }, { status: 400 });
     }
 
     // 2. Fetch all reservations for the targeted month and services
@@ -188,7 +195,7 @@ export async function POST(req: Request) {
     const commissionSnapshots = await getCommissionSnapshots(activeReservations.map((reservation: any) => reservation.id));
 
     // 3. Calculate completed services and commissions per doctor
-    const inserts = providers.map((prov: any) => {
+    const inserts = validProviders.map((prov: any) => {
       const fixedSalary = Number(prov.fixed_salary || 0);
       const commissionType = prov.commission_type || 'none';
       const commissionValue = Number(prov.commission_value || 0);
