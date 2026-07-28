@@ -508,9 +508,9 @@ routes:**
    is a one-shot `DO` block, not a trigger, and has not been applied anyway.
 6. Update this file in the same commit as the change it describes.
 7. **Update the matching manual-test checklist in the same commit as every micro-task.** Use
-   `FINANCE_PHASE_1_MANUAL_TESTS.md`, `FINANCE_PHASE_2_MANUAL_TESTS.md`,
-   `FINANCE_PHASE_3_MANUAL_TESTS.md`, `FINANCE_PHASE_3B_MANUAL_TESTS.md`,
-   `FINANCE_PHASE_4_MANUAL_TESTS.md`, or `FINANCE_PHASE_5_MANUAL_TESTS.md`; record the test date,
+   `ai_docs/manual_tests/FINANCE_PHASE_1_MANUAL_TESTS.md`, `ai_docs/manual_tests/FINANCE_PHASE_2_MANUAL_TESTS.md`,
+   `ai_docs/manual_tests/FINANCE_PHASE_3_MANUAL_TESTS.md`, `ai_docs/manual_tests/FINANCE_PHASE_3B_MANUAL_TESTS.md`,
+   `ai_docs/manual_tests/FINANCE_PHASE_4_MANUAL_TESTS.md`, or `ai_docs/manual_tests/FINANCE_PHASE_5_MANUAL_TESTS.md`; record the test date,
    environment, IDs/fixture, and result after each manual verification. A phase is not fully tested
    until its checklist is complete.
 8. **Phase 3B is UI work, so `tsc`/`eslint`/scratch scripts are necessary but never sufficient.**
@@ -936,7 +936,7 @@ regresses.
 > no-customer checkout) were listed below as "follow-up observations, do not block completion" —
 > reasonable at the time, but they were still unverified theory, not measured fact. Both were
 > exercised live against dev on 2026-07-26 (see the added evidence below and
-> `FINANCE_PHASE_1_MANUAL_TESTS.md`'s 1.10 rows) using a real staff session
+> `ai_docs/manual_tests/FINANCE_PHASE_1_MANUAL_TESTS.md`'s 1.10 rows) using a real staff session
 > (`mohamed.zaky.anwar@gmail.com`, `superadmin`) obtained via `scratch/get_session_token.ts`
 > against the deployed `dev.reveraclinics.com` environment — not just the pure functions or a
 > single first-completion case.
@@ -981,7 +981,7 @@ regresses.
   balance settlement code right above it, but is worth a deliberate decision later, not an
   accident to discover. **Verified live 2026-07-26 and approved as-is** — see below.
 
-**Live-verified 2026-07-26 (the two remaining checklist items from `FINANCE_PHASE_1_MANUAL_TESTS.md`):**
+**Live-verified 2026-07-26 (the two remaining checklist items from `ai_docs/manual_tests/FINANCE_PHASE_1_MANUAL_TESTS.md`):**
 - **Repeat payment on an already-completed booking:** `PATCH /api/reservations?id=2e03f8ea-…`
   with `amountPaid: 150` (was `100`) against the already-completed booking from the first live
   check above. Result: one new `payments` row of `50` (the delta) attached to the **same**
@@ -1036,7 +1036,7 @@ invoice write is additive and best-effort: the established product-sale, stock-d
 effect.
 
 **Live-verified 2026-07-26** against deployed dev (`dev.reveraclinics.com`) using a real staff
-session — see `FINANCE_PHASE_1_MANUAL_TESTS.md` for the full evidence. A real sale (qty 2, branch
+session — see `ai_docs/manual_tests/FINANCE_PHASE_1_MANUAL_TESTS.md` for the full evidence. A real sale (qty 2, branch
 name, card payment) produced exactly the expected `product_sales`/`stock_movements`/`invoices`/
 `invoice_lines`/`payments` rows, with `received_by_employee_id` correctly attributed to the real
 signed-in staff member — notably **better** than the reservations-checkout path (task 1.10), where
@@ -1072,7 +1072,7 @@ newly-created package/invoice records when a later write fails. `API_CONTRACT.md
 request and response.
 
 **Live-verified 2026-07-26** against deployed dev with a real staff session — see
-`FINANCE_PHASE_1_MANUAL_TESTS.md` for full evidence. Covered: the happy path (2-item package,
+`ai_docs/manual_tests/FINANCE_PHASE_1_MANUAL_TESTS.md` for full evidence. Covered: the happy path (2-item package,
 correct invoice/line/payment/`customer_packages`/`customer_package_items`, `expires_at` exact),
 unrestricted-package-uses-request-branch, restricted-package-uses-own-branch, and all five
 rejection cases (inactive, missing customer, empty package, zero-qty item, mismatched restricted
@@ -1107,7 +1107,7 @@ linked dev on 2026-07-26; `supabase migration list --linked` matches local/remot
 `20260726010700`, and `supabase db diff --linked` found no schema changes.
 
 **Live-verified 2026-07-26** against deployed dev with a real staff session — see
-`FINANCE_PHASE_1_MANUAL_TESTS.md` for full evidence. A 3-session, 900 EGP package consumed across
+`ai_docs/manual_tests/FINANCE_PHASE_1_MANUAL_TESTS.md` for full evidence. A 3-session, 900 EGP package consumed across
 3 completed reservations recognised exactly `300 + 300 + 300 = 900`, matching the cumulative-then-
 subtract math the RPC uses (the same anti-drift technique task 1.8/1.9 already proved out for the
 pure-function version); `qty_remaining` decremented correctly each time and the package flipped to
@@ -1623,7 +1623,7 @@ DEC-018 lists `none` as a valid configured state, e.g. a salaried doctor with no
 ## 2.11 — Wire booking checkout to consume the recipe and snapshot cost/commission
 
 **DONE, live-verified 2026-07-26** against deployed dev with a real staff session and a real
-multi-service booking — see `FINANCE_PHASE_2_MANUAL_TESTS.md` for full evidence
+multi-service booking — see `ai_docs/manual_tests/FINANCE_PHASE_2_MANUAL_TESTS.md` for full evidence
 (`cogs_snapshot: 250`, `commission_snapshot: 150`, matched hand-computed values exactly; one
 `consumption_entries` + one `stock_movements` row, both correct). This same live test doubles as
 verification for the per-line failure-isolation fix from earlier code review (see that task's own
@@ -1741,7 +1741,7 @@ path.
 ## 2.13 — New endpoint: record a purchase
 
 **DONE, live-verified 2026-07-26** against deployed dev with a real staff session — see
-`FINANCE_PHASE_2_MANUAL_TESTS.md`. A 2-line purchase produced `total: 1240` (exact hand-check),
+`ai_docs/manual_tests/FINANCE_PHASE_2_MANUAL_TESTS.md`. A 2-line purchase produced `total: 1240` (exact hand-check),
 one `'in'` `stock_movements` row per line, and confirmed `inventory_products.stock_quantity`/
 `cost_price` are untouched by this route (deferred to 2.12/future scope, as documented below).
 Unauthenticated `POST` correctly `401`s.
@@ -1766,7 +1766,7 @@ stock quantity increased by exactly the purchased qty.
 
 ## 2.14 — Doctor payroll: match by `provider_id`, not `doctor_name` string
 
-**DONE, live-verified 2026-07-26** against deployed dev — see `FINANCE_PHASE_2_MANUAL_TESTS.md`.
+**DONE, live-verified 2026-07-26** against deployed dev — see `ai_docs/manual_tests/FINANCE_PHASE_2_MANUAL_TESTS.md`.
 A disposable provider with one completed, commission-snapshotted booking reported
 `calculated_commission: 25` via `GET /api/hr/doctor-payroll`; after renaming the provider, the
 same `id` still reported the identical `calculated_commission: 25` and `reservations_count: 1` —
@@ -1820,7 +1820,7 @@ once this task's row is closed.
 
 ## 2.15 — Migration: `service_devices`; wire device pulse cost into checkout
 
-**DONE, live-verified 2026-07-26** against deployed dev — see `FINANCE_PHASE_2_MANUAL_TESTS.md`.
+**DONE, live-verified 2026-07-26** against deployed dev — see `ai_docs/manual_tests/FINANCE_PHASE_2_MANUAL_TESTS.md`.
 A service with `pulses_per_session: 1000` on a device with `lamp_replacement_cost: 5000` /
 `max_pulses_limit: 100000` correctly contributed `50` to `cogs_snapshot` (`costPerPulse(5000,
 100000) × 1000`), summed with materials cost into the same column exactly as designed.
@@ -3144,7 +3144,7 @@ DEC-034). Required a small schema addition: `packages.name_ar` (bilingual parity
 included services' total → confirm it appears on both public pages with a savings badge and
 correct language switching; uncheck "Show on Website" → confirm it disappears publicly while
 remaining usable in admin/POS. Full checklist:
-`ai_docs/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section 2).
+`ai_docs/manual_tests/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section 2).
 
 **Done 2026-07-28.** See DEC-034. Typecheck/lint clean; end-to-end browser verification against
 the dev database is still outstanding.
@@ -3181,7 +3181,7 @@ violates DEC-027** (new admin sections must be a `src/components/admin/` submodu
 there as a follow-up extraction, not fixed in this pass, given the money-critical nature of the
 checkout code touched.
 
-**Verify:** full checklist in `ai_docs/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section 3) — sell
+**Verify:** full checklist in `ai_docs/manual_tests/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section 3) — sell
 a package, confirm it shows active with correct remaining counts, redeem a session at checkout
 with no deposit collected, confirm `qty_remaining` decrements and a `package_revenue_recognitions`
 row is created, and confirm redemption is correctly disabled when a deposit was already paid.

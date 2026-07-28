@@ -736,7 +736,7 @@ failing over silently") for this specific trigger.
 
 **Verify:** `npx tsc --noEmit` / `npx eslint` clean. POST with a non-existent `customer_id` now
 returns `404` before any stock or ledger write happens; a real `customer_id` still sells normally
-(re-verified against dev — see `FINANCE_PHASE_1_MANUAL_TESTS.md` task 1.11 evidence).
+(re-verified against dev — see `ai_docs/manual_tests/FINANCE_PHASE_1_MANUAL_TESTS.md` task 1.11 evidence).
 
 **A second, related bug found while reproducing this, NOT fixed here — the `page_settings`
 fallback itself silently discards its own history.** `POST`'s fallback branch computes what to
@@ -1102,7 +1102,7 @@ second booking, not the first.
 
 ## RISK-030: Promotions Discounts Are Marketing-Only — Never Applied At Booking Or Checkout, And Business Value Is Undefined (RESOLVED)
 
-**Manual test checklist:** `ai_docs/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section 1) — also
+**Manual test checklist:** `ai_docs/manual_tests/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section 1) — also
 covers the related Packages public-display (DEC-034) and sell/redeem (DEC-035) work shipped in
 the same session.
 
@@ -1164,7 +1164,7 @@ without reading the code. Log the decision in `DECISIONS.md` once made.
 
 ## RISK-029: Checkout Charged The Full Service Price Again, Ignoring The Deposit Already Paid
 
-**Manual test checklist:** `ai_docs/RISK_029_MANUAL_TESTS.md` — covers this fix, the cancel/no-show
+**Manual test checklist:** `ai_docs/manual_tests/RISK_029_MANUAL_TESTS.md` — covers this fix, the cancel/no-show
 refund/forfeit policy, postpone, and RISK-027/RISK-028 checks from the same testing session.
 
 **Severity:** High · **Type:** Data integrity / money

@@ -54,11 +54,12 @@ fork / "make it work for any clinic" refactor — PROPOSAL-001 is the plan).
   - **Module**, **Status** (Done once `tsc`/`eslint` are clean on touched files; note explicitly if
     live-browser verification is still outstanding, since typecheck passing is not the same as a
     human confirming it works).
-  - **Manual Testing Checklist** — every Dev Notes block must include (or point to) a full,
-    click-through manual test checklist for the feature just shipped, written to a dedicated
-    `ai_docs/*_MANUAL_TESTS.md` file (create one per feature/fix, or append a new numbered section
-    to an existing one if the work is a continuation of an already-tracked feature — follow the
-    format already established by `RISK_029_MANUAL_TESTS.md` / `FINANCE_PHASE_3B_MANUAL_TESTS.md`:
-    an "Evidence log" table + a per-check `- [ ]` list). Reference that file from the relevant
-    `RISKS.md`/`DECISIONS.md` entry the same way RISK-029/RISK-030 do. This applies to every
-    feature going forward, not just risk fixes.
+  - **Test Note** — a short pointer line in the Notion card itself (e.g. "Manual test checklist:
+    `ai_docs/manual_tests/<FILE>.md`"), not the checklist content inline in the card.
+- **Every feature/fix also gets a full manual test checklist file**, regardless of whether it's a
+  risk fix — written to `ai_docs/manual_tests/` (create one per feature, or append a new numbered
+  section to an existing file if the work continues an already-tracked feature). Follow the format
+  already established there (`RISK_029_MANUAL_TESTS.md`, `FINANCE_PHASE_3B_MANUAL_TESTS.md`): an
+  "Evidence log" table + a per-check `- [ ]` list. Reference it from the relevant `RISKS.md`/
+  `DECISIONS.md` entry the same way RISK-029/RISK-030 do, **and** as the Test Note in the Dev Notes
+  block above.
