@@ -404,8 +404,13 @@ export async function PUT(req: Request) {
     const changes: string[] = [];
     if (existing.status !== computedStatus) changes.push(`Status: ${existing.status} → ${computedStatus}`);
     if (existing.current_pulse_count !== newCurrent) changes.push(`Pulse count: ${existing.current_pulse_count} → ${newCurrent}`);
+    if (existing.warning_threshold_1 !== t1) changes.push(`Warning Threshold 1: ${existing.warning_threshold_1} → ${t1}`);
     if (existing.maintenance_threshold_2 !== t2) changes.push(`Max Pulses: ${existing.maintenance_threshold_2} → ${t2}`);
-    if (existing.name !== updatedDevice.name) changes.push(`Name updated to '${updatedDevice.name}'`);
+    if (existing.lamp_replacement_cost !== updatedDevice.lamp_replacement_cost) changes.push(`Lamp Cost: EGP ${existing.lamp_replacement_cost || 0} → EGP ${updatedDevice.lamp_replacement_cost}`);
+    if (existing.model !== updatedDevice.model) changes.push(`Model: ${existing.model || 'N/A'} → ${updatedDevice.model}`);
+    if (existing.serial_number !== updatedDevice.serial_number) changes.push(`Serial: ${existing.serial_number || 'N/A'} → ${updatedDevice.serial_number}`);
+    if (existing.category !== updatedDevice.category) changes.push(`Category: ${existing.category || 'N/A'} → ${updatedDevice.category}`);
+    if (existing.name !== updatedDevice.name) changes.push(`Name: '${existing.name}' → '${updatedDevice.name}'`);
 
     const changeSummary = changes.length > 0 ? changes.join('; ') : 'Device details updated.';
 

@@ -3392,7 +3392,10 @@ export default function AdminPage() {
   const fetchDeviceAuditLogs = useCallback(async () => {
     try {
       setLoadingDeviceAuditLogs(true);
-      const res = await fetch("/api/inventory/devices/audit-logs", { cache: "no-store" });
+      const res = await fetch("/api/inventory/devices/audit-logs", {
+        headers: authenticatedJsonHeaders,
+        cache: "no-store"
+      });
       if (res.ok) {
         const data = await res.json();
         setDeviceAuditLogs(data || []);
@@ -3402,7 +3405,7 @@ export default function AdminPage() {
     } finally {
       setLoadingDeviceAuditLogs(false);
     }
-  }, []);
+  }, [authenticatedJsonHeaders]);
 
   const fetchInventoryDevices = useCallback(async () => {
     try {
@@ -18216,6 +18219,7 @@ export default function AdminPage() {
                       if (res.ok) {
                         setShowAddDeviceModal(false);
                         fetchInventoryDevices();
+                        fetchDeviceAuditLogs();
                         alert(editingDevice ? "Device updated successfully!" : "Device registered successfully!");
                       } else {
                         const err = await res.json();
@@ -18776,6 +18780,7 @@ export default function AdminPage() {
                         setShowUpdatePulsesModal(false);
                         setSelectedDeviceForPulses(null);
                         fetchInventoryDevices();
+                        fetchDeviceAuditLogs();
 
                         if (updated.status === "Maintenance Due") {
                           alert("⚠️ Maintenance Due! Counter has reached or exceeded the 2nd maintenance threshold.");
@@ -18911,6 +18916,7 @@ export default function AdminPage() {
                         setShowResetPulsesModal(false);
                         setSelectedDeviceForReset(null);
                         fetchInventoryDevices();
+                        fetchDeviceAuditLogs();
                         alert("Counter reset successfully! Maintenance logged and alert cycle restarted.");
                       } else {
                         const err = await res.json();
