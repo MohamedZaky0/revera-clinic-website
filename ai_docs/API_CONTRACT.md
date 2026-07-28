@@ -1,6 +1,6 @@
 # API_CONTRACT.md — Revera Clinics API Endpoints
 
-> **Last Updated:** 2026-07-28
+> **Last Updated:** 2026-07-29
 > **Base:** Next.js App Router API routes under `/app/api/`
 > **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, product-sales mutations, and every Phase 3 expenses/assets/loans route); coverage is not yet universal. All routes use the Supabase service role key server-side
 > **Previous content was for a different project — discarded entirely**
@@ -80,13 +80,17 @@ Deletes a category by its key.
 
 Returns all services ordered by `sort_order`.
 
-**Response:** `ServiceRow[]` — `{ id, en, ar, img, cat, unit, price, sortOrder, duration, descriptionEn, descriptionAr, isShared, enableReminder, branchPricing, visible, active, createdAt }`
+**Response:** `ServiceRow[]` — `{ id, en, ar, img, cat, unit, price, sortOrder, duration, duration_minutes, descriptionEn, descriptionAr, isShared, enableReminder, branchPricing, visible, active, createdAt }`
+
+`duration_minutes` (nullable, integer) — **Added 2026-07-25**, prefer this over the legacy free-text
+`duration`; see `DB_SCHEMA.md`.
 
 ---
 
 ## POST /api/services
 
-Upsert one or many services.
+Upsert one or many services. `id` is only included on an existing service being re-saved — see
+`services.id`'s note in `DB_SCHEMA.md` (RISK-033: this column's identity mode matters for upsert).
 
 **Body:** Single service object OR array (all fields from ServiceRow)
 
@@ -168,17 +172,28 @@ Returns reservations. Filterable by query params.
 - `phone` — Patient phone filter (returns only matched bookings)
 - `customerId` — UUID customer identifier filter
 
-**Response:** `ReservationRow[]` — `{ id, serviceId, date, requestedTime, name, email, phone, notes, status, timeSlot, sessionType, doctorName, createdAt, branchId, customerId }`
+**Response:** `ReservationRow[]` — `{ id, serviceId, serviceIds, date, requestedTime, name, email, phone, notes, status, timeSlot, sessionType, createdAt, isManual, branchId, customerId, amountPaid, amountLeft, roomId, rooms, createdByEmployeeId, services, doctorName, providerId, followUpDate }`
 
 ---
 
 ## POST /api/reservations
 
-Creates a new reservation with status 'pending'.
+Creates a new reservation. Status is `'pending'`, or `'pending_deposit'` when a deposit
+percentage is configured and the booking isn't manual (`isManual` not set).
 
-**Body:** `{ serviceId, date, requestedTime?, name, email, phone, notes?, sessionType?, branchId?, customerId? }`
+**Body:** `{ serviceId, date, requestedTime?, name, email, phone, notes?, sessionType?, branchId?, doctorName?, createdByEmployeeId?, isManual?, customerId? }`
 
 Required: serviceId, date, name, email, phone.
+
+`customerId`, if provided and it resolves to a real existing customer, links the reservation to
+that customer directly — bypassing the phone-based lookup/creation below entirely (used by the
+admin "Select Existing Patient" search picker). Otherwise the customer is looked up by phone
+(normalized via `normalizeEgyptMobile()`, trims + `+20`/`20` prefix — RISK-032) or created if no
+match.
+
+**Closed-day guard (RISK-034):** rejected with `400` if `date` falls on a weekday the branch (or,
+absent a branch, the default clinic hours) has marked closed — unless `isManual` is `true` (staff
+manual bookings can override to schedule a deliberate one-off exception).
 
 **Response:** Created reservation, status 201
 
@@ -188,9 +203,14 @@ Required: serviceId, date, name, email, phone.
 
 Updates a reservation. Supports three modes:
 
-**Approve:** `{ action: "approve", timeSlot, doctorName? }`
-- Validates: day not fully booked (< 8 approved), time slot not already taken
-- Sets status to 'approved', assigns timeSlot
+**Approve:** `{ action: "approve", timeSlot, doctorName?, date? }`
+- `date` (optional) lets staff change the appointment date at approval time — not just the time
+  slot — reusing the same field the `postpone` action already accepts. Defaults to the
+  reservation's existing `date` if omitted. Added so a request landing on an unavailable/closed
+  day (RISK-034) doesn't leave staff stuck with no valid slot to approve.
+- Validates room availability for the (possibly new) date and time slot; assigns a compatible
+  clinical room
+- Sets status to 'approved', assigns `timeSlot`, `date`, `doctorName`/`providerId`, `roomId`
 
 **Reject:** `{ action: "reject" }`
 - Sets status to 'rejected'
@@ -242,6 +262,50 @@ of free 15-minute slots exists to fit the service's duration. Uses branch-specif
 
 ---
 
+## GET /api/inventory/products
+
+Requires a staff bearer token. Returns every product (dual-storage: native `inventory_products`
+table if populated, else a `page_settings` JSON blob, seeded with defaults on first read).
+
+**Response:** `{ products: ProductItem[] }` — `{ id, name, arabic_name?, category, branch_id?, sku?, unit, purchase_price, selling_price, stock_quantity, min_reorder_quantity, status, role, notes?, created_at, updated_at }`
+
+`role` (`'retail' | 'consumable' | 'both'`, **added task 3B.3**, DEC-021) — whether this product is
+sold to patients, consumed in services, or both; filters the recipe picker in
+`POST /api/service-consumables` and is enforced at checkout by `applyCheckoutCosting`.
+
+---
+
+## POST /api/inventory/products
+
+Requires a staff bearer token. Creates a product.
+
+**Body:** `{ name, arabic_name?, category?, branch_id?, sku?, unit?, purchase_price, selling_price, stock_quantity?, min_reorder_quantity?, status?, role?, notes? }`
+
+Required: `name`, `purchase_price`, `selling_price`. `role` must be one of `retail`/`consumable`/`both`
+if provided (defaults `retail`). `status` auto-forces to `'Out of Stock'` if `stock_quantity` is 0.
+
+**Response:** Created product, status 201
+
+---
+
+## PUT /api/inventory/products
+
+Requires a staff bearer token. Updates a product — only fields present in the body change.
+
+**Body:** `{ id, ...any ProductItem field }`
+
+**Response:** Updated product
+
+---
+
+## DELETE /api/inventory/products?id={id}
+
+Requires a staff bearer token.
+
+**Response:** `{ success: true, id }`
+
+---
+
 ## GET /api/inventory/products/sales
 
 Requires a staff bearer token. Returns product-sale history.
@@ -270,6 +334,69 @@ After a successful native `product_sales` insert, the route additively attempts 
 
 **Response:** `{ success: true, sale: ProductSaleRecord, sales: ProductSaleRecord[] }` (`200`), or
 `{ success: false, error }` (`404` for a non-existent customer, `409` for insufficient stock, `400` for missing/invalid required fields)
+
+---
+
+## GET /api/inventory/devices
+
+Requires a staff bearer token. Returns every clinic device (dual-storage: native
+`inventory_devices` table if populated, else a `page_settings` blob), with `status` recomputed
+live from pulse counts vs. thresholds (`'Optimal' | 'Warning' | 'Maintenance Due'`, or
+`'Out of Service'` if manually set).
+
+**Response:** `{ devices: [...], history: [...] }` — each device:
+`{ id, name, model, serial_number, category, branch_id, initial_pulse_count, current_pulse_count, total_lifetime_pulses, warning_threshold_1, maintenance_threshold_2, lamp_replacement_cost, warning_1_notified, warning_2_notified, last_maintenance_date, status, notes, created_at, updated_at }`
+
+`lamp_replacement_cost` + `maintenance_threshold_2` (**added task 3B.4**) — read by
+`applyCheckoutCosting` in `/api/reservations` to snapshot `lamp_replacement_cost /
+max_pulses_limit × pulses_per_session` onto the invoice line's COGS. The real
+`inventory_devices` table only stores `total_pulses`/`max_pulses_limit` (see `DB_SCHEMA.md`) —
+`normalizeDeviceRow()` in this route maps those to the blob-shape field names
+(`current_pulse_count`/`maintenance_threshold_2`) every other reader of this route expects.
+
+---
+
+## POST /api/inventory/devices
+
+Requires a staff bearer token. Registers a device; writes a `'Device Created'` audit log entry.
+
+**Body:** `{ name, model?, serial_number?, category?, branch_id?, initial_pulse_count?, warning_threshold_1?, maintenance_threshold_2?, lamp_replacement_cost?, notes? }`
+
+Required: `name`. `lamp_replacement_cost` must be a non-negative number if provided.
+
+**Response:** Created device, status 201
+
+---
+
+## PUT /api/inventory/devices
+
+Requires a staff bearer token. Updates a device — only fields present in the body change.
+
+**Body:** `{ id, ...any device field }`
+
+**Response:** Updated device
+
+---
+
+## GET /api/inventory/devices/audit-logs
+
+Requires a staff bearer token. Returns the full maintenance/pulse-reset/creation audit trail for
+**all** devices (no filtering by device — the caller filters client-side), newest first. Reads the
+native `device_maintenance_history` table if populated, else a `page_settings` blob fallback.
+
+**Response:** `DeviceAuditLog[]` — `{ id, device_id, device_name, type, action_type, performed_by, date, starting_pulse_count?, ending_pulse_count?, pulses_delivered?, pulses_added?, reason?, notes?, details?, created_at }`
+
+---
+
+## POST /api/inventory/devices/audit-logs
+
+Requires a staff bearer token. Records one audit log entry (used internally by device creation,
+pulse resets, and maintenance edits — not typically called directly from the UI).
+
+**Body:** Any subset of `DeviceAuditLog` fields (all optional; `recordDeviceAuditLog()` fills
+sensible defaults for missing ones).
+
+**Response:** Created log entry, status 201
 
 ---
 
@@ -497,6 +624,19 @@ Callers filter client-side to what they need — mirrors the "return everything,
 convention already used by `GET /api/services` and `GET /api/packages`.
 
 **Response:** `{ packages: [{ id, packageId, packageName, packageNameAr, status, purchasedAt, expiresAt, pricePaid, items: [{ id, serviceId, serviceName, serviceNameAr, qtyTotal, qtyUsed, qtyRemaining }] }] }`
+
+---
+
+## GET /api/customers/package-redemptions?customer_id={id}
+
+Requires a staff bearer token. For one customer's booking history: which reservations were paid
+for (fully or partially) by redeeming a package session, which package that was, and when it was
+originally bought — joins `package_revenue_recognitions` back to `customer_packages`/`packages`,
+filtered to that customer. Lets the Booking History table show *why* a visit shows 0 EGP paid
+instead of leaving it unexplained, and stays accurate even if the package is later edited/
+discontinued, since it's sourced from the recognition event record, not the live package row.
+
+**Response:** `{ redemptions: [{ reservationId, recognisedAmount, recognisedAt, packageName, packageNameAr, packagePurchasedAt }] }`
 
 ---
 

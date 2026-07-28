@@ -2560,7 +2560,7 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 | 3B.9 | Suppliers: `/api/suppliers` CRUD endpoint + real UI under Inventory | 3B.1 | `DONE` | Claude | ef9ecff |
 | 3B.10 | Purchases: real UI under Inventory wired to `POST /api/purchases` | 3B.9 | `DONE` | Claude | ef9ecff |
 | 3B.11 | Delete the orphaned Suppliers/Purchases/Batch Management mock screens | 3B.9, 3B.10 | `DONE` | Claude | 23ea00e |
-| 3B.12 | `API_CONTRACT.md` + `DB_SCHEMA.md` rollup for Phase 3B | rolling | `TODO` | — | — |
+| 3B.12 | `API_CONTRACT.md` + `DB_SCHEMA.md` rollup for Phase 3B | rolling | `DONE` | Claude | pending commit |
 | 3B.13 | Packages public display on the marketing site (DEC-034) | 3B.8 | `DONE` | Claude | pending commit |
 | 3B.14 | Package sell/redeem UI + checkout redemption + patient package/promo awareness (DEC-035) | 3B.8, 3B.13 | `DONE` | Claude | pending commit |
 | 3B.15 | Activate "Marketing" nav section; extract Promotions, re-parent Packages (DEC-036) | 3B.8 | `DONE` | Claude | pending commit |
@@ -3117,6 +3117,29 @@ documented, and that every route whose **mapper changed** (`/api/services`,
 that second half is the one a rollup usually misses, because the endpoint list looks unchanged.
 
 Close this out last.
+
+**Done 2026-07-29.** `DB_SCHEMA.md` was already in sync (checked table-by-table against every
+Phase 3B/finance table — `inventory_products.role`, `inventory_devices.lamp_replacement_cost`/
+`max_pulses_limit`, `service_consumables`, `service_devices`, `suppliers`,
+`purchases`/`purchase_lines` were all already documented accurately from earlier incremental
+updates). `API_CONTRACT.md` had the real gaps this task warns about:
+- **Missing entirely:** base `GET/POST/PUT/DELETE /api/inventory/products` and
+  `/api/inventory/devices` CRUD (only their `/sales`/`/reconcile` sub-routes were documented),
+  and `/api/inventory/devices/audit-logs` (added by a parallel session, never rolled up here).
+  `GET /api/customers/package-redemptions` (added this session, 3B.14 follow-up) was also missing.
+- **Stale mapper shapes:** `GET /api/services`'s documented `ServiceRow` was missing
+  `duration_minutes` (added task 3B.2, 2026-07-25 — over a week undocumented); `GET /api/reservations`'s
+  response was missing more than half its actual fields (`serviceIds`, `isManual`, `amountPaid`,
+  `amountLeft`, `roomId`, `rooms`, `createdByEmployeeId`, `services`, `providerId`,
+  `followUpDate`); `POST /api/reservations` didn't mention `isManual`, `customerId`, or the
+  RISK-034 closed-day guard; the `approve` action's doc hadn't caught up to the new `date` field
+  or the real room-availability validation logic.
+
+One correction while verifying: my first draft of the `audit-logs` doc entry guessed a
+`?deviceId=` filter and an `{ auditLogs: [...] }` wrapper from the endpoint's name alone — the
+actual route has no filter param and returns a plain array. Caught by reading the route file
+before finalizing, not by assuming from the URL shape; left as a reminder to always verify against
+the code, not the name.
 
 ---
 
