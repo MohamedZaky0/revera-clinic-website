@@ -458,6 +458,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // Reject a booking on a day the clinic (branch) is marked closed. The client already
+    // filters these out in BookingModal, but this route has no server-side auth (CLAUDE.md
+    // rule 3) — a client bug (one was found live: a doctor's same-weekday schedule entry could
+    // silently reopen a day the branch itself had marked closed) or a direct API call must not
+    // be able to create a real booking on a closed day. Manual/staff bookings can override this,
+    // since staff sometimes need to schedule a deliberate one-off exception.
+    if (!body.isManual) {
+      try {
+        let serviceHoursForBranch: any[] = [];
+        if (branchId) {
+          const { data: bData } = await supabaseServer
+            .from('branches')
+            .select('service_hours')
+            .eq('id', branchId)
+            .maybeSingle();
+          if (bData && Array.isArray(bData.service_hours) && bData.service_hours.length > 0) {
+            serviceHoursForBranch = bData.service_hours;
+          }
+        }
+        if (serviceHoursForBranch.length === 0) {
+          const { data: pageSet } = await supabaseServer
+            .from('page_settings')
+            .select('value')
+            .eq('key', 'home')
+            .maybeSingle();
+          serviceHoursForBranch = pageSet?.value?.footer?.serviceHours || [];
+        }
+        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const weekdayName = weekdays[new Date(date).getDay()];
+        const clinicDay = serviceHoursForBranch.find((sh: any) => sh.day?.toLowerCase() === weekdayName.toLowerCase());
+        if (clinicDay && clinicDay.isOpen === false) {
+          return NextResponse.json(
+            { error: `The clinic is closed on ${weekdayName}s. Please choose another available date.` },
+            { status: 400 }
+          );
+        }
+      } catch (e) {
+        console.error('Could not validate clinic hours for requested date:', e);
+      }
+    }
+
     if (email) {
       const cleanEmail = email.trim().toLowerCase();
       const { data: employeeCheck, error: empCheckError } = await supabaseServer

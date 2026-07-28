@@ -17,10 +17,14 @@
 | Date | Check | Environment | Evidence | Result |
 |---|---|---|---|---|
 | 2026-07-28 | Section 3, live test: sold a package to a real patient (3 services), booked one of the covered services, opened checkout | dev, real admin session | "Apply from package" never appeared. First suspected cause (real bug, fixed regardless): `GET /api/customers/packages` returned `customer_package_items.service_id` (a `bigint`) without the `Number(...)` coercion every other reader of this column applies — fixed in the API route and defensively at the comparison site. Retested, still failed — direct DB check (`scratch/check_hamada_package.ts`) found the **actual** cause: the test booking's phone was entered with a trailing space (`"01231456123 "`), so `POST /api/reservations`'s exact-match customer lookup (`.eq('mobile', phone)`) didn't match the existing "01231456123" customer the package was sold to and silently created a 5th duplicate "Hamada" customer instead — the booking's `customer_id` never matched the package owner's. Fixed by reusing `normalizeEgyptMobile()` (already existed in `src/lib/customerIdentity.ts`) in that lookup. | FAIL → both causes fixed, pending re-test on a fresh booking |
+| 2026-07-29 | Section 1, live test: created a Promotion via the (newly-extracted) Promotions admin UI | dev, real admin session | Appeared to save in the UI but never persisted, and never showed on the public site. Direct DB check (`scratch/check_promotions.ts`) confirmed zero services had ever had a promotion in `branch_pricing`. Reproduced the exact failure directly (`scratch/test_promotion_upsert.ts`): Postgres 428C9 — `services.id` had regressed to `GENERATED ALWAYS AS IDENTITY` (see RISK-033), which rejects any upsert carrying an explicit `id`, i.e. every edit to an *existing* service. Fix written (`20260729000000_fix_services_id_identity_generation.sql`) but **not yet applied** — requires the user to run `npx supabase db push` (blocked from unattended DB migrations). | FAIL → fix written, pending migration apply + re-test |
 
 ## Per-check list
 
 ### 1. Promotions are enforced at deposit + checkout (RISK-030)
+
+> **Run `npx supabase db push` first** (applies the pending `services.id` identity fix, RISK-033
+> — without it, no promotion or service edit will actually persist, no matter what the UI shows).
 
 - [ ] In admin → Services → Promotions, set an active percentage or fixed discount on one service
       at one branch.

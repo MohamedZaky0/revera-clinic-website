@@ -514,13 +514,19 @@ export function BookingModal() {
       }
     });
 
+    // Clinic-level closure always wins — a doctor having a same-weekday schedule entry (e.g.
+    // configured to work every day regardless of clinic hours) must never reopen a day the
+    // clinic itself is closed. Previously this was only checked in the `!found` branch below,
+    // so any doctor with a Friday entry silently made Friday bookable even when the branch's
+    // service_hours marked Friday closed.
+    if (clinicClosed) {
+      return { start: "23:59", end: "23:59" };
+    }
+
     if (found) {
       if (minStart < clinicStartMins) minStart = clinicStartMins;
       if (maxEnd > clinicEndMins) maxEnd = clinicEndMins;
     } else {
-      if (clinicClosed) {
-        return { start: "23:59", end: "23:59" };
-      }
       minStart = clinicStartMins;
       maxEnd = clinicEndMins;
     }
