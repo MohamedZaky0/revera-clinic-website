@@ -32,3 +32,15 @@
       valid dates.
 - [ ] Reject/cancel the pre-existing bad test booking for 2026-07-31 via the normal admin
       "Reject" action, since no direct DB cleanup was performed for it.
+
+### Approve modal — change date/hour instead of being stuck
+
+- [ ] Open the "Approve" modal for the 2026-07-31 (Friday) test booking (or a fresh one on a
+      closed day) → confirm a new "Appointment date" field is shown alongside the time slot, and
+      a red "No time slots available on this date" note appears since it's a closed day.
+- [ ] Confirm "Confirm approve" is disabled while the date has no valid slot.
+- [ ] Change the date to an open day → confirm the time-slot dropdown repopulates with real
+      options, the warning disappears, and "Confirm approve" becomes enabled.
+- [ ] Approve with the new date → confirm the reservation's `date`/`time_slot` update to the
+      newly-picked values (not the originally requested Friday), status becomes `approved`, and
+      a room/doctor are still assigned correctly for the new date.

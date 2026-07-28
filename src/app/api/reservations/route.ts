@@ -770,6 +770,11 @@ export async function PATCH(req: Request) {
     if (action === 'approve') {
       if (!timeSlot) return NextResponse.json({ error: 'Missing timeSlot' }, { status: 400 });
 
+      // Staff can change the date at approval time (e.g. the requested date turned out to be a
+      // closed day, or is simply already fully booked) — reuses the same `date` field the
+      // `postpone` action already accepts, rather than adding a second, separate parameter.
+      const approveTargetDate = newDate || target.date;
+
       let chosenRoomId: string | null = null;
       let serviceCompRoomIds: string[] = [];
 
@@ -832,7 +837,7 @@ export async function PATCH(req: Request) {
         const { data: dayBookings, error: bookingsError } = await supabaseServer
           .from('reservations')
           .select('id, room_id, time_slot, service_id')
-          .eq('date', target.date)
+          .eq('date', approveTargetDate)
           .eq('status', 'approved')
           .not('room_id', 'is', null);
 
@@ -935,6 +940,7 @@ export async function PATCH(req: Request) {
         .from('reservations')
         .update({
           status: 'approved',
+          date: approveTargetDate,
           time_slot: timeSlot,
           doctor_name: doctorName || null,
           provider_id: await resolveProviderId(doctorName),

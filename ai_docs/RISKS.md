@@ -1413,9 +1413,19 @@ future client bug or direct API call to create the same kind of booking.
   falls on a weekday the branch (or, absent a branch, the default clinic hours) has marked closed.
   Deliberately skipped when `body.isManual` is true, since staff manually creating a booking may
   need to schedule a genuine one-off exception.
+- **Follow-up, same day:** the admin "Approve" modal (`admin/page.tsx`, `openApprove`/`approve`)
+  had no way to change the requested date at all — only the time slot, fixed to whatever date the
+  patient originally picked. Combined with the bug above, a bad request landing on a closed day
+  left staff stuck: unable to approve (no valid slot exists) and with no way to fix it short of
+  rejecting the whole request. Added an "Appointment date" field to the approve modal — changing
+  it re-derives available slots for the new date (reusing the existing, already-correct
+  `getDayOperatingHoursApprove`), and `PATCH /api/reservations` (`action: 'approve'`) now accepts
+  the same `date` field the `postpone` action already uses, updating the reservation's date/room/
+  slot availability check against the newly-chosen date instead of the original one.
 
-**Not fixed here:** the specific bad test booking already created for 2026-07-31 — reject/cancel
-it via the normal admin "Reject" action on that pending request; no direct DB cleanup was done.
+**Not fixed here:** the specific bad test booking already created for 2026-07-31 — either approve
+it now with a corrected date via the fixed modal, or reject it via the normal admin "Reject"
+action; no direct DB cleanup was done.
 
 ---
 

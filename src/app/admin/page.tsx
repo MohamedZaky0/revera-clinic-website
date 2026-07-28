@@ -1323,6 +1323,7 @@ export default function AdminPage() {
   const [loadingApproveId, setLoadingApproveId] = useState<string | null>(null);
   const [doctorName, setDoctorName] = useState<string>("Dr. Sara El Gamel");
   const [slot, setSlot] = useState<string>("12:00");
+  const [approveDate, setApproveDate] = useState<string>("");
   const [activeNav, setActiveNav] = useState("Bookings");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [providerTab, setProviderTab] = useState<"Doctors" | "Attendance">("Doctors");
@@ -7200,20 +7201,27 @@ export default function AdminPage() {
     return unavailable;
   }
 
+  // Shared by the initial open and by changing the date inside the approve modal — recomputes
+  // which time slots are actually pickable for whichever date is currently selected there.
+  async function refreshApproveAvailability(r: Req, dateStr: string) {
+    const branchParam = r.branchId ? `&branchId=${r.branchId}` : "";
+    const data = await fetch(`/api/availability?date=${dateStr}&serviceId=${r.serviceId}${branchParam}`).then((res) => res.json());
+    const { start, end } = getDayOperatingHoursApprove({ ...r, date: dateStr });
+    const unavailable = data && Array.isArray(data.unavailableSlots) ? data.unavailableSlots : [];
+    setApproveUnavailableSlots(unavailable);
+    const filteredSlots = SLOTS.filter((s) => {
+      const norm = normaliseTo24hSlot(s) ?? "";
+      return norm >= start && norm < end;
+    });
+    const first = filteredSlots.find((s) => !unavailable.includes(s)) || filteredSlots[0] || SLOTS[0];
+    setSlot(first);
+  }
+
   async function openApprove(r: Req) {
     setLoadingApproveId(r.id);
     try {
-      const branchParam = r.branchId ? `&branchId=${r.branchId}` : "";
-      const data = await fetch(`/api/availability?date=${r.date}&serviceId=${r.serviceId}${branchParam}`).then((res) => res.json());
-      const { start, end } = getDayOperatingHoursApprove(r);
-      const unavailable = data && Array.isArray(data.unavailableSlots) ? data.unavailableSlots : [];
-      setApproveUnavailableSlots(unavailable);
-      const filteredSlots = SLOTS.filter((s) => {
-        const norm = normaliseTo24hSlot(s) ?? "";
-        return norm >= start && norm < end;
-      });
-      const first = filteredSlots.find((s) => !unavailable.includes(s)) || filteredSlots[0] || SLOTS[0];
-      setSlot(first);
+      setApproveDate(r.date);
+      await refreshApproveAvailability(r, r.date);
       setDoctorName("Dr. Sara El Gamel");
       setSelected(r);
     } catch (err) {
@@ -7223,13 +7231,22 @@ export default function AdminPage() {
     }
   }
 
+  // Staff picking a different date than originally requested (e.g. the requested day turned out
+  // to be a closed day, or is already fully booked) — re-derives available slots for that date
+  // instead of forcing staff to reject the request just to change the date.
+  async function handleApproveDateChange(newDateStr: string) {
+    setApproveDate(newDateStr);
+    if (!selected) return;
+    await refreshApproveAvailability(selected, newDateStr);
+  }
+
   async function approve() {
     if (!selected) return;
     const res = await fetch(
       "/api/reservations?id=" + encodeURIComponent(selected.id),
       {
         method: "PATCH",
-        body: JSON.stringify({ action: "approve", timeSlot: slot, doctorName }),
+        body: JSON.stringify({ action: "approve", timeSlot: slot, doctorName, date: approveDate || selected.date }),
         headers: authenticatedJsonHeaders,
       }
     );
@@ -24176,8 +24193,18 @@ export default function AdminPage() {
               </button>
             </div>
             <p className="mb-4 text-sm text-[#5A6A51]">
-              Appoint on {selected.date}. Choose the available time slot below.
+              Requested for {selected.date}. Confirm the date and time slot below — change the
+              date if the requested one isn't available (e.g. a closed day).
             </p>
+            <label className="mb-2 block text-sm font-semibold text-[#414E36]">
+              Appointment date
+            </label>
+            <input
+              type="date"
+              value={approveDate || selected.date}
+              onChange={(e) => handleApproveDateChange(e.target.value)}
+              className="mb-4 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
+            />
             <label className="mb-2 block text-sm font-semibold text-[#414E36]">
               Time slot
             </label>
@@ -24187,7 +24214,7 @@ export default function AdminPage() {
               className="mb-4 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
             >
               {(() => {
-                const { start, end } = getDayOperatingHoursApprove(selected);
+                const { start, end } = getDayOperatingHoursApprove({ ...selected, date: approveDate || selected.date });
                 const filteredSlots = SLOTS.filter((s) => {
                   const norm = normaliseTo24hSlot(s) ?? "";
                   return norm >= start && norm < end;
@@ -24202,6 +24229,20 @@ export default function AdminPage() {
                 });
               })()}
             </select>
+            {(() => {
+              const { start, end } = getDayOperatingHoursApprove({ ...selected, date: approveDate || selected.date });
+              const hasSlots = SLOTS.some((s) => {
+                const norm = normaliseTo24hSlot(s) ?? "";
+                return norm >= start && norm < end;
+              });
+              if (hasSlots) return null;
+              return (
+                <p className="-mt-2 mb-4 text-xs font-semibold text-rose-600">
+                  No time slots available on this date — it may be a closed day for this branch,
+                  or fully booked. Pick a different date above.
+                </p>
+              );
+            })()}
 
             <label className="mb-2 block text-sm font-semibold text-[#414E36]">
               Assign Doctor
@@ -24225,7 +24266,8 @@ export default function AdminPage() {
               <button
                 type="button"
                 onClick={approve}
-                className="rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                disabled={approveUnavailableSlots.includes(slot) || !slot}
+                className="rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Confirm approve
               </button>
