@@ -26236,13 +26236,13 @@ export default function AdminPage() {
                 />
                 {matchedCustomerId && (
                   <p className="mt-1.5 flex items-center gap-2 text-[11px] font-semibold text-emerald-700">
-                    Linked to an existing patient record — this booking won't create a duplicate.
+                    ✓ Existing patient found{newPatientName ? `: ${newPatientName}` : ""}
                     <button
                       type="button"
                       onClick={() => setMatchedCustomerId(null)}
                       className="text-[#5A6A51] underline hover:text-[#414E36]"
                     >
-                      Unlink
+                      Not them?
                     </button>
                   </p>
                 )}
