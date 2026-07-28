@@ -7,6 +7,7 @@ import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/led
 import { computeCommission, consumptionCost, costPerPulse } from '@/lib/costing';
 import { deductInventoryStock } from '@/app/api/inventory/products/route';
 import { incrementDevicePulses } from '@/app/api/inventory/devices/route';
+import { normalizeEgyptMobile } from '@/lib/customerIdentity';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -475,12 +476,19 @@ export async function POST(req: Request) {
     }
 
     // 1. Lookup or create customer profile
+    // Phone is the identity anchor for matching an existing customer — normalized the same way
+    // isOwnIdentity() already does (trim + +20/20 prefix), so a stray trailing space or a
+    // "+20"-prefixed number doesn't silently create a duplicate customer distinct from the one
+    // an existing phone number resolves to (found via a live bug: a booking with an untrimmed
+    // phone got its own new customer row instead of matching the existing one a package had
+    // already been sold to, so the package never showed as redeemable for that booking).
+    const normalizedPhone = normalizeEgyptMobile(phone) || phone;
     let customerId: string | null = null;
     try {
       const { data: customer, error: customerError } = await supabaseServer
         .from('customers')
         .select('id, number_of_bookings, name, email')
-        .eq('mobile', phone)
+        .eq('mobile', normalizedPhone)
         .maybeSingle();
 
       if (customerError) {
@@ -509,7 +517,7 @@ export async function POST(req: Request) {
           .from('customers')
           .insert({
             name,
-            mobile: phone,
+            mobile: normalizedPhone,
             email: email || null,
             registration_date: new Date().toISOString(),
             active: true,
