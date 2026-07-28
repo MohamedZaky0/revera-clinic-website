@@ -1283,6 +1283,48 @@ whole Payment Settlement modal into its own module per DEC-027's "extract when t
 
 ---
 
+## RISK-032: An Untrimmed/Differently-Formatted Phone Number Silently Forked A Duplicate Customer (RESOLVED)
+
+**Manual test checklist:** `ai_docs/manual_tests/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md` (section
+4 covers the fix directly; the evidence log entry for section 3 documents how this was found).
+
+**Severity:** Medium · **Type:** Data integrity
+**Found:** 2026-07-28, live-testing package redemption (RISK-031/DEC-035 work) — a package sold to
+"Hamada Patient" (mobile `01231456123`) never showed as redeemable on a booking made minutes later
+for the same, visually-identical patient.
+**Status:** Resolved 2026-07-28.
+
+**What it is:** `POST /api/reservations`'s customer lookup did an exact string match —
+`.eq('mobile', phone)` — with no trimming or normalization of the phone value the client sent. A
+direct query against the dev database (`scratch/check_hamada_package.ts`) found the test booking's
+phone had been entered as `"01231456123 "` (one trailing space), which doesn't `=== "01231456123"`
+in Postgres either — so instead of matching the existing "Hamada Patient" customer (who already
+had the package), the route silently created a **new, 5th "Hamada"-named customer** and linked the
+reservation to that instead. Both records display identically in the UI ("Hamada Patient" /
+"01231456123") since nothing trims for display, so the fork was invisible until the package failed
+to show as redeemable and a raw DB query revealed the mismatch.
+
+**Consequence, beyond blocking package redemption:** this is a general customer-identity bug, not
+package-specific — a repeat patient with any incidental phone formatting difference (a stray
+space, a `+20` prefix, etc.) between bookings would silently accumulate duplicate customer rows,
+each with its own wallet/spend/outstanding history fragmented across the duplicates instead of one
+accurate patient record.
+
+**Fix:** `POST /api/reservations` now normalizes the phone with `normalizeEgyptMobile()`
+(`src/lib/customerIdentity.ts` — already existed, already used by `isOwnIdentity()` for the same
+class of problem on the patient-auth side, trims + normalizes `+20`/`20` prefixes) before the
+lookup and before storing on a newly-created customer. Also added: a "Select Existing Patient"
+search picker in the manual booking creation modal (`src/app/admin/page.tsx`), so staff can link a
+booking to a known customer's real id directly instead of relying on phone-string matching at all
+— `POST /api/reservations` now accepts an optional `customerId` that, when provided and valid,
+bypasses the phone-matching path entirely.
+
+**Not fixed here:** the handful of pre-existing duplicate customer rows this bug already created in
+the dev database (mock data, disposable) — cleanup deferred pending explicit approval for the
+database-mutation script, since Claude Code's auto-mode classifier blocks unattended DB writes.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:

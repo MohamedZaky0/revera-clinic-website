@@ -74,3 +74,18 @@
       quick succession from two tabs) → confirm the checkout still completes and charges
       correctly, and staff see a clear alert naming the failed redemption rather than a silent
       failure or a rolled-back checkout.
+
+### 4. Phone normalization + existing-patient picker (RISK-032)
+
+- [ ] In "Add Manual Reservation", type a partial name or phone into the new "Select Existing
+      Patient" search box → confirm matching patients from the already-loaded customer list appear,
+      selecting one auto-fills name/email/phone and shows the "Linked to an existing patient
+      record" note.
+- [ ] Create that booking → confirm no new duplicate customer is created (check the Customers list
+      count before/after), and the reservation's `customer_id` matches the selected patient's.
+- [ ] Click "Unlink", then manually retype the same patient's phone number with a deliberate
+      trailing space or leading `+20` → confirm the booking still resolves to the **same** existing
+      customer (no duplicate), verifying the `normalizeEgyptMobile()` fix independent of the picker.
+- [ ] Create a booking for a genuinely new phone number (no picker selection, no existing match) →
+      confirm a new customer is still created normally (this feature is additive, not a regression
+      of the fallback path).
