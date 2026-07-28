@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cachedFetch, prefetchUrl } from "@/lib/fetchCache";
-import { Category, ServiceItem, ALL_15MIN_SLOTS, getServiceDurationMinutes, normaliseTo24hSlot } from "@/lib/services";
+import { Category, ServiceItem, ALL_15MIN_SLOTS, getServiceDurationMinutes, normaliseTo24hSlot, getEffectiveServicePrice } from "@/lib/services";
 import { 
   getServiceToggles, 
   isServiceActive, 
@@ -202,6 +202,8 @@ export function BookingModal() {
 
   // Derived from dynamicServices — must be declared before useEffects that depend on it
   const selectedService = serviceId ? dynamicServices.find((service) => service.id === serviceId) : undefined;
+  // Resolves branch-scoped price + any active promotion — never the raw, undiscounted service.price
+  const effectiveServicePrice = selectedService ? getEffectiveServicePrice(selectedService, branchId, branches) : 0;
 
   // Clear serviceId if it doesn't support the selected sessionType
   useEffect(() => {
@@ -677,7 +679,7 @@ export function BookingModal() {
     
     setIsPaying(true);
     
-    const svcPrice = selectedService.price || 0;
+    const svcPrice = effectiveServicePrice;
     const depAmount = Math.round(svcPrice * (depositPercentage / 100));
     const remBalance = svcPrice - depAmount;
     
@@ -1141,7 +1143,7 @@ Attached is my payment transaction receipt photo.`;
                     <div className="mt-2 border-t border-[#414E36]/10 pt-2 text-xs space-y-1 text-[#414E36] font-medium">
                       <p>
                         <span className="font-semibold text-purple-800">{isRTL ? "عربون الحجز المطلـوب:" : "Required Deposit:"} </span>
-                        EGP {Math.round((selectedService.price || 0) * (depositPercentage / 100))} ({depositPercentage}%)
+                        EGP {Math.round(effectiveServicePrice * (depositPercentage / 100))} ({depositPercentage}%)
                       </p>
                     </div>
                   )}
@@ -1378,15 +1380,15 @@ Attached is my payment transaction receipt photo.`;
                 <div className="rounded-2xl border border-[#C4AE7C]/20 bg-[#FBFBF9] p-4 text-xs space-y-2 text-[#1F251A]">
                   <div className="flex justify-between">
                     <span className="opacity-70">{isRTL ? "سعر الخدمة الإجمالي:" : "Service Price:"}</span>
-                    <span className="font-semibold">EGP {selectedService?.price || 0}</span>
+                    <span className="font-semibold">EGP {effectiveServicePrice}</span>
                   </div>
                   <div className="flex justify-between text-purple-700 font-bold">
                     <span>{isRTL ? `عربون الحجز المطلـوب (${depositPercentage}%):` : `Required Deposit (${depositPercentage}%):`}</span>
-                    <span>EGP {Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
+                    <span>EGP {Math.round(effectiveServicePrice * (depositPercentage / 100))}</span>
                   </div>
                   <div className="border-t border-dashed border-[#C4AE7C]/20 pt-2 flex justify-between font-bold">
                     <span>{isRTL ? "المبلغ المتبقي بالعيادة:" : "Remaining Balance (Pay at Clinic):"}</span>
-                    <span>EGP {(selectedService?.price || 0) - Math.round((selectedService?.price || 0) * (depositPercentage / 100))}</span>
+                    <span>EGP {effectiveServicePrice - Math.round(effectiveServicePrice * (depositPercentage / 100))}</span>
                   </div>
                 </div>
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { getServiceDurationMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot, getEffectiveServicePrice } from '@/lib/services';
+import { getServiceDurationMinutes, ALL_15MIN_SLOTS, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from '@/lib/services';
 import { computeSettledBalances } from '@/lib/billing';
 import { requireAdministratorAccess, requireStaffAccess } from '@/lib/access';
 import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
@@ -289,19 +289,21 @@ async function writeCheckoutInvoice(params: {
   if (svcErr) throw svcErr;
   if (!services || services.length === 0) return;
 
-  const lines = services.map((svc: any) =>
-    buildInvoiceLine({
+  const lines = services.map((svc: any) => {
+    const priceDetails = getServicePriceDetails(
+      { price: svc.price !== null ? Number(svc.price) : 0, branchPricing: svc.branch_pricing },
+      targetBranchName
+    );
+    return buildInvoiceLine({
       lineType: 'service',
       description: svc.en || `Service #${svc.id}`,
       qty: 1,
-      unitPrice: getEffectiveServicePrice(
-        { price: svc.price !== null ? Number(svc.price) : 0, branchPricing: svc.branch_pricing },
-        targetBranchName
-      ),
+      unitPrice: priceDetails.basePrice,
+      discount: priceDetails.basePrice - priceDetails.discountedPrice,
       serviceId: svc.id,
       providerId: providerId ?? undefined,
-    })
-  );
+    });
+  });
 
   const totals = buildInvoiceTotals(lines);
 

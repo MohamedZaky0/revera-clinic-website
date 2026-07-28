@@ -1100,6 +1100,64 @@ second booking, not the first.
 
 ---
 
+## RISK-030: Promotions Discounts Are Marketing-Only — Never Applied At Booking Or Checkout, And Business Value Is Undefined (RESOLVED)
+
+**Severity:** Medium · **Type:** Product definition / customer trust
+**Found:** 2026-07-28, while comparing the Packages admin feature (3B.8) to the Promotions nav
+tab, during a documentation pass — not a user-reported bug.
+**Status:** Resolved 2026-07-28 — product decision made: promotions are a real, checkout-enforced
+discount (not a marketing-only teaser). Clarification from the dev team that promotions are
+"connected to the Branches table" was correct but answered a different question — that's how a
+promotion is *scoped* (per-branch, via `branchPricing[]`), not whether it was *enforced* when
+money changed hands. Investigation found most charge paths already called the correct
+`getEffectiveServicePrice()` helper (booking creation, admin checkout/invoice-preview); three
+remaining gaps were fixed: (1) `BookingModal.tsx`'s deposit calc/display used the raw
+undiscounted `selectedService.price` instead of `getEffectiveServicePrice()`; (2) admin's
+"Mark Deposit as Paid" panel (`admin/page.tsx`, `pending_deposit` bookings) had the same raw-price
+bug; (3) `writeCheckoutInvoice()` in `api/reservations/route.ts` passed the already-discounted
+price as `unitPrice` with `discount` always `0`, so invoices never recorded that a promotion
+applied — now uses `getServicePriceDetails()` to record `unitPrice: basePrice` and
+`discount: basePrice - discountedPrice` (mirrors the existing `cogs_snapshot`/
+`commission_snapshot` write-once pattern), so `invoices.discount_total` is now populated and the
+actual charge (`line_total`) is unchanged.
+
+**What it is:** `admin/page.tsx`'s "Promotions" nav tab (`activeNav === "Promotions"`, lines
+~9352+) lets staff attach a percentage or fixed-amount discount, with optional start/end dates,
+to one service at one branch. Unlike RISK-004's old service-store pattern, this **does** persist
+for real: `handleSavePromotion`/`handleDeletePromotion`/`handleTogglePromotion` write into
+`branchPricing[].promotion` on the service object and call `syncServicesToApi`, which `POST`s to
+`/api/services` and lands in the real `services.branch_pricing` JSONB column. It survives a
+refresh and a different browser. So this is not the RISK-004/RISK-025 "parallel universe" bug —
+the data is real.
+
+**The gap:** the discount is only ever read back in one place —
+`getServicePriceDetails()` (`src/lib/services.ts:274-358`), consumed exclusively by
+`HomeServicesSection.tsx` and `ServicesSection.tsx` to render a "20% OFF" badge and a
+struck-through price on the public marketing pages. Nothing else reads it:
+- `BookingModal.tsx` prices a booking (and its deposit) off `selectedService.price` — the flat
+  top-level price — never `getServicePriceDetails()` or `branchPricing[].promotion`.
+- The admin checkout modal (`checkoutBooking`) computes `totalCost` from the service price the
+  same way; RISK-029's deposit fix didn't touch this path either.
+- No invoice/ledger code (`src/lib/ledger.ts`, `src/lib/billing.ts`) references `promotion` at
+  all.
+
+**Consequence:** a patient can see "SAVE 100 EGP" on the services page, then get quoted and
+charged the full undiscounted price the moment they actually book or check out — the discount
+never reaches money. That's a bait-pricing / trust problem for a clinic, not just a missing
+feature, and staff have no way to honor the advertised price without manually discounting at
+checkout (which nothing in the UI prompts them to do).
+
+**Open question — not resolved here, needs a product decision:** is Promotions meant to be a
+real, checkout-enforced discount (in which case it needs `getServicePriceDetails()` wired into
+`BookingModal` pricing/deposit calc and into `checkoutBooking`'s `totalCost`, plus a discount
+line on the invoice so reporting isn't misleading), or is it meant to stay a marketing-page-only
+"as low as" teaser with a disclaimer that final price is confirmed at booking? Either is a
+legitimate choice for a clinic, but right now the UI (percent off, a date range, an "Enabled"
+toggle) reads exactly like a real discount system, which is misleading for whoever configures it
+without reading the code. Log the decision in `DECISIONS.md` once made.
+
+---
+
 ## RISK-029: Checkout Charged The Full Service Price Again, Ignoring The Deposit Already Paid
 
 **Manual test checklist:** `ai_docs/RISK_029_MANUAL_TESTS.md` — covers this fix, the cancel/no-show

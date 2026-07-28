@@ -24896,7 +24896,7 @@ export default function AdminPage() {
                       </p>
                       {(() => {
                         const svc = localServices.find(s => s.id === viewingBooking.serviceId);
-                        const svcPrice = (svc && svc.price !== undefined) ? svc.price : 0;
+                        const svcPrice = getEffectiveServicePrice(svc, viewingBooking.branchId, branches);
                         const depVal = Math.round(svcPrice * (bookingDepositPercentage / 100));
                         return (
                           <div className="rounded-xl bg-white p-3 text-xs space-y-1 text-purple-900 font-semibold border border-purple-200">
@@ -24914,7 +24914,7 @@ export default function AdminPage() {
                       <button
                         onClick={async () => {
                           const svc = localServices.find(s => s.id === viewingBooking.serviceId);
-                          const svcPrice = (svc && svc.price !== undefined) ? svc.price : 0;
+                          const svcPrice = getEffectiveServicePrice(svc, viewingBooking.branchId, branches);
                           const depVal = Math.round(svcPrice * (bookingDepositPercentage / 100));
                           const remaining = svcPrice - depVal;
 
