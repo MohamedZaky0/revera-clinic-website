@@ -3794,6 +3794,10 @@ export default function AdminPage() {
   };
 
   const handleOpenSellProductModal = (prod: any) => {
+    if (prod?.role === "consumable") {
+      alert("Consumable products are reserved for clinic service usage and cannot be sold to patients.");
+      return;
+    }
     setSelectedSellProduct(prod);
     setSellQuantity(1);
     setSellPatientPhone("");
@@ -11895,7 +11899,7 @@ export default function AdminPage() {
                                 className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                               >
                                 <option value="">-- Choose Product / Item --</option>
-                                {inventoryProducts.map((p) => (
+                                {inventoryProducts.filter((p) => p.role !== "consumable").map((p) => (
                                   <option key={p.id} value={p.id}>
                                     {p.name} ({p.category || 'Product'}) - EGP {p.selling_price || p.price || 0}
                                   </option>
@@ -18003,11 +18007,11 @@ export default function AdminPage() {
                                           <button
                                             type="button"
                                             onClick={() => handleOpenSellProductModal(prod)}
-                                            disabled={prod.stock_quantity <= 0}
+                                            disabled={prod.stock_quantity <= 0 || prod.role === 'consumable'}
                                             className="inline-flex items-center gap-1 rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 disabled:cursor-not-allowed"
-                                            title={prod.stock_quantity <= 0 ? "Out of Stock" : "Sell Product"}
+                                            title={prod.role === 'consumable' ? 'Consumable Only (Used in services only, not for retail sale)' : prod.stock_quantity <= 0 ? 'Out of Stock' : 'Sell Product'}
                                           >
-                                            <Tag size={13} /> Sell Product
+                                            <Tag size={13} /> {prod.role === 'consumable' ? 'Consumable Only' : 'Sell Product'}
                                           </button>
                                           <button
                                             type="button"

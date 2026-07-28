@@ -374,10 +374,19 @@ export async function POST(req: Request) {
     // record full revenue against a quantity the clinic never actually had in stock.
     const { data: productForStockCheck, error: stockCheckErr } = await supabaseServer
       .from('inventory_products')
-      .select('stock_quantity')
+      .select('stock_quantity, role')
       .eq('id', product_id)
       .maybeSingle();
     if (stockCheckErr) throw stockCheckErr;
+    if (productForStockCheck && (productForStockCheck as any).role === 'consumable') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Consumable products are reserved for clinic service usage and cannot be sold to patients.'
+        },
+        { status: 400 }
+      );
+    }
     if (productForStockCheck && Number(productForStockCheck.stock_quantity || 0) < Number(quantity)) {
       return NextResponse.json(
         {
