@@ -1961,6 +1961,8 @@ export default function AdminPage() {
   const [dateFilter, setDateFilter] = useState<string>("All");     // All, or "YYYY-MM-DD"
 
   // Form states for manual booking creation
+  const [patientSearchQuery, setPatientSearchQuery] = useState("");
+  const [showPatientSearchResults, setShowPatientSearchResults] = useState(false);
   const [newPatientName, setNewPatientName] = useState("");
   const [newPatientEmail, setNewPatientEmail] = useState("");
   const [newPatientPhone, setNewPatientPhone] = useState("");
@@ -7395,6 +7397,15 @@ export default function AdminPage() {
     fetchAllReservations();
   }
 
+  function selectExistingPatientForBooking(customer: any) {
+    setNewPatientName(customer.name || "");
+    setNewPatientEmail(customer.email || "");
+    setNewPatientPhone(customer.mobile || customer.phone || "");
+    setMatchedCustomerId(customer.id || null);
+    setPatientSearchQuery("");
+    setShowPatientSearchResults(false);
+  }
+
   async function handleManualPhoneChange(val: string) {
     setNewPatientPhone(val);
     setMatchedCustomerId(null);
@@ -7457,6 +7468,11 @@ export default function AdminPage() {
       name: newPatientName,
       email: newPatientEmail,
       phone: newPatientPhone,
+      // When staff explicitly picked an existing patient (search picker or a resolved phone
+      // match), link the reservation to that exact customer id directly — bypasses the
+      // phone-string-matching path entirely, so a typo/formatting difference in the phone field
+      // can never fork off a duplicate customer for a patient staff already identified.
+      customerId: matchedCustomerId || undefined,
       notes: finalNotes,
       sessionType: newPatientSessionType,
       status: newPatientStatus,
@@ -7499,6 +7515,9 @@ export default function AdminPage() {
       setNewPatientName("");
       setNewPatientEmail("");
       setNewPatientPhone("");
+      setMatchedCustomerId(null);
+      setPatientSearchQuery("");
+      setShowPatientSearchResults(false);
       setNewPatientDate("");
       setNewPatientTimeSlot("12:00");
       setNewPatientService(1);
@@ -26199,6 +26218,64 @@ export default function AdminPage() {
             </div>
 
             <div className="space-y-4">
+              {/* 0. Select an existing patient, instead of relying on the phone field to match one */}
+              <div className="relative">
+                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
+                  Select Existing Patient (optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Search patients by name or phone..."
+                  value={patientSearchQuery}
+                  onChange={(e) => {
+                    setPatientSearchQuery(e.target.value);
+                    setShowPatientSearchResults(e.target.value.trim().length > 0);
+                  }}
+                  onFocus={() => setShowPatientSearchResults(patientSearchQuery.trim().length > 0)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                />
+                {matchedCustomerId && (
+                  <p className="mt-1.5 flex items-center gap-2 text-[11px] font-semibold text-emerald-700">
+                    Linked to an existing patient record — this booking won't create a duplicate.
+                    <button
+                      type="button"
+                      onClick={() => setMatchedCustomerId(null)}
+                      className="text-[#5A6A51] underline hover:text-[#414E36]"
+                    >
+                      Unlink
+                    </button>
+                  </p>
+                )}
+                {showPatientSearchResults && patientSearchQuery.trim().length > 0 && (() => {
+                  const q = patientSearchQuery.trim().toLowerCase();
+                  const matches = dbCustomers
+                    .filter((c: any) => {
+                      const phone = String(c.mobile || c.phone || "").toLowerCase();
+                      return String(c.name || "").toLowerCase().includes(q) || phone.includes(q);
+                    })
+                    .slice(0, 8);
+                  return (
+                    <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-2xl border border-[#414E36]/15 bg-white shadow-lg">
+                      {matches.length === 0 ? (
+                        <p className="px-4 py-3 text-xs text-[#8A9A81] italic">No matching patients — filling in the fields below will create a new one.</p>
+                      ) : (
+                        matches.map((c: any) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => selectExistingPatientForBooking(c)}
+                            className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-[#EDF1EC] border-b border-[#414E36]/5 last:border-b-0"
+                          >
+                            <span className="font-semibold text-[#1F251A]">{c.name}</span>
+                            <span className="text-xs text-[#5A6A51]">{c.mobile || c.phone}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
               {/* 1. Phone Number at top */}
               <div>
                 <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number *</label>

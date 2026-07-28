@@ -452,7 +452,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId, doctorName, createdByEmployeeId } = body;
+    const { serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId, doctorName, createdByEmployeeId, customerId: explicitCustomerId } = body;
 
     if (!serviceId || !date || !name || !email || !phone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -485,11 +485,21 @@ export async function POST(req: Request) {
     const normalizedPhone = normalizeEgyptMobile(phone) || phone;
     let customerId: string | null = null;
     try {
-      const { data: customer, error: customerError } = await supabaseServer
-        .from('customers')
-        .select('id, number_of_bookings, name, email')
-        .eq('mobile', normalizedPhone)
-        .maybeSingle();
+      // Staff explicitly picked an existing patient (search picker, or an already-resolved phone
+      // match carried over from the form) — use that exact id directly rather than re-deriving
+      // one from the phone string. Falls through to the phone-lookup path below only if the id
+      // doesn't actually resolve to a real customer (e.g. stale/tampered client state).
+      const { data: explicitCustomer } = explicitCustomerId
+        ? await supabaseServer.from('customers').select('id, number_of_bookings, name, email').eq('id', explicitCustomerId).maybeSingle()
+        : { data: null };
+
+      const { data: customer, error: customerError } = explicitCustomer
+        ? { data: explicitCustomer, error: null }
+        : await supabaseServer
+            .from('customers')
+            .select('id, number_of_bookings, name, email')
+            .eq('mobile', normalizedPhone)
+            .maybeSingle();
 
       if (customerError) {
         console.error('Customer lookup error:', customerError);
