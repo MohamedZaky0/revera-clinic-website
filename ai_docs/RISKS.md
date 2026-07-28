@@ -1281,6 +1281,14 @@ own component, (2) `PatientPackagePromoBanner` (already a clean, prop-driven, ex
 function), and (3) the checkout modal's redemption logic, ideally alongside finally extracting the
 whole Payment Settlement modal into its own module per DEC-027's "extract when touched" clause.
 
+**Partial update, 2026-07-29 (DEC-036):** while activating the "Marketing" nav section (moving
+Promotions + Packages' admin screens out from under Services/their own top-level item), Promotions
+was extracted into `src/components/admin/marketing/PromotionsAdminPanel.tsx` — this closes the
+Promotions half of DEC-027 compliance (Promotions wasn't part of this risk's original scope, since
+it predated DEC-027 and hadn't been touched yet; it's now been touched, and extracted properly).
+**The original subject of this risk — the customer-profile "Packages" tab, `PatientPackagePromoBanner`,
+and the checkout modal's redemption logic — is still unextracted and still open.**
+
 ---
 
 ## RISK-032: An Untrimmed/Differently-Formatted Phone Number Silently Forked A Duplicate Customer (RESOLVED)

@@ -2563,6 +2563,7 @@ Phase 4's task 4.5 split the cleanup between them — see both.
 | 3B.12 | `API_CONTRACT.md` + `DB_SCHEMA.md` rollup for Phase 3B | rolling | `TODO` | — | — |
 | 3B.13 | Packages public display on the marketing site (DEC-034) | 3B.8 | `DONE` | Claude | pending commit |
 | 3B.14 | Package sell/redeem UI + checkout redemption + patient package/promo awareness (DEC-035) | 3B.8, 3B.13 | `DONE` | Claude | pending commit |
+| 3B.15 | Activate "Marketing" nav section; extract Promotions, re-parent Packages (DEC-036) | 3B.8 | `DONE` | Claude | pending commit |
 
 ---
 
@@ -3188,6 +3189,45 @@ row is created, and confirm redemption is correctly disabled when a deposit was 
 
 **Done 2026-07-28.** See DEC-035, RISK-031. Typecheck/lint clean; end-to-end browser verification
 against the dev database is still outstanding.
+
+---
+
+## 3B.15 — Activate "Marketing" nav section; extract Promotions, re-parent Packages
+
+**Depends on 3B.8.**
+
+**Measured state:** Promotions was its own top-level sidebar item, fully inline in
+`admin/page.tsx` (~530 lines: state, handlers, JSX). Packages' admin screen
+(`PackageAdminPanel.tsx`, already a proper submodule) lived as a sub-tab under Services
+("Package Offers"). The sidebar already had an unused `Marketing` placeholder
+(`comingSoon: true`). Prompted by the user pointing out Promotions and Packages are both
+"marketing offers" and asking to consolidate them, with "Marketing Campaigns" (an existing
+orphaned SMS-blast mock screen) reserved as a third tab later.
+
+**What:** activated `Marketing` as a real submenu-parent sidebar entry (mirrors the existing
+`Settings` submenu pattern — a `marketingExpanded` toggle, sub-items `Promotions`/`Packages`).
+Extracted Promotions in full (state + handlers + JSX) into
+`src/components/admin/marketing/PromotionsAdminPanel.tsx`, taking `localServices`,
+`setLocalServices`, `branches`, `syncServicesToApi` as props (kept as props rather than an
+independent fetch/save cycle, since the handlers read-modify-write the *entire* shared services
+array and an independent cycle would risk racing/going stale against unsaved Services-tab edits).
+Re-parented `PackageAdminPanel` from the Services tab bar to its own `activeNav === "Packages"`
+destination — no changes to the component itself. Reused the existing `"services"` permission
+scope for both (see DEC-036) rather than introducing a new `marketing.*` scope, to keep this a
+pure nav reorganization.
+
+**Where it lives:** `src/components/admin/marketing/PromotionsAdminPanel.tsx` (new); sidebar/
+permission wiring in `src/app/admin/page.tsx` (`SIDEBAR_ITEMS`, the three `parentScreenMap`s, the
+new `Marketing` submenu branch).
+
+**Verify:** full checklist in `ai_docs/manual_tests/PACKAGES_AND_PROMOTIONS_MANUAL_TESTS.md`
+(section 5) — sidebar shows "Marketing" (no longer greyed out) with Promotions/Packages as
+sub-items; both work identically to before the move; Services' tab bar no longer shows "Package
+Offers"; a non-superadmin role with existing `services.*` permissions still sees Marketing (i.e.
+the permission-scope reuse didn't change who can see what).
+
+**Done 2026-07-29.** See DEC-036, RISK-031 (partial update). Typecheck/lint clean; end-to-end
+browser verification against the dev database is still outstanding.
 
 ---
 

@@ -4,12 +4,13 @@
 > **Environment:** linked dev database. All current data is mock and may be reset. Use a staff
 > bearer token (a real logged-in admin session) for every staff-side check below.
 >
-> Covers three pieces shipped 2026-07-28, in the order they should be tested (each depends on data
-> from the last): (1) promotions actually charging the discounted price — RISK-030 in
+> Covers five pieces shipped 2026-07-28/29, in the order they should be tested (each depends on
+> data from the last): (1) promotions actually charging the discounted price — RISK-030 in
 > `ai_docs/RISKS.md`; (2) packages showing on the public site — DEC-034 in `ai_docs/DECISIONS.md`;
-> (3) selling/redeeming a package from admin — DEC-035 in `ai_docs/DECISIONS.md`. See
-> `ai_docs/RISKS.md` → RISK-031 for a known architecture-debt item found while shipping (3),
-> unrelated to correctness.
+> (3) selling/redeeming a package from admin — DEC-035 in `ai_docs/DECISIONS.md`; (4) phone
+> normalization + the existing-patient picker — RISK-032; (5) activating the "Marketing" nav
+> section and extracting Promotions/re-parenting Packages — DEC-036. See `ai_docs/RISKS.md` →
+> RISK-031 for a known architecture-debt item found while shipping (3), partially resolved by (5).
 
 ## Evidence log
 
@@ -96,3 +97,16 @@
 - [ ] Create a booking for a genuinely new phone number (no picker selection, no existing match) →
       confirm a new customer is still created normally (this feature is additive, not a regression
       of the fallback path).
+
+### 5. Marketing nav section activated (DEC-036)
+
+- [ ] As superadmin, confirm the sidebar shows "Marketing" (no longer greyed out/disabled) with a
+      chevron; expanding it shows "Promotions" and "Packages"; the old standalone "Promotions"
+      sidebar entry is gone.
+- [ ] Click "Promotions" → confirm the same list/filters/add/edit/delete/toggle behavior as
+      before the move (this must be identical — it's a pure relocation, not a rewrite).
+- [ ] Click "Packages" → confirm the same `PackageAdminPanel` UI as before (previously under
+      Services → "Package Offers"); confirm the Services tab bar no longer shows "Package Offers".
+- [ ] As a non-superadmin role that currently has `services.*` permissions (or the literal
+      `"Promotions"` permission string): confirm Marketing/Promotions/Packages are still visible —
+      the permission-scope reuse (DEC-036) must not have changed who can see what.

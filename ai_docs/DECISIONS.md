@@ -1010,4 +1010,51 @@ questions: where should "use a session" happen, and how strictly should it be ga
   packages once past the coarse role-list gate — consistent with existing Products-tab precedent,
   not a new gap introduced here.
 
+---
+
+## DEC-036: Promotions + Packages Live Under A "Marketing" Nav Section, Not Their Own Top-Level Items
+
+**Date:** 2026-07-29
+**Status:** Decided — active
+
+**Context:**
+Promotions was its own top-level sidebar item, fully inline in `admin/page.tsx`. Packages' admin
+screen (`PackageAdminPanel.tsx`, already a proper DEC-027-compliant submodule) lived as a sub-tab
+under Services ("Package Offers"). The user pointed out both are conceptually "marketing offers"
+and asked to consolidate them under the sidebar's existing `Marketing` placeholder
+(`comingSoon: true`, unused until now), with "Marketing Campaigns" (an existing orphaned SMS-blast
+mock screen) reserved as a third tab **later**.
+
+**Chosen Option:**
+- Activated `Marketing` as a real submenu-parent sidebar entry (mirrors the existing `Settings`
+  submenu pattern exactly — a `marketingExpanded` toggle, a literal sub-items array, not a
+  generic data-driven submenu). Sub-items: `Promotions`, `Packages`. `Marketing Campaigns` is
+  deliberately left out of that array for now — its existing (orphaned) JSX block is untouched,
+  so adding it later is a one-line addition.
+- Extracted Promotions in full (state + handlers + JSX, ~530 lines) into a new
+  `src/components/admin/marketing/PromotionsAdminPanel.tsx`, taking `localServices`,
+  `setLocalServices`, `branches`, `syncServicesToApi` as props — this is the DEC-027
+  "extract when touched" trigger, since the move required touching this code anyway.
+- Re-parented `PackageAdminPanel` from the Services tab bar to its own `activeNav === "Packages"`
+  destination — no changes to the component itself, since it already self-fetches everything via
+  `session`.
+- **Reused the existing `"services"` permission-prefix scope** for both `Promotions` and
+  `Packages` in all three `parentScreenMap`s that gate sidebar visibility/access (rather than
+  introducing a new `marketing.*` permission scope). This was a deliberate, explicit choice to
+  keep this a pure nav reorganization — who can see Promotions/Packages must not change as a side
+  effect of moving menus around.
+
+**Reason:**
+- Matches how staff actually think about these features ("what deals are we running"), not how
+  the codebase happened to grow them.
+- Reduces `admin/page.tsx`'s size and finally makes Promotions DEC-027-compliant, without
+  redesigning RBAC in the same change (a separate, unrequested risk).
+
+**Trade-offs:**
+- The customer-profile "Purchased Packages" tab and checkout redemption logic (RISK-031/DEC-035)
+  are customer *data*, not marketing *configuration* — they intentionally stay where they are,
+  under Customers/booking flows, not moved here.
+- `PromotionsAdminPanel` still shares the page-level `localServices` array by props rather than
+  self-fetching (unlike `PackageAdminPanel`) — matches its pre-existing read-modify-write-the-
+  whole-array behavior, but means it's not as fully decoupled from `admin/page.tsx` as Packages is.
 
