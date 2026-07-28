@@ -3,21 +3,26 @@ import { supabaseServer } from '@/lib/supabaseServer';
 import { verifyHrAccess } from '@/lib/auth';
 
 async function getCommissionSnapshots(reservationIds: string[]): Promise<Map<string, number>> {
-  if (reservationIds.length === 0) return new Map();
+  const isValidUuid = (str: any) =>
+    typeof str === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(str).trim());
+
+  const validReservationIds = (reservationIds || []).filter((id: any) => isValidUuid(id));
+  if (validReservationIds.length === 0) return new Map();
 
   const { data: invoices, error: invoicesError } = await supabaseServer
     .from('invoices')
     .select('id, reservation_id')
-    .in('reservation_id', reservationIds);
+    .in('reservation_id', validReservationIds);
   if (invoicesError) throw invoicesError;
 
-  const invoiceIds = (invoices || []).map((invoice: any) => invoice.id);
-  if (invoiceIds.length === 0) return new Map();
+  const validInvoiceIds = (invoices || []).map((invoice: any) => invoice.id).filter((id: any) => isValidUuid(id));
+  if (validInvoiceIds.length === 0) return new Map();
 
   const { data: invoiceLines, error: linesError } = await supabaseServer
     .from('invoice_lines')
     .select('invoice_id, commission_snapshot')
-    .in('invoice_id', invoiceIds);
+    .in('invoice_id', validInvoiceIds);
   if (linesError) throw linesError;
 
   const reservationByInvoice = new Map<string, string>((invoices || []).map((invoice: any) => [String(invoice.id), String(invoice.reservation_id)]));
@@ -172,7 +177,7 @@ export async function POST(req: Request) {
     const [resResult, servicesResult] = await Promise.all([
       supabaseServer
         .from('reservations')
-        .select('provider_id, status, date, amount_paid, amount_left, service_id')
+        .select('id, provider_id, status, date, amount_paid, amount_left, service_id')
         .like('date', `${month}-%`),
       supabaseServer
         .from('services').select('id, price')
