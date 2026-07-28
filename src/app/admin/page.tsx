@@ -5270,6 +5270,7 @@ export default function AdminPage() {
       .then((data) => {
         if (data && data.name) {
           fetchProviders();
+          fetchRolesAndEmployees();
           setShowProviderModal(false);
           setEditingDoctorInline(null);
           alert(isEdit ? "Provider updated successfully!" : "Provider added successfully!");
@@ -19206,6 +19207,8 @@ export default function AdminPage() {
                           const shortId = emp.employee_id?.includes("@")
                             ? emp.employee_id.split("@")[0]
                             : emp.id?.slice(0, 8);
+                          const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
+                          const effectiveSalary = matchProv ? (matchProv.fixedSalary ?? matchProv.fixed_salary ?? emp.salary ?? 0) : (emp.salary || 0);
                           return (
                             <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
                               <td className="px-6 py-4 text-xs font-mono font-bold text-[#5A6A51]">{shortId}</td>
@@ -19241,7 +19244,7 @@ export default function AdminPage() {
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-xs font-bold text-[#1F251A]">
-                                {Number(emp.salary || 0).toLocaleString()} EGP
+                                {Number(effectiveSalary).toLocaleString()} EGP
                               </td>
                               <td className="px-6 py-4 text-center">
                                 <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
@@ -19270,7 +19273,7 @@ export default function AdminPage() {
                                           setNewEmployeePhone(emp.phone || "");
                                           setNewEmployeeDepartment(emp.department || "Reception");
                                           updateShiftState(emp.shift || "Day");
-                                          setNewEmployeeSalary(String(emp.salary || 0));
+                                          setNewEmployeeSalary(String(effectiveSalary));
                                           setNewEmployeeNationalId(emp.national_id || "");
                                           setNewEmployeeNationalIdFront(emp.national_id_front || "");
                                           setNewEmployeeNationalIdBack(emp.national_id_back || "");
