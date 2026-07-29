@@ -3295,7 +3295,7 @@ browser verification against the dev database is still outstanding.
 | 4.2 | `hasFinancePermission` helper — short-circuits on `superadmin` only | — | `DONE` | Windsurf | 1b747fe |
 | 4.3 | Seed the `admin` role's permissions with `finance.*` by default | 4.1 | `DONE` | Windsurf | 1b747fe |
 | 4.4 | Wire the Finance sidebar entry through all 4 permission maps, as a `src/components/admin/Finance/` module | 4.1, 4.2, DEC-027 | `DONE` | Windsurf | 1b747fe |
-| 4.5 | Delete the ~4,000 lines of dead mock finance JSX | 4.4 (Finance nav must work before the old block is removed) | `DONE` | Windsurf | WAVE2 |
+| 4.5 | Delete the ~4,000 lines of dead mock finance JSX | 4.4 (Finance nav must work before the old block is removed) | `DONE` | Windsurf | ec828cf |
 | 4.6 | `GET /api/finance/pnl` — monthly P&L | 1.10, 1.11, 1.14, 2.11, 3.10–3.12 | `TODO` | — | — |
 | 4.7 | `GET /api/finance/service-margin` — per-service contribution margin | 2.9, 2.11 | `TODO` | — | — |
 | 4.8 | `GET /api/finance/doctor-pnl`, `GET /api/finance/branch-pnl` | 2.14, 4.6 | `TODO` | — | — |
