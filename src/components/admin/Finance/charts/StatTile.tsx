@@ -22,13 +22,13 @@ export function StatTile({
   accent = "primary",
 }: StatTileProps) {
   const accentColor =
-    accent === "accent" ? "var(--cr-accent, #C4AE7C)" : "var(--cr-primary, #414E36)";
+    accent === "accent" ? "var(--cr-accent)" : "var(--cr-primary)";
 
   return (
     <div
       className="flex flex-col rounded-2xl border p-5"
       style={{
-        backgroundColor: "var(--cr-white, #fff)",
+        backgroundColor: "var(--cr-white)",
         borderColor: "rgba(90, 106, 81, 0.12)",
       }}
     >
@@ -43,14 +43,14 @@ export function StatTile({
         )}
         <span
           className="text-xs font-semibold uppercase tracking-wider"
-          style={{ color: "var(--cr-primary, #1F251A)", opacity: 0.65 }}
+          style={{ color: "var(--cr-primary, var(--cr-dark))", opacity: 0.65 }}
         >
           {label}
         </span>
       </div>
       <div
         className="text-2xl font-semibold"
-        style={{ color: "var(--cr-primary, #1F251A)" }}
+        style={{ color: "var(--cr-primary, var(--cr-dark))" }}
       >
         {value}
       </div>
@@ -58,13 +58,13 @@ export function StatTile({
         <div className="mt-2 flex items-center gap-2 text-xs">
           <span
             style={{
-              color: trend.positive ? "var(--cr-success, #16a34a)" : "var(--cr-danger, #dc2626)",
+              color: trend.positive ? "var(--cr-success)" : "var(--cr-error)",
             }}
           >
             {trend.positive ? "+" : ""}
             {trend.value}%
           </span>
-          <span style={{ color: "var(--cr-primary, #1F251A)", opacity: 0.6 }}>
+          <span style={{ color: "var(--cr-primary, var(--cr-dark))", opacity: 0.6 }}>
             {trend.label}
           </span>
         </div>

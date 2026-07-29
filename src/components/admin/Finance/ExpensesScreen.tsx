@@ -206,20 +206,20 @@ export function ExpensesScreen({ accessToken, branches = [] }: ExpensesScreenPro
 
       <div
         className="rounded-[32px] border p-6 shadow-sm"
-        style={{ backgroundColor: "var(--cr-white, #fff)", borderColor: "rgba(90, 106, 81, 0.15)" }}
+        style={{ backgroundColor: "var(--cr-white)", borderColor: "rgba(90, 106, 81, 0.15)" }}
       >
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
             <Search
               size={18}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5A6A51]/50"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50"
             />
             <input
               type="text"
               placeholder="Search expenses by category, vendor or note..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-2xl border border-[#414E36]/15 bg-white py-3 pl-12 pr-4 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+              className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white py-3 pl-12 pr-4 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
             />
           </div>
           <button
@@ -228,7 +228,7 @@ export function ExpensesScreen({ accessToken, branches = [] }: ExpensesScreenPro
               resetForm();
               setShowForm(true);
             }}
-            className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+            className="inline-flex items-center gap-2 rounded-3xl bg-[var(--cr-primary)] px-5 py-3 text-sm font-semibold text-[var(--cr-white)] transition hover:bg-[var(--color-brand-primary-hover)]"
           >
             <Plus size={16} /> Add Expense
           </button>
@@ -243,15 +243,15 @@ export function ExpensesScreen({ accessToken, branches = [] }: ExpensesScreenPro
         {showForm && (
           <form
             onSubmit={handleSave}
-            className="mb-6 grid gap-4 rounded-2xl border border-[#E6E9EB] bg-[#FBFBF9] p-5"
+            className="mb-6 grid gap-4 rounded-2xl border border-[var(--cr-divider)] bg-[var(--cr-white)] p-5"
           >
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Category</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Category</label>
                 <select
                   value={form.categoryId}
                   onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 >
                   <option value="">Select category</option>
@@ -263,11 +263,11 @@ export function ExpensesScreen({ accessToken, branches = [] }: ExpensesScreenPro
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Branch (optional)</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Branch (optional)</label>
                 <select
                   value={form.branchId}
                   onChange={(e) => setForm({ ...form, branchId: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 >
                   <option value="">All / Unassigned</option>
                   {branches.map((b) => (
@@ -278,50 +278,50 @@ export function ExpensesScreen({ accessToken, branches = [] }: ExpensesScreenPro
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Date</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Date</label>
                 <input
                   type="date"
                   value={form.incurredOn}
                   onChange={(e) => setForm({ ...form, incurredOn: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Amount (EGP)</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Amount (EGP)</label>
                 <input
                   type="number"
                   min="0.01"
                   step="0.01"
                   value={form.amount}
                   onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Vendor / Merchant</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Vendor / Merchant</label>
                 <input
                   type="text"
                   value={form.vendor}
                   onChange={(e) => setForm({ ...form, vendor: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Note</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Note</label>
                 <input
                   type="text"
                   value={form.note}
                   onChange={(e) => setForm({ ...form, note: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 />
               </div>
             </div>
             <div className="flex gap-3">
               <button
                 type="submit"
-                className="rounded-xl bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                className="rounded-xl bg-[var(--cr-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--cr-white)] transition hover:bg-[var(--color-brand-primary-hover)]"
               >
                 {editing ? "Update Expense" : "Add Expense"}
               </button>
@@ -332,7 +332,7 @@ export function ExpensesScreen({ accessToken, branches = [] }: ExpensesScreenPro
                   setEditing(null);
                   resetForm();
                 }}
-                className="rounded-xl border border-[#414E36]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
+                className="rounded-xl border border-[var(--cr-primary)]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[var(--cr-primary)] transition hover:bg-[var(--cr-white)]"
               >
                 Cancel
               </button>
@@ -343,7 +343,7 @@ export function ExpensesScreen({ accessToken, branches = [] }: ExpensesScreenPro
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
             <thead>
-              <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+              <tr className="border-b border-[var(--cr-divider)] bg-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 <th className="px-6 py-4 text-left">Date</th>
                 <th className="px-6 py-4 text-left">Category</th>
                 <th className="px-6 py-4 text-left">Branch</th>
@@ -353,40 +353,40 @@ export function ExpensesScreen({ accessToken, branches = [] }: ExpensesScreenPro
                 <th className="px-6 py-4 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+            <tbody className="divide-y divide-[var(--cr-divider)] text-[var(--cr-primary)]">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-[#5A6A51]">
+                  <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
                     Loading...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-[#5A6A51]">
+                  <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
                     No expenses found.
                   </td>
                 </tr>
               ) : (
                 filtered.map((exp) => (
-                  <tr key={exp.id} className="transition hover:bg-[#F9F9F7]">
-                    <td className="px-6 py-5 whitespace-nowrap text-[#5A6A51]">{exp.incurred_on}</td>
-                    <td className="px-6 py-5 font-semibold text-[#1F251A]">
+                  <tr key={exp.id} className="transition hover:bg-[var(--cr-divider)]">
+                    <td className="px-6 py-5 whitespace-nowrap text-muted-foreground">{exp.incurred_on}</td>
+                    <td className="px-6 py-5 font-semibold text-[var(--cr-dark)]">
                       {categoryById.get(exp.category_id)?.name || "Unknown"}
                     </td>
-                    <td className="px-6 py-5 text-[#5A6A51]">
+                    <td className="px-6 py-5 text-muted-foreground">
                       {branches.find((b) => b.id === exp.branch_id)?.name_en ||
                         (exp.branch_id ? "Unknown" : "—")}
                     </td>
-                    <td className="px-6 py-5 text-[#1F251A]">{exp.vendor || "—"}</td>
+                    <td className="px-6 py-5 text-[var(--cr-dark)]">{exp.vendor || "—"}</td>
                     <td className="px-6 py-5 text-right font-semibold text-red-600">
                       EGP {Number(exp.amount).toLocaleString()}
                     </td>
-                    <td className="px-6 py-5 text-[#5A6A51]">{exp.note || "—"}</td>
+                    <td className="px-6 py-5 text-muted-foreground">{exp.note || "—"}</td>
                     <td className="px-6 py-5 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => startEdit(exp)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-[var(--cr-secondary)] hover:text-[var(--cr-primary)]"
                           title="Edit"
                         >
                           <Edit3 size={15} />

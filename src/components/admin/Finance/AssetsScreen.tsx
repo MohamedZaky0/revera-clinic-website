@@ -255,27 +255,27 @@ export function AssetsScreen({ accessToken, branches = [] }: AssetsScreenProps) 
 
       <div
         className="rounded-[32px] border p-6 shadow-sm"
-        style={{ backgroundColor: "var(--cr-white, #fff)", borderColor: "rgba(90, 106, 81, 0.15)" }}
+        style={{ backgroundColor: "var(--cr-white)", borderColor: "rgba(90, 106, 81, 0.15)" }}
       >
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
             <Search
               size={18}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5A6A51]/50"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50"
             />
             <input
               type="text"
               placeholder="Search assets by name, category or status..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-2xl border border-[#414E36]/15 bg-white py-3 pl-12 pr-4 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+              className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white py-3 pl-12 pr-4 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
             />
           </div>
           <div className="flex gap-3">
             <button
               onClick={handlePostDepreciation}
               disabled={posting}
-              className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-5 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#f5f4f0] disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-3xl border border-[var(--cr-primary)]/15 bg-[var(--cr-white)] px-5 py-3 text-sm font-semibold text-[var(--cr-primary)] transition hover:bg-[var(--cr-divider)] disabled:opacity-50"
             >
               {posting ? <Loader2 size={16} className="animate-spin" /> : <Layers size={16} />}
               Post Depreciation
@@ -286,7 +286,7 @@ export function AssetsScreen({ accessToken, branches = [] }: AssetsScreenProps) 
                 resetForm();
                 setShowForm(true);
               }}
-              className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+              className="inline-flex items-center gap-2 rounded-3xl bg-[var(--cr-primary)] px-5 py-3 text-sm font-semibold text-[var(--cr-white)] transition hover:bg-[var(--color-brand-primary-hover)]"
             >
               <Plus size={16} /> Add Asset
             </button>
@@ -302,25 +302,25 @@ export function AssetsScreen({ accessToken, branches = [] }: AssetsScreenProps) 
         {showForm && (
           <form
             onSubmit={handleSave}
-            className="mb-6 grid gap-4 rounded-2xl border border-[#E6E9EB] bg-[#FBFBF9] p-5"
+            className="mb-6 grid gap-4 rounded-2xl border border-[var(--cr-divider)] bg-[var(--cr-white)] p-5"
           >
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="sm:col-span-2 lg:col-span-3">
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Asset Name</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Asset Name</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Category</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Category</label>
                 <select
                   value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value as FixedAsset["category"] })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 >
                   {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
@@ -331,11 +331,11 @@ export function AssetsScreen({ accessToken, branches = [] }: AssetsScreenProps) 
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Branch (optional)</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Branch (optional)</label>
                 <select
                   value={form.branchId}
                   onChange={(e) => setForm({ ...form, branchId: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 >
                   <option value="">All / Unassigned</option>
                   {branches.map((b) => (
@@ -346,56 +346,56 @@ export function AssetsScreen({ accessToken, branches = [] }: AssetsScreenProps) 
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Purchased On</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Purchased On</label>
                 <input
                   type="date"
                   value={form.purchasedOn}
                   onChange={(e) => setForm({ ...form, purchasedOn: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Cost (EGP)</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Cost (EGP)</label>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={form.cost}
                   onChange={(e) => setForm({ ...form, cost: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Useful Life (months)</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Useful Life (months)</label>
                 <input
                   type="number"
                   min="1"
                   step="1"
                   value={form.usefulLifeMonths}
                   onChange={(e) => setForm({ ...form, usefulLifeMonths: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Salvage Value (EGP)</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Salvage Value (EGP)</label>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={form.salvageValue}
                   onChange={(e) => setForm({ ...form, salvageValue: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Linked Device (optional)</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Linked Device (optional)</label>
                 <select
                   value={form.deviceId}
                   onChange={(e) => setForm({ ...form, deviceId: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 >
                   <option value="">None</option>
                   {devices.map((d) => (
@@ -409,7 +409,7 @@ export function AssetsScreen({ accessToken, branches = [] }: AssetsScreenProps) 
             <div className="flex gap-3">
               <button
                 type="submit"
-                className="rounded-xl bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                className="rounded-xl bg-[var(--cr-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--cr-white)] transition hover:bg-[var(--color-brand-primary-hover)]"
               >
                 {editing ? "Update Asset" : "Add Asset"}
               </button>
@@ -420,7 +420,7 @@ export function AssetsScreen({ accessToken, branches = [] }: AssetsScreenProps) 
                   setEditing(null);
                   resetForm();
                 }}
-                className="rounded-xl border border-[#414E36]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
+                className="rounded-xl border border-[var(--cr-primary)]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[var(--cr-primary)] transition hover:bg-[var(--cr-white)]"
               >
                 Cancel
               </button>
@@ -431,7 +431,7 @@ export function AssetsScreen({ accessToken, branches = [] }: AssetsScreenProps) 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
             <thead>
-              <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+              <tr className="border-b border-[var(--cr-divider)] bg-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 <th className="px-6 py-4 text-left">Asset</th>
                 <th className="px-6 py-4 text-left">Category</th>
                 <th className="px-6 py-4 text-left">Branch</th>
@@ -442,33 +442,33 @@ export function AssetsScreen({ accessToken, branches = [] }: AssetsScreenProps) 
                 <th className="px-6 py-4 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+            <tbody className="divide-y divide-[var(--cr-divider)] text-[var(--cr-primary)]">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-[#5A6A51]">
+                  <td colSpan={8} className="px-6 py-8 text-center text-muted-foreground">
                     Loading...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-[#5A6A51]">
+                  <td colSpan={8} className="px-6 py-8 text-center text-muted-foreground">
                     No fixed assets found.
                   </td>
                 </tr>
               ) : (
                 filtered.map((asset) => (
-                  <tr key={asset.id} className="transition hover:bg-[#F9F9F7]">
-                    <td className="px-6 py-5 font-semibold text-[#1F251A]">{asset.name}</td>
-                    <td className="px-6 py-5 text-[#5A6A51]">{CATEGORY_LABELS[asset.category]}</td>
-                    <td className="px-6 py-5 text-[#5A6A51]">
+                  <tr key={asset.id} className="transition hover:bg-[var(--cr-divider)]">
+                    <td className="px-6 py-5 font-semibold text-[var(--cr-dark)]">{asset.name}</td>
+                    <td className="px-6 py-5 text-muted-foreground">{CATEGORY_LABELS[asset.category]}</td>
+                    <td className="px-6 py-5 text-muted-foreground">
                       {branches.find((b) => b.id === asset.branch_id)?.name_en ||
                         (asset.branch_id ? "Unknown" : "—")}
                     </td>
-                    <td className="px-6 py-5 whitespace-nowrap text-[#5A6A51]">{asset.purchased_on}</td>
-                    <td className="px-6 py-5 text-right font-semibold text-[#1F251A]">
+                    <td className="px-6 py-5 whitespace-nowrap text-muted-foreground">{asset.purchased_on}</td>
+                    <td className="px-6 py-5 text-right font-semibold text-[var(--cr-dark)]">
                       EGP {Number(asset.cost).toLocaleString()}
                     </td>
-                    <td className="px-6 py-5 text-right font-semibold text-[#414E36]">
+                    <td className="px-6 py-5 text-right font-semibold text-[var(--cr-primary)]">
                       EGP {Number(asset.current_book_value ?? asset.cost).toLocaleString()}
                     </td>
                     <td className="px-6 py-5">
@@ -488,7 +488,7 @@ export function AssetsScreen({ accessToken, branches = [] }: AssetsScreenProps) 
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => startEdit(asset)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-[var(--cr-secondary)] hover:text-[var(--cr-primary)]"
                           title="Edit"
                         >
                           <Edit3 size={15} />

@@ -211,20 +211,20 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
 
       <div
         className="rounded-[32px] border p-6 shadow-sm"
-        style={{ backgroundColor: "var(--cr-white, #fff)", borderColor: "rgba(90, 106, 81, 0.15)" }}
+        style={{ backgroundColor: "var(--cr-white)", borderColor: "rgba(90, 106, 81, 0.15)" }}
       >
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
             <Search
               size={18}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5A6A51]/50"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50"
             />
             <input
               type="text"
               placeholder="Search loans by lender..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-2xl border border-[#414E36]/15 bg-white py-3 pl-12 pr-4 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
+              className="w-full rounded-2xl border border-[var(--cr-primary)]/15 bg-white py-3 pl-12 pr-4 text-sm text-[var(--cr-dark)] outline-none transition focus:border-[var(--cr-accent)] focus:ring-2 focus:ring-[var(--cr-accent)]/20"
             />
           </div>
           <button
@@ -232,7 +232,7 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
               resetForm();
               setShowForm(true);
             }}
-            className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+            className="inline-flex items-center gap-2 rounded-3xl bg-[var(--cr-primary)] px-5 py-3 text-sm font-semibold text-[var(--cr-white)] transition hover:bg-[var(--color-brand-primary-hover)]"
           >
             <Plus size={16} /> Add Loan
           </button>
@@ -247,73 +247,73 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
         {showForm && (
           <form
             onSubmit={handleSave}
-            className="mb-6 grid gap-4 rounded-2xl border border-[#E6E9EB] bg-[#FBFBF9] p-5"
+            className="mb-6 grid gap-4 rounded-2xl border border-[var(--cr-divider)] bg-[var(--cr-white)] p-5"
           >
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="sm:col-span-2 lg:col-span-3">
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Lender</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Lender</label>
                 <input
                   type="text"
                   value={form.lender}
                   onChange={(e) => setForm({ ...form, lender: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Principal (EGP)</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Principal (EGP)</label>
                 <input
                   type="number"
                   min="0.01"
                   step="0.01"
                   value={form.principal}
                   onChange={(e) => setForm({ ...form, principal: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Annual Rate (%)</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Annual Rate (%)</label>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={form.annualRate}
                   onChange={(e) => setForm({ ...form, annualRate: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Term (months)</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Term (months)</label>
                 <input
                   type="number"
                   min="1"
                   step="1"
                   value={form.termMonths}
                   onChange={(e) => setForm({ ...form, termMonths: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Started On</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Started On</label>
                 <input
                   type="date"
                   value={form.startedOn}
                   onChange={(e) => setForm({ ...form, startedOn: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Installment (EGP)</label>
+                <label className="mb-1 block text-xs font-semibold text-muted-foreground">Installment (EGP)</label>
                 <input
                   type="number"
                   min="0.01"
                   step="0.01"
                   value={form.installment}
                   onChange={(e) => setForm({ ...form, installment: e.target.value })}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                  className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                   required
                 />
               </div>
@@ -323,34 +323,34 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
                   id="isOpening"
                   checked={form.isOpening}
                   onChange={(e) => setForm({ ...form, isOpening: e.target.checked })}
-                  className="h-4 w-4 accent-[#414E36]"
+                  className="h-4 w-4 accent-[var(--cr-primary)]"
                 />
-                <label htmlFor="isOpening" className="text-xs font-semibold text-[#5A6A51]">
+                <label htmlFor="isOpening" className="text-xs font-semibold text-muted-foreground">
                   Opening loan (already in progress at go-live)
                 </label>
               </div>
               {form.isOpening && (
                 <>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Opening Balance (EGP)</label>
+                    <label className="mb-1 block text-xs font-semibold text-muted-foreground">Opening Balance (EGP)</label>
                     <input
                       type="number"
                       min="0.01"
                       step="0.01"
                       value={form.openingBalance}
                       onChange={(e) => setForm({ ...form, openingBalance: e.target.value })}
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                       required
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-[#5A6A51]">Opening As-Of (YYYY-MM)</label>
+                    <label className="mb-1 block text-xs font-semibold text-muted-foreground">Opening As-Of (YYYY-MM)</label>
                     <input
                       type="text"
                       pattern="\d{4}-\d{2}"
                       value={form.openingAsOf}
                       onChange={(e) => setForm({ ...form, openingAsOf: e.target.value })}
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                      className="w-full rounded-xl border border-[var(--cr-primary)]/15 bg-white px-3 py-2.5 text-sm text-[var(--cr-dark)] outline-none focus:border-[var(--cr-accent)]"
                       required
                     />
                   </div>
@@ -360,7 +360,7 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
             <div className="flex gap-3">
               <button
                 type="submit"
-                className="rounded-xl bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
+                className="rounded-xl bg-[var(--cr-primary)] px-5 py-2.5 text-sm font-semibold text-[var(--cr-white)] transition hover:bg-[var(--color-brand-primary-hover)]"
               >
                 Add Loan
               </button>
@@ -370,7 +370,7 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
                   setShowForm(false);
                   resetForm();
                 }}
-                className="rounded-xl border border-[#414E36]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
+                className="rounded-xl border border-[var(--cr-primary)]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[var(--cr-primary)] transition hover:bg-[var(--cr-white)]"
               >
                 Cancel
               </button>
@@ -381,7 +381,7 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-sm">
             <thead>
-              <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
+              <tr className="border-b border-[var(--cr-divider)] bg-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 <th className="px-6 py-4 text-left">Lender</th>
                 <th className="px-6 py-4 text-right">Principal</th>
                 <th className="px-6 py-4 text-right">Rate</th>
@@ -391,39 +391,39 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
                 <th className="px-6 py-4 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+            <tbody className="divide-y divide-[var(--cr-divider)] text-[var(--cr-primary)]">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-[#5A6A51]">
+                  <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
                     Loading...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                <td colSpan={7} className="px-6 py-8 text-center text-[#5A6A51]">
+                <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
                     No loans found.
                   </td>
                 </tr>
               ) : (
                 filtered.map((loan) => (
-                  <tr key={loan.id} className="transition hover:bg-[#F9F9F7]">
-                    <td className="px-6 py-5 font-semibold text-[#1F251A]">{loan.lender}</td>
-                    <td className="px-6 py-5 text-right font-semibold text-[#1F251A]">
+                  <tr key={loan.id} className="transition hover:bg-[var(--cr-divider)]">
+                    <td className="px-6 py-5 font-semibold text-[var(--cr-dark)]">{loan.lender}</td>
+                    <td className="px-6 py-5 text-right font-semibold text-[var(--cr-dark)]">
                       EGP {Number(loan.principal).toLocaleString()}
                     </td>
-                    <td className="px-6 py-5 text-right text-[#5A6A51]">
+                    <td className="px-6 py-5 text-right text-muted-foreground">
                       {Number(loan.annual_rate).toFixed(2)}%
                     </td>
-                    <td className="px-6 py-5 whitespace-nowrap text-[#5A6A51]">{loan.started_on}</td>
-                    <td className="px-6 py-5 text-[#5A6A51]">{loan.term_months} months</td>
-                    <td className="px-6 py-5 text-right font-semibold text-[#414E36]">
+                    <td className="px-6 py-5 whitespace-nowrap text-muted-foreground">{loan.started_on}</td>
+                    <td className="px-6 py-5 text-muted-foreground">{loan.term_months} months</td>
+                    <td className="px-6 py-5 text-right font-semibold text-[var(--cr-primary)]">
                       EGP {Number(loan.remaining_balance ?? loan.principal).toLocaleString()}
                     </td>
                     <td className="px-6 py-5 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => viewSchedule(loan)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#5A6A51] transition hover:bg-[#EDF1EC] hover:text-[#414E36]"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-[var(--cr-secondary)] hover:text-[var(--cr-primary)]"
                           title="View schedule"
                         >
                           <Eye size={15} />
@@ -457,20 +457,20 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-xl font-semibold text-[#1F251A]">
+              <h3 className="text-xl font-semibold text-[var(--cr-dark)]">
                 {viewing.loan.lender} — Amortization Schedule
               </h3>
               <button
                 onClick={() => setViewing(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#5A6A51] transition hover:bg-[#EDF1EC]"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-[var(--cr-secondary)]"
               >
                 <X size={18} />
               </button>
             </div>
-            <div className="overflow-x-auto rounded-xl border border-[#E6E9EB]">
+            <div className="overflow-x-auto rounded-xl border border-[var(--cr-divider)]">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-wider text-[#5A6A51]">
+                  <tr className="border-b border-[var(--cr-divider)] bg-[var(--cr-divider)] text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     <th className="px-4 py-3 text-left">Period</th>
                     <th className="px-4 py-3 text-right">Installment</th>
                     <th className="px-4 py-3 text-right">Interest</th>
@@ -478,10 +478,10 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
                     <th className="px-4 py-3 text-right">Balance After</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
+                <tbody className="divide-y divide-[var(--cr-divider)] text-[var(--cr-primary)]">
                   {viewing.schedule.map((row) => (
                     <tr key={row.period} className={row.is_opening ? "bg-amber-50/50" : ""}>
-                      <td className="px-4 py-3 text-[#1F251A]">
+                      <td className="px-4 py-3 text-[var(--cr-dark)]">
                         {row.period}
                         {row.is_opening && (
                           <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
@@ -498,7 +498,7 @@ export function LoansScreen({ accessToken }: LoansScreenProps) {
                       <td className="px-4 py-3 text-right font-medium text-green-600">
                         EGP {Number(row.principal_part).toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-[#1F251A]">
+                      <td className="px-4 py-3 text-right font-semibold text-[var(--cr-dark)]">
                         EGP {Number(row.balance_after).toLocaleString()}
                       </td>
                     </tr>

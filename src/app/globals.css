@@ -52,6 +52,7 @@
   --cr-divider: var(--color-brand-sand);
   --cr-dark-divider: rgba(255, 255, 255, 0.1);
   --cr-error: rgb(230, 87, 87);
+  --cr-success: rgb(34, 148, 63);
 
   /* Mapped to shadcn tokens */
   --background: var(--color-brand-light);

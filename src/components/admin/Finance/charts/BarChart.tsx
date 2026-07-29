@@ -21,7 +21,7 @@ export function BarChart({
   data,
   valueLabel = "Value",
   height = 300,
-  color = "var(--cr-accent, #C4AE7C)",
+  color = "var(--cr-accent)",
 }: BarChartProps) {
   return (
     <div style={{ width: "100%", height }}>
@@ -34,12 +34,12 @@ export function BarChart({
           />
           <XAxis
             dataKey="label"
-            tick={{ fill: "var(--cr-primary, #1F251A)", fontSize: 12, opacity: 0.7 }}
+            tick={{ fill: "var(--cr-primary, var(--cr-dark))", fontSize: 12, opacity: 0.7 }}
             axisLine={{ stroke: "rgba(90, 106, 81, 0.15)" }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: "var(--cr-primary, #1F251A)", fontSize: 12, opacity: 0.7 }}
+            tick={{ fill: "var(--cr-primary, var(--cr-dark))", fontSize: 12, opacity: 0.7 }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => Number(v).toLocaleString()}
@@ -47,10 +47,10 @@ export function BarChart({
           <Tooltip
             cursor={{ fill: "rgba(90, 106, 81, 0.05)" }}
             contentStyle={{
-              backgroundColor: "var(--cr-white, #fff)",
+              backgroundColor: "var(--cr-white)",
               border: "1px solid rgba(90, 106, 81, 0.15)",
               borderRadius: "12px",
-              color: "var(--cr-primary, #1F251A)",
+              color: "var(--cr-primary, var(--cr-dark))",
             }}
             formatter={(value: any) => [Number(value ?? 0).toLocaleString(), valueLabel]}
           />

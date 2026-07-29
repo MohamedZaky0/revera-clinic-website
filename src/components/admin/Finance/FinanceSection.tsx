@@ -33,24 +33,24 @@ export function FinanceSection({ accessToken, branches = [] }: FinanceSectionPro
     <div className="space-y-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold" style={{ color: "var(--cr-primary, #1F251A)" }}>
+          <h2 className="text-2xl font-semibold" style={{ color: "var(--cr-primary, var(--cr-dark))" }}>
             Finance
           </h2>
-          <p className="mt-2 text-sm" style={{ color: "var(--cr-primary, #1F251A)", opacity: 0.7 }}>
+          <p className="mt-2 text-sm" style={{ color: "var(--cr-primary, var(--cr-dark))", opacity: 0.7 }}>
             Reporting and management for clinic P&L, margins, cash flow, and budgets.
           </p>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-[#E6E9EB] pb-2">
+      <div className="flex flex-wrap gap-2 border-b border-[var(--cr-divider)] pb-2">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`inline-flex items-center gap-2 rounded-t-xl px-4 py-2.5 text-sm font-semibold transition ${
               activeTab === tab.id
-                ? "border-b-2 border-[#C4AE7C] text-[#1F251A]"
-                : "text-[#5A6A51] hover:text-[#1F251A]"
+                ? "border-b-2 border-[var(--cr-accent)] text-[var(--cr-dark)]"
+                : "text-muted-foreground hover:text-[var(--cr-dark)]"
             }`}
           >
             {tab.icon}
@@ -63,20 +63,20 @@ export function FinanceSection({ accessToken, branches = [] }: FinanceSectionPro
         <div
           className="flex flex-col items-center justify-center rounded-2xl border p-12 text-center"
           style={{
-            backgroundColor: "var(--cr-white, #fff)",
+            backgroundColor: "var(--cr-white)",
             borderColor: "rgba(90, 106, 81, 0.15)",
           }}
         >
           <span
             className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: "rgba(196, 174, 124, 0.15)", color: "var(--cr-accent, #C4AE7C)" }}
+            style={{ backgroundColor: "rgba(196, 174, 124, 0.15)", color: "var(--cr-accent)" }}
           >
             <CircleDollarSign size={32} />
           </span>
-          <h3 className="mb-2 text-lg font-semibold" style={{ color: "var(--cr-primary, #1F251A)" }}>
+          <h3 className="mb-2 text-lg font-semibold" style={{ color: "var(--cr-primary, var(--cr-dark))" }}>
             Finance overview
           </h3>
-          <p className="max-w-md text-sm" style={{ color: "var(--cr-primary, #1F251A)", opacity: 0.7 }}>
+          <p className="max-w-md text-sm" style={{ color: "var(--cr-primary, var(--cr-dark))", opacity: 0.7 }}>
             Reporting dashboards will be available here in task 4.15. Use the tabs above to manage
             expenses, fixed assets and loans.
           </p>

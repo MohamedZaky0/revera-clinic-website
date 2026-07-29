@@ -21,7 +21,7 @@ export function LineAreaChart({
   data,
   valueLabel = "Value",
   height = 300,
-  color = "var(--cr-primary, #414E36)",
+  color = "var(--cr-primary)",
 }: LineAreaChartProps) {
   return (
     <div style={{ width: "100%", height }}>
@@ -40,22 +40,22 @@ export function LineAreaChart({
           />
           <XAxis
             dataKey="label"
-            tick={{ fill: "var(--cr-primary, #1F251A)", fontSize: 12, opacity: 0.7 }}
+            tick={{ fill: "var(--cr-primary, var(--cr-dark))", fontSize: 12, opacity: 0.7 }}
             axisLine={{ stroke: "rgba(90, 106, 81, 0.15)" }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fill: "var(--cr-primary, #1F251A)", fontSize: 12, opacity: 0.7 }}
+            tick={{ fill: "var(--cr-primary, var(--cr-dark))", fontSize: 12, opacity: 0.7 }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => Number(v).toLocaleString()}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "var(--cr-white, #fff)",
+              backgroundColor: "var(--cr-white)",
               border: "1px solid rgba(90, 106, 81, 0.15)",
               borderRadius: "12px",
-              color: "var(--cr-primary, #1F251A)",
+              color: "var(--cr-primary, var(--cr-dark))",
             }}
             formatter={(value: any) => [Number(value ?? 0).toLocaleString(), valueLabel]}
           />
