@@ -63,3 +63,110 @@ export function utilization(bookedMinutes: number, bottleneckMinutesValue: numbe
   }
   return bookedMinutes / bottleneckMinutesValue;
 }
+
+/**
+ * Shared route-facing helpers below — pure transforms over already-fetched rows (no
+ * `supabaseServer` calls), used by both /api/finance/capacity (5.9) and /api/finance/service-mix
+ * (5.10) so the two routes can never silently disagree on what "a provider's day" or "the days in
+ * this range" means.
+ */
+
+export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// `branches.service_hours` does not actually exist on the live table despite being documented
+// (confirmed by direct query while building task 5.9) and the page_settings('home').footer.
+// serviceHours fallback is also empty on this dev DB. /api/availability's own hardcoded default
+// (09:00-20:00 every day) is what actually governs clinic hours today, so capacity math uses the
+// same default for consistency — computed room capacity must agree with what /api/availability
+// actually offers, not a different assumed schedule.
+export const DEFAULT_OPEN_MINUTES_PER_DAY = 11 * 60; // 09:00-20:00
+
+export function getDayShiftWindows(dayConfig: any): ShiftWindow[] {
+  if (dayConfig?.shifts && Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
+    return dayConfig.shifts.filter((s: any) => s?.start && s?.end);
+  }
+  if (dayConfig?.start && dayConfig?.end) {
+    return [{ start: dayConfig.start, end: dayConfig.end }];
+  }
+  return [];
+}
+
+export function getProviderDayConfig(provider: any, weekday: string, branchIdForSchedule?: string | null): any {
+  const wdh = provider.working_days_hours;
+  if (!wdh) return null;
+  let config = wdh;
+  if (wdh.branch_schedules && branchIdForSchedule && wdh.branch_schedules[branchIdForSchedule]) {
+    config = wdh.branch_schedules[branchIdForSchedule];
+  }
+  if (config.in_person) return config.in_person[weekday] || null;
+  return config[weekday] || null;
+}
+
+export function isProviderCompatibleWithBranch(provider: any, branchId: string): boolean {
+  const wdh = provider.working_days_hours;
+  if (wdh && typeof wdh === 'object' && Array.isArray(wdh.branch_ids)) {
+    return wdh.branch_ids.includes(branchId);
+  }
+  return !provider.branch_id || provider.branch_id === branchId;
+}
+
+/** Every 'YYYY-MM-DD' date from fromDate to toDateInclusive, both inclusive. */
+export function dateRangeDays(fromDate: string, toDateInclusive: string): string[] {
+  const days: string[] = [];
+  const cursor = new Date(`${fromDate}T00:00:00.000Z`);
+  const end = new Date(`${toDateInclusive}T00:00:00.000Z`);
+  while (cursor.getTime() <= end.getTime()) {
+    days.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+}
+
+export interface DayCapacityFigures {
+  date: string;
+  roomMinutes: number;
+  doctorMinutes: number;
+  bottleneckMinutes: number;
+}
+
+/**
+ * Day-by-day roomMinutes/doctorMinutes/bottleneckMinutes for one branch across a date range,
+ * given already-fetched rooms/providers/holiday exclusions. Shared by both 5.9 and 5.10 so a
+ * sellable-capacity calculation (5.10) always agrees with the capacity report (5.9) it is derived
+ * from.
+ */
+export function computeBranchDays(
+  days: string[],
+  branchId: string,
+  availableRoomCount: number,
+  branchClosedDates: Set<string>,
+  compatibleProviders: { id: string; working_days_hours: any }[],
+  providerHolidayDates: Map<string, Set<string>>
+): DayCapacityFigures[] {
+  return days.map((date) => {
+    const dateObj = new Date(`${date}T00:00:00.000Z`);
+    const weekday = WEEKDAYS[dateObj.getUTCDay()];
+
+    const branchClosed = branchClosedDates.has(date);
+    const dayRoomMinutes = branchClosed
+      ? 0
+      : roomMinutes(Array.from({ length: availableRoomCount }, () => ({ status: 'available' })), DEFAULT_OPEN_MINUTES_PER_DAY);
+
+    const providerShiftsForDay: ShiftWindow[][] = [];
+    for (const provider of compatibleProviders) {
+      if (providerHolidayDates.get(provider.id)?.has(date)) continue;
+      const dayConfig = getProviderDayConfig(provider, weekday, branchId);
+      if (!dayConfig || !dayConfig.isOpen) continue;
+      const windows = getDayShiftWindows(dayConfig);
+      if (windows.length > 0) providerShiftsForDay.push(windows);
+    }
+    const dayDoctorMinutes = doctorMinutes(providerShiftsForDay);
+
+    return {
+      date,
+      roomMinutes: dayRoomMinutes,
+      doctorMinutes: dayDoctorMinutes,
+      bottleneckMinutes: bottleneckMinutes(dayRoomMinutes, dayDoctorMinutes),
+    };
+  });
+}
