@@ -24635,17 +24635,39 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  {viewingBooking.status === 'started' && hasPermission("bookings.edit") && (
-                    <div className="rounded-2xl border-2 border-dashed border-[#C4AE7C]/30 bg-[#EDF1EC] p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Session Flow</p>
-                      <p className="text-xs text-[#5A6A51] mb-4">The session is currently active. End session to settle invoice.</p>
+                  {viewingBooking.status === 'started' && (
+                    <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/60 p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-amber-900">Session Flow</p>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/80 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-900 animate-pulse">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-600"></span>
+                          Treatment In Session
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        Treatment is currently active. The assigned doctor will complete the session upon finishing the procedure.
+                      </p>
+                    </div>
+                  )}
+
+                  {viewingBooking.status === 'completed' && hasPermission("bookings.edit") && (
+                    <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-900">Treatment Completed</p>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-200/80 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-900">
+                          Ready for Payment
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-800 leading-relaxed">
+                        The doctor has completed the treatment. Settle invoice and collect payment from patient.
+                      </p>
                       <button
                         onClick={() => {
                           setCheckoutBooking(viewingBooking);
                         }}
-                        className="w-full rounded-2xl bg-[#C4AE7C] py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#b59e6c] transition flex items-center justify-center gap-1.5 shadow-md"
+                        className="w-full rounded-2xl bg-[#414E36] py-3 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center justify-center gap-2 shadow-md"
                       >
-                        End Session & Pay
+                        Pay &amp; Settle Invoice
                       </button>
                     </div>
                   )}

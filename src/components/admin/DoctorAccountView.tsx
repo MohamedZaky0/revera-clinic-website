@@ -28,8 +28,7 @@ import {
   DollarSign,
   Printer,
   RefreshCw,
-  X,
-  LayoutDashboard
+  X
 } from "lucide-react";
 
 interface DoctorAccountViewProps {
@@ -50,19 +49,21 @@ export default function DoctorAccountView({
   doctorEmail = "doctor@revera.com",
   doctorBranch = "Main Branch",
   initialReservations = [],
-  onLogout,
-  onSwitchToAdmin
+  onLogout
 }: DoctorAccountViewProps) {
   const [activeTab, setActiveTab] = useState<DoctorTab>("schedule");
   const [reservations, setReservations] = useState<any[]>(initialReservations);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Active Session State (real selected reservation)
+  // Active Session State (Ongoing Tab)
   const [activeSessionBooking, setActiveSessionBooking] = useState<any | null>(null);
   const [clinicalNote, setClinicalNote] = useState("");
   const [medicalRecord, setMedicalRecord] = useState<any | null>(null);
   const [savingNote, setSavingNote] = useState(false);
+
+  // In-Page Session Modal State (Schedule Tab)
+  const [scheduleModalBooking, setScheduleModalBooking] = useState<any | null>(null);
 
   // Prescription Modal State
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
@@ -143,8 +144,16 @@ export default function DoctorAccountView({
   // Sync activeSessionBooking automatically when receptionist starts a session
   useEffect(() => {
     if (receptionistStartedSession) {
-      setActiveSessionBooking(receptionistStartedSession);
-      setClinicalNote(receptionistStartedSession.notes || "");
+      // Only set if not already set or completed
+      if (!activeSessionBooking || activeSessionBooking.status === "completed" || activeSessionBooking.id !== receptionistStartedSession.id) {
+        setActiveSessionBooking(receptionistStartedSession);
+        setClinicalNote(receptionistStartedSession.notes || "");
+      }
+    } else {
+      // If no started session exists in DB, clear active session
+      if (activeSessionBooking && activeSessionBooking.status === "completed") {
+        setActiveSessionBooking(null);
+      }
     }
   }, [receptionistStartedSession]);
 
@@ -169,11 +178,10 @@ export default function DoctorAccountView({
     );
   }, [todaysReservations, searchQuery]);
 
-  // Open a session manually from table
-  const handleOpenSession = async (booking: any) => {
-    setActiveSessionBooking(booking);
+  // Open session details in Modal on SAME PAGE (Schedule tab)
+  const handleOpenScheduleModal = async (booking: any) => {
+    setScheduleModalBooking(booking);
     setClinicalNote(booking.notes || "");
-    setActiveTab("ongoing");
 
     // Fetch medical intake record for this patient
     const customerId = booking.customer_id || booking.customerId || booking.id;
@@ -192,16 +200,16 @@ export default function DoctorAccountView({
   };
 
   // Save clinical notes to database
-  const handleSaveClinicalNote = async () => {
-    if (!activeSessionBooking) return;
+  const handleSaveClinicalNote = async (targetBooking: any) => {
+    if (!targetBooking) return;
     setSavingNote(true);
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`/api/reservations?id=${encodeURIComponent(activeSessionBooking.id)}`, {
+      const res = await fetch(`/api/reservations?id=${encodeURIComponent(targetBooking.id)}`, {
         method: "PATCH",
         headers,
         body: JSON.stringify({
-          status: activeSessionBooking.status,
+          status: targetBooking.status,
           notes: clinicalNote
         })
       });
@@ -221,14 +229,14 @@ export default function DoctorAccountView({
     }
   };
 
-  // Complete treatment status in database
-  const handleCompleteTreatment = async () => {
-    if (!activeSessionBooking) return;
-    if (!confirm(`Mark treatment session as COMPLETED for ${activeSessionBooking.name || "Patient"}?`)) return;
+  // Complete treatment status in database & CLOSE SESSION FROM ONGOING
+  const handleCompleteTreatment = async (targetBooking: any) => {
+    if (!targetBooking) return;
+    if (!confirm(`Mark treatment session as COMPLETED for ${targetBooking.name || "Patient"}?`)) return;
 
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`/api/reservations?id=${encodeURIComponent(activeSessionBooking.id)}`, {
+      const res = await fetch(`/api/reservations?id=${encodeURIComponent(targetBooking.id)}`, {
         method: "PATCH",
         headers,
         body: JSON.stringify({
@@ -238,8 +246,11 @@ export default function DoctorAccountView({
       });
 
       if (res.ok) {
-        setActiveSessionBooking({ ...activeSessionBooking, status: "completed" });
         alert("Treatment session marked as COMPLETED!");
+        
+        // Clear active session from Ongoing Tab so it closes!
+        setActiveSessionBooking(null);
+        setScheduleModalBooking(null);
         fetchDoctorReservations();
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -252,12 +263,12 @@ export default function DoctorAccountView({
   };
 
   // Create real prescription in DB
-  const handleCreatePrescription = async (e: React.FormEvent) => {
+  const handleCreatePrescription = async (e: React.FormEvent, targetBooking: any) => {
     e.preventDefault();
-    if (!activeSessionBooking) return;
+    if (!targetBooking) return;
 
-    const customerId = activeSessionBooking.customer_id || activeSessionBooking.customerId || activeSessionBooking.id;
-    const patientName = activeSessionBooking.name || activeSessionBooking.customer_name || "Patient";
+    const customerId = targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
+    const patientName = targetBooking.name || targetBooking.customer_name || "Patient";
 
     setSavingRx(true);
     try {
@@ -357,7 +368,7 @@ export default function DoctorAccountView({
                 }`}
               >
                 <Stethoscope size={18} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
-                {receptionistStartedSession && (
+                {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
                   <span className="absolute -top-1 -right-1 flex h-3 w-3">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
@@ -366,7 +377,9 @@ export default function DoctorAccountView({
                 {activeTab === "ongoing" && (
                   <span className="animate-fadeIn whitespace-nowrap tracking-wide flex items-center gap-1">
                     Ongoing Session
-                    {receptionistStartedSession && <span className="rounded-full bg-amber-400 h-2 w-2"></span>}
+                    {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
+                      <span className="rounded-full bg-amber-400 h-2 w-2"></span>
+                    )}
                   </span>
                 )}
               </button>
@@ -391,18 +404,9 @@ export default function DoctorAccountView({
             </div>
           </nav>
 
-          {/* Right: Controls & Logout */}
+          {/* Right: Refined Doctor Profile Box & Logout */}
           <div className="flex items-center gap-3">
-            {onSwitchToAdmin && (
-              <button
-                type="button"
-                onClick={onSwitchToAdmin}
-                className="hidden lg:flex items-center gap-2 rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
-              >
-                <LayoutDashboard size={14} /> Admin View
-              </button>
-            )}
-
+            
             <button
               type="button"
               onClick={fetchDoctorReservations}
@@ -412,13 +416,15 @@ export default function DoctorAccountView({
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
             </button>
 
-            <div className="hidden md:flex items-center gap-2 rounded-2xl bg-white border border-[#414E36]/15 px-3 py-1.5 shadow-sm">
-              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#414E36]/10 text-[#414E36] font-bold text-xs">
-                Dr
+            {/* Premium Doctor Account Profile Box */}
+            <div className="flex items-center gap-3 rounded-full border border-[#414E36]/20 bg-white/95 px-4 py-1.5 shadow-[0_4px_20px_rgba(65,78,54,0.06)] backdrop-blur-md hover:border-[#414E36]/40 transition-all">
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[#414E36] text-white font-black text-xs shadow-md border-2 border-white">
+                {(doctorName.replace(/^Dr\.?\s*/i, '') || "D").slice(0, 2).toUpperCase()}
+                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
               </div>
-              <div className="text-left">
-                <p className="text-xs font-bold text-[#1F251A] leading-none">{doctorName}</p>
-                <p className="text-[10px] text-[#5A6A51] font-medium mt-0.5">{doctorEmail}</p>
+              <div className="text-left hidden md:block">
+                <p className="text-xs font-black text-[#1F251A] tracking-tight leading-tight">{doctorName}</p>
+                <p className="text-[10px] font-semibold text-[#5A6A51] leading-none mt-0.5">{doctorEmail}</p>
               </div>
             </div>
 
@@ -560,7 +566,7 @@ export default function DoctorAccountView({
                           <td className="px-6 py-4 text-right">
                             <button
                               type="button"
-                              onClick={() => handleOpenSession(item)}
+                              onClick={() => handleOpenScheduleModal(item)}
                               className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
                             >
                               Open Session
@@ -576,11 +582,11 @@ export default function DoctorAccountView({
           </div>
         )}
 
-        {/* ── TAB 2: ONGOING SESSION VIEW (AUTO-LINKED TO RECEPTIONIST START SESSION) ── */}
+        {/* ── TAB 2: ONGOING SESSION VIEW ── */}
         {activeTab === "ongoing" && (
           <div className="space-y-6 w-full">
             
-            {activeSessionBooking ? (
+            {activeSessionBooking && activeSessionBooking.status !== "completed" ? (
               <>
                 {/* Active Patient Card */}
                 <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 border border-[#414E36]/10 shadow-sm w-full">
@@ -593,15 +599,9 @@ export default function DoctorAccountView({
                         <h2 className="text-2xl font-bold text-[#1F251A]">
                           {activeSessionBooking.name || activeSessionBooking.customer_name || "Patient"}
                         </h2>
-                        {(activeSessionBooking.status === "started" || activeSessionBooking.status === "in-progress") ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800 animate-pulse">
-                            <Play size={12} /> Session Started by Reception
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-bold text-emerald-800 capitalize">
-                            {activeSessionBooking.status || "Active Session"}
-                          </span>
-                        )}
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800 animate-pulse">
+                          <Play size={12} /> Session Started by Reception
+                        </span>
                       </div>
                       <p className="text-xs text-[#5A6A51] mt-1">
                         {activeSessionBooking.service || activeSessionBooking.service_name} • {activeSessionBooking.time || activeSessionBooking.time_slot || "Today"} • <strong className="text-[#414E36]">{activeSessionBooking.room || "Treatment Room"}</strong>
@@ -619,7 +619,7 @@ export default function DoctorAccountView({
                     </button>
                     <button
                       type="button"
-                      onClick={handleCompleteTreatment}
+                      onClick={() => handleCompleteTreatment(activeSessionBooking)}
                       className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
                     >
                       <Check size={16} /> Complete Treatment
@@ -681,7 +681,7 @@ export default function DoctorAccountView({
                       <div className="flex justify-end">
                         <button
                           type="button"
-                          onClick={handleSaveClinicalNote}
+                          onClick={() => handleSaveClinicalNote(activeSessionBooking)}
                           disabled={savingNote}
                           className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50"
                         >
@@ -717,7 +717,7 @@ export default function DoctorAccountView({
           </div>
         )}
 
-        {/* ── TAB 3: SETTINGS VIEW (FULL WIDTH REAL DATA) ── */}
+        {/* ── TAB 3: SETTINGS VIEW ── */}
         {activeTab === "settings" && (
           <div className="w-full space-y-6">
             <div>
@@ -793,15 +793,120 @@ export default function DoctorAccountView({
 
       </main>
 
+      {/* ── IN-PAGE SESSION MODAL (SCHEDULE TAB - SAME PAGE) ── */}
+      {scheduleModalBooking && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[32px] bg-white p-6 shadow-2xl space-y-6 border border-[#414E36]/20">
+            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#414E36] text-white font-bold text-lg shadow-md">
+                  {(scheduleModalBooking.name || "P").slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[#1F251A]">
+                    {scheduleModalBooking.name || scheduleModalBooking.customer_name || "Patient Session"}
+                  </h3>
+                  <p className="text-xs text-[#5A6A51] mt-0.5">
+                    {scheduleModalBooking.service || scheduleModalBooking.service_name} • {scheduleModalBooking.time || scheduleModalBooking.time_slot} • <strong className="text-[#414E36]">{scheduleModalBooking.room || "Treatment Room"}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScheduleModalBooking(null)}
+                className="rounded-full p-2 text-[#5A6A51] hover:bg-[#F4F5F1] transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Intake Form */}
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 space-y-3">
+                  <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                    <AlertCircle size={14} className="text-[#414E36]" /> Clinical Intake
+                  </h4>
+                  {medicalRecord ? (
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between border-b border-[#414E36]/10 pb-1.5">
+                        <span className="text-[#5A6A51]">Skin Type:</span>
+                        <span className="font-bold text-[#1F251A]">{medicalRecord.skin_type || "Normal"}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-[#414E36]/10 pb-1.5">
+                        <span className="text-[#5A6A51]">Allergies:</span>
+                        <span className="font-bold text-rose-700">{medicalRecord.allergies || "None"}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#5A6A51]">No intake form on record.</p>
+                  )}
+
+                  <div className="pt-2 border-t border-[#414E36]/10">
+                    <span className="text-xs font-bold text-[#5A6A51]">Notes:</span>
+                    <p className="text-xs text-[#1F251A] mt-1 bg-white p-2.5 rounded-xl border border-[#414E36]/10 font-mono">
+                      {scheduleModalBooking.notes || "No notes."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes Editor & Actions */}
+              <div className="lg:col-span-2 space-y-4">
+                <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                  <FileText size={14} className="text-[#414E36]" /> Procedure Observations & Notes
+                </h4>
+                <textarea
+                  rows={6}
+                  value={clinicalNote}
+                  onChange={(e) => setClinicalNote(e.target.value)}
+                  placeholder="Enter clinical observations, laser parameters, post-procedure advice..."
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                />
+                
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveClinicalNote(scheduleModalBooking)}
+                    disabled={savingNote}
+                    className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition disabled:opacity-50"
+                  >
+                    {savingNote ? "Saving..." : "Save Notes"}
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPrescriptionModal(true)}
+                      className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition"
+                    >
+                      Write Prescription
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCompleteTreatment(scheduleModalBooking)}
+                      className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
+                    >
+                      Complete Treatment
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── PRESCRIPTION MODAL ── */}
-      {showPrescriptionModal && activeSessionBooking && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      {showPrescriptionModal && (activeSessionBooking || scheduleModalBooking) && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-2xl rounded-[32px] bg-white p-6 shadow-2xl space-y-5 border border-[#414E36]/20">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
               <div>
                 <h3 className="text-lg font-bold text-[#1F251A]">Write Digital Prescription</h3>
                 <p className="text-xs text-[#5A6A51]">
-                  Patient: <strong className="text-[#414E36]">{activeSessionBooking.name || activeSessionBooking.customer_name}</strong>
+                  Patient: <strong className="text-[#414E36]">{(activeSessionBooking || scheduleModalBooking).name || (activeSessionBooking || scheduleModalBooking).customer_name}</strong>
                 </p>
               </div>
               <button
@@ -813,7 +918,7 @@ export default function DoctorAccountView({
               </button>
             </div>
 
-            <form onSubmit={handleCreatePrescription} className="space-y-4">
+            <form onSubmit={(e) => handleCreatePrescription(e, activeSessionBooking || scheduleModalBooking)} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#5A6A51] mb-1">Clinical Diagnosis</label>
                 <input
