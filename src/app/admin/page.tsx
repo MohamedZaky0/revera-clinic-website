@@ -743,6 +743,7 @@ export default function AdminPage() {
   const [authChecking, setAuthChecking] = useState(true);
   const lastActivityRef = useRef<number>(Date.now());
   const [adminRole, setAdminRole] = useState<string | null>(null);
+  const [forceAdminView, setForceAdminView] = useState(false);
   const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
   const hasPermission = useCallback((permKey: string): boolean => {
     if (adminRole === 'superadmin') return true;
@@ -7658,7 +7659,7 @@ export default function AdminPage() {
     loggedEmpAccount?.role_name?.toLowerCase() === "doctor" ||
     loggedEmpAccount?.role_name?.toLowerCase() === "doctors";
 
-  if (isDoctorUserAccount && adminRole !== "superadmin") {
+  if (isDoctorUserAccount && !forceAdminView) {
     return (
       <DoctorAccountView
         doctorDbId={loggedEmpAccount?.id || adminDbId}
@@ -7667,6 +7668,7 @@ export default function AdminPage() {
         doctorBranch={loggedEmpAccount?.branch_id || "Main Branch"}
         initialReservations={allReservations}
         onLogout={handleLogout}
+        onSwitchToAdmin={(adminRole === "superadmin" || adminRole === "admin") ? () => setForceAdminView(true) : undefined}
       />
     );
   }

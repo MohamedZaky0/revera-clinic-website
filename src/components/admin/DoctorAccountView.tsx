@@ -27,7 +27,8 @@ import {
   DollarSign,
   Printer,
   RefreshCw,
-  X
+  X,
+  LayoutDashboard
 } from "lucide-react";
 
 interface DoctorAccountViewProps {
@@ -37,6 +38,7 @@ interface DoctorAccountViewProps {
   doctorBranch?: string;
   initialReservations?: any[];
   onLogout: () => void;
+  onSwitchToAdmin?: () => void;
 }
 
 type DoctorTab = "schedule" | "ongoing" | "settings";
@@ -47,7 +49,8 @@ export default function DoctorAccountView({
   doctorEmail = "doctor@revera.com",
   doctorBranch = "Main Branch",
   initialReservations = [],
-  onLogout
+  onLogout,
+  onSwitchToAdmin
 }: DoctorAccountViewProps) {
   const [activeTab, setActiveTab] = useState<DoctorTab>("schedule");
   const [reservations, setReservations] = useState<any[]>(initialReservations);
@@ -72,9 +75,8 @@ export default function DoctorAccountView({
   // Password Update State
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [updatingPassword, setUpdatingPassword] = useState(false);
 
-  // Fetch real reservations from DB
+  // Fetch real reservations from DB with polling for live updates
   const fetchDoctorReservations = async () => {
     setLoading(true);
     try {
@@ -92,6 +94,9 @@ export default function DoctorAccountView({
 
   useEffect(() => {
     fetchDoctorReservations();
+    // Auto-refresh schedule every 10 seconds to catch receptionist "Start Session" clicks live
+    const interval = setInterval(fetchDoctorReservations, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // Filter reservations for Today & Doctor assignment
@@ -104,7 +109,6 @@ export default function DoctorAccountView({
 
       // Filter by doctor name/ID if set
       if (r.doctor && doctorName && r.doctor.toLowerCase() !== doctorName.toLowerCase()) {
-        // If reservation specifies a different doctor, skip unless no doctor is specified
         if (r.doctor.trim() && r.doctor.toLowerCase() !== "doctor" && r.doctor.toLowerCase() !== "any") {
           return false;
         }
@@ -113,11 +117,28 @@ export default function DoctorAccountView({
     });
   }, [reservations, todayStr, doctorName]);
 
+  // AUTO-DETECT SESSION STARTED BY RECEPTIONIST ("started" or "in-progress" status)
+  const receptionistStartedSession = useMemo(() => {
+    return (
+      todaysReservations.find((r) => r.status === "started" || r.status === "in-progress") ||
+      reservations.find((r) => r.status === "started" || r.status === "in-progress") ||
+      null
+    );
+  }, [todaysReservations, reservations]);
+
+  // Sync activeSessionBooking automatically when receptionist starts a session
+  useEffect(() => {
+    if (receptionistStartedSession) {
+      setActiveSessionBooking(receptionistStartedSession);
+      setClinicalNote(receptionistStartedSession.notes || "");
+    }
+  }, [receptionistStartedSession]);
+
   // Statistics derived from REAL DB data
   const stats = useMemo(() => {
     const total = todaysReservations.length;
     const completed = todaysReservations.filter((r) => r.status === "completed" || r.status === "done").length;
-    const inProgress = todaysReservations.filter((r) => r.status === "in-progress" || r.status === "started").length;
+    const inProgress = todaysReservations.filter((r) => r.status === "started" || r.status === "in-progress").length;
     const upcoming = todaysReservations.filter((r) => ["pending", "approved", "confirmed"].includes(r.status)).length;
     return { total, completed, inProgress, upcoming };
   }, [todaysReservations]);
@@ -134,7 +155,7 @@ export default function DoctorAccountView({
     );
   }, [todaysReservations, searchQuery]);
 
-  // Open a real session
+  // Open a session manually from table
   const handleOpenSession = async (booking: any) => {
     setActiveSessionBooking(booking);
     setClinicalNote(booking.notes || "");
@@ -186,7 +207,7 @@ export default function DoctorAccountView({
   // Complete treatment status in database
   const handleCompleteTreatment = async () => {
     if (!activeSessionBooking) return;
-    if (!confirm(`Mark treatment session as Completed for ${activeSessionBooking.name || "Patient"}?`)) return;
+    if (!confirm(`Mark treatment session as COMPLETED for ${activeSessionBooking.name || "Patient"}?`)) return;
 
     try {
       const res = await fetch(`/api/reservations?id=${encodeURIComponent(activeSessionBooking.id)}`, {
@@ -255,7 +276,7 @@ export default function DoctorAccountView({
   return (
     <div className="min-h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col">
       {/* ── TOP HEADER & FLOATING NAVIGATION BAR (FULL SCREEN WIDTH) ── */}
-      <header className="sticky top-0 z-50 w-full bg-[#F4F5F1]/80 backdrop-blur-md px-8 py-4 transition-all border-b border-[#414E36]/10">
+      <header className="sticky top-0 z-50 w-full bg-[#F4F5F1]/90 backdrop-blur-md px-8 py-4 transition-all border-b border-[#414E36]/10 shadow-sm">
         <div className="w-full flex items-center justify-between gap-4">
           
           {/* Left: Brand Logo & Doctor Badge */}
@@ -282,9 +303,9 @@ export default function DoctorAccountView({
             </div>
           </div>
 
-          {/* ── CENTER FLOATING NAV BAR (COMPACT ICONS, EXPANDS ACTIVE TAB) ── */}
+          {/* ── CENTER FLOATING NAV BAR (ICON ONLY WHEN UNSELECTED, EXPANDS ON CLICK) ── */}
           <nav className="flex items-center justify-center">
-            <div className="flex items-center gap-1.5 rounded-full border border-[#414E36]/20 bg-white/90 p-1.5 shadow-[0_12px_40px_rgba(65,78,54,0.1)] backdrop-blur-2xl transition-all duration-300 hover:border-[#414E36]/40 hover:shadow-[0_16px_50px_rgba(65,78,54,0.16)]">
+            <div className="flex items-center gap-1.5 rounded-full border border-[#414E36]/20 bg-white/95 p-1.5 shadow-[0_12px_40px_rgba(65,78,54,0.1)] backdrop-blur-2xl transition-all duration-300 hover:border-[#414E36]/40 hover:shadow-[0_16px_50px_rgba(65,78,54,0.16)]">
               
               {/* Tab 1: Schedule */}
               <button
@@ -315,8 +336,17 @@ export default function DoctorAccountView({
                 }`}
               >
                 <Stethoscope size={18} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
+                {receptionistStartedSession && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                  </span>
+                )}
                 {activeTab === "ongoing" && (
-                  <span className="animate-fadeIn whitespace-nowrap tracking-wide">Ongoing Session</span>
+                  <span className="animate-fadeIn whitespace-nowrap tracking-wide flex items-center gap-1">
+                    Ongoing Session
+                    {receptionistStartedSession && <span className="rounded-full bg-amber-400 h-2 w-2"></span>}
+                  </span>
                 )}
               </button>
 
@@ -340,8 +370,18 @@ export default function DoctorAccountView({
             </div>
           </nav>
 
-          {/* Right: Quick Doctor Profile & Logout */}
+          {/* Right: Controls & Logout */}
           <div className="flex items-center gap-3">
+            {onSwitchToAdmin && (
+              <button
+                type="button"
+                onClick={onSwitchToAdmin}
+                className="hidden lg:flex items-center gap-2 rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
+              >
+                <LayoutDashboard size={14} /> Admin View
+              </button>
+            )}
+
             <button
               type="button"
               onClick={fetchDoctorReservations}
@@ -409,7 +449,7 @@ export default function DoctorAccountView({
               </div>
             </div>
 
-            {/* Quick Dynamic Stats Cards (Real Database Numbers) */}
+            {/* Quick Dynamic Stats Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Scheduled Today</span>
@@ -480,7 +520,7 @@ export default function DoctorAccountView({
                                 <CheckCircle2 size={12} /> Completed
                               </span>
                             )}
-                            {(item.status === "in-progress" || item.status === "started") && (
+                            {(item.status === "started" || item.status === "in-progress") && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-800 animate-pulse">
                                 <Play size={12} /> In Session
                               </span>
@@ -515,7 +555,7 @@ export default function DoctorAccountView({
           </div>
         )}
 
-        {/* ── TAB 2: ONGOING SESSION VIEW (FULL WIDTH REAL DATA) ── */}
+        {/* ── TAB 2: ONGOING SESSION VIEW (AUTO-LINKED TO RECEPTIONIST START SESSION) ── */}
         {activeTab === "ongoing" && (
           <div className="space-y-6 w-full">
             
@@ -532,9 +572,15 @@ export default function DoctorAccountView({
                         <h2 className="text-2xl font-bold text-[#1F251A]">
                           {activeSessionBooking.name || activeSessionBooking.customer_name || "Patient"}
                         </h2>
-                        <span className="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800 capitalize">
-                          {activeSessionBooking.status || "In Session"}
-                        </span>
+                        {(activeSessionBooking.status === "started" || activeSessionBooking.status === "in-progress") ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800 animate-pulse">
+                            <Play size={12} /> Session Started by Reception
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-bold text-emerald-800 capitalize">
+                            {activeSessionBooking.status || "Active Session"}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-[#5A6A51] mt-1">
                         {activeSessionBooking.service || activeSessionBooking.service_name} • {activeSessionBooking.time || activeSessionBooking.time_slot || "Today"} • <strong className="text-[#414E36]">{activeSessionBooking.room || "Treatment Room"}</strong>
@@ -627,19 +673,23 @@ export default function DoctorAccountView({
                 </div>
               </>
             ) : (
-              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-12 text-center text-[#5A6A51]">
-                <Stethoscope size={40} className="mx-auto text-[#414E36]/30 mb-3" />
-                <h3 className="text-lg font-bold text-[#1F251A]">No Active Patient Session Selected</h3>
-                <p className="text-xs text-[#5A6A51] mt-1 mb-4">
-                  Please select an appointment from your <strong>Schedule</strong> tab to open the patient session.
+              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-12 text-center text-[#5A6A51] space-y-4">
+                <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+                  <Play size={28} />
+                </div>
+                <h3 className="text-xl font-bold text-[#1F251A]">Waiting for Receptionist to Start Session</h3>
+                <p className="text-xs text-[#5A6A51] max-w-md mx-auto leading-relaxed">
+                  When the receptionist clicks <strong>&quot;Start Session&quot;</strong> on a patient booking assigned to you, the patient treatment portal will automatically open here in real-time.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("schedule")}
-                  className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
-                >
-                  View Today&apos;s Schedule
-                </button>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("schedule")}
+                    className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
+                  >
+                    View Today&apos;s Patient Queue
+                  </button>
+                </div>
               </div>
             )}
 
