@@ -28,7 +28,8 @@ import {
   DollarSign,
   Printer,
   RefreshCw,
-  X
+  X,
+  Info
 } from "lucide-react";
 
 interface DoctorAccountViewProps {
@@ -55,6 +56,23 @@ export default function DoctorAccountView({
   const [reservations, setReservations] = useState<any[]>(initialReservations);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Date Selector State for Schedule (Yesterday, Today, Tomorrow, Custom Date)
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const yesterdayStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const tomorrowStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(todayStr);
 
   // Active Session State (Ongoing Tab)
   const [activeSessionBooking, setActiveSessionBooking] = useState<any | null>(null);
@@ -114,15 +132,28 @@ export default function DoctorAccountView({
     return () => clearInterval(interval);
   }, []);
 
-  // Filter reservations for Today & Doctor assignment
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Filter reservations for Selected Date & Doctor assignment
+  const selectedDateReservations = useMemo(() => {
+    return reservations.filter((r) => {
+      const resDate = r.date ? String(r.date).slice(0, 10) : "";
+      if (resDate !== selectedDateStr) return false;
 
+      // Filter by doctor name/ID if set
+      if (r.doctor && doctorName && r.doctor.toLowerCase() !== doctorName.toLowerCase()) {
+        if (r.doctor.trim() && r.doctor.toLowerCase() !== "doctor" && r.doctor.toLowerCase() !== "any") {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [reservations, selectedDateStr, doctorName]);
+
+  // Today's reservations specifically for receptionist auto-link
   const todaysReservations = useMemo(() => {
     return reservations.filter((r) => {
       const resDate = r.date ? String(r.date).slice(0, 10) : "";
       if (resDate !== todayStr) return false;
 
-      // Filter by doctor name/ID if set
       if (r.doctor && doctorName && r.doctor.toLowerCase() !== doctorName.toLowerCase()) {
         if (r.doctor.trim() && r.doctor.toLowerCase() !== "doctor" && r.doctor.toLowerCase() !== "any") {
           return false;
@@ -144,39 +175,37 @@ export default function DoctorAccountView({
   // Sync activeSessionBooking automatically when receptionist starts a session
   useEffect(() => {
     if (receptionistStartedSession) {
-      // Only set if not already set or completed
       if (!activeSessionBooking || activeSessionBooking.status === "completed" || activeSessionBooking.id !== receptionistStartedSession.id) {
         setActiveSessionBooking(receptionistStartedSession);
         setClinicalNote(receptionistStartedSession.notes || "");
       }
     } else {
-      // If no started session exists in DB, clear active session
       if (activeSessionBooking && activeSessionBooking.status === "completed") {
         setActiveSessionBooking(null);
       }
     }
   }, [receptionistStartedSession]);
 
-  // Statistics derived from REAL DB data
+  // Statistics derived dynamically for the selected date
   const stats = useMemo(() => {
-    const total = todaysReservations.length;
-    const completed = todaysReservations.filter((r) => r.status === "completed" || r.status === "done").length;
-    const inProgress = todaysReservations.filter((r) => r.status === "started" || r.status === "in-progress").length;
-    const upcoming = todaysReservations.filter((r) => ["pending", "approved", "confirmed"].includes(r.status)).length;
+    const total = selectedDateReservations.length;
+    const completed = selectedDateReservations.filter((r) => r.status === "completed" || r.status === "done").length;
+    const inProgress = selectedDateReservations.filter((r) => r.status === "started" || r.status === "in-progress").length;
+    const upcoming = selectedDateReservations.filter((r) => ["pending", "approved", "confirmed"].includes(r.status)).length;
     return { total, completed, inProgress, upcoming };
-  }, [todaysReservations]);
+  }, [selectedDateReservations]);
 
   // Filtered schedule by search query
   const filteredSchedule = useMemo(() => {
-    if (!searchQuery.trim()) return todaysReservations;
+    if (!searchQuery.trim()) return selectedDateReservations;
     const q = searchQuery.toLowerCase();
-    return todaysReservations.filter(
+    return selectedDateReservations.filter(
       (r) =>
         (r.name || r.customer_name || "").toLowerCase().includes(q) ||
         (r.service || r.service_name || "").toLowerCase().includes(q) ||
         (r.phone || "").includes(q)
     );
-  }, [todaysReservations, searchQuery]);
+  }, [selectedDateReservations, searchQuery]);
 
   // Open session details in Modal on SAME PAGE (Schedule tab)
   const handleOpenScheduleModal = async (booking: any) => {
@@ -247,8 +276,6 @@ export default function DoctorAccountView({
 
       if (res.ok) {
         alert("Treatment session marked as COMPLETED!");
-        
-        // Clear active session from Ongoing Tab so it closes!
         setActiveSessionBooking(null);
         setScheduleModalBooking(null);
         fetchDoctorReservations();
@@ -335,7 +362,7 @@ export default function DoctorAccountView({
             </div>
           </div>
 
-          {/* ── CENTER FLOATING NAV BAR (ICON ONLY WHEN UNSELECTED, EXPANDS ON CLICK) ── */}
+          {/* ── CENTER FLOATING NAV BAR ── */}
           <nav className="flex items-center justify-center">
             <div className="flex items-center gap-1.5 rounded-full border border-[#414E36]/20 bg-white/95 p-1.5 shadow-[0_12px_40px_rgba(65,78,54,0.1)] backdrop-blur-2xl transition-all duration-300 hover:border-[#414E36]/40 hover:shadow-[0_16px_50px_rgba(65,78,54,0.16)]">
               
@@ -406,7 +433,6 @@ export default function DoctorAccountView({
 
           {/* Right: Refined Doctor Profile Box & Logout */}
           <div className="flex items-center gap-3">
-            
             <button
               type="button"
               onClick={fetchDoctorReservations}
@@ -451,9 +477,17 @@ export default function DoctorAccountView({
             {/* Header Title & Search */}
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-[#1F251A]">Today&apos;s Appointments & Patient Queue</h2>
+                <h2 className="text-2xl font-bold text-[#1F251A]">
+                  {selectedDateStr === todayStr
+                    ? "Today's Appointments & Patient Queue"
+                    : selectedDateStr === yesterdayStr
+                    ? "Yesterday's Appointments & History"
+                    : selectedDateStr === tomorrowStr
+                    ? "Tomorrow's Upcoming Appointments"
+                    : `Appointments for ${selectedDateStr}`}
+                </h2>
                 <p className="text-xs text-[#5A6A51] mt-1">
-                  Real-time clinic shift schedule, patient arrivals, and active treatments.
+                  Structured shift schedule, patient arrivals, and completed treatment history.
                 </p>
               </div>
 
@@ -468,18 +502,64 @@ export default function DoctorAccountView({
                     className="rounded-2xl border border-[#414E36]/15 bg-white pl-9 pr-4 py-2 text-xs text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] w-64"
                   />
                 </div>
-
-                <div className="flex items-center gap-2 rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2 text-xs font-bold text-[#414E36] shadow-sm">
-                  <Clock size={14} />
-                  <span>Today ({new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})</span>
-                </div>
               </div>
             </div>
 
-            {/* Quick Dynamic Stats Cards */}
+            {/* Structured Date Navigation Pills Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-3xl border border-[#414E36]/10 shadow-sm w-full">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDateStr(yesterdayStr)}
+                  className={`px-4 py-2 text-xs font-bold rounded-2xl transition ${
+                    selectedDateStr === yesterdayStr
+                      ? "bg-[#414E36] text-white shadow-sm"
+                      : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
+                  }`}
+                >
+                  Yesterday ({yesterdayStr})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedDateStr(todayStr)}
+                  className={`px-4 py-2 text-xs font-bold rounded-2xl transition ${
+                    selectedDateStr === todayStr
+                      ? "bg-[#414E36] text-white shadow-sm"
+                      : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
+                  }`}
+                >
+                  Today ({todayStr})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedDateStr(tomorrowStr)}
+                  className={`px-4 py-2 text-xs font-bold rounded-2xl transition ${
+                    selectedDateStr === tomorrowStr
+                      ? "bg-[#414E36] text-white shadow-sm"
+                      : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
+                  }`}
+                >
+                  Tomorrow ({tomorrowStr})
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-[#5A6A51]">Jump to Date:</span>
+                <input
+                  type="date"
+                  value={selectedDateStr}
+                  onChange={(e) => setSelectedDateStr(e.target.value)}
+                  className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-1.5 text-xs font-bold text-[#414E36] outline-none focus:border-[#414E36]"
+                />
+              </div>
+            </div>
+
+            {/* Quick Dynamic Stats Cards (Recalculated for Selected Date) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Scheduled Today</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Total Scheduled</span>
                 <div className="mt-2 text-3xl font-extrabold text-[#1F251A]">{stats.total} Patients</div>
               </div>
               <div className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
@@ -516,9 +596,9 @@ export default function DoctorAccountView({
                         <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">
                           <div className="flex flex-col items-center gap-2">
                             <CalendarDays size={32} className="text-[#414E36]/30" />
-                            <p className="font-bold text-sm text-[#1F251A]">No appointments scheduled for today</p>
+                            <p className="font-bold text-sm text-[#1F251A]">No appointments scheduled for {selectedDateStr}</p>
                             <p className="text-xs text-[#5A6A51]">
-                              All new patient bookings will automatically populate here in real-time.
+                              All patient bookings for this date will appear here automatically.
                             </p>
                           </div>
                         </td>
@@ -567,9 +647,9 @@ export default function DoctorAccountView({
                             <button
                               type="button"
                               onClick={() => handleOpenScheduleModal(item)}
-                              className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 bg-white px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
                             >
-                              Open Session
+                              <Info size={14} /> Info
                             </button>
                           </td>
                         </tr>
