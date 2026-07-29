@@ -1395,3 +1395,156 @@ still-open branch-on-product-sale gap) land in `unattributed` too, never silentl
   unattributed: { ...same shape, branchId: null, branchName: 'Unattributed' }
 }
 ```
+
+---
+
+## GET /api/finance/package-profitability
+
+Requires a staff bearer token **and** the `finance.view_margins` permission (superadmin bypasses).
+Per package: is it actually profitable, which nothing else in the module answers. Only
+trustworthy since RISK-035 stopped double-billing package-redeemed visits.
+
+**Query params:** either `period` (`'YYYY-MM'`) or both `from`/`to` (`'YYYY-MM-DD'`, inclusive).
+`packageId?` limits to one package.
+
+Revenue/cost are counted when a session is **delivered**, not when the package is sold —
+`revenueRecognised` sums `package_revenue_recognitions.recognised_amount` in range;
+`costToDeliver`/`commissionAttributed` join each recognition's `reservation_id` to that
+reservation's invoice and match the line by `service_id` (via `customer_package_items.service_id`)
+to read `cogs_snapshot`/`commission_snapshot` — the same real costing every other report uses.
+`soldInRange` (count + cash) is a separate, deliberately different number: new package sales in
+the period, cash collected regardless of whether any session has been used yet. `outstanding` is
+a not-period-bound snapshot: every currently `active` sale of the package, with
+`deferredLiability` computed via `deferredBalance()` (`src/lib/packages.ts`) summed the same way
+the consumption RPC computes total sessions (sum of `qty_total` across every item in that
+`customer_package`, not per item) — "how much service delivery do we still owe."
+
+**Response:**
+```
+{
+  range: { label, from, to },
+  packages: [
+    {
+      packageId, packageName, sessionsDelivered, uncostedSessionCount,
+      revenueRecognised, costToDeliver, commissionAttributed, contributionMargin,
+      soldInRange: { count, cash },
+      outstanding: { activeCustomerPackages, deferredLiability }
+    }
+  ]
+}
+```
+
+---
+
+## GET /api/finance/no-show-cost
+
+Requires a staff bearer token **and** the `finance.view_capacity` permission (superadmin
+bypasses). Count and **estimated** lost revenue for reservations that never delivered:
+`no_show`, `cancelled`, `postponed` (RISK-029's three non-completion outcomes).
+
+**Query params:** either `period` (`'YYYY-MM'`) or both `from`/`to` (`'YYYY-MM-DD'`, inclusive,
+matched against `reservations.date`, a text column — RISK-020). `branchId?` scopes to that branch.
+
+Estimated using **today's** list price (`getServicePriceDetails`, honoring any active promotion)
+for the booked service(s) — this is not a stored snapshot of what would have been charged (unlike
+a completed booking's real `invoice_lines`), and is labeled as an estimate in the response and UI
+rather than presented with false precision.
+
+**Response:**
+```
+{
+  range: { label, from, to },
+  branchId: string | null,
+  totalCount, totalEstimatedLostRevenue,
+  byStatus: { no_show: { count, estimatedLostRevenue }, cancelled: {...}, postponed: {...} },
+  byBranch: [ { branchId, branchName, count, estimatedLostRevenue } ]
+}
+```
+
+---
+
+## GET /api/finance/commission-payouts
+
+Requires a staff bearer token **and** the `finance.view_pnl` permission (superadmin bypasses). A
+reconciliation view, not a duplicate of `GET /api/hr/doctor-payroll` (which already manages the
+actual payroll run) — compares what the booking ledger says a doctor earned in commission this
+month against what `doctor_payroll.total_commission_earned` actually recorded for them, the same
+kind of drift-detection `GET /api/customers/reconcile` already does for patient balances.
+
+**Query params:** `period` (`'YYYY-MM'`, required).
+
+`ledgerCommission` sums `invoice_lines.commission_snapshot` for that `provider_id` on `issued`
+invoices in the period (same source doctor-pnl uses). `payroll` is the matching `doctor_payroll`
+row for `(provider_id, month)` if one exists, else `null`. `status` is `payroll_not_run` (no
+`doctor_payroll` row this month), `matches` (`variance === 0`), or `mismatch`.
+
+**Response:**
+```
+{
+  period: 'YYYY-MM',
+  providers: [
+    {
+      providerId, providerName, ledgerCommission,
+      payroll: { commission, status, paymentDate } | null,
+      variance: number | null,
+      status: 'payroll_not_run' | 'matches' | 'mismatch'
+    }
+  ]
+}
+```
+
+---
+
+## GET /api/finance/trend
+
+Requires a staff bearer token **and** the `finance.view_pnl` permission (superadmin bypasses).
+The same revenue/cogs/commission/fixedOverhead/contributionMargin/fullyLoadedProfit accounting as
+`GET /api/finance/pnl`, one row per month for the last `months` months (default 6, max 24) ending
+with the current month — the only Phase 4 report with a multi-period view; every other report is
+single-period only.
+
+**Query params:** `months?` (integer, default 6, max 24). `branchId?` scopes every month the same
+way 4.6's `branchId` does (including loan interest being entirely excluded from a branch-scoped
+month, not just this endpoint's aggregate).
+
+Deliberately a simpler shape than 4.6 (no category breakdowns, no `partiallyCosted` line counts)
+since this is a chart data source — click into a specific month's full P&L on that screen for the
+detail. Verified to match 4.6's output exactly for the same period.
+
+**Response:**
+```
+{
+  branchId: string | null,
+  months: [
+    { period: 'YYYY-MM', revenue, cogs, commission, fixedOverhead, contributionMargin, fullyLoadedProfit }
+  ]
+}
+```
+
+---
+
+## GET /api/finance/new-vs-returning
+
+Requires a staff bearer token **and** the `finance.view_pnl` permission (superadmin bypasses).
+Splits the range's revenue (same definition as 4.6: service/product `invoice_lines` + package
+revenue recognised in range) by whether each contributing customer is new or returning — no other
+Phase 4 report groups revenue by whether the patient is new.
+
+**Query params:** either `period` (`'YYYY-MM'`) or both `from`/`to` (`'YYYY-MM-DD'`, inclusive).
+`branchId?` scopes to that branch.
+
+"New" means the customer's **earliest-ever** issued invoice (across all time, not just this
+range) falls inside this range; anyone whose first invoice predates the range is "returning," even
+if this is their first visit in a while. Invoices with no linked `customer_id` are reported
+separately under `walkIn`, never silently folded into either bucket.
+
+**Response:**
+```
+{
+  range: { label, from, to },
+  branchId: string | null,
+  new: { revenue, customerCount },
+  returning: { revenue, customerCount },
+  walkIn: { revenue, note }
+}
+```

@@ -186,6 +186,44 @@ export function PnlScreen({ accessToken, branches = [] }: PnlScreenProps) {
             </div>
           </div>
 
+          {(() => {
+            const cmRatio = data.revenue.total > 0 ? data.views.contributionMargin.value / data.revenue.total : 0;
+            const breakEvenRevenue = cmRatio > 0 ? data.fixedOverhead.total / cmRatio : null;
+            const aboveBreakEven = breakEvenRevenue !== null && data.revenue.total >= breakEvenRevenue;
+            return (
+              <div
+                className="rounded-[32px] border p-6 shadow-sm"
+                style={{ backgroundColor: "var(--cr-white)", borderColor: "var(--cr-divider)" }}
+              >
+                <h3 className="mb-1 text-lg font-semibold" style={{ color: "var(--cr-dark)" }}>
+                  Break-even
+                </h3>
+                {breakEvenRevenue === null ? (
+                  <p className="text-sm text-muted-foreground">
+                    Can&apos;t estimate this month — contribution margin is zero or negative, so no amount of
+                    revenue at the current mix covers overhead. Look at Service Margins to find what&apos;s
+                    dragging the margin down.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    At this month&apos;s mix of prices and costs, the clinic needs{" "}
+                    <strong style={{ color: "var(--cr-dark)" }}>{egp(breakEvenRevenue)}</strong> in revenue to
+                    cover overhead ({egp(data.fixedOverhead.total)}) exactly.{" "}
+                    {aboveBreakEven ? (
+                      <span style={{ color: "var(--cr-success)" }}>
+                        Already {egp(data.revenue.total - breakEvenRevenue)} past that this month.
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--cr-error)" }}>
+                        Still {egp(breakEvenRevenue - data.revenue.total)} short this month.
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="grid gap-6 lg:grid-cols-2">
             <div
               className="rounded-[32px] border p-6 shadow-sm"

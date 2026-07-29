@@ -12,6 +12,11 @@ import {
   Banknote,
   Clock,
   Target,
+  Gift,
+  CalendarX,
+  HandCoins,
+  LineChart as LineChartIcon,
+  UserPlus,
 } from "lucide-react";
 import { ExpensesScreen } from "./ExpensesScreen";
 import { AssetsScreen } from "./AssetsScreen";
@@ -23,6 +28,11 @@ import { DoctorBranchPnlScreen } from "./DoctorBranchPnlScreen";
 import { CashFlowScreen } from "./CashFlowScreen";
 import { ReceivablesAgingScreen } from "./ReceivablesAgingScreen";
 import { BudgetVsActualScreen } from "./BudgetVsActualScreen";
+import { PackageProfitabilityScreen } from "./PackageProfitabilityScreen";
+import { NoShowCostScreen } from "./NoShowCostScreen";
+import { CommissionPayoutsScreen } from "./CommissionPayoutsScreen";
+import { TrendScreen } from "./TrendScreen";
+import { NewVsReturningScreen } from "./NewVsReturningScreen";
 
 export type FinanceTab =
   | "overview"
@@ -34,7 +44,12 @@ export type FinanceTab =
   | "doctor-branch-pnl"
   | "cashflow"
   | "receivables-aging"
-  | "budget-vs-actual";
+  | "budget-vs-actual"
+  | "package-profitability"
+  | "no-show-cost"
+  | "commission-payouts"
+  | "trend"
+  | "new-vs-returning";
 
 export interface BranchOption {
   id: string;
@@ -58,6 +73,11 @@ const TABS: { id: FinanceTab; label: string; icon: ReactNode }[] = [
   { id: "cashflow", label: "Cash Flow", icon: <Banknote size={16} /> },
   { id: "receivables-aging", label: "Receivables Aging", icon: <Clock size={16} /> },
   { id: "budget-vs-actual", label: "Budget vs Actual", icon: <Target size={16} /> },
+  { id: "package-profitability", label: "Package Profitability", icon: <Gift size={16} /> },
+  { id: "no-show-cost", label: "No-Show / Cancellation Cost", icon: <CalendarX size={16} /> },
+  { id: "commission-payouts", label: "Commission Payouts", icon: <HandCoins size={16} /> },
+  { id: "trend", label: "Trend", icon: <LineChartIcon size={16} /> },
+  { id: "new-vs-returning", label: "New vs Returning", icon: <UserPlus size={16} /> },
 ];
 
 export function FinanceSection({ accessToken, branches = [] }: FinanceSectionProps) {
@@ -105,6 +125,12 @@ export function FinanceSection({ accessToken, branches = [] }: FinanceSectionPro
       {activeTab === "cashflow" && <CashFlowScreen accessToken={accessToken} branches={branches} />}
       {activeTab === "receivables-aging" && <ReceivablesAgingScreen accessToken={accessToken} branches={branches} />}
       {activeTab === "budget-vs-actual" && <BudgetVsActualScreen accessToken={accessToken} branches={branches} />}
+
+      {activeTab === "package-profitability" && <PackageProfitabilityScreen accessToken={accessToken} />}
+      {activeTab === "no-show-cost" && <NoShowCostScreen accessToken={accessToken} branches={branches} />}
+      {activeTab === "commission-payouts" && <CommissionPayoutsScreen accessToken={accessToken} />}
+      {activeTab === "trend" && <TrendScreen accessToken={accessToken} branches={branches} />}
+      {activeTab === "new-vs-returning" && <NewVsReturningScreen accessToken={accessToken} branches={branches} />}
     </div>
   );
 }
