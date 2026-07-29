@@ -3716,6 +3716,39 @@ holds (a revoked role cannot reach these screens by URL or otherwise).
 
 ---
 
+# Phase 4B — Additional Reports (user-requested, 2026-07-29)
+
+> Requested directly, after Phase 4 closed, in response to "where could you see if the package is
+> really profitable" plus a request for more decision-useful, non-technical reports. Not part of
+> PROPOSAL-002's original Phase 4/5 sketch — tracked here rather than left undocumented, same
+> discipline as every other task in this file. 4B.1 depends on **RISK-035** (see `RISKS.md`),
+> found while scoping 4B.2: package revenue was being double-counted at checkout, which would have
+> made a package-profitability report confidently wrong rather than merely incomplete.
+
+## Phase 4B task table
+
+| ID | Task | Depends on | Status | Owner | Commit |
+|---|---|---|---|---|---|
+| 4B.1 | Fix RISK-035 (package-redeemed visits double-billed) | — | `DONE` | Claude | 3f8c0a2 |
+| 4B.2 | `GET /api/finance/package-profitability` + UI | 4B.1, 1.13, 4.6 | `DONE` | Claude | d97310b |
+| 4B.3 | `GET /api/finance/no-show-cost` + UI | RISK-029 (status values) | `DONE` | Claude | d97310b |
+| 4B.4 | `GET /api/finance/commission-payouts` + UI | 2.14, `doctor_payroll` (HR) | `DONE` | Claude | d97310b |
+| 4B.5 | `GET /api/finance/trend` + UI | 4.6 | `DONE` | Claude | d97310b |
+| 4B.6 | `GET /api/finance/new-vs-returning` + UI | 4.6 | `DONE` | Claude | d97310b |
+| 4B.7 | Break-even stat added to the existing P&L screen (no new endpoint — client-computed from 4.6's response) | 4.6, 4.15 | `DONE` | Claude | d97310b |
+
+**Verify (all of 4B.2–4B.7):** every number hand-computed against live dev data (or an isolated,
+self-cleaning fixture where dev data didn't already cover the case, e.g. the "returning patient"
+classification and the no-show cost estimate) and matched the endpoint's output exactly. Browser-
+verified as superadmin: all six additions render real data with no console errors; the existing
+4.4 permission gate holds (a receptionist with no `finance.*` permission still cannot see
+`Finance` in the sidebar at all, so none of these are reachable).
+
+**Update `DB_SCHEMA.md`:** none (no schema change). **Update `API_CONTRACT.md`:** all five new
+endpoints documented in the same commit as their code.
+
+---
+
 # Phase 5 — Capacity & Optimization
 
 > **Depends on Phase 1 (packages, for netting out committed capacity per DEC-023), Phase 2
