@@ -9477,7 +9477,10 @@ export default function AdminPage() {
 
           {/* ── FINANCE VIEW ── */}
           {activeNav === "Finance" && (
-            <FinanceSection />
+            <FinanceSection
+              accessToken={session?.access_token}
+              branches={branches.map((b) => ({ id: b.id, name_en: b.name_en, name_ar: b.name_ar }))}
+            />
           )}
 
           {/* ── ALL PRESCRIPTIONS VIEW ── */}

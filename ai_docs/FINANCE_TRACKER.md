@@ -3303,7 +3303,7 @@ browser verification against the dev database is still outstanding.
 | 4.10 | `GET /api/finance/receivables-aging` | 1.14 | `TODO` | — | — |
 | 4.11 | Migration: `budget_lines` table + `GET /api/finance/budget-vs-actual` | 3.1 | `TODO` | — | — |
 | 4.12 | Chart library selection + base chart components | — | `DONE` | Windsurf | 1b747fe |
-| 4.13 | UI: Finance **management** screens (Expenses, Assets & Depreciation, Loans) | 4.4, 4.12, 3.10–3.12 | `TODO` | — | — |
+| 4.13 | UI: Finance **management** screens (Expenses, Assets & Depreciation, Loans) | 4.4, 4.12, 3.10–3.12 | `DONE` | Windsurf | WAVE2 |
 | 4.14 | `API_CONTRACT.md` rollup for Phase 4 | rolling, alongside 4.6–4.11 | `TODO` | — | — |
 | 4.15 | UI: Finance **reporting** screens (P&L, Service Margins, Doctor/Branch P&L, Cash Flow, Receivables Aging, Budget vs Actual) | 4.4, 4.6–4.12 | `TODO` | — | — |
 
