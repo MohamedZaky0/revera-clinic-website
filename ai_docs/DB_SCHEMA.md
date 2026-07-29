@@ -341,7 +341,7 @@ either. Treat as unconfirmed; verify directly in Supabase before relying on it.
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
-**Note:** `admin` and `superadmin` roles are seeded with the seven `finance.*` permissions by default via `supabase/migrations/20260729000000_seed_finance_role_permissions.sql`. The full set is `finance.view_pnl`, `finance.view_margins`, `finance.view_cashflow`, `finance.manage_expenses`, `finance.manage_assets`, `finance.manage_loans`, and `finance.view_capacity`. These permissions are grantable and revocable (DEC-022): admins see the Finance section by default, but individual keys can be removed per role through the Role Permission settings UI.
+**Note:** `admin` and `superadmin` roles are seeded with the seven `finance.*` permissions by default via `supabase/migrations/20260729000500_seed_finance_role_permissions.sql` (renamed from its original `20260729000000` timestamp — collided with `20260729000000_fix_services_id_identity_generation.sql`, which the Supabase CLI's `supabase_migrations.schema_migrations` bookkeeping cannot hold two rows for, since `version` is its primary key; caught when `supabase db push` failed inserting the second row during Wave 3). The full set is `finance.view_pnl`, `finance.view_margins`, `finance.view_cashflow`, `finance.manage_expenses`, `finance.manage_assets`, `finance.manage_loans`, and `finance.view_capacity`. These permissions are grantable and revocable (DEC-022): admins see the Finance section by default, but individual keys can be removed per role through the Role Permission settings UI.
 
 ---
 
@@ -1184,6 +1184,24 @@ month structurally impossible, not just discouraged.
 | `created_at` | timestamptz | Default now() |
 
 Unique `(loan_id, period)`.
+
+### `budget_lines`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `category_id` | UUID | FK → expense_categories.id ON DELETE CASCADE |
+| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable — null means clinic-wide |
+| `period` | text | `'YYYY-MM'` |
+| `budgeted` | numeric | Default 0 |
+| `created_at` | timestamptz | Default now() |
+
+Unique `(category_id, branch_id, period)`. **Added 2026-07-29 by task 4.11** (Phase 4), scoped to
+exactly what `GET /api/finance/budget-vs-actual` needs — one budgeted number per category/branch/
+month, not a general budgeting system. Listed here under Phase 3 rather than Phase 4 because it is
+schema support for a Phase 3 category (`expense_categories`), even though the report consuming it
+is Phase 4; PROPOSALS.md's Phase 3 setup-data list (item 19, "monthly budget per expense category")
+named the need but no table existed for it until this task.
 
 ## Notes on Schema Gaps
 

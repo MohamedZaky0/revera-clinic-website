@@ -1264,3 +1264,33 @@ inherits RISK-012's inflated figures): for every `issued` invoice, `outstanding 
   items: [ { customerId, customerName, invoiceId, invoiceNo, issuedAt, outstanding, ageDays, bucket } ]
 }
 ```
+
+---
+
+## GET /api/finance/budget-vs-actual
+
+Requires a staff bearer token **and** the `finance.manage_expenses` permission (superadmin
+bypasses — no dedicated budget key exists; budgets are expense-category scoped, so this was the
+closest fit). Task 4.11. No write endpoint for `budget_lines` exists yet — out of this task's
+scope; whatever builds the budget-entry UI (task 4.15 or later) needs one.
+
+**Query params:** `period` (`'YYYY-MM'`, required). `branchId?`/`categoryId?` filter which
+`budget_lines` rows are returned.
+
+For each `budget_lines` row in `period`: `actual` = `SUM(expenses.amount)` in that category for
+that period — scoped to the row's specific `branch_id` if set, or summed across **every** branch
+if the row's `branch_id` is `NULL` (a clinic-wide budget). `variance = budgeted - actual` (positive
+= under/on budget, negative = over). Categories with real expenses in the period but **no**
+matching budget line are surfaced separately under `unbudgeted`, not silently omitted.
+
+**Response:**
+```
+{
+  period: 'YYYY-MM',
+  branchId: string | null,
+  items: [
+    { budgetLineId, categoryId, categoryName, branchId, period, budgeted, actual, variance, status }
+  ],
+  unbudgeted: [ { categoryId, categoryName, actual } ]
+}
+```
