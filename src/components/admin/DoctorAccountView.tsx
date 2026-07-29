@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
+import { supabase } from "@/lib/supabaseClient";
 import {
   CalendarDays,
   Stethoscope,
@@ -76,11 +77,24 @@ export default function DoctorAccountView({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Auth headers helper for staff access verification
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json"
+    };
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
+    }
+    return headers;
+  };
+
   // Fetch real reservations from DB with polling for live updates
   const fetchDoctorReservations = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/reservations", { cache: "no-store" });
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/reservations", { headers, cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setReservations(Array.isArray(data) ? data : []);
@@ -165,7 +179,8 @@ export default function DoctorAccountView({
     const customerId = booking.customer_id || booking.customerId || booking.id;
     if (customerId) {
       try {
-        const res = await fetch(`/api/medical-records?customerId=${encodeURIComponent(customerId)}`);
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/medical-records?customerId=${encodeURIComponent(customerId)}`, { headers });
         if (res.ok) {
           const data = await res.json();
           setMedicalRecord(data.form || null);
@@ -181,9 +196,10 @@ export default function DoctorAccountView({
     if (!activeSessionBooking) return;
     setSavingNote(true);
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch(`/api/reservations?id=${encodeURIComponent(activeSessionBooking.id)}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           status: activeSessionBooking.status,
           notes: clinicalNote
@@ -194,11 +210,12 @@ export default function DoctorAccountView({
         alert("Clinical notes saved successfully!");
         fetchDoctorReservations();
       } else {
-        alert("Failed to save clinical notes.");
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || errData.message || "Failed to save clinical notes.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving clinical note:", err);
-      alert("Error saving clinical note.");
+      alert(err.message || "Error saving clinical note.");
     } finally {
       setSavingNote(false);
     }
@@ -210,9 +227,10 @@ export default function DoctorAccountView({
     if (!confirm(`Mark treatment session as COMPLETED for ${activeSessionBooking.name || "Patient"}?`)) return;
 
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch(`/api/reservations?id=${encodeURIComponent(activeSessionBooking.id)}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           status: "completed",
           notes: clinicalNote
@@ -224,10 +242,12 @@ export default function DoctorAccountView({
         alert("Treatment session marked as COMPLETED!");
         fetchDoctorReservations();
       } else {
-        alert("Failed to complete treatment.");
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || errData.message || "Failed to complete treatment.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error completing treatment:", err);
+      alert(err.message || "Error completing treatment.");
     }
   };
 
@@ -241,9 +261,10 @@ export default function DoctorAccountView({
 
     setSavingRx(true);
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch("/api/prescriptions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           customer_id: customerId,
           patient_name: patientName,
@@ -262,12 +283,12 @@ export default function DoctorAccountView({
         setRxMedications([{ name: "", dosage: "", frequency: "", duration: "" }]);
         setRxGeneralNotes("");
       } else {
-        const err = await res.json();
-        alert(err.error || "Failed to create prescription.");
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || err.message || "Failed to create prescription.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error creating prescription:", err);
-      alert("Error saving prescription.");
+      alert(err.message || "Error saving prescription.");
     } finally {
       setSavingRx(false);
     }
