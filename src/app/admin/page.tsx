@@ -4590,13 +4590,19 @@ export default function AdminPage() {
     });
 
     // Synthesize entries for any patients in allReservations who aren't in dbCustomers
-    const existingPhones = new Set(processedDbCustomers.map((c) => c.phone).filter(Boolean));
+    const existingIds = new Set(processedDbCustomers.map((c) => c.id).filter(Boolean));
+    const existingPhones = new Set(processedDbCustomers.map((c) => c.phone?.trim()).filter(Boolean));
     const existingNames = new Set(processedDbCustomers.map((c) => c.name?.trim().toLowerCase()).filter(Boolean));
 
     const reservationDerivedCustomers: Customer[] = [];
     allReservations.forEach((r: any) => {
+      // A reservation linked to a real customer record is always covered by that
+      // record, regardless of whether this particular booking's name/phone snapshot
+      // matches it verbatim (bookings can carry different display names/whitespace).
+      if (r.customerId && existingIds.has(r.customerId)) return;
+
       const name = r.name || r.patient_name || r.customerName;
-      const phone = r.phone || r.mobile || r.customerPhone || "";
+      const phone = (r.phone || r.mobile || r.customerPhone || "").trim();
       const email = r.email || r.customerEmail || "";
 
       if (!name) return;
