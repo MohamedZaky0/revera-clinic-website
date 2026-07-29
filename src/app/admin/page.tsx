@@ -113,6 +113,7 @@ import { PackageAdminPanel } from "@/components/admin/packages/PackageAdminPanel
 import { PromotionsAdminPanel } from "@/components/admin/marketing/PromotionsAdminPanel";
 import { FinanceSection } from "@/components/admin/Finance/FinanceSection";
 import { DoctorServiceCommissionEditor, ServiceCommissionEntry, DefaultCommissionType } from "@/components/admin/services/DoctorServiceCommissionEditor";
+import DoctorAccountView from "@/components/admin/DoctorAccountView";
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
@@ -2305,6 +2306,13 @@ export default function AdminPage() {
       fetchHrData();
     }
   }, [activeNav, fetchHrData]);
+
+  async function handleLogout() {
+    if (supabase) {
+      await triggerCheckout();
+      await supabase.auth.signOut();
+    }
+  }
 
   // Geolocation Check-In on login resolution
   useEffect(() => {
@@ -7636,6 +7644,18 @@ export default function AdminPage() {
   }
   function handleMarkAsRead(id: string) {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  }
+
+  if (adminRole === "doctor" || adminRole === "Doctor") {
+    const docEmp = employeesList.find((e) => e.email === adminEmail);
+    return (
+      <DoctorAccountView
+        doctorName={docEmp?.name || adminEmail || "Doctor"}
+        doctorEmail={adminEmail}
+        doctorBranch={docEmp?.branch_id || "Main Branch"}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   return (
