@@ -1429,6 +1429,60 @@ action; no direct DB cleanup was done.
 
 ---
 
+## RISK-035: Package-Redeemed Visits Were Invoiced At Full Price, Double-Counting Revenue And Creating Phantom Receivables
+
+**Severity:** Critical · **Type:** Financial data integrity · **Found:** 2026-07-29, while
+building PROPOSAL-002 Phase 4's P&L report (task 4.6) · **RESOLVED 2026-07-29**
+
+**What it is:** Checkout (`writeCheckoutInvoice` in `POST`/`PATCH /api/reservations`) invoices
+every service on a completed booking at its full list price — it has no concept of packages at
+all. Separately, `POST /api/packages/consume` (task 1.13) records the *correct* revenue for a
+package-covered visit in `package_revenue_recognitions`, per DEC-023. The admin checkout UI
+already computes which services in a booking are redeemed against an existing package
+(`redeemedPackageItems`, used to correctly exclude them from what the patient is charged
+client-side) — but never sent that information to the server. The result, confirmed against a
+real redemption already in dev data: a patient using a pre-paid session generated **both** the
+correct `package_revenue_recognitions` entry (EGP 166.67) **and** a full-price, unpaid invoice
+(EGP 100) for the same visit, with real `cogs_snapshot`/`commission_snapshot` costing correctly
+attached to that same phantom line.
+
+**Consequence, confirmed on real (mock) data, not theoretical:**
+1. **Revenue double-counted.** `GET /api/finance/pnl` (and everything built on it — 4.8's doctor/
+   branch P&L) counted the phantom full-price line *and* the correct recognition for the same
+   session, inflating revenue for any period with package activity.
+2. **Phantom receivable.** The unpaid phantom invoice showed up in `GET /api/finance/receivables-
+   aging` as a real patient debt. The patient owed nothing — they pre-paid weeks earlier via the
+   package.
+3. **Cost tracking was correct** — `applyCheckoutCosting` (task 2.11) runs on every invoice line
+   regardless of price, so `cogs_snapshot`/`commission_snapshot` for a package-delivered session
+   were always accurate. Only the revenue side was wrong.
+
+**Fix:**
+- `writeCheckoutInvoice` accepts a new `redeemedServiceIds: number[]` param. For any service in
+  that set, the invoice line is still written (list `unit_price`, for the audit trail) but with
+  `discount` equal to the full price, making `line_total: 0` — the visit stays on the invoice and
+  its `cogs_snapshot`/`commission_snapshot` are computed exactly as before; only the phantom
+  revenue is suppressed. A `(package redemption)` suffix is added to the line description so it
+  reads clearly on the invoice itself.
+- `PATCH /api/reservations` accepts `redeemedServiceIds` in the request body and passes it
+  through — see `API_CONTRACT.md`.
+- `admin/page.tsx`'s checkout handler now sends `redeemedServiceIds: Object.keys(redeemedPackageItems).map(Number)` —
+  data the client already had, just never transmitted.
+- The one existing bad invoice/line in dev (`INV-000021`) was corrected in place to match what the
+  fix now produces (`line_total`/`grand_total` zeroed, `cogs_snapshot` untouched) — dev data is
+  mock (DEC-026), no broader backfill needed.
+
+**Verified:** `scratch/risk035_check.ts` — creates an isolated service/customer/reservation,
+completes checkout with `redeemedServiceIds` set, and confirms the invoice is written (audit
+trail preserved), `line_total`/`grand_total` are 0, `cogs_snapshot` is still computed, no
+`payments` row is created, and `GET /api/finance/receivables-aging` does not list it as
+outstanding — 10/10 checks pass. Separately confirmed a normal (non-package) checkout with no
+`redeemedServiceIds` still charges full price, unaffected by this change.
+
+**Manual test checklist:** `ai_docs/manual_tests/RISK_035_MANUAL_TESTS.md`.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:

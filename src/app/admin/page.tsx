@@ -27075,7 +27075,11 @@ export default function AdminPage() {
                   amountPaid: totalPaidIncludingDeposit,
                   amountLeft: remainingAmount,
                   walletWithdrawal: walletDeduction,
-                  walletDeposit: changeAmount > 0 && depositChangeToWallet ? changeAmount : 0
+                  walletDeposit: changeAmount > 0 && depositChangeToWallet ? changeAmount : 0,
+                  // RISK-035: without this, checkout invoices every service at full price even
+                  // when it's covered by a package the patient already paid for — the server has
+                  // no other way to know which lines in this booking are package redemptions.
+                  redeemedServiceIds: Object.keys(redeemedPackageItems).map(Number)
                 })
               });
               if (res.ok) {

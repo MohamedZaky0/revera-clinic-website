@@ -265,9 +265,14 @@ async function writeCheckoutInvoice(params: {
   amountPaid: number;
   consumptionOverrides?: Record<string, Record<string, number>>;
   receivedByEmployeeId?: string | null;
+  redeemedServiceIds?: number[];
 }): Promise<void> {
-  const { reservationId, customerId, branchId, providerId, serviceIds, amountPaid, consumptionOverrides, receivedByEmployeeId } = params;
+  const {
+    reservationId, customerId, branchId, providerId, serviceIds, amountPaid, consumptionOverrides,
+    receivedByEmployeeId, redeemedServiceIds,
+  } = params;
   if (serviceIds.length === 0) return;
+  const redeemedSet = new Set((redeemedServiceIds || []).map(Number));
 
   let targetBranchName: string | null = null;
   if (branchId) {
@@ -295,12 +300,19 @@ async function writeCheckoutInvoice(params: {
       { price: svc.price !== null ? Number(svc.price) : 0, branchPricing: svc.branch_pricing },
       targetBranchName
     );
+    // A service already paid for via a package must not also be invoiced at full price here —
+    // that revenue is recognised separately, per session delivered, by /api/packages/consume
+    // (task 1.13, DEC-023). Charging both was RISK-035: the patient's existing package entitlement
+    // already covers this visit, so the line is written at its list price with a full discount
+    // (line_total 0) rather than silently omitted, keeping the visit on the invoice for the audit
+    // trail without billing it again or creating a phantom receivable.
+    const isRedeemed = redeemedSet.has(Number(svc.id));
     return buildInvoiceLine({
       lineType: 'service',
-      description: svc.en || `Service #${svc.id}`,
+      description: (svc.en || `Service #${svc.id}`) + (isRedeemed ? ' (package redemption)' : ''),
       qty: 1,
       unitPrice: priceDetails.basePrice,
-      discount: priceDetails.basePrice - priceDetails.discountedPrice,
+      discount: isRedeemed ? priceDetails.basePrice : priceDetails.basePrice - priceDetails.discountedPrice,
       serviceId: svc.id,
       providerId: providerId ?? undefined,
     });
@@ -735,7 +747,7 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides, date: newDate, followUpDate } = body;
+    const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides, redeemedServiceIds, date: newDate, followUpDate } = body;
 
     const { data: target, error: findError } = await supabaseServer
       .from('reservations')
@@ -1179,6 +1191,7 @@ export async function PATCH(req: Request) {
               serviceIds,
               amountPaid: Math.max(0, paymentDelta),
               consumptionOverrides,
+              redeemedServiceIds: Array.isArray(redeemedServiceIds) ? redeemedServiceIds.map(Number) : undefined,
             });
           } else if (wasAlreadyCompleted && paymentDelta > 0) {
             await appendPaymentToExistingInvoice(id, paymentDelta);
