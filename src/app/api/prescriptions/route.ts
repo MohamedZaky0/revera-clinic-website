@@ -36,23 +36,26 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customerId');
 
-    if (!customerId) {
-      return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
-    }
-
     try {
-      const { data, error } = await supabaseServer
+      let query = supabaseServer
         .from('prescriptions')
         .select('*')
-        .eq('customer_id', customerId)
         .order('date', { ascending: false });
+
+      if (customerId && customerId !== 'all') {
+        query = query.eq('customer_id', customerId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         // If table doesn't exist, fall back to local JSON
         if (error.code === 'PGRST205') {
           console.warn('prescriptions table not found in Supabase. Falling back to local data/prescriptions.json');
           const local = readLocalPrescriptions();
-          const filtered = local.filter((p: any) => p.customer_id === customerId);
+          const filtered = (customerId && customerId !== 'all')
+            ? local.filter((p: any) => p.customer_id === customerId)
+            : local;
           return NextResponse.json(filtered);
         }
         throw error;
@@ -62,7 +65,9 @@ export async function GET(req: Request) {
       if (dbErr.code === 'PGRST205' || dbErr.message?.includes('relation "public.prescriptions" does not exist')) {
         console.warn('prescriptions table not found in Supabase. Falling back to local data/prescriptions.json');
         const local = readLocalPrescriptions();
-        const filtered = local.filter((p: any) => p.customer_id === customerId);
+        const filtered = (customerId && customerId !== 'all')
+          ? local.filter((p: any) => p.customer_id === customerId)
+          : local;
         return NextResponse.json(filtered);
       }
       throw dbErr;

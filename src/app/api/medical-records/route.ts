@@ -35,23 +35,23 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customerId');
 
-    if (!customerId) {
-      return NextResponse.json({ error: 'Customer ID is required' }, { status: 400 });
-    }
-
     let form: any = null;
     let reports: any[] = [];
 
     // Try Supabase first for intake form
     try {
-      const { data: formData, error: formErr } = await supabaseServer
-        .from('medical_records')
-        .select('*')
-        .eq('customer_id', String(customerId))
-        .single();
-
-      if (!formErr && formData) {
-        form = formData;
+      let formQuery = supabaseServer.from('medical_records').select('*');
+      if (customerId && customerId !== 'all') {
+        formQuery = formQuery.eq('customer_id', String(customerId));
+        const { data: formData, error: formErr } = await formQuery.single();
+        if (!formErr && formData) {
+          form = formData;
+        }
+      } else {
+        const { data: formData, error: formErr } = await formQuery;
+        if (!formErr && formData) {
+          form = formData;
+        }
       }
     } catch (err) {
       console.warn('Supabase medical_records lookup failed, using local fallback');
@@ -60,16 +60,20 @@ export async function GET(req: Request) {
     // Fallback to local JSON for form if not found in DB
     if (!form) {
       const localForms = readLocalData(FORMS_LOCAL_PATH);
-      form = localForms.find((f: any) => String(f.customer_id) === String(customerId)) || null;
+      if (customerId && customerId !== 'all') {
+        form = localForms.find((f: any) => String(f.customer_id) === String(customerId)) || null;
+      } else {
+        form = localForms;
+      }
     }
 
     // Try Supabase first for reports
     try {
-      const { data: reportsData, error: repErr } = await supabaseServer
-        .from('medical_reports')
-        .select('*')
-        .eq('customer_id', String(customerId))
-        .order('created_at', { ascending: false });
+      let repQuery = supabaseServer.from('medical_reports').select('*').order('created_at', { ascending: false });
+      if (customerId && customerId !== 'all') {
+        repQuery = repQuery.eq('customer_id', String(customerId));
+      }
+      const { data: reportsData, error: repErr } = await repQuery;
 
       if (!repErr && reportsData) {
         reports = reportsData;
@@ -81,7 +85,11 @@ export async function GET(req: Request) {
     // Fallback to local JSON for reports if empty
     if (reports.length === 0) {
       const localReports = readLocalData(REPORTS_LOCAL_PATH);
-      reports = localReports.filter((r: any) => String(r.customer_id) === String(customerId));
+      if (customerId && customerId !== 'all') {
+        reports = localReports.filter((r: any) => String(r.customer_id) === String(customerId));
+      } else {
+        reports = localReports;
+      }
     }
 
     return NextResponse.json({
