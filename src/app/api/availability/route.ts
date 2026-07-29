@@ -9,6 +9,37 @@ function formatDate(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// A doctor's day may be a single start..end window, or a real shifts[] array (split shift,
+// e.g. 9am-1pm then 4pm-8pm). Falling back to start/end only when shifts is absent/empty
+// matches admin/page.tsx's own shift-reading convention — see RISK/PROPOSAL-002 Phase 5 note
+// on why treating a split shift as one collapsed window overstates available minutes.
+function getDayShiftWindows(dayConfig: any): { start: string; end: string }[] {
+  if (dayConfig?.shifts && Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
+    return dayConfig.shifts.filter((s: any) => s?.start && s?.end);
+  }
+  if (dayConfig?.start && dayConfig?.end) {
+    return [{ start: dayConfig.start, end: dayConfig.end }];
+  }
+  return [];
+}
+
+// The whole session must fit inside one continuous shift — it must not span the gap between
+// two shifts (e.g. a 1pm-4pm gap in a 9-1/4-8 split shift).
+function sessionFitsWithinShift(
+  slotTime: string,
+  durationMinutes: number,
+  windows: { start: string; end: string }[]
+): boolean {
+  const startMin = timeToMinutes(slotTime);
+  const endMin = startMin + durationMinutes;
+  return windows.some((w) => startMin >= timeToMinutes(w.start) && endMin <= timeToMinutes(w.end));
+}
+
 // Simple in-memory cache for database resources (stable definitions)
 let cachedServices: any[] | null = null;
 let cachedServicesExpiry = 0;
@@ -308,14 +339,15 @@ export async function GET(req: Request) {
           const dayConfig = getDoctorDayConfig(doc, weekdayName);
           if (!dayConfig || !dayConfig.isOpen) continue;
 
-          if (slotTime < dayConfig.start || slotTime >= dayConfig.end) continue;
+          const shiftWindows = getDayShiftWindows(dayConfig);
+          if (!sessionFitsWithinShift(slotTime, targetDuration, shiftWindows)) continue;
 
           let docFree = true;
           const docBookings = slots.filter(s => s.doctorName === doc.name);
 
           for (let k = 0; k < targetSlotsNeeded; k++) {
             const currentSlot = ALL_15MIN_SLOTS[i + k];
-            if (currentSlot >= dayConfig.end) {
+            if (currentSlot === undefined) {
               docFree = false;
               break;
             }
@@ -439,14 +471,15 @@ export async function GET(req: Request) {
           const dayConfig = getDoctorDayConfig(doc, weekdayName);
           if (!dayConfig || !dayConfig.isOpen) continue;
 
-          if (slotTime < dayConfig.start || slotTime >= dayConfig.end) continue;
+          const shiftWindows = getDayShiftWindows(dayConfig);
+          if (!sessionFitsWithinShift(slotTime, targetDuration, shiftWindows)) continue;
 
           let docFree = true;
           const docBookings = slots.filter(s => s.doctorName === doc.name);
 
           for (let k = 0; k < targetSlotsNeeded; k++) {
             const currentSlotIdx = i + k;
-            if (currentSlotIdx >= ALL_15MIN_SLOTS.length || ALL_15MIN_SLOTS[currentSlotIdx] >= dayConfig.end) {
+            if (currentSlotIdx >= ALL_15MIN_SLOTS.length) {
               docFree = false;
               break;
             }
