@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef, Fragment } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
 import { ServiceItem, SERVICES, ALL_15MIN_SLOTS, getServiceDurationMinutes, getDurationInMinutes, normaliseTo24hSlot, getEffectiveServicePrice, getServicePriceDetails } from "@/lib/services";
@@ -58,6 +58,12 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  FlaskConical,
+  CheckCircle2,
+  XCircle,
+  Play,
+  Terminal,
+  Activity,
   ShoppingBag,
   CircleDollarSign,
   Presentation,
@@ -412,7 +418,8 @@ const PERMISSION_STRUCTURE = [
       { key: "settings.terms", label: "Manage Terms & Conditions" },
       { key: "settings.notification", label: "Manage Notification Settings" },
       { key: "settings.queue", label: "Manage Queue Settings" },
-      { key: "settings.pages", label: "Manage Pages Settings (CMS)" }
+      { key: "settings.pages", label: "Manage Pages Settings (CMS)" },
+      { key: "settings.test_suite", label: "Run System Test Suite" }
     ]
   },
   {
@@ -1990,7 +1997,8 @@ export default function AdminPage() {
           "Notification Settings": "settings.notification",
           "Queue Settings": "settings.queue",
           "Pages Settings": "settings.pages",
-          "Role Management": "settings.roles"
+          "Role Management": "settings.roles",
+          "System Test Suite": "settings.test_suite"
         };
         if (settingsSubsections[activeNav]) {
           isPermitted = hasPermission(settingsSubsections[activeNav]);
@@ -3077,7 +3085,8 @@ export default function AdminPage() {
       "Notification Settings": "settings.notification",
       "Queue Settings": "settings.queue",
       "Pages Settings": "settings.pages",
-      "Role Management": "settings.roles"
+      "Role Management": "settings.roles",
+      "System Test Suite": "settings.test_suite"
     };
     
     if (settingsSubsections[activeNav]) {
@@ -3269,6 +3278,130 @@ export default function AdminPage() {
       setLoadingDeviceAuditLogs(false);
     }
   }, [authenticatedJsonHeaders]);
+
+  // ── System Test Suite State & Diagnostics Engine ──
+  interface SystemTestCase {
+    id: string;
+    name: string;
+    category: string;
+    endpoint: string;
+    description: string;
+    status: 'idle' | 'running' | 'pass' | 'fail';
+    durationMs?: number;
+    statusCode?: number;
+    responseDetails?: any;
+    errorMsg?: string;
+  }
+
+  const INITIAL_SYSTEM_TEST_SUITES: SystemTestCase[] = [
+    { id: 'TC-001', name: 'Supabase Database & Auth Health', category: 'Database & Auth', endpoint: '/api/health/supabase', description: 'Verifies live database connection, response latency, and env configurations.', status: 'idle' },
+    { id: 'TC-002', name: 'Current User Session & RBAC Permissions', category: 'Database & Auth', endpoint: '/api/auth/me', description: 'Checks staff session authentication and user profile authorization.', status: 'idle' },
+    { id: 'TC-003', name: 'Clinic Branches API Integrity', category: 'Services & Bookings', endpoint: '/api/branches', description: 'Verifies clinic branches data, operating hours, and location IDs.', status: 'idle' },
+    { id: 'TC-004', name: 'Services Catalog & Category Mapping', category: 'Services & Bookings', endpoint: '/api/services', description: 'Validates service catalog pricing, durations, and category tags.', status: 'idle' },
+    { id: 'TC-005', name: 'Dynamic Service Categories Store', category: 'Services & Bookings', endpoint: '/api/categories', description: 'Checks service category definitions and branch customization.', status: 'idle' },
+    { id: 'TC-006', name: 'Inventory Products & Stock Levels', category: 'Inventory & Equipment', endpoint: '/api/inventory/products', description: 'Tests product stock levels, pricing, roles (retail/consumable), and SKUs.', status: 'idle' },
+    { id: 'TC-007', name: 'Clinic Equipment Devices & Pulse Limits', category: 'Inventory & Equipment', endpoint: '/api/inventory/devices', description: 'Verifies laser pulse counters, threshold limits, and replacement costs.', status: 'idle' },
+    { id: 'TC-008', name: 'Device Audit Logs System', category: 'Inventory & Equipment', endpoint: '/api/inventory/devices/audit-logs', description: 'Tests equipment maintenance history and pulse reset logs.', status: 'idle' },
+    { id: 'TC-009', name: 'Provider Schedule Audit Logs', category: 'Inventory & Equipment', endpoint: '/api/providers/schedule-audit-logs', description: 'Validates doctor schedule modification logs and shift audit history.', status: 'idle' },
+    { id: 'TC-010', name: 'Employee Roster & Accounts', category: 'HR & Payroll', endpoint: '/api/employees', description: 'Verifies employee list, departments, positions, and accounts.', status: 'idle' },
+    { id: 'TC-011', name: 'Employee Role & Access Control Rules', category: 'HR & Payroll', endpoint: '/api/roles', description: 'Tests system role definitions and view/edit permission matrices.', status: 'idle' },
+    { id: 'TC-012', name: 'Regular Staff Payroll Calculation Engine', category: 'HR & Payroll', endpoint: '/api/hr/payroll', description: 'Tests monthly staff salary, bonuses, deductions, and net pay calculations.', status: 'idle' },
+    { id: 'TC-013', name: 'Doctor Payroll & Commission Engine', category: 'HR & Payroll', endpoint: '/api/hr/doctor-payroll', description: 'Validates doctor fixed salaries, commission tiers, and reservation pay.', status: 'idle' },
+    { id: 'TC-014', name: 'Leave Requests Management', category: 'HR & Payroll', endpoint: '/api/hr/leaves', description: 'Tests employee leave request submissions and approval statuses.', status: 'idle' },
+    { id: 'TC-015', name: 'GPS Attendance Check-in Engine', category: 'HR & Payroll', endpoint: '/api/hr/attendance', description: 'Tests geofenced attendance logs and shift duration calculations.', status: 'idle' },
+    { id: 'TC-016', name: 'Patient Medical Records & Intake Reports', category: 'Medical & Patients', endpoint: '/api/medical-records', description: 'Validates intake form submission, medical history, and clinical notes.', status: 'idle' },
+    { id: 'TC-017', name: 'Customer Product Purchase Balances', category: 'Medical & Patients', endpoint: '/api/customers/products', description: 'Tests customer retail package balances and product usage tracking.', status: 'idle' },
+    { id: 'TC-018', name: 'Patient Prescriptions Register', category: 'Medical & Patients', endpoint: '/api/prescriptions', description: 'Verifies doctor prescription generation and dosage records.', status: 'idle' },
+    { id: 'TC-019', name: 'Clinic Expense Categories & Ledger', category: 'Expenses & Assets', endpoint: '/api/expenses', description: 'Tests expense items, payment methods, and recurring expense rules.', status: 'idle' },
+    { id: 'TC-020', name: 'Clinic Asset Depreciation Engine', category: 'Expenses & Assets', endpoint: '/api/assets', description: 'Validates capital asset valuation and straight-line depreciation.', status: 'idle' },
+    { id: 'TC-021', name: 'Clinic Loans & Repayment Schedules', category: 'Expenses & Assets', endpoint: '/api/loans', description: 'Tests financial loans, interest schedules, and repayment logs.', status: 'idle' },
+    { id: 'TC-022', name: 'Terms & Conditions Policy Config', category: 'System & Settings', endpoint: '/api/terms', description: 'Verifies deposit terms, cancellation policies, and clinic terms.', status: 'idle' },
+    { id: 'TC-023', name: 'HR Missing Check-in Warning Alerts', category: 'HR & Payroll', endpoint: '/api/hr/alerts', description: 'Tests missing clock-in detection and automated HR warning alerts.', status: 'idle' }
+  ];
+
+  const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
+  const [runningAllDiagnostics, setRunningAllDiagnostics] = useState(false);
+  const [testCategoryFilter, setTestCategoryFilter] = useState<string>('all');
+  const [testSuiteSearch, setTestSuiteSearch] = useState<string>('');
+  const [expandedDiagnosticId, setExpandedDiagnosticId] = useState<string | null>(null);
+
+  const runSingleDiagnosticTest = async (testId: string) => {
+    setSystemTestSuites((prev) =>
+      prev.map((t) => (t.id === testId ? { ...t, status: 'running', errorMsg: undefined } : t))
+    );
+
+    const targetTest = systemTestSuites.find((t) => t.id === testId);
+    if (!targetTest) return;
+
+    const startTime = performance.now();
+    try {
+      const res = await fetch(targetTest.endpoint, {
+        headers: authenticatedJsonHeaders,
+        cache: 'no-store'
+      });
+      const endTime = performance.now();
+      const durationMs = Math.round(endTime - startTime);
+
+      if (res.ok) {
+        let data: any = {};
+        try {
+          data = await res.json();
+        } catch {
+          data = { message: 'OK (non-JSON response)' };
+        }
+        setSystemTestSuites((prev) =>
+          prev.map((t) =>
+            t.id === testId
+              ? {
+                  ...t,
+                  status: 'pass',
+                  durationMs,
+                  statusCode: res.status,
+                  responseDetails: data
+                }
+              : t
+          )
+        );
+      } else {
+        const errText = await res.text();
+        setSystemTestSuites((prev) =>
+          prev.map((t) =>
+            t.id === testId
+              ? {
+                  ...t,
+                  status: 'fail',
+                  durationMs,
+                  statusCode: res.status,
+                  errorMsg: `HTTP ${res.status}: ${errText.slice(0, 300)}`
+                }
+              : t
+          )
+        );
+      }
+    } catch (err: any) {
+      const endTime = performance.now();
+      setSystemTestSuites((prev) =>
+        prev.map((t) =>
+          t.id === testId
+            ? {
+                ...t,
+                status: 'fail',
+                durationMs: Math.round(endTime - startTime),
+                errorMsg: err.message || 'Network error'
+              }
+            : t
+        )
+      );
+    }
+  };
+
+  const runAllDiagnosticTests = async () => {
+    setRunningAllDiagnostics(true);
+    for (const test of systemTestSuites) {
+      await runSingleDiagnosticTest(test.id);
+    }
+    setRunningAllDiagnostics(false);
+  };
 
   const fetchInventoryDevices = useCallback(async () => {
     try {
@@ -7608,7 +7741,8 @@ export default function AdminPage() {
                           { label: "Notification Settings", icon: Bell, perm: "settings.notification" },
                           { label: "Queue Settings", icon: ListOrdered, perm: "settings.queue" },
                           { label: "Pages Settings", icon: FileText, perm: "settings.pages" },
-                          { label: "Role Management", icon: Shield, perm: "settings.roles" }
+                          { label: "Role Management", icon: Shield, perm: "settings.roles" },
+                          { label: "System Test Suite", icon: FlaskConical, perm: "settings.test_suite" }
                         ].filter(sub => {
                           if (!sub.perm) return true;
                           if (adminRole === 'superadmin') return true;
@@ -17093,6 +17227,224 @@ export default function AdminPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeNav === "System Test Suite" && (
+            <div className="space-y-8 animate-fadeIn">
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#414E36]/10 text-[#414E36]">
+                      <FlaskConical size={22} />
+                    </div>
+                    <h2 className="text-3xl font-bold text-[#1F251A]">System Test Suite & Automated Diagnostics</h2>
+                  </div>
+                  <p className="mt-2 text-sm text-[#5A6A51]">
+                    Automated end-to-end testing suite verifying every API endpoint, database query, HR calculation, and inventory process across the system.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={runningAllDiagnostics}
+                    onClick={runAllDiagnosticTests}
+                    className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-3 text-xs font-bold text-white shadow-lg shadow-[#414E36]/20 transition-all hover:bg-[#343F2B] disabled:opacity-50"
+                  >
+                    {runningAllDiagnostics ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin text-white" />
+                        <span>Running Diagnostics...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play size={16} fill="currentColor" />
+                        <span>Run All Diagnostics</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Statistics Overview Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] p-5 shadow-sm">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Total Tests</span>
+                  <div className="mt-2 text-3xl font-extrabold text-[#1F251A]">{systemTestSuites.length}</div>
+                </div>
+
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Passed</span>
+                  <div className="mt-2 text-3xl font-extrabold text-emerald-800">
+                    {systemTestSuites.filter(t => t.status === 'pass').length}
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-5 shadow-sm">
+                  <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Failed</span>
+                  <div className="mt-2 text-3xl font-extrabold text-rose-800">
+                    {systemTestSuites.filter(t => t.status === 'fail').length}
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Pending / Idle</span>
+                  <div className="mt-2 text-3xl font-extrabold text-slate-700">
+                    {systemTestSuites.filter(t => t.status === 'idle' || t.status === 'running').length}
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter & Search Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 shadow-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-[#5A6A51] mr-1">Category:</span>
+                  {['all', 'Database & Auth', 'Services & Bookings', 'Inventory & Equipment', 'HR & Payroll', 'Medical & Patients', 'Expenses & Assets', 'System & Settings'].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setTestCategoryFilter(cat)}
+                      className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
+                        testCategoryFilter === cat
+                          ? 'bg-[#414E36] text-white shadow-sm'
+                          : 'bg-white text-[#5A6A51] border border-[#E6E9EB] hover:border-[#414E36]'
+                      }`}
+                    >
+                      {cat === 'all' ? 'All Categories' : cat}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative w-full max-w-xs">
+                  <Search size={14} className="absolute left-3.5 top-3 text-[#5A6A51]" />
+                  <input
+                    type="text"
+                    placeholder="Search test cases or endpoints..."
+                    value={testSuiteSearch}
+                    onChange={(e) => setTestSuiteSearch(e.target.value)}
+                    className="w-full rounded-2xl border border-[#E6E9EB] bg-white pl-9 pr-4 py-2 text-xs text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                  />
+                </div>
+              </div>
+
+              {/* Test Cases Table */}
+              <div className="overflow-hidden rounded-[32px] border border-[#414E36]/10 bg-white shadow-[0_30px_80px_rgba(47,61,41,0.05)]">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-xs uppercase tracking-wider text-[#5A6A51]">
+                      <tr>
+                        <th className="px-6 py-4 font-bold">ID</th>
+                        <th className="px-6 py-4 font-bold">Test Name & Target Endpoint</th>
+                        <th className="px-6 py-4 font-bold">Category</th>
+                        <th className="px-6 py-4 font-bold text-center">Status</th>
+                        <th className="px-6 py-4 font-bold text-center">Latency</th>
+                        <th className="px-6 py-4 font-bold text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#414E36]/05 text-[#1F251A]">
+                      {systemTestSuites
+                        .filter((tc) => {
+                          const matchesCat = testCategoryFilter === 'all' || tc.category === testCategoryFilter;
+                          const matchesSearch =
+                            tc.name.toLowerCase().includes(testSuiteSearch.toLowerCase()) ||
+                            tc.endpoint.toLowerCase().includes(testSuiteSearch.toLowerCase()) ||
+                            tc.id.toLowerCase().includes(testSuiteSearch.toLowerCase());
+                          return matchesCat && matchesSearch;
+                        })
+                        .map((tc) => {
+                          const isExpanded = expandedDiagnosticId === tc.id;
+                          return (
+                            <Fragment key={tc.id}>
+                              <tr className="hover:bg-[#FBFBF9]/80 transition">
+                                <td className="px-6 py-4 font-mono font-bold text-[#414E36]">{tc.id}</td>
+                                <td className="px-6 py-4">
+                                  <div className="font-bold text-sm text-[#1F251A]">{tc.name}</div>
+                                  <div className="mt-0.5 flex items-center gap-2">
+                                    <span className="font-mono text-[11px] text-[#5A6A51] bg-[#EDF1EC] px-2 py-0.5 rounded-md">
+                                      {tc.endpoint}
+                                    </span>
+                                    <span className="text-[11px] text-[#8C9A84]">{tc.description}</span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="inline-block rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-2.5 py-1 text-[11px] font-semibold text-[#414E36]">
+                                    {tc.category}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                  {tc.status === 'pass' && (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                                      <CheckCircle2 size={14} className="text-emerald-600" /> PASS
+                                    </span>
+                                  )}
+                                  {tc.status === 'fail' && (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800">
+                                      <XCircle size={14} className="text-rose-600" /> FAIL
+                                    </span>
+                                  )}
+                                  {tc.status === 'running' && (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                                      <Loader2 size={14} className="animate-spin text-amber-600" /> RUNNING
+                                    </span>
+                                  )}
+                                  {tc.status === 'idle' && (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                                      <span className="h-2 w-2 rounded-full bg-slate-400"></span> IDLE
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 text-center font-mono text-xs font-bold text-[#5A6A51]">
+                                  {tc.durationMs !== undefined ? `${tc.durationMs}ms` : '—'}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      disabled={tc.status === 'running'}
+                                      onClick={() => runSingleDiagnosticTest(tc.id)}
+                                      className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#EDF1EC] transition disabled:opacity-50"
+                                    >
+                                      Run Test
+                                    </button>
+                                    {(tc.responseDetails || tc.errorMsg) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedDiagnosticId(isExpanded ? null : tc.id)}
+                                        className="rounded-xl bg-[#EDF1EC] p-1.5 text-[#414E36] hover:bg-[#414E36]/20 transition"
+                                        title="View Details JSON"
+                                      >
+                                        <Terminal size={14} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                              {isExpanded && (
+                                <tr className="bg-[#1F251A]/03">
+                                  <td colSpan={6} className="px-6 py-4">
+                                    <div className="rounded-2xl bg-[#1F251A] p-4 text-emerald-400 font-mono text-[11px] overflow-x-auto shadow-inner">
+                                      <div className="mb-2 flex items-center justify-between text-slate-400 border-b border-slate-700 pb-2">
+                                        <span>Diagnostic Result Output ({tc.id})</span>
+                                        <span>Status Code: {tc.statusCode || 'N/A'}</span>
+                                      </div>
+                                      {tc.errorMsg && (
+                                        <div className="text-rose-400 font-bold mb-2">Error: {tc.errorMsg}</div>
+                                      )}
+                                      {tc.responseDetails && (
+                                        <pre>{JSON.stringify(tc.responseDetails, null, 2)}</pre>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
