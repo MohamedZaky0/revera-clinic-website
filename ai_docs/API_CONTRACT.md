@@ -1313,3 +1313,84 @@ matching budget line are surfaced separately under `unbudgeted`, not silently om
   unbudgeted: [ { categoryId, categoryName, actual } ]
 }
 ```
+
+---
+
+## GET /api/finance/doctor-pnl
+
+Requires a staff bearer token **and** the `finance.view_pnl` permission (superadmin bypasses).
+Task 4.8 — the same accrual revenue/COGS/commission accounting as `GET /api/finance/pnl`, sliced
+by `invoice_lines.provider_id` (and, for package sessions, the delivering reservation's
+`provider_id` via `package_revenue_recognitions.reservation_id` — never `doctor_name` string
+matching; this is the concrete report RISK-015 exists to make trustworthy).
+
+**Query params:** either `period` (`'YYYY-MM'`) or both `from`/`to` (`'YYYY-MM-DD'`, inclusive).
+`branchId?` scopes to invoices for that branch.
+
+**No fixed-overhead or fully-loaded view** — this codebase has no established basis for
+allocating rent/depreciation/loan interest to an individual doctor (DEC-015 only defines a
+room-minutes allocation for services/sessions), so this endpoint stops at contribution margin,
+matching 4.7's service-margin. Lines with no `provider_id` land in `unattributed`, not silently
+dropped.
+
+**Reconciliation invariant:** `SUM(providers[].revenue.total) + unattributed.revenue.total` equals
+`GET /api/finance/pnl`'s `revenue.total` for the same range (same for `cogs`/`commission`/
+`contributionMargin`) — verified by hand against live dev data, not just asserted.
+
+**Response:**
+```
+{
+  range: { label, from, to },
+  branchId: string | null,
+  note: string,
+  providers: [
+    {
+      providerId, providerName,
+      revenue: { total },
+      cogs: { total, costedLineCount, uncostedLineCount, partiallyCosted },
+      commission: { total, commissionedLineCount, uncommissionedLineCount, partiallyCommissioned },
+      contributionMargin
+    }
+  ],
+  unattributed: { ...same shape, providerId: null, providerName: 'Unattributed' }
+}
+```
+
+---
+
+## GET /api/finance/branch-pnl
+
+Requires a staff bearer token **and** the `finance.view_pnl` permission (superadmin bypasses).
+Task 4.8 — the same full P&L shape as `GET /api/finance/pnl` (revenue, cogs, commission,
+fixedOverhead, contributionMargin, fullyLoadedProfit), sliced by `branch_id`.
+
+**Query params:** either `period` (`'YYYY-MM'`) or both `from`/`to` (`'YYYY-MM-DD'`, inclusive).
+
+Revenue/cogs/commission attribute via each invoice's `branch_id` (package recognitions via the
+delivering reservation's `branch_id`). Expenses attribute via their own `branch_id`. Depreciation
+attributes via the asset's `branch_id`. **Loan interest carries no `branch_id` anywhere in the
+schema and always lands in `unattributed`** — unlike 4.6's whole-clinic total, which includes it
+directly when no `branchId` filter is given. Rows with no branch attribution (e.g. task 0.4's
+still-open branch-on-product-sale gap) land in `unattributed` too, never silently dropped.
+
+**Reconciliation invariant:** summing every field across `branches[]` plus `unattributed` equals
+4.6's whole-clinic totals exactly for the same range — verified by hand against live dev data.
+
+**Response:**
+```
+{
+  range: { label, from, to },
+  note: string,
+  branches: [
+    {
+      branchId, branchName,
+      revenue: { total },
+      cogs: { total, costedLineCount, uncostedLineCount, partiallyCosted },
+      commission: { total, commissionedLineCount, uncommissionedLineCount, partiallyCommissioned },
+      fixedOverhead: { total, expenses, depreciation, loanInterest },
+      contributionMargin, fullyLoadedProfit
+    }
+  ],
+  unattributed: { ...same shape, branchId: null, branchName: 'Unattributed' }
+}
+```
