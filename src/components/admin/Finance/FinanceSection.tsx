@@ -1,13 +1,40 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { CircleDollarSign, TrendingUp, Wallet, Landmark } from "lucide-react";
+import {
+  CircleDollarSign,
+  TrendingUp,
+  Wallet,
+  Landmark,
+  FileBarChart2,
+  Activity,
+  Users,
+  Banknote,
+  Clock,
+  Target,
+} from "lucide-react";
 import { ExpensesScreen } from "./ExpensesScreen";
 import { AssetsScreen } from "./AssetsScreen";
 import { LoansScreen } from "./LoansScreen";
 import { FinanceOverview } from "./FinanceOverview";
+import { PnlScreen } from "./PnlScreen";
+import { ServiceMarginScreen } from "./ServiceMarginScreen";
+import { DoctorBranchPnlScreen } from "./DoctorBranchPnlScreen";
+import { CashFlowScreen } from "./CashFlowScreen";
+import { ReceivablesAgingScreen } from "./ReceivablesAgingScreen";
+import { BudgetVsActualScreen } from "./BudgetVsActualScreen";
 
-export type FinanceTab = "overview" | "expenses" | "assets" | "loans";
+export type FinanceTab =
+  | "overview"
+  | "expenses"
+  | "assets"
+  | "loans"
+  | "pnl"
+  | "service-margin"
+  | "doctor-branch-pnl"
+  | "cashflow"
+  | "receivables-aging"
+  | "budget-vs-actual";
 
 export interface BranchOption {
   id: string;
@@ -25,6 +52,12 @@ const TABS: { id: FinanceTab; label: string; icon: ReactNode }[] = [
   { id: "expenses", label: "Expenses", icon: <Wallet size={16} /> },
   { id: "assets", label: "Assets & Depreciation", icon: <TrendingUp size={16} /> },
   { id: "loans", label: "Loans", icon: <Landmark size={16} /> },
+  { id: "pnl", label: "P&L", icon: <FileBarChart2 size={16} /> },
+  { id: "service-margin", label: "Service Margins", icon: <Activity size={16} /> },
+  { id: "doctor-branch-pnl", label: "Doctor / Branch P&L", icon: <Users size={16} /> },
+  { id: "cashflow", label: "Cash Flow", icon: <Banknote size={16} /> },
+  { id: "receivables-aging", label: "Receivables Aging", icon: <Clock size={16} /> },
+  { id: "budget-vs-actual", label: "Budget vs Actual", icon: <Target size={16} /> },
 ];
 
 export function FinanceSection({ accessToken, branches = [] }: FinanceSectionProps) {
@@ -65,6 +98,13 @@ export function FinanceSection({ accessToken, branches = [] }: FinanceSectionPro
       {activeTab === "expenses" && <ExpensesScreen accessToken={accessToken} branches={branches} />}
       {activeTab === "assets" && <AssetsScreen accessToken={accessToken} branches={branches} />}
       {activeTab === "loans" && <LoansScreen accessToken={accessToken} />}
+
+      {activeTab === "pnl" && <PnlScreen accessToken={accessToken} branches={branches} />}
+      {activeTab === "service-margin" && <ServiceMarginScreen accessToken={accessToken} branches={branches} />}
+      {activeTab === "doctor-branch-pnl" && <DoctorBranchPnlScreen accessToken={accessToken} branches={branches} />}
+      {activeTab === "cashflow" && <CashFlowScreen accessToken={accessToken} branches={branches} />}
+      {activeTab === "receivables-aging" && <ReceivablesAgingScreen accessToken={accessToken} branches={branches} />}
+      {activeTab === "budget-vs-actual" && <BudgetVsActualScreen accessToken={accessToken} branches={branches} />}
     </div>
   );
 }
