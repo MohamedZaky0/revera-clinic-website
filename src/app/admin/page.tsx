@@ -743,6 +743,7 @@ export default function AdminPage() {
   const [authChecking, setAuthChecking] = useState(true);
   const lastActivityRef = useRef<number>(Date.now());
   const [adminRole, setAdminRole] = useState<string | null>(null);
+  const [adminDepartment, setAdminDepartment] = useState<string>("");
   const [forceAdminView, setForceAdminView] = useState(false);
   const [adminPermissions, setAdminPermissions] = useState<string[]>([]);
   const hasPermission = useCallback((permKey: string): boolean => {
@@ -1914,14 +1915,19 @@ export default function AdminPage() {
         if (res.ok) {
           const authData = await res.json();
           setAdminRole(authData.role);
+          setAdminDepartment(authData.department || "");
           setAdminPermissions(authData.permissions || []);
           setAdminEmail(authData.email || "");
           setAdminEmployeeId(authData.employeeId || "");
           setAdminDbId(authData.id || "");
+
+          // Pre-fetch employee accounts list so doctor role is known immediately before rendering
+          await fetchRolesAndEmployees();
         } else {
           console.warn("Unregistered employee session. Logging out.");
           await supabase.auth.signOut();
           setAdminRole(null);
+          setAdminDepartment("");
           setAdminPermissions([]);
           setAdminEmail("");
           setAdminEmployeeId("");
@@ -7654,6 +7660,8 @@ export default function AdminPage() {
   const isDoctorUserAccount =
     adminRole?.toLowerCase() === "doctor" ||
     adminRole?.toLowerCase() === "doctors" ||
+    adminDepartment?.toLowerCase() === "doctors" ||
+    adminDepartment?.toLowerCase() === "doctor" ||
     loggedEmpAccount?.department?.toLowerCase() === "doctors" ||
     loggedEmpAccount?.department?.toLowerCase() === "doctor" ||
     loggedEmpAccount?.role_name?.toLowerCase() === "doctor" ||
