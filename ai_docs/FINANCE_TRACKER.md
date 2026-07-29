@@ -3298,7 +3298,7 @@ browser verification against the dev database is still outstanding.
 | 4.5 | Delete the ~4,000 lines of dead mock finance JSX | 4.4 (Finance nav must work before the old block is removed) | `DONE` | Windsurf | ec828cf |
 | 4.6 | `GET /api/finance/pnl` — monthly P&L | 1.10, 1.11, 1.14, 2.11, 3.10–3.12 | `DONE` | Claude | bb88d31 |
 | 4.7 | `GET /api/finance/service-margin` — per-service contribution margin | 2.9, 2.11 | `DONE` | Claude | 716b804 |
-| 4.8 | `GET /api/finance/doctor-pnl`, `GET /api/finance/branch-pnl` | 2.14, 4.6 | `TODO` | — | — |
+| 4.8 | `GET /api/finance/doctor-pnl`, `GET /api/finance/branch-pnl` | 2.14, 4.6 | `DONE` | Claude | dd57ed8 |
 | 4.9 | `GET /api/finance/cashflow` | 1.1–1.4, 3.10, 3.12 | `DONE` | Claude | b9d9f01 |
 | 4.10 | `GET /api/finance/receivables-aging` | 1.14 | `DONE` | Claude | 62b4641 |
 | 4.11 | Migration: `budget_lines` table + `GET /api/finance/budget-vs-actual` | 3.1 | `DONE` | Claude | 5c997e1 |
