@@ -189,6 +189,9 @@ no application code reads or writes it; do not use it until its purpose is decid
 | `rooms` | uuid[] | Array of room IDs for multi-room bookings, default `{}` |
 | `created_by_employee_id` | UUID | FK → employee_accounts.id, nullable — who created the booking (for HR revenue-target attribution) |
 | `follow_up_date` | date | nullable. **Added 2026-07-28** by `20260728000100_add_reservations_follow_up_date.sql`. Only meaningful when `status = 'postponed'` and no new date/time is known yet — a reminder for staff to check back, not a real slot. Cleared once the booking is actually rescheduled (`date`/`time_slot` updated, status leaves `postponed`). |
+| `approved_at` | timestamptz | nullable. **Added 2026-07-29** by `20260729020000_add_reservation_status_timestamps.sql` (PROPOSAL-002 Phase 5, task 5.1). Set by `PATCH /api/reservations` `action: 'approve'`. |
+| `completed_at` | timestamptz | nullable. Same migration. Set by the generic `PATCH /api/reservations` update branch the first time `status` transitions to `'completed'` (guarded so a later money-only PATCH on an already-completed booking does not overwrite it). |
+| `cancelled_at` | timestamptz | nullable. Same migration. Set by `PATCH /api/reservations` `action: 'cancel' \| 'no_show'` — no separate `no_show_at` column exists; this column doubles as "left the pipeline without being delivered" for both, which is what Phase 5's utilization math (`src/lib/capacity.ts`) needs to exclude from booked minutes. |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
@@ -1202,6 +1205,44 @@ month, not a general budgeting system. Listed here under Phase 3 rather than Pha
 schema support for a Phase 3 category (`expense_categories`), even though the report consuming it
 is Phase 4; PROPOSALS.md's Phase 3 setup-data list (item 19, "monthly budget per expense category")
 named the need but no table existed for it until this task.
+
+## Phase 5 — Capacity & Optimization (PROPOSAL-002)
+
+### `holiday_calendar`
+
+**Added 2026-07-29** by `20260729020100_create_holiday_calendar.sql` (task 5.2).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `branch_id` | UUID | FK → branches.id, cascade delete, nullable |
+| `provider_id` | UUID | FK → providers.id, cascade delete, nullable |
+| `date` | date | NOT NULL |
+| `reason` | text | nullable |
+| `created_at` | timestamptz | |
+
+CHECK `branch_id IS NOT NULL OR provider_id IS NOT NULL` — one row is either a branch-wide closure
+or a specific provider's leave day (or both, if a provider is on leave only at one branch). Task
+5.5's capacity math must exclude a provider's shifts entirely on a date they have a row here, and
+exclude a branch's open minutes entirely on a date it has a branch-wide row here.
+
+### `refused_demand`
+
+**Added 2026-07-29** by `20260729020200_create_refused_demand.sql` (task 5.3). **Schema-only — no
+application caller writes to this table yet.** PROPOSALS.md names this "the single most important
+input for a capacity-expansion ROI case" (patients who found no free slot and left, currently
+leaving no trace) but wiring a UI capture point (e.g. `BookingModal.tsx` logging an abandoned
+search) is separate follow-up work, not part of this migration.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `branch_id` | UUID | FK → branches.id ON DELETE SET NULL, nullable |
+| `service_id` | bigint | FK → services.id ON DELETE SET NULL, nullable |
+| `requested_at` | timestamptz | Default now() |
+| `reason` | text | Default `'no_slot'`, CHECK IN (`'no_slot'`, `'too_expensive'`, `'other'`) |
+| `note` | text | nullable |
+| `created_at` | timestamptz | |
 
 ## Notes on Schema Gaps
 

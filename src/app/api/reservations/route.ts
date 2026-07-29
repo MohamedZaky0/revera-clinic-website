@@ -957,7 +957,8 @@ export async function PATCH(req: Request) {
           doctor_name: doctorName || null,
           provider_id: await resolveProviderId(doctorName),
           room_id: chosenRoomId,
-          rooms: serviceCompRoomIds
+          rooms: serviceCompRoomIds,
+          approved_at: new Date().toISOString(),
         })
         .eq('id', id)
         .select()
@@ -1031,6 +1032,10 @@ export async function PATCH(req: Request) {
           // no further balance is owed for a service that was never delivered.
           amount_paid: action === 'cancel' ? 0 : target.amount_paid,
           amount_left: 0,
+          // No dedicated no_show_at column (PROPOSAL-002 Phase 5 only specifies three timestamp
+          // columns) — cancelled_at doubles as "left the pipeline without being delivered" for
+          // both cancel and no_show, which is what task 5.5's utilization math needs to exclude.
+          cancelled_at: new Date().toISOString(),
         })
         .eq('id', id)
         .select()
@@ -1079,6 +1084,9 @@ export async function PATCH(req: Request) {
     } else if (status || notes !== undefined || doctorName !== undefined || sessionType !== undefined || amountPaid !== undefined || amountLeft !== undefined || serviceId !== undefined || serviceIds !== undefined || createdByEmployeeId !== undefined || newDate !== undefined) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
+      if (status === 'completed' && target.status !== 'completed') {
+        updates.completed_at = new Date().toISOString();
+      }
       if (notes !== undefined) updates.notes = notes;
       if (doctorName !== undefined) {
         updates.doctor_name = doctorName;
