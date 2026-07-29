@@ -1126,3 +1126,45 @@ invalidate the already-generated schedule; delete and recreate the loan instead.
 Requires an administrator bearer token. Cascades to the loan's `loan_schedule`.
 
 **Response:** `{ success: true }`
+
+---
+
+## GET /api/finance/pnl
+
+Requires a staff bearer token **and** the `finance.view_pnl` permission (superadmin bypasses).
+Whole-range profit & loss (task 4.6).
+
+**Query params:** either `period` (`'YYYY-MM'`) or both `from`/`to` (`'YYYY-MM-DD'`, inclusive).
+`branchId?` — when given, scopes invoices/expenses/depreciation to that branch; loan interest has
+no branch attribution anywhere in the schema and is **excluded** (`fixedOverhead.loanInterestExcluded:
+true`) rather than silently guessed at.
+
+**Revenue** = `SUM(invoice_lines.line_total)` for `service`/`product` lines on `issued` invoices in
+range, **plus** `SUM(package_revenue_recognitions.recognised_amount)` recognised in range (DEC-023
+— a package's own `invoice_lines` line books cash received, not revenue, so it is excluded from
+revenue to avoid double-counting).
+
+**COGS/commission** = `SUM(invoice_lines.cogs_snapshot)` / `SUM(invoice_lines.commission_snapshot)`
+for lines in range. `NULL` values (never costed) are excluded from the sum and counted separately
+(`uncostedLineCount`/`uncommissionedLineCount`) rather than treated as zero — `partiallyCosted`/
+`partiallyCommissioned` flag when any exist.
+
+**Fixed overhead** = `expenses.amount` + `depreciation_entries.amount` + `loan_schedule.interest_part`
+(never `installment` — its `principal_part` is a balance-sheet movement, not a P&L expense) for the
+range.
+
+**Response:**
+```
+{
+  range: { label, from, to },
+  branchId: string | null,
+  revenue: { total, servicesAndProducts, packageRecognised },
+  cogs: { total, costedLineCount, uncostedLineCount, partiallyCosted },
+  commission: { total, commissionedLineCount, uncommissionedLineCount, partiallyCommissioned },
+  fixedOverhead: { total, expenses, depreciation, loanInterest, loanInterestExcluded },
+  views: {
+    contributionMargin: { value, formula, label },   // DEC-015 primary — decisions
+    fullyLoadedProfit: { value, formula, label }      // DEC-015 secondary — full-cost curiosity
+  }
+}
+```
