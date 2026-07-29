@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { BarChart, LineAreaChart, StatTile } from "./charts";
 
 export interface Expense {
@@ -42,6 +43,7 @@ export function FinanceOverview({ accessToken }: FinanceOverviewProps) {
   const [assets, setAssets] = useState<FixedAsset[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const headers = useMemo(
     () => (accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined),
@@ -50,6 +52,8 @@ export function FinanceOverview({ accessToken }: FinanceOverviewProps) {
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
+      setError(null);
       try {
         const [expRes, catRes, assetRes, loanRes] = await Promise.all([
           fetch("/api/expenses", { headers, cache: "no-store" }),
@@ -57,6 +61,10 @@ export function FinanceOverview({ accessToken }: FinanceOverviewProps) {
           fetch("/api/assets", { headers, cache: "no-store" }),
           fetch("/api/loans", { headers, cache: "no-store" }),
         ]);
+        if (!expRes.ok) throw new Error("Unable to load expenses.");
+        if (!catRes.ok) throw new Error("Unable to load expense categories.");
+        if (!assetRes.ok) throw new Error("Unable to load assets.");
+        if (!loanRes.ok) throw new Error("Unable to load loans.");
         const [expData, catData, assetData, loanData] = await Promise.all([
           expRes.json(),
           catRes.json(),
@@ -67,8 +75,8 @@ export function FinanceOverview({ accessToken }: FinanceOverviewProps) {
         setCategories(Array.isArray(catData) ? catData : []);
         setAssets(Array.isArray(assetData) ? assetData : []);
         setLoans(Array.isArray(loanData) ? loanData : []);
-      } catch {
-        // ignore overview fetch errors
+      } catch (err: any) {
+        setError(err?.message || "Failed to load finance overview data.");
       } finally {
         setLoading(false);
       }
@@ -132,6 +140,13 @@ export function FinanceOverview({ accessToken }: FinanceOverviewProps) {
         <StatTile label="Total Asset Cost" value={`EGP ${totalAssets.toLocaleString()}`} />
         <StatTile label="Total Loans" value={`EGP ${totalLoans.toLocaleString()}`} />
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-xl bg-red-50 p-4 text-sm font-medium text-red-700">
+          <AlertCircle size={18} />
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="p-12 text-center text-muted-foreground">Loading overview...</div>
