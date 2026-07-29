@@ -2327,10 +2327,10 @@ export default function AdminPage() {
       return;
     }
     
-    // Bypass location enforcement only for global superadmins who have no assigned branch
+    // Bypass location enforcement for superadmins and admins
     const loggedEmp = employeesList.find(e => e.id === adminDbId || e.email?.toLowerCase() === adminEmail.toLowerCase());
-    if (adminRole === 'superadmin' && !loggedEmp?.branch_id) {
-      console.log("Skipping location check: global superadmin bypass.");
+    if (adminRole === 'superadmin' || adminRole === 'admin') {
+      console.log("Skipping location check: admin / superadmin bypass.");
       return;
     }
 
@@ -7646,13 +7646,24 @@ export default function AdminPage() {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
   }
 
-  if (adminRole === "doctor" || adminRole === "Doctor") {
-    const docEmp = employeesList.find((e) => e.email === adminEmail);
+  const loggedEmpAccount = employeesList.find(
+    (e) => e.id === adminDbId || e.email?.toLowerCase() === adminEmail.toLowerCase()
+  );
+
+  const isDoctorUserAccount =
+    adminRole?.toLowerCase() === "doctor" ||
+    adminRole?.toLowerCase() === "doctors" ||
+    loggedEmpAccount?.department?.toLowerCase() === "doctors" ||
+    loggedEmpAccount?.department?.toLowerCase() === "doctor" ||
+    loggedEmpAccount?.role_name?.toLowerCase() === "doctor" ||
+    loggedEmpAccount?.role_name?.toLowerCase() === "doctors";
+
+  if (isDoctorUserAccount && adminRole !== "superadmin") {
     return (
       <DoctorAccountView
-        doctorName={docEmp?.name || adminEmail || "Doctor"}
+        doctorName={loggedEmpAccount?.name || adminEmail || "Doctor"}
         doctorEmail={adminEmail}
-        doctorBranch={docEmp?.branch_id || "Main Branch"}
+        doctorBranch={loggedEmpAccount?.branch_id || "Main Branch"}
         onLogout={handleLogout}
       />
     );
