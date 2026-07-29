@@ -1168,3 +1168,39 @@ range.
   }
 }
 ```
+
+---
+
+## GET /api/finance/service-margin
+
+Requires a staff bearer token **and** the `finance.view_margins` permission (superadmin bypasses).
+Per-service contribution margin (task 4.7) — the same `price − materials − commission − pulse_cost`
+formula as DEC-015, per minute and per session.
+
+**Query params:** either `period` (`'YYYY-MM'`) or both `from`/`to` (`'YYYY-MM-DD'`, inclusive).
+`branchId?` scopes to invoices for that branch. `serviceId?` limits to one service.
+
+For each service with at least one `line_type='service'` line on an `issued` invoice in range:
+`contributionMarginPerSession = (SUM(line_total) − SUM(cogs_snapshot) − SUM(commission_snapshot))
+/ costedSessionCount`, summed and divided once (not averaged per-line) for the same reason
+`buildInvoiceTotals()` rounds once at the end. `cmPerMinute = contributionMarginPerSession /
+durationMinutes`, using `getServiceDurationMinutes()` (prefers `services.duration_minutes`, falls
+back to parsing `services.duration`; `durationIsFallback: true` flags when the fallback fired). A
+line needs **both** `cogs_snapshot` and `commission_snapshot` non-null to count toward
+`costedSessionCount` — mixing a real number with a NULL treated as zero would overstate margin.
+Results sort by `cmPerMinute` descending.
+
+**Response:**
+```
+{
+  range: { label, from, to },
+  branchId: string | null,
+  services: [
+    {
+      serviceId, serviceName, durationMinutes, durationIsFallback,
+      sessionCount, costedSessionCount, partiallyCosted,
+      revenueTotal, contributionMarginTotal, contributionMarginPerSession, cmPerMinute
+    }
+  ]
+}
+```
