@@ -1237,3 +1237,30 @@ is given.
   netCashFlow
 }
 ```
+
+---
+
+## GET /api/finance/receivables-aging
+
+Requires a staff bearer token **and** the `finance.view_cashflow` permission (superadmin bypasses
+— no dedicated key exists for receivables; closest fit, since aging is unrealized cash. Flag if
+this should get its own `finance.*` key instead). Standard receivables aging report (task 4.10).
+
+**Query params:** `branchId?` scopes to invoices for that branch. `asOf?` (`'YYYY-MM-DD'`, defaults
+to today) — the date age is measured against.
+
+Built on the **task 1.14 ledger derivation**, not the pre-1.14 `customers.outstanding` scalar (that
+inherits RISK-012's inflated figures): for every `issued` invoice, `outstanding = max(0, grandTotal
+- SUM(payments for that invoice))`. Only invoices with `outstanding > 0` appear. Bucketed by
+`floor((asOf - issuedAt) / 1 day)`: `0-30` / `31-60` / `61-90` / `90+`.
+
+**Response:**
+```
+{
+  asOf: 'YYYY-MM-DD',
+  branchId: string | null,
+  totalOutstanding: number,
+  buckets: { '0-30', '31-60', '61-90', '90+' },
+  items: [ { customerId, customerName, invoiceId, invoiceNo, issuedAt, outstanding, ageDays, bucket } ]
+}
+```
