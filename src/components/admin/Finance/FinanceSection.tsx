@@ -5,6 +5,7 @@ import { CircleDollarSign, TrendingUp, Wallet, Landmark } from "lucide-react";
 import { ExpensesScreen } from "./ExpensesScreen";
 import { AssetsScreen } from "./AssetsScreen";
 import { LoansScreen } from "./LoansScreen";
+import { FinanceOverview } from "./FinanceOverview";
 
 export type FinanceTab = "overview" | "expenses" | "assets" | "loans";
 
@@ -59,29 +60,7 @@ export function FinanceSection({ accessToken, branches = [] }: FinanceSectionPro
         ))}
       </div>
 
-      {activeTab === "overview" && (
-        <div
-          className="flex flex-col items-center justify-center rounded-2xl border p-12 text-center"
-          style={{
-            backgroundColor: "var(--cr-white)",
-            borderColor: "rgba(90, 106, 81, 0.15)",
-          }}
-        >
-          <span
-            className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl"
-            style={{ backgroundColor: "rgba(196, 174, 124, 0.15)", color: "var(--cr-accent)" }}
-          >
-            <CircleDollarSign size={32} />
-          </span>
-          <h3 className="mb-2 text-lg font-semibold" style={{ color: "var(--cr-primary, var(--cr-dark))" }}>
-            Finance overview
-          </h3>
-          <p className="max-w-md text-sm" style={{ color: "var(--cr-primary, var(--cr-dark))", opacity: 0.7 }}>
-            Reporting dashboards will be available here in task 4.15. Use the tabs above to manage
-            expenses, fixed assets and loans.
-          </p>
-        </div>
-      )}
+      {activeTab === "overview" && <FinanceOverview accessToken={accessToken} />}
 
       {activeTab === "expenses" && <ExpensesScreen accessToken={accessToken} branches={branches} />}
       {activeTab === "assets" && <AssetsScreen accessToken={accessToken} branches={branches} />}
