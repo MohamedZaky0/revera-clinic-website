@@ -40,24 +40,40 @@ export async function GET(req: Request) {
     if (invoicesError) throw invoicesError;
     const invoiceIds = (invoices || []).map((row: any) => row.id);
 
-    let serviceProductRevenue = 0;
+    let serviceRevenue = 0;
+    let productRevenue = 0;
     let cogs = 0;
     let commission = 0;
     let costedLineCount = 0;
     let uncostedLineCount = 0;
     let commissionedLineCount = 0;
     let uncommissionedLineCount = 0;
+    const serviceRevenueByServiceId = new Map<number, number>();
+    const productRevenueByProductId = new Map<string, number>();
 
     if (invoiceIds.length > 0) {
       const { data: lines, error: linesError } = await supabaseServer
         .from('invoice_lines')
-        .select('line_type, line_total, cogs_snapshot, commission_snapshot')
+        .select('line_type, line_total, cogs_snapshot, commission_snapshot, service_id, product_id')
         .in('invoice_id', invoiceIds);
       if (linesError) throw linesError;
 
       for (const line of lines || []) {
-        if (line.line_type === 'service' || line.line_type === 'product') {
-          serviceProductRevenue += Number(line.line_total || 0);
+        const lineTotal = Number(line.line_total || 0);
+        if (line.line_type === 'service') {
+          serviceRevenue += lineTotal;
+          if (line.service_id !== null && line.service_id !== undefined) {
+            const sid = Number(line.service_id);
+            serviceRevenueByServiceId.set(sid, (serviceRevenueByServiceId.get(sid) || 0) + lineTotal);
+          }
+        } else if (line.line_type === 'product') {
+          productRevenue += lineTotal;
+          if (line.product_id) {
+            productRevenueByProductId.set(
+              line.product_id,
+              (productRevenueByProductId.get(line.product_id) || 0) + lineTotal
+            );
+          }
         }
         // cogs_snapshot / commission_snapshot are NULL for lines never costed (Phase 2 not run
         // yet, or a product-only line no costing path ever touches) — unknown, not zero.
@@ -76,6 +92,51 @@ export async function GET(req: Request) {
       }
     }
 
+    // Break service/product revenue down by category — a lump "revenue" total hides exactly the
+    // question a clinic owner asks first ("which category actually made this").
+    const serviceIds = Array.from(serviceRevenueByServiceId.keys());
+    let serviceCatById = new Map<number, string | null>();
+    if (serviceIds.length > 0) {
+      const { data: services, error: servicesError } = await supabaseServer
+        .from('services')
+        .select('id, cat')
+        .in('id', serviceIds);
+      if (servicesError) throw servicesError;
+      serviceCatById = new Map((services || []).map((s: any) => [Number(s.id), s.cat || null]));
+    }
+    const serviceCatKeys = Array.from(new Set(Array.from(serviceCatById.values()).filter(Boolean))) as string[];
+    let categoryLabelByKey = new Map<string, string>();
+    if (serviceCatKeys.length > 0) {
+      const { data: categories, error: categoriesError } = await supabaseServer
+        .from('categories')
+        .select('key, en')
+        .in('key', serviceCatKeys);
+      if (categoriesError) throw categoriesError;
+      categoryLabelByKey = new Map((categories || []).map((c: any) => [c.key, c.en]));
+    }
+    const servicesByCategory = new Map<string, number>();
+    for (const [sid, amount] of serviceRevenueByServiceId) {
+      const catKey = serviceCatById.get(sid);
+      const label = catKey ? categoryLabelByKey.get(catKey) || catKey : 'Uncategorized';
+      servicesByCategory.set(label, round2((servicesByCategory.get(label) || 0) + amount));
+    }
+
+    const productIds = Array.from(productRevenueByProductId.keys());
+    let productCategoryById = new Map<string, string | null>();
+    if (productIds.length > 0) {
+      const { data: products, error: productsError } = await supabaseServer
+        .from('inventory_products')
+        .select('id, category')
+        .in('id', productIds);
+      if (productsError) throw productsError;
+      productCategoryById = new Map((products || []).map((p: any) => [p.id, p.category || null]));
+    }
+    const productsByCategory = new Map<string, number>();
+    for (const [pid, amount] of productRevenueByProductId) {
+      const label = productCategoryById.get(pid) || 'Uncategorized';
+      productsByCategory.set(label, round2((productsByCategory.get(label) || 0) + amount));
+    }
+
     // Package revenue recognised in range (DEC-023) — NOT the package's original invoice_lines
     // line, which books cash received, not revenue.
     let recognitionQuery = supabaseServer
@@ -91,21 +152,40 @@ export async function GET(req: Request) {
       0
     );
 
-    const revenue = round2(serviceProductRevenue + packageRevenueRecognised);
+    const revenue = round2(serviceRevenue + productRevenue + packageRevenueRecognised);
     cogs = round2(cogs);
     commission = round2(commission);
 
     // Fixed overhead: expenses + depreciation + loan interest (task 3.7 — interest_part only,
-    // never installment, which includes the principal balance-sheet movement).
+    // never installment, which includes the principal balance-sheet movement). Expenses broken
+    // down by category — same reasoning as the revenue split above.
     let expensesQuery = supabaseServer
       .from('expenses')
-      .select('amount')
+      .select('amount, category_id')
       .gte('incurred_on', range.fromDate)
       .lt('incurred_on', range.toDateExclusive);
     if (branchId) expensesQuery = expensesQuery.eq('branch_id', branchId);
     const { data: expenseRows, error: expensesError } = await expensesQuery;
     if (expensesError) throw expensesError;
     const expensesTotal = round2((expenseRows || []).reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0));
+
+    const expenseCategoryIds = Array.from(
+      new Set((expenseRows || []).map((row: any) => row.category_id).filter(Boolean))
+    );
+    let expenseCategoryNameById = new Map<string, string>();
+    if (expenseCategoryIds.length > 0) {
+      const { data: expenseCategories, error: expenseCategoriesError } = await supabaseServer
+        .from('expense_categories')
+        .select('id, name')
+        .in('id', expenseCategoryIds);
+      if (expenseCategoriesError) throw expenseCategoriesError;
+      expenseCategoryNameById = new Map((expenseCategories || []).map((c: any) => [c.id, c.name]));
+    }
+    const expensesByCategoryMap = new Map<string, number>();
+    for (const row of expenseRows || []) {
+      const label = row.category_id ? expenseCategoryNameById.get(row.category_id) || 'Unknown category' : 'Uncategorized';
+      expensesByCategoryMap.set(label, round2((expensesByCategoryMap.get(label) || 0) + Number(row.amount || 0)));
+    }
 
     // Depreciation is asset-scoped; a branch filter means "assets belonging to that branch."
     let assetQuery = supabaseServer.from('fixed_assets').select('id');
@@ -155,7 +235,14 @@ export async function GET(req: Request) {
       branchId: branchId || null,
       revenue: {
         total: revenue,
-        servicesAndProducts: round2(serviceProductRevenue),
+        services: {
+          total: round2(serviceRevenue),
+          byCategory: Array.from(servicesByCategory.entries()).map(([category, amount]) => ({ category, amount })),
+        },
+        products: {
+          total: round2(productRevenue),
+          byCategory: Array.from(productsByCategory.entries()).map(([category, amount]) => ({ category, amount })),
+        },
         packageRecognised: round2(packageRevenueRecognised),
       },
       cogs: {
@@ -172,7 +259,10 @@ export async function GET(req: Request) {
       },
       fixedOverhead: {
         total: fixedOverhead,
-        expenses: expensesTotal,
+        expenses: {
+          total: expensesTotal,
+          byCategory: Array.from(expensesByCategoryMap.entries()).map(([category, amount]) => ({ category, amount })),
+        },
         depreciation: depreciationTotal,
         loanInterest: loanInterestTotal,
         loanInterestExcluded,

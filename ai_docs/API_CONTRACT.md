@@ -1142,7 +1142,10 @@ true`) rather than silently guessed at.
 **Revenue** = `SUM(invoice_lines.line_total)` for `service`/`product` lines on `issued` invoices in
 range, **plus** `SUM(package_revenue_recognitions.recognised_amount)` recognised in range (DEC-023
 — a package's own `invoice_lines` line books cash received, not revenue, so it is excluded from
-revenue to avoid double-counting).
+revenue to avoid double-counting). Services and products are kept as separate totals (never
+combined into one lump figure), each broken down `byCategory` — services via `services.cat` →
+`categories.en`, products via `inventory_products.category` (a free-text field, not FK'd to a
+table) — so "which category actually made this" doesn't require a second query.
 
 **COGS/commission** = `SUM(invoice_lines.cogs_snapshot)` / `SUM(invoice_lines.commission_snapshot)`
 for lines in range. `NULL` values (never costed) are excluded from the sum and counted separately
@@ -1151,17 +1154,28 @@ for lines in range. `NULL` values (never costed) are excluded from the sum and c
 
 **Fixed overhead** = `expenses.amount` + `depreciation_entries.amount` + `loan_schedule.interest_part`
 (never `installment` — its `principal_part` is a balance-sheet movement, not a P&L expense) for the
-range.
+range. `expenses` is broken down `byCategory` (via `expense_categories.name`) for the same reason
+revenue is — a single overhead number hides whether it's rent, utilities, or something else driving
+it.
 
 **Response:**
 ```
 {
   range: { label, from, to },
   branchId: string | null,
-  revenue: { total, servicesAndProducts, packageRecognised },
+  revenue: {
+    total,
+    services: { total, byCategory: [{ category, amount }] },
+    products: { total, byCategory: [{ category, amount }] },
+    packageRecognised
+  },
   cogs: { total, costedLineCount, uncostedLineCount, partiallyCosted },
   commission: { total, commissionedLineCount, uncommissionedLineCount, partiallyCommissioned },
-  fixedOverhead: { total, expenses, depreciation, loanInterest, loanInterestExcluded },
+  fixedOverhead: {
+    total,
+    expenses: { total, byCategory: [{ category, amount }] },
+    depreciation, loanInterest, loanInterestExcluded
+  },
   views: {
     contributionMargin: { value, formula, label },   // DEC-015 primary — decisions
     fullyLoadedProfit: { value, formula, label }      // DEC-015 secondary — full-cost curiosity
@@ -1221,7 +1235,8 @@ is given.
 
 - **Cash received:** `SUM(payments.amount)` for payments against `issued` invoices in range, broken
   down `byMethod` (`cash`/`card`/`wallet`/`instapay`/`transfer`).
-- **Cash paid out:** `expenses.amount` (by `incurred_on`) + `purchases.paid` (by `purchased_at`) +
+- **Cash paid out:** `expenses.amount` (by `incurred_on`, broken down `byCategory` via
+  `expense_categories.name` — same reasoning as 4.6's P&L) + `purchases.paid` (by `purchased_at`) +
   `loan_schedule.installment` (by scheduled period — the **whole** installment here, unlike 4.6's
   P&L, which uses only `interest_part`; the principal portion is real cash leaving the bank even
   though it isn't a P&L expense).
@@ -1233,7 +1248,11 @@ is given.
   branchId: string | null,
   note: string,
   cashReceived: { total, byMethod: { cash, card, wallet, instapay, transfer } },
-  cashPaidOut: { total, expenses, purchases, purchasesExcluded, loanInstallments, loanInstallmentsExcluded },
+  cashPaidOut: {
+    total,
+    expenses: { total, byCategory: [{ category, amount }] },
+    purchases, purchasesExcluded, loanInstallments, loanInstallmentsExcluded
+  },
   netCashFlow
 }
 ```

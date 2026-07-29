@@ -62,18 +62,37 @@ export async function GET(req: Request) {
       }
     }
 
-    // Cash paid out: expenses (branch-scoped), purchases.paid (no branch_id anywhere in the
+    // Cash paid out: expenses (branch-scoped, broken down by category — a lump total hides
+    // which category actually drove the outflow), purchases.paid (no branch_id anywhere in the
     // schema — excluded and flagged, not silently guessed at, when branchId is given), loan
     // installment by scheduled period (also clinic-wide, same reasoning).
     let expensesQuery = supabaseServer
       .from('expenses')
-      .select('amount')
+      .select('amount, category_id')
       .gte('incurred_on', range.fromDate)
       .lt('incurred_on', range.toDateExclusive);
     if (branchId) expensesQuery = expensesQuery.eq('branch_id', branchId);
     const { data: expenseRows, error: expensesError } = await expensesQuery;
     if (expensesError) throw expensesError;
     const expensesPaid = round2((expenseRows || []).reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0));
+
+    const expenseCategoryIds = Array.from(
+      new Set((expenseRows || []).map((row: any) => row.category_id).filter(Boolean))
+    );
+    let expenseCategoryNameById = new Map<string, string>();
+    if (expenseCategoryIds.length > 0) {
+      const { data: expenseCategories, error: expenseCategoriesError } = await supabaseServer
+        .from('expense_categories')
+        .select('id, name')
+        .in('id', expenseCategoryIds);
+      if (expenseCategoriesError) throw expenseCategoriesError;
+      expenseCategoryNameById = new Map((expenseCategories || []).map((c: any) => [c.id, c.name]));
+    }
+    const expensesByCategoryMap = new Map<string, number>();
+    for (const row of expenseRows || []) {
+      const label = row.category_id ? expenseCategoryNameById.get(row.category_id) || 'Unknown category' : 'Uncategorized';
+      expensesByCategoryMap.set(label, round2((expensesByCategoryMap.get(label) || 0) + Number(row.amount || 0)));
+    }
 
     let purchasesPaid = 0;
     let purchasesExcluded = false;
@@ -114,7 +133,10 @@ export async function GET(req: Request) {
       cashReceived: { total: round2(cashReceived), byMethod: receivedByMethod },
       cashPaidOut: {
         total: cashPaidOut,
-        expenses: expensesPaid,
+        expenses: {
+          total: expensesPaid,
+          byCategory: Array.from(expensesByCategoryMap.entries()).map(([category, amount]) => ({ category, amount })),
+        },
         purchases: purchasesPaid,
         purchasesExcluded,
         loanInstallments: loanInstallmentsPaid,
