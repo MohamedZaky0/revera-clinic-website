@@ -3304,7 +3304,7 @@ browser verification against the dev database is still outstanding.
 | 4.11 | Migration: `budget_lines` table + `GET /api/finance/budget-vs-actual` | 3.1 | `DONE` | Claude | 5c997e1 |
 | 4.12 | Chart library selection + base chart components | — | `DONE` | Windsurf | a685982 |
 | 4.13 | UI: Finance **management** screens (Expenses, Assets & Depreciation, Loans) | 4.4, 4.12, 3.10–3.12 | `DONE` | Windsurf | a685982 |
-| 4.14 | `API_CONTRACT.md` rollup for Phase 4 | rolling, alongside 4.6–4.11 | `TODO` | — | — |
+| 4.14 | `API_CONTRACT.md` rollup for Phase 4 | rolling, alongside 4.6–4.11 | `DONE` | Claude | see below |
 | 4.15 | UI: Finance **reporting** screens (P&L, Service Margins, Doctor/Branch P&L, Cash Flow, Receivables Aging, Budget vs Actual) | 4.4, 4.6–4.12 | `TODO` | — | — |
 
 ---

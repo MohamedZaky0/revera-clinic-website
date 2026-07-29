@@ -2,7 +2,7 @@
 
 > **Last Updated:** 2026-07-29
 > **Base:** Next.js App Router API routes under `/app/api/`
-> **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, product-sales mutations, and every Phase 3 expenses/assets/loans route); coverage is not yet universal. All routes use the Supabase service role key server-side
+> **Auth:** Server-side bearer-token validation is enabled on selected sensitive routes (including employee, role, payroll, reservation PATCH/DELETE, product-sales mutations, every Phase 3 expenses/assets/loans route, and every Phase 4 `/api/finance/*` reporting route — each additionally gated on a specific `finance.*` permission via `hasFinancePermission`, not just staff membership); coverage is not yet universal. All routes use the Supabase service role key server-side
 > **Previous content was for a different project — discarded entirely**
 
 ---
