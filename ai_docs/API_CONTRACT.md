@@ -1204,3 +1204,36 @@ Results sort by `cmPerMinute` descending.
   ]
 }
 ```
+
+---
+
+## GET /api/finance/cashflow
+
+Requires a staff bearer token **and** the `finance.view_cashflow` permission (superadmin bypasses).
+Cash actually received vs. cash actually paid out (task 4.9) — **deliberately a different number
+from `GET /api/finance/pnl`'s revenue** (RISK-016). Do not substitute one for the other in the UI.
+
+**Query params:** either `period` (`'YYYY-MM'`) or both `from`/`to` (`'YYYY-MM-DD'`, inclusive).
+`branchId?` scopes cash received (via the paid invoice's branch) and paid expenses to that branch.
+`purchases` and `loans` carry no `branch_id` anywhere in the schema — both are **excluded** (flagged
+via `purchasesExcluded`/`loanInstallmentsExcluded`) rather than silently guessed at when `branchId`
+is given.
+
+- **Cash received:** `SUM(payments.amount)` for payments against `issued` invoices in range, broken
+  down `byMethod` (`cash`/`card`/`wallet`/`instapay`/`transfer`).
+- **Cash paid out:** `expenses.amount` (by `incurred_on`) + `purchases.paid` (by `purchased_at`) +
+  `loan_schedule.installment` (by scheduled period — the **whole** installment here, unlike 4.6's
+  P&L, which uses only `interest_part`; the principal portion is real cash leaving the bank even
+  though it isn't a P&L expense).
+
+**Response:**
+```
+{
+  range: { label, from, to },
+  branchId: string | null,
+  note: string,
+  cashReceived: { total, byMethod: { cash, card, wallet, instapay, transfer } },
+  cashPaidOut: { total, expenses, purchases, purchasesExcluded, loanInstallments, loanInstallmentsExcluded },
+  netCashFlow
+}
+```
