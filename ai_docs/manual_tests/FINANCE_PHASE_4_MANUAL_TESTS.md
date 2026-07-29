@@ -11,6 +11,7 @@
 | 2026-07-29 | 4.3 | dev (Supabase REST) | Live `admin`/`superadmin` roles queried before/after PATCH; all seven `finance.*` keys present after seed. Migration file `20260729000000_seed_finance_role_permissions.sql` created for reproducibility. | PASS |
 | 2026-07-29 | 4.4 | local / dev | `Finance` removed from `comingSoon` and wired through all four `parentScreenMap` instances; `FinanceSection` created under `src/components/admin/Finance/`. `tsc`/`eslint` clean. Browser click-through pending. | PASS (code) / PENDING (browser) |
 | 2026-07-29 | 4.12 | local | `recharts` installed (React 19 / Next 16 compatible). `StatTile`, `LineAreaChart`, `BarChart` created under `src/components/admin/Finance/charts/`. `tsc`/`eslint` clean. Runtime render pending. | PASS (code) / PENDING (browser) |
+| 2026-07-29 | 4.5 | local | Removed dead mock finance constants (`MOCK_POS_ORDERS`, `MOCK_FINANCE_TRANSACTIONS`, `MOCK_PAYROLL`, `MOCK_EXPENSE_CATEGORIES`, `MOCK_EXPENSES`) and state hooks (`financesExpanded`, `transactionSearch`, `payrollSearch`, etc.). Deleted dead views: POS Orders, Expense Categories, Transactions, Expenses, Payroll, Finances Dashboard, Transaction Reports (~1,500 lines removed from `src/app/admin/page.tsx`). Confirmed no remaining references to deleted mocks. `tsc`/`eslint` clean. Build and browser smoke pending. | PASS |
 
 ## Per-task checklist
 
