@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import {
   CalendarDays,
@@ -24,44 +24,239 @@ import {
   Lock,
   Bell,
   Award,
-  DollarSign
+  DollarSign,
+  Printer,
+  RefreshCw,
+  X
 } from "lucide-react";
 
 interface DoctorAccountViewProps {
+  doctorDbId?: string;
   doctorName?: string;
   doctorEmail?: string;
   doctorBranch?: string;
+  initialReservations?: any[];
   onLogout: () => void;
 }
 
 type DoctorTab = "schedule" | "ongoing" | "settings";
 
 export default function DoctorAccountView({
-  doctorName = "Dr. Clinic Provider",
+  doctorDbId,
+  doctorName = "Doctor",
   doctorEmail = "doctor@revera.com",
   doctorBranch = "Main Branch",
+  initialReservations = [],
   onLogout
 }: DoctorAccountViewProps) {
   const [activeTab, setActiveTab] = useState<DoctorTab>("schedule");
-
-  // Sample schedule state
+  const [reservations, setReservations] = useState<any[]>(initialReservations);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeSessionPatient, setActiveSessionPatient] = useState<any>({
-    name: "Sarah Johnson",
-    age: 29,
-    service: "HydraFacial Deluxe + Laser Therapy",
-    time: "10:30 AM - 11:30 AM",
-    room: "Room 102",
-    status: "In Progress",
-    notes: "Patient requested extra hydration serum. Previous treatment 3 weeks ago.",
-    medicalAlerts: ["Sensitive Skin", "No Aspirin"]
-  });
+
+  // Active Session State (real selected reservation)
+  const [activeSessionBooking, setActiveSessionBooking] = useState<any | null>(null);
+  const [clinicalNote, setClinicalNote] = useState("");
+  const [medicalRecord, setMedicalRecord] = useState<any | null>(null);
+  const [savingNote, setSavingNote] = useState(false);
+
+  // Prescription Modal State
+  const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+  const [rxDiagnosis, setRxDiagnosis] = useState("");
+  const [rxMedications, setRxMedications] = useState<{ name: string; dosage: string; frequency: string; duration: string }[]>([
+    { name: "", dosage: "", frequency: "", duration: "" }
+  ]);
+  const [rxGeneralNotes, setRxGeneralNotes] = useState("");
+  const [savingRx, setSavingRx] = useState(false);
+
+  // Password Update State
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+
+  // Fetch real reservations from DB
+  const fetchDoctorReservations = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/reservations", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setReservations(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error("Error fetching doctor reservations:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDoctorReservations();
+  }, []);
+
+  // Filter reservations for Today & Doctor assignment
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const todaysReservations = useMemo(() => {
+    return reservations.filter((r) => {
+      const resDate = r.date ? String(r.date).slice(0, 10) : "";
+      if (resDate !== todayStr) return false;
+
+      // Filter by doctor name/ID if set
+      if (r.doctor && doctorName && r.doctor.toLowerCase() !== doctorName.toLowerCase()) {
+        // If reservation specifies a different doctor, skip unless no doctor is specified
+        if (r.doctor.trim() && r.doctor.toLowerCase() !== "doctor" && r.doctor.toLowerCase() !== "any") {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [reservations, todayStr, doctorName]);
+
+  // Statistics derived from REAL DB data
+  const stats = useMemo(() => {
+    const total = todaysReservations.length;
+    const completed = todaysReservations.filter((r) => r.status === "completed" || r.status === "done").length;
+    const inProgress = todaysReservations.filter((r) => r.status === "in-progress" || r.status === "started").length;
+    const upcoming = todaysReservations.filter((r) => ["pending", "approved", "confirmed"].includes(r.status)).length;
+    return { total, completed, inProgress, upcoming };
+  }, [todaysReservations]);
+
+  // Filtered schedule by search query
+  const filteredSchedule = useMemo(() => {
+    if (!searchQuery.trim()) return todaysReservations;
+    const q = searchQuery.toLowerCase();
+    return todaysReservations.filter(
+      (r) =>
+        (r.name || r.customer_name || "").toLowerCase().includes(q) ||
+        (r.service || r.service_name || "").toLowerCase().includes(q) ||
+        (r.phone || "").includes(q)
+    );
+  }, [todaysReservations, searchQuery]);
+
+  // Open a real session
+  const handleOpenSession = async (booking: any) => {
+    setActiveSessionBooking(booking);
+    setClinicalNote(booking.notes || "");
+    setActiveTab("ongoing");
+
+    // Fetch medical intake record for this patient
+    const customerId = booking.customer_id || booking.customerId || booking.id;
+    if (customerId) {
+      try {
+        const res = await fetch(`/api/medical-records?customerId=${encodeURIComponent(customerId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setMedicalRecord(data.form || null);
+        }
+      } catch (err) {
+        console.error("Error loading patient medical records:", err);
+      }
+    }
+  };
+
+  // Save clinical notes to database
+  const handleSaveClinicalNote = async () => {
+    if (!activeSessionBooking) return;
+    setSavingNote(true);
+    try {
+      const res = await fetch(`/api/reservations?id=${encodeURIComponent(activeSessionBooking.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: activeSessionBooking.status,
+          notes: clinicalNote
+        })
+      });
+
+      if (res.ok) {
+        alert("Clinical notes saved successfully!");
+        fetchDoctorReservations();
+      } else {
+        alert("Failed to save clinical notes.");
+      }
+    } catch (err) {
+      console.error("Error saving clinical note:", err);
+      alert("Error saving clinical note.");
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  // Complete treatment status in database
+  const handleCompleteTreatment = async () => {
+    if (!activeSessionBooking) return;
+    if (!confirm(`Mark treatment session as Completed for ${activeSessionBooking.name || "Patient"}?`)) return;
+
+    try {
+      const res = await fetch(`/api/reservations?id=${encodeURIComponent(activeSessionBooking.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "completed",
+          notes: clinicalNote
+        })
+      });
+
+      if (res.ok) {
+        setActiveSessionBooking({ ...activeSessionBooking, status: "completed" });
+        alert("Treatment session marked as COMPLETED!");
+        fetchDoctorReservations();
+      } else {
+        alert("Failed to complete treatment.");
+      }
+    } catch (err) {
+      console.error("Error completing treatment:", err);
+    }
+  };
+
+  // Create real prescription in DB
+  const handleCreatePrescription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSessionBooking) return;
+
+    const customerId = activeSessionBooking.customer_id || activeSessionBooking.customerId || activeSessionBooking.id;
+    const patientName = activeSessionBooking.name || activeSessionBooking.customer_name || "Patient";
+
+    setSavingRx(true);
+    try {
+      const res = await fetch("/api/prescriptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_id: customerId,
+          patient_name: patientName,
+          date: new Date().toISOString().slice(0, 10),
+          diagnosis: rxDiagnosis,
+          medications: rxMedications.filter((m) => m.name.trim() !== ""),
+          general_notes: rxGeneralNotes,
+          doctor_notes: clinicalNote
+        })
+      });
+
+      if (res.ok) {
+        alert("Digital Prescription created successfully!");
+        setShowPrescriptionModal(false);
+        setRxDiagnosis("");
+        setRxMedications([{ name: "", dosage: "", frequency: "", duration: "" }]);
+        setRxGeneralNotes("");
+      } else {
+        const err = await res.json();
+        alert(err.error || "Failed to create prescription.");
+      }
+    } catch (err) {
+      console.error("Error creating prescription:", err);
+      alert("Error saving prescription.");
+    } finally {
+      setSavingRx(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col">
-      {/* ── TOP HEADER & FLOATING NAVIGATION BAR ── */}
-      <header className="sticky top-0 z-50 w-full bg-[#F4F5F1]/80 backdrop-blur-md px-6 py-4 transition-all">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+    <div className="min-h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col">
+      {/* ── TOP HEADER & FLOATING NAVIGATION BAR (FULL SCREEN WIDTH) ── */}
+      <header className="sticky top-0 z-50 w-full bg-[#F4F5F1]/80 backdrop-blur-md px-8 py-4 transition-all border-b border-[#414E36]/10">
+        <div className="w-full flex items-center justify-between gap-4">
           
           {/* Left: Brand Logo & Doctor Badge */}
           <div className="flex items-center gap-3">
@@ -87,7 +282,7 @@ export default function DoctorAccountView({
             </div>
           </div>
 
-          {/* ── CENTER FLOATING NAV BAR (ICON-ONLY WHEN UNSELECTED, EXPANDS ON CLICK) ── */}
+          {/* ── CENTER FLOATING NAV BAR (COMPACT ICONS, EXPANDS ACTIVE TAB) ── */}
           <nav className="flex items-center justify-center">
             <div className="flex items-center gap-1.5 rounded-full border border-[#414E36]/20 bg-white/90 p-1.5 shadow-[0_12px_40px_rgba(65,78,54,0.1)] backdrop-blur-2xl transition-all duration-300 hover:border-[#414E36]/40 hover:shadow-[0_16px_50px_rgba(65,78,54,0.16)]">
               
@@ -147,6 +342,15 @@ export default function DoctorAccountView({
 
           {/* Right: Quick Doctor Profile & Logout */}
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={fetchDoctorReservations}
+              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
+              title="Refresh Schedule"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+            </button>
+
             <div className="hidden md:flex items-center gap-2 rounded-2xl bg-white border border-[#414E36]/15 px-3 py-1.5 shadow-sm">
               <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#414E36]/10 text-[#414E36] font-bold text-xs">
                 Dr
@@ -170,19 +374,19 @@ export default function DoctorAccountView({
         </div>
       </header>
 
-      {/* ── MAIN CONTENT AREA ── */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 animate-fadeIn">
+      {/* ── MAIN CONTENT AREA (FULL SCREEN WIDTH) ── */}
+      <main className="flex-1 w-full px-8 py-6 animate-fadeIn flex flex-col">
         
         {/* ── TAB 1: SCHEDULE VIEW ── */}
         {activeTab === "schedule" && (
-          <div className="space-y-6">
+          <div className="space-y-6 w-full">
             
-            {/* Header Title & Date Picker */}
+            {/* Header Title & Search */}
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-[#1F251A]">Today&apos;s Appointments & Patient Queue</h2>
                 <p className="text-xs text-[#5A6A51] mt-1">
-                  Manage your daily clinic shift schedule, patient arrivals, and treatment progress.
+                  Real-time clinic shift schedule, patient arrivals, and active treatments.
                 </p>
               </div>
 
@@ -191,10 +395,10 @@ export default function DoctorAccountView({
                   <Search size={14} className="absolute left-3 top-3 text-[#5A6A51]" />
                   <input
                     type="text"
-                    placeholder="Search patient name..."
+                    placeholder="Search patient or service..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="rounded-2xl border border-[#414E36]/15 bg-white pl-9 pr-4 py-2 text-xs text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                    className="rounded-2xl border border-[#414E36]/15 bg-white pl-9 pr-4 py-2 text-xs text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] w-64"
                   />
                 </div>
 
@@ -205,113 +409,105 @@ export default function DoctorAccountView({
               </div>
             </div>
 
-            {/* Quick Status Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-4 shadow-sm">
+            {/* Quick Dynamic Stats Cards (Real Database Numbers) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
+              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Scheduled Today</span>
-                <div className="mt-2 text-2xl font-extrabold text-[#1F251A]">6 Patients</div>
+                <div className="mt-2 text-3xl font-extrabold text-[#1F251A]">{stats.total} Patients</div>
               </div>
-              <div className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm">
+              <div className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Completed</span>
-                <div className="mt-2 text-2xl font-extrabold text-emerald-800">2 Sessions</div>
+                <div className="mt-2 text-3xl font-extrabold text-emerald-800">{stats.completed} Sessions</div>
               </div>
-              <div className="rounded-3xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
+              <div className="rounded-3xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-700">In Treatment</span>
-                <div className="mt-2 text-2xl font-extrabold text-amber-800">1 Active</div>
+                <div className="mt-2 text-3xl font-extrabold text-amber-800">{stats.inProgress} Active</div>
               </div>
-              <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-4 shadow-sm">
+              <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Upcoming Queue</span>
-                <div className="mt-2 text-2xl font-extrabold text-slate-700">3 Waiting</div>
+                <div className="mt-2 text-3xl font-extrabold text-slate-700">{stats.upcoming} Waiting</div>
               </div>
             </div>
 
-            {/* Patients Schedule Table */}
-            <div className="overflow-hidden rounded-[32px] border border-[#414E36]/10 bg-white shadow-[0_20px_50px_rgba(47,61,41,0.05)]">
-              <div className="overflow-x-auto">
+            {/* Real Patients Schedule Table */}
+            <div className="overflow-hidden rounded-[32px] border border-[#414E36]/10 bg-white shadow-[0_20px_50px_rgba(47,61,41,0.05)] w-full">
+              <div className="overflow-x-auto w-full">
                 <table className="w-full text-left text-xs">
                   <thead className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-xs uppercase tracking-wider text-[#5A6A51]">
                     <tr>
                       <th className="px-6 py-4 font-bold">Time Slot</th>
                       <th className="px-6 py-4 font-bold">Patient Name</th>
                       <th className="px-6 py-4 font-bold">Requested Service</th>
-                      <th className="px-6 py-4 font-bold">Room</th>
+                      <th className="px-6 py-4 font-bold">Room / Location</th>
                       <th className="px-6 py-4 font-bold text-center">Status</th>
                       <th className="px-6 py-4 font-bold text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#414E36]/05 text-[#1F251A]">
-                    {[
-                      {
-                        time: "09:00 AM - 10:00 AM",
-                        name: "Emma Watson",
-                        service: "Laser Skin Resurfacing",
-                        room: "Room 101",
-                        status: "Completed"
-                      },
-                      {
-                        time: "10:30 AM - 11:30 AM",
-                        name: "Sarah Johnson",
-                        service: "HydraFacial Deluxe + Laser Therapy",
-                        room: "Room 102",
-                        status: "In Progress"
-                      },
-                      {
-                        time: "12:00 PM - 01:00 PM",
-                        name: "Michael Brown",
-                        service: "Botox Consultation & Injection",
-                        room: "Room 103",
-                        status: "Arrived"
-                      },
-                      {
-                        time: "02:00 PM - 03:00 PM",
-                        name: "Jessica Alba",
-                        service: "Chemical Peel Treatment",
-                        room: "Room 101",
-                        status: "Scheduled"
-                      }
-                    ]
-                      .filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .map((item, idx) => (
-                        <tr key={idx} className="hover:bg-[#FBFBF9]/80 transition">
-                          <td className="px-6 py-4 font-bold text-[#414E36]">{item.time}</td>
-                          <td className="px-6 py-4">
-                            <div className="font-bold text-sm text-[#1F251A]">{item.name}</div>
+                    {filteredSchedule.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">
+                          <div className="flex flex-col items-center gap-2">
+                            <CalendarDays size={32} className="text-[#414E36]/30" />
+                            <p className="font-bold text-sm text-[#1F251A]">No appointments scheduled for today</p>
+                            <p className="text-xs text-[#5A6A51]">
+                              All new patient bookings will automatically populate here in real-time.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredSchedule.map((item, idx) => (
+                        <tr key={item.id || idx} className="hover:bg-[#FBFBF9]/80 transition">
+                          <td className="px-6 py-4 font-bold text-[#414E36]">
+                            {item.time || item.time_slot || item.timeSlot || "09:00 AM"}
                           </td>
-                          <td className="px-6 py-4 font-medium text-[#5A6A51]">{item.service}</td>
-                          <td className="px-6 py-4 font-semibold text-[#414E36]">{item.room}</td>
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-sm text-[#1F251A]">
+                              {item.name || item.customer_name || "Patient"}
+                            </div>
+                            {item.phone && <div className="text-[10px] text-[#5A6A51] font-mono">{item.phone}</div>}
+                          </td>
+                          <td className="px-6 py-4 font-medium text-[#5A6A51]">
+                            {item.service || item.service_name || "Consultation"}
+                          </td>
+                          <td className="px-6 py-4 font-semibold text-[#414E36]">
+                            {item.room || item.room_name || "Treatment Room"}
+                          </td>
                           <td className="px-6 py-4 text-center">
-                            {item.status === "Completed" && (
+                            {(item.status === "completed" || item.status === "done") && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-800">
                                 <CheckCircle2 size={12} /> Completed
                               </span>
                             )}
-                            {item.status === "In Progress" && (
+                            {(item.status === "in-progress" || item.status === "started") && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-800 animate-pulse">
                                 <Play size={12} /> In Session
                               </span>
                             )}
-                            {item.status === "Arrived" && (
+                            {item.status === "arrived" && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-[11px] font-bold text-blue-800">
                                 <UserCheck size={12} /> Arrived
                               </span>
                             )}
-                            {item.status === "Scheduled" && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700">
-                                Scheduled
+                            {["pending", "approved", "confirmed"].includes(item.status) && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700 capitalize">
+                                {item.status}
                               </span>
                             )}
                           </td>
                           <td className="px-6 py-4 text-right">
                             <button
                               type="button"
-                              onClick={() => setActiveTab("ongoing")}
-                              className="rounded-xl border border-[#414E36]/20 bg-white px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition"
+                              onClick={() => handleOpenSession(item)}
+                              className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
                             >
                               Open Session
                             </button>
                           </td>
                         </tr>
-                      ))}
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -319,113 +515,149 @@ export default function DoctorAccountView({
           </div>
         )}
 
-        {/* ── TAB 2: ONGOING SESSION VIEW ── */}
+        {/* ── TAB 2: ONGOING SESSION VIEW (FULL WIDTH REAL DATA) ── */}
         {activeTab === "ongoing" && (
-          <div className="space-y-6">
+          <div className="space-y-6 w-full">
             
-            {/* Header Info */}
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 border border-[#414E36]/10 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#414E36]/10 text-[#414E36] font-bold text-lg">
-                  SJ
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-bold text-[#1F251A]">{activeSessionPatient.name}</h2>
-                    <span className="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800">
-                      Active Session
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#5A6A51] mt-1">
-                    {activeSessionPatient.service} • {activeSessionPatient.time} • <strong className="text-[#414E36]">{activeSessionPatient.room}</strong>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => alert("Prescription modal opened")}
-                  className="flex items-center gap-2 rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
-                >
-                  <FileText size={14} /> Write Prescription
-                </button>
-                <button
-                  type="button"
-                  onClick={() => alert("Session completed!")}
-                  className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
-                >
-                  <Check size={16} /> Complete Treatment
-                </button>
-              </div>
-            </div>
-
-            {/* Treatment & Clinical Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* Left Column: Medical Alerts & History */}
-              <div className="space-y-6">
-                <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm">
-                  <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <AlertCircle size={16} className="text-rose-600" /> Patient Medical Alerts
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {activeSessionPatient.medicalAlerts.map((alertItem: string, i: number) => (
-                      <span key={i} className="rounded-xl bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-800">
-                        ⚠️ {alertItem}
-                      </span>
-                    ))}
+            {activeSessionBooking ? (
+              <>
+                {/* Active Patient Card */}
+                <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 border border-[#414E36]/10 shadow-sm w-full">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#414E36] text-white font-bold text-xl shadow-md">
+                      {(activeSessionBooking.name || "P").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-2xl font-bold text-[#1F251A]">
+                          {activeSessionBooking.name || activeSessionBooking.customer_name || "Patient"}
+                        </h2>
+                        <span className="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800 capitalize">
+                          {activeSessionBooking.status || "In Session"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#5A6A51] mt-1">
+                        {activeSessionBooking.service || activeSessionBooking.service_name} • {activeSessionBooking.time || activeSessionBooking.time_slot || "Today"} • <strong className="text-[#414E36]">{activeSessionBooking.room || "Treatment Room"}</strong>
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="mt-6 border-t border-[#414E36]/10 pt-4 space-y-2">
-                    <span className="text-xs font-bold text-[#5A6A51]">Patient Notes:</span>
-                    <p className="text-xs text-[#1F251A] leading-relaxed bg-[#F4F5F1] p-3 rounded-2xl">
-                      {activeSessionPatient.notes}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Doctor Treatment Notes & Consumable Usage */}
-              <div className="md:col-span-2 space-y-6">
-                <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
-                  <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                    <FileText size={16} className="text-[#414E36]" /> Doctor Clinical & Procedure Notes
-                  </h3>
-                  <textarea
-                    rows={5}
-                    placeholder="Enter clinical observations, laser pulse settings, skin reaction, and post-care advice..."
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20"
-                  />
-                  <div className="flex justify-end">
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => alert("Notes saved successfully!")}
-                      className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition"
+                      onClick={() => setShowPrescriptionModal(true)}
+                      className="flex items-center gap-2 rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
                     >
-                      Save Clinical Note
+                      <FileText size={14} /> Write Prescription
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCompleteTreatment}
+                      className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
+                    >
+                      <Check size={16} /> Complete Treatment
                     </button>
                   </div>
                 </div>
-              </div>
 
-            </div>
+                {/* Treatment Details & Notes */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
+                  
+                  {/* Patient Intake & Medical History */}
+                  <div className="space-y-6">
+                    <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm">
+                      <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <AlertCircle size={16} className="text-[#414E36]" /> Patient Clinical Intake
+                      </h3>
+                      
+                      {medicalRecord ? (
+                        <div className="space-y-3 text-xs">
+                          <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                            <span className="font-bold text-[#5A6A51]">Skin Type:</span>
+                            <span className="font-bold text-[#1F251A]">{medicalRecord.skin_type || "Normal"}</span>
+                          </div>
+                          <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                            <span className="font-bold text-[#5A6A51]">Allergies:</span>
+                            <span className="font-bold text-rose-700">{medicalRecord.allergies || "None reported"}</span>
+                          </div>
+                          <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                            <span className="font-bold text-[#5A6A51]">Medication:</span>
+                            <span className="font-semibold text-[#1F251A]">{medicalRecord.medication_details || "None"}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[#5A6A51]">No intake form recorded yet for this patient.</p>
+                      )}
+
+                      <div className="mt-6 border-t border-[#414E36]/10 pt-4 space-y-2">
+                        <span className="text-xs font-bold text-[#5A6A51]">Booking Notes:</span>
+                        <p className="text-xs text-[#1F251A] leading-relaxed bg-[#F4F5F1] p-3 rounded-2xl font-mono">
+                          {activeSessionBooking.notes || "No booking notes provided."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Doctor Clinical Notes Editor */}
+                  <div className="lg:col-span-2 space-y-6">
+                    <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
+                      <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                        <FileText size={16} className="text-[#414E36]" /> Doctor Procedure Observations & Medical Notes
+                      </h3>
+                      <textarea
+                        rows={8}
+                        value={clinicalNote}
+                        onChange={(e) => setClinicalNote(e.target.value)}
+                        placeholder="Enter clinical observations, laser pulse parameters, skin reactions, and post-procedure recommendations..."
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans"
+                      />
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleSaveClinicalNote}
+                          disabled={savingNote}
+                          className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50"
+                        >
+                          {savingNote ? "Saving..." : "Save Clinical Notes"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </>
+            ) : (
+              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-12 text-center text-[#5A6A51]">
+                <Stethoscope size={40} className="mx-auto text-[#414E36]/30 mb-3" />
+                <h3 className="text-lg font-bold text-[#1F251A]">No Active Patient Session Selected</h3>
+                <p className="text-xs text-[#5A6A51] mt-1 mb-4">
+                  Please select an appointment from your <strong>Schedule</strong> tab to open the patient session.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("schedule")}
+                  className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
+                >
+                  View Today&apos;s Schedule
+                </button>
+              </div>
+            )}
 
           </div>
         )}
 
-        {/* ── TAB 3: SETTINGS VIEW ── */}
+        {/* ── TAB 3: SETTINGS VIEW (FULL WIDTH REAL DATA) ── */}
         {activeTab === "settings" && (
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="w-full space-y-6">
             <div>
-              <h2 className="text-2xl font-bold text-[#1F251A]">Doctor Account & Shift Settings</h2>
+              <h2 className="text-2xl font-bold text-[#1F251A]">Doctor Profile & Security Settings</h2>
               <p className="text-xs text-[#5A6A51] mt-1">
-                Manage your credentials, branch assignments, and personal preferences.
+                Manage your credentials, branch details, and security options.
               </p>
             </div>
 
-            {/* Profile Overview Card */}
-            <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm flex items-center justify-between gap-4">
+            {/* Profile Card */}
+            <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm flex items-center justify-between gap-4 w-full">
               <div className="flex items-center gap-4">
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#414E36] text-white font-extrabold text-xl shadow-md">
                   Dr
@@ -434,16 +666,16 @@ export default function DoctorAccountView({
                   <h3 className="text-lg font-bold text-[#1F251A]">{doctorName}</h3>
                   <p className="text-xs text-[#5A6A51]">{doctorEmail}</p>
                   <span className="mt-2 inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-bold text-[#414E36]">
-                    Primary Branch: {doctorBranch}
+                    Assigned Branch: {doctorBranch}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Password & Security Card */}
-            <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
+            {/* Password Update Form */}
+            <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4 w-full">
               <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                <Lock size={16} className="text-[#414E36]" /> Security & Password
+                <Lock size={16} className="text-[#414E36]" /> Security & Account Password
               </h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -451,6 +683,8 @@ export default function DoctorAccountView({
                   <label className="block text-xs font-bold text-[#5A6A51] mb-1">New Password</label>
                   <input
                     type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Enter new password"
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
                   />
@@ -459,6 +693,8 @@ export default function DoctorAccountView({
                   <label className="block text-xs font-bold text-[#5A6A51] mb-1">Confirm Password</label>
                   <input
                     type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
                     className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
                   />
@@ -467,8 +703,16 @@ export default function DoctorAccountView({
 
               <button
                 type="button"
-                onClick={() => alert("Password updated successfully!")}
-                className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition"
+                onClick={() => {
+                  if (!newPassword || newPassword !== confirmPassword) {
+                    alert("Passwords do not match or are empty.");
+                    return;
+                  }
+                  alert("Password updated successfully!");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                }}
+                className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition"
               >
                 Update Password
               </button>
@@ -477,6 +721,132 @@ export default function DoctorAccountView({
         )}
 
       </main>
+
+      {/* ── PRESCRIPTION MODAL ── */}
+      {showPrescriptionModal && activeSessionBooking && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-[32px] bg-white p-6 shadow-2xl space-y-5 border border-[#414E36]/20">
+            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-[#1F251A]">Write Digital Prescription</h3>
+                <p className="text-xs text-[#5A6A51]">
+                  Patient: <strong className="text-[#414E36]">{activeSessionBooking.name || activeSessionBooking.customer_name}</strong>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPrescriptionModal(false)}
+                className="rounded-full p-2 text-[#5A6A51] hover:bg-[#F4F5F1]"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePrescription} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1">Clinical Diagnosis</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Post-laser inflammation, Acne Vulgaris Grade II"
+                  value={rxDiagnosis}
+                  onChange={(e) => setRxDiagnosis(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                />
+              </div>
+
+              {/* Medications List */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-[#5A6A51]">Prescribed Medications</label>
+                {rxMedications.map((med, idx) => (
+                  <div key={idx} className="grid grid-cols-4 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Medication Name"
+                      value={med.name}
+                      onChange={(e) => {
+                        const updated = [...rxMedications];
+                        updated[idx].name = e.target.value;
+                        setRxMedications(updated);
+                      }}
+                      className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Dosage (e.g. 500mg)"
+                      value={med.dosage}
+                      onChange={(e) => {
+                        const updated = [...rxMedications];
+                        updated[idx].dosage = e.target.value;
+                        setRxMedications(updated);
+                      }}
+                      className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Frequency (e.g. 2x Daily)"
+                      value={med.frequency}
+                      onChange={(e) => {
+                        const updated = [...rxMedications];
+                        updated[idx].frequency = e.target.value;
+                        setRxMedications(updated);
+                      }}
+                      className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Duration (e.g. 7 Days)"
+                      value={med.duration}
+                      onChange={(e) => {
+                        const updated = [...rxMedications];
+                        updated[idx].duration = e.target.value;
+                        setRxMedications(updated);
+                      }}
+                      className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setRxMedications([...rxMedications, { name: "", dosage: "", frequency: "", duration: "" }])}
+                  className="text-xs font-bold text-[#414E36] flex items-center gap-1 mt-1 hover:underline"
+                >
+                  <Plus size={14} /> Add Another Medication
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#5A6A51] mb-1">General Patient Instructions</label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Apply sunscreen SPF 50 daily, avoid direct sun exposure for 48 hours..."
+                  value={rxGeneralNotes}
+                  onChange={(e) => setRxGeneralNotes(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPrescriptionModal(false)}
+                  className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 text-xs font-bold text-[#5A6A51] hover:bg-[#F4F5F1]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingRx}
+                  className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50"
+                >
+                  {savingRx ? "Saving..." : "Save & Print Prescription"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

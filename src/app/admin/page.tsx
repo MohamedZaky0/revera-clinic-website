@@ -7661,9 +7661,11 @@ export default function AdminPage() {
   if (isDoctorUserAccount && adminRole !== "superadmin") {
     return (
       <DoctorAccountView
+        doctorDbId={loggedEmpAccount?.id || adminDbId}
         doctorName={loggedEmpAccount?.name || adminEmail || "Doctor"}
         doctorEmail={adminEmail}
         doctorBranch={loggedEmpAccount?.branch_id || "Main Branch"}
+        initialReservations={allReservations}
         onLogout={handleLogout}
       />
     );
