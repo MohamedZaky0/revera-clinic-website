@@ -106,7 +106,7 @@ async function main() {
 
   // ================= Isolated fixtures, all dated 2030-01 =================
   const PERIOD = '2030-01';
-  const ISSUED_AT = '2030-01-15T10:00:00.000Z';
+  const ISSUED_AT = '2030-01-15T00:00:00.000Z';
   const INCURRED_ON = '2030-01-15';
 
   const { data: branch, error: branchError } = await admin
@@ -267,9 +267,13 @@ async function main() {
   const assetId = assetRes.json?.id;
   if (assetId) cleanup.push(async () => { await admin.from('fixed_assets').delete().eq('id', assetId); });
 
-  const depRes = await api(superadminToken, 'POST', '/api/assets/post-depreciation', { period: PERIOD });
-  const postedDep = (depRes.json?.posted || []).find((d: any) => d.asset_id === assetId);
-  checkTrue(`fixture: depreciation posted for ${PERIOD} => amount 100`, postedDep?.amount === 100, depRes.json);
+  // Inserted directly rather than via POST /api/assets/post-depreciation -- that endpoint posts
+  // depreciation for EVERY active asset in the whole dev DB, not just this fixture's, which would
+  // pollute unrelated real assets with an extra 2030-01 entry every time this script runs.
+  const { error: depError } = await admin
+    .from('depreciation_entries')
+    .insert({ asset_id: assetId, period: PERIOD, amount: 100, book_value_after: 1100 });
+  checkTrue(`fixture: depreciation inserted for ${PERIOD} (1200/12)`, !depError, depError);
 
   const loanRes = await api(superadminToken, 'POST', '/api/loans', {
     lender: `Phase4Check Bank ${stamp}`,
