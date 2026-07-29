@@ -341,6 +341,8 @@ either. Treat as unconfirmed; verify directly in Supabase before relying on it.
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
+**Note:** `admin` and `superadmin` roles are seeded with the seven `finance.*` permissions by default via `supabase/migrations/20260729000000_seed_finance_role_permissions.sql`. The full set is `finance.view_pnl`, `finance.view_margins`, `finance.view_cashflow`, `finance.manage_expenses`, `finance.manage_assets`, `finance.manage_loans`, and `finance.view_capacity`. These permissions are grantable and revocable (DEC-022): admins see the Finance section by default, but individual keys can be removed per role through the Role Permission settings UI.
+
 ---
 
 ### `provider_attendance`
