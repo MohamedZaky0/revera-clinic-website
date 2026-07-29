@@ -59,6 +59,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       id: employee.id,
       role: employee.role_name,
+      department: employee.department,
       permissions: role?.permissions || [],
       email: employee.email,
       employeeId: employee.employee_id
