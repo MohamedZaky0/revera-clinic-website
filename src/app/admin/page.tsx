@@ -24921,8 +24921,8 @@ export default function AdminPage() {
                     const currentLeft = Number(viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null ? viewingBooking.amountLeft : ((viewingBooking as any).amount_left || 0));
                     const implicitDeposit = (totalServicePrice > 0 && currentLeft < totalServicePrice) ? (totalServicePrice - currentLeft) : 0;
 
-                    // Total Spent is the maximum of customer history, explicit booking paid amount, or implicit deposit paid
-                    const totalSpentDisplay = Math.max(customerHistorySpent, bookingPaidVal, implicitDeposit);
+                    // Total Spent for this booking is the explicit amount paid or deposit paid
+                    const totalSpentDisplay = Math.max(bookingPaidVal, implicitDeposit);
                     const outstandingAmount = currentLeft;
 
                     return (
