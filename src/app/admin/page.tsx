@@ -1365,7 +1365,7 @@ export default function AdminPage() {
 
   const handleAddProductToViewingBooking = async () => {
     if (!viewingBooking || !selectedDrawerProductId) return;
-    const prod = inventoryProducts.find((p: any) => String(p.id) === String(selectedDrawerProductId));
+    const prod = (inventoryProducts || []).find((p: any) => String(p.id) === String(selectedDrawerProductId));
     if (!prod) return;
 
     const unitPrice = Number(prod.price || prod.unit_price || prod.selling_price || 0);
@@ -1381,7 +1381,7 @@ export default function AdminPage() {
       total
     });
 
-    const currentLeft = Number(viewingBooking.amountLeft !== undefined ? viewingBooking.amountLeft : ((viewingBooking as any).amount_left || 0));
+    const currentLeft = Number(viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null ? viewingBooking.amountLeft : ((viewingBooking as any).amount_left || 0));
     const newLeft = currentLeft + total;
 
     const updatedNotes = (viewingBooking.notes || "") + `\n[Added Product]: ${prod.name} (x${qty}) - ${total} EGP`;
@@ -24416,40 +24416,107 @@ export default function AdminPage() {
                    * - Why: Consolidates clinical services and related products into a single final invoice for the patient.
                    */}
                   {/* Products Card */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS & SESSION CONSUMABLES</p>
-                        <p className="text-sm font-bold text-[#1F251A] mt-0.5">
-                          {Array.isArray((viewingBooking as any).attachedProducts) && (viewingBooking as any).attachedProducts.length > 0
-                            ? `${(viewingBooking as any).attachedProducts.length} Product(s) Attached`
-                            : "No products added"}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setShowDrawerProductModal(true)}
-                        className="rounded-2xl border border-[#414E36]/20 bg-[#414E36] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center gap-1.5 shadow-sm"
-                      >
-                        + Add Product
-                      </button>
-                    </div>
+                  {(() => {
+                    const list: any[] = Array.isArray((viewingBooking as any).attachedProducts)
+                      ? [...(viewingBooking as any).attachedProducts]
+                      : [];
+                    const existingNames = new Set(list.map((p: any) => (p.name || '').trim().toLowerCase()));
 
-                    {Array.isArray((viewingBooking as any).attachedProducts) && (viewingBooking as any).attachedProducts.length > 0 ? (
-                      <div className="space-y-2">
-                        {(viewingBooking as any).attachedProducts.map((prod: any, pIdx: number) => (
-                          <div key={pIdx} className="flex items-center justify-between p-2.5 rounded-xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs">
-                            <div>
-                              <span className="font-bold text-[#1F251A]">{prod.name}</span>
-                              <span className="text-[11px] text-[#5A6A51] block">Qty: {prod.qty} x {prod.unitPrice || prod.price} EGP</span>
-                            </div>
-                            <span className="font-extrabold text-[#414E36]">{(prod.qty * (prod.unitPrice || prod.price)) || 0} EGP</span>
+                    if (viewingBooking.notes) {
+                      const notesStr = viewingBooking.notes;
+
+                      // Doctor session notes pattern: "- Product Name (xQty) @ Price EGP = Total EGP"
+                      const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
+                      for (const match of doctorMatches) {
+                        const name = match[1].trim();
+                        const qty = Number(match[2]);
+                        const unitPrice = Number(match[3]);
+                        if (!existingNames.has(name.toLowerCase())) {
+                          existingNames.add(name.toLowerCase());
+                          list.push({
+                            id: name,
+                            name,
+                            qty,
+                            unitPrice,
+                            total: qty * unitPrice,
+                            addedBy: 'Doctor Session'
+                          });
+                        }
+                      }
+
+                      // Receptionist notes pattern: "[Added Product]: Product Name (xQty) - Total EGP"
+                      const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)\s+\(x(\d+)\)\s+-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+                      for (const match of receptionistMatches) {
+                        const name = match[1].trim();
+                        const qty = Number(match[2]);
+                        const total = Number(match[3]);
+                        const unitPrice = qty > 0 ? total / qty : total;
+                        if (!existingNames.has(name.toLowerCase())) {
+                          existingNames.add(name.toLowerCase());
+                          list.push({
+                            id: name,
+                            name,
+                            qty,
+                            unitPrice,
+                            total,
+                            addedBy: 'Receptionist'
+                          });
+                        }
+                      }
+                    }
+
+                    return (
+                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS & SESSION CONSUMABLES</p>
+                            <p className="text-sm font-bold text-[#1F251A] mt-0.5">
+                              {list.length > 0
+                                ? `${list.length} Product(s) Attached`
+                                : "No products added"}
+                            </p>
                           </div>
-                        ))}
+                          <button
+                            disabled={isInvoicePaid}
+                            onClick={() => !isInvoicePaid && setShowDrawerProductModal(true)}
+                            title={isInvoicePaid ? "Session is already paid and settled" : "Add retail product to booking"}
+                            className={`rounded-2xl border border-[#414E36]/20 px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 shadow-sm ${
+                              isInvoicePaid
+                                ? "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-300"
+                                : "bg-[#414E36] text-white hover:bg-[#343F2B]"
+                            }`}
+                          >
+                            + Add Product
+                          </button>
+                        </div>
+
+                        {list.length > 0 ? (
+                          <div className="space-y-2">
+                            {list.map((prod: any, pIdx: number) => (
+                              <div key={pIdx} className="flex items-center justify-between p-2.5 rounded-xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-[#1F251A]">{prod.name}</span>
+                                    {prod.addedBy && (
+                                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                                        {prod.addedBy}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[11px] text-[#5A6A51] block mt-0.5">
+                                    Qty: {prod.qty} x {prod.unitPrice || prod.price} EGP
+                                  </span>
+                                </div>
+                                <span className="font-extrabold text-[#414E36]">{(prod.total || (prod.qty * (prod.unitPrice || prod.price))) || 0} EGP</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-[#5A6A51]">No retail or procedure products linked to this booking yet.</p>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-xs text-[#5A6A51]">No retail or procedure products linked to this booking yet.</p>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* Prescriptions Card */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
@@ -25176,6 +25243,109 @@ export default function AdminPage() {
           </div>
         );
       })()}
+
+      {/* Add Product Modal for Booking Drawer */}
+      {showDrawerProductModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+              <h3 className="text-base font-bold text-[#1F251A]">Add Product / Session Consumable</h3>
+              <button
+                onClick={() => {
+                  setShowDrawerProductModal(false);
+                  setSelectedDrawerProductId("");
+                  setSelectedDrawerProductQty(1);
+                }}
+                className="rounded-full bg-gray-100 p-1.5 text-gray-500 hover:bg-gray-200 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-[#1F251A] mb-1">Select Skincare / Medical Product</label>
+                <select
+                  value={selectedDrawerProductId}
+                  onChange={(e) => setSelectedDrawerProductId(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#414E36]"
+                >
+                  <option value="">-- Select Product --</option>
+                  {(inventoryProducts || [])
+                    .filter((p: any) => p.role !== 'consumable')
+                    .map((p: any) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} — EGP {p.price || p.unit_price || p.selling_price || 0} (Stock: {p.stock ?? p.quantity ?? p.stock_quantity ?? 'N/A'})
+                      </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedDrawerProductId && (() => {
+                const selectedProd = (inventoryProducts || [])
+                  .find((p: any) => String(p.id) === String(selectedDrawerProductId));
+                const unitPrice = Number(selectedProd?.price || selectedProd?.unit_price || selectedProd?.selling_price || 0);
+                const totalCost = unitPrice * selectedDrawerProductQty;
+
+                return (
+                  <div className="rounded-xl bg-[#FBFBF9] p-3 space-y-2 border border-[#414E36]/10">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-gray-600">Quantity:</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDrawerProductQty(Math.max(1, selectedDrawerProductQty - 1))}
+                          className="w-7 h-7 rounded-lg bg-gray-200 font-bold flex items-center justify-center hover:bg-gray-300 transition text-sm"
+                        >
+                          -
+                        </button>
+                        <span className="font-bold text-[#1F251A] px-2 text-sm">{selectedDrawerProductQty}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDrawerProductQty(selectedDrawerProductQty + 1)}
+                          className="w-7 h-7 rounded-lg bg-gray-200 font-bold flex items-center justify-center hover:bg-gray-300 transition text-sm"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-xs border-t border-gray-200 pt-2">
+                      <span className="font-semibold text-gray-600">Unit Price:</span>
+                      <span className="font-bold text-[#1F251A]">{unitPrice} EGP</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-extrabold border-t border-gray-200 pt-2 text-[#414E36]">
+                      <span>Added to Invoice:</span>
+                      <span>{totalCost} EGP</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDrawerProductModal(false);
+                  setSelectedDrawerProductId("");
+                  setSelectedDrawerProductQty(1);
+                }}
+                className="w-1/2 rounded-xl border border-gray-300 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!selectedDrawerProductId}
+                onClick={handleAddProductToViewingBooking}
+                className="w-1/2 rounded-xl bg-[#414E36] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 shadow-sm"
+              >
+                Add to Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 1. Cancellations Modal */}
       {showCancellationsModal && (

@@ -456,7 +456,8 @@ export default function DoctorAccountView({
         body: JSON.stringify({
           status: targetBooking.status,
           notes: finalNotes,
-          amountLeft: updatedInvoiceTotal - Number(targetBooking.amount_paid || 0)
+          amountLeft: updatedInvoiceTotal - Number(targetBooking.amount_paid || 0),
+          attachedProducts: usedProducts
         })
       });
 
@@ -510,7 +511,8 @@ export default function DoctorAccountView({
         body: JSON.stringify({
           status: "completed",
           notes: finalNotes,
-          amountLeft: updatedInvoiceTotal - Number(targetBooking.amount_paid || 0)
+          amountLeft: updatedInvoiceTotal - Number(targetBooking.amount_paid || 0),
+          attachedProducts: usedProducts
         })
       });
 
