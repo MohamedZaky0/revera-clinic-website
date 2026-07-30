@@ -622,10 +622,17 @@ prescriptions (diagnosis/medications/follow-up) got a real table.
 | `branch_name` | text | nullable — stored as a name string, not a `branch_id` FK |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
+| `deleted_at` | timestamptz | nullable. **Added 2026-07-30** (`20260730000000_add_deleted_at_to_inventory_products.sql`, DEC-038). Soft-delete marker — non-null means hidden from `GET /api/inventory/products` and every user-facing list, but the row (and anything referencing it) stays intact. Indexed. |
 
 RLS enabled, public "allow all" policy. Confirmed wired via `/api/inventory/products` — dual-storage:
 reads real table first, falls back to a `page_settings` JSON snapshot (key `'inventory_products'`)
 only when the table is empty, then seeds the real table from it.
+
+**Delete rule (DEC-038):** `DELETE /api/inventory/products?id=X` soft-deletes (sets `deleted_at`)
+for any staff member. Only a superadmin may pass `&hard=true` to permanently delete the row via
+`.delete()`. `consumption_entries.product_id` is `ON DELETE RESTRICT` (see below), so a hard delete
+of a product with consumption history is rejected with a 409, not silently swallowed as the old
+handler used to do.
 
 ---
 

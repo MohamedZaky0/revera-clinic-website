@@ -25,6 +25,9 @@ export interface ProductItem {
   notes?: string;
   created_at: string;
   updated_at: string;
+  /** DEC-038: soft-delete marker. Non-null means "deleted" from every user-facing list, but the
+   *  row (and anything referencing it, e.g. consumption_entries) stays intact. */
+  deleted_at?: string | null;
 }
 
 const DEFAULT_PRODUCTS: ProductItem[] = [
@@ -155,7 +158,8 @@ function mapDbRowToProduct(row: any): ProductItem {
     role: PRODUCT_ROLES.includes(row.role) ? row.role : 'retail',
     notes: '',
     created_at: row.created_at || new Date().toISOString(),
-    updated_at: row.updated_at || new Date().toISOString()
+    updated_at: row.updated_at || new Date().toISOString(),
+    deleted_at: row.deleted_at || null
   };
 }
 
@@ -174,7 +178,8 @@ function mapProductToDbRow(item: ProductItem) {
     status: stockQty <= 0 ? 'Out of Stock' : (item.status || 'Active'),
     role: PRODUCT_ROLES.includes(item.role) ? item.role : 'retail',
     created_at: item.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
+    deleted_at: item.deleted_at || null
   };
 }
 
@@ -317,7 +322,7 @@ export async function GET(req: Request) {
   try {
     const data = await getStoredProductsData();
     return NextResponse.json({
-      products: data.products || []
+      products: (data.products || []).filter((p) => !p.deleted_at)
     });
   } catch (err: any) {
     console.error('GET /api/inventory/products error:', err);
@@ -478,6 +483,15 @@ export async function PUT(req: Request) {
   }
 }
 
+/**
+ * DELETE /api/inventory/products?id=X[&hard=true]
+ *
+ * DEC-038: everyone gets soft-delete by default (sets `deleted_at`, row and its history —
+ * consumption_entries, stock_movements, product_sales, invoice_lines — stay intact). Only a
+ * superadmin may pass `hard=true` to permanently remove the row. `consumption_entries.product_id`
+ * is ON DELETE RESTRICT, so a hard delete of a product with consumption history is rejected by
+ * Postgres, not silently swallowed as it was before this change.
+ */
 export async function DELETE(req: Request) {
   const access = await requireStaffAccess(req);
   if ('error' in access) {
@@ -487,23 +501,43 @@ export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const wantsHardDelete = searchParams.get('hard') === 'true';
 
     if (!id) {
       return NextResponse.json({ error: 'Product ID is required.' }, { status: 400 });
     }
 
+    if (wantsHardDelete && access.access.role !== 'superadmin') {
+      return NextResponse.json({ error: 'Only a superadmin can permanently delete a product.' }, { status: 403 });
+    }
+
     const data = await getStoredProductsData();
     const products = data.products || [];
-    const filtered = products.filter((p) => p.id !== id);
+    const index = products.findIndex((p) => p.id === id);
 
-    await saveProductsData({ products: filtered });
+    if (index === -1) {
+      return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
+    }
 
-    // Also delete from Supabase table if present
-    try {
-      await supabaseServer.from('inventory_products').delete().eq('id', id);
-    } catch (e) {}
+    if (wantsHardDelete) {
+      const { error: dbError } = await supabaseServer.from('inventory_products').delete().eq('id', id);
+      if (dbError) {
+        return NextResponse.json({
+          error: `Cannot permanently delete this product — it likely has sales, consumption, or stock history attached (${dbError.message}). Use soft delete instead.`
+        }, { status: 409 });
+      }
 
-    return NextResponse.json({ success: true, id });
+      const filtered = products.filter((p) => p.id !== id);
+      await saveProductsData({ products: filtered });
+
+      return NextResponse.json({ success: true, id, mode: 'hard' });
+    }
+
+    const nowIso = new Date().toISOString();
+    products[index] = { ...products[index], deleted_at: nowIso, updated_at: nowIso };
+    await saveProductsData({ products }); // upserts the full array, including deleted_at, to inventory_products
+
+    return NextResponse.json({ success: true, id, mode: 'soft' });
   } catch (err: any) {
     console.error('DELETE /api/inventory/products error:', err);
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });

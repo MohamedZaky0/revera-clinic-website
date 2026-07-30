@@ -1087,3 +1087,52 @@ Reports/Data Analysis section.
 - Finance's tab bar keeps growing (13 tabs as of this change); if it becomes unwieldy, revisit
   grouping (as DEC-036 did for Marketing) rather than pulling Capacity/Service Mix out on their own.
 
+## DEC-038: Inventory Product Delete Is Soft-Delete For Everyone, Hard-Delete Superadmin-Only
+
+**Date:** 2026-07-30
+**Status:** Decided — active
+
+**Context:**
+The Product Catalog's delete button called `DELETE /api/inventory/products`, gated only by
+`requireStaffAccess` (any staff), which ran a real `.delete()` against `inventory_products` with
+the Supabase error swallowed in an empty `catch (e) {}`. Since `consumption_entries.product_id` is
+`ON DELETE RESTRICT`, deleting any product ever consumed in a checkout was silently rejected at the
+DB layer while the endpoint still returned `{ success: true }` and removed the product from the
+`page_settings` JSON fallback — the two stores diverged and the product reappeared on next load
+(dual-storage prioritizes the DB table when non-empty). This is what "I can't delete the product"
+actually was.
+
+**Chosen Option:**
+- Added `inventory_products.deleted_at` (migration `20260730000000_add_deleted_at_to_inventory_products.sql`,
+  applied to dev via `supabase db push`).
+- `DELETE /api/inventory/products?id=X` now soft-deletes by default for any staff member (sets
+  `deleted_at`, row and its history stay intact) — this is the **only** delete path available to
+  non-superadmins.
+- `&hard=true` performs a real `.delete()`, but the route now checks `access.role === 'superadmin'`
+  first and returns 403 for anyone else; a superadmin hitting an FK violation (e.g. consumption
+  history) gets a clear 409 with a message pointing at soft delete, instead of a silent no-op.
+  `GET /api/inventory/products` filters out anything with `deleted_at` set.
+- Frontend (`src/app/admin/page.tsx` `handleDeleteProduct`): non-superadmins get the original single
+  confirm (now soft-delete). Superadmins get a second confirm offering permanent delete (OK) vs.
+  soft delete (Cancel).
+
+**Reason:**
+- This is a genuinely new convention for this codebase — every other delete endpoint
+  (`employees`, `reservations`) is hard-delete-only, gated by `requireAdministratorAccess`
+  (superadmin+admin). Products specifically need soft-delete because `consumption_entries`
+  RESTRICTs the FK, so hard-delete-for-everyone was never actually going to work once a product had
+  real usage history — soft-delete is the only option that doesn't require cascading deletes through
+  sales/consumption/stock-movement history.
+- Restricting hard-delete to superadmin specifically (not admin) was the user's explicit ask, not
+  inferred — matches the existing `hasFinancePermission` precedent of treating `superadmin` as a
+  distinct tier from `admin` for irreversible actions.
+
+**Trade-offs:**
+- No restore/undo UI exists yet — a soft-deleted product is simply hidden from every list. If a
+  clinic needs products back, that's currently a direct DB fix, not a supported flow.
+- `deductInventoryStock`/`restockInventoryProduct` still look products up via the unfiltered
+  `getStoredProductsData()`, not the `deleted_at`-filtered list — a soft-deleted product could
+  theoretically still be found by exact name/ID match from another code path. Low risk today since
+  the only caller-facing list (`GET`) already excludes it, so nothing surfaces a deleted product to
+  pick from in the first place.
+

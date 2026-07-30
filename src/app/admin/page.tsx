@@ -3661,16 +3661,26 @@ export default function AdminPage() {
   };
 
   const handleDeleteProduct = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete product "${name}"?`)) return;
+    if (!confirm(`Are you sure you want to delete product "${name}"? It will be hidden from the catalog.`)) return;
+
+    // Only a superadmin may choose a permanent (hard) delete — everyone else always soft-deletes.
+    let hard = false;
+    if (adminRole === "superadmin") {
+      hard = confirm(
+        `Permanently delete "${name}" forever? This cannot be undone.\n\nClick OK to permanently delete, or Cancel to just hide it (soft delete, reversible by support).`
+      );
+    }
+
     try {
-      const res = await fetch(`/api/inventory/products?id=${id}`, {
+      const res = await fetch(`/api/inventory/products?id=${id}${hard ? "&hard=true" : ""}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${session?.access_token || ""}` }
       });
+      const resBody = await res.json().catch(() => ({}));
       if (res.ok) {
         await fetchInventoryProducts();
       } else {
-        alert("Failed to delete product.");
+        alert(resBody?.error || "Failed to delete product.");
       }
     } catch (err) {
       console.error("Error deleting product:", err);
