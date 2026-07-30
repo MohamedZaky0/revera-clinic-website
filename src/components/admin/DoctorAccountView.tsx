@@ -29,7 +29,10 @@ import {
   Printer,
   RefreshCw,
   X,
-  Info
+  Info,
+  Edit,
+  Save,
+  AlertTriangle
 } from "lucide-react";
 
 interface DoctorAccountViewProps {
@@ -78,7 +81,18 @@ export default function DoctorAccountView({
   const [activeSessionBooking, setActiveSessionBooking] = useState<any | null>(null);
   const [clinicalNote, setClinicalNote] = useState("");
   const [medicalRecord, setMedicalRecord] = useState<any | null>(null);
+  const [medicalRecordLoading, setMedicalRecordLoading] = useState(false);
+  const [resolvedCustomerId, setResolvedCustomerId] = useState<string | null>(null);
   const [savingNote, setSavingNote] = useState(false);
+
+  // Medical Record Form State (for first time or editing)
+  const [showMedicalForm, setShowMedicalForm] = useState(false);
+  const [formSkinType, setFormSkinType] = useState("Normal");
+  const [formAllergies, setFormAllergies] = useState("");
+  const [formMedicationDetails, setFormMedicationDetails] = useState("");
+  const [formMedicalConditionsDetails, setFormMedicalConditionsDetails] = useState("");
+  const [formPreviousTreatmentsDetails, setFormPreviousTreatmentsDetails] = useState("");
+  const [savingMedicalRecord, setSavingMedicalRecord] = useState(false);
 
   // In-Page Session Modal State (Schedule Tab)
   const [scheduleModalBooking, setScheduleModalBooking] = useState<any | null>(null);
@@ -127,7 +141,6 @@ export default function DoctorAccountView({
 
   useEffect(() => {
     fetchDoctorReservations();
-    // Auto-refresh schedule every 10 seconds to catch receptionist "Start Session" clicks live
     const interval = setInterval(fetchDoctorReservations, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -138,7 +151,6 @@ export default function DoctorAccountView({
       const resDate = r.date ? String(r.date).slice(0, 10) : "";
       if (resDate !== selectedDateStr) return false;
 
-      // Filter by doctor name/ID if set
       if (r.doctor && doctorName && r.doctor.toLowerCase() !== doctorName.toLowerCase()) {
         if (r.doctor.trim() && r.doctor.toLowerCase() !== "doctor" && r.doctor.toLowerCase() !== "any") {
           return false;
@@ -172,12 +184,71 @@ export default function DoctorAccountView({
     );
   }, [todaysReservations, reservations]);
 
+  // Helper to fetch medical records for a booking
+  const loadPatientMedicalRecord = async (booking: any) => {
+    if (!booking) return;
+    setMedicalRecordLoading(true);
+    setMedicalRecord(null);
+    setShowMedicalForm(false);
+
+    try {
+      let customerId = booking.customer_id || booking.customerId;
+
+      // Fallback: If customer_id is missing on booking, lookup customer by phone or name
+      if (!customerId && (booking.phone || booking.name || booking.customer_name)) {
+        try {
+          const custRes = await fetch("/api/customers");
+          if (custRes.ok) {
+            const customers = await custRes.json();
+            const found = customers.find(
+              (c: any) =>
+                (booking.phone && c.phone && String(c.phone).trim() === String(booking.phone).trim()) ||
+                (c.name && (booking.name || booking.customer_name) && c.name.toLowerCase() === (booking.name || booking.customer_name).toLowerCase())
+            );
+            if (found) {
+              customerId = found.id;
+            }
+          }
+        } catch (err) {
+          console.warn("Customer lookup error:", err);
+        }
+      }
+
+      const targetId = customerId || booking.id;
+      setResolvedCustomerId(targetId);
+
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/medical-records?customerId=${encodeURIComponent(targetId)}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.form) {
+          setMedicalRecord(data.form);
+          setFormSkinType(data.form.skin_type || "Normal");
+          setFormAllergies(data.form.allergies || "");
+          setFormMedicationDetails(data.form.medication_details || "");
+          setFormMedicalConditionsDetails(data.form.medical_conditions_details || "");
+          setFormPreviousTreatmentsDetails(data.form.previous_treatments_details || "");
+          setShowMedicalForm(false);
+        } else {
+          setMedicalRecord(null);
+          // First visit: automatically prompt medical intake form
+          setShowMedicalForm(true);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading patient medical record:", err);
+    } finally {
+      setMedicalRecordLoading(false);
+    }
+  };
+
   // Sync activeSessionBooking automatically when receptionist starts a session
   useEffect(() => {
     if (receptionistStartedSession) {
       if (!activeSessionBooking || activeSessionBooking.status === "completed" || activeSessionBooking.id !== receptionistStartedSession.id) {
         setActiveSessionBooking(receptionistStartedSession);
         setClinicalNote(receptionistStartedSession.notes || "");
+        loadPatientMedicalRecord(receptionistStartedSession);
       }
     } else {
       if (activeSessionBooking && activeSessionBooking.status === "completed") {
@@ -185,6 +256,63 @@ export default function DoctorAccountView({
       }
     }
   }, [receptionistStartedSession]);
+
+  // Save Medical Intake Record to database
+  const handleSaveMedicalRecord = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!resolvedCustomerId) {
+      alert("Missing customer ID for medical record.");
+      return;
+    }
+
+    setSavingMedicalRecord(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/medical-records", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          type: "form",
+          customerId: resolvedCustomerId,
+          recordData: {
+            customer_id: resolvedCustomerId,
+            skin_type: formSkinType,
+            allergies: formAllergies,
+            is_taking_medication: Boolean(formMedicationDetails.trim()),
+            medication_details: formMedicationDetails,
+            has_medical_conditions: Boolean(formMedicalConditionsDetails.trim()),
+            medical_conditions_details: formMedicalConditionsDetails,
+            has_previous_treatments: Boolean(formPreviousTreatmentsDetails.trim()),
+            previous_treatments_details: formPreviousTreatmentsDetails,
+            created_by_role: "Doctor",
+            created_by_name: doctorName
+          }
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert("Patient Medical Record saved successfully!");
+        setMedicalRecord(data.record || {
+          skin_type: formSkinType,
+          allergies: formAllergies,
+          medication_details: formMedicationDetails,
+          medical_conditions_details: formMedicalConditionsDetails,
+          previous_treatments_details: formPreviousTreatmentsDetails,
+          updated_at: new Date().toISOString()
+        });
+        setShowMedicalForm(false);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Failed to save medical record.");
+      }
+    } catch (err: any) {
+      console.error("Error saving medical record:", err);
+      alert(err.message || "Error saving medical record.");
+    } finally {
+      setSavingMedicalRecord(false);
+    }
+  };
 
   // Statistics derived dynamically for the selected date
   const stats = useMemo(() => {
@@ -211,21 +339,7 @@ export default function DoctorAccountView({
   const handleOpenScheduleModal = async (booking: any) => {
     setScheduleModalBooking(booking);
     setClinicalNote(booking.notes || "");
-
-    // Fetch medical intake record for this patient
-    const customerId = booking.customer_id || booking.customerId || booking.id;
-    if (customerId) {
-      try {
-        const headers = await getAuthHeaders();
-        const res = await fetch(`/api/medical-records?customerId=${encodeURIComponent(customerId)}`, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          setMedicalRecord(data.form || null);
-        }
-      } catch (err) {
-        console.error("Error loading patient medical records:", err);
-      }
-    }
+    loadPatientMedicalRecord(booking);
   };
 
   // Save clinical notes to database
@@ -261,6 +375,14 @@ export default function DoctorAccountView({
   // Complete treatment status in database & CLOSE SESSION FROM ONGOING
   const handleCompleteTreatment = async (targetBooking: any) => {
     if (!targetBooking) return;
+
+    // ENFORCE MEDICAL RECORD: If patient is on first visit & no medical record exists, REQUIRE IT!
+    if (!medicalRecord) {
+      alert("Medical Record Required:\nThis is the patient's first visit. You must complete and save the Patient Medical Record before completing treatment.");
+      setShowMedicalForm(true);
+      return;
+    }
+
     if (!confirm(`Mark treatment session as COMPLETED for ${targetBooking.name || "Patient"}?`)) return;
 
     try {
@@ -294,7 +416,7 @@ export default function DoctorAccountView({
     e.preventDefault();
     if (!targetBooking) return;
 
-    const customerId = targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
+    const customerId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
     const patientName = targetBooking.name || targetBooking.customer_name || "Patient";
 
     setSavingRx(true);
@@ -556,7 +678,7 @@ export default function DoctorAccountView({
               </div>
             </div>
 
-            {/* Quick Dynamic Stats Cards (Recalculated for Selected Date) */}
+            {/* Quick Dynamic Stats Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Total Scheduled</span>
@@ -710,14 +832,28 @@ export default function DoctorAccountView({
                 {/* Treatment Details & Notes */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
                   
-                  {/* Patient Intake & Medical History */}
+                  {/* Patient Medical Record & Intake Section */}
                   <div className="space-y-6">
-                    <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm">
-                      <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider mb-4 flex items-center gap-2">
-                        <AlertCircle size={16} className="text-[#414E36]" /> Patient Clinical Intake
-                      </h3>
-                      
-                      {medicalRecord ? (
+                    <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                          <AlertCircle size={16} className="text-[#414E36]" /> Patient Medical Record
+                        </h3>
+
+                        {medicalRecord ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                            <CheckCircle2 size={10} /> On File
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800 animate-pulse">
+                            <AlertTriangle size={10} /> Intake Required
+                          </span>
+                        )}
+                      </div>
+
+                      {medicalRecordLoading ? (
+                        <p className="text-xs text-[#5A6A51]">Loading patient medical record...</p>
+                      ) : medicalRecord && !showMedicalForm ? (
                         <div className="space-y-3 text-xs">
                           <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
                             <span className="font-bold text-[#5A6A51]">Skin Type:</span>
@@ -728,12 +864,115 @@ export default function DoctorAccountView({
                             <span className="font-bold text-rose-700">{medicalRecord.allergies || "None reported"}</span>
                           </div>
                           <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                            <span className="font-bold text-[#5A6A51]">Medication:</span>
+                            <span className="font-bold text-[#5A6A51]">Current Medication:</span>
                             <span className="font-semibold text-[#1F251A]">{medicalRecord.medication_details || "None"}</span>
                           </div>
+                          <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                            <span className="font-bold text-[#5A6A51]">Medical Conditions:</span>
+                            <span className="font-semibold text-[#1F251A]">{medicalRecord.medical_conditions_details || "None"}</span>
+                          </div>
+                          <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                            <span className="font-bold text-[#5A6A51]">Previous Treatments:</span>
+                            <span className="font-semibold text-[#1F251A]">{medicalRecord.previous_treatments_details || "None"}</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setShowMedicalForm(true)}
+                            className="mt-2 flex items-center gap-1.5 text-xs font-bold text-[#414E36] hover:underline"
+                          >
+                            <Edit size={14} /> Update Medical Record
+                          </button>
                         </div>
                       ) : (
-                        <p className="text-xs text-[#5A6A51]">No intake form recorded yet for this patient.</p>
+                        /* Medical Intake Form (Required for First Visit or Edit) */
+                        <form onSubmit={handleSaveMedicalRecord} className="space-y-3 border-t border-[#414E36]/10 pt-3">
+                          {!medicalRecord && (
+                            <div className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200">
+                              <strong className="block font-bold">First Visit Detected!</strong>
+                              Patient medical record intake is required before completing treatment.
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Skin Type</label>
+                            <select
+                              value={formSkinType}
+                              onChange={(e) => setFormSkinType(e.target.value)}
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                            >
+                              <option value="Normal">Normal</option>
+                              <option value="Dry">Dry</option>
+                              <option value="Oily">Oily</option>
+                              <option value="Sensitive">Sensitive</option>
+                              <option value="Combination">Combination</option>
+                              <option value="Acne-Prone">Acne-Prone</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Known Allergies</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Latex, Aspirin, None"
+                              value={formAllergies}
+                              onChange={(e) => setFormAllergies(e.target.value)}
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Current Medications</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Roaccutane, Blood thinners, None"
+                              value={formMedicationDetails}
+                              onChange={(e) => setFormMedicationDetails(e.target.value)}
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Chronic Medical Conditions</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Diabetes, Eczema, None"
+                              value={formMedicalConditionsDetails}
+                              onChange={(e) => setFormMedicalConditionsDetails(e.target.value)}
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Previous Aesthetic Treatments</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Chemical Peel 3 mos ago, None"
+                              value={formPreviousTreatmentsDetails}
+                              onChange={(e) => setFormPreviousTreatmentsDetails(e.target.value)}
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                            />
+                          </div>
+
+                          <div className="flex justify-end gap-2 pt-2">
+                            {medicalRecord && (
+                              <button
+                                type="button"
+                                onClick={() => setShowMedicalForm(false)}
+                                className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#5A6A51]"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                            <button
+                              type="submit"
+                              disabled={savingMedicalRecord}
+                              className="rounded-xl bg-[#414E36] px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1"
+                            >
+                              <Save size={14} /> {savingMedicalRecord ? "Saving..." : "Save Medical Record"}
+                            </button>
+                          </div>
+                        </form>
                       )}
 
                       <div className="mt-6 border-t border-[#414E36]/10 pt-4 space-y-2">
@@ -901,13 +1140,27 @@ export default function DoctorAccountView({
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Intake Form */}
+              {/* Medical Record / Intake Form */}
               <div className="space-y-4">
                 <div className="rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 space-y-3">
-                  <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                    <AlertCircle size={14} className="text-[#414E36]" /> Clinical Intake
-                  </h4>
-                  {medicalRecord ? (
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                      <AlertCircle size={14} className="text-[#414E36]" /> Medical Record
+                    </h4>
+                    {medicalRecord ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-800">
+                        <CheckCircle2 size={10} /> On File
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[9px] font-bold text-rose-800 animate-pulse">
+                        <AlertTriangle size={10} /> Intake Required
+                      </span>
+                    )}
+                  </div>
+
+                  {medicalRecordLoading ? (
+                    <p className="text-xs text-[#5A6A51]">Loading medical record...</p>
+                  ) : medicalRecord && !showMedicalForm ? (
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between border-b border-[#414E36]/10 pb-1.5">
                         <span className="text-[#5A6A51]">Skin Type:</span>
@@ -917,9 +1170,70 @@ export default function DoctorAccountView({
                         <span className="text-[#5A6A51]">Allergies:</span>
                         <span className="font-bold text-rose-700">{medicalRecord.allergies || "None"}</span>
                       </div>
+                      <div className="flex justify-between border-b border-[#414E36]/10 pb-1.5">
+                        <span className="text-[#5A6A51]">Medications:</span>
+                        <span className="font-semibold text-[#1F251A]">{medicalRecord.medication_details || "None"}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowMedicalForm(true)}
+                        className="mt-1 flex items-center gap-1 text-[11px] font-bold text-[#414E36] hover:underline"
+                      >
+                        <Edit size={12} /> Edit Record
+                      </button>
                     </div>
                   ) : (
-                    <p className="text-xs text-[#5A6A51]">No intake form on record.</p>
+                    <form onSubmit={handleSaveMedicalRecord} className="space-y-2 pt-1 text-xs">
+                      {!medicalRecord && (
+                        <p className="text-[10px] font-bold text-amber-900 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                          First Visit: Medical Intake Form Required
+                        </p>
+                      )}
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#5A6A51]">Skin Type</label>
+                        <select
+                          value={formSkinType}
+                          onChange={(e) => setFormSkinType(e.target.value)}
+                          className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs font-bold text-[#1F251A]"
+                        >
+                          <option value="Normal">Normal</option>
+                          <option value="Dry">Dry</option>
+                          <option value="Oily">Oily</option>
+                          <option value="Sensitive">Sensitive</option>
+                          <option value="Combination">Combination</option>
+                          <option value="Acne-Prone">Acne-Prone</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#5A6A51]">Allergies</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Latex, Aspirin, None"
+                          value={formAllergies}
+                          onChange={(e) => setFormAllergies(e.target.value)}
+                          className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs text-[#1F251A]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#5A6A51]">Medications</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Roaccutane, None"
+                          value={formMedicationDetails}
+                          onChange={(e) => setFormMedicationDetails(e.target.value)}
+                          className="w-full rounded-lg border border-[#414E36]/15 bg-white px-2 py-1 text-xs text-[#1F251A]"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="submit"
+                          disabled={savingMedicalRecord}
+                          className="rounded-lg bg-[#414E36] px-3 py-1 text-xs font-bold text-white hover:bg-[#343F2B]"
+                        >
+                          {savingMedicalRecord ? "Saving..." : "Save Record"}
+                        </button>
+                      </div>
+                    </form>
                   )}
 
                   <div className="pt-2 border-t border-[#414E36]/10">
