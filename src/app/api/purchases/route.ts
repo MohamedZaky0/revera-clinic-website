@@ -66,13 +66,23 @@ export async function POST(req: Request) {
 
     const productIds = [...new Set(normalizedLines.map((line) => line.productId))];
     const [productsResult, supplierResult] = await Promise.all([
-      supabaseServer.from('inventory_products').select('id').in('id', productIds),
+      supabaseServer.from('inventory_products').select('id, deleted_at').in('id', productIds),
       supplierId ? supabaseServer.from('suppliers').select('id').eq('id', supplierId).maybeSingle() : Promise.resolve({ data: null, error: null }),
     ]);
     if (productsResult.error) throw productsResult.error;
     if (supplierResult.error) throw supplierResult.error;
     if ((productsResult.data || []).length !== productIds.length) {
       return NextResponse.json({ error: 'One or more products do not exist.' }, { status: 404 });
+    }
+    // DEC-038: restocking a soft-deleted product would silently bring it back to life with fresh
+    // stock/cost while it's still hidden from the catalog — use hard/soft delete's own reversal
+    // (currently DB-only) instead of letting a purchase resurrect it as a side effect.
+    const deletedProductIds = (productsResult.data || []).filter((p: any) => p.deleted_at).map((p: any) => p.id);
+    if (deletedProductIds.length > 0) {
+      return NextResponse.json(
+        { error: `Cannot record a purchase for deleted product(s): ${deletedProductIds.join(', ')}.` },
+        { status: 410 }
+      );
     }
     if (supplierId && !supplierResult.data) {
       return NextResponse.json({ error: 'Supplier not found.' }, { status: 404 });

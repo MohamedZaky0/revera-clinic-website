@@ -1130,9 +1130,29 @@ actually was.
 **Trade-offs:**
 - No restore/undo UI exists yet — a soft-deleted product is simply hidden from every list. If a
   clinic needs products back, that's currently a direct DB fix, not a supported flow.
-- `deductInventoryStock`/`restockInventoryProduct` still look products up via the unfiltered
-  `getStoredProductsData()`, not the `deleted_at`-filtered list — a soft-deleted product could
-  theoretically still be found by exact name/ID match from another code path. Low risk today since
-  the only caller-facing list (`GET`) already excludes it, so nothing surfaces a deleted product to
-  pick from in the first place.
+
+**Follow-up (2026-07-30, same day):** the UI's `window.confirm()`/`alert()` popups were replaced
+with two distinct row buttons (superadmin) and a clean in-page modal (see the manual test file's
+"Revision" evidence row and incident note for the test-script mistake that briefly soft-deleted two
+real products — caught and restored the same session).
+
+The user then flagged, correctly, that the *Finance* side of this needed to actually be closed, not
+just the visible Stock Valuation stat (which already inherited the `GET` filter fix automatically).
+Closed:
+- `POST /api/inventory/products/sales` and `POST /api/purchases` now check `deleted_at` on the
+  referenced product(s) and return `410` before writing anything — a soft-deleted product can no
+  longer generate new `product_sales`/`invoice_lines` revenue or new `purchases`/`purchase_lines`/
+  `stock_movements` restock activity. This was the actual integrity gap: soft-delete only hides a
+  product from lists, it doesn't stop code that already has the product's ID from acting on it.
+- `deductInventoryStock`/`restockInventoryProduct` (the two internal helpers everything above calls
+  into) now also refuse to mutate a soft-deleted row directly, as defense in depth for any other
+  caller that isn't gated at its own HTTP entry point.
+
+**Remaining known gap:** `service_consumables` (a service's product recipe) and the checkout-time
+consumption/costing path (`applyCheckoutCosting` in `reservations/route.ts`) still don't check
+`deleted_at` — a service whose recipe already references a since-deleted product will keep costing
+and consuming it silently at checkout. Deliberately left open: it requires a recipe that already
+points at the product (staff can't newly pick a deleted product from a recipe editor's dropdown
+today), so the blast radius is narrower than the sell/purchase paths that were closed. Revisit if
+this surfaces in practice.
 

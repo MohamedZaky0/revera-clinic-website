@@ -374,10 +374,19 @@ export async function POST(req: Request) {
     // record full revenue against a quantity the clinic never actually had in stock.
     const { data: productForStockCheck, error: stockCheckErr } = await supabaseServer
       .from('inventory_products')
-      .select('stock_quantity, role')
+      .select('stock_quantity, role, deleted_at')
       .eq('id', product_id)
       .maybeSingle();
     if (stockCheckErr) throw stockCheckErr;
+    // DEC-038: a soft-deleted product is gone from the catalog everywhere else — selling it here
+    // would keep generating real product_sales/invoice_lines revenue against something the clinic
+    // marked as deleted, which is exactly the Finance-integrity gap soft delete exists to close.
+    if (productForStockCheck && (productForStockCheck as any).deleted_at) {
+      return NextResponse.json(
+        { success: false, error: 'This product has been deleted and can no longer be sold.' },
+        { status: 410 }
+      );
+    }
     if (productForStockCheck && (productForStockCheck as any).role === 'consumable') {
       return NextResponse.json(
         {

@@ -264,6 +264,12 @@ export async function deductInventoryStock(productIdOrName: string, quantityToDe
 
     if (targetIndex >= 0) {
       const target = products[targetIndex];
+      // DEC-038: a soft-deleted product's stock/cost must stay frozen — otherwise it could keep
+      // moving quietly in the DB even though it's supposed to be gone from the catalog.
+      if (target.deleted_at) {
+        console.warn(`deductInventoryStock: skipped — product ${target.id} is soft-deleted.`);
+        return;
+      }
       const currentStock = Number(target.stock_quantity || 0);
       const newStock = Math.max(0, currentStock - Number(quantityToDeduct));
       const newStatus = newStock <= 0 ? 'Out of Stock' : target.status;
@@ -296,6 +302,10 @@ export async function restockInventoryProduct(productId: string, quantityReceive
     if (targetIndex === -1) return;
 
     const target = products[targetIndex];
+    if (target.deleted_at) {
+      console.warn(`restockInventoryProduct: skipped — product ${target.id} is soft-deleted.`);
+      return;
+    }
     const newStock = Number(target.stock_quantity || 0) + Number(quantityReceived);
     const newStatus = target.status === 'Out of Stock' && newStock > 0 ? 'Active' : target.status;
 
