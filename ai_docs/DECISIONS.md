@@ -1058,3 +1058,32 @@ mock screen) reserved as a third tab **later**.
   self-fetching (unlike `PackageAdminPanel`) — matches its pre-existing read-modify-write-the-
   whole-array behavior, but means it's not as fully decoupled from `admin/page.tsx` as Packages is.
 
+## DEC-037: Capacity and Service Mix (5.9/5.10) Live As Finance Tabs, Not A New Reports Section
+
+**Date:** 2026-07-30
+**Status:** Decided — active
+
+**Context:**
+An open question deferred from 2026-07-26 asked whether Phase 5's capacity/break-even/service-mix
+screens belong in Finance at all, since the underlying data (room-minutes, utilisation %, no-show
+rate) is operational/planning data, not money-in/money-out like the rest of Finance. The tracker
+had been defaulting to building them as Finance tabs (per DEC-027's modular-section pattern)
+pending this decision.
+
+**Chosen Option:**
+Keep `CapacityScreen` and `ServiceMixScreen` as tabs inside `src/components/admin/Finance/`,
+alongside the existing P&L/Cash Flow/Trend tabs, rather than standing up a new top-level
+Reports/Data Analysis section.
+
+**Reason:**
+- A new section means new sidebar entry, new permission scope, and its own UI scaffolding — real
+  added cost for a planning-vs-operational distinction a clinic owner likely doesn't care about
+  when trying to answer "why is my utilisation low."
+- The backend endpoints (`/api/finance/capacity`, `/api/finance/service-mix`) are location-agnostic
+  — only which section renders them changes — so this is cheap to reverse later if it turns out to
+  matter once more clinics use the product.
+
+**Trade-offs:**
+- Finance's tab bar keeps growing (13 tabs as of this change); if it becomes unwieldy, revisit
+  grouping (as DEC-036 did for Marketing) rather than pulling Capacity/Service Mix out on their own.
+
