@@ -1058,3 +1058,23 @@ mock screen) reserved as a third tab **later**.
   self-fetching (unlike `PackageAdminPanel`) — matches its pre-existing read-modify-write-the-
   whole-array behavior, but means it's not as fully decoupled from `admin/page.tsx` as Packages is.
 
+---
+
+## DEC-036: Doctor Portal Session Flow, Consumables & Receptionist Checkout Settlement
+
+**Date:** 2026-07-30
+**Status:** Decided — active
+
+**Context:**
+The clinic required improvements to doctor and receptionist roles:
+1. Receptionists start treatment sessions ("Start Session"); Doctors end sessions via "Complete Treatment". Session remains ongoing until ended by Doctor.
+2. Doctor schedule view provides structured date filtering (`Yesterday`, `Today`, `Tomorrow`, Date Picker) and replaces "Open Session" with an `Info` modal.
+3. First-time patients require completing a Patient Medical Record intake before Doctor can complete treatment. Returning patients display full medical history.
+4. Doctors can add session consumables (products from inventory) and extra device pulses during sessions, dynamically updating total booking cost.
+5. In Admin Booking Details drawer, Products and Prescriptions sections are unlocked and connected to clinic inventory & prescription engine.
+6. In Receptionist Checkout, attached session add-ons (products & extra pulses) display as line items and adjust remaining balance. Customer Information displays deposit paid as "Total Spent" and balance remaining as "Outstanding", updating to 0 upon checkout completion.
+
+**Reason:**
+Ensures clinic inventory tracking, medical compliance, and accurate financial record keeping across receptionist and doctor workflows.
+
+

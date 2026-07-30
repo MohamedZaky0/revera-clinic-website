@@ -24900,8 +24900,30 @@ export default function AdminPage() {
                   {(() => {
                     const customerRecord = dbCustomers.find(c => c.id === viewingBooking.customerId || c.phone === viewingBooking.phone);
                     const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
-                    const depositPaid = Number(viewingBooking.amountPaid !== undefined ? viewingBooking.amountPaid : ((viewingBooking as any).amount_paid || 0));
-                    const outstandingAmount = Number(viewingBooking.amountLeft !== undefined ? viewingBooking.amountLeft : ((viewingBooking as any).amount_left || 0));
+                    const customerHistorySpent = customerRecord ? Number(customerRecord.spent_amount || customerRecord.spent || (customerRecord as any).total_spent || 0) : 0;
+
+                    // Booking explicit paid amounts
+                    const bookingPaidVal = Math.max(
+                      Number(viewingBooking.amountPaid || 0),
+                      Number((viewingBooking as any).amount_paid || 0),
+                      Number((viewingBooking as any).deposit || 0),
+                      Number((viewingBooking as any).deposit_amount || 0)
+                    );
+
+                    // Derive deposit if services total is greater than amountLeft
+                    const totalServicePrice = (Array.isArray(viewingBooking.serviceIds) ? viewingBooking.serviceIds : [viewingBooking.serviceId])
+                      .filter(Boolean)
+                      .reduce((sum, sId) => {
+                        const s = (typeof localServices !== 'undefined' ? localServices : SERVICES).find((srv: any) => String(srv.id) === String(sId));
+                        return sum + (s ? Number(s.price || 0) : 0);
+                      }, 0);
+
+                    const currentLeft = Number(viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null ? viewingBooking.amountLeft : ((viewingBooking as any).amount_left || 0));
+                    const implicitDeposit = (totalServicePrice > 0 && currentLeft < totalServicePrice) ? (totalServicePrice - currentLeft) : 0;
+
+                    // Total Spent is the maximum of customer history, explicit booking paid amount, or implicit deposit paid
+                    const totalSpentDisplay = Math.max(customerHistorySpent, bookingPaidVal, implicitDeposit);
+                    const outstandingAmount = currentLeft;
 
                     return (
                       <div className="overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white">
@@ -24928,7 +24950,7 @@ export default function AdminPage() {
                             </div>
                             <div>
                               <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Total Spent</p>
-                              <p className="mt-0.5 font-bold text-green-600">EGP {depositPaid.toFixed(0)}</p>
+                              <p className="mt-0.5 font-bold text-green-600">EGP {totalSpentDisplay.toFixed(0)}</p>
                             </div>
                             <div>
                               <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Outstanding</p>
@@ -27386,14 +27408,114 @@ export default function AdminPage() {
                         Package redemption is unavailable — a deposit was already paid on this booking.
                       </p>
                     )}
-                    {extraAddonsCost > 0 && (
-                      <div className="flex justify-between font-medium items-center text-[#414E36] bg-[#414E36]/10 rounded-lg px-2.5 py-1.5 text-xs mt-2">
-                        <span className="font-bold flex items-center gap-1">
-                          ✨ Session Add-ons & Consumables (Products / Extra Pulses)
-                        </span>
-                        <span className="font-bold">+{extraAddonsCost} EGP</span>
-                      </div>
-                    )}
+                    {(() => {
+                      if (extraAddonsCost <= 0) return null;
+
+                      // Extract attached products or notes lines from checkoutBooking
+                      const attached = Array.isArray((checkoutBooking as any).attachedProducts) ? (checkoutBooking as any).attachedProducts : [];
+                      const notesStr = String(checkoutBooking.notes || "");
+
+                      const parsedItems: Array<{ title: string; subtitle?: string; cost?: number; icon: string }> = [];
+                      let accountedCost = 0;
+
+                      // 1. Attached products
+                      attached.forEach((prod: any) => {
+                        const qty = Number(prod.qty) || 1;
+                        const price = Number(prod.unitPrice || prod.price || 0);
+                        const itemCost = Number(prod.total) || (qty * price);
+                        parsedItems.push({
+                          title: prod.name || "Product Consumable",
+                          subtitle: `Qty: ${qty}${price ? ` × ${price} EGP` : ''}`,
+                          cost: itemCost,
+                          icon: "📦"
+                        });
+                        accountedCost += itemCost;
+                      });
+
+                      // 2. Parse Extra Pulses or Product notes if not already added
+                      if (notesStr) {
+                        const lines = notesStr.split('\n');
+                        lines.forEach(l => {
+                          const trimmed = l.trim();
+                          if (!trimmed) return;
+
+                          if (trimmed.includes('[Extra Device Pulses]:')) {
+                            const pulseMatch = trimmed.match(/\[Extra Device Pulses\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/i);
+                            if (pulseMatch) {
+                              const detailText = pulseMatch[1].trim();
+                              const itemCost = parseFloat(pulseMatch[2]) || 0;
+                              parsedItems.push({
+                                title: "Extra Device Pulses",
+                                subtitle: detailText,
+                                cost: itemCost,
+                                icon: "⚡"
+                              });
+                              accountedCost += itemCost;
+                            } else if (!parsedItems.some(i => i.title === "Extra Device Pulses")) {
+                              parsedItems.push({
+                                title: "Extra Device Pulses",
+                                subtitle: trimmed.replace('[Extra Device Pulses]:', '').trim(),
+                                icon: "⚡"
+                              });
+                            }
+                          } else if (trimmed.includes('[Added Product]:')) {
+                            const prodMatch = trimmed.match(/\[Added Product\]:\s*(.*?)(?:\s*\(x(\d+)\))?\s*-\s*(\d+(?:\.\d+)?)\s*EGP/i);
+                            if (prodMatch) {
+                              const pName = prodMatch[1].trim();
+                              const pQty = prodMatch[2] || "1";
+                              const itemCost = parseFloat(prodMatch[3]) || 0;
+                              if (!parsedItems.some(i => i.title.toLowerCase().includes(pName.toLowerCase()))) {
+                                parsedItems.push({
+                                  title: pName,
+                                  subtitle: `Qty: ${pQty}`,
+                                  cost: itemCost,
+                                  icon: "📦"
+                                });
+                                accountedCost += itemCost;
+                              }
+                            }
+                          }
+                        });
+                      }
+
+                      // 3. Fallback or remaining unaccounted amount
+                      const remainingCost = Math.max(0, extraAddonsCost - accountedCost);
+
+                      return (
+                        <div className="mt-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 space-y-2 text-xs">
+                          <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-1.5">
+                            <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                              <span>✨</span> Session Add-ons & Consumables / المستلزمات والإضافات
+                            </span>
+                            <span className="font-bold text-[#414E36]">+{extraAddonsCost} EGP</span>
+                          </div>
+
+                          <div className="space-y-1.5 pt-0.5">
+                            {parsedItems.map((item, iIdx) => (
+                              <div key={iIdx} className="flex items-start justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 shadow-2xs">
+                                <div className="flex items-start gap-2">
+                                  <span className="text-sm mt-0.5">{item.icon}</span>
+                                  <div>
+                                    <p className="font-bold text-[#1F251A]">{item.title}</p>
+                                    {item.subtitle && <p className="text-[11px] text-[#5A6A51]">{item.subtitle}</p>}
+                                  </div>
+                                </div>
+                                {item.cost !== undefined && item.cost > 0 && (
+                                  <span className="font-extrabold text-[#414E36] mt-0.5">+{item.cost} EGP</span>
+                                )}
+                              </div>
+                            ))}
+
+                            {remainingCost > 0 && parsedItems.length > 0 && (
+                              <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 text-[11px] text-[#5A6A51]">
+                                <span>Other Session Add-ons / إضافات أخرى</span>
+                                <span className="font-bold text-[#414E36]">+{remainingCost} EGP</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
                       <span>Total Cost / الإجمالي</span>
                       <span>{totalCost} EGP</span>
