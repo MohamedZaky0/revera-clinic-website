@@ -24902,27 +24902,16 @@ export default function AdminPage() {
                     const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
                     const customerHistorySpent = customerRecord ? Number(customerRecord.spent_amount || customerRecord.spent || (customerRecord as any).total_spent || 0) : 0;
 
-                    // Booking explicit paid amounts
-                    const bookingPaidVal = Math.max(
-                      Number(viewingBooking.amountPaid || 0),
-                      Number((viewingBooking as any).amount_paid || 0),
-                      Number((viewingBooking as any).deposit || 0),
-                      Number((viewingBooking as any).deposit_amount || 0)
-                    );
-
-                    // Derive deposit if services total is greater than amountLeft
-                    const totalServicePrice = (Array.isArray(viewingBooking.serviceIds) ? viewingBooking.serviceIds : [viewingBooking.serviceId])
-                      .filter(Boolean)
-                      .reduce((sum, sId) => {
-                        const s = (typeof localServices !== 'undefined' ? localServices : SERVICES).find((srv: any) => String(srv.id) === String(sId));
-                        return sum + (s ? Number(s.price || 0) : 0);
-                      }, 0);
-
                     const currentLeft = Number(viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null ? viewingBooking.amountLeft : ((viewingBooking as any).amount_left || 0));
-                    const implicitDeposit = (totalServicePrice > 0 && currentLeft < totalServicePrice) ? (totalServicePrice - currentLeft) : 0;
+                    const totalBookingPrice = cost;
 
-                    // Total Spent for this booking is the explicit amount paid or deposit paid
-                    const totalSpentDisplay = Math.max(bookingPaidVal, implicitDeposit);
+                    // Total Spent for this booking is total price minus remaining balance, or full amount if completed
+                    let totalSpentDisplay = 0;
+                    if (viewingBooking.status === 'completed') {
+                      totalSpentDisplay = Math.max(totalBookingPrice, Number(viewingBooking.amountPaid || (viewingBooking as any).amount_paid || 0));
+                    } else {
+                      totalSpentDisplay = Math.max(0, totalBookingPrice - currentLeft);
+                    }
                     const outstandingAmount = currentLeft;
 
                     return (
