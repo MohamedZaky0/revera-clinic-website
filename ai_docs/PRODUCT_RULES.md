@@ -1,12 +1,8 @@
 # PRODUCT_RULES.md — Revera Clinics Business Rules (Enforced in Code)
 
-> **Last Updated:** 2026-07-25
+> **Last Updated:** 2026-07-30
 > **Source:** Confirmed from live code only — no speculation
-> **Previous content was for a different project — discarded entirely**
-> **2026-07-25:** three entries were removed or corrected after a full read of
-> `src/app/api/reservations/route.ts` — the 8-per-day cap and the per-service slot-uniqueness rule
-> were never enforced, and the "no admin authentication" entry was stale. Struck-through headings
-> are kept deliberately so the false rules are not silently re-added.
+> **2026-07-30 Update:** Added Doctor & Receptionist Session Workflows, Patient Medical Records Intake Requirements, Session Products & Pulses calculation, and Admin Customer Balances formulas.
 
 ---
 
@@ -232,3 +228,31 @@ The following are **not currently enforced in code**:
 - External Payment Gateway processing (payments are logged as cash/card settlements in the admin dashboard ledger only)
 - Automated reminders (enable_reminder flag exists on services but no sending logic found)
 - Server-side auth validation on `/api/*` routes (browser login gate only)
+
+---
+
+## Receptionist & Doctor Session Workflow Rules
+**Enforced in:** `src/app/admin/page.tsx`, `src/components/admin/DoctorAccountView.tsx`, `PATCH /api/reservations`
+
+1. **Session Control**:
+   - Receptionist clicks **"Start Session"** to begin patient treatment (transitions booking status to `ongoing`).
+   - Receptionist **cannot** end treatment sessions. Treatment ending is strictly performed by the Doctor via **"Complete Treatment"**.
+   - Upon session completion by the Doctor, the booking status transitions from `ongoing` to `completed`, and the Receptionist interface presents the **"Pay & Settle Invoice"** button.
+
+2. **Session Date Navigation & Booking Info**:
+   - Doctor Portal schedule features a structured date selector (**Yesterday**, **Today**, **Tomorrow**, Date Picker).
+   - "Open Session" action button is replaced with `<Info /> Info` modal button to view booking details inline without navigating away.
+
+3. **Patient Medical Record / Clinical Intake**:
+   - Returning patients display their real medical record history on file fetched from `/api/medical-records`.
+   - First-time patients without an existing record **must** have an intake form submitted by the Doctor before completing treatment.
+
+4. **Session Products & Extra Device Pulses**:
+   - Doctors can add session consumables/skincare products (`/api/inventory/products`) and extra device pulses (`/api/inventory/devices`) directly within the session notes view.
+   - Session add-ons dynamically update the booking's `amount_left` and total invoice price in real time.
+   - In the Receptionist Payment Settlement checkout modal, session add-ons are displayed as line items under **Session Add-ons & Consumables** and included in `totalCost` and `balanceDue`.
+
+5. **Customer Information Balances in Booking Details Drawer**:
+   - **Total Spent** displays the deposit amount paid (`amountPaid`).
+   - **Outstanding** displays the remaining left balance (`amountLeft`).
+   - Upon completing payment settlement checkout, Total Spent is updated to total paid and Outstanding is updated to 0 EGP.
