@@ -24905,13 +24905,8 @@ export default function AdminPage() {
                     const currentLeft = Number(viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null ? viewingBooking.amountLeft : ((viewingBooking as any).amount_left || 0));
                     const totalBookingPrice = cost;
 
-                    // Total Spent for this booking is total price minus remaining balance, or full amount if completed
-                    let totalSpentDisplay = 0;
-                    if (viewingBooking.status === 'completed') {
-                      totalSpentDisplay = Math.max(totalBookingPrice, Number(viewingBooking.amountPaid || (viewingBooking as any).amount_paid || 0));
-                    } else {
-                      totalSpentDisplay = Math.max(0, totalBookingPrice - currentLeft);
-                    }
+                    // Total Spent for this booking is the actual amount paid so far (total price minus remaining balance due)
+                    const totalSpentDisplay = Math.max(0, totalBookingPrice - currentLeft);
                     const outstandingAmount = currentLeft;
 
                     return (
