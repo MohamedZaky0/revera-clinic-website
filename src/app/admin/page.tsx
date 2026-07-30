@@ -47,6 +47,7 @@ import {
   Menu,
   Package,
   PackageCheck,
+  Archive,
   Cpu,
   Gauge,
   History,
@@ -3660,30 +3661,39 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteProduct = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete product "${name}"? It will be hidden from the catalog.`)) return;
+  // DEC-038: everyone can soft-delete; only a superadmin's UI ever offers hard delete (enforced
+  // again server-side). Requesting either opens the confirm modal below rather than a JS confirm().
+  const [productPendingDelete, setProductPendingDelete] = useState<{ id: string; name: string; mode: "soft" | "hard" } | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState(false);
+  const [productDeleteError, setProductDeleteError] = useState<string | null>(null);
 
-    // Only a superadmin may choose a permanent (hard) delete — everyone else always soft-deletes.
-    let hard = false;
-    if (adminRole === "superadmin") {
-      hard = confirm(
-        `Permanently delete "${name}" forever? This cannot be undone.\n\nClick OK to permanently delete, or Cancel to just hide it (soft delete, reversible by support).`
-      );
-    }
+  const requestDeleteProduct = (id: string, name: string, mode: "soft" | "hard") => {
+    setProductDeleteError(null);
+    setProductPendingDelete({ id, name, mode });
+  };
 
+  const confirmProductDelete = async () => {
+    if (!productPendingDelete) return;
+    const { id, mode } = productPendingDelete;
+    setDeletingProduct(true);
+    setProductDeleteError(null);
     try {
-      const res = await fetch(`/api/inventory/products?id=${id}${hard ? "&hard=true" : ""}`, {
+      const res = await fetch(`/api/inventory/products?id=${id}${mode === "hard" ? "&hard=true" : ""}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${session?.access_token || ""}` }
       });
       const resBody = await res.json().catch(() => ({}));
       if (res.ok) {
         await fetchInventoryProducts();
+        setProductPendingDelete(null);
       } else {
-        alert(resBody?.error || "Failed to delete product.");
+        setProductDeleteError(resBody?.error || "Failed to delete product.");
       }
     } catch (err) {
       console.error("Error deleting product:", err);
+      setProductDeleteError("Error deleting product.");
+    } finally {
+      setDeletingProduct(false);
     }
   };
 
@@ -18185,14 +18195,38 @@ export default function AdminPage() {
                                           >
                                             <Pencil size={15} />
                                           </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                                            className="rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
-                                            title="Delete Product"
-                                          >
-                                            <Trash2 size={15} />
-                                          </button>
+                                          {adminRole === "superadmin" ? (
+                                            <>
+                                              <button
+                                                type="button"
+                                                data-testid={`soft-delete-product-${prod.id}`}
+                                                onClick={() => requestDeleteProduct(prod.id, prod.name, "soft")}
+                                                className="rounded-xl border border-amber-200 p-2 text-amber-600 transition hover:bg-amber-50 hover:text-amber-700"
+                                                title="Soft Delete (hide, reversible)"
+                                              >
+                                                <Archive size={15} />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                data-testid={`hard-delete-product-${prod.id}`}
+                                                onClick={() => requestDeleteProduct(prod.id, prod.name, "hard")}
+                                                className="rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
+                                                title="Permanently Delete (superadmin only)"
+                                              >
+                                                <Trash2 size={15} />
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              data-testid={`soft-delete-product-${prod.id}`}
+                                              onClick={() => requestDeleteProduct(prod.id, prod.name, "soft")}
+                                              className="rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
+                                              title="Delete Product"
+                                            >
+                                              <Trash2 size={15} />
+                                            </button>
+                                          )}
                                         </div>
                                       </td>
                                     </tr>
@@ -18738,6 +18772,75 @@ export default function AdminPage() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* ── MODAL: DELETE / SOFT-DELETE PRODUCT CONFIRM (DEC-038) ── */}
+          {productPendingDelete && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn">
+              <div
+                role="dialog"
+                aria-modal="true"
+                data-testid="product-delete-modal"
+                className="w-full max-w-md rounded-[32px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-5"
+              >
+                <div className="flex items-start gap-4">
+                  <div
+                    className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl ${
+                      productPendingDelete.mode === "hard" ? "bg-rose-50 text-rose-600" : "bg-amber-50 text-amber-600"
+                    }`}
+                  >
+                    {productPendingDelete.mode === "hard" ? <Trash2 size={22} /> : <Archive size={22} />}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[#1F251A]">
+                      {productPendingDelete.mode === "hard" ? "Permanently delete this product?" : "Delete this product?"}
+                    </h3>
+                    <p className="mt-1.5 text-sm text-[#5A6A51]">
+                      {productPendingDelete.mode === "hard" ? (
+                        <>
+                          This will permanently erase <strong>&quot;{productPendingDelete.name}&quot;</strong> from the
+                          database. This cannot be undone, and will be rejected if it has sales, purchase, or
+                          consumption history attached — use soft delete for those.
+                        </>
+                      ) : (
+                        <>
+                          <strong>&quot;{productPendingDelete.name}&quot;</strong> will be hidden from the catalog and
+                          every report. Its sales, stock, and consumption history are preserved.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                {productDeleteError && (
+                  <div className="flex items-start gap-2 rounded-2xl bg-rose-50 border border-rose-100 p-3 text-xs text-rose-700">
+                    <AlertTriangle size={15} className="mt-0.5 flex-shrink-0" />
+                    <span>{productDeleteError}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    data-testid="product-delete-modal-cancel"
+                    onClick={() => setProductPendingDelete(null)}
+                    disabled={deletingProduct}
+                    className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] transition hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="product-delete-modal-confirm"
+                    onClick={confirmProductDelete}
+                    disabled={deletingProduct}
+                    className={`rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-60 ${
+                      productPendingDelete.mode === "hard" ? "bg-rose-600 hover:bg-rose-700" : "bg-[#414E36] hover:bg-[#2e3a26]"
+                    }`}
+                  >
+                    {deletingProduct ? "Deleting..." : productPendingDelete.mode === "hard" ? "Permanently Delete" : "Delete (Soft)"}
+                  </button>
+                </div>
               </div>
             </div>
           )}
