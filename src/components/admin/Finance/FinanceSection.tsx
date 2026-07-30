@@ -17,6 +17,8 @@ import {
   HandCoins,
   LineChart as LineChartIcon,
   UserPlus,
+  Gauge,
+  PieChart,
 } from "lucide-react";
 import { ExpensesScreen } from "./ExpensesScreen";
 import { AssetsScreen } from "./AssetsScreen";
@@ -33,6 +35,8 @@ import { NoShowCostScreen } from "./NoShowCostScreen";
 import { CommissionPayoutsScreen } from "./CommissionPayoutsScreen";
 import { TrendScreen } from "./TrendScreen";
 import { NewVsReturningScreen } from "./NewVsReturningScreen";
+import { CapacityScreen } from "./CapacityScreen";
+import { ServiceMixScreen } from "./ServiceMixScreen";
 
 export type FinanceTab =
   | "overview"
@@ -49,7 +53,9 @@ export type FinanceTab =
   | "no-show-cost"
   | "commission-payouts"
   | "trend"
-  | "new-vs-returning";
+  | "new-vs-returning"
+  | "capacity"
+  | "service-mix";
 
 export interface BranchOption {
   id: string;
@@ -78,6 +84,8 @@ const TABS: { id: FinanceTab; label: string; icon: ReactNode }[] = [
   { id: "commission-payouts", label: "Commission Payouts", icon: <HandCoins size={16} /> },
   { id: "trend", label: "Trend", icon: <LineChartIcon size={16} /> },
   { id: "new-vs-returning", label: "New vs Returning", icon: <UserPlus size={16} /> },
+  { id: "capacity", label: "Capacity", icon: <Gauge size={16} /> },
+  { id: "service-mix", label: "Service Mix", icon: <PieChart size={16} /> },
 ];
 
 export function FinanceSection({ accessToken, branches = [] }: FinanceSectionProps) {
@@ -131,6 +139,8 @@ export function FinanceSection({ accessToken, branches = [] }: FinanceSectionPro
       {activeTab === "commission-payouts" && <CommissionPayoutsScreen accessToken={accessToken} />}
       {activeTab === "trend" && <TrendScreen accessToken={accessToken} branches={branches} />}
       {activeTab === "new-vs-returning" && <NewVsReturningScreen accessToken={accessToken} branches={branches} />}
+      {activeTab === "capacity" && <CapacityScreen accessToken={accessToken} branches={branches} />}
+      {activeTab === "service-mix" && <ServiceMixScreen accessToken={accessToken} branches={branches} />}
     </div>
   );
 }

@@ -23,6 +23,9 @@ export function BarChart({
   height = 300,
   color = "var(--cr-accent)",
 }: BarChartProps) {
+  const longestTick = data.reduce((max, d) => Math.max(max, Number(d.value).toLocaleString().length), 0);
+  const yAxisWidth = Math.max(40, Math.min(90, longestTick * 7 + 12));
+
   return (
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -39,6 +42,7 @@ export function BarChart({
             tickLine={false}
           />
           <YAxis
+            width={yAxisWidth}
             tick={{ fill: "var(--cr-primary, var(--cr-dark))", fontSize: 12, opacity: 0.7 }}
             axisLine={false}
             tickLine={false}
