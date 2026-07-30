@@ -27248,8 +27248,6 @@ export default function AdminPage() {
           // computeSettledBalances (src/lib/billing.ts) treats amountPaid on the completing PATCH
           // as the booking's final total paid, not a delta for just this step — it must include
           // the deposit already collected, or that deposit silently never reaches
-          // customers.spent_amount. remainingAmount already correctly nets out wallet + this
-          // payment against the deposit-adjusted netDue, so amountLeft needs no separate formula.
           const totalPaidIncludingDeposit = depositAlreadyPaid + amountPaidNum;
 
           const handleConfirmCheckout = async () => {
@@ -27264,18 +27262,10 @@ export default function AdminPage() {
                   amountLeft: remainingAmount,
                   walletWithdrawal: walletDeduction,
                   walletDeposit: changeAmount > 0 && depositChangeToWallet ? changeAmount : 0,
-                  // RISK-035: without this, checkout invoices every service at full price even
-                  // when it's covered by a package the patient already paid for — the server has
-                  // no other way to know which lines in this booking are package redemptions.
                   redeemedServiceIds: Object.keys(redeemedPackageItems).map(Number)
                 })
               });
               if (res.ok) {
-                // The reservation is now 'completed' server-side — only now will
-                // /api/packages/consume accept it. Fire one call per redeemed line; a failure
-                // here (e.g. a race on the last remaining session) must NOT undo the checkout
-                // that already succeeded — the booking stays completed and correctly charged
-                // for the non-redeemed amount. Surface failures so staff can reconcile manually.
                 const redeemedEntries = Object.entries(redeemedPackageItems);
                 const consumeFailures: string[] = [];
                 for (const [serviceIdStr, customerPackageItemId] of redeemedEntries) {
@@ -27302,10 +27292,8 @@ export default function AdminPage() {
                 setUseWalletBalance(false);
                 setDepositChangeToWallet(false);
                 setRedeemedPackageItems({});
-                // Refresh list and details
                 fetchAllReservations();
                 fetchCustomers();
-                // Close the viewing booking drawer if open
                 setViewingBooking(null);
 
                 if (consumeFailures.length > 0) {
@@ -27326,10 +27314,10 @@ export default function AdminPage() {
           };
 
           return (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="w-full max-w-lg rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+              <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto my-auto rounded-3xl bg-[#FBFBF9] p-6 sm:p-8 shadow-2xl border border-[#414E36]/10 space-y-6">
                 {/* Header */}
-                <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Invoice Checkout</p>
                     <h3 className="text-xl font-bold text-[#1F251A] mt-1">Payment Settlement</h3>
@@ -27358,32 +27346,32 @@ export default function AdminPage() {
                   </div>
 
                   {/* Services Invoice details */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-[#EDF1EC]/30 p-4 space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-1">Services List / الخدمات</p>
-                    {bookingServicesList.map((svc: any, idx: number) => {
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Services List / الخدمات</p>
+                    {bookingServicesList.map((svc: any) => {
                       const isRedeemed = !!redeemedPackageItems[svc.serviceId];
                       return (
-                        <div key={idx} className="space-y-1">
-                          <div className="flex justify-between font-medium items-center gap-2">
-                            <span className="text-[#1F251A] flex items-center gap-1.5 flex-wrap">
-                              {svc.name}
+                        <div key={svc.serviceId} className="border-b border-[#414E36]/10 pb-2 space-y-1">
+                          <div className="flex justify-between items-center text-sm font-semibold">
+                            <span className="flex items-center gap-2">
+                              <span>{svc.name}</span>
                               {svc.hasPromotion && !isRedeemed && (
-                                <span className="inline-flex rounded-full bg-[#C4AE7C] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                                  {svc.promotionText}
+                                <span className="text-[10px] font-bold bg-[#C4AE7C] text-white px-2 py-0.5 rounded-full">
+                                  {svc.promotionText || "OFFER"}
                                 </span>
                               )}
                             </span>
-                            <span className={isRedeemed ? "text-emerald-700 font-bold" : ""}>
-                              {isRedeemed ? "FREE (Package)" : `${svc.price} EGP`}
+                            <span className={isRedeemed ? "line-through text-[#5A6A51]" : ""}>
+                              {svc.price} EGP
                             </span>
                           </div>
                           {svc.redeemableItem && (
-                            <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] text-emerald-800 bg-emerald-50/60 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+                            <label className="flex items-center gap-2 text-xs bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-lg p-2 cursor-pointer font-medium">
                               <input
                                 type="checkbox"
                                 checked={isRedeemed}
                                 onChange={(e) => {
-                                  setRedeemedPackageItems((prev) => {
+                                  setRedeemedPackageItems((prev: any) => {
                                     const next = { ...prev };
                                     if (e.target.checked) {
                                       next[svc.serviceId] = svc.redeemableItem.id;
@@ -27393,10 +27381,10 @@ export default function AdminPage() {
                                     return next;
                                   });
                                 }}
-                                className="h-3.5 w-3.5 rounded border-emerald-300 text-emerald-700 focus:ring-emerald-500"
+                                className="h-4 w-4 rounded accent-emerald-700"
                               />
-                              <span className="font-semibold">
-                                Apply from package: {svc.redeemableItem.packageName} ({svc.redeemableItem.qtyRemaining} left)
+                              <span>
+                                Apply from package: <strong>{svc.redeemableItem.packageName}</strong> ({svc.redeemableItem.qtyRemaining} left)
                               </span>
                             </label>
                           )}
@@ -27411,14 +27399,12 @@ export default function AdminPage() {
                     {(() => {
                       if (extraAddonsCost <= 0) return null;
 
-                      // Extract attached products or notes lines from checkoutBooking
                       const attached = Array.isArray((checkoutBooking as any).attachedProducts) ? (checkoutBooking as any).attachedProducts : [];
                       const notesStr = String(checkoutBooking.notes || "");
 
                       const parsedItems: Array<{ title: string; subtitle?: string; cost?: number; icon: string }> = [];
                       let accountedCost = 0;
 
-                      // 1. Attached products
                       attached.forEach((prod: any) => {
                         const qty = Number(prod.qty) || 1;
                         const price = Number(prod.unitPrice || prod.price || 0);
@@ -27432,7 +27418,6 @@ export default function AdminPage() {
                         accountedCost += itemCost;
                       });
 
-                      // 2. Parse Extra Pulses or Product notes if not already added
                       if (notesStr) {
                         const lines = notesStr.split('\n');
                         lines.forEach(l => {
@@ -27444,13 +27429,15 @@ export default function AdminPage() {
                             if (pulseMatch) {
                               const detailText = pulseMatch[1].trim();
                               const itemCost = parseFloat(pulseMatch[2]) || 0;
-                              parsedItems.push({
-                                title: "Extra Device Pulses",
-                                subtitle: detailText,
-                                cost: itemCost,
-                                icon: "⚡"
-                              });
-                              accountedCost += itemCost;
+                              if (!parsedItems.some(i => i.title === "Extra Device Pulses")) {
+                                parsedItems.push({
+                                  title: "Extra Device Pulses",
+                                  subtitle: detailText,
+                                  cost: itemCost,
+                                  icon: "⚡"
+                                });
+                                accountedCost += itemCost;
+                              }
                             } else if (!parsedItems.some(i => i.title === "Extra Device Pulses")) {
                               parsedItems.push({
                                 title: "Extra Device Pulses",
