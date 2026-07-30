@@ -32,7 +32,9 @@ import {
   Info,
   Edit,
   Save,
-  AlertTriangle
+  AlertTriangle,
+  Zap,
+  ShoppingBag
 } from "lucide-react";
 
 interface DoctorAccountViewProps {
@@ -85,6 +87,18 @@ export default function DoctorAccountView({
   const [resolvedCustomerId, setResolvedCustomerId] = useState<string | null>(null);
   const [savingNote, setSavingNote] = useState(false);
 
+  // Consumables & Devices Inventory State
+  const [productsList, setProductsList] = useState<any[]>([]);
+  const [devicesList, setDevicesList] = useState<any[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [selectedProductQty, setSelectedProductQty] = useState<number>(1);
+  const [usedProducts, setUsedProducts] = useState<{ id: string; name: string; qty: number; unitPrice: number; total: number }[]>([]);
+
+  // Extra Device Pulses State
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+  const [extraPulsesCount, setExtraPulsesCount] = useState<number>(0);
+  const [pricePerPulse, setPricePerPulse] = useState<number>(0);
+
   // Medical Record Form State (for first time or editing)
   const [showMedicalForm, setShowMedicalForm] = useState(false);
   const [formSkinType, setFormSkinType] = useState("Normal");
@@ -121,6 +135,30 @@ export default function DoctorAccountView({
     }
     return headers;
   };
+
+  // Fetch inventory products & devices on mount
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const [prodRes, devRes] = await Promise.all([
+          fetch("/api/inventory/products", { headers }),
+          fetch("/api/inventory/devices", { headers })
+        ]);
+        if (prodRes.ok) {
+          const pData = await prodRes.json();
+          setProductsList(pData.products || []);
+        }
+        if (devRes.ok) {
+          const dData = await devRes.json();
+          setDevicesList(dData.devices || []);
+        }
+      } catch (err) {
+        console.warn("Error fetching inventory for doctor portal:", err);
+      }
+    };
+    fetchInventory();
+  }, []);
 
   // Fetch real reservations from DB with polling for live updates
   const fetchDoctorReservations = async () => {
@@ -190,11 +228,13 @@ export default function DoctorAccountView({
     setMedicalRecordLoading(true);
     setMedicalRecord(null);
     setShowMedicalForm(false);
+    setUsedProducts([]);
+    setExtraPulsesCount(0);
+    setPricePerPulse(0);
 
     try {
       let customerId = booking.customer_id || booking.customerId;
 
-      // Fallback: If customer_id is missing on booking, lookup customer by phone or name
       if (!customerId && (booking.phone || booking.name || booking.customer_name)) {
         try {
           const custRes = await fetch("/api/customers");
@@ -231,7 +271,6 @@ export default function DoctorAccountView({
           setShowMedicalForm(false);
         } else {
           setMedicalRecord(null);
-          // First visit: automatically prompt medical intake form
           setShowMedicalForm(true);
         }
       }
@@ -256,6 +295,54 @@ export default function DoctorAccountView({
       }
     }
   }, [receptionistStartedSession]);
+
+  // Consumables Add & Remove Helpers
+  const handleAddProductToSession = () => {
+    if (!selectedProductId) return;
+    const prod = productsList.find((p) => String(p.id) === String(selectedProductId));
+    if (!prod) return;
+
+    const unitPrice = Number(prod.price || prod.unit_price || prod.selling_price || 0);
+    const qty = Number(selectedProductQty) || 1;
+    const total = unitPrice * qty;
+
+    setUsedProducts((prev) => {
+      const existingIdx = prev.findIndex((p) => String(p.id) === String(prod.id));
+      if (existingIdx >= 0) {
+        const updated = [...prev];
+        updated[existingIdx].qty += qty;
+        updated[existingIdx].total = updated[existingIdx].qty * unitPrice;
+        return updated;
+      }
+      return [...prev, { id: String(prod.id), name: prod.name, qty, unitPrice, total }];
+    });
+
+    setSelectedProductId("");
+    setSelectedProductQty(1);
+  };
+
+  const handleRemoveProductFromSession = (index: number) => {
+    setUsedProducts((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Subtotal & Updated Invoice Calculations
+  const productsSubtotal = useMemo(() => {
+    return usedProducts.reduce((sum, item) => sum + item.total, 0);
+  }, [usedProducts]);
+
+  const extraPulsesSubtotal = useMemo(() => {
+    return (Number(extraPulsesCount) || 0) * (Number(pricePerPulse) || 0);
+  }, [extraPulsesCount, pricePerPulse]);
+
+  const baseBookingPrice = useMemo(() => {
+    const target = activeSessionBooking || scheduleModalBooking;
+    if (!target) return 0;
+    return Number(target.amount_left !== undefined ? target.amount_left : (target.price || target.service_price || target.total_price || 0));
+  }, [activeSessionBooking, scheduleModalBooking]);
+
+  const updatedInvoiceTotal = useMemo(() => {
+    return baseBookingPrice + productsSubtotal + extraPulsesSubtotal;
+  }, [baseBookingPrice, productsSubtotal, extraPulsesSubtotal]);
 
   // Save Medical Intake Record to database
   const handleSaveMedicalRecord = async (e?: React.FormEvent) => {
@@ -342,10 +429,25 @@ export default function DoctorAccountView({
     loadPatientMedicalRecord(booking);
   };
 
-  // Save clinical notes to database
+  // Save clinical notes & session consumables to database
   const handleSaveClinicalNote = async (targetBooking: any) => {
     if (!targetBooking) return;
     setSavingNote(true);
+
+    let sessionAddonsSummary = "";
+    if (usedProducts.length > 0) {
+      sessionAddonsSummary += `\n\n[Products Used During Session]:\n` + usedProducts.map(p => `- ${p.name} (x${p.qty}) @ ${p.unitPrice} EGP = ${p.total} EGP`).join("\n");
+    }
+    if (extraPulsesCount > 0) {
+      const devName = devicesList.find(d => String(d.id) === String(selectedDeviceId))?.name || "Laser Device";
+      sessionAddonsSummary += `\n[Extra Device Pulses]: ${extraPulsesCount} pulses on ${devName} @ ${pricePerPulse} EGP/pulse = ${extraPulsesSubtotal} EGP`;
+    }
+    if (productsSubtotal + extraPulsesSubtotal > 0) {
+      sessionAddonsSummary += `\n[Invoice Total Updated]: ${updatedInvoiceTotal} EGP (Base: ${baseBookingPrice} EGP + Consumables: ${productsSubtotal + extraPulsesSubtotal} EGP)`;
+    }
+
+    const finalNotes = (clinicalNote || "") + sessionAddonsSummary;
+
     try {
       const headers = await getAuthHeaders();
       const res = await fetch(`/api/reservations?id=${encodeURIComponent(targetBooking.id)}`, {
@@ -353,12 +455,13 @@ export default function DoctorAccountView({
         headers,
         body: JSON.stringify({
           status: targetBooking.status,
-          notes: clinicalNote
+          notes: finalNotes,
+          amountLeft: updatedInvoiceTotal - Number(targetBooking.amount_paid || 0)
         })
       });
 
       if (res.ok) {
-        alert("Clinical notes saved successfully!");
+        alert("Clinical notes & updated invoice total saved successfully!");
         fetchDoctorReservations();
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -383,7 +486,21 @@ export default function DoctorAccountView({
       return;
     }
 
-    if (!confirm(`Mark treatment session as COMPLETED for ${targetBooking.name || "Patient"}?`)) return;
+    if (!confirm(`Mark treatment session as COMPLETED for ${targetBooking.name || "Patient"}?\nUpdated Invoice Total: ${updatedInvoiceTotal} EGP`)) return;
+
+    let sessionAddonsSummary = "";
+    if (usedProducts.length > 0) {
+      sessionAddonsSummary += `\n\n[Products Used During Session]:\n` + usedProducts.map(p => `- ${p.name} (x${p.qty}) @ ${p.unitPrice} EGP = ${p.total} EGP`).join("\n");
+    }
+    if (extraPulsesCount > 0) {
+      const devName = devicesList.find(d => String(d.id) === String(selectedDeviceId))?.name || "Laser Device";
+      sessionAddonsSummary += `\n[Extra Device Pulses]: ${extraPulsesCount} pulses on ${devName} @ ${pricePerPulse} EGP/pulse = ${extraPulsesSubtotal} EGP`;
+    }
+    if (productsSubtotal + extraPulsesSubtotal > 0) {
+      sessionAddonsSummary += `\n[Invoice Total Updated]: ${updatedInvoiceTotal} EGP (Base: ${baseBookingPrice} EGP + Consumables: ${productsSubtotal + extraPulsesSubtotal} EGP)`;
+    }
+
+    const finalNotes = (clinicalNote || "") + sessionAddonsSummary;
 
     try {
       const headers = await getAuthHeaders();
@@ -392,12 +509,13 @@ export default function DoctorAccountView({
         headers,
         body: JSON.stringify({
           status: "completed",
-          notes: clinicalNote
+          notes: finalNotes,
+          amountLeft: updatedInvoiceTotal - Number(targetBooking.amount_paid || 0)
         })
       });
 
       if (res.ok) {
-        alert("Treatment session marked as COMPLETED!");
+        alert(`Treatment session marked as COMPLETED!\nInvoice Total Updated to: ${updatedInvoiceTotal} EGP`);
         setActiveSessionBooking(null);
         setScheduleModalBooking(null);
         fetchDoctorReservations();
@@ -456,7 +574,7 @@ export default function DoctorAccountView({
 
   return (
     <div className="min-h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col">
-      {/* ── TOP HEADER & FLOATING NAVIGATION BAR (FULL SCREEN WIDTH) ── */}
+      {/* ── TOP HEADER & FLOATING NAVIGATION BAR ── */}
       <header className="sticky top-0 z-50 w-full bg-[#F4F5F1]/90 backdrop-blur-md px-8 py-4 transition-all border-b border-[#414E36]/10 shadow-sm">
         <div className="w-full flex items-center justify-between gap-4">
           
@@ -984,8 +1102,154 @@ export default function DoctorAccountView({
                     </div>
                   </div>
 
-                  {/* Doctor Clinical Notes Editor */}
+                  {/* Doctor Clinical Notes & Session Consumables Section */}
                   <div className="lg:col-span-2 space-y-6">
+                    
+                    {/* ── NEW: SESSION CONSUMABLES & EXTRA PULSES SECTION (ABOVE NOTES) ── */}
+                    <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
+                        <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                          <Sparkles size={16} className="text-[#414E36]" /> Session Consumables & Extra Device Pulses
+                        </h3>
+                        <div className="flex items-center gap-2 rounded-2xl bg-[#414E36]/10 px-3.5 py-1.5 text-xs font-black text-[#414E36]">
+                          <span>Updated Invoice Total:</span>
+                          <span className="text-sm text-[#414E36] font-extrabold">{updatedInvoiceTotal} EGP</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* 1. Products Used During Session */}
+                        <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                          <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
+                            <ShoppingBag size={14} className="text-[#414E36]" /> Products Used in Treatment
+                          </h4>
+                          
+                          <div className="grid grid-cols-3 gap-2">
+                            <select
+                              value={selectedProductId}
+                              onChange={(e) => setSelectedProductId(e.target.value)}
+                              className="col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                            >
+                              <option value="">-- Select Product --</option>
+                              {productsList.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} ({p.price || p.unit_price || p.selling_price || 0} EGP)
+                                </option>
+                              ))}
+                            </select>
+
+                            <input
+                              type="number"
+                              min={1}
+                              value={selectedProductQty}
+                              onChange={(e) => setSelectedProductQty(Math.max(1, parseInt(e.target.value) || 1))}
+                              className="rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                              placeholder="Qty"
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleAddProductToSession}
+                            className="w-full rounded-xl bg-[#414E36] py-1.5 text-xs font-bold text-white hover:bg-[#343F2B] transition"
+                          >
+                            + Add Product to Invoice
+                          </button>
+
+                          {/* Added Products List */}
+                          {usedProducts.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-[#414E36]/10">
+                              {usedProducts.map((item, i) => (
+                                <div key={i} className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-[#414E36]/10">
+                                  <div>
+                                    <span className="font-bold text-[#1F251A]">{item.name}</span>
+                                    <span className="text-[10px] text-[#5A6A51] block">Qty: {item.qty} x {item.unitPrice} EGP</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold text-[#414E36]">{item.total} EGP</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveProductFromSession(i)}
+                                      className="text-rose-600 hover:text-rose-800 text-xs font-bold"
+                                    >
+                                      <X size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. Extra Device Pulses */}
+                        <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                          <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
+                            <Zap size={14} className="text-amber-600" /> Extra Device Pulses
+                          </h4>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Select Laser / Aesthetic Device</label>
+                            <select
+                              value={selectedDeviceId}
+                              onChange={(e) => setSelectedDeviceId(e.target.value)}
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                            >
+                              <option value="">-- Select Device --</option>
+                              {devicesList.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                  {d.name} ({d.status || 'Active'})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Extra Pulses Count</label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={extraPulsesCount}
+                                onChange={(e) => setExtraPulsesCount(Math.max(0, parseInt(e.target.value) || 0))}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                placeholder="e.g. 50"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Price per Pulse (EGP)</label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={pricePerPulse}
+                                onChange={(e) => setPricePerPulse(Math.max(0, parseFloat(e.target.value) || 0))}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                                placeholder="e.g. 2.5"
+                              />
+                            </div>
+                          </div>
+
+                          {extraPulsesSubtotal > 0 && (
+                            <div className="text-xs bg-amber-50 p-2.5 rounded-xl border border-amber-200 flex justify-between font-bold text-amber-900">
+                              <span>Extra Pulses Subtotal:</span>
+                              <span>+{extraPulsesSubtotal} EGP</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Invoice Breakdown Summary */}
+                      <div className="bg-[#414E36]/05 p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-4 text-[#5A6A51]">
+                          <span>Base Service: <strong className="text-[#1F251A]">{baseBookingPrice} EGP</strong></span>
+                          <span>Products Addons: <strong className="text-[#1F251A]">+{productsSubtotal} EGP</strong></span>
+                          <span>Pulses Addons: <strong className="text-[#1F251A]">+{extraPulsesSubtotal} EGP</strong></span>
+                        </div>
+                        <div className="text-[#414E36] font-extrabold text-sm">
+                          Final Invoice: {updatedInvoiceTotal} EGP
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
                       <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
                         <FileText size={16} className="text-[#414E36]" /> Doctor Procedure Observations & Medical Notes
