@@ -1381,8 +1381,19 @@ export default function AdminPage() {
       total
     });
 
-    const currentLeft = Number(viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null ? viewingBooking.amountLeft : ((viewingBooking as any).amount_left || 0));
-    const newLeft = currentLeft + total;
+    // Calculate total base services cost
+    const svcIds = Array.isArray(viewingBooking.serviceIds) ? viewingBooking.serviceIds : (viewingBooking.serviceId ? [viewingBooking.serviceId] : []);
+    const baseServicesCost = svcIds.reduce((sum: number, id: number) => {
+      const s = localServices.find(srv => srv.id === id);
+      return sum + (s ? getEffectiveServicePrice(s, viewingBooking.branchId, branches) : 500);
+    }, 0);
+
+    // Calculate total attached products cost including newly added product
+    const totalProductsCost = currentProducts.reduce((sum: number, p: any) => sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unitPrice || p.price || 0))), 0);
+    const grandTotalCost = baseServicesCost + totalProductsCost;
+
+    const sessionPaid = Number(viewingBooking.amountPaid || 0);
+    const newLeft = Math.max(0, grandTotalCost - sessionPaid);
 
     const updatedNotes = (viewingBooking.notes || "") + `\n[Added Product]: ${prod.name} (x${qty}) - ${total} EGP`;
 
@@ -1392,7 +1403,8 @@ export default function AdminPage() {
         headers: authenticatedJsonHeaders,
         body: JSON.stringify({
           amountLeft: newLeft,
-          notes: updatedNotes
+          notes: updatedNotes,
+          attachedProducts: currentProducts
         })
       });
 
@@ -3457,7 +3469,8 @@ export default function AdminPage() {
     { id: 'TC-021', name: 'Clinic Loans & Repayment Schedules', category: 'Expenses & Assets', endpoint: '/api/loans', description: 'Tests financial loans, interest schedules, and repayment logs.', status: 'idle' },
     { id: 'TC-022', name: 'Terms & Conditions Policy Config', category: 'System & Settings', endpoint: '/api/terms', description: 'Verifies deposit terms, cancellation policies, and clinic terms.', status: 'idle' },
     { id: 'TC-023', name: 'HR Missing Check-in Warning Alerts', category: 'HR & Payroll', endpoint: '/api/hr/alerts', description: 'Tests missing clock-in detection and automated HR warning alerts.', status: 'idle' },
-    { id: 'TC-024', name: 'Customer Balances & Ledger Reconciliation', category: 'Medical & Patients', endpoint: '/api/customers/reconcile', description: 'Reconciles stored customer scalar balances against ledger transaction history.', status: 'idle' }
+    { id: 'TC-024', name: 'Customer Balances & Ledger Reconciliation', category: 'Medical & Patients', endpoint: '/api/customers/reconcile', description: 'Reconciles stored customer scalar balances against ledger transaction history.', status: 'idle' },
+    { id: 'TC-025', name: 'Booking Products & Consumables Invoice Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies attached products & session consumables price recalculation and session left updates.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -24124,7 +24137,41 @@ export default function AdminPage() {
         });
 
         const serviceNames = bookingServices.map(bs => bs.name).join(", ");
-        const cost = bookingServices.reduce((sum, bs) => sum + bs.price, 0);
+        const servicesCost = bookingServices.reduce((sum, bs) => sum + bs.price, 0);
+
+        // Compute products cost from attachedProducts and notes
+        const drawerAttachedList: any[] = Array.isArray((viewingBooking as any).attachedProducts)
+          ? [...(viewingBooking as any).attachedProducts]
+          : [];
+        const drawerExistingNames = new Set(drawerAttachedList.map((p: any) => (p.name || '').trim().toLowerCase()));
+
+        if (viewingBooking.notes) {
+          const notesStr = viewingBooking.notes;
+          const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
+          for (const match of doctorMatches) {
+            const name = match[1].trim();
+            const qty = Number(match[2]);
+            const unitPrice = Number(match[3]);
+            if (!drawerExistingNames.has(name.toLowerCase())) {
+              drawerExistingNames.add(name.toLowerCase());
+              drawerAttachedList.push({ name, qty, unitPrice, total: qty * unitPrice });
+            }
+          }
+          const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)\s+\(x(\d+)\)\s+-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+          for (const match of receptionistMatches) {
+            const name = match[1].trim();
+            const qty = Number(match[2]);
+            const total = Number(match[3]);
+            const unitPrice = qty > 0 ? total / qty : total;
+            if (!drawerExistingNames.has(name.toLowerCase())) {
+              drawerExistingNames.add(name.toLowerCase());
+              drawerAttachedList.push({ name, qty, unitPrice, total });
+            }
+          }
+        }
+
+        const productsCost = drawerAttachedList.reduce((sum, p) => sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unitPrice || p.price || 0))), 0);
+        const totalPrice = servicesCost + productsCost;
 
         const sessionPaid = Number(viewingBooking.amountPaid || 0);
         const rawLeft = viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null
@@ -24132,10 +24179,12 @@ export default function AdminPage() {
           : ((viewingBooking as any).amount_left !== undefined && (viewingBooking as any).amount_left !== null
               ? Number((viewingBooking as any).amount_left)
               : null);
+
         const sessionLeft = (rawLeft !== null && rawLeft > 0)
           ? rawLeft
-          : Math.max(0, cost - sessionPaid);
-        const isInvoicePaid = sessionLeft <= 0 || sessionPaid >= cost;
+          : Math.max(0, totalPrice - sessionPaid);
+
+        const isInvoicePaid = sessionLeft <= 0 || (sessionPaid >= totalPrice && totalPrice > 0);
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4">
@@ -24232,11 +24281,17 @@ export default function AdminPage() {
                       </div>
                       <div className="flex justify-between font-semibold text-[#1F251A]">
                         <span>Service Cost</span>
-                        <span>{cost} EGP</span>
+                        <span>{servicesCost} EGP</span>
                       </div>
+                      {productsCost > 0 && (
+                        <div className="flex justify-between font-semibold text-[#414E36]">
+                          <span>Products & Consumables</span>
+                          <span>+{productsCost} EGP</span>
+                        </div>
+                      )}
                       <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
                         <span>Total Price</span>
-                        <span>{cost} EGP</span>
+                        <span>{totalPrice} EGP</span>
                       </div>
                       <div className="border-t border-[#414E36]/10 pt-2 grid grid-cols-2 gap-2 text-xs font-semibold">
                         <div className="flex flex-col">

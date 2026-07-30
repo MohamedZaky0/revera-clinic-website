@@ -599,6 +599,22 @@ deferred balance       = Σ price_paid × qty_remaining / qty_total
 
 ---
 
+## DEC-024: Attached Products & Consumables Included in Booking Invoice Total
+
+**Date:** 2026-07-30
+**Status:** Decided — active
+
+**Context:**
+Previously, when doctors or receptionists attached products/consumables to a booking drawer or via clinical notes, the products were listed but the booking `amountLeft` / session outstanding and overall `Total Price` did not incorporate the cost of attached products.
+
+**Chosen Option:**
+1. Compute `productsCost` dynamically from `viewingBooking.attachedProducts` array and note entries.
+2. Calculate `totalPrice = servicesCost + productsCost`.
+3. Recalculate `sessionLeft = Math.max(0, totalPrice - sessionPaid)` when adding products or opening the booking drawer.
+4. Added test `TC-025` to the System Test Suite in Admin Settings to verify attached products recalculate total invoice price and session outstanding balance.
+
+---
+
 ## DEC-024: Opening Balances Are Bidirectional And Generic Across Clinics
 
 **Date:** 2026-07-25
