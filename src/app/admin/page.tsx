@@ -24126,6 +24126,17 @@ export default function AdminPage() {
         const serviceNames = bookingServices.map(bs => bs.name).join(", ");
         const cost = bookingServices.reduce((sum, bs) => sum + bs.price, 0);
 
+        const sessionPaid = Number(viewingBooking.amountPaid || 0);
+        const rawLeft = viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null
+          ? Number(viewingBooking.amountLeft)
+          : ((viewingBooking as any).amount_left !== undefined && (viewingBooking as any).amount_left !== null
+              ? Number((viewingBooking as any).amount_left)
+              : null);
+        const sessionLeft = (rawLeft !== null && rawLeft > 0)
+          ? rawLeft
+          : Math.max(0, cost - sessionPaid);
+        const isInvoicePaid = sessionLeft <= 0 || sessionPaid >= cost;
+
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4">
             <div className="w-full max-w-5xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -24212,46 +24223,35 @@ export default function AdminPage() {
                   </div>
 
                   {/* Price Details */}
-                  {(() => {
-                    const sessionPaid = Number(viewingBooking.amountPaid || 0);
-                    const sessionLeft = Number(
-                      viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null
-                        ? viewingBooking.amountLeft
-                        : ((viewingBooking as any).amount_left !== undefined && (viewingBooking as any).amount_left !== null
-                            ? (viewingBooking as any).amount_left
-                            : Math.max(0, cost - sessionPaid))
-                    );
-
-                    return (
-                      <div className="rounded-2xl border-2 border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-5">
-                        <p className="text-sm font-bold text-[#1F251A] mb-4">Price Details</p>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between text-[#5A6A51]">
-                            <span>Base Price</span>
-                            <span>-</span>
-                          </div>
-                          <div className="flex justify-between font-semibold text-[#1F251A]">
-                            <span>Service Cost</span>
-                            <span>{cost} EGP</span>
-                          </div>
-                          <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
-                            <span>Total Price</span>
-                            <span>{cost} EGP</span>
-                          </div>
-                          <div className="border-t border-[#414E36]/10 pt-2 grid grid-cols-2 gap-2 text-xs font-semibold">
-                            <div className="flex flex-col">
-                              <span className="text-[#5A6A51]">Session Paid</span>
-                              <span className="text-green-600 font-bold text-sm">EGP {sessionPaid.toFixed(0)}</span>
-                            </div>
-                            <div className="flex flex-col text-right">
-                              <span className="text-[#5A6A51]">Session Outstanding</span>
-                              <span className="text-red-600 font-bold text-sm">EGP {sessionLeft.toFixed(0)}</span>
-                            </div>
-                          </div>
+                  <div className="rounded-2xl border-2 border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-5">
+                    <p className="text-sm font-bold text-[#1F251A] mb-4">Price Details</p>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between text-[#5A6A51]">
+                        <span>Base Price</span>
+                        <span>-</span>
+                      </div>
+                      <div className="flex justify-between font-semibold text-[#1F251A]">
+                        <span>Service Cost</span>
+                        <span>{cost} EGP</span>
+                      </div>
+                      <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
+                        <span>Total Price</span>
+                        <span>{cost} EGP</span>
+                      </div>
+                      <div className="border-t border-[#414E36]/10 pt-2 grid grid-cols-2 gap-2 text-xs font-semibold">
+                        <div className="flex flex-col">
+                          <span className="text-[#5A6A51]">Session Paid</span>
+                          <span className="text-green-600 font-bold text-sm">EGP {sessionPaid.toFixed(0)}</span>
+                        </div>
+                        <div className="flex flex-col text-right">
+                          <span className="text-[#5A6A51]">Session Outstanding</span>
+                          <span className={sessionLeft > 0 ? "text-red-600 font-bold text-sm" : "text-green-600 font-bold text-sm"}>
+                            EGP {sessionLeft.toFixed(0)}
+                          </span>
                         </div>
                       </div>
-                    );
-                  })()}
+                    </div>
+                  </div>
 
                   {/* Services & Adjustments */}
                   <div className="flex flex-col gap-3 border-b border-[#414E36]/10 pb-4">
@@ -24832,25 +24832,47 @@ export default function AdminPage() {
                   )}
 
                   {viewingBooking.status === 'completed' && hasPermission("bookings.edit") && (
-                    <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-900">Treatment Completed</p>
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-200/80 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-900">
-                          Ready for Payment
-                        </span>
+                    !isInvoicePaid ? (
+                      <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-900">Treatment Completed</p>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/80 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-900">
+                            Ready for Payment
+                          </span>
+                        </div>
+                        <p className="text-xs text-emerald-800 leading-relaxed">
+                          The doctor has completed the treatment. Settle invoice and collect remaining payment from patient.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setCheckoutBooking(viewingBooking);
+                          }}
+                          className="w-full rounded-2xl bg-[#414E36] py-3 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center justify-center gap-2 shadow-md"
+                        >
+                          Pay &amp; Settle Invoice
+                        </button>
                       </div>
-                      <p className="text-xs text-emerald-800 leading-relaxed">
-                        The doctor has completed the treatment. Settle invoice and collect payment from patient.
-                      </p>
-                      <button
-                        onClick={() => {
-                          setCheckoutBooking(viewingBooking);
-                        }}
-                        className="w-full rounded-2xl bg-[#414E36] py-3 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center justify-center gap-2 shadow-md"
-                      >
-                        Pay &amp; Settle Invoice
-                      </button>
-                    </div>
+                    ) : (
+                      <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-100/70 p-5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-950">Treatment Completed</p>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-300 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-950">
+                            ✓ Invoice Settled &amp; Paid
+                          </span>
+                        </div>
+                        <p className="text-xs text-emerald-900 leading-relaxed font-medium">
+                          The invoice for this treatment session has been fully paid and settled.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setInvoiceBooking(viewingBooking);
+                          }}
+                          className="w-full rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center justify-center gap-2 shadow-sm"
+                        >
+                          View Invoice &amp; Print PDF
+                        </button>
+                      </div>
+                    )
                   )}
 
                   {!['completed', 'cancelled', 'rejected', 'no_show', 'started'].includes(viewingBooking.status) && hasPermission("bookings.edit") && (
