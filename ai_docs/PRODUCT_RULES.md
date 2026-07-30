@@ -210,8 +210,8 @@ These keys will need changing when forking for client #2.
 
 When completing a reservation, the receptionist processes a payment settlement. If the reservation's status is updated to `'completed'`, the linked customer's profile is updated:
 - **Wallet Balance**: Decreased by any `walletWithdrawal` amount used for payment and increased by any `walletDeposit` (overpayment change saved to wallet).
-- **Total Spent**: Increased by the amount paid plus any wallet balance used to offset the cost.
-- **Outstanding Debt**: Increased by any unpaid remainder (`amountLeft`).
+- **Total Spent**: Increased by the amount paid plus any wallet balance used to offset the cost. Customer's lifetime total spent (`spent_amount`) only increases when payment is actually settled.
+- **Outstanding Debt**: Increased by any unpaid session remainder (`effectiveAmountLeft = totalCost - amountPaid`). When a session treatment is completed without payment, the unpaid session amount is added to `customer.outstanding`. Upon invoice settlement, `customer.outstanding` is reduced and `customer.spent_amount` is increased.
 
 ---
 
@@ -252,7 +252,14 @@ The following are **not currently enforced in code**:
    - Session add-ons dynamically update the booking's `amount_left` and total invoice price in real time.
    - In the Receptionist Payment Settlement checkout modal, session add-ons are displayed as line items under **Session Add-ons & Consumables** and included in `totalCost` and `balanceDue`.
 
-5. **Customer Information Balances in Booking Details Drawer**:
-   - **Total Spent** displays the deposit amount paid (`amountPaid`).
-   - **Outstanding** displays the remaining left balance (`amountLeft`).
-   - Upon completing payment settlement checkout, Total Spent is updated to total paid and Outstanding is updated to 0 EGP.
+5. **Customer Information & Financials in Booking Details Drawer**:
+   - **Customer Information Card**: Displays the customer's account-level lifetime metrics across all reservations:
+     - **Wallet Balance**: Customer's stored wallet credit (`customerRecord.wallet_balance`).
+     - **Total Spent (All Visits)**: Customer's total spent across all completed visits (`customerRecord.spent_amount`).
+     - **Outstanding (All Visits)**: Customer's total debt across all visits (`customerRecord.outstanding`).
+   - **Price Details & Session Financials Card**: Displays this specific session's breakdown:
+     - **Total Price**: Total cost for the session services and add-ons (`cost EGP`).
+     - **Session Paid**: Actual amount paid so far for this specific session (`amountPaid EGP`).
+     - **Session Outstanding**: Remaining balance owed for this specific session (`amountLeft EGP` / `cost - amountPaid EGP`).
+   - Upon completing payment settlement checkout, Session Paid is updated to total price, Session Outstanding drops to 0 EGP, Customer Total Spent increases by settled payment, and Customer Outstanding is reduced by settled amount.
+

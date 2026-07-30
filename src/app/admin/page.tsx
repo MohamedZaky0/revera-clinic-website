@@ -3456,7 +3456,8 @@ export default function AdminPage() {
     { id: 'TC-020', name: 'Clinic Asset Depreciation Engine', category: 'Expenses & Assets', endpoint: '/api/assets', description: 'Validates capital asset valuation and straight-line depreciation.', status: 'idle' },
     { id: 'TC-021', name: 'Clinic Loans & Repayment Schedules', category: 'Expenses & Assets', endpoint: '/api/loans', description: 'Tests financial loans, interest schedules, and repayment logs.', status: 'idle' },
     { id: 'TC-022', name: 'Terms & Conditions Policy Config', category: 'System & Settings', endpoint: '/api/terms', description: 'Verifies deposit terms, cancellation policies, and clinic terms.', status: 'idle' },
-    { id: 'TC-023', name: 'HR Missing Check-in Warning Alerts', category: 'HR & Payroll', endpoint: '/api/hr/alerts', description: 'Tests missing clock-in detection and automated HR warning alerts.', status: 'idle' }
+    { id: 'TC-023', name: 'HR Missing Check-in Warning Alerts', category: 'HR & Payroll', endpoint: '/api/hr/alerts', description: 'Tests missing clock-in detection and automated HR warning alerts.', status: 'idle' },
+    { id: 'TC-024', name: 'Customer Balances & Ledger Reconciliation', category: 'Medical & Patients', endpoint: '/api/customers/reconcile', description: 'Reconciles stored customer scalar balances against ledger transaction history.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -24211,23 +24212,46 @@ export default function AdminPage() {
                   </div>
 
                   {/* Price Details */}
-                  <div className="rounded-2xl border-2 border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-5">
-                    <p className="text-sm font-bold text-[#1F251A] mb-4">Price Details</p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between text-[#5A6A51]">
-                        <span>Base Price</span>
-                        <span>-</span>
+                  {(() => {
+                    const sessionPaid = Number(viewingBooking.amountPaid || 0);
+                    const sessionLeft = Number(
+                      viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null
+                        ? viewingBooking.amountLeft
+                        : ((viewingBooking as any).amount_left !== undefined && (viewingBooking as any).amount_left !== null
+                            ? (viewingBooking as any).amount_left
+                            : Math.max(0, cost - sessionPaid))
+                    );
+
+                    return (
+                      <div className="rounded-2xl border-2 border-dashed border-[#414E36]/20 bg-[#FBFBF9] p-5">
+                        <p className="text-sm font-bold text-[#1F251A] mb-4">Price Details</p>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between text-[#5A6A51]">
+                            <span>Base Price</span>
+                            <span>-</span>
+                          </div>
+                          <div className="flex justify-between font-semibold text-[#1F251A]">
+                            <span>Service Cost</span>
+                            <span>{cost} EGP</span>
+                          </div>
+                          <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
+                            <span>Total Price</span>
+                            <span>{cost} EGP</span>
+                          </div>
+                          <div className="border-t border-[#414E36]/10 pt-2 grid grid-cols-2 gap-2 text-xs font-semibold">
+                            <div className="flex flex-col">
+                              <span className="text-[#5A6A51]">Session Paid</span>
+                              <span className="text-green-600 font-bold text-sm">EGP {sessionPaid.toFixed(0)}</span>
+                            </div>
+                            <div className="flex flex-col text-right">
+                              <span className="text-[#5A6A51]">Session Outstanding</span>
+                              <span className="text-red-600 font-bold text-sm">EGP {sessionLeft.toFixed(0)}</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between font-semibold text-[#1F251A]">
-                        <span>Service Cost</span>
-                        <span>{cost} EGP</span>
-                      </div>
-                      <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
-                        <span>Total Price</span>
-                        <span>{cost} EGP</span>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   {/* Services & Adjustments */}
                   <div className="flex flex-col gap-3 border-b border-[#414E36]/10 pb-4">
@@ -24901,13 +24925,7 @@ export default function AdminPage() {
                     const customerRecord = dbCustomers.find(c => c.id === viewingBooking.customerId || c.phone === viewingBooking.phone);
                     const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
                     const customerHistorySpent = customerRecord ? Number(customerRecord.spent_amount || customerRecord.spent || (customerRecord as any).total_spent || 0) : 0;
-
-                    const currentLeft = Number(viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null ? viewingBooking.amountLeft : ((viewingBooking as any).amount_left || 0));
-                    const totalBookingPrice = cost;
-
-                    // Total Spent for this booking is the actual amount paid so far (total price minus remaining balance due)
-                    const totalSpentDisplay = Math.max(0, totalBookingPrice - currentLeft);
-                    const outstandingAmount = currentLeft;
+                    const customerHistoryOutstanding = customerRecord ? Number(customerRecord.outstanding || 0) : 0;
 
                     return (
                       <div className="overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white">
@@ -24933,12 +24951,12 @@ export default function AdminPage() {
                               <p className="mt-0.5 font-bold text-[#C4AE7C]">EGP {walletBalance.toFixed(0)}</p>
                             </div>
                             <div>
-                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Total Spent</p>
-                              <p className="mt-0.5 font-bold text-green-600">EGP {totalSpentDisplay.toFixed(0)}</p>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold" title="Total spent by this customer across all completed visits">Total Spent</p>
+                              <p className="mt-0.5 font-bold text-green-600">EGP {customerHistorySpent.toFixed(0)}</p>
                             </div>
                             <div>
-                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Outstanding</p>
-                              <p className="mt-0.5 font-bold text-red-600">EGP {outstandingAmount.toFixed(0)}</p>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold" title="Total outstanding balance owed by this customer across all visits">Outstanding</p>
+                              <p className="mt-0.5 font-bold text-red-600">EGP {customerHistoryOutstanding.toFixed(0)}</p>
                             </div>
                           </div>
                         </div>
