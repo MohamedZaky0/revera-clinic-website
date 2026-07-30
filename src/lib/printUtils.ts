@@ -14,7 +14,10 @@ export interface InvoiceBookingData {
 
 export interface ServiceItemData {
   name: string;
-  price: number;
+  qty?: number;
+  unitPrice?: number;
+  price?: number;
+  total?: number;
 }
 
 /** Standardized cross-browser PDF invoice printer */
@@ -35,14 +38,19 @@ export function printInvoice(
 
   const serviceRows = servicesList
     .map(
-      (s) => `
+      (s) => {
+        const qty = Number(s.qty) || 1;
+        const uPrice = Number(s.unitPrice !== undefined ? s.unitPrice : (s.price !== undefined ? s.price : 0));
+        const itemTotal = Number(s.total !== undefined ? s.total : (qty * uPrice));
+        return `
       <tr>
         <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: left; color: #111827; font-weight: 600;">${s.name}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: center; color: #4B5563;">1</td>
-        <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: right; color: #111827;">EGP ${(s.price || 0).toLocaleString()}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: right; color: #111827; font-weight: bold;">EGP ${(s.price || 0).toLocaleString()}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: center; color: #4B5563;">${qty}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: right; color: #111827;">EGP ${uPrice.toLocaleString()}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #E5E7EB; text-align: right; color: #111827; font-weight: bold;">EGP ${itemTotal.toLocaleString()}</td>
       </tr>
-    `
+    `;
+      }
     )
     .join('');
 

@@ -27892,17 +27892,88 @@ export default function AdminPage() {
       {invoiceBooking && (
         (() => {
           // 1. Calculate service cost
-          const svcIds = Array.isArray(invoiceBooking.serviceIds) ? invoiceBooking.serviceIds : [invoiceBooking.serviceId];
-          const bookingServicesList = svcIds.map((id: number) => {
+          const svcIds = Array.isArray(invoiceBooking.serviceIds) ? invoiceBooking.serviceIds : (invoiceBooking.serviceId ? [invoiceBooking.serviceId] : []);
+          const baseServicesList = svcIds.map((id: number) => {
             const s = localServices.find(srv => srv.id === id);
+            const price = s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500;
             return {
               name: s?.en || `Service #${id}`,
               nameAr: s?.ar || `خدمة #${id}`,
-              price: s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500
+              qty: 1,
+              unitPrice: price,
+              price: price,
+              total: price
             };
           });
-          const totalCost = bookingServicesList.reduce((sum: number, s: any) => sum + s.price, 0);
-          
+
+          // Extract attached products/consumables/add-ons
+          const invoiceAttachedList: Array<{ name: string; qty: number; unitPrice: number; total: number }> = [];
+          const existingNames = new Set<string>();
+
+          if (Array.isArray(invoiceBooking.attachedProducts)) {
+            for (const prod of invoiceBooking.attachedProducts) {
+              const name = String(prod.name || 'Product / Consumable').trim();
+              const qty = Number(prod.qty) || 1;
+              const unitPrice = Number(prod.unitPrice || prod.price || (prod.total && qty ? prod.total / qty : 0));
+              const total = Number(prod.total) || (qty * unitPrice);
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                invoiceAttachedList.push({ name, qty, unitPrice, total });
+              }
+            }
+          }
+
+          if (invoiceBooking.notes) {
+            const notesStr = String(invoiceBooking.notes);
+
+            const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
+            for (const match of doctorMatches) {
+              const name = match[1].trim();
+              const qty = Number(match[2]);
+              const unitPrice = Number(match[3]);
+              const total = qty * unitPrice;
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                invoiceAttachedList.push({ name, qty, unitPrice, total });
+              }
+            }
+
+            const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+            for (const match of receptionistMatches) {
+              const name = match[1].trim();
+              const qty = match[2] ? Number(match[2]) : 1;
+              const total = Number(match[3]);
+              const unitPrice = qty > 0 ? total / qty : total;
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                invoiceAttachedList.push({ name, qty, unitPrice, total });
+              }
+            }
+
+            const pulseMatches = notesStr.matchAll(/\[Extra Device Pulses\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+            for (const match of pulseMatches) {
+              const detail = match[1].trim();
+              const total = Number(match[2]);
+              const name = `Extra Device Pulses (${detail})`;
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                invoiceAttachedList.push({ name, qty: 1, unitPrice: total, total });
+              }
+            }
+          }
+
+          const invoiceProductsList = invoiceAttachedList.map((p) => ({
+            name: `${p.name} (Add-on)`,
+            nameAr: `${p.name} (إضافة)`,
+            qty: p.qty,
+            unitPrice: p.unitPrice,
+            price: p.unitPrice,
+            total: p.total
+          }));
+
+          const allInvoiceItems = [...baseServicesList, ...invoiceProductsList];
+          const totalCost = allInvoiceItems.reduce((sum: number, item: any) => sum + item.total, 0);
+
           // 2. Fetch customer and branch details
           const walletUsed = Math.max(0, totalCost - (invoiceBooking.amountPaid ?? 0) - (invoiceBooking.amountLeft ?? 0));
           const branch = branches.find(b => b.id === invoiceBooking.branchId);
@@ -27960,24 +28031,24 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* Table of Services */}
+                  {/* Table of Services & Add-ons */}
                   <div className="overflow-x-auto my-6 border border-gray-100 rounded-2xl bg-white">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-100">
-                          <th className="p-3 text-left">Service Rendered</th>
+                          <th className="p-3 text-left">Service / Item Rendered</th>
                           <th className="p-3 text-center w-16">Qty</th>
                           <th className="p-3 text-right w-24">Unit Price</th>
                           <th className="p-3 text-right w-24">Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {bookingServicesList.map((s: any, idx: number) => (
+                        {allInvoiceItems.map((item: any, idx: number) => (
                           <tr key={idx} className="hover:bg-gray-50/50">
-                            <td className="p-3 font-semibold text-[#1F251A]">{s.name}</td>
-                            <td className="p-3 text-center text-gray-500">1</td>
-                            <td className="p-3 text-right text-gray-600">EGP {s.price.toLocaleString()}</td>
-                            <td className="p-3 text-right font-bold text-[#1F251A]">EGP {s.price.toLocaleString()}</td>
+                            <td className="p-3 font-semibold text-[#1F251A]">{item.name}</td>
+                            <td className="p-3 text-center text-gray-500">{item.qty}</td>
+                            <td className="p-3 text-right text-gray-600">EGP {item.unitPrice.toLocaleString()}</td>
+                            <td className="p-3 text-right font-bold text-[#1F251A]">EGP {item.total.toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -28025,7 +28096,7 @@ export default function AdminPage() {
                     Close
                   </button>
                   <button
-                    onClick={() => handlePrintInvoice(invoiceBooking, bookingServicesList, totalCost, walletUsed, branchName)}
+                    onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName)}
                     className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
