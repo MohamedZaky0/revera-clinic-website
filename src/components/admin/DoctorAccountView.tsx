@@ -34,7 +34,8 @@ import {
   Save,
   AlertTriangle,
   Zap,
-  ShoppingBag
+  ShoppingBag,
+  Users
 } from "lucide-react";
 
 interface DoctorAccountViewProps {
@@ -48,7 +49,7 @@ interface DoctorAccountViewProps {
   onSwitchToAdmin?: () => void;
 }
 
-type DoctorTab = "schedule" | "ongoing" | "settings";
+type DoctorTab = "schedule" | "ongoing" | "patients" | "settings";
 
 export default function DoctorAccountView({
   doctorDbId,
@@ -63,6 +64,7 @@ export default function DoctorAccountView({
   const [reservations, setReservations] = useState<any[]>(initialReservations);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [patientSearchQuery, setPatientSearchQuery] = useState("");
   const [branchList, setBranchList] = useState<any[]>(branches || []);
 
   useEffect(() => {
@@ -97,6 +99,68 @@ export default function DoctorAccountView({
     }
     return doctorBranch;
   }, [doctorBranch, branchList]);
+
+  // Derived Doctor Patients List from Reservations
+  const doctorPatientsList = useMemo(() => {
+    const patientMap = new Map<string, {
+      id: string;
+      name: string;
+      phone: string;
+      email: string;
+      totalVisits: number;
+      lastVisitDate: string;
+      recentServices: string[];
+      bookings: any[];
+    }>();
+
+    reservations.forEach((r) => {
+      const key = r.customer_id || r.customer_phone || r.phone || r.name || r.id;
+      if (!key) return;
+
+      const pName = r.name || r.customer_name || r.patient_name || "Patient";
+      const pPhone = r.phone || r.customer_phone || "N/A";
+      const pEmail = r.email || r.customer_email || "";
+      const serviceName = r.service_name || r.service || (Array.isArray(r.services) ? r.services.join(", ") : "Clinical Session");
+      const visitDate = r.date || "";
+
+      if (!patientMap.has(key)) {
+        patientMap.set(key, {
+          id: String(key),
+          name: pName,
+          phone: pPhone,
+          email: pEmail,
+          totalVisits: 1,
+          lastVisitDate: visitDate,
+          recentServices: [serviceName],
+          bookings: [r]
+        });
+      } else {
+        const existing = patientMap.get(key)!;
+        existing.totalVisits += 1;
+        existing.bookings.push(r);
+        if (serviceName && !existing.recentServices.includes(serviceName)) {
+          existing.recentServices.push(serviceName);
+        }
+        if (visitDate && visitDate > existing.lastVisitDate) {
+          existing.lastVisitDate = visitDate;
+        }
+      }
+    });
+
+    return Array.from(patientMap.values());
+  }, [reservations]);
+
+  const filteredPatients = useMemo(() => {
+    if (!patientSearchQuery.trim()) return doctorPatientsList;
+    const q = patientSearchQuery.toLowerCase();
+    return doctorPatientsList.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.phone.toLowerCase().includes(q) ||
+        p.email.toLowerCase().includes(q) ||
+        p.recentServices.some((s) => s.toLowerCase().includes(q))
+    );
+  }, [doctorPatientsList, patientSearchQuery]);
 
   // Date Selector State for Schedule (Yesterday, Today, Tomorrow, Custom Date)
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -621,7 +685,7 @@ export default function DoctorAccountView({
         {/* Top: Logo & Branding */}
         <div className="space-y-6">
           <div className="flex items-center gap-3 pb-5 border-b border-[#414E36]/10">
-            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-[#414E36] p-2 shadow-md">
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-white border border-[#414E36]/20 p-1.5 shadow-sm">
               <Image
                 src="/images/main_logo.png"
                 alt="Revera Clinics"
@@ -683,6 +747,26 @@ export default function DoctorAccountView({
                 {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
                   <span className="rounded-full bg-amber-400 h-2 w-2"></span>
                 )}
+              </span>
+            </button>
+
+            {/* Tab 3: Patients */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("patients")}
+              title="Patients"
+              className={`group relative flex w-full items-center gap-3.5 rounded-2xl px-4 py-3 text-xs font-bold transition-all duration-300 ${
+                activeTab === "patients"
+                  ? "bg-[#414E36] text-white shadow-md shadow-[#414E36]/25 translate-x-1"
+                  : "text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36] hover:translate-x-0.5"
+              }`}
+            >
+              <Users size={20} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
+              <span className="tracking-wide text-sm flex-1 text-left flex items-center justify-between">
+                Patients
+                <span className="rounded-full bg-[#414E36]/10 px-2 py-0.5 text-[10px] font-bold text-[#414E36] group-hover:bg-white/20 group-hover:text-white">
+                  {doctorPatientsList.length}
+                </span>
               </span>
             </button>
 
@@ -1339,7 +1423,139 @@ export default function DoctorAccountView({
           </div>
         )}
 
-        {/* ── TAB 3: SETTINGS VIEW (EMPTY FOR NOW) ── */}
+        {/* ── TAB 3: PATIENTS VIEW ── */}
+        {activeTab === "patients" && (
+          <div className="w-full space-y-6">
+            {/* Header & Search */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-[#1F251A]">My Patients Directory</h2>
+                <p className="text-xs text-[#5A6A51] mt-1">
+                  All patients assigned to your care across scheduled, active, and completed visits.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-3 text-[#5A6A51]" />
+                  <input
+                    type="text"
+                    placeholder="Search patient name, phone, or service..."
+                    value={patientSearchQuery}
+                    onChange={(e) => setPatientSearchQuery(e.target.value)}
+                    className="rounded-2xl border border-[#414E36]/15 bg-white pl-9 pr-4 py-2 text-xs text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] w-72 shadow-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#414E36]/10 text-[#414E36]">
+                  <Users size={22} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[#5A6A51]">Total Assigned Patients</p>
+                  <p className="text-xl font-extrabold text-[#1F251A] mt-0.5">{doctorPatientsList.length}</p>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                  <CheckCircle2 size={22} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[#5A6A51]">Completed Patient Visits</p>
+                  <p className="text-xl font-extrabold text-[#1F251A] mt-0.5">
+                    {reservations.filter(r => r.status === "completed").length}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+                  <Clock size={22} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-[#5A6A51]">Scheduled & Queue</p>
+                  <p className="text-xl font-extrabold text-[#1F251A] mt-0.5">
+                    {reservations.filter(r => r.status !== "completed" && r.status !== "cancelled").length}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Patients List Grid */}
+            {filteredPatients.length === 0 ? (
+              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-12 text-center text-[#5A6A51] space-y-3 shadow-sm">
+                <div className="h-14 w-14 mx-auto flex items-center justify-center rounded-2xl bg-[#414E36]/10 text-[#414E36]">
+                  <Users size={26} />
+                </div>
+                <h3 className="text-lg font-bold text-[#1F251A]">No Patients Found</h3>
+                <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
+                  {patientSearchQuery ? "No patients match your search term." : "No patients have been assigned to your schedule yet."}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredPatients.map((patient) => (
+                  <div key={patient.id} className="rounded-3xl border border-[#414E36]/12 bg-white p-5 shadow-sm hover:shadow-md hover:border-[#414E36]/30 transition-all flex flex-col justify-between space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#414E36] text-white font-extrabold text-sm shadow-sm">
+                            {patient.name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-bold text-[#1F251A] truncate">{patient.name}</h4>
+                            <p className="text-xs text-[#5A6A51] truncate">{patient.phone}</p>
+                          </div>
+                        </div>
+                        <span className="shrink-0 rounded-xl bg-[#414E36]/10 px-2.5 py-1 text-[10px] font-bold text-[#414E36]">
+                          {patient.totalVisits} {patient.totalVisits === 1 ? "Visit" : "Visits"}
+                        </span>
+                      </div>
+
+                      {/* Services */}
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#5A6A51]/70">Services Received</p>
+                        <div className="flex flex-wrap gap-1">
+                          {patient.recentServices.slice(0, 3).map((srv, idx) => (
+                            <span key={idx} className="rounded-lg bg-[#F4F5F1] px-2 py-0.5 text-[10px] font-semibold text-[#414E36] truncate max-w-[180px]">
+                              {srv}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer / Action */}
+                    <div className="pt-3 border-t border-[#414E36]/10 flex items-center justify-between text-xs">
+                      <span className="text-[11px] text-[#5A6A51]">
+                        Last: <strong>{patient.lastVisitDate || "N/A"}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (patient.bookings.length > 0) {
+                            handleOpenScheduleModal(patient.bookings[0]);
+                          }
+                        }}
+                        className="rounded-xl bg-[#414E36]/10 hover:bg-[#414E36] text-[#414E36] hover:text-white px-3 py-1.5 font-bold transition flex items-center gap-1 text-xs"
+                      >
+                        <span>View Details</span>
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── TAB 4: SETTINGS VIEW (EMPTY FOR NOW) ── */}
         {activeTab === "settings" && (
           <div className="w-full space-y-6">
             <div>
