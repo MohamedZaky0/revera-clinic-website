@@ -42,6 +42,7 @@ interface DoctorAccountViewProps {
   doctorName?: string;
   doctorEmail?: string;
   doctorBranch?: string;
+  branches?: any[];
   initialReservations?: any[];
   onLogout: () => void;
   onSwitchToAdmin?: () => void;
@@ -54,6 +55,7 @@ export default function DoctorAccountView({
   doctorName = "Doctor",
   doctorEmail = "doctor@revera.com",
   doctorBranch = "Main Branch",
+  branches = [],
   initialReservations = [],
   onLogout
 }: DoctorAccountViewProps) {
@@ -61,6 +63,40 @@ export default function DoctorAccountView({
   const [reservations, setReservations] = useState<any[]>(initialReservations);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [branchList, setBranchList] = useState<any[]>(branches || []);
+
+  useEffect(() => {
+    if (branches && branches.length > 0) {
+      setBranchList(branches);
+    } else {
+      fetch("/api/branches")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) setBranchList(data);
+          else if (data && Array.isArray(data.branches)) setBranchList(data.branches);
+        })
+        .catch(() => {});
+    }
+  }, [branches]);
+
+  const resolvedBranchName = useMemo(() => {
+    if (!doctorBranch) return "Main Branch";
+    const match = branchList.find(
+      (b) => b.id === doctorBranch || b.name_en === doctorBranch
+    );
+    if (match) return match.name_en || match.name || "Main Branch";
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      doctorBranch.trim()
+    );
+    if (isUuid) {
+      if (branchList.length > 0) {
+        return branchList[0].name_en || branchList[0].name || "Main Branch";
+      }
+      return "Main Branch";
+    }
+    return doctorBranch;
+  }, [doctorBranch, branchList]);
 
   // Date Selector State for Schedule (Yesterday, Today, Tomorrow, Custom Date)
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -591,15 +627,9 @@ export default function DoctorAccountView({
               />
             </div>
             <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#414E36]">
-                  Doctor Portal
-                </span>
-                <span className="inline-flex items-center rounded-md bg-[#414E36]/10 px-2 py-0.5 text-[10px] font-bold text-[#414E36]">
-                  <MapPin size={10} className="mr-1 inline" />
-                  {doctorBranch}
-                </span>
-              </div>
+              <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#414E36]">
+                Doctor Portal
+              </span>
               <h1 className="text-sm font-bold text-[#1F251A] truncate max-w-[160px]">{doctorName}</h1>
             </div>
           </div>
@@ -1321,7 +1351,7 @@ export default function DoctorAccountView({
                   <h3 className="text-lg font-bold text-[#1F251A]">{doctorName}</h3>
                   <p className="text-xs text-[#5A6A51]">{doctorEmail}</p>
                   <span className="mt-2 inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-bold text-[#414E36]">
-                    Assigned Branch: {doctorBranch}
+                    Assigned Branch: {resolvedBranchName}
                   </span>
                 </div>
               </div>
