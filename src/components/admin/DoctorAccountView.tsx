@@ -675,9 +675,9 @@ export default function DoctorAccountView({
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-x-hidden">
+    <div className="h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-hidden">
       {/* ── SIDEBAR NAVIGATION ── */}
-      <aside className="w-full md:w-64 lg:w-72 bg-white/90 backdrop-blur-xl border-b md:border-b-0 md:border-r border-[#414E36]/15 flex flex-col justify-between shrink-0 sticky top-0 z-40 md:h-screen p-5 shadow-sm">
+      <aside className="w-full md:w-64 lg:w-72 bg-white/90 backdrop-blur-xl border-b md:border-b-0 md:border-r border-[#414E36]/15 flex flex-col justify-between shrink-0 h-auto md:h-full p-5 shadow-sm overflow-y-auto">
         
         {/* Top: Logo & Branding */}
         <div className="space-y-6">
@@ -832,7 +832,7 @@ export default function DoctorAccountView({
       </aside>
 
       {/* ── MAIN CONTENT AREA ── */}
-      <main className="flex-1 w-full min-h-screen overflow-y-auto px-6 md:px-8 py-6 animate-fadeIn flex flex-col">
+      <main className="flex-1 w-full h-full overflow-y-auto px-6 md:px-8 py-6 animate-fadeIn flex flex-col">
         
         {/* ── TAB 1: SCHEDULE VIEW ── */}
         {activeTab === "schedule" && (
