@@ -160,6 +160,9 @@ export default function DoctorAccountView({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Doctor Profile Modal State
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
   // Auth headers helper for staff access verification
   const getAuthHeaders = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -702,17 +705,22 @@ export default function DoctorAccountView({
 
         {/* Bottom: Doctor Profile & Actions */}
         <div className="pt-4 border-t border-[#414E36]/10 space-y-3 mt-4 md:mt-0">
-          {/* Doctor Account Card */}
-          <div className="flex items-center gap-3 rounded-2xl border border-[#414E36]/15 bg-[#F9F9F7] p-2.5 shadow-sm">
-            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#414E36] text-white font-black text-xs shadow-md border-2 border-white">
+          {/* Doctor Account Card (Clickable to open Doctor Profile Modal) */}
+          <button
+            type="button"
+            onClick={() => setShowProfileModal(true)}
+            title="View Doctor Profile & Security Settings"
+            className="flex w-full items-center gap-3 rounded-2xl border border-[#414E36]/15 bg-[#F9F9F7] p-2.5 shadow-sm hover:bg-white hover:border-[#414E36]/30 transition-all text-left group cursor-pointer"
+          >
+            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#414E36] text-white font-black text-xs shadow-md border-2 border-white group-hover:scale-105 transition-transform">
               {(doctorName.replace(/^Dr\.?\s*/i, '') || "D").slice(0, 2).toUpperCase()}
               <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
             </div>
             <div className="text-left min-w-0 flex-1">
-              <p className="text-xs font-black text-[#1F251A] tracking-tight leading-tight truncate">{doctorName}</p>
+              <p className="text-xs font-black text-[#1F251A] tracking-tight leading-tight truncate group-hover:text-[#414E36]">{doctorName}</p>
               <p className="text-[10px] font-semibold text-[#5A6A51] leading-none mt-0.5 truncate">{doctorEmail}</p>
             </div>
-          </div>
+          </button>
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
@@ -1331,76 +1339,24 @@ export default function DoctorAccountView({
           </div>
         )}
 
-        {/* ── TAB 3: SETTINGS VIEW ── */}
+        {/* ── TAB 3: SETTINGS VIEW (EMPTY FOR NOW) ── */}
         {activeTab === "settings" && (
           <div className="w-full space-y-6">
             <div>
-              <h2 className="text-2xl font-bold text-[#1F251A]">Doctor Profile & Security Settings</h2>
+              <h2 className="text-2xl font-bold text-[#1F251A]">Settings</h2>
               <p className="text-xs text-[#5A6A51] mt-1">
-                Manage your credentials, branch details, and security options.
+                Portal settings and system preferences.
               </p>
             </div>
 
-            {/* Profile Card */}
-            <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm flex items-center justify-between gap-4 w-full">
-              <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#414E36] text-white font-extrabold text-xl shadow-md">
-                  Dr
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-[#1F251A]">{doctorName}</h3>
-                  <p className="text-xs text-[#5A6A51]">{doctorEmail}</p>
-                  <span className="mt-2 inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-bold text-[#414E36]">
-                    Assigned Branch: {resolvedBranchName}
-                  </span>
-                </div>
+            <div className="rounded-3xl border border-[#414E36]/10 bg-white p-16 text-center text-[#5A6A51] space-y-3 shadow-sm">
+              <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-2xl bg-[#414E36]/10 text-[#414E36]">
+                <Settings size={28} />
               </div>
-            </div>
-
-            {/* Password Update Form */}
-            <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4 w-full">
-              <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                <Lock size={16} className="text-[#414E36]" /> Security & Account Password
-              </h3>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#5A6A51] mb-1">New Password</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#5A6A51] mb-1">Confirm Password</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm new password"
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!newPassword || newPassword !== confirmPassword) {
-                    alert("Passwords do not match or are empty.");
-                    return;
-                  }
-                  alert("Password updated successfully!");
-                  setNewPassword("");
-                  setConfirmPassword("");
-                }}
-                className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition"
-              >
-                Update Password
-              </button>
+              <h3 className="text-lg font-bold text-[#1F251A]">No Settings Available</h3>
+              <p className="text-xs text-[#5A6A51] max-w-sm mx-auto leading-relaxed">
+                Settings options will be added here in future updates.
+              </p>
             </div>
           </div>
         )}
@@ -1708,6 +1664,98 @@ export default function DoctorAccountView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── DOCTOR PROFILE & SECURITY SETTINGS MODAL ── */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-6 border border-[#414E36]/10">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-[#1F251A]">Doctor Profile & Security Settings</h2>
+                <p className="text-xs text-[#5A6A51] mt-0.5">Manage your credentials, branch details, and security options.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowProfileModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F4F5F1] text-[#5A6A51] hover:bg-rose-50 hover:text-rose-600 transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Profile Info Card */}
+            <div className="rounded-2xl border border-[#414E36]/10 bg-[#F9F9F7] p-5 flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#414E36] text-white font-extrabold text-lg shadow-md shrink-0">
+                {(doctorName.replace(/^Dr\.?\s*/i, '') || "D").slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-bold text-[#1F251A] truncate">{doctorName}</h3>
+                <p className="text-xs text-[#5A6A51] truncate">{doctorEmail}</p>
+                <span className="mt-2 inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-bold text-[#414E36]">
+                  Assigned Branch: {resolvedBranchName}
+                </span>
+              </div>
+            </div>
+
+            {/* Password Update Section */}
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                <Lock size={15} className="text-[#414E36]" /> Security & Account Password
+              </h3>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#5A6A51] mb-1">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#5A6A51] mb-1">Confirm Password</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowProfileModal(false)}
+                    className="rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-xs font-bold text-[#5A6A51] hover:bg-[#F4F5F1] transition"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newPassword || newPassword !== confirmPassword) {
+                        alert("Passwords do not match or are empty.");
+                        return;
+                      }
+                      alert("Password updated successfully!");
+                      setNewPassword("");
+                      setConfirmPassword("");
+                      setShowProfileModal(false);
+                    }}
+                    className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition"
+                  >
+                    Update Password
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
