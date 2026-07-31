@@ -575,13 +575,13 @@ export default function DoctorAccountView({
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col">
-      {/* ── TOP HEADER & FLOATING NAVIGATION BAR ── */}
-      <header className="sticky top-0 z-50 w-full bg-[#F4F5F1]/90 backdrop-blur-md px-8 py-4 transition-all border-b border-[#414E36]/10 shadow-sm">
-        <div className="w-full flex items-center justify-between gap-4">
-          
-          {/* Left: Brand Logo & Doctor Badge */}
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-x-hidden">
+      {/* ── SIDEBAR NAVIGATION ── */}
+      <aside className="w-full md:w-64 lg:w-72 bg-white/90 backdrop-blur-xl border-b md:border-b-0 md:border-r border-[#414E36]/15 flex flex-col justify-between shrink-0 sticky top-0 z-40 md:h-screen p-5 shadow-sm">
+        
+        {/* Top: Logo & Branding */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 pb-5 border-b border-[#414E36]/10">
             <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-[#414E36] p-2 shadow-md">
               <Image
                 src="/images/main_logo.png"
@@ -590,9 +590,9 @@ export default function DoctorAccountView({
                 style={{ objectFit: "contain", padding: "2px" }}
               />
             </div>
-            <div className="hidden sm:flex flex-col">
+            <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-extrabold uppercase tracking-widest text-[#414E36]">
+                <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#414E36]">
                   Doctor Portal
                 </span>
                 <span className="inline-flex items-center rounded-md bg-[#414E36]/10 px-2 py-0.5 text-[10px] font-bold text-[#414E36]">
@@ -600,117 +600,116 @@ export default function DoctorAccountView({
                   {doctorBranch}
                 </span>
               </div>
-              <h1 className="text-sm font-bold text-[#1F251A]">{doctorName}</h1>
+              <h1 className="text-sm font-bold text-[#1F251A] truncate max-w-[160px]">{doctorName}</h1>
             </div>
           </div>
 
-          {/* ── CENTER FLOATING NAV BAR ── */}
-          <nav className="flex items-center justify-center">
-            <div className="flex items-center gap-1.5 rounded-full border border-[#414E36]/20 bg-white/95 p-1.5 shadow-[0_12px_40px_rgba(65,78,54,0.1)] backdrop-blur-2xl transition-all duration-300 hover:border-[#414E36]/40 hover:shadow-[0_16px_50px_rgba(65,78,54,0.16)]">
-              
-              {/* Tab 1: Schedule */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("schedule")}
-                title="Schedule"
-                className={`group relative flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
-                  activeTab === "schedule"
-                    ? "bg-[#414E36] px-5 py-2.5 text-white shadow-md shadow-[#414E36]/30 font-bold text-xs gap-2"
-                    : "px-3.5 py-2.5 text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
-                }`}
-              >
-                <CalendarDays size={18} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
-                {activeTab === "schedule" && (
-                  <span className="animate-fadeIn whitespace-nowrap tracking-wide">Schedule</span>
-                )}
-              </button>
+          {/* Navigation Links */}
+          <nav className="space-y-1.5">
+            <p className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-[#5A6A51]/70 mb-2">
+              Menu
+            </p>
 
-              {/* Tab 2: Ongoing Session */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("ongoing")}
-                title="Ongoing Session"
-                className={`group relative flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
-                  activeTab === "ongoing"
-                    ? "bg-[#414E36] px-5 py-2.5 text-white shadow-md shadow-[#414E36]/30 font-bold text-xs gap-2"
-                    : "px-3.5 py-2.5 text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
-                }`}
-              >
-                <Stethoscope size={18} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
+            {/* Tab 1: Schedule */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("schedule")}
+              title="Schedule"
+              className={`group relative flex w-full items-center gap-3.5 rounded-2xl px-4 py-3 text-xs font-bold transition-all duration-300 ${
+                activeTab === "schedule"
+                  ? "bg-[#414E36] text-white shadow-md shadow-[#414E36]/25 translate-x-1"
+                  : "text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36] hover:translate-x-0.5"
+              }`}
+            >
+              <CalendarDays size={20} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
+              <span className="tracking-wide text-sm">Schedule</span>
+            </button>
+
+            {/* Tab 2: Ongoing Session */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("ongoing")}
+              title="Ongoing Session"
+              className={`group relative flex w-full items-center gap-3.5 rounded-2xl px-4 py-3 text-xs font-bold transition-all duration-300 ${
+                activeTab === "ongoing"
+                  ? "bg-[#414E36] text-white shadow-md shadow-[#414E36]/25 translate-x-1"
+                  : "text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36] hover:translate-x-0.5"
+              }`}
+            >
+              <div className="relative">
+                <Stethoscope size={20} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
                 {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
-                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
                   </span>
                 )}
-                {activeTab === "ongoing" && (
-                  <span className="animate-fadeIn whitespace-nowrap tracking-wide flex items-center gap-1">
-                    Ongoing Session
-                    {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
-                      <span className="rounded-full bg-amber-400 h-2 w-2"></span>
-                    )}
-                  </span>
+              </div>
+              <span className="tracking-wide text-sm flex-1 text-left flex items-center justify-between">
+                Ongoing Session
+                {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
+                  <span className="rounded-full bg-amber-400 h-2 w-2"></span>
                 )}
-              </button>
+              </span>
+            </button>
 
-              {/* Tab 3: Settings */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("settings")}
-                title="Settings"
-                className={`group relative flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
-                  activeTab === "settings"
-                    ? "bg-[#414E36] px-5 py-2.5 text-white shadow-md shadow-[#414E36]/30 font-bold text-xs gap-2"
-                    : "px-3.5 py-2.5 text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
-                }`}
-              >
-                <Settings size={18} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
-                {activeTab === "settings" && (
-                  <span className="animate-fadeIn whitespace-nowrap tracking-wide">Settings</span>
-                )}
-              </button>
-
-            </div>
+            {/* Tab 3: Settings */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("settings")}
+              title="Settings"
+              className={`group relative flex w-full items-center gap-3.5 rounded-2xl px-4 py-3 text-xs font-bold transition-all duration-300 ${
+                activeTab === "settings"
+                  ? "bg-[#414E36] text-white shadow-md shadow-[#414E36]/25 translate-x-1"
+                  : "text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36] hover:translate-x-0.5"
+              }`}
+            >
+              <Settings size={20} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
+              <span className="tracking-wide text-sm">Settings</span>
+            </button>
           </nav>
+        </div>
 
-          {/* Right: Refined Doctor Profile Box & Logout */}
-          <div className="flex items-center gap-3">
+        {/* Bottom: Doctor Profile & Actions */}
+        <div className="pt-4 border-t border-[#414E36]/10 space-y-3 mt-4 md:mt-0">
+          {/* Doctor Account Card */}
+          <div className="flex items-center gap-3 rounded-2xl border border-[#414E36]/15 bg-[#F9F9F7] p-2.5 shadow-sm">
+            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#414E36] text-white font-black text-xs shadow-md border-2 border-white">
+              {(doctorName.replace(/^Dr\.?\s*/i, '') || "D").slice(0, 2).toUpperCase()}
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
+            </div>
+            <div className="text-left min-w-0 flex-1">
+              <p className="text-xs font-black text-[#1F251A] tracking-tight leading-tight truncate">{doctorName}</p>
+              <p className="text-[10px] font-semibold text-[#5A6A51] leading-none mt-0.5 truncate">{doctorEmail}</p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={fetchDoctorReservations}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
+              className="flex-1 flex items-center justify-center gap-2 h-9 rounded-xl border border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm text-xs font-semibold"
               title="Refresh Schedule"
             >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              <span>Refresh</span>
             </button>
-
-            {/* Premium Doctor Account Profile Box */}
-            <div className="flex items-center gap-3 rounded-full border border-[#414E36]/20 bg-white/95 px-4 py-1.5 shadow-[0_4px_20px_rgba(65,78,54,0.06)] backdrop-blur-md hover:border-[#414E36]/40 transition-all">
-              <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[#414E36] text-white font-black text-xs shadow-md border-2 border-white">
-                {(doctorName.replace(/^Dr\.?\s*/i, '') || "D").slice(0, 2).toUpperCase()}
-                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
-              </div>
-              <div className="text-left hidden md:block">
-                <p className="text-xs font-black text-[#1F251A] tracking-tight leading-tight">{doctorName}</p>
-                <p className="text-[10px] font-semibold text-[#5A6A51] leading-none mt-0.5">{doctorEmail}</p>
-              </div>
-            </div>
 
             <button
               type="button"
               onClick={onLogout}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50/60 text-rose-700 hover:bg-rose-100 hover:text-rose-800 transition shadow-sm"
+              className="flex h-9 w-9 items-center justify-center shrink-0 rounded-xl border border-rose-200 bg-rose-50/60 text-rose-700 hover:bg-rose-100 hover:text-rose-800 transition shadow-sm"
               title="Sign Out"
             >
-              <LogOut size={16} />
+              <LogOut size={15} />
             </button>
           </div>
-
         </div>
-      </header>
+      </aside>
 
-      {/* ── MAIN CONTENT AREA (FULL SCREEN WIDTH) ── */}
-      <main className="flex-1 w-full px-8 py-6 animate-fadeIn flex flex-col">
+      {/* ── MAIN CONTENT AREA ── */}
+      <main className="flex-1 w-full min-h-screen overflow-y-auto px-6 md:px-8 py-6 animate-fadeIn flex flex-col">
         
         {/* ── TAB 1: SCHEDULE VIEW ── */}
         {activeTab === "schedule" && (
