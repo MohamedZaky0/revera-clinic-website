@@ -3470,7 +3470,8 @@ export default function AdminPage() {
     { id: 'TC-022', name: 'Terms & Conditions Policy Config', category: 'System & Settings', endpoint: '/api/terms', description: 'Verifies deposit terms, cancellation policies, and clinic terms.', status: 'idle' },
     { id: 'TC-023', name: 'HR Missing Check-in Warning Alerts', category: 'HR & Payroll', endpoint: '/api/hr/alerts', description: 'Tests missing clock-in detection and automated HR warning alerts.', status: 'idle' },
     { id: 'TC-024', name: 'Customer Balances & Ledger Reconciliation', category: 'Medical & Patients', endpoint: '/api/customers/reconcile', description: 'Reconciles stored customer scalar balances against ledger transaction history.', status: 'idle' },
-    { id: 'TC-025', name: 'Booking Products & Consumables Invoice Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies attached products & session consumables price recalculation and session left updates.', status: 'idle' }
+    { id: 'TC-025', name: 'Booking Products & Consumables Invoice Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies attached products & session consumables price recalculation and session left updates.', status: 'idle' },
+    { id: 'TC-026', name: 'Doctor Schedule & Calendar View Data Pipeline', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies doctor schedule reservations data pipeline and month/day calendar timeline structure.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
