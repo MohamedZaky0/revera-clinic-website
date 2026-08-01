@@ -3473,7 +3473,8 @@ export default function AdminPage() {
     { id: 'TC-025', name: 'Booking Products & Consumables Invoice Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies attached products & session consumables price recalculation and session left updates.', status: 'idle' },
     { id: 'TC-026', name: 'Doctor Schedule & Calendar View Data Pipeline', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies doctor schedule reservations data pipeline and month/day calendar timeline structure.', status: 'idle' },
     { id: 'TC-027', name: 'Doctor Portal Bilingual & RTL Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Doctor Portal English View and Arabic View toggle, localized dictionary copy, and RTL layout engine.', status: 'idle' },
-    { id: 'TC-028', name: 'Doctor Portal Right Session Drawer & Notes Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Right Slide-Over Session Drawer, clean doctor-written notes isolation, and structured payment/consumables callout cards.', status: 'idle' }
+    { id: 'TC-028', name: 'Doctor Portal Right Session Drawer & Notes Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Right Slide-Over Session Drawer, clean doctor-written notes isolation, and structured payment/consumables callout cards.', status: 'idle' },
+    { id: 'TC-029', name: 'Doctor Portal Patient Full Visit History Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Patient Full Visit History Right Drawer, listing all historical visits, dates, services, and doctor clinical notes.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
