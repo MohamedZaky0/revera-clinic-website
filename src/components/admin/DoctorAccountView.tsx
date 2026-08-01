@@ -665,14 +665,55 @@ export default function DoctorAccountView({
     }
   };
 
-  // Statistics derived dynamically for the selected date
-  const stats = useMemo(() => {
+  // Statistics derived dynamically for the selected date (Queue List View)
+  const dayStats = useMemo(() => {
     const total = selectedDateReservations.length;
     const completed = selectedDateReservations.filter((r) => r.status === "completed" || r.status === "done").length;
     const inProgress = selectedDateReservations.filter((r) => r.status === "started" || r.status === "in-progress").length;
     const upcoming = selectedDateReservations.filter((r) => ["pending", "approved", "confirmed"].includes(r.status)).length;
     return { total, completed, inProgress, upcoming };
   }, [selectedDateReservations]);
+
+  // Statistics derived dynamically for the full active calendar month (Calendar View)
+  const monthStats = useMemo(() => {
+    const targetYear = calendarMonth.getFullYear();
+    const targetMonth = calendarMonth.getMonth();
+    const q = searchQuery.trim().toLowerCase();
+
+    const monthReservations = reservations.filter((r) => {
+      const resDate = r.date ? String(r.date).slice(0, 10) : "";
+      if (!resDate) return false;
+      const parts = resDate.split("-");
+      if (parts.length < 3) return false;
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      if (y !== targetYear || m !== targetMonth) return false;
+
+      if (r.doctor && doctorName && r.doctor.toLowerCase() !== doctorName.toLowerCase()) {
+        if (r.doctor.trim() && r.doctor.toLowerCase() !== "doctor" && r.doctor.toLowerCase() !== "any") {
+          return false;
+        }
+      }
+
+      if (q) {
+        const match =
+          (r.name || r.customer_name || "").toLowerCase().includes(q) ||
+          (r.service || r.service_name || "").toLowerCase().includes(q) ||
+          (r.phone || "").includes(q);
+        if (!match) return false;
+      }
+
+      return true;
+    });
+
+    const total = monthReservations.length;
+    const completed = monthReservations.filter((r) => r.status === "completed" || r.status === "done").length;
+    const inProgress = monthReservations.filter((r) => r.status === "started" || r.status === "in-progress").length;
+    const upcoming = monthReservations.filter((r) => ["pending", "approved", "confirmed"].includes(r.status)).length;
+    return { total, completed, inProgress, upcoming };
+  }, [reservations, calendarMonth, doctorName, searchQuery]);
+
+  const stats = scheduleViewMode === "calendar" ? monthStats : dayStats;
 
   // Filtered schedule by search query
   const filteredSchedule = useMemo(() => {
@@ -1081,19 +1122,27 @@ export default function DoctorAccountView({
             {/* Quick Dynamic Stats Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Total Scheduled</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">
+                  {scheduleViewMode === "calendar" ? `Total Scheduled (${calendarMonth.toLocaleDateString("en-US", { month: "short" })})` : "Total Scheduled"}
+                </span>
                 <div className="mt-2 text-3xl font-extrabold text-[#1F251A]">{stats.total} Patients</div>
               </div>
               <div className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Completed</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                  {scheduleViewMode === "calendar" ? `Completed (${calendarMonth.toLocaleDateString("en-US", { month: "short" })})` : "Completed"}
+                </span>
                 <div className="mt-2 text-3xl font-extrabold text-emerald-800">{stats.completed} Sessions</div>
               </div>
               <div className="rounded-3xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-700">In Treatment</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
+                  {scheduleViewMode === "calendar" ? `In Treatment (${calendarMonth.toLocaleDateString("en-US", { month: "short" })})` : "In Treatment"}
+                </span>
                 <div className="mt-2 text-3xl font-extrabold text-amber-800">{stats.inProgress} Active</div>
               </div>
               <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Upcoming Queue</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                  {scheduleViewMode === "calendar" ? `Upcoming (${calendarMonth.toLocaleDateString("en-US", { month: "short" })})` : "Upcoming Queue"}
+                </span>
                 <div className="mt-2 text-3xl font-extrabold text-slate-700">{stats.upcoming} Waiting</div>
               </div>
             </div>
