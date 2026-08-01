@@ -60,6 +60,127 @@ interface DoctorAccountViewProps {
 
 type DoctorTab = "schedule" | "ongoing" | "patients" | "analytics" | "settings" | "profile";
 
+const doctorTranslations = {
+  en: {
+    portalTitle: "Doctor Portal",
+    menu: "Menu",
+    schedule: "Schedule",
+    ongoingSession: "Ongoing Session",
+    patients: "Patients",
+    analytics: "Analytics",
+    settings: "Settings",
+    refresh: "Refresh",
+    signOut: "Sign Out",
+    todayAppointmentsTitle: "Today's Appointments & Patient Queue",
+    yesterdayAppointmentsTitle: "Yesterday's Appointments & History",
+    tomorrowAppointmentsTitle: "Tomorrow's Upcoming Appointments",
+    customDateAppointmentsTitle: "Appointments for",
+    scheduleSubtitle: "Structured shift schedule, patient arrivals, and completed treatment history.",
+    searchPlaceholder: "Search patient or service...",
+    calendarViewBtn: "Calendar View",
+    queueListViewBtn: "Queue List View",
+    yesterdayBtn: "Yesterday",
+    todayBtn: "Today",
+    tomorrowBtn: "Tomorrow",
+    jumpToDateLabel: "Jump to Date:",
+    totalScheduledCard: "Total Scheduled",
+    completedCard: "Completed",
+    inTreatmentCard: "In Treatment",
+    upcomingQueueCard: "Upcoming Queue",
+    patientsUnit: "Patients",
+    sessionsUnit: "Sessions",
+    activeUnit: "Active",
+    waitingUnit: "Waiting",
+    monthLabel: "Month",
+    weekdaySun: "Sun",
+    weekdayMon: "Mon",
+    weekdayTue: "Tue",
+    weekdayWed: "Wed",
+    weekdayThu: "Thu",
+    weekdayFri: "Fri",
+    weekdaySat: "Sat",
+    dayTimelineHeader: "Day Schedule Timeline —",
+    patientAppointmentsScheduled: "patient appointments scheduled for this date.",
+    noAppointmentsFor: "No Appointments for",
+    noAppointmentsDesc: "There are no patient bookings scheduled on this date. Select another day on the calendar or jump to Today.",
+    jumpToTodayBtn: "Jump to Today",
+    timeSlotHeader: "Time Slot",
+    patientNameHeader: "Patient Name",
+    requestedServiceHeader: "Requested Service",
+    roomLocationHeader: "Room / Location",
+    statusHeader: "Status",
+    actionHeader: "Action",
+    completedStatus: "Completed",
+    inSessionStatus: "In Session",
+    arrivedStatus: "Arrived",
+    detailsBtn: "Details",
+    infoBtn: "Info",
+    noAppointmentsTableTitle: "No appointments scheduled for",
+    noAppointmentsTableDesc: "All patient bookings for this date will appear here automatically.",
+    englishViewBtn: "English View",
+    arabicViewBtn: "العرض بالعربية"
+  },
+  ar: {
+    portalTitle: "بوابة الطبيب",
+    menu: "القائمة الرئيسية",
+    schedule: "جدول المواعيد",
+    ongoingSession: "الجلسة الحالية",
+    patients: "سجل المرضى",
+    analytics: "التحليلات والماليات",
+    settings: "الإعدادات",
+    refresh: "تحديث",
+    signOut: "تسجيل الخروج",
+    todayAppointmentsTitle: "مواعيد اليوم وقائمة الانتظار",
+    yesterdayAppointmentsTitle: "مواعيد الأمس والسجل السابق",
+    tomorrowAppointmentsTitle: "المواعيد القادمة لغداً",
+    customDateAppointmentsTitle: "مواعيد يوم",
+    scheduleSubtitle: "جدول ورديات العمل، وصول المرضى، وسجل الجلسات المكتملة.",
+    searchPlaceholder: "البحث عن مريض أو خدمة...",
+    calendarViewBtn: "عرض التقويم",
+    queueListViewBtn: "عرض القائمة",
+    yesterdayBtn: "الأمس",
+    todayBtn: "اليوم",
+    tomorrowBtn: "الغد",
+    jumpToDateLabel: "الانتقال إلى تاريخ:",
+    totalScheduledCard: "إجمالي المواعيد",
+    completedCard: "المكتملة",
+    inTreatmentCard: "قيد العلاج",
+    upcomingQueueCard: "قائمة الانتظار",
+    patientsUnit: "مرضى",
+    sessionsUnit: "جلسات",
+    activeUnit: "نشطة",
+    waitingUnit: "في الانتظار",
+    monthLabel: "شهر",
+    weekdaySun: "الأحد",
+    weekdayMon: "الإثنين",
+    weekdayTue: "الثلاثاء",
+    weekdayWed: "الأربعاء",
+    weekdayThu: "الخميس",
+    weekdayFri: "الجمعة",
+    weekdaySat: "السبت",
+    dayTimelineHeader: "الجدول الزمني لليوم —",
+    patientAppointmentsScheduled: "مواعيد مرضى مسجلة لهذا التاريخ.",
+    noAppointmentsFor: "لا توجد مواعيد لـ",
+    noAppointmentsDesc: "لا توجد حجوزات مرضى مجدولة في هذا التاريخ. اختر يوماً آخر من التقويم أو عد إلى اليوم.",
+    jumpToTodayBtn: "العودة لليوم",
+    timeSlotHeader: "وقت الموعد",
+    patientNameHeader: "اسم المريض",
+    requestedServiceHeader: "الخدمة المطلوبة",
+    roomLocationHeader: "الغرفة / الموقع",
+    statusHeader: "الحالة",
+    actionHeader: "الإجراء",
+    completedStatus: "مكتملة",
+    inSessionStatus: "في الجلسة",
+    arrivedStatus: "وصل المركز",
+    detailsBtn: "التفاصيل",
+    infoBtn: "التفاصيل",
+    noAppointmentsTableTitle: "لا توجد مواعيد مجدولة لـ",
+    noAppointmentsTableDesc: "جميع حجوزات المرضى لهذا التاريخ ستظهر هنا تلقائياً.",
+    englishViewBtn: "English View",
+    arabicViewBtn: "العرض بالعربية"
+  }
+};
+
 export default function DoctorAccountView({
   doctorDbId,
   doctorName = "Doctor",
@@ -69,6 +190,8 @@ export default function DoctorAccountView({
   initialReservations = [],
   onLogout
 }: DoctorAccountViewProps) {
+  const [lang, setLang] = useState<"en" | "ar">("en");
+  const t = doctorTranslations[lang];
   const [activeTab, setActiveTab] = useState<DoctorTab>("schedule");
   const [scheduleViewMode, setScheduleViewMode] = useState<"calendar" | "list">("calendar");
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
@@ -890,7 +1013,7 @@ export default function DoctorAccountView({
   };
 
   return (
-    <div className="h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-hidden">
+    <div className="h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
       {/* ── SIDEBAR NAVIGATION ── */}
       <aside className="w-full md:w-64 lg:w-72 bg-white/90 backdrop-blur-xl border-b md:border-b-0 md:border-r border-[#414E36]/15 flex flex-col justify-between shrink-0 h-auto md:h-full p-5 shadow-sm overflow-y-auto">
         
@@ -907,7 +1030,7 @@ export default function DoctorAccountView({
             </div>
             <div className="flex flex-col">
               <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#414E36]">
-                Doctor Portal
+                {t.portalTitle}
               </span>
               <h1 className="text-sm font-bold text-[#1F251A] truncate max-w-[160px]">{doctorName}</h1>
             </div>
@@ -916,14 +1039,14 @@ export default function DoctorAccountView({
           {/* Navigation Links */}
           <nav className="space-y-1.5">
             <p className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-[#5A6A51]/70 mb-2">
-              Menu
+              {t.menu}
             </p>
 
             {/* Tab 1: Schedule */}
             <button
               type="button"
               onClick={() => setActiveTab("schedule")}
-              title="Schedule"
+              title={t.schedule}
               className={`group relative flex w-full items-center gap-3.5 rounded-2xl px-4 py-3 text-xs font-bold transition-all duration-300 ${
                 activeTab === "schedule"
                   ? "bg-[#414E36] text-white shadow-md shadow-[#414E36]/25 translate-x-1"
@@ -931,14 +1054,14 @@ export default function DoctorAccountView({
               }`}
             >
               <CalendarDays size={20} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
-              <span className="tracking-wide text-sm">Schedule</span>
+              <span className="tracking-wide text-sm">{t.schedule}</span>
             </button>
 
             {/* Tab 2: Ongoing Session */}
             <button
               type="button"
               onClick={() => setActiveTab("ongoing")}
-              title="Ongoing Session"
+              title={t.ongoingSession}
               className={`group relative flex w-full items-center gap-3.5 rounded-2xl px-4 py-3 text-xs font-bold transition-all duration-300 ${
                 activeTab === "ongoing"
                   ? "bg-[#414E36] text-white shadow-md shadow-[#414E36]/25 translate-x-1"
@@ -955,7 +1078,7 @@ export default function DoctorAccountView({
                 )}
               </div>
               <span className="tracking-wide text-sm flex-1 text-left flex items-center justify-between">
-                Ongoing Session
+                {t.ongoingSession}
                 {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
                   <span className="rounded-full bg-amber-400 h-2 w-2"></span>
                 )}
@@ -966,7 +1089,7 @@ export default function DoctorAccountView({
             <button
               type="button"
               onClick={() => setActiveTab("patients")}
-              title="Patients"
+              title={t.patients}
               className={`group relative flex w-full items-center gap-3.5 rounded-2xl px-4 py-3 text-xs font-bold transition-all duration-300 ${
                 activeTab === "patients"
                   ? "bg-[#414E36] text-white shadow-md shadow-[#414E36]/25 translate-x-1"
@@ -975,7 +1098,7 @@ export default function DoctorAccountView({
             >
               <Users size={20} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
               <span className="tracking-wide text-sm flex-1 text-left flex items-center justify-between">
-                Patients
+                {t.patients}
                 <span className="rounded-full bg-[#414E36]/10 px-2 py-0.5 text-[10px] font-bold text-[#414E36] group-hover:bg-white/20 group-hover:text-white">
                   {doctorPatientsList.length}
                 </span>
@@ -986,7 +1109,7 @@ export default function DoctorAccountView({
             <button
               type="button"
               onClick={() => setActiveTab("analytics")}
-              title="Analytics & Financial Details"
+              title={t.analytics}
               className={`group relative flex w-full items-center gap-3.5 rounded-2xl px-4 py-3 text-xs font-bold transition-all duration-300 ${
                 activeTab === "analytics"
                   ? "bg-[#414E36] text-white shadow-md shadow-[#414E36]/25 translate-x-1"
@@ -994,14 +1117,14 @@ export default function DoctorAccountView({
               }`}
             >
               <BarChart3 size={20} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
-              <span className="tracking-wide text-sm">Analytics</span>
+              <span className="tracking-wide text-sm">{t.analytics}</span>
             </button>
 
             {/* Tab 3: Settings */}
             <button
               type="button"
               onClick={() => setActiveTab("settings")}
-              title="Settings"
+              title={t.settings}
               className={`group relative flex w-full items-center gap-3.5 rounded-2xl px-4 py-3 text-xs font-bold transition-all duration-300 ${
                 activeTab === "settings"
                   ? "bg-[#414E36] text-white shadow-md shadow-[#414E36]/25 translate-x-1"
@@ -1009,14 +1132,14 @@ export default function DoctorAccountView({
               }`}
             >
               <Settings size={20} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
-              <span className="tracking-wide text-sm">Settings</span>
+              <span className="tracking-wide text-sm">{t.settings}</span>
             </button>
           </nav>
         </div>
 
         {/* Bottom: Doctor Profile & Actions */}
         <div className="pt-4 border-t border-[#414E36]/10 space-y-3 mt-4 md:mt-0">
-          {/* Doctor Account Card (Clickable to switch to Profile view) */}
+          {/* Doctor Account Card */}
           <button
             type="button"
             onClick={() => setActiveTab("profile")}
@@ -1043,17 +1166,17 @@ export default function DoctorAccountView({
               type="button"
               onClick={fetchDoctorReservations}
               className="flex-1 flex items-center justify-center gap-2 h-9 rounded-xl border border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm text-xs font-semibold"
-              title="Refresh Schedule"
+              title={t.refresh}
             >
               <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              <span>Refresh</span>
+              <span>{t.refresh}</span>
             </button>
 
             <button
               type="button"
               onClick={onLogout}
               className="flex h-9 w-9 items-center justify-center shrink-0 rounded-xl border border-rose-200 bg-rose-50/60 text-rose-700 hover:bg-rose-100 hover:text-rose-800 transition shadow-sm"
-              title="Sign Out"
+              title={t.signOut}
             >
               <LogOut size={15} />
             </button>
@@ -1073,19 +1196,45 @@ export default function DoctorAccountView({
               <div>
                 <h2 className="text-2xl font-bold text-[#1F251A]">
                   {selectedDateStr === todayStr
-                    ? "Today's Appointments & Patient Queue"
+                    ? t.todayAppointmentsTitle
                     : selectedDateStr === yesterdayStr
-                    ? "Yesterday's Appointments & History"
+                    ? t.yesterdayAppointmentsTitle
                     : selectedDateStr === tomorrowStr
-                    ? "Tomorrow's Upcoming Appointments"
-                    : `Appointments for ${selectedDateStr}`}
+                    ? t.tomorrowAppointmentsTitle
+                    : `${t.customDateAppointmentsTitle} ${selectedDateStr}`}
                 </h2>
                 <p className="text-xs text-[#5A6A51] mt-1">
-                  Structured shift schedule, patient arrivals, and completed treatment history.
+                  {t.scheduleSubtitle}
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
+                {/* LANGUAGE SWITCHER BUTTONS (English View / العرض بالعربية) */}
+                <div className="flex items-center rounded-2xl bg-white p-1 border border-[#414E36]/15 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setLang("en")}
+                    className={`px-3.5 py-2 text-xs font-bold rounded-xl transition ${
+                      lang === "en"
+                        ? "bg-[#414E36] text-white shadow-sm"
+                        : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F4F5F1]"
+                    }`}
+                  >
+                    {t.englishViewBtn}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLang("ar")}
+                    className={`px-3.5 py-2 text-xs font-bold rounded-xl transition ${
+                      lang === "ar"
+                        ? "bg-[#414E36] text-white shadow-sm"
+                        : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F4F5F1]"
+                    }`}
+                  >
+                    {t.arabicViewBtn}
+                  </button>
+                </div>
+
                 {/* VIEW MODE TOGGLE SWITCHER (Primary: Calendar, Secondary: Queue List) */}
                 <div className="flex items-center rounded-2xl bg-white p-1 border border-[#414E36]/15 shadow-sm">
                   <button
@@ -1098,7 +1247,7 @@ export default function DoctorAccountView({
                     }`}
                   >
                     <Calendar size={14} />
-                    <span>Calendar View</span>
+                    <span>{t.calendarViewBtn}</span>
                   </button>
 
                   <button
@@ -1111,7 +1260,7 @@ export default function DoctorAccountView({
                     }`}
                   >
                     <List size={14} />
-                    <span>Queue List View</span>
+                    <span>{t.queueListViewBtn}</span>
                   </button>
                 </div>
 
@@ -1120,7 +1269,7 @@ export default function DoctorAccountView({
                   <Search size={14} className="absolute left-3 top-3 text-[#5A6A51]" />
                   <input
                     type="text"
-                    placeholder="Search patient or service..."
+                    placeholder={t.searchPlaceholder}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="rounded-2xl border border-[#414E36]/15 bg-white pl-9 pr-4 py-2 text-xs text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] w-56"
@@ -1133,27 +1282,27 @@ export default function DoctorAccountView({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">
-                  {scheduleViewMode === "calendar" ? `Total Scheduled (${calendarMonth.toLocaleDateString("en-US", { month: "short" })})` : "Total Scheduled"}
+                  {scheduleViewMode === "calendar" ? `${t.totalScheduledCard} (${calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" })})` : t.totalScheduledCard}
                 </span>
-                <div className="mt-2 text-3xl font-extrabold text-[#1F251A]">{stats.total} Patients</div>
+                <div className="mt-2 text-3xl font-extrabold text-[#1F251A]">{stats.total} {t.patientsUnit}</div>
               </div>
               <div className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                  {scheduleViewMode === "calendar" ? `Completed (${calendarMonth.toLocaleDateString("en-US", { month: "short" })})` : "Completed"}
+                  {scheduleViewMode === "calendar" ? `${t.completedCard} (${calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" })})` : t.completedCard}
                 </span>
-                <div className="mt-2 text-3xl font-extrabold text-emerald-800">{stats.completed} Sessions</div>
+                <div className="mt-2 text-3xl font-extrabold text-emerald-800">{stats.completed} {t.sessionsUnit}</div>
               </div>
               <div className="rounded-3xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
-                  {scheduleViewMode === "calendar" ? `In Treatment (${calendarMonth.toLocaleDateString("en-US", { month: "short" })})` : "In Treatment"}
+                  {scheduleViewMode === "calendar" ? `${t.inTreatmentCard} (${calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" })})` : t.inTreatmentCard}
                 </span>
-                <div className="mt-2 text-3xl font-extrabold text-amber-800">{stats.inProgress} Active</div>
+                <div className="mt-2 text-3xl font-extrabold text-amber-800">{stats.inProgress} {t.activeUnit}</div>
               </div>
               <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                  {scheduleViewMode === "calendar" ? `Upcoming (${calendarMonth.toLocaleDateString("en-US", { month: "short" })})` : "Upcoming Queue"}
+                  {scheduleViewMode === "calendar" ? `${t.upcomingQueueCard} (${calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" })})` : t.upcomingQueueCard}
                 </span>
-                <div className="mt-2 text-3xl font-extrabold text-slate-700">{stats.upcoming} Waiting</div>
+                <div className="mt-2 text-3xl font-extrabold text-slate-700">{stats.upcoming} {t.waitingUnit}</div>
               </div>
             </div>
 
@@ -1168,7 +1317,7 @@ export default function DoctorAccountView({
                     <div className="flex items-center gap-2">
                       <Calendar size={18} className="text-[#414E36]" />
                       <h3 className="text-base font-extrabold text-[#1F251A]">
-                        {calendarMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                        {calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "long", year: "numeric" })}
                       </h3>
                     </div>
 
@@ -1185,9 +1334,9 @@ export default function DoctorAccountView({
                         type="button"
                         onClick={handleTodayCalendarMonth}
                         className="px-3 py-1 text-xs font-bold rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
-                        title="Jump to Today"
+                        title={t.todayBtn}
                       >
-                        Today
+                        {t.todayBtn}
                       </button>
                       <button
                         type="button"
@@ -1202,13 +1351,13 @@ export default function DoctorAccountView({
 
                   {/* Weekday Header Labels */}
                   <div className="grid grid-cols-7 text-center text-[11px] font-extrabold uppercase tracking-wider text-[#5A6A51]/70">
-                    <div>Sun</div>
-                    <div>Mon</div>
-                    <div>Tue</div>
-                    <div>Wed</div>
-                    <div>Thu</div>
-                    <div>Fri</div>
-                    <div>Sat</div>
+                    <div>{t.weekdaySun}</div>
+                    <div>{t.weekdayMon}</div>
+                    <div>{t.weekdayTue}</div>
+                    <div>{t.weekdayWed}</div>
+                    <div>{t.weekdayThu}</div>
+                    <div>{t.weekdayFri}</div>
+                    <div>{t.weekdaySat}</div>
                   </div>
 
                   {/* Days Grid Cells */}
@@ -1276,19 +1425,19 @@ export default function DoctorAccountView({
                   <div className="flex flex-wrap items-center justify-around pt-3 border-t border-[#414E36]/10 text-[10px] text-[#5A6A51] font-semibold">
                     <div className="flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                      <span>Completed</span>
+                      <span>{t.completedStatus}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-amber-500" />
-                      <span>In Session</span>
+                      <span>{t.inSessionStatus}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-blue-500" />
-                      <span>Arrived</span>
+                      <span>{t.arrivedStatus}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-[#414E36]/40" />
-                      <span>Upcoming</span>
+                      <span>{t.upcomingQueueCard}</span>
                     </div>
                   </div>
                 </div>
@@ -1299,10 +1448,10 @@ export default function DoctorAccountView({
                     <div>
                       <h3 className="text-sm font-extrabold text-[#1F251A] flex items-center gap-2">
                         <Clock size={16} className="text-[#414E36]" />
-                        Day Schedule Timeline — {selectedDateStr}
+                        {t.dayTimelineHeader} {selectedDateStr}
                       </h3>
                       <p className="text-[11px] text-[#5A6A51] mt-0.5">
-                        {filteredSchedule.length} patient appointments scheduled for this date.
+                        {filteredSchedule.length} {t.patientAppointmentsScheduled}
                       </p>
                     </div>
 
@@ -1311,7 +1460,7 @@ export default function DoctorAccountView({
                       onClick={() => setSelectedDateStr(todayStr)}
                       className="px-3.5 py-1.5 text-xs font-bold rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
                     >
-                      Jump to Today
+                      {t.jumpToTodayBtn}
                     </button>
                   </div>
 
@@ -1321,9 +1470,9 @@ export default function DoctorAccountView({
                       <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-[#FBFBF9] text-[#414E36]/40 mb-3 shadow-inner">
                         <CalendarDays size={32} />
                       </div>
-                      <h4 className="text-base font-bold text-[#1F251A]">No Appointments for {selectedDateStr}</h4>
+                      <h4 className="text-base font-bold text-[#1F251A]">{t.noAppointmentsFor} {selectedDateStr}</h4>
                       <p className="text-xs text-[#5A6A51] max-w-sm mt-1">
-                        There are no patient bookings scheduled on this date. Select another day on the calendar or jump to Today.
+                        {t.noAppointmentsDesc}
                       </p>
                     </div>
                   ) : (
@@ -1361,17 +1510,17 @@ export default function DoctorAccountView({
 
                                   {isCompleted && (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                                      <CheckCircle2 size={11} /> Completed
+                                      <CheckCircle2 size={11} /> {t.completedStatus}
                                     </span>
                                   )}
                                   {isInSession && (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 animate-pulse">
-                                      <Play size={11} /> In Session
+                                      <Play size={11} /> {t.inSessionStatus}
                                     </span>
                                   )}
                                   {isArrived && (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-800">
-                                      <UserCheck size={11} /> Arrived
+                                      <UserCheck size={11} /> {t.arrivedStatus}
                                     </span>
                                   )}
                                   {!isCompleted && !isInSession && !isArrived && (
@@ -1408,7 +1557,7 @@ export default function DoctorAccountView({
                                 onClick={() => handleOpenScheduleModal(item)}
                                 className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 bg-white px-3.5 py-2 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
                               >
-                                <Info size={14} /> Details
+                                <Info size={14} /> {t.detailsBtn}
                               </button>
                             </div>
                           </div>
@@ -1433,7 +1582,7 @@ export default function DoctorAccountView({
                           : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
                       }`}
                     >
-                      Yesterday ({yesterdayStr})
+                      {t.yesterdayBtn} ({yesterdayStr})
                     </button>
 
                     <button
@@ -1445,7 +1594,7 @@ export default function DoctorAccountView({
                           : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
                       }`}
                     >
-                      Today ({todayStr})
+                      {t.todayBtn} ({todayStr})
                     </button>
 
                     <button
@@ -1457,12 +1606,12 @@ export default function DoctorAccountView({
                           : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
                       }`}
                     >
-                      Tomorrow ({tomorrowStr})
+                      {t.tomorrowBtn} ({tomorrowStr})
                     </button>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-[#5A6A51]">Jump to Date:</span>
+                    <span className="text-xs font-bold text-[#5A6A51]">{t.jumpToDateLabel}</span>
                     <input
                       type="date"
                       value={selectedDateStr}
@@ -1477,12 +1626,12 @@ export default function DoctorAccountView({
                   <table className="w-full text-left text-xs">
                     <thead className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-xs uppercase tracking-wider text-[#5A6A51]">
                       <tr>
-                        <th className="px-6 py-4 font-bold">Time Slot</th>
-                        <th className="px-6 py-4 font-bold">Patient Name</th>
-                        <th className="px-6 py-4 font-bold">Requested Service</th>
-                        <th className="px-6 py-4 font-bold">Room / Location</th>
-                        <th className="px-6 py-4 font-bold text-center">Status</th>
-                        <th className="px-6 py-4 font-bold text-right">Action</th>
+                        <th className="px-6 py-4 font-bold">{t.timeSlotHeader}</th>
+                        <th className="px-6 py-4 font-bold">{t.patientNameHeader}</th>
+                        <th className="px-6 py-4 font-bold">{t.requestedServiceHeader}</th>
+                        <th className="px-6 py-4 font-bold">{t.roomLocationHeader}</th>
+                        <th className="px-6 py-4 font-bold text-center">{t.statusHeader}</th>
+                        <th className="px-6 py-4 font-bold text-right">{t.actionHeader}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#414E36]/05 text-[#1F251A]">
@@ -1491,9 +1640,9 @@ export default function DoctorAccountView({
                           <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">
                             <div className="flex flex-col items-center gap-2">
                               <CalendarDays size={32} className="text-[#414E36]/30" />
-                              <p className="font-bold text-sm text-[#1F251A]">No appointments scheduled for {selectedDateStr}</p>
+                              <p className="font-bold text-sm text-[#1F251A]">{t.noAppointmentsTableTitle} {selectedDateStr}</p>
                               <p className="text-xs text-[#5A6A51]">
-                                All patient bookings for this date will appear here automatically.
+                                {t.noAppointmentsTableDesc}
                               </p>
                             </div>
                           </td>

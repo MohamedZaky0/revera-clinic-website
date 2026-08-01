@@ -72,7 +72,7 @@ After that, check task-specific files:
 - Booking modal (MD3 Date & Time pickers, single-step Service+Date+Time selection) → `reservations` table (real Supabase writes with customer_id links)
 - Admin booking management — calendar, list, approve/reject, full lifecycle stages, inline notes editor
 - Admin Bookings "Schedule" view — single-day grid, doctors as rows, 15-min time slots as columns
-- Doctor Portal Schedule — dual view system with primary super cool & simple interactive Month/Day Calendar View and secondary Queue List View
+- Doctor Portal Schedule — dual view system with primary super cool & simple interactive Month/Day Calendar View and secondary Queue List View, with bilingual English View and Arabic View switcher buttons + full RTL layout support
 - Booking lifecycle stages: `pending → approved → confirmed → started → completed`
 - Customer Wallet Ledgers — real writes updating spent_amount, outstanding, and wallet_balance during checkout
 - Payment settlement drawer inside admin booking details
