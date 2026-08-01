@@ -674,20 +674,30 @@ export default function DoctorAccountView({
     return { total, completed, inProgress, upcoming };
   }, [selectedDateReservations]);
 
-  // Statistics derived dynamically for the full active calendar month (Calendar View)
+  // Statistics derived dynamically for the full active calendar month view (Calendar View)
   const monthStats = useMemo(() => {
     const targetYear = calendarMonth.getFullYear();
     const targetMonth = calendarMonth.getMonth();
     const q = searchQuery.trim().toLowerCase();
+    const visibleDates = new Set(calendarDaysList.map((d) => d.dateStr));
 
     const monthReservations = reservations.filter((r) => {
       const resDate = r.date ? String(r.date).slice(0, 10) : "";
       if (!resDate) return false;
-      const parts = resDate.split("-");
-      if (parts.length < 3) return false;
-      const y = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1;
-      if (y !== targetYear || m !== targetMonth) return false;
+
+      // Include if date is visible on current calendar grid OR falls in active calendar month/year
+      let isVisible = visibleDates.has(resDate);
+      if (!isVisible) {
+        const parts = resDate.split("-");
+        if (parts.length >= 3) {
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10) - 1;
+          if (y === targetYear && m === targetMonth) {
+            isVisible = true;
+          }
+        }
+      }
+      if (!isVisible) return false;
 
       if (r.doctor && doctorName && r.doctor.toLowerCase() !== doctorName.toLowerCase()) {
         if (r.doctor.trim() && r.doctor.toLowerCase() !== "doctor" && r.doctor.toLowerCase() !== "any") {
@@ -711,7 +721,7 @@ export default function DoctorAccountView({
     const inProgress = monthReservations.filter((r) => r.status === "started" || r.status === "in-progress").length;
     const upcoming = monthReservations.filter((r) => ["pending", "approved", "confirmed"].includes(r.status)).length;
     return { total, completed, inProgress, upcoming };
-  }, [reservations, calendarMonth, doctorName, searchQuery]);
+  }, [reservations, calendarMonth, calendarDaysList, doctorName, searchQuery]);
 
   const stats = scheduleViewMode === "calendar" ? monthStats : dayStats;
 
