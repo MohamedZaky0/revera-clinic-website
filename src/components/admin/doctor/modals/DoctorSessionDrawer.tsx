@@ -11,7 +11,8 @@ import {
   CreditCard,
   Package,
   DollarSign,
-  FileText
+  FileText,
+  Play
 } from "lucide-react";
 import { parseBookingNotes } from "../utils";
 
@@ -41,6 +42,8 @@ interface DoctorSessionDrawerProps {
   savingNote: boolean;
   setShowPrescriptionModal: (show: boolean) => void;
   handleCompleteTreatment: (booking: any) => void;
+  setActiveSessionBooking?: (booking: any) => void;
+  setActiveTab?: (tab: any) => void;
   t: any;
 }
 
@@ -70,6 +73,8 @@ export default function DoctorSessionDrawer({
   savingNote,
   setShowPrescriptionModal,
   handleCompleteTreatment,
+  setActiveSessionBooking,
+  setActiveTab,
   t
 }: DoctorSessionDrawerProps) {
   if (!scheduleModalBooking) return null;
@@ -303,14 +308,29 @@ export default function DoctorSessionDrawer({
 
         {/* Drawer Action Sticky Footer */}
         <div className="p-4 px-6 bg-[#FBFBF9] border-t border-[#414E36]/10 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={() => handleSaveClinicalNote(scheduleModalBooking)}
-            disabled={savingNote}
-            className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm disabled:opacity-50"
-          >
-            {savingNote ? "..." : t.saveClinicalNotesBtn}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSessionBooking?.(scheduleModalBooking);
+                setActiveTab?.("ongoing");
+                setScheduleModalBooking(null);
+              }}
+              className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 text-xs font-bold transition shadow-sm flex items-center gap-1.5"
+            >
+              <Play size={14} />
+              <span>{t.startOngoingSessionBtn}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSaveClinicalNote(scheduleModalBooking)}
+              disabled={savingNote}
+              className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm disabled:opacity-50"
+            >
+              {savingNote ? "..." : t.saveClinicalNotesBtn}
+            </button>
+          </div>
 
           <div className="flex items-center gap-2">
             <button

@@ -13,7 +13,10 @@ import {
   Sparkles,
   ShoppingBag,
   Zap,
-  X
+  X,
+  Clock,
+  ChevronRight,
+  UserCheck
 } from "lucide-react";
 import { DoctorTab } from "../types";
 
@@ -61,6 +64,8 @@ interface DoctorOngoingSessionTabProps {
   handleSaveClinicalNote: (booking: any) => void;
   savingNote: boolean;
   setActiveTab: (tab: DoctorTab) => void;
+  reservations?: any[];
+  setActiveSessionBooking?: (booking: any) => void;
   t: any;
 }
 
@@ -108,8 +113,23 @@ export default function DoctorOngoingSessionTab({
   handleSaveClinicalNote,
   savingNote,
   setActiveTab,
+  reservations = [],
+  setActiveSessionBooking,
   t
 }: DoctorOngoingSessionTabProps) {
+  // Find all active / started sessions from reservations list
+  const activeSessionsList = reservations.filter((r) => {
+    const st = String(r.status || "").toLowerCase().trim();
+    return (
+      st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment"
+    );
+  });
+
+  // Find all non-completed queue bookings
+  const queueBookings = reservations.filter(
+    (r) => r.status !== "completed" && r.status !== "cancelled"
+  );
+
   return (
     <div className="space-y-6 w-full">
       {activeSessionBooking && activeSessionBooking.status !== "completed" ? (
@@ -479,23 +499,107 @@ export default function DoctorOngoingSessionTab({
           </div>
         </>
       ) : (
-        <div className="rounded-3xl border border-[#414E36]/10 bg-white p-12 text-center text-[#5A6A51] space-y-4">
-          <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
-            <Play size={28} />
+        <div className="space-y-6">
+          {/* Active Sessions Banner if any found */}
+          {activeSessionsList.length > 0 && (
+            <div className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-6 shadow-md space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500 text-white font-bold text-lg shadow-sm animate-pulse">
+                    <Play size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-extrabold text-amber-950">{t.activeSessionDetectedTitle}</h3>
+                    <p className="text-xs text-amber-800 font-bold mt-0.5">
+                      {activeSessionsList[0].name || activeSessionsList[0].customer_name} • {activeSessionsList[0].service || activeSessionsList[0].service_name} • <strong className="text-amber-950">{activeSessionsList[0].room || activeSessionsList[0].room_name || "Treatment Room"}</strong>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveSessionBooking?.(activeSessionsList[0])}
+                  className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition flex items-center gap-2"
+                >
+                  <UserCheck size={16} /> {t.openActiveSessionBtn}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Standard Waiting Screen */}
+          <div className="rounded-3xl border border-[#414E36]/10 bg-white p-12 text-center text-[#5A6A51] space-y-4 shadow-sm">
+            <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+              <Play size={28} />
+            </div>
+            <h3 className="text-xl font-bold text-[#1F251A]">{t.waitingForReceptionistTitle}</h3>
+            <p className="text-xs text-[#5A6A51] max-w-md mx-auto leading-relaxed">
+              {t.waitingForReceptionistDesc}
+            </p>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab("schedule")}
+                className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
+              >
+                {t.viewTodayQueueBtn}
+              </button>
+            </div>
           </div>
-          <h3 className="text-xl font-bold text-[#1F251A]">{t.waitingForReceptionistTitle}</h3>
-          <p className="text-xs text-[#5A6A51] max-w-md mx-auto leading-relaxed">
-            {t.waitingForReceptionistDesc}
-          </p>
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab("schedule")}
-              className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
-            >
-              {t.viewTodayQueueBtn}
-            </button>
-          </div>
+
+          {/* Queue & Available Bookings Launcher List */}
+          {queueBookings.length > 0 && (
+            <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                <h4 className="text-sm font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                  <Clock size={16} className="text-[#414E36]" /> {t.todayAvailableBookings}
+                </h4>
+                <span className="rounded-full bg-[#414E36]/10 px-3 py-1 text-xs font-bold text-[#414E36]">
+                  {queueBookings.length} {t.totalScheduledCard}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {queueBookings.map((booking: any, idx: number) => {
+                  const st = String(booking.status || "").toLowerCase().trim();
+                  const isStarted = st === "started" || st === "in-progress" || st === "in_progress" || st === "active";
+
+                  return (
+                    <div
+                      key={booking.id || idx}
+                      className={`rounded-2xl border p-4 shadow-sm flex flex-col justify-between space-y-3 transition ${
+                        isStarted ? "border-amber-300 bg-amber-50/50" : "border-[#414E36]/15 bg-[#FBFBF9]"
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <h5 className="text-sm font-bold text-[#1F251A] truncate">
+                            {booking.name || booking.customer_name || "Patient"}
+                          </h5>
+                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold capitalize ${
+                            isStarted ? "bg-amber-200 text-amber-900 animate-pulse" : "bg-[#414E36]/10 text-[#414E36]"
+                          }`}>
+                            {booking.status || "Scheduled"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#5A6A51]">
+                          {booking.service || booking.service_name} • {booking.time || booking.time_slot || "Today"}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveSessionBooking?.(booking)}
+                        className="w-full rounded-xl bg-[#414E36] hover:bg-[#343F2B] text-white py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
+                      >
+                        <Play size={13} /> {t.openSessionBtn}
+                        <ChevronRight size={13} className="rtl:rotate-180" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

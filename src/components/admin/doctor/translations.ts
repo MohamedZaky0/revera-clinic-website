@@ -97,6 +97,11 @@ export const doctorTranslations = {
     doctorNotesTitle: "Doctor Procedure Observations & Medical Notes",
     doctorNotesPlaceholder: "Enter clinical observations, laser pulse parameters, skin reactions, and post-procedure recommendations...",
     saveClinicalNotesBtn: "Save Clinical Notes",
+    activeSessionDetectedTitle: "Active Session Detected!",
+    openActiveSessionBtn: "Open Active Session Now",
+    todayAvailableBookings: "Today's Patient Queue & Active Sessions",
+    openSessionBtn: "Open Treatment Session",
+    startOngoingSessionBtn: "Start / Open Session",
 
     // Patients Directory Tab
     patientsDirectoryTitle: "My Patients Directory",
@@ -274,6 +279,11 @@ export const doctorTranslations = {
     doctorNotesTitle: "ملاحظات الطبيب وإجراءات العلاج",
     doctorNotesPlaceholder: "أدخل الملاحظات السريرية، إعدادات النبضات، تفاعلات البشرة، وتوصيات ما بعد العلاج...",
     saveClinicalNotesBtn: "حفظ ملاحظات الطبيب",
+    activeSessionDetectedTitle: "تم اكتشاف جلسة نشطة!",
+    openActiveSessionBtn: "فتح الجلسة النشطة الآن",
+    todayAvailableBookings: "مواعيد اليوم والجلسات المتاحة",
+    openSessionBtn: "فتح جلسة العلاج",
+    startOngoingSessionBtn: "بدء / فتح الجلسة",
 
     // Patients Directory Tab
     patientsDirectoryTitle: "سجل المرضى",

@@ -335,7 +335,9 @@ export default function DoctorAccountView({
               return [updated, ...prev];
             });
 
-            if (updated.status === "started" && (!activeSessionBooking || activeSessionBooking.status === "completed")) {
+            const st = String(updated.status || "").toLowerCase().trim();
+            const isActive = st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
+            if (isActive && (!activeSessionBooking || activeSessionBooking.status === "completed" || activeSessionBooking.id === updated.id)) {
               setActiveSessionBooking(updated);
             }
           }
@@ -350,16 +352,17 @@ export default function DoctorAccountView({
 
   // Receptionist Started Session Auto-Detect
   const receptionistStartedSession = useMemo(() => {
-    return reservations.find(
-      (r) =>
-        (r.status === "started" || r.status === "in-progress") &&
-        r.status !== "completed"
-    );
+    return reservations.find((r) => {
+      const st = String(r.status || "").toLowerCase().trim();
+      return st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
+    });
   }, [reservations]);
 
   useEffect(() => {
-    if (receptionistStartedSession && (!activeSessionBooking || activeSessionBooking.id !== receptionistStartedSession.id)) {
-      setActiveSessionBooking(receptionistStartedSession);
+    if (receptionistStartedSession) {
+      if (!activeSessionBooking || activeSessionBooking.status === "completed" || activeSessionBooking.id !== receptionistStartedSession.id) {
+        setActiveSessionBooking(receptionistStartedSession);
+      }
     }
   }, [receptionistStartedSession, activeSessionBooking]);
 
@@ -845,6 +848,8 @@ export default function DoctorAccountView({
             handleSaveClinicalNote={handleSaveClinicalNote}
             savingNote={savingNote}
             setActiveTab={setActiveTab}
+            reservations={reservations}
+            setActiveSessionBooking={setActiveSessionBooking}
             t={t}
           />
         )}
@@ -917,6 +922,8 @@ export default function DoctorAccountView({
         savingNote={savingNote}
         setShowPrescriptionModal={setShowPrescriptionModal}
         handleCompleteTreatment={handleCompleteTreatment}
+        setActiveSessionBooking={setActiveSessionBooking}
+        setActiveTab={setActiveTab}
         t={t}
       />
 
