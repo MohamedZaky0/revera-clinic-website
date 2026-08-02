@@ -669,10 +669,31 @@ export default function DoctorAccountView({
   const handleCompleteTreatment = async (targetBooking: any) => {
     if (!targetBooking) return;
 
-    if (!medicalRecord) {
-      alert("ATTENTION: Patient medical intake record is required on file before completing treatment. Please fill out the medical form.");
-      setShowMedicalForm(true);
-      return;
+    // Auto-save medical record intake if doctor filled form fields
+    if (!medicalRecord && (formAllergies || formMedicationDetails || formMedicalConditionsDetails || formPreviousTreatmentsDetails)) {
+      try {
+        const custId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
+        const headers = await getAuthHeaders();
+        const medRes = await fetch("/api/medical-records", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            customer_id: custId,
+            patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
+            skin_type: formSkinType,
+            allergies: formAllergies,
+            medication_details: formMedicationDetails,
+            medical_conditions_details: formMedicalConditionsDetails,
+            previous_treatments_details: formPreviousTreatmentsDetails
+          })
+        });
+        if (medRes.ok) {
+          const mData = await medRes.json();
+          setMedicalRecord(mData.medicalRecord || mData);
+        }
+      } catch (e) {
+        console.error("Auto-save medical record error:", e);
+      }
     }
 
     let sessionAddonsSummary = "";
@@ -704,8 +725,20 @@ export default function DoctorAccountView({
 
       if (res.ok) {
         alert(`Treatment session marked as COMPLETED!\nInvoice Total Updated to: ${updatedInvoiceTotal} EGP`);
+        
+        // Immediately close ongoing active session workspace
         setActiveSessionBooking(null);
         setScheduleModalBooking(null);
+        setClinicalNote("");
+        setUsedProducts([]);
+        setExtraPulsesCount(0);
+        setMedicalRecord(null);
+
+        // Update reservations state locally so status='completed' is immediately reflected
+        setReservations((prev) =>
+          prev.map((r) => (String(r.id) === String(targetBooking.id) ? { ...r, status: "completed", notes: finalNotes } : r))
+        );
+
         fetchDoctorReservations();
       } else {
         const errData = await res.json().catch(() => ({}));
