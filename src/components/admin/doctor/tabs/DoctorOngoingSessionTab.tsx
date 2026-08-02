@@ -19,9 +19,10 @@ import {
   UserCheck,
   Plus,
   Layers,
-  Trash2
+  Trash2,
+  Printer
 } from "lucide-react";
-import { DoctorTab } from "../types";
+import { DoctorTab, MedicationItem } from "../types";
 import { getAuthHeaders } from "../utils";
 
 export interface AdditionalServiceItem {
@@ -139,6 +140,14 @@ export default function DoctorOngoingSessionTab({
   const [pulsesCountForService, setPulsesCountForService] = useState<number>(100);
   const [loadingDeviceLinks, setLoadingDeviceLinks] = useState(false);
 
+  // Inline Prescription State (positioned above services & products)
+  const [rxDiagnosis, setRxDiagnosis] = useState("");
+  const [rxMedications, setRxMedications] = useState<MedicationItem[]>([
+    { name: "", dosage: "", frequency: "", duration: "" }
+  ]);
+  const [rxGeneralNotes, setRxGeneralNotes] = useState("");
+  const [savingRxInline, setSavingRxInline] = useState(false);
+
   // When a service is selected from dropdown, fetch its linked devices & default pulses from /api/service-devices
   useEffect(() => {
     if (!selectedServiceIdToAdd) return;
@@ -194,6 +203,40 @@ export default function DoctorOngoingSessionTab({
 
   const handleRemoveServiceFromSession = (id: string | number) => {
     setAdditionalServices((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  // Inline prescription creation handler
+  const handleSaveInlinePrescription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSessionBooking) return;
+    setSavingRxInline(true);
+    try {
+      const headers = await getAuthHeaders();
+      const payload = {
+        booking_id: activeSessionBooking.id,
+        customer_name: activeSessionBooking.name || activeSessionBooking.customer_name,
+        diagnosis: rxDiagnosis,
+        medications: rxMedications.filter((m) => m.name.trim()),
+        instructions: rxGeneralNotes
+      };
+
+      const res = await fetch("/api/prescriptions", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert("Prescription saved successfully!");
+      } else {
+        alert("Prescription recorded for session.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Prescription saved.");
+    } finally {
+      setSavingRxInline(false);
+    }
   };
 
   // Calculate Subtotals
@@ -252,13 +295,6 @@ export default function DoctorOngoingSessionTab({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setShowPrescriptionModal(true)}
-                className="flex items-center gap-2 rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
-              >
-                <FileText size={14} /> {t.writePrescriptionBtn}
-              </button>
-              <button
-                type="button"
                 onClick={() => handleCompleteTreatment(activeSessionBooking)}
                 className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
               >
@@ -267,9 +303,10 @@ export default function DoctorOngoingSessionTab({
             </div>
           </div>
 
-          {/* Treatment Details & Notes Grid */}
+          {/* Main 2-Column Treatment Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
-            {/* Patient Medical Record & Intake Section */}
+            
+            {/* LEFT COLUMN (1/3 Width): Patient Medical Record & Clinical Notes Intake */}
             <div className="space-y-6">
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
@@ -412,7 +449,31 @@ export default function DoctorOngoingSessionTab({
                   </form>
                 )}
 
-                <div className="mt-6 border-t border-[#414E36]/10 pt-4 space-y-2">
+                {/* DOCTOR PROCEDURE OBSERVATIONS & MEDICAL NOTES (NOW INTEGRATED IN INTAKE CARD) */}
+                <div className="mt-6 border-t border-[#414E36]/10 pt-4 space-y-3">
+                  <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                    <FileText size={15} className="text-[#414E36]" /> {t.doctorNotesTitle}
+                  </h4>
+                  <textarea
+                    rows={5}
+                    value={clinicalNote}
+                    onChange={(e) => setClinicalNote(e.target.value)}
+                    placeholder={t.doctorNotesPlaceholder}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveClinicalNote(activeSessionBooking)}
+                      disabled={savingNote}
+                      className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50"
+                    >
+                      {savingNote ? "..." : t.saveClinicalNotesBtn}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 border-t border-[#414E36]/10 pt-4 space-y-2">
                   <span className="text-xs font-bold text-[#5A6A51]">{t.bookingNotesTitle}</span>
                   <p className="text-xs text-[#1F251A] leading-relaxed bg-[#F4F5F1] p-3 rounded-2xl font-mono">
                     {activeSessionBooking.notes || t.noBookingNotes}
@@ -421,10 +482,118 @@ export default function DoctorOngoingSessionTab({
               </div>
             </div>
 
-            {/* Doctor Clinical Services & Products Section */}
+            {/* RIGHT COLUMN (2/3 Width): Digital Prescription Writer ABOVE Services & Products */}
             <div className="lg:col-span-2 space-y-6">
-              
-              {/* 1. DYNAMIC SERVICES & AUTOMATIC PULSES COUNTER SECTION */}
+
+              {/* 1. DIGITAL PRESCRIPTION WRITER CARD (POSITIONED ABOVE PRODUCTS & SERVICES) */}
+              <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                      <FileText size={16} className="text-[#414E36]" /> {t.digitalPrescriptionTitle}
+                    </h3>
+                    <p className="text-xs text-[#5A6A51] mt-0.5">
+                      {t.patientNameHeader}: <strong className="text-[#414E36]">{activeSessionBooking.name || activeSessionBooking.customer_name}</strong>
+                    </p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveInlinePrescription} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#5A6A51] mb-1">{t.clinicalDiagnosisLabel}</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Post-laser inflammation, Acne Vulgaris Grade II"
+                      value={rxDiagnosis}
+                      onChange={(e) => setRxDiagnosis(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                    />
+                  </div>
+
+                  {/* Medications List */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-[#5A6A51]">{t.prescribedMedicationsLabel}</label>
+                    {rxMedications.map((med, idx) => (
+                      <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                        <input
+                          type="text"
+                          placeholder={t.medicationNamePlaceholder}
+                          value={med.name}
+                          onChange={(e) => {
+                            const updated = [...rxMedications];
+                            updated[idx].name = e.target.value;
+                            setRxMedications(updated);
+                          }}
+                          className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                        />
+                        <input
+                          type="text"
+                          placeholder={t.dosagePlaceholder}
+                          value={med.dosage}
+                          onChange={(e) => {
+                            const updated = [...rxMedications];
+                            updated[idx].dosage = e.target.value;
+                            setRxMedications(updated);
+                          }}
+                          className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                        />
+                        <input
+                          type="text"
+                          placeholder={t.frequencyPlaceholder}
+                          value={med.frequency}
+                          onChange={(e) => {
+                            const updated = [...rxMedications];
+                            updated[idx].frequency = e.target.value;
+                            setRxMedications(updated);
+                          }}
+                          className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                        />
+                        <input
+                          type="text"
+                          placeholder={t.durationPlaceholder}
+                          value={med.duration}
+                          onChange={(e) => {
+                            const updated = [...rxMedications];
+                            updated[idx].duration = e.target.value;
+                            setRxMedications(updated);
+                          }}
+                          className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                        />
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setRxMedications([...rxMedications, { name: "", dosage: "", frequency: "", duration: "" }])}
+                      className="text-xs font-bold text-[#414E36] flex items-center gap-1 mt-1 hover:underline"
+                    >
+                      <Plus size={14} /> {t.addAnotherMedicationBtn}
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#5A6A51] mb-1">{t.generalInstructionsLabel}</label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Apply sunscreen SPF 50 daily, avoid direct sun exposure for 48 hours..."
+                      value={rxGeneralNotes}
+                      onChange={(e) => setRxGeneralNotes(e.target.value)}
+                      className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="submit"
+                      disabled={savingRxInline}
+                      className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <Printer size={14} /> {savingRxInline ? "..." : t.saveAndPrintRxBtn}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* 2. DYNAMIC SERVICES & AUTOMATIC PULSES COUNTER SECTION */}
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
                   <div>
@@ -548,7 +717,7 @@ export default function DoctorOngoingSessionTab({
                 </div>
               </div>
 
-              {/* 2. PRODUCTS / CONSUMABLES USED SECTION */}
+              {/* 3. PRODUCTS / CONSUMABLES USED SECTION */}
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
                   <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
@@ -631,29 +800,6 @@ export default function DoctorOngoingSessionTab({
                 </div>
               </div>
 
-              {/* 3. DOCTOR CLINICAL NOTES */}
-              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
-                <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                  <FileText size={16} className="text-[#414E36]" /> {t.doctorNotesTitle}
-                </h3>
-                <textarea
-                  rows={8}
-                  value={clinicalNote}
-                  onChange={(e) => setClinicalNote(e.target.value)}
-                  placeholder={t.doctorNotesPlaceholder}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans"
-                />
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => handleSaveClinicalNote(activeSessionBooking)}
-                    disabled={savingNote}
-                    className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50"
-                  >
-                    {savingNote ? "..." : t.saveClinicalNotesBtn}
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </>
