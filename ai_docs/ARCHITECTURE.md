@@ -71,6 +71,8 @@ src/
 │
 ├── components/                   Public website UI components and admin submodules
 │   ├── admin/                     Required location for every new admin section; legacy sections are extracted here incrementally
+│   │   ├── DoctorAccountView.tsx  Doctor portal root coordinator
+│   │   └── doctor/                Doctor portal sub-modules (types.ts, DoctorSidebar, DoctorScheduleTab, DoctorOngoingSessionTab, DoctorPatientsTab, DoctorAnalyticsTab, DoctorSettingsTab, DoctorProfileTab, modals)
 │   ├── Navbar.tsx
 │   ├── HeroSlider.tsx
 │   ├── ServicesSection.tsx        Services catalog + WhatsApp CTA
