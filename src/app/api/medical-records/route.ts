@@ -33,7 +33,7 @@ function writeLocalData(filepath: string, data: any[]) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const customerId = searchParams.get('customerId');
+    const customerId = searchParams.get('customerId') || searchParams.get('customer_id');
 
     let form: any = null;
     let reports: any[] = [];
@@ -106,8 +106,8 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const type = body.type || 'form';
-    const recordData = body.recordData || body.data || {};
-    const reportData = body.reportData || body.data || {};
+    const recordData = body.recordData || body.data || body;
+    const reportData = body.reportData || body.data || body;
     const customerId = body.customerId || body.customer_id || recordData.customer_id || reportData.customer_id;
 
     if (!customerId) {

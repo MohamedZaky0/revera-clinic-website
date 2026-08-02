@@ -114,6 +114,19 @@ export const doctorTranslations = {
     deviceUsedLabel: "Device Used:",
     overridePulsesLabel: "Override Pulses Count:",
 
+    // Digital Prescription & History Details
+    savedPrescriptionTitle: "Issued Digital Prescription",
+    diagnosisLabel: "Diagnosis",
+    prescribedMedsTable: "Prescribed Medications",
+    medNameHeader: "Medication",
+    dosageHeader: "Dosage",
+    frequencyHeader: "Frequency",
+    durationHeader: "Duration",
+    instructionsLabel: "Instructions",
+    noPrescriptionOnRecord: "No digital prescription issued for this visit.",
+    completedSessionRecord: "Completed Session Record",
+    sessionSummaryTitle: "Session Summary & Financials",
+
     // Patients Directory Tab
     patientsDirectoryTitle: "My Patients Directory",
     patientsDirectorySubtitle: "All patients assigned to your care across scheduled, active, and completed visits.",
@@ -306,6 +319,19 @@ export const doctorTranslations = {
     pulsesLabel: "نبضة",
     deviceUsedLabel: "الجهاز المستخدم:",
     overridePulsesLabel: "تعديل عدد النبضات:",
+
+    // Digital Prescription & History Details
+    savedPrescriptionTitle: "الروشتة الطبية الصادرة",
+    diagnosisLabel: "التشخيص",
+    prescribedMedsTable: "الأدوية الموصوفة",
+    medNameHeader: "اسم الدواء",
+    dosageHeader: "الجرعة",
+    frequencyHeader: "التكرار",
+    durationHeader: "المدة",
+    instructionsLabel: "التعليمات",
+    noPrescriptionOnRecord: "لم يتم إصدار روشتة رقمية لهذه الزيارة.",
+    completedSessionRecord: "سجل الجلسة المكتملة",
+    sessionSummaryTitle: "ملخص الجلسة والماليات",
 
     // Patients Directory Tab
     patientsDirectoryTitle: "سجل المرضى",

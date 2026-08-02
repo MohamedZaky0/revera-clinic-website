@@ -12,7 +12,9 @@ import {
   Package,
   DollarSign,
   FileText,
-  Play
+  Play,
+  Pill,
+  Check
 } from "lucide-react";
 import { parseBookingNotes } from "../utils";
 
@@ -44,6 +46,7 @@ interface DoctorSessionDrawerProps {
   handleCompleteTreatment: (booking: any) => void;
   setActiveSessionBooking?: (booking: any) => void;
   setActiveTab?: (tab: any) => void;
+  prescriptionsMap?: Record<string, any[]>;
   t: any;
 }
 
@@ -75,10 +78,18 @@ export default function DoctorSessionDrawer({
   handleCompleteTreatment,
   setActiveSessionBooking,
   setActiveTab,
+  prescriptionsMap = {},
   t
 }: DoctorSessionDrawerProps) {
   if (!scheduleModalBooking) return null;
   const parsedNotes = parseBookingNotes(scheduleModalBooking.notes || "");
+  const isCompleted = scheduleModalBooking.status === "completed" || scheduleModalBooking.status === "done";
+
+  // Lookup prescriptions for this customer/booking
+  const customerId = scheduleModalBooking.customer_id || scheduleModalBooking.customerId;
+  const bookingId = scheduleModalBooking.id;
+  const customerRxList = (customerId && prescriptionsMap[customerId]) || (bookingId && prescriptionsMap[bookingId]) || [];
+  const activeRx = customerRxList.length > 0 ? customerRxList[0] : null;
 
   return (
     <div className="fixed inset-0 z-[100] flex justify-end bg-black/50 backdrop-blur-sm transition-opacity animate-fadeIn">
@@ -96,21 +107,27 @@ export default function DoctorSessionDrawer({
           <div className="flex items-center gap-3.5">
             <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#414E36] text-white font-black text-base shadow-md border-2 border-white">
               {(scheduleModalBooking.name || scheduleModalBooking.customer_name || "P").slice(0, 2).toUpperCase()}
-              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white shadow-sm" />
+              <span className={`absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white shadow-sm ${
+                isCompleted ? "bg-emerald-500" : "bg-amber-500"
+              }`} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-extrabold text-[#1F251A]">
-                  {scheduleModalBooking.name || scheduleModalBooking.customer_name || t.patientSessionDrawerTitle}
+                  {scheduleModalBooking.name || scheduleModalBooking.customer_name}
                 </h3>
-                <span className="rounded-full bg-[#414E36]/10 px-2.5 py-0.5 text-[10px] font-extrabold text-[#414E36] capitalize">
-                  {scheduleModalBooking.status || "Scheduled"}
-                </span>
+                {isCompleted ? (
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800 flex items-center gap-1">
+                    <CheckCircle2 size={12} /> {t.completedStatus}
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-[#414E36]/10 px-2.5 py-0.5 text-[10px] font-extrabold text-[#414E36] capitalize">
+                    {scheduleModalBooking.status || "Scheduled"}
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-[#5A6A51] mt-0.5 font-medium flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-[#414E36]">{scheduleModalBooking.service || scheduleModalBooking.service_name || "Clinical Session"}</span>
-                <span>•</span>
-                <span>{scheduleModalBooking.room || scheduleModalBooking.room_name || "Treatment Room"}</span>
+              <p className="text-xs text-[#5A6A51] mt-0.5 font-mono">
+                {scheduleModalBooking.service || scheduleModalBooking.service_name} • {scheduleModalBooking.time || scheduleModalBooking.time_slot || "Today"}
               </p>
             </div>
           </div>
@@ -125,38 +142,22 @@ export default function DoctorSessionDrawer({
           </button>
         </div>
 
-        {/* Drawer Main Scrollable Content */}
+        {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* 1. Quick Info Overview Banner */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-2xl bg-[#F4F5F1] p-4 border border-[#414E36]/10 text-xs">
-            <div>
-              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">{t.timeSlotHeader}</span>
-              <p className="font-bold text-[#1F251A] mt-0.5">{scheduleModalBooking.time || scheduleModalBooking.time_slot || "09:00 AM"}</p>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">{t.dateHeader}</span>
-              <p className="font-bold text-[#1F251A] mt-0.5">{scheduleModalBooking.date || selectedDateStr}</p>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">Phone</span>
-              <p className="font-mono text-[#1F251A] mt-0.5">{scheduleModalBooking.phone || "N/A"}</p>
-            </div>
-          </div>
-
-          {/* 2. Medical Record Card */}
-          <div className="rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] p-5 space-y-4">
+          {/* 1. Patient Medical Record Intake Card */}
+          <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
                 <AlertCircle size={15} className="text-[#414E36]" /> {t.patientMedicalRecordTitle}
               </h4>
               {medicalRecord ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                  <CheckCircle2 size={11} /> {t.onFileStatus}
+                  <CheckCircle2 size={10} /> {t.onFileStatus}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800 animate-pulse">
-                  <AlertTriangle size={11} /> {t.intakeRequiredStatus}
+                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800">
+                  <AlertTriangle size={10} /> {t.intakeRequiredStatus}
                 </span>
               )}
             </div>
@@ -164,76 +165,69 @@ export default function DoctorSessionDrawer({
             {medicalRecordLoading ? (
               <p className="text-xs text-[#5A6A51]">{t.loadingMedicalRecord}</p>
             ) : medicalRecord && !showMedicalForm ? (
-              <div className="space-y-2.5 text-xs bg-white p-4 rounded-xl border border-[#414E36]/10">
-                <div className="flex justify-between items-center border-b border-[#414E36]/10 pb-2">
-                  <span className="text-[#5A6A51] font-medium">{t.skinTypeLabel}:</span>
-                  <span className="font-bold text-[#1F251A] bg-[#414E36]/10 px-2.5 py-0.5 rounded-lg">{medicalRecord.skin_type || "Normal"}</span>
+              <div className="space-y-2 text-xs bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                  <span className="font-bold text-[#5A6A51]">{t.skinTypeLabel}:</span>
+                  <span className="font-bold text-[#1F251A]">{medicalRecord.skin_type || "Normal"}</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-[#414E36]/10 pb-2">
-                  <span className="text-[#5A6A51] font-medium">{t.allergiesLabel}:</span>
-                  <span className={`font-bold px-2.5 py-0.5 rounded-lg ${medicalRecord.allergies && medicalRecord.allergies !== "None" ? "bg-rose-100 text-rose-800" : "bg-emerald-100 text-emerald-800"}`}>
-                    {medicalRecord.allergies || "None"}
-                  </span>
+                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                  <span className="font-bold text-[#5A6A51]">{t.allergiesLabel}:</span>
+                  <span className="font-bold text-rose-700">{medicalRecord.allergies || "None reported"}</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-[#414E36]/10 pb-2">
-                  <span className="text-[#5A6A51] font-medium">{t.currentMedicationLabel}:</span>
+                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                  <span className="font-bold text-[#5A6A51]">{t.currentMedicationLabel}:</span>
                   <span className="font-semibold text-[#1F251A]">{medicalRecord.medication_details || "None"}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowMedicalForm(true)}
-                  className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-[#414E36] hover:underline pt-1"
-                >
-                  <Edit size={13} /> {t.updateMedicalRecordBtn}
-                </button>
+                <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                  <span className="font-bold text-[#5A6A51]">{t.medicalConditionsLabel}:</span>
+                  <span className="font-semibold text-[#1F251A]">{medicalRecord.medical_conditions_details || "None"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-bold text-[#5A6A51]">{t.previousTreatmentsLabel}:</span>
+                  <span className="font-semibold text-[#1F251A]">{medicalRecord.previous_treatments_details || "None"}</span>
+                </div>
               </div>
             ) : (
-              <form onSubmit={handleSaveMedicalRecord} className="space-y-3 pt-1 text-xs bg-white p-4 rounded-xl border border-[#414E36]/10">
-                {!medicalRecord && (
-                  <p className="text-[11px] font-bold text-amber-900 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
-                    {t.firstVisitNotice}
-                  </p>
-                )}
+              <form onSubmit={handleSaveMedicalRecord} className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
                 <div>
-                  <label className="block text-[10px] font-bold text-[#5A6A51] uppercase mb-1">{t.skinTypeLabel}</label>
+                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.skinTypeLabel}</label>
                   <select
                     value={formSkinType}
                     onChange={(e) => setFormSkinType(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
                   >
                     <option value="Normal">Normal</option>
                     <option value="Dry">Dry</option>
                     <option value="Oily">Oily</option>
                     <option value="Sensitive">Sensitive</option>
                     <option value="Combination">Combination</option>
-                    <option value="Acne-Prone">Acne-Prone</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-[#5A6A51] uppercase mb-1">{t.allergiesLabel}</label>
+                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.allergiesLabel}</label>
                   <input
                     type="text"
-                    placeholder="e.g. Latex, Aspirin, None"
                     value={formAllergies}
                     onChange={(e) => setFormAllergies(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                    placeholder="None reported"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-[#5A6A51] uppercase mb-1">{t.currentMedicationLabel}</label>
+                  <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.currentMedicationLabel}</label>
                   <input
                     type="text"
-                    placeholder="e.g. Roaccutane, None"
                     value={formMedicationDetails}
                     onChange={(e) => setFormMedicationDetails(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none"
+                    className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none"
+                    placeholder="None"
                   />
                 </div>
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex justify-end pt-2">
                   <button
                     type="submit"
                     disabled={savingMedicalRecord}
-                    className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-white hover:bg-[#343F2B]"
+                    className="rounded-xl bg-[#414E36] px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition"
                   >
                     {savingMedicalRecord ? "..." : t.saveMedicalRecordBtn}
                   </button>
@@ -242,27 +236,60 @@ export default function DoctorSessionDrawer({
             )}
           </div>
 
-          {/* 3. System Metadata Cards */}
-          {(parsedNotes.instaPayLog || parsedNotes.productsLog || parsedNotes.invoiceLog) && (
-            <div className="space-y-3">
+          {/* 2. Issued Digital Prescription Display */}
+          <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm space-y-3">
+            <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+              <Pill size={15} className="text-[#414E36]" /> {t.savedPrescriptionTitle}
+            </h4>
+
+            {activeRx ? (
+              <div className="bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 space-y-3 text-xs">
+                {activeRx.diagnosis && (
+                  <div>
+                    <span className="font-bold text-[#5A6A51] text-[11px]">{t.diagnosisLabel}:</span>
+                    <p className="font-bold text-[#1F251A] mt-0.5">{activeRx.diagnosis}</p>
+                  </div>
+                )}
+
+                {Array.isArray(activeRx.medications) && activeRx.medications.length > 0 && (
+                  <div className="space-y-1.5">
+                    <span className="font-bold text-[#5A6A51] text-[11px]">{t.prescribedMedsTable}:</span>
+                    <div className="space-y-1">
+                      {activeRx.medications.map((m: any, idx: number) => (
+                        <div key={idx} className="bg-white p-2.5 rounded-xl border border-[#414E36]/10 flex flex-wrap justify-between gap-2">
+                          <span className="font-bold text-[#1F251A]">{m.name}</span>
+                          <span className="text-[11px] text-[#5A6A51] font-mono">
+                            {m.dosage} • {m.frequency} • {m.duration}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeRx.general_notes && (
+                  <div className="pt-2 border-t border-[#414E36]/10">
+                    <span className="font-bold text-[#5A6A51] text-[11px]">{t.instructionsLabel}:</span>
+                    <p className="text-[#1F251A] mt-0.5 font-sans leading-relaxed">{activeRx.general_notes}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-[#5A6A51] bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 italic">
+                {t.noPrescriptionOnRecord}
+              </p>
+            )}
+          </div>
+
+          {/* 3. Session Consumables & Financial Breakdown */}
+          {(parsedNotes.productsLog || parsedNotes.invoiceLog) && (
+            <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm space-y-3">
               <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                <Receipt size={15} className="text-[#414E36]" /> {t.sessionConsumablesTitle}
+                <Receipt size={15} className="text-[#414E36]" /> {t.sessionSummaryTitle}
               </h4>
 
-              {parsedNotes.instaPayLog && (
-                <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 text-xs space-y-1">
-                  <div className="flex items-center gap-2 font-bold text-blue-900">
-                    <CreditCard size={14} className="text-blue-700" />
-                    <span>InstaPay Payment Information</span>
-                  </div>
-                  <p className="font-mono text-blue-800 text-[11px] pt-1">
-                    {parsedNotes.instaPayLog.replace(/\[|\]/g, "")}
-                  </p>
-                </div>
-              )}
-
               {parsedNotes.productsLog && (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs space-y-1">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs">
                   <div className="flex items-center gap-2 font-bold text-emerald-900">
                     <Package size={14} className="text-emerald-700" />
                     <span>{t.productsUsedTitle}</span>
@@ -295,60 +322,83 @@ export default function DoctorSessionDrawer({
               </h4>
             </div>
 
-            <textarea
-              rows={6}
-              value={clinicalNote}
-              onChange={(e) => setClinicalNote(e.target.value)}
-              placeholder={t.doctorNotesPlaceholder}
-              className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans leading-relaxed"
-            />
+            {isCompleted ? (
+              <p className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] font-sans leading-relaxed">
+                {parsedNotes.cleanDoctorNote || t.noBookingNotes}
+              </p>
+            ) : (
+              <textarea
+                rows={5}
+                value={clinicalNote}
+                onChange={(e) => setClinicalNote(e.target.value)}
+                placeholder={t.doctorNotesPlaceholder}
+                className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans leading-relaxed"
+              />
+            )}
           </div>
 
         </div>
 
         {/* Drawer Action Sticky Footer */}
         <div className="p-4 px-6 bg-[#FBFBF9] border-t border-[#414E36]/10 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveSessionBooking?.(scheduleModalBooking);
-                setActiveTab?.("ongoing");
-                setScheduleModalBooking(null);
-              }}
-              className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 text-xs font-bold transition shadow-sm flex items-center gap-1.5"
-            >
-              <Play size={14} />
-              <span>{t.startOngoingSessionBtn}</span>
-            </button>
+          {isCompleted ? (
+            <div className="flex items-center justify-between w-full">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-extrabold text-emerald-800">
+                <CheckCircle2 size={14} /> {t.completedSessionRecord}
+              </span>
+              <button
+                type="button"
+                onClick={() => setScheduleModalBooking(null)}
+                className="rounded-2xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition"
+              >
+                {t.closeDrawerBtn}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveSessionBooking?.(scheduleModalBooking);
+                    setActiveTab?.("ongoing");
+                    setScheduleModalBooking(null);
+                  }}
+                  className="rounded-2xl bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 text-xs font-bold transition shadow-sm flex items-center gap-1.5"
+                >
+                  <Play size={14} />
+                  <span>{t.startOngoingSessionBtn}</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => handleSaveClinicalNote(scheduleModalBooking)}
-              disabled={savingNote}
-              className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm disabled:opacity-50"
-            >
-              {savingNote ? "..." : t.saveClinicalNotesBtn}
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => handleSaveClinicalNote(scheduleModalBooking)}
+                  disabled={savingNote}
+                  className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm disabled:opacity-50"
+                >
+                  {savingNote ? "..." : t.saveClinicalNotesBtn}
+                </button>
+              </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowPrescriptionModal(true)}
-              className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
-            >
-              {t.writePrescriptionBtn}
-            </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPrescriptionModal(true)}
+                  className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
+                >
+                  {t.writePrescriptionBtn}
+                </button>
 
-            <button
-              type="button"
-              onClick={() => handleCompleteTreatment(scheduleModalBooking)}
-              className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
-            >
-              {t.completeTreatmentBtn}
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => handleCompleteTreatment(scheduleModalBooking)}
+                  className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
+                >
+                  {t.completeTreatmentBtn}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

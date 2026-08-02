@@ -372,7 +372,11 @@ export default function DoctorAccountView({
     }
   }, [receptionistStartedSession, activeSessionBooking]);
 
-  // Load Patient Medical Record whenever target booking changes
+  // Global Patient Records & Prescriptions Cache Map
+  const [medicalRecordsMap, setMedicalRecordsMap] = useState<Record<string, any>>({});
+  const [prescriptionsMap, setPrescriptionsMap] = useState<Record<string, any[]>>({});
+
+  // Load Patient Medical Record & Prescriptions whenever target booking changes
   const targetBookingForMedicalRecord = activeSessionBooking || scheduleModalBooking;
 
   useEffect(() => {
@@ -403,22 +407,43 @@ export default function DoctorAccountView({
         setResolvedCustomerId(custId || null);
 
         if (custId) {
+          // Check local cache first
+          if (medicalRecordsMap[custId]) {
+            const cached = medicalRecordsMap[custId];
+            setMedicalRecord(cached);
+            setFormSkinType(cached.skin_type || "Normal");
+            setFormAllergies(cached.allergies || "");
+            setFormMedicationDetails(cached.medication_details || "");
+            setFormMedicalConditionsDetails(cached.medical_conditions_details || "");
+            setFormPreviousTreatmentsDetails(cached.previous_treatments_details || "");
+            setShowMedicalForm(false);
+          }
+
           const medRes = await fetch(`/api/medical-records?customer_id=${encodeURIComponent(custId)}`, { headers });
           if (medRes.ok) {
             const medData = await medRes.json();
-            const record = Array.isArray(medData) ? medData[0] : medData.medicalRecord || medData.record;
-            if (record) {
+            const record = Array.isArray(medData) ? medData[0] : medData.medicalRecord || medData.record || medData.form;
+            if (record && (record.skin_type || record.allergies || record.medication_details || record.medical_conditions_details || record.previous_treatments_details)) {
               setMedicalRecord(record);
+              setMedicalRecordsMap((prev) => ({ ...prev, [custId]: record }));
               setFormSkinType(record.skin_type || "Normal");
               setFormAllergies(record.allergies || "");
               setFormMedicationDetails(record.medication_details || "");
               setFormMedicalConditionsDetails(record.medical_conditions_details || "");
               setFormPreviousTreatmentsDetails(record.previous_treatments_details || "");
               setShowMedicalForm(false);
-            } else {
+            } else if (!medicalRecordsMap[custId]) {
               setMedicalRecord(null);
               setShowMedicalForm(true);
             }
+          }
+
+          // Fetch Prescriptions for customer / booking
+          const rxRes = await fetch(`/api/prescriptions?customer_id=${encodeURIComponent(custId)}`, { headers });
+          if (rxRes.ok) {
+            const rxData = await rxRes.json();
+            const list = Array.isArray(rxData) ? rxData : rxData.prescriptions || [];
+            setPrescriptionsMap((prev) => ({ ...prev, [custId]: list }));
           }
         } else {
           setMedicalRecord(null);
@@ -964,6 +989,7 @@ export default function DoctorAccountView({
         handleCompleteTreatment={handleCompleteTreatment}
         setActiveSessionBooking={setActiveSessionBooking}
         setActiveTab={setActiveTab}
+        prescriptionsMap={prescriptionsMap}
         t={t}
       />
 
@@ -986,6 +1012,8 @@ export default function DoctorAccountView({
         selectedPatientHistory={selectedPatientHistory}
         setSelectedPatientHistory={setSelectedPatientHistory}
         handleOpenScheduleModal={handleOpenScheduleModal}
+        medicalRecordsMap={medicalRecordsMap}
+        prescriptionsMap={prescriptionsMap}
         t={t}
       />
     </div>
