@@ -217,7 +217,8 @@ export default function DoctorAccountView({
   const [resolvedCustomerId, setResolvedCustomerId] = useState<string | null>(null);
   const [savingNote, setSavingNote] = useState(false);
 
-  // Consumables & Devices Inventory State
+  // Catalog State (Services, Inventory Products & Devices)
+  const [servicesList, setServicesList] = useState<any[]>([]);
   const [productsList, setProductsList] = useState<any[]>([]);
   const [devicesList, setDevicesList] = useState<any[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>("");
@@ -254,14 +255,15 @@ export default function DoctorAccountView({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Fetch inventory products & devices on mount
+  // Fetch inventory products, devices & services catalog on mount
   useEffect(() => {
     const fetchInventory = async () => {
       try {
         const headers = await getAuthHeaders();
-        const [prodRes, devRes] = await Promise.all([
+        const [prodRes, devRes, srvRes] = await Promise.all([
           fetch("/api/inventory/products", { headers }),
-          fetch("/api/inventory/devices", { headers })
+          fetch("/api/inventory/devices", { headers }),
+          fetch("/api/services", { headers })
         ]);
         if (prodRes.ok) {
           const pData = await prodRes.json();
@@ -271,8 +273,12 @@ export default function DoctorAccountView({
           const dData = await devRes.json();
           setDevicesList(Array.isArray(dData) ? dData : dData.devices || []);
         }
+        if (srvRes.ok) {
+          const sData = await srvRes.json();
+          setServicesList(Array.isArray(sData) ? sData : sData.services || []);
+        }
       } catch (err) {
-        console.error("Error loading doctor inventory:", err);
+        console.error("Error loading doctor catalog:", err);
       }
     };
     fetchInventory();
@@ -824,6 +830,7 @@ export default function DoctorAccountView({
             setFormPreviousTreatmentsDetails={setFormPreviousTreatmentsDetails}
             savingMedicalRecord={savingMedicalRecord}
             handleSaveMedicalRecord={handleSaveMedicalRecord}
+            servicesList={servicesList}
             productsList={productsList}
             devicesList={devicesList}
             selectedProductId={selectedProductId}

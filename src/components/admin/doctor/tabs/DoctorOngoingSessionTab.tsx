@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Play,
   FileText,
@@ -16,9 +16,22 @@ import {
   X,
   Clock,
   ChevronRight,
-  UserCheck
+  UserCheck,
+  Plus,
+  Layers,
+  Trash2
 } from "lucide-react";
 import { DoctorTab } from "../types";
+import { getAuthHeaders } from "../utils";
+
+export interface AdditionalServiceItem {
+  id: string | number;
+  name: string;
+  price: number;
+  deviceId?: string;
+  deviceName?: string;
+  pulses: number;
+}
 
 interface DoctorOngoingSessionTabProps {
   activeSessionBooking: any;
@@ -40,6 +53,7 @@ interface DoctorOngoingSessionTabProps {
   setFormPreviousTreatmentsDetails: (val: string) => void;
   savingMedicalRecord: boolean;
   handleSaveMedicalRecord: (e: React.FormEvent) => void;
+  servicesList?: any[];
   productsList: any[];
   devicesList: any[];
   selectedProductId: string;
@@ -89,8 +103,9 @@ export default function DoctorOngoingSessionTab({
   setFormPreviousTreatmentsDetails,
   savingMedicalRecord,
   handleSaveMedicalRecord,
-  productsList,
-  devicesList,
+  servicesList = [],
+  productsList = [],
+  devicesList = [],
   selectedProductId,
   setSelectedProductId,
   selectedProductQty,
@@ -117,12 +132,85 @@ export default function DoctorOngoingSessionTab({
   setActiveSessionBooking,
   t
 }: DoctorOngoingSessionTabProps) {
+  // Additional Services added during ongoing treatment session
+  const [additionalServices, setAdditionalServices] = useState<AdditionalServiceItem[]>([]);
+  const [selectedServiceIdToAdd, setSelectedServiceIdToAdd] = useState<string>("");
+  const [selectedDeviceForService, setSelectedDeviceForService] = useState<string>("");
+  const [pulsesCountForService, setPulsesCountForService] = useState<number>(100);
+  const [loadingDeviceLinks, setLoadingDeviceLinks] = useState(false);
+
+  // When a service is selected from dropdown, fetch its linked devices & default pulses from /api/service-devices
+  useEffect(() => {
+    if (!selectedServiceIdToAdd) return;
+    const fetchServiceDevices = async () => {
+      setLoadingDeviceLinks(true);
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(`/api/service-devices?serviceId=${selectedServiceIdToAdd}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const links = data.deviceLinks || [];
+          if (links.length > 0) {
+            setSelectedDeviceForService(links[0].device_id || "");
+            setPulsesCountForService(Number(links[0].pulses_per_session) || 100);
+          } else {
+            setPulsesCountForService(100);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading service devices:", err);
+      } finally {
+        setLoadingDeviceLinks(false);
+      }
+    };
+    fetchServiceDevices();
+  }, [selectedServiceIdToAdd]);
+
+  // Handler to add an additional service to the session
+  const handleAddServiceToSession = () => {
+    if (!selectedServiceIdToAdd) return;
+    const srv = servicesList.find((s) => String(s.id) === String(selectedServiceIdToAdd));
+    if (!srv) return;
+
+    const srvName = srv.en || srv.name || "Clinical Service";
+    const srvPrice = Number(srv.price || 0);
+
+    const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceForService));
+
+    const newItem: AdditionalServiceItem = {
+      id: Date.now(),
+      name: srvName,
+      price: srvPrice,
+      deviceId: devObj?.id,
+      deviceName: devObj?.name,
+      pulses: Math.max(0, pulsesCountForService || 0)
+    };
+
+    setAdditionalServices((prev) => [...prev, newItem]);
+    setSelectedServiceIdToAdd("");
+    setSelectedDeviceForService("");
+    setPulsesCountForService(100);
+  };
+
+  const handleRemoveServiceFromSession = (id: string | number) => {
+    setAdditionalServices((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  // Calculate Subtotals
+  const additionalServicesSubtotal = additionalServices.reduce((sum, item) => sum + item.price, 0);
+  const totalServicesPrice = baseBookingPrice + additionalServicesSubtotal;
+  
+  // Total Pulses Calculated = (Primary Service Default Pulses) + (Additional Services Pulses)
+  const additionalPulsesTotal = additionalServices.reduce((sum, item) => sum + item.pulses, 0);
+  const totalSessionPulses = (extraPulsesCount || 0) + additionalPulsesTotal;
+
+  // Final Session Invoice Total
+  const finalSessionTotal = totalServicesPrice + productsSubtotal + extraPulsesSubtotal;
+
   // Find all active / started sessions from reservations list
   const activeSessionsList = reservations.filter((r) => {
     const st = String(r.status || "").toLowerCase().trim();
-    return (
-      st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment"
-    );
+    return st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
   });
 
   // Find all non-completed queue bookings
@@ -134,7 +222,7 @@ export default function DoctorOngoingSessionTab({
     <div className="space-y-6 w-full">
       {activeSessionBooking && activeSessionBooking.status !== "completed" ? (
         <>
-          {/* Active Patient Card */}
+          {/* Active Patient Header Card */}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 border border-[#414E36]/10 shadow-sm w-full">
             <div className="flex items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#414E36] text-white font-bold text-xl shadow-md">
@@ -149,8 +237,14 @@ export default function DoctorOngoingSessionTab({
                     <Play size={12} /> {t.sessionStartedByReception}
                   </span>
                 </div>
-                <p className="text-xs text-[#5A6A51] mt-1">
-                  {activeSessionBooking.service || activeSessionBooking.service_name} • {activeSessionBooking.time || activeSessionBooking.time_slot || "Today"} • <strong className="text-[#414E36]">{activeSessionBooking.room || "Treatment Room"}</strong>
+                <p className="text-xs text-[#5A6A51] mt-1 flex items-center gap-2">
+                  <strong className="text-[#414E36] font-bold">
+                    {activeSessionBooking.service || activeSessionBooking.service_name}
+                  </strong>
+                  <span>•</span>
+                  <span>{activeSessionBooking.time || activeSessionBooking.time_slot || "Today"}</span>
+                  <span>•</span>
+                  <span className="text-[#414E36] font-bold">{activeSessionBooking.room || "Treatment Room"}</span>
                 </p>
               </div>
             </div>
@@ -173,7 +267,7 @@ export default function DoctorOngoingSessionTab({
             </div>
           </div>
 
-          {/* Treatment Details & Notes */}
+          {/* Treatment Details & Notes Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
             {/* Patient Medical Record & Intake Section */}
             <div className="space-y-6">
@@ -327,149 +421,217 @@ export default function DoctorOngoingSessionTab({
               </div>
             </div>
 
-            {/* Doctor Clinical Notes & Session Consumables Section */}
+            {/* Doctor Clinical Services & Products Section */}
             <div className="lg:col-span-2 space-y-6">
-              {/* SESSION CONSUMABLES & EXTRA PULSES SECTION */}
+              
+              {/* 1. DYNAMIC SERVICES & AUTOMATIC PULSES COUNTER SECTION */}
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
-                  <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                    <Sparkles size={16} className="text-[#414E36]" /> {t.sessionConsumablesTitle}
-                  </h3>
-                  <div className="flex items-center gap-2 rounded-2xl bg-[#414E36]/10 px-3.5 py-1.5 text-xs font-black text-[#414E36]">
-                    <span>{t.updatedInvoiceTotal}</span>
-                    <span className="text-sm text-[#414E36] font-extrabold">{updatedInvoiceTotal} EGP</span>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                      <Zap size={16} className="text-amber-600" /> {t.additionalServicesTitle}
+                    </h3>
+                  </div>
+                  
+                  {/* Live Total Pulse Counter Badge */}
+                  <div className="flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-1.5 text-xs font-black text-amber-900 shadow-sm">
+                    <Zap size={14} className="text-amber-600 fill-amber-500 animate-pulse" />
+                    <span>{t.totalPulsesCalculated}</span>
+                    <span className="text-sm text-amber-900 font-extrabold">{totalSessionPulses} {t.pulsesLabel}</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Products Used */}
-                  <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
-                    <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
-                      <ShoppingBag size={14} className="text-[#414E36]" /> {t.productsUsedTitle}
-                    </h4>
-                    
-                    <div className="grid grid-cols-3 gap-2">
-                      <select
-                        value={selectedProductId}
-                        onChange={(e) => setSelectedProductId(e.target.value)}
-                        className="col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                      >
-                        <option value="">{t.selectProductPlaceholder}</option>
-                        {productsList.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({p.price || p.unit_price || p.selling_price || 0} EGP)
-                          </option>
-                        ))}
-                      </select>
+                {/* Primary Reserved Service Display */}
+                <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
+                      <Layers size={14} className="text-[#414E36]" /> {t.primaryBookingService}
+                    </span>
+                    <span className="font-extrabold text-[#414E36]">{baseBookingPrice} EGP</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10">
+                    <span className="font-bold text-[#1F251A]">
+                      {activeSessionBooking.service || activeSessionBooking.service_name}
+                    </span>
+                    <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg">
+                      {extraPulsesCount || 100} {t.pulsesLabel}
+                    </span>
+                  </div>
+                </div>
 
-                      <input
-                        type="number"
-                        min={1}
-                        value={selectedProductQty}
-                        onChange={(e) => setSelectedProductQty(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                        placeholder="Qty"
-                      />
-                    </div>
+                {/* Additional Services Selection & Counter */}
+                <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                  <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
+                    <Plus size={14} className="text-[#414E36]" /> {t.addAdditionalServiceBtn}
+                  </h4>
 
-                    <button
-                      type="button"
-                      onClick={handleAddProductToSession}
-                      className="w-full rounded-xl bg-[#414E36] py-1.5 text-xs font-bold text-white hover:bg-[#343F2B] transition"
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    {/* Service Selector Dropdown */}
+                    <select
+                      value={selectedServiceIdToAdd}
+                      onChange={(e) => setSelectedServiceIdToAdd(e.target.value)}
+                      className="md:col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
                     >
-                      {t.addProductToInvoiceBtn}
-                    </button>
+                      <option value="">{t.selectServicePlaceholder}</option>
+                      {servicesList.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.en || s.name} ({s.price || 0} EGP)
+                        </option>
+                      ))}
+                    </select>
 
-                    {usedProducts.length > 0 && (
-                      <div className="space-y-1.5 pt-2 border-t border-[#414E36]/10">
-                        {usedProducts.map((item, i) => (
-                          <div key={i} className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-[#414E36]/10">
-                            <div>
-                              <span className="font-bold text-[#1F251A]">{item.name}</span>
-                              <span className="text-[10px] text-[#5A6A51] block">Qty: {item.qty} x {item.unitPrice} EGP</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-extrabold text-[#414E36]">{item.total} EGP</span>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveProductFromSession(i)}
-                                className="text-rose-600 hover:text-rose-800 text-xs font-bold"
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {/* Device Selector */}
+                    <select
+                      value={selectedDeviceForService}
+                      onChange={(e) => setSelectedDeviceForService(e.target.value)}
+                      className="rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none"
+                    >
+                      <option value="">{t.selectDevicePlaceholder}</option>
+                      {devicesList.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  {/* Extra Device Pulses */}
-                  <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
-                    <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
-                      <Zap size={14} className="text-amber-600" /> {t.extraDevicePulsesTitle}
-                    </h4>
-
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.selectDevicePlaceholder}</label>
-                      <select
-                        value={selectedDeviceId}
-                        onChange={(e) => {
-                          const devId = e.target.value;
-                          setSelectedDeviceId(devId);
-                          const dev = devicesList.find((d) => d.id === devId);
-                          if (dev) {
-                            const pPrice = Number(dev.price_per_pulse || dev.pulse_price || dev.cost_per_pulse || 2.5);
-                            setPricePerPulse(pPrice);
-                          } else {
-                            setPricePerPulse(0);
-                          }
-                        }}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                      >
-                        <option value="">{t.selectDevicePlaceholder}</option>
-                        {devicesList.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name} ({d.status || 'Active'})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.extraPulsesCountLabel}</label>
+                      <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.overridePulsesLabel}</label>
                       <input
                         type="number"
                         min={0}
-                        value={extraPulsesCount}
-                        onChange={(e) => setExtraPulsesCount(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
-                        placeholder="e.g. 50"
+                        value={pulsesCountForService}
+                        onChange={(e) => setPulsesCountForService(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                        placeholder="Pulses (e.g. 150)"
                       />
                     </div>
 
-                    {extraPulsesSubtotal > 0 && (
-                      <div className="text-xs bg-amber-50 p-2.5 rounded-xl border border-amber-200 flex justify-between font-bold text-amber-900">
-                        <span>{t.extraPulsesSubtotal} ({extraPulsesCount} pulses @ {pricePerPulse} EGP)</span>
-                        <span>+{extraPulsesSubtotal} EGP</span>
-                      </div>
-                    )}
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={handleAddServiceToSession}
+                        disabled={!selectedServiceIdToAdd}
+                        className="w-full rounded-xl bg-[#414E36] py-2 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        <Plus size={14} /> {t.addAdditionalServiceBtn}
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Added Additional Services List */}
+                  {additionalServices.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-[#414E36]/10">
+                      {additionalServices.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10">
+                          <div>
+                            <span className="font-bold text-[#1F251A] block">{item.name}</span>
+                            <span className="text-[10px] text-[#5A6A51]">
+                              {item.deviceName ? `${t.deviceUsedLabel} ${item.deviceName} • ` : ""}{item.pulses} {t.pulsesLabel}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-extrabold text-[#414E36]">+{item.price} EGP</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveServiceFromSession(item.id)}
+                              className="text-rose-600 hover:text-rose-800 text-xs font-bold"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. PRODUCTS / CONSUMABLES USED SECTION */}
+              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
+                  <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
+                    <ShoppingBag size={16} className="text-[#414E36]" /> {t.productsUsedTitle}
+                  </h3>
                 </div>
 
-                {/* Invoice Breakdown Summary */}
-                <div className="bg-[#414E36]/05 p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-4 text-[#5A6A51]">
-                    <span>{t.baseServiceLabel} <strong className="text-[#1F251A]">{baseBookingPrice} EGP</strong></span>
-                    <span>{t.productsAddonsLabel} <strong className="text-[#1F251A]">+{productsSubtotal} EGP</strong></span>
-                    <span>{t.pulsesAddonsLabel} <strong className="text-[#1F251A]">+{extraPulsesSubtotal} EGP</strong></span>
+                <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
+                  <div className="grid grid-cols-3 gap-2">
+                    <select
+                      value={selectedProductId}
+                      onChange={(e) => setSelectedProductId(e.target.value)}
+                      className="col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                    >
+                      <option value="">{t.selectProductPlaceholder}</option>
+                      {productsList.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.price || p.unit_price || p.selling_price || 0} EGP)
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="number"
+                      min={1}
+                      value={selectedProductQty}
+                      onChange={(e) => setSelectedProductQty(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                      placeholder="Qty"
+                    />
                   </div>
-                  <div className="text-[#414E36] font-extrabold text-sm">
-                    {t.finalInvoiceLabel} {updatedInvoiceTotal} EGP
+
+                  <button
+                    type="button"
+                    onClick={handleAddProductToSession}
+                    className="w-full rounded-xl bg-[#414E36] py-1.5 text-xs font-bold text-white hover:bg-[#343F2B] transition"
+                  >
+                    {t.addProductToInvoiceBtn}
+                  </button>
+
+                  {usedProducts.length > 0 && (
+                    <div className="space-y-1.5 pt-2 border-t border-[#414E36]/10">
+                      {usedProducts.map((item, i) => (
+                        <div key={i} className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-[#414E36]/10">
+                          <div>
+                            <span className="font-bold text-[#1F251A]">{item.name}</span>
+                            <span className="text-[10px] text-[#5A6A51] block">Qty: {item.qty} x {item.unitPrice} EGP</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-[#414E36]">{item.total} EGP</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveProductFromSession(i)}
+                              className="text-rose-600 hover:text-rose-800 text-xs font-bold"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Final Session Invoice Breakdown Summary */}
+                <div className="bg-[#414E36]/05 p-4 rounded-2xl space-y-2 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-[#5A6A51]">
+                    <span>{t.baseServiceLabel} <strong className="text-[#1F251A]">{baseBookingPrice} EGP</strong></span>
+                    {additionalServicesSubtotal > 0 && (
+                      <span>{t.additionalServicesSubtotal} <strong className="text-[#1F251A]">+{additionalServicesSubtotal} EGP</strong></span>
+                    )}
+                    {productsSubtotal > 0 && (
+                      <span>{t.productsAddonsLabel} <strong className="text-[#1F251A]">+{productsSubtotal} EGP</strong></span>
+                    )}
+                  </div>
+                  <div className="pt-2 border-t border-[#414E36]/10 flex items-center justify-between text-[#414E36] font-extrabold text-base">
+                    <span>{t.finalInvoiceLabel}</span>
+                    <span>{finalSessionTotal} EGP</span>
                   </div>
                 </div>
               </div>
 
+              {/* 3. DOCTOR CLINICAL NOTES */}
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
                 <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
                   <FileText size={16} className="text-[#414E36]" /> {t.doctorNotesTitle}

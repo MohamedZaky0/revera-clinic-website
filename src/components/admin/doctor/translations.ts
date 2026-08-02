@@ -103,6 +103,17 @@ export const doctorTranslations = {
     openSessionBtn: "Open Treatment Session",
     startOngoingSessionBtn: "Start / Open Session",
 
+    // Dynamic Services & Pulses Section
+    additionalServicesTitle: "Session Clinical Services & Pulse Counter",
+    addAdditionalServiceBtn: "+ Add Additional Service",
+    selectServicePlaceholder: "-- Select Service --",
+    primaryBookingService: "Primary Reserved Service:",
+    additionalServicesSubtotal: "Additional Services:",
+    totalPulsesCalculated: "Total Pulses Calculated:",
+    pulsesLabel: "pulses",
+    deviceUsedLabel: "Device Used:",
+    overridePulsesLabel: "Override Pulses Count:",
+
     // Patients Directory Tab
     patientsDirectoryTitle: "My Patients Directory",
     patientsDirectorySubtitle: "All patients assigned to your care across scheduled, active, and completed visits.",
@@ -284,6 +295,17 @@ export const doctorTranslations = {
     todayAvailableBookings: "مواعيد اليوم والجلسات المتاحة",
     openSessionBtn: "فتح جلسة العلاج",
     startOngoingSessionBtn: "بدء / فتح الجلسة",
+
+    // Dynamic Services & Pulses Section
+    additionalServicesTitle: "الخدمات الطبية بالجلسة وعدّاد النبضات",
+    addAdditionalServiceBtn: "+ إضافة خدمة إضافية",
+    selectServicePlaceholder: "-- اختر الخدمة --",
+    primaryBookingService: "الخدمة الأساسية بالحجز:",
+    additionalServicesSubtotal: "الخدمات الإضافية:",
+    totalPulsesCalculated: "إجمالي النبضات المحسوبة:",
+    pulsesLabel: "نبضة",
+    deviceUsedLabel: "الجهاز المستخدم:",
+    overridePulsesLabel: "تعديل عدد النبضات:",
 
     // Patients Directory Tab
     patientsDirectoryTitle: "سجل المرضى",
