@@ -41,6 +41,7 @@ interface DoctorSessionDrawerProps {
   savingNote: boolean;
   setShowPrescriptionModal: (show: boolean) => void;
   handleCompleteTreatment: (booking: any) => void;
+  t: any;
 }
 
 export default function DoctorSessionDrawer({
@@ -68,7 +69,8 @@ export default function DoctorSessionDrawer({
   handleSaveClinicalNote,
   savingNote,
   setShowPrescriptionModal,
-  handleCompleteTreatment
+  handleCompleteTreatment,
+  t
 }: DoctorSessionDrawerProps) {
   if (!scheduleModalBooking) return null;
   const parsedNotes = parseBookingNotes(scheduleModalBooking.notes || "");
@@ -94,7 +96,7 @@ export default function DoctorSessionDrawer({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-extrabold text-[#1F251A]">
-                  {scheduleModalBooking.name || scheduleModalBooking.customer_name || "Patient Session"}
+                  {scheduleModalBooking.name || scheduleModalBooking.customer_name || t.patientSessionDrawerTitle}
                 </h3>
                 <span className="rounded-full bg-[#414E36]/10 px-2.5 py-0.5 text-[10px] font-extrabold text-[#414E36] capitalize">
                   {scheduleModalBooking.status || "Scheduled"}
@@ -112,7 +114,7 @@ export default function DoctorSessionDrawer({
             type="button"
             onClick={() => setScheduleModalBooking(null)}
             className="rounded-2xl p-2.5 text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36] transition"
-            title="Close Drawer"
+            title={t.closeDrawerBtn}
           >
             <X size={20} />
           </button>
@@ -124,11 +126,11 @@ export default function DoctorSessionDrawer({
           {/* 1. Quick Info Overview Banner */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-2xl bg-[#F4F5F1] p-4 border border-[#414E36]/10 text-xs">
             <div>
-              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">Time Slot</span>
+              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">{t.timeSlotHeader}</span>
               <p className="font-bold text-[#1F251A] mt-0.5">{scheduleModalBooking.time || scheduleModalBooking.time_slot || "09:00 AM"}</p>
             </div>
             <div>
-              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">Date</span>
+              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">{t.dateHeader}</span>
               <p className="font-bold text-[#1F251A] mt-0.5">{scheduleModalBooking.date || selectedDateStr}</p>
             </div>
             <div>
@@ -141,35 +143,35 @@ export default function DoctorSessionDrawer({
           <div className="rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                <AlertCircle size={15} className="text-[#414E36]" /> Patient Medical Record
+                <AlertCircle size={15} className="text-[#414E36]" /> {t.patientMedicalRecordTitle}
               </h4>
               {medicalRecord ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                  <CheckCircle2 size={11} /> On File
+                  <CheckCircle2 size={11} /> {t.onFileStatus}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800 animate-pulse">
-                  <AlertTriangle size={11} /> Intake Required
+                  <AlertTriangle size={11} /> {t.intakeRequiredStatus}
                 </span>
               )}
             </div>
 
             {medicalRecordLoading ? (
-              <p className="text-xs text-[#5A6A51]">Loading medical record...</p>
+              <p className="text-xs text-[#5A6A51]">{t.loadingMedicalRecord}</p>
             ) : medicalRecord && !showMedicalForm ? (
               <div className="space-y-2.5 text-xs bg-white p-4 rounded-xl border border-[#414E36]/10">
                 <div className="flex justify-between items-center border-b border-[#414E36]/10 pb-2">
-                  <span className="text-[#5A6A51] font-medium">Skin Type:</span>
+                  <span className="text-[#5A6A51] font-medium">{t.skinTypeLabel}:</span>
                   <span className="font-bold text-[#1F251A] bg-[#414E36]/10 px-2.5 py-0.5 rounded-lg">{medicalRecord.skin_type || "Normal"}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-[#414E36]/10 pb-2">
-                  <span className="text-[#5A6A51] font-medium">Allergies:</span>
+                  <span className="text-[#5A6A51] font-medium">{t.allergiesLabel}:</span>
                   <span className={`font-bold px-2.5 py-0.5 rounded-lg ${medicalRecord.allergies && medicalRecord.allergies !== "None" ? "bg-rose-100 text-rose-800" : "bg-emerald-100 text-emerald-800"}`}>
                     {medicalRecord.allergies || "None"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center border-b border-[#414E36]/10 pb-2">
-                  <span className="text-[#5A6A51] font-medium">Medications:</span>
+                  <span className="text-[#5A6A51] font-medium">{t.currentMedicationLabel}:</span>
                   <span className="font-semibold text-[#1F251A]">{medicalRecord.medication_details || "None"}</span>
                 </div>
                 <button
@@ -177,18 +179,18 @@ export default function DoctorSessionDrawer({
                   onClick={() => setShowMedicalForm(true)}
                   className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-[#414E36] hover:underline pt-1"
                 >
-                  <Edit size={13} /> Edit Medical Record
+                  <Edit size={13} /> {t.updateMedicalRecordBtn}
                 </button>
               </div>
             ) : (
               <form onSubmit={handleSaveMedicalRecord} className="space-y-3 pt-1 text-xs bg-white p-4 rounded-xl border border-[#414E36]/10">
                 {!medicalRecord && (
                   <p className="text-[11px] font-bold text-amber-900 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
-                    First Visit: Patient Medical Intake Form Required
+                    {t.firstVisitNotice}
                   </p>
                 )}
                 <div>
-                  <label className="block text-[10px] font-bold text-[#5A6A51] uppercase mb-1">Skin Type</label>
+                  <label className="block text-[10px] font-bold text-[#5A6A51] uppercase mb-1">{t.skinTypeLabel}</label>
                   <select
                     value={formSkinType}
                     onChange={(e) => setFormSkinType(e.target.value)}
@@ -203,7 +205,7 @@ export default function DoctorSessionDrawer({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-[#5A6A51] uppercase mb-1">Allergies</label>
+                  <label className="block text-[10px] font-bold text-[#5A6A51] uppercase mb-1">{t.allergiesLabel}</label>
                   <input
                     type="text"
                     placeholder="e.g. Latex, Aspirin, None"
@@ -213,7 +215,7 @@ export default function DoctorSessionDrawer({
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-[#5A6A51] uppercase mb-1">Medications</label>
+                  <label className="block text-[10px] font-bold text-[#5A6A51] uppercase mb-1">{t.currentMedicationLabel}</label>
                   <input
                     type="text"
                     placeholder="e.g. Roaccutane, None"
@@ -228,18 +230,18 @@ export default function DoctorSessionDrawer({
                     disabled={savingMedicalRecord}
                     className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-white hover:bg-[#343F2B]"
                   >
-                    {savingMedicalRecord ? "Saving..." : "Save Record"}
+                    {savingMedicalRecord ? "..." : t.saveMedicalRecordBtn}
                   </button>
                 </div>
               </form>
             )}
           </div>
 
-          {/* 3. System Metadata Cards (InstaPay, Products Used, Financial Logs) */}
+          {/* 3. System Metadata Cards */}
           {(parsedNotes.instaPayLog || parsedNotes.productsLog || parsedNotes.invoiceLog) && (
             <div className="space-y-3">
               <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                <Receipt size={15} className="text-[#414E36]" /> Session Financial & Payment Details
+                <Receipt size={15} className="text-[#414E36]" /> {t.sessionConsumablesTitle}
               </h4>
 
               {parsedNotes.instaPayLog && (
@@ -258,7 +260,7 @@ export default function DoctorSessionDrawer({
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs space-y-1">
                   <div className="flex items-center gap-2 font-bold text-emerald-900">
                     <Package size={14} className="text-emerald-700" />
-                    <span>Products Used During Session</span>
+                    <span>{t.productsUsedTitle}</span>
                   </div>
                   <pre className="font-mono text-emerald-800 text-[11px] pt-1 whitespace-pre-wrap leading-relaxed">
                     {parsedNotes.productsLog.replace(/^\[Products Used During Session\]:\s*/i, "")}
@@ -270,7 +272,7 @@ export default function DoctorSessionDrawer({
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs flex items-center justify-between">
                   <div className="flex items-center gap-2 font-bold text-slate-800">
                     <DollarSign size={14} className="text-slate-600" />
-                    <span>Updated Session Invoice Total</span>
+                    <span>{t.updatedInvoiceTotal}</span>
                   </div>
                   <span className="font-extrabold text-sm text-[#414E36]">
                     {parsedNotes.invoiceLog.replace(/^\[Invoice Total Updated\]:\s*/i, "")}
@@ -284,18 +286,15 @@ export default function DoctorSessionDrawer({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                <FileText size={15} className="text-[#414E36]" /> Procedure Observations & Doctor Notes
+                <FileText size={15} className="text-[#414E36]" /> {t.doctorNotesTitle}
               </h4>
-              <span className="text-[10px] font-bold text-[#5A6A51] bg-[#414E36]/10 px-2.5 py-0.5 rounded-full">
-                Doctor Notes Only
-              </span>
             </div>
 
             <textarea
               rows={6}
               value={clinicalNote}
               onChange={(e) => setClinicalNote(e.target.value)}
-              placeholder="Enter doctor's clinical observations, laser settings, treatment parameters, or post-procedure advice..."
+              placeholder={t.doctorNotesPlaceholder}
               className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans leading-relaxed"
             />
           </div>
@@ -310,7 +309,7 @@ export default function DoctorSessionDrawer({
             disabled={savingNote}
             className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm disabled:opacity-50"
           >
-            {savingNote ? "Saving Notes..." : "Save Notes"}
+            {savingNote ? "..." : t.saveClinicalNotesBtn}
           </button>
 
           <div className="flex items-center gap-2">
@@ -319,7 +318,7 @@ export default function DoctorSessionDrawer({
               onClick={() => setShowPrescriptionModal(true)}
               className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
             >
-              Write Prescription
+              {t.writePrescriptionBtn}
             </button>
 
             <button
@@ -327,7 +326,7 @@ export default function DoctorSessionDrawer({
               onClick={() => handleCompleteTreatment(scheduleModalBooking)}
               className="rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
             >
-              Complete Treatment
+              {t.completeTreatmentBtn}
             </button>
           </div>
         </div>

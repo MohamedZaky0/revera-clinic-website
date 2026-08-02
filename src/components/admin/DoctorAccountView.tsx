@@ -843,6 +843,7 @@ export default function DoctorAccountView({
             handleSaveClinicalNote={handleSaveClinicalNote}
             savingNote={savingNote}
             setActiveTab={setActiveTab}
+            t={t}
           />
         )}
 
@@ -855,6 +856,7 @@ export default function DoctorAccountView({
             filteredPatients={filteredPatients}
             reservations={reservations}
             setSelectedPatientHistory={setSelectedPatientHistory}
+            t={t}
           />
         )}
 
@@ -864,11 +866,12 @@ export default function DoctorAccountView({
             analyticsData={analyticsData}
             doctorPatientsList={doctorPatientsList}
             reservations={reservations}
+            t={t}
           />
         )}
 
         {/* TAB 5: SETTINGS VIEW */}
-        {activeTab === "settings" && <DoctorSettingsTab />}
+        {activeTab === "settings" && <DoctorSettingsTab t={t} />}
 
         {/* TAB 6: DOCTOR PROFILE VIEW */}
         {activeTab === "profile" && (
@@ -880,6 +883,7 @@ export default function DoctorAccountView({
             setNewPassword={setNewPassword}
             confirmPassword={confirmPassword}
             setConfirmPassword={setConfirmPassword}
+            t={t}
           />
         )}
       </main>
@@ -911,6 +915,7 @@ export default function DoctorAccountView({
         savingNote={savingNote}
         setShowPrescriptionModal={setShowPrescriptionModal}
         handleCompleteTreatment={handleCompleteTreatment}
+        t={t}
       />
 
       <DoctorPrescriptionModal
@@ -925,12 +930,14 @@ export default function DoctorAccountView({
         setRxGeneralNotes={setRxGeneralNotes}
         savingRx={savingRx}
         handleCreatePrescription={handleCreatePrescription}
+        t={t}
       />
 
       <DoctorPatientHistoryDrawer
         selectedPatientHistory={selectedPatientHistory}
         setSelectedPatientHistory={setSelectedPatientHistory}
         handleOpenScheduleModal={handleOpenScheduleModal}
+        t={t}
       />
     </div>
   );

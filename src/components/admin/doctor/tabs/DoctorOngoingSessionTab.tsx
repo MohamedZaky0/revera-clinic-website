@@ -61,6 +61,7 @@ interface DoctorOngoingSessionTabProps {
   handleSaveClinicalNote: (booking: any) => void;
   savingNote: boolean;
   setActiveTab: (tab: DoctorTab) => void;
+  t: any;
 }
 
 export default function DoctorOngoingSessionTab({
@@ -106,7 +107,8 @@ export default function DoctorOngoingSessionTab({
   setClinicalNote,
   handleSaveClinicalNote,
   savingNote,
-  setActiveTab
+  setActiveTab,
+  t
 }: DoctorOngoingSessionTabProps) {
   return (
     <div className="space-y-6 w-full">
@@ -124,7 +126,7 @@ export default function DoctorOngoingSessionTab({
                     {activeSessionBooking.name || activeSessionBooking.customer_name || "Patient"}
                   </h2>
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800 animate-pulse">
-                    <Play size={12} /> Session Started by Reception
+                    <Play size={12} /> {t.sessionStartedByReception}
                   </span>
                 </div>
                 <p className="text-xs text-[#5A6A51] mt-1">
@@ -139,14 +141,14 @@ export default function DoctorOngoingSessionTab({
                 onClick={() => setShowPrescriptionModal(true)}
                 className="flex items-center gap-2 rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
               >
-                <FileText size={14} /> Write Prescription
+                <FileText size={14} /> {t.writePrescriptionBtn}
               </button>
               <button
                 type="button"
                 onClick={() => handleCompleteTreatment(activeSessionBooking)}
                 className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
               >
-                <Check size={16} /> Complete Treatment
+                <Check size={16} /> {t.completeTreatmentBtn}
               </button>
             </div>
           </div>
@@ -158,42 +160,42 @@ export default function DoctorOngoingSessionTab({
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                    <AlertCircle size={16} className="text-[#414E36]" /> Patient Medical Record
+                    <AlertCircle size={16} className="text-[#414E36]" /> {t.patientMedicalRecordTitle}
                   </h3>
 
                   {medicalRecord ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                      <CheckCircle2 size={10} /> On File
+                      <CheckCircle2 size={10} /> {t.onFileStatus}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800 animate-pulse">
-                      <AlertTriangle size={10} /> Intake Required
+                      <AlertTriangle size={10} /> {t.intakeRequiredStatus}
                     </span>
                   )}
                 </div>
 
                 {medicalRecordLoading ? (
-                  <p className="text-xs text-[#5A6A51]">Loading patient medical record...</p>
+                  <p className="text-xs text-[#5A6A51]">{t.loadingMedicalRecord}</p>
                 ) : medicalRecord && !showMedicalForm ? (
                   <div className="space-y-3 text-xs">
                     <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                      <span className="font-bold text-[#5A6A51]">Skin Type:</span>
+                      <span className="font-bold text-[#5A6A51]">{t.skinTypeLabel}:</span>
                       <span className="font-bold text-[#1F251A]">{medicalRecord.skin_type || "Normal"}</span>
                     </div>
                     <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                      <span className="font-bold text-[#5A6A51]">Allergies:</span>
+                      <span className="font-bold text-[#5A6A51]">{t.allergiesLabel}:</span>
                       <span className="font-bold text-rose-700">{medicalRecord.allergies || "None reported"}</span>
                     </div>
                     <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                      <span className="font-bold text-[#5A6A51]">Current Medication:</span>
+                      <span className="font-bold text-[#5A6A51]">{t.currentMedicationLabel}:</span>
                       <span className="font-semibold text-[#1F251A]">{medicalRecord.medication_details || "None"}</span>
                     </div>
                     <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                      <span className="font-bold text-[#5A6A51]">Medical Conditions:</span>
+                      <span className="font-bold text-[#5A6A51]">{t.medicalConditionsLabel}:</span>
                       <span className="font-semibold text-[#1F251A]">{medicalRecord.medical_conditions_details || "None"}</span>
                     </div>
                     <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                      <span className="font-bold text-[#5A6A51]">Previous Treatments:</span>
+                      <span className="font-bold text-[#5A6A51]">{t.previousTreatmentsLabel}:</span>
                       <span className="font-semibold text-[#1F251A]">{medicalRecord.previous_treatments_details || "None"}</span>
                     </div>
 
@@ -202,7 +204,7 @@ export default function DoctorOngoingSessionTab({
                       onClick={() => setShowMedicalForm(true)}
                       className="mt-2 flex items-center gap-1.5 text-xs font-bold text-[#414E36] hover:underline"
                     >
-                      <Edit size={14} /> Update Medical Record
+                      <Edit size={14} /> {t.updateMedicalRecordBtn}
                     </button>
                   </div>
                 ) : (
@@ -210,13 +212,13 @@ export default function DoctorOngoingSessionTab({
                   <form onSubmit={handleSaveMedicalRecord} className="space-y-3 border-t border-[#414E36]/10 pt-3">
                     {!medicalRecord && (
                       <div className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200">
-                        <strong className="block font-bold">First Visit Detected!</strong>
-                        Patient medical record intake is required before completing treatment.
+                        <strong className="block font-bold">{t.firstVisitDetected}</strong>
+                        {t.firstVisitNotice}
                       </div>
                     )}
 
                     <div>
-                      <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Skin Type</label>
+                      <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.skinTypeLabel}</label>
                       <select
                         value={formSkinType}
                         onChange={(e) => setFormSkinType(e.target.value)}
@@ -232,7 +234,7 @@ export default function DoctorOngoingSessionTab({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Known Allergies</label>
+                      <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.allergiesLabel}</label>
                       <input
                         type="text"
                         placeholder="e.g. Latex, Aspirin, None"
@@ -243,7 +245,7 @@ export default function DoctorOngoingSessionTab({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Current Medications</label>
+                      <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.currentMedicationLabel}</label>
                       <input
                         type="text"
                         placeholder="e.g. Roaccutane, Blood thinners, None"
@@ -254,7 +256,7 @@ export default function DoctorOngoingSessionTab({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Chronic Medical Conditions</label>
+                      <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.medicalConditionsLabel}</label>
                       <input
                         type="text"
                         placeholder="e.g. Diabetes, Eczema, None"
@@ -265,7 +267,7 @@ export default function DoctorOngoingSessionTab({
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">Previous Aesthetic Treatments</label>
+                      <label className="block text-[11px] font-bold text-[#5A6A51] mb-1">{t.previousTreatmentsLabel}</label>
                       <input
                         type="text"
                         placeholder="e.g. Chemical Peel 3 mos ago, None"
@@ -282,7 +284,7 @@ export default function DoctorOngoingSessionTab({
                           onClick={() => setShowMedicalForm(false)}
                           className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#5A6A51]"
                         >
-                          Cancel
+                          {t.cancelBtn}
                         </button>
                       )}
                       <button
@@ -290,16 +292,16 @@ export default function DoctorOngoingSessionTab({
                         disabled={savingMedicalRecord}
                         className="rounded-xl bg-[#414E36] px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1"
                       >
-                        <Save size={14} /> {savingMedicalRecord ? "Saving..." : "Save Medical Record"}
+                        <Save size={14} /> {savingMedicalRecord ? "..." : t.saveMedicalRecordBtn}
                       </button>
                     </div>
                   </form>
                 )}
 
                 <div className="mt-6 border-t border-[#414E36]/10 pt-4 space-y-2">
-                  <span className="text-xs font-bold text-[#5A6A51]">Booking Notes:</span>
+                  <span className="text-xs font-bold text-[#5A6A51]">{t.bookingNotesTitle}</span>
                   <p className="text-xs text-[#1F251A] leading-relaxed bg-[#F4F5F1] p-3 rounded-2xl font-mono">
-                    {activeSessionBooking.notes || "No booking notes provided."}
+                    {activeSessionBooking.notes || t.noBookingNotes}
                   </p>
                 </div>
               </div>
@@ -311,10 +313,10 @@ export default function DoctorOngoingSessionTab({
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
                   <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                    <Sparkles size={16} className="text-[#414E36]" /> Session Consumables & Extra Device Pulses
+                    <Sparkles size={16} className="text-[#414E36]" /> {t.sessionConsumablesTitle}
                   </h3>
                   <div className="flex items-center gap-2 rounded-2xl bg-[#414E36]/10 px-3.5 py-1.5 text-xs font-black text-[#414E36]">
-                    <span>Updated Invoice Total:</span>
+                    <span>{t.updatedInvoiceTotal}</span>
                     <span className="text-sm text-[#414E36] font-extrabold">{updatedInvoiceTotal} EGP</span>
                   </div>
                 </div>
@@ -323,7 +325,7 @@ export default function DoctorOngoingSessionTab({
                   {/* Products Used */}
                   <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
                     <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
-                      <ShoppingBag size={14} className="text-[#414E36]" /> Products Used in Treatment
+                      <ShoppingBag size={14} className="text-[#414E36]" /> {t.productsUsedTitle}
                     </h4>
                     
                     <div className="grid grid-cols-3 gap-2">
@@ -332,7 +334,7 @@ export default function DoctorOngoingSessionTab({
                         onChange={(e) => setSelectedProductId(e.target.value)}
                         className="col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
                       >
-                        <option value="">-- Select Product --</option>
+                        <option value="">{t.selectProductPlaceholder}</option>
                         {productsList.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name} ({p.price || p.unit_price || p.selling_price || 0} EGP)
@@ -355,7 +357,7 @@ export default function DoctorOngoingSessionTab({
                       onClick={handleAddProductToSession}
                       className="w-full rounded-xl bg-[#414E36] py-1.5 text-xs font-bold text-white hover:bg-[#343F2B] transition"
                     >
-                      + Add Product to Invoice
+                      {t.addProductToInvoiceBtn}
                     </button>
 
                     {usedProducts.length > 0 && (
@@ -385,17 +387,17 @@ export default function DoctorOngoingSessionTab({
                   {/* Extra Device Pulses */}
                   <div className="space-y-3 bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
                     <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-1.5">
-                      <Zap size={14} className="text-amber-600" /> Extra Device Pulses
+                      <Zap size={14} className="text-amber-600" /> {t.extraDevicePulsesTitle}
                     </h4>
 
                     <div>
-                      <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Select Laser / Aesthetic Device</label>
+                      <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.selectDevicePlaceholder}</label>
                       <select
                         value={selectedDeviceId}
                         onChange={(e) => setSelectedDeviceId(e.target.value)}
                         className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
                       >
-                        <option value="">-- Select Device --</option>
+                        <option value="">{t.selectDevicePlaceholder}</option>
                         {devicesList.map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.name} ({d.status || 'Active'})
@@ -406,7 +408,7 @@ export default function DoctorOngoingSessionTab({
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Extra Pulses Count</label>
+                        <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.extraPulsesCountLabel}</label>
                         <input
                           type="number"
                           min={0}
@@ -417,7 +419,7 @@ export default function DoctorOngoingSessionTab({
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Price per Pulse (EGP)</label>
+                        <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.pricePerPulseLabel}</label>
                         <input
                           type="number"
                           min={0}
@@ -431,7 +433,7 @@ export default function DoctorOngoingSessionTab({
 
                     {extraPulsesSubtotal > 0 && (
                       <div className="text-xs bg-amber-50 p-2.5 rounded-xl border border-amber-200 flex justify-between font-bold text-amber-900">
-                        <span>Extra Pulses Subtotal:</span>
+                        <span>{t.extraPulsesSubtotal}</span>
                         <span>+{extraPulsesSubtotal} EGP</span>
                       </div>
                     )}
@@ -441,25 +443,25 @@ export default function DoctorOngoingSessionTab({
                 {/* Invoice Breakdown Summary */}
                 <div className="bg-[#414E36]/05 p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-4 text-[#5A6A51]">
-                    <span>Base Service: <strong className="text-[#1F251A]">{baseBookingPrice} EGP</strong></span>
-                    <span>Products Addons: <strong className="text-[#1F251A]">+{productsSubtotal} EGP</strong></span>
-                    <span>Pulses Addons: <strong className="text-[#1F251A]">+{extraPulsesSubtotal} EGP</strong></span>
+                    <span>{t.baseServiceLabel} <strong className="text-[#1F251A]">{baseBookingPrice} EGP</strong></span>
+                    <span>{t.productsAddonsLabel} <strong className="text-[#1F251A]">+{productsSubtotal} EGP</strong></span>
+                    <span>{t.pulsesAddonsLabel} <strong className="text-[#1F251A]">+{extraPulsesSubtotal} EGP</strong></span>
                   </div>
                   <div className="text-[#414E36] font-extrabold text-sm">
-                    Final Invoice: {updatedInvoiceTotal} EGP
+                    {t.finalInvoiceLabel} {updatedInvoiceTotal} EGP
                   </div>
                 </div>
               </div>
 
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
                 <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                  <FileText size={16} className="text-[#414E36]" /> Doctor Procedure Observations & Medical Notes
+                  <FileText size={16} className="text-[#414E36]" /> {t.doctorNotesTitle}
                 </h3>
                 <textarea
                   rows={8}
                   value={clinicalNote}
                   onChange={(e) => setClinicalNote(e.target.value)}
-                  placeholder="Enter clinical observations, laser pulse parameters, skin reactions, and post-procedure recommendations..."
+                  placeholder={t.doctorNotesPlaceholder}
                   className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans"
                 />
                 <div className="flex justify-end">
@@ -469,7 +471,7 @@ export default function DoctorOngoingSessionTab({
                     disabled={savingNote}
                     className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50"
                   >
-                    {savingNote ? "Saving..." : "Save Clinical Notes"}
+                    {savingNote ? "..." : t.saveClinicalNotesBtn}
                   </button>
                 </div>
               </div>
@@ -481,9 +483,9 @@ export default function DoctorOngoingSessionTab({
           <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
             <Play size={28} />
           </div>
-          <h3 className="text-xl font-bold text-[#1F251A]">Waiting for Receptionist to Start Session</h3>
+          <h3 className="text-xl font-bold text-[#1F251A]">{t.waitingForReceptionistTitle}</h3>
           <p className="text-xs text-[#5A6A51] max-w-md mx-auto leading-relaxed">
-            When the receptionist clicks <strong>&quot;Start Session&quot;</strong> on a patient booking assigned to you, the patient treatment portal will automatically open here in real-time.
+            {t.waitingForReceptionistDesc}
           </p>
           <div className="pt-2">
             <button
@@ -491,7 +493,7 @@ export default function DoctorOngoingSessionTab({
               onClick={() => setActiveTab("schedule")}
               className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
             >
-              View Today&apos;s Patient Queue
+              {t.viewTodayQueueBtn}
             </button>
           </div>
         </div>

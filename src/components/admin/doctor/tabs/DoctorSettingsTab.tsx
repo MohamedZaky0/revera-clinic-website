@@ -3,13 +3,17 @@
 import React from "react";
 import { Settings } from "lucide-react";
 
-export default function DoctorSettingsTab() {
+interface DoctorSettingsTabProps {
+  t: any;
+}
+
+export default function DoctorSettingsTab({ t }: DoctorSettingsTabProps) {
   return (
     <div className="w-full space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-[#1F251A]">Settings</h2>
+        <h2 className="text-2xl font-bold text-[#1F251A]">{t.settingsTitle}</h2>
         <p className="text-xs text-[#5A6A51] mt-1">
-          Portal settings and system preferences.
+          {t.settingsSubtitle}
         </p>
       </div>
 
@@ -17,9 +21,9 @@ export default function DoctorSettingsTab() {
         <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-2xl bg-[#414E36]/10 text-[#414E36]">
           <Settings size={28} />
         </div>
-        <h3 className="text-lg font-bold text-[#1F251A]">No Settings Available</h3>
+        <h3 className="text-lg font-bold text-[#1F251A]">{t.noSettingsAvailableTitle}</h3>
         <p className="text-xs text-[#5A6A51] max-w-sm mx-auto leading-relaxed">
-          Settings options will be added here in future updates.
+          {t.noSettingsAvailableDesc}
         </p>
       </div>
     </div>

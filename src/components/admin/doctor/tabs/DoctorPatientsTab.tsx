@@ -11,6 +11,7 @@ interface DoctorPatientsTabProps {
   filteredPatients: DoctorPatient[];
   reservations: any[];
   setSelectedPatientHistory: (patient: DoctorPatient) => void;
+  t: any;
 }
 
 export default function DoctorPatientsTab({
@@ -19,16 +20,17 @@ export default function DoctorPatientsTab({
   doctorPatientsList,
   filteredPatients,
   reservations,
-  setSelectedPatientHistory
+  setSelectedPatientHistory,
+  t
 }: DoctorPatientsTabProps) {
   return (
     <div className="w-full space-y-6">
       {/* Header & Search */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-[#1F251A]">My Patients Directory</h2>
+          <h2 className="text-2xl font-bold text-[#1F251A]">{t.patientsDirectoryTitle}</h2>
           <p className="text-xs text-[#5A6A51] mt-1">
-            All patients assigned to your care across scheduled, active, and completed visits.
+            {t.patientsDirectorySubtitle}
           </p>
         </div>
 
@@ -37,7 +39,7 @@ export default function DoctorPatientsTab({
             <Search size={14} className="absolute left-3 top-3 text-[#5A6A51]" />
             <input
               type="text"
-              placeholder="Search patient name, phone, or service..."
+              placeholder={t.searchPatientsPlaceholder}
               value={patientSearchQuery}
               onChange={(e) => setPatientSearchQuery(e.target.value)}
               className="rounded-2xl border border-[#414E36]/15 bg-white pl-9 pr-4 py-2 text-xs text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] w-72 shadow-sm"
@@ -53,7 +55,7 @@ export default function DoctorPatientsTab({
             <Users size={22} />
           </div>
           <div>
-            <p className="text-xs font-bold text-[#5A6A51]">Total Assigned Patients</p>
+            <p className="text-xs font-bold text-[#5A6A51]">{t.totalAssignedPatients}</p>
             <p className="text-xl font-extrabold text-[#1F251A] mt-0.5">{doctorPatientsList.length}</p>
           </div>
         </div>
@@ -63,7 +65,7 @@ export default function DoctorPatientsTab({
             <CheckCircle2 size={22} />
           </div>
           <div>
-            <p className="text-xs font-bold text-[#5A6A51]">Completed Patient Visits</p>
+            <p className="text-xs font-bold text-[#5A6A51]">{t.completedPatientVisits}</p>
             <p className="text-xl font-extrabold text-[#1F251A] mt-0.5">
               {reservations.filter(r => r.status === "completed").length}
             </p>
@@ -75,7 +77,7 @@ export default function DoctorPatientsTab({
             <Clock size={22} />
           </div>
           <div>
-            <p className="text-xs font-bold text-[#5A6A51]">Scheduled & Queue</p>
+            <p className="text-xs font-bold text-[#5A6A51]">{t.scheduledAndQueue}</p>
             <p className="text-xl font-extrabold text-[#1F251A] mt-0.5">
               {reservations.filter(r => r.status !== "completed" && r.status !== "cancelled").length}
             </p>
@@ -89,9 +91,9 @@ export default function DoctorPatientsTab({
           <div className="h-14 w-14 mx-auto flex items-center justify-center rounded-2xl bg-[#414E36]/10 text-[#414E36]">
             <Users size={26} />
           </div>
-          <h3 className="text-lg font-bold text-[#1F251A]">No Patients Found</h3>
+          <h3 className="text-lg font-bold text-[#1F251A]">{t.noPatientsFoundTitle}</h3>
           <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
-            {patientSearchQuery ? "No patients match your search term." : "No patients have been assigned to your schedule yet."}
+            {patientSearchQuery ? t.noPatientsSearchDesc : t.noPatientsDesc}
           </p>
         </div>
       ) : (
@@ -110,13 +112,13 @@ export default function DoctorPatientsTab({
                     </div>
                   </div>
                   <span className="shrink-0 rounded-xl bg-[#414E36]/10 px-2.5 py-1 text-[10px] font-bold text-[#414E36]">
-                    {patient.totalVisits} {patient.totalVisits === 1 ? "Visit" : "Visits"}
+                    {patient.totalVisits} {patient.totalVisits === 1 ? t.visit : t.visits}
                   </span>
                 </div>
 
                 {/* Services */}
                 <div className="space-y-1">
-                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#5A6A51]/70">Services Received</p>
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#5A6A51]/70">{t.servicesReceivedHeader}</p>
                   <div className="flex flex-wrap gap-1">
                     {patient.recentServices.slice(0, 3).map((srv, idx) => (
                       <span key={idx} className="rounded-lg bg-[#F4F5F1] px-2 py-0.5 text-[10px] font-semibold text-[#414E36] truncate max-w-[180px]">
@@ -130,14 +132,14 @@ export default function DoctorPatientsTab({
               {/* Footer / Action */}
               <div className="pt-3 border-t border-[#414E36]/10 flex items-center justify-between text-xs">
                 <span className="text-[11px] text-[#5A6A51]">
-                  Last: <strong>{patient.lastVisitDate || "N/A"}</strong>
+                  {t.lastVisitLabel} <strong>{patient.lastVisitDate || "N/A"}</strong>
                 </span>
                 <button
                   type="button"
                   onClick={() => setSelectedPatientHistory(patient)}
                   className="rounded-xl bg-[#414E36]/10 hover:bg-[#414E36] text-[#414E36] hover:text-white px-3.5 py-1.5 font-bold transition flex items-center gap-1.5 text-xs shadow-sm"
                 >
-                  <span>View Details ({patient.totalVisits} {patient.totalVisits === 1 ? "Visit" : "Visits"})</span>
+                  <span>{t.viewDetailsBtn} ({patient.totalVisits} {patient.totalVisits === 1 ? t.visit : t.visits})</span>
                   <ChevronRight size={13} />
                 </button>
               </div>

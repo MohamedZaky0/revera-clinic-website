@@ -9,12 +9,14 @@ interface DoctorPatientHistoryDrawerProps {
   selectedPatientHistory: DoctorPatient | null;
   setSelectedPatientHistory: (patient: DoctorPatient | null) => void;
   handleOpenScheduleModal: (booking: any) => void;
+  t: any;
 }
 
 export default function DoctorPatientHistoryDrawer({
   selectedPatientHistory,
   setSelectedPatientHistory,
-  handleOpenScheduleModal
+  handleOpenScheduleModal,
+  t
 }: DoctorPatientHistoryDrawerProps) {
   if (!selectedPatientHistory) return null;
 
@@ -41,7 +43,7 @@ export default function DoctorPatientHistoryDrawer({
                   {selectedPatientHistory.name}
                 </h3>
                 <span className="rounded-full bg-[#414E36]/10 px-2.5 py-0.5 text-[10px] font-extrabold text-[#414E36]">
-                  {selectedPatientHistory.totalVisits} {selectedPatientHistory.totalVisits === 1 ? "Visit" : "Visits"}
+                  {selectedPatientHistory.totalVisits} {selectedPatientHistory.totalVisits === 1 ? t.visit : t.visits}
                 </span>
               </div>
               <p className="text-xs text-[#5A6A51] mt-0.5 font-mono">
@@ -54,7 +56,7 @@ export default function DoctorPatientHistoryDrawer({
             type="button"
             onClick={() => setSelectedPatientHistory(null)}
             className="rounded-2xl p-2.5 text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36] transition"
-            title="Close Drawer"
+            title={t.closeDrawerBtn}
           >
             <X size={20} />
           </button>
@@ -66,15 +68,15 @@ export default function DoctorPatientHistoryDrawer({
           {/* Patient Quick Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-2xl bg-[#F4F5F1] p-4 border border-[#414E36]/10 text-xs">
             <div>
-              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">Total Visits</span>
-              <p className="font-extrabold text-[#1F251A] mt-0.5">{selectedPatientHistory.totalVisits} Sessions</p>
+              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">{t.completedPatientVisits}</span>
+              <p className="font-extrabold text-[#1F251A] mt-0.5">{selectedPatientHistory.totalVisits} {t.sessionsUnit}</p>
             </div>
             <div>
-              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">Latest Visit</span>
+              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">{t.lastVisitLabel}</span>
               <p className="font-extrabold text-[#414E36] mt-0.5">{selectedPatientHistory.lastVisitDate || "N/A"}</p>
             </div>
             <div>
-              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">Services Received</span>
+              <span className="text-[10px] font-bold text-[#5A6A51] uppercase">{t.servicesReceivedHeader}</span>
               <p className="font-bold text-[#1F251A] mt-0.5 truncate">{selectedPatientHistory.recentServices.join(", ") || "General"}</p>
             </div>
           </div>
@@ -83,10 +85,10 @@ export default function DoctorPatientHistoryDrawer({
           <div className="space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-[#414E36]/10">
               <h4 className="text-xs font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                <Clock size={15} className="text-[#414E36]" /> Complete Treatment History & Visit Timeline
+                <Clock size={15} className="text-[#414E36]" /> {t.patientHistoryDrawerTitle}
               </h4>
               <span className="text-[10px] font-bold text-[#5A6A51] bg-[#414E36]/10 px-2.5 py-0.5 rounded-full">
-                {selectedPatientHistory.bookings.length} Total Visits Recorded
+                {selectedPatientHistory.bookings.length} {t.totalScheduledCard}
               </span>
             </div>
 
@@ -119,12 +121,12 @@ export default function DoctorPatientHistoryDrawer({
                     <div className="flex items-center gap-2">
                       {isCompleted && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                          <CheckCircle2 size={11} /> Completed
+                          <CheckCircle2 size={11} /> {t.completedStatus}
                         </span>
                       )}
                       {isInSession && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800 animate-pulse">
-                          <Play size={11} /> In Session
+                          <Play size={11} /> {t.inSessionStatus}
                         </span>
                       )}
                       {!isCompleted && !isInSession && (
@@ -141,7 +143,7 @@ export default function DoctorPatientHistoryDrawer({
                         }}
                         className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm flex items-center gap-1"
                       >
-                        <span>Inspect</span>
+                        <span>{t.inspectBtn}</span>
                         <ChevronRight size={12} />
                       </button>
                     </div>
@@ -149,9 +151,9 @@ export default function DoctorPatientHistoryDrawer({
 
                   {/* Doctor Notes for this specific visit */}
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Clinical Observations & Notes:</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.doctorNotesTitle}:</span>
                     <p className="text-xs text-[#1F251A] mt-1 bg-white p-3 rounded-xl border border-[#414E36]/10 font-sans leading-relaxed">
-                      {parsed.cleanDoctorNote || "No doctor clinical notes entered for this session."}
+                      {parsed.cleanDoctorNote || t.noBookingNotes}
                     </p>
                   </div>
 
@@ -170,13 +172,13 @@ export default function DoctorPatientHistoryDrawer({
 
         {/* Footer */}
         <div className="p-4 px-6 bg-[#FBFBF9] border-t border-[#414E36]/10 flex items-center justify-between text-xs text-[#5A6A51]">
-          <span>Viewing complete medical visit history</span>
+          <span>{t.patientHistoryDrawerTitle}</span>
           <button
             type="button"
             onClick={() => setSelectedPatientHistory(null)}
             className="rounded-xl bg-[#414E36] px-4 py-2 font-bold text-white shadow-sm hover:bg-[#343F2B] transition"
           >
-            Close Timeline
+            {t.closeTimelineBtn}
           </button>
         </div>
       </div>
