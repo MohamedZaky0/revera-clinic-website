@@ -82,32 +82,6 @@ export default function DoctorScheduleTab({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* LANGUAGE SWITCHER BUTTONS (English View / العرض بالعربية) */}
-          <div className="flex items-center rounded-2xl bg-white p-1 border border-[#414E36]/15 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setLang("en")}
-              className={`px-3.5 py-2 text-xs font-bold rounded-xl transition ${
-                lang === "en"
-                  ? "bg-[#414E36] text-white shadow-sm"
-                  : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F4F5F1]"
-              }`}
-            >
-              {t.englishViewBtn}
-            </button>
-            <button
-              type="button"
-              onClick={() => setLang("ar")}
-              className={`px-3.5 py-2 text-xs font-bold rounded-xl transition ${
-                lang === "ar"
-                  ? "bg-[#414E36] text-white shadow-sm"
-                  : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F4F5F1]"
-              }`}
-            >
-              {t.arabicViewBtn}
-            </button>
-          </div>
-
           {/* VIEW MODE TOGGLE SWITCHER */}
           <div className="flex items-center rounded-2xl bg-white p-1 border border-[#414E36]/15 shadow-sm">
             <button
@@ -200,7 +174,7 @@ export default function DoctorScheduleTab({
                   className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
                   title="Previous Month"
                 >
-                  <ChevronLeft size={16} />
+                  <ChevronLeft size={16} className="rtl:rotate-180 transition-transform" />
                 </button>
                 <button
                   type="button"
@@ -216,7 +190,7 @@ export default function DoctorScheduleTab({
                   className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
                   title="Next Month"
                 >
-                  <ChevronRight size={16} />
+                  <ChevronRight size={16} className="rtl:rotate-180 transition-transform" />
                 </button>
               </div>
             </div>

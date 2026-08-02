@@ -23,6 +23,8 @@ interface DoctorSidebarProps {
   activeSessionBooking: any;
   loading: boolean;
   t: any;
+  lang: "en" | "ar";
+  setLang: (lang: "en" | "ar") => void;
   onFetchReservations: () => void;
   onLogout: () => void;
 }
@@ -37,14 +39,16 @@ export default function DoctorSidebar({
   activeSessionBooking,
   loading,
   t,
+  lang,
+  setLang,
   onFetchReservations,
   onLogout
 }: DoctorSidebarProps) {
   return (
     <aside className="w-full md:w-64 lg:w-72 bg-white/90 backdrop-blur-xl border-b md:border-b-0 md:border-r border-[#414E36]/15 flex flex-col justify-between shrink-0 h-auto md:h-full p-5 shadow-sm overflow-y-auto">
       {/* Top: Logo & Branding */}
-      <div className="space-y-6">
-        <div className="flex items-center gap-3 pb-5 border-b border-[#414E36]/10">
+      <div className="space-y-5">
+        <div className="flex items-center gap-3 pb-4 border-b border-[#414E36]/10">
           <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-white border border-[#414E36]/20 p-1.5 shadow-sm">
             <Image
               src="/images/main_logo.png"
@@ -59,6 +63,32 @@ export default function DoctorSidebar({
             </span>
             <h1 className="text-sm font-bold text-[#1F251A] truncate max-w-[160px]">{doctorName}</h1>
           </div>
+        </div>
+
+        {/* Global Language Toggle Switcher */}
+        <div className="flex items-center rounded-2xl bg-[#F4F5F1] p-1 border border-[#414E36]/15 shadow-sm w-full">
+          <button
+            type="button"
+            onClick={() => setLang("en")}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition text-center ${
+              lang === "en"
+                ? "bg-[#414E36] text-white shadow-sm"
+                : "text-[#5A6A51] hover:text-[#414E36] hover:bg-white"
+            }`}
+          >
+            {t.englishViewBtn}
+          </button>
+          <button
+            type="button"
+            onClick={() => setLang("ar")}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition text-center ${
+              lang === "ar"
+                ? "bg-[#414E36] text-white shadow-sm"
+                : "text-[#5A6A51] hover:text-[#414E36] hover:bg-white"
+            }`}
+          >
+            {t.arabicViewBtn}
+          </button>
         </div>
 
         {/* Navigation Links */}

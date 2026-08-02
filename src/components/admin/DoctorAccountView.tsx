@@ -764,6 +764,8 @@ export default function DoctorAccountView({
         activeSessionBooking={activeSessionBooking}
         loading={loading}
         t={t}
+        lang={lang}
+        setLang={setLang}
         onFetchReservations={fetchDoctorReservations}
         onLogout={onLogout}
       />

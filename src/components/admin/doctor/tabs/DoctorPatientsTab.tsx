@@ -140,7 +140,7 @@ export default function DoctorPatientsTab({
                   className="rounded-xl bg-[#414E36]/10 hover:bg-[#414E36] text-[#414E36] hover:text-white px-3.5 py-1.5 font-bold transition flex items-center gap-1.5 text-xs shadow-sm"
                 >
                   <span>{t.viewDetailsBtn} ({patient.totalVisits} {patient.totalVisits === 1 ? t.visit : t.visits})</span>
-                  <ChevronRight size={13} />
+                  <ChevronRight size={13} className="rtl:rotate-180 transition-transform" />
                 </button>
               </div>
             </div>

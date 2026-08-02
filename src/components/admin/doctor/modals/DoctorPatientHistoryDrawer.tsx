@@ -144,7 +144,7 @@ export default function DoctorPatientHistoryDrawer({
                         className="rounded-xl border border-[#414E36]/20 bg-white px-3 py-1 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm flex items-center gap-1"
                       >
                         <span>{t.inspectBtn}</span>
-                        <ChevronRight size={12} />
+                        <ChevronRight size={12} className="rtl:rotate-180 transition-transform" />
                       </button>
                     </div>
                   </div>
