@@ -850,61 +850,6 @@ export default function DoctorOngoingSessionTab({
               </button>
             </div>
           </div>
-
-          {/* Queue & Available Bookings Launcher List */}
-          {queueBookings.length > 0 && (
-            <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-                <h4 className="text-sm font-extrabold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                  <Clock size={16} className="text-[#414E36]" /> {t.todayAvailableBookings}
-                </h4>
-                <span className="rounded-full bg-[#414E36]/10 px-3 py-1 text-xs font-bold text-[#414E36]">
-                  {queueBookings.length} {t.totalScheduledCard}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {queueBookings.map((booking: any, idx: number) => {
-                  const st = String(booking.status || "").toLowerCase().trim();
-                  const isStarted = st === "started" || st === "in-progress" || st === "in_progress" || st === "active";
-
-                  return (
-                    <div
-                      key={booking.id || idx}
-                      className={`rounded-2xl border p-4 shadow-sm flex flex-col justify-between space-y-3 transition ${
-                        isStarted ? "border-amber-300 bg-amber-50/50" : "border-[#414E36]/15 bg-[#FBFBF9]"
-                      }`}
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <h5 className="text-sm font-bold text-[#1F251A] truncate">
-                            {booking.name || booking.customer_name || "Patient"}
-                          </h5>
-                          <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold capitalize ${
-                            isStarted ? "bg-amber-200 text-amber-900 animate-pulse" : "bg-[#414E36]/10 text-[#414E36]"
-                          }`}>
-                            {booking.status || "Scheduled"}
-                          </span>
-                        </div>
-                        <p className="text-xs text-[#5A6A51]">
-                          {booking.service || booking.service_name} • {booking.time || booking.time_slot || "Today"}
-                        </p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveSessionBooking?.(booking)}
-                        className="w-full rounded-xl bg-[#414E36] hover:bg-[#343F2B] text-white py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
-                      >
-                        <Play size={13} /> {t.openSessionBtn}
-                        <ChevronRight size={13} className="rtl:rotate-180" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
