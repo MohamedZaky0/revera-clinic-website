@@ -414,7 +414,17 @@ export default function DoctorOngoingSessionTab({
                       <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.selectDevicePlaceholder}</label>
                       <select
                         value={selectedDeviceId}
-                        onChange={(e) => setSelectedDeviceId(e.target.value)}
+                        onChange={(e) => {
+                          const devId = e.target.value;
+                          setSelectedDeviceId(devId);
+                          const dev = devicesList.find((d) => d.id === devId);
+                          if (dev) {
+                            const pPrice = Number(dev.price_per_pulse || dev.pulse_price || dev.cost_per_pulse || 2.5);
+                            setPricePerPulse(pPrice);
+                          } else {
+                            setPricePerPulse(0);
+                          }
+                        }}
                         className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
                       >
                         <option value="">{t.selectDevicePlaceholder}</option>
@@ -426,34 +436,21 @@ export default function DoctorOngoingSessionTab({
                       </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.extraPulsesCountLabel}</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={extraPulsesCount}
-                          onChange={(e) => setExtraPulsesCount(Math.max(0, parseInt(e.target.value) || 0))}
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                          placeholder="e.g. 50"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.pricePerPulseLabel}</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={pricePerPulse}
-                          onChange={(e) => setPricePerPulse(Math.max(0, parseFloat(e.target.value) || 0))}
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
-                          placeholder="e.g. 2.5"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">{t.extraPulsesCountLabel}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={extraPulsesCount}
+                        onChange={(e) => setExtraPulsesCount(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-bold text-[#1F251A] outline-none focus:border-[#414E36]"
+                        placeholder="e.g. 50"
+                      />
                     </div>
 
                     {extraPulsesSubtotal > 0 && (
                       <div className="text-xs bg-amber-50 p-2.5 rounded-xl border border-amber-200 flex justify-between font-bold text-amber-900">
-                        <span>{t.extraPulsesSubtotal}</span>
+                        <span>{t.extraPulsesSubtotal} ({extraPulsesCount} pulses @ {pricePerPulse} EGP)</span>
                         <span>+{extraPulsesSubtotal} EGP</span>
                       </div>
                     )}
