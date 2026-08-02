@@ -285,8 +285,8 @@ export default function DoctorAccountView({
   }, []);
 
   // Fetch Doctor Reservations from DB
-  const fetchDoctorReservations = async () => {
-    setLoading(true);
+  const fetchDoctorReservations = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       let queryUrl = "/api/reservations?limit=150";
       if (doctorDbId) {
@@ -313,15 +313,20 @@ export default function DoctorAccountView({
     } catch (err) {
       console.error("Error fetching doctor reservations:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
+  // Silent 3-second background polling for instant session start detection
   useEffect(() => {
     fetchDoctorReservations();
+    const interval = setInterval(() => {
+      fetchDoctorReservations(true);
+    }, 3000);
+    return () => clearInterval(interval);
   }, [doctorDbId, doctorName]);
 
-  // Real-time Subscriptions for Started Sessions & Bookings
+  // Persistent Real-time Subscriptions for Started Sessions & Bookings
   useEffect(() => {
     const channel = supabase
       .channel("doctor-realtime-reservations")
@@ -343,8 +348,13 @@ export default function DoctorAccountView({
 
             const st = String(updated.status || "").toLowerCase().trim();
             const isActive = st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
-            if (isActive && (!activeSessionBooking || activeSessionBooking.status === "completed" || activeSessionBooking.id === updated.id)) {
-              setActiveSessionBooking(updated);
+            if (isActive) {
+              setActiveSessionBooking((curr: any) => {
+                if (!curr || curr.status === "completed" || curr.id === updated.id) {
+                  return updated;
+                }
+                return curr;
+              });
             }
           }
         }
@@ -354,7 +364,7 @@ export default function DoctorAccountView({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeSessionBooking]);
+  }, []);
 
   // Receptionist Started Session Auto-Detect
   const receptionistStartedSession = useMemo(() => {
