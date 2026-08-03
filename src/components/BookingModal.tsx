@@ -168,6 +168,22 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
     setSelectedTime(null);
   }, [selectedDate]);
 
+  // Auto-scroll Step 1 to the next section as the user progresses, instead of leaving them to
+  // find it manually below the fold — service picked -> jump to the calendar; date picked ->
+  // jump to the time slots.
+  const dateTimeSectionRef = useRef<HTMLDivElement | null>(null);
+  const timePickerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (serviceId === null) return;
+    dateTimeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [serviceId]);
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    timePickerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selectedDate]);
+
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { serviceId?: number } | null;
@@ -1117,7 +1133,7 @@ Attached is my payment transaction receipt photo.`;
 
                 {/* Inline MD3 Date & Time Pickers */}
                 {serviceId !== null && (
-                  <div className="pt-4 border-t border-gray-200/80">
+                  <div className="pt-4 border-t border-gray-200/80" ref={dateTimeSectionRef}>
                     <p className="mb-4 text-sm font-semibold" style={{ color: "var(--cr-primary)" }}>
                       {isRTL ? "اختر التاريخ والوقت المناسب" : "Select Date & Time"}
                     </p>
@@ -1132,13 +1148,15 @@ Attached is my payment transaction receipt photo.`;
                       />
 
                       {/* Time Picker */}
-                      <MaterialTimePicker
-                        selectedTime={selectedTime}
-                        onSelectTime={setSelectedTime}
-                        availableSlots={filteredTimeSlots}
-                        takenSlots={takenSlots}
-                        isRTL={isRTL}
-                      />
+                      <div ref={timePickerRef} className="w-full">
+                        <MaterialTimePicker
+                          selectedTime={selectedTime}
+                          onSelectTime={setSelectedTime}
+                          availableSlots={filteredTimeSlots}
+                          takenSlots={takenSlots}
+                          isRTL={isRTL}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
