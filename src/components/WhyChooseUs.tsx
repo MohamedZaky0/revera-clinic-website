@@ -218,7 +218,7 @@ export function WhyChooseUs() {
                 <div className="wcu-left-img">
                   <Image
                     src={t.whyChooseUs.image1 || "/images/clinic/treatment.jpg"}
-                    alt="Dental clinic room — Revera Clinics"
+                    alt="Physical therapy clinic room — Revera Clinics"
                     fill
                     priority
                     unoptimized

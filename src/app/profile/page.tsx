@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { SiteFooter } from "@/components/SiteFooter";
-import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -535,7 +534,7 @@ export default function ProfilePage() {
                       <Calendar className="mx-auto text-[#5A6A51]/40 mb-4" size={40} />
                       <p className="text-[#5A6A51] text-sm font-medium">{profileT.emptyBookings}</p>
                       <button
-                        onClick={() => window.dispatchEvent(new CustomEvent("open-booking"))}
+                        onClick={() => router.push("/book")}
                         className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-3 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-md"
                       >
                         {profileT.bookNow}
@@ -619,7 +618,6 @@ export default function ProfilePage() {
         </div>
       </main>
       <SiteFooter />
-      <BookingModal />
       <AuthModal />
     </>
   );

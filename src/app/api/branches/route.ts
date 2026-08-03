@@ -49,8 +49,16 @@ export async function POST(req: Request) {
         return NextResponse.json(upsertData);
       }
 
-      // Return requested branch payload so state updates gracefully
-      return NextResponse.json({ id, ...fields });
+      // Both attempts failed (e.g. a column in `fields` doesn't exist on the table) — this used
+      // to fall through to `NextResponse.json({ id, ...fields })` with a 200, which echoed the
+      // submitted payload back as if it had saved, when nothing was actually persisted. See
+      // RISK-037: that silent success is exactly why branches.service_hours' missing column went
+      // unnoticed. Surface the real failure instead.
+      console.error("Supabase branches upsert also failed:", upsertError);
+      return NextResponse.json(
+        { error: (upsertError && upsertError.message) || (error && error.message) || 'Failed to save branch' },
+        { status: 500 }
+      );
     } else {
       // Create new branch
       const { data, error } = await supabaseServer

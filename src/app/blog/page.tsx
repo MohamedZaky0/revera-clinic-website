@@ -4,7 +4,6 @@ import { Navbar } from "@/components/Navbar";
 import { PageHeader } from "@/components/PageHeader";
 import { BlogGrid } from "@/components/BlogGrid";
 import { SiteFooter } from "@/components/SiteFooter";
-import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 
 import { CLIENT } from "@/config/client";
@@ -24,7 +23,6 @@ export default function BlogPage() {
         <BlogGrid />
       </main>
       <SiteFooter />
-      <BookingModal />
       <AuthModal />
     </>
   );

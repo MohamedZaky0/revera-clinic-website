@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Category, ServiceItem, getServicePriceDetails } from "@/lib/services";
 import { 
@@ -133,6 +134,7 @@ interface ServiceCardProps {
 }
 
 function ServiceCard({ service, lang, descText, isRTL }: ServiceCardProps) {
+  const router = useRouter();
   const [hovered, setHovered] = useState(false);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
   const [showCursor, setShowCursor] = useState(false);
@@ -270,7 +272,7 @@ function ServiceCard({ service, lang, descText, isRTL }: ServiceCardProps) {
         <div
           style={{ position: "relative", width: "100%", height: 220, borderRadius: 24, overflow: "hidden", cursor: showCursor ? "none" : "pointer" }}
           onClick={() => {
-            window.dispatchEvent(new CustomEvent("open-booking", { detail: { serviceId: service.id } }));
+            router.push(`/book?service=${service.id}`);
           }}
           onMouseEnter={(e) => {
             // Prefetch availability on hover so it's cached before user clicks
@@ -372,6 +374,7 @@ function ServiceCard({ service, lang, descText, isRTL }: ServiceCardProps) {
 
 export function HomeServicesSection() {
   const { t, language, isRTL } = useLanguage();
+  const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [serviceToggles, setServiceToggles] = useState<ServiceToggleState>({});
   const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>([]);
@@ -577,7 +580,7 @@ export function HomeServicesSection() {
                       }}
                       onClick={(e) => {
                         e.preventDefault();
-                        window.dispatchEvent(new CustomEvent("open-booking"));
+                        router.push("/book");
                       }}
                     >
                       {t.services.ctaBtn}

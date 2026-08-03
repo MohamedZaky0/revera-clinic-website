@@ -364,8 +364,8 @@ export function SiteFooter() {
                   }}
                 >
                   {isRTL
-                    ? "نغير حياتك من خلال طب الجلدية والجراحة التجميلية المتخصصة وعلاجات الليزر ورعاية الأسنان المتكاملة."
-                    : "Transforming lives with expert dermatology, cosmetic surgery, laser treatments, and comprehensive dental care."}
+                    ? "نغير حياتك من خلال طب الجلدية والجراحة التجميلية المتخصصة وعلاجات الليزر ورعاية العلاج الطبيعي المتكاملة."
+                    : "Transforming lives with expert dermatology, cosmetic surgery, laser treatments, and comprehensive physical therapy care."}
                 </p>
                 <div
                   className="ft-social-row"

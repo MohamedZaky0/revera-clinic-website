@@ -3,6 +3,7 @@ import { Marcellus, Sora } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AlertConfirmProvider } from "@/contexts/AlertConfirmContext";
+import { GlobalBookingModal } from "@/components/GlobalBookingModal";
 
 import { CLIENT } from "@/config/client";
 
@@ -44,6 +45,7 @@ export default function RootLayout({
         <LanguageProvider>
           <AlertConfirmProvider>
             {children}
+            <GlobalBookingModal />
           </AlertConfirmProvider>
         </LanguageProvider>
       </body>

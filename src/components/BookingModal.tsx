@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, type MouseEvent } from "react";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cachedFetch, prefetchUrl } from "@/lib/fetchCache";
 import { Category, ServiceItem, ALL_15MIN_SLOTS, getServiceDurationMinutes, normaliseTo24hSlot, getEffectiveServicePrice } from "@/lib/services";
@@ -55,10 +56,21 @@ function timeToMinutes(timeStr: string): number {
   return hh * 60 + mm;
 }
 
-export function BookingModal() {
-  const { t, isRTL } = useLanguage();
+type BookingModalProps = {
+  /** 'modal' (default) = existing popup, unchanged behavior. 'page' = renders as plain page
+   * content with no overlay/backdrop, for use on a dedicated /book route. */
+  variant?: "modal" | "page";
+  /** page variant only — preselects a service on mount, equivalent to the "open-booking"
+   * CustomEvent's detail.serviceId used by every modal trigger. */
+  initialServiceId?: number | null;
+};
 
-  const [open, setOpen] = useState(false);
+export function BookingModal({ variant = "modal", initialServiceId = null }: BookingModalProps = {}) {
+  const { t, isRTL } = useLanguage();
+  const router = useRouter();
+  const isPageVariant = variant === "page";
+
+  const [open, setOpen] = useState(isPageVariant);
   const [step, setStep] = useState<Step>(1);
   const [selectedCategory, setSelectedCategory] = useState<Category>("dermatology");
   const [serviceId, setServiceId] = useState<number | null>(null);
@@ -183,6 +195,20 @@ export function BookingModal() {
     window.addEventListener("open-booking", handler);
     return () => window.removeEventListener("open-booking", handler);
   }, [dynamicServices, dynamicCategories]);
+
+  // Page variant: apply the ?service= preselection once dynamicServices has loaded (or
+  // immediately if none was requested), by re-dispatching the same "open-booking" event the
+  // modal triggers already use — reuses the handler above instead of duplicating its category/
+  // sessionType derivation logic.
+  const initialServiceAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!isPageVariant || initialServiceAppliedRef.current) return;
+    if (initialServiceId != null && dynamicServices.length === 0) return;
+    initialServiceAppliedRef.current = true;
+    window.dispatchEvent(
+      new CustomEvent("open-booking", { detail: { serviceId: initialServiceId ?? undefined } })
+    );
+  }, [isPageVariant, initialServiceId, dynamicServices]);
 
   useEffect(() => {
     if (open) {
@@ -395,15 +421,16 @@ export function BookingModal() {
     };
   }, [serviceId, selectedDate, branchId, selectedService, sessionType]);
 
-  // Close on Escape key
+  // Close on Escape key — modal variant only; a page has no "close" to dismiss into, and
+  // Escape shouldn't silently wipe a patient's in-progress booking form.
   useEffect(() => {
-    if (!open) return;
+    if (!open || isPageVariant) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, handleClose]);
+  }, [open, isPageVariant, handleClose]);
 
   function handleNext() {
     if (step === 1 && serviceId !== null && selectedDate !== null && selectedTime !== null) {
@@ -806,17 +833,29 @@ Attached is my payment transaction receipt photo.`;
   const currentQrUrl = selectedDepositMethod === "wallet" ? walletQrUrl : instapayQrUrl;
   const currentPaymentLink = selectedDepositMethod === "wallet" ? (walletLink || `tel:${walletNumber || "01035595691"}`) : instapayLink;
 
+  const handleDonePage = useCallback(() => {
+    resetState();
+    router.push("/");
+  }, [resetState, router]);
+
+  const outerProps = isPageVariant
+    ? { className: "w-full" }
+    : {
+        className: `modal-overlay${open ? " open" : ""}`,
+        onClick: (e: MouseEvent) => {
+          if (e.target === e.currentTarget) handleClose();
+        },
+        role: "dialog" as const,
+        "aria-modal": true,
+        "aria-label": t.booking.title,
+      };
+
   return (
-    <div
-      className={`modal-overlay${open ? " open" : ""}`}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) handleClose();
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t.booking.title}
-    >
-      <div className="modal-box max-w-4xl" dir={isRTL ? "rtl" : "ltr"}>
+    <div {...outerProps}>
+      <div
+        className={isPageVariant ? "w-full max-w-4xl mx-auto bg-white rounded-[20px] p-6 sm:p-10" : "modal-box max-w-4xl"}
+        dir={isRTL ? "rtl" : "ltr"}
+      >
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -836,14 +875,16 @@ Attached is my payment transaction receipt photo.`;
               </p>
             )}
           </div>
-          <button
-            onClick={handleClose}
-            aria-label={t.booking.closeBtn}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-xl transition-colors hover:bg-gray-100 cursor-pointer"
-            style={{ color: "var(--cr-accent)" }}
-          >
-            ×
-          </button>
+          {!isPageVariant && (
+            <button
+              onClick={handleClose}
+              aria-label={t.booking.closeBtn}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-xl transition-colors hover:bg-gray-100 cursor-pointer"
+              style={{ color: "var(--cr-accent)" }}
+            >
+              ×
+            </button>
+          )}
         </div>
 
         {/* Success screen */}
@@ -886,8 +927,8 @@ Attached is my payment transaction receipt photo.`;
                 </p>
               </div>
             )}
-            <button onClick={handleClose} className="btn-primary mt-2">
-              {t.booking.closeBtn}
+            <button onClick={isPageVariant ? handleDonePage : handleClose} className="btn-primary mt-2">
+              {isPageVariant ? (isRTL ? "العودة للرئيسية" : "Back to Home") : t.booking.closeBtn}
             </button>
           </div>
         ) : (

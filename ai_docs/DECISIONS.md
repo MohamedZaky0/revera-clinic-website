@@ -1194,3 +1194,70 @@ The clinic required improvements to doctor and receptionist roles:
 **Reason:**
 Ensures clinic inventory tracking, medical compliance, and accurate financial record keeping across receptionist and doctor workflows.
 
+---
+
+## DEC-040: Booking Gets a Dedicated `/book` Page — Popup Kept Only as a Secondary "Quick Book"
+
+**Date:** 2026-08-03
+**Status:** Decided — active
+
+**Context:**
+The only way to book was `BookingModal`, a popup opened from a `window.dispatchEvent(new
+CustomEvent("open-booking"))` fired from ~10 CTAs across the public site (Navbar ×2, HeroSlider,
+ServicesSection ×3, HomeServicesSection ×2, AboutSection, AboutPageIntro, ContactPageContent,
+profile page), with the component itself mounted redundantly on 6 different pages so each page's
+listener could catch the event. Two problems this created: (1) a popup can't be deep-linked —
+there was no URL a paid ad could point at that lands directly on the booking flow, and (2) a modal
+is inherently more distracting/interruptive than a focused page for a flow this important.
+
+The clinic owner also plans to use this route in paid ad campaigns, and — separately — pointed out
+that if `BookingModal` avoids hardcoded client-specific values (it already imports `CLIENT` from
+`src/config/client.ts` and uses CSS variable brand tokens, not raw hex), a dedicated booking page
+carries over "for free" to any future fork under DEC-001's fork-per-client model. That observation
+changed the framing of this decision: **the page doesn't need to be a separately-portable
+module** — forking this repo already makes it portable, same as every other route.
+
+**Chosen Option:**
+- `BookingModal` gained two optional props — `variant?: "modal" | "page"` (default `"modal"`,
+  preserving 100% of existing popup behavior unchanged) and `initialServiceId?: number | null`.
+  No business logic (pricing, availability, deposit payment, `POST /api/reservations`) was touched
+  — only the outer wrapper (overlay/backdrop vs. plain container), the close button, the Escape-key
+  handler, and the post-submit success action are variant-aware. This was deliberate: this exact
+  code path has a history of subtle bugs (RISK-010, RISK-011, RISK-029, RISK-035), so the lowest-
+  regression-risk change was preferred over a bigger content-split refactor.
+- New route `src/app/book/page.tsx` (Server Component, exports SEO `metadata`, reads `?service=`
+  from `searchParams`) renders `<BookingPageClient>`, a minimal client shell (logo-links-home +
+  language toggle only, no full nav/footer) wrapping `<BookingModal variant="page" />`. Category/
+  service browsing already exists inside the modal's Step 1 (category chips + service picker) —
+  the page shell doesn't duplicate it, to keep the page focused rather than adding a second
+  browsing surface.
+- Every trigger except Navbar's "Make Appointment" (desktop + mobile) now does
+  `router.push("/book")` or `router.push(\`/book?service=\${id}\`)` instead of dispatching the
+  event. **Navbar's CTA is kept as the popup ("Quick Book")** — the user's explicit call — since
+  it's the highest-traffic, already-engaged-visitor entry point, where a fast in-context popup
+  still beats a page navigation.
+- `BookingModal`'s single remaining popup mount moved out of 6 per-page mounts into one place:
+  `GlobalBookingModal` (a small client wrapper using `usePathname`) in the root layout, skipping
+  render on `/book` itself (where the popup would be a redundant duplicate of the visible page
+  flow).
+
+**Reason:**
+- A URL beats an event for ad landing pages — `/book?service=12&utm_source=...` is a real,
+  shareable, trackable destination; a `CustomEvent` is not.
+- Keeping the popup for Navbar's CTA (per explicit request) avoids forcing every visitor into a
+  full page navigation for what is, for an already-browsing visitor, a quick action.
+- Not attempting a "fully portable, framework-agnostic embeddable widget" was a deliberate scope
+  cut, not an oversight — that would mean a public CORS-enabled API surface and a props-based
+  branding contract instead of `config/client.ts`, which is real, unrequested scope beyond what
+  DEC-001's fork-per-client model already provides for free.
+
+**Trade-offs:**
+- `GlobalBookingModal` still mounts (closed, inert) on every route including `/admin`, which never
+  triggers it — a small, accepted inefficiency rather than adding an `/admin`-specific exclusion
+  for a component that's already invisible and inactive there.
+- If the "Quick Book" popup and the `/book` page ever drift in behavior, both now need updating —
+  they share `BookingModal`'s internals via the `variant` prop specifically to minimize this risk,
+  but the wrapper JSX/close-button/success-action branches are still hand-kept in sync.
+
+**Manual test checklist:** `ai_docs/manual_tests/BOOKING_PAGE_MANUAL_TESTS.md`.
+

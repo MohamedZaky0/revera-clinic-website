@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Branch } from "@/types";
 
 export function ContactPageContent() {
   const { t, isRTL, language } = useLanguage();
+  const router = useRouter();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [activeBranchId, setActiveBranchId] = useState<string | null>(null);
   const [form, setForm] = useState({ fname: "", lname: "", phone: "", email: "", message: "" });
@@ -63,7 +65,7 @@ export function ContactPageContent() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    window.dispatchEvent(new CustomEvent("open-booking"));
+    router.push("/book");
   }
 
   const inputStyle: React.CSSProperties = {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Category, ServiceItem, getServicePriceDetails } from "@/lib/services";
 import { 
@@ -131,6 +132,7 @@ interface ServiceCardProps {
 }
 
 function ServiceCard({ service, lang, descText }: ServiceCardProps) {
+  const router = useRouter();
   const [hovered, setHovered] = useState(false);
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
   const [showCursor, setShowCursor] = useState(false);
@@ -147,7 +149,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
       }}
       onMouseLeave={() => setHovered(false)}
       onClick={() => {
-        window.dispatchEvent(new CustomEvent("open-booking", { detail: { serviceId: service.id } }));
+        router.push(`/book?service=${service.id}`);
       }}
       style={{
         backgroundColor: "var(--cr-secondary)",
@@ -268,7 +270,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
         <div
           style={{ position: "relative", width: "100%", height: 220, borderRadius: 24, overflow: "hidden", cursor: showCursor ? "none" : "pointer" }}
           onClick={() => {
-            window.dispatchEvent(new CustomEvent("open-booking", { detail: { serviceId: service.id } }));
+            router.push(`/book?service=${service.id}`);
           }}
           onMouseEnter={() => {
             setShowCursor(true);
@@ -369,6 +371,7 @@ function ServiceCard({ service, lang, descText }: ServiceCardProps) {
 
 export function ServicesSection() {
   const { t, language, isRTL } = useLanguage();
+  const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [serviceToggles, setServiceToggles] = useState<ServiceToggleState>({});
   const [dynamicServices, setDynamicServices] = useState<ServiceItem[]>([]);
@@ -400,7 +403,7 @@ export function ServicesSection() {
     ? "اكتشف خدماتنا الطبية المتخصصة المصممة لتعزيز صحتك وجمالك العام."
     : "Discover our specialized medical services designed to support your health and overall wellness.";
 
-  const handleBook = () => window.dispatchEvent(new CustomEvent("open-booking"));
+  const handleBook = () => router.push("/book");
 
   return (
     <section

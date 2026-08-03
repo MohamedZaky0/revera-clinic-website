@@ -29,7 +29,7 @@ export const translations: Record<"en" | "ar", Translation> = {
           welcome: "Welcome to Revera Clinics",
           heading: "Advanced Medical Care You Can Trust!",
           description:
-            "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and dental services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
+            "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and physical therapy services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
           bookBtn: "Book Appointment",
           rating: "4.5",
           reviewCount: "(1000+ review)",
@@ -38,7 +38,7 @@ export const translations: Record<"en" | "ar", Translation> = {
           welcome: "Welcome to Revera Clinics",
           heading: "Your Beauty & Health Journey Starts Here!",
           description:
-            "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and dental care for all ages.",
+            "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and physical therapy care for all ages.",
           bookBtn: "Book Appointment",
           rating: "4.5",
           reviewCount: "(1000+ review)",
@@ -73,13 +73,13 @@ export const translations: Record<"en" | "ar", Translation> = {
     services: {
       tag: "Services",
       heading:
-        "Explore our comprehensive dermatology, cosmetic surgery, and dental services",
+        "Explore our comprehensive dermatology, cosmetic surgery, and physical therapy services",
       selectCategory: "Select a category to view services",
       categories: [
-        { id: "dental", label: "Dental Clinic", sublabel: "عياده اسنان" },
-        { id: "general", label: "General", sublabel: "عام" },
-        { id: "dermatology", label: "Dermatology", sublabel: "قسم الجلديه" },
-        { id: "derma", label: "Derma", sublabel: "ديرما" },
+        { id: "dermatology", label: "Dermatology & Aesthetic", sublabel: "الجلدية والتجميل" },
+        { id: "gynecology", label: "Gynecology", sublabel: "النساء والتوليد" },
+        { id: "physiotherapy", label: "Physical Therapy", sublabel: "العلاج الطبيعي" },
+        { id: "osteopathy", label: "Osteopathy & Nutrition", sublabel: "تقويم العظام والتغذية" },
       ],
       loadingText: "Loading our services...",
       errorText: "Unable to load services at the moment. Please try again later.",
@@ -200,7 +200,7 @@ export const translations: Record<"en" | "ar", Translation> = {
     footer: {
       blogHeading: "Latest insights on beauty & medical care",
       description:
-        "Transforming lives with expert dermatology, cosmetic surgery, laser treatments, and comprehensive dental care.",
+        "Transforming lives with expert dermatology, cosmetic surgery, laser treatments, and comprehensive physical therapy care.",
       quickLinks: "quick link",
       links: ["Home", "About us", "services", "Contact us"],
       openHours: "Open Hours:",
@@ -445,13 +445,13 @@ export const translations: Record<"en" | "ar", Translation> = {
     services: {
       tag: "الخدمات",
       heading:
-        "استكشف خدمات الجلدية والجراحة التجميلية والأسنان الشاملة لدينا",
+        "استكشف خدمات الجلدية والجراحة التجميلية والعلاج الطبيعي الشاملة لدينا",
       selectCategory: "اختر فئة لعرض الخدمات",
       categories: [
-        { id: "dental", label: "عيادة الأسنان", sublabel: "Dental Clinic" },
-        { id: "general", label: "عام", sublabel: "General" },
-        { id: "dermatology", label: "قسم الجلدية", sublabel: "Dermatology" },
-        { id: "derma", label: "ديرما", sublabel: "Derma" },
+        { id: "dermatology", label: "الجلدية والتجميل", sublabel: "Dermatology & Aesthetic" },
+        { id: "gynecology", label: "النساء والتوليد", sublabel: "Gynecology" },
+        { id: "physiotherapy", label: "العلاج الطبيعي", sublabel: "Physical Therapy" },
+        { id: "osteopathy", label: "تقويم العظام والتغذية", sublabel: "Osteopathy & Nutrition" },
       ],
       loadingText: "جارٍ تحميل خدماتنا...",
       errorText: "تعذّر تحميل الخدمات في الوقت الحالي. يرجى المحاولة مرة أخرى.",

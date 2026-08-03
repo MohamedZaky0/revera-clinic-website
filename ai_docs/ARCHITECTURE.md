@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Revera Clinics System Architecture
 
-> **Last Updated:** 2026-07-25
+> **Last Updated:** 2026-08-03
 > **Audited from:** live source code, cross-checked against `supabase/migrations/` (all previous content was for a different project — discarded)
 
 ---
@@ -27,12 +27,13 @@
 ```
 src/
 ├── app/
-│   ├── layout.tsx                 Root layout: metadata, font vars, LanguageProvider
+│   ├── layout.tsx                 Root layout: metadata, font vars, LanguageProvider, mounts GlobalBookingModal (Quick Book popup)
 │   ├── page.tsx                   Homepage
 │   ├── about/page.tsx
 │   ├── services/page.tsx
 │   ├── blog/page.tsx
 │   ├── contact/page.tsx
+│   ├── book/page.tsx              Dedicated booking landing page (DEC-040) — SEO metadata, ?service= preselect, renders BookingModal variant="page"
 │   ├── admin/page.tsx             Legacy admin shell/composer (browser login gate only; do not add new section logic here)
 │   ├── profile/page.tsx           Patient profile + wallet + visit history
 │   ├── auth/callback/page.tsx     Supabase auth callback: handles invite + recovery hash, redirects to /admin
@@ -77,7 +78,9 @@ src/
 │   ├── HeroSlider.tsx
 │   ├── ServicesSection.tsx        Services catalog + WhatsApp CTA
 │   ├── HomeServicesSection.tsx    Homepage variant of services
-│   ├── BookingModal.tsx           Patient booking flow (3 steps → reservations table)
+│   ├── BookingModal.tsx           Patient booking flow (3 steps → reservations table). variant="modal" (default, popup) | "page" (plain content for /book) — see DEC-040
+│   ├── BookingPageClient.tsx      Minimal focused shell for /book (logo + language toggle only) wrapping BookingModal variant="page"
+│   ├── GlobalBookingModal.tsx     Single root-layout mount of the popup BookingModal ("Quick Book"), skipped on /book itself
 │   ├── AuthModal.tsx              Patient phone/OTP login (UI-only, no backend wiring)
 │   ├── AuthRedirectHandler.tsx    Detects invite/recovery hash on any page → redirects to /auth/callback
 │   ├── SiteFooter.tsx

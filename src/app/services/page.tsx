@@ -8,7 +8,6 @@ import { TestimonialsSection } from "@/components/TestimonialsSection";
 import { HowItWorks } from "@/components/HowItWorks";
 import { WhyChooseUs } from "@/components/WhyChooseUs";
 import { SiteFooter } from "@/components/SiteFooter";
-import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 
 import { CLIENT } from "@/config/client";
@@ -32,7 +31,6 @@ export default function ServicesPage() {
         <WhyChooseUs />
       </main>
       <SiteFooter />
-      <BookingModal />
       <AuthModal />
     </>
   );

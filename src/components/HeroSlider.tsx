@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, type CSSProperties } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Swiper, SwiperSlide } from "swiper/react";
 import type { Swiper as SwiperType } from "swiper";
 import { Autoplay, EffectFade } from "swiper/modules";
@@ -37,13 +38,14 @@ function HeadingWords({ text }: { text: string }) {
 
 export function HeroSlider() {
   const { t, isRTL } = useLanguage();
+  const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
   const [heroReady, setHeroReady] = useState(false);
   const slides = t.hero.slides;
 
   const openBooking = useCallback(() => {
-    window.dispatchEvent(new CustomEvent("open-booking"));
-  }, []);
+    router.push("/book");
+  }, [router]);
 
   useEffect(() => {
     const timer = setTimeout(() => setHeroReady(true), 950);

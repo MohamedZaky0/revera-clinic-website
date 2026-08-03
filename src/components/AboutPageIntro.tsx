@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 export function AboutPageIntro() {
   const { t, isRTL } = useLanguage();
+  const router = useRouter();
   const sectionRef = useRef<HTMLElement>(null);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -24,7 +26,7 @@ export function AboutPageIntro() {
   const revealDelay = `transition-all duration-700 delay-200 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`;
 
   function handleBooking() {
-    window.dispatchEvent(new CustomEvent("open-booking"));
+    router.push("/book");
   }
 
   return (

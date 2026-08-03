@@ -562,7 +562,7 @@ const DEFAULT_HERO_SLIDES = [
   {
     welcome: "Welcome to Revera Clinics",
     heading: "Advanced Medical Care You Can Trust!",
-    description: "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and dental services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
+    description: "Discover comprehensive dermatology, cosmetic surgery, laser treatments, and physical therapy services tailored to your unique needs. With over 15 years of professional expertise, we're here to guide you toward lasting beauty and wellness.",
     bookBtn: "Book Appointment",
     rating: "4.5",
     reviewCount: "(1000+ review)",
@@ -571,7 +571,7 @@ const DEFAULT_HERO_SLIDES = [
   {
     welcome: "Welcome to Revera Clinics",
     heading: "Your Beauty & Health Journey Starts Here!",
-    description: "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and dental care for all ages.",
+    description: "Specialized clinics under full medical supervision offering services in dermatology, cosmetic surgery, laser treatments, and physical therapy care for all ages.",
     bookBtn: "Book Appointment",
     rating: "4.5",
     reviewCount: "(1000+ review)",

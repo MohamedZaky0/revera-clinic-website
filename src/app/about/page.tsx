@@ -10,7 +10,6 @@ import { TestimonialsSection } from "@/components/TestimonialsSection";
 import { OurResults } from "@/components/OurResults";
 import { FaqSection } from "@/components/FaqSection";
 import { SiteFooter } from "@/components/SiteFooter";
-import { BookingModal } from "@/components/BookingModal";
 import { AuthModal } from "@/components/AuthModal";
 
 import { CLIENT } from "@/config/client";
@@ -36,7 +35,6 @@ export default function AboutPage() {
         <FaqSection />
       </main>
       <SiteFooter />
-      <BookingModal />
       <AuthModal />
     </>
   );

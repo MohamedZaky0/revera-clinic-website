@@ -75,7 +75,7 @@ export function WhatWeDo() {
               direction: isRTL ? "rtl" : "ltr",
             }}
           >
-            {/* ── Left column — dental clinic image (rectangular, rounded) ── */}
+            {/* ── Left column — physical therapy clinic image (rectangular, rounded) ── */}
             <div style={{ position: "relative" }}>
               <div
                 className="image-anime"
@@ -88,7 +88,7 @@ export function WhatWeDo() {
               >
                 <Image
                   src="/images/clinic/room.jpg"
-                  alt="Dental clinic — Revera Clinics"
+                  alt="Physical therapy clinic — Revera Clinics"
                   fill
                   sizes="(max-width: 768px) 100vw, 33vw"
                   style={{ objectFit: "cover", objectPosition: "center" }}
