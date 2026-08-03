@@ -34,7 +34,8 @@ function writeLocalPrescriptions(data: any[]) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const customerId = searchParams.get('customerId');
+    const customerId = searchParams.get('customerId') || searchParams.get('customer_id');
+    const bookingId = searchParams.get('bookingId') || searchParams.get('booking_id');
 
     try {
       let query = supabaseServer
@@ -45,6 +46,9 @@ export async function GET(req: Request) {
       if (customerId && customerId !== 'all') {
         query = query.eq('customer_id', customerId);
       }
+      if (bookingId) {
+        query = query.eq('booking_id', bookingId);
+      }
 
       const { data, error } = await query;
 
@@ -52,11 +56,14 @@ export async function GET(req: Request) {
         // If table doesn't exist, fall back to local JSON
         if (error.code === 'PGRST205') {
           console.warn('prescriptions table not found in Supabase. Falling back to local data/prescriptions.json');
-          const local = readLocalPrescriptions();
-          const filtered = (customerId && customerId !== 'all')
-            ? local.filter((p: any) => p.customer_id === customerId)
-            : local;
-          return NextResponse.json(filtered);
+          let local = readLocalPrescriptions();
+          if (customerId && customerId !== 'all') {
+            local = local.filter((p: any) => String(p.customer_id) === String(customerId));
+          }
+          if (bookingId) {
+            local = local.filter((p: any) => String(p.booking_id) === String(bookingId));
+          }
+          return NextResponse.json(local);
         }
         throw error;
       }
@@ -64,11 +71,14 @@ export async function GET(req: Request) {
     } catch (dbErr: any) {
       if (dbErr.code === 'PGRST205' || dbErr.message?.includes('relation "public.prescriptions" does not exist')) {
         console.warn('prescriptions table not found in Supabase. Falling back to local data/prescriptions.json');
-        const local = readLocalPrescriptions();
-        const filtered = (customerId && customerId !== 'all')
-          ? local.filter((p: any) => p.customer_id === customerId)
-          : local;
-        return NextResponse.json(filtered);
+        let local = readLocalPrescriptions();
+        if (customerId && customerId !== 'all') {
+          local = local.filter((p: any) => String(p.customer_id) === String(customerId));
+        }
+        if (bookingId) {
+          local = local.filter((p: any) => String(p.booking_id) === String(bookingId));
+        }
+        return NextResponse.json(local);
       }
       throw dbErr;
     }
@@ -86,31 +96,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const {
-    id,
-    customer_id,
-    patient_name,
-    date,
-    diagnosis,
-    medications,
-    general_notes,
-    doctor_notes,
-    follow_up_date
-  } = body;
+  const id = body.id;
+  const customerId = body.customer_id || body.customerId;
+  const bookingId = body.booking_id || body.bookingId;
+  const patientName = body.patient_name || body.customer_name || "Patient";
+  const diagnosis = body.diagnosis;
+  const medications = body.medications;
+  const generalNotes = body.general_notes || body.instructions || body.notes;
 
-  if (!customer_id || !patient_name) {
-    return NextResponse.json({ error: 'customer_id and patient_name are required' }, { status: 400 });
+  if (!patientName) {
+    return NextResponse.json({ error: 'patient_name or customer_name is required' }, { status: 400 });
   }
 
   const prescriptionData = {
-    customer_id,
-    patient_name,
-    date: date || new Date().toISOString().slice(0, 10),
+    customer_id: customerId || null,
+    booking_id: bookingId || null,
+    patient_name: patientName,
+    date: body.date || new Date().toISOString().slice(0, 10),
     diagnosis: diagnosis || null,
     medications: Array.isArray(medications) ? medications : [],
-    general_notes: general_notes || null,
-    doctor_notes: doctor_notes || null,
-    follow_up_date: follow_up_date || null,
+    general_notes: generalNotes || null,
+    doctor_notes: body.doctor_notes || null,
+    follow_up_date: body.follow_up_date || null,
     updated_at: new Date().toISOString()
   };
 

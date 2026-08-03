@@ -1,63 +1,198 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import Image from "next/image";
 import { supabase } from "@/lib/supabaseClient";
-import {
-  CalendarDays,
-  Stethoscope,
-  Settings,
-  LogOut,
-  Clock,
-  User,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  ShieldCheck,
-  ChevronRight,
-  Sparkles,
-  MapPin,
-  Search,
-  Plus,
-  Play,
-  Check,
-  UserCheck,
-  Lock,
-  Bell,
-  Award,
-  DollarSign,
-  Printer,
-  RefreshCw,
-  X,
-  Info
-} from "lucide-react";
-
-interface DoctorAccountViewProps {
-  doctorDbId?: string;
-  doctorName?: string;
-  doctorEmail?: string;
-  doctorBranch?: string;
-  initialReservations?: any[];
-  onLogout: () => void;
-  onSwitchToAdmin?: () => void;
-}
-
-type DoctorTab = "schedule" | "ongoing" | "settings";
+import { DoctorAccountViewProps, DoctorTab, DoctorPatient, UsedProduct, MedicationItem } from "./doctor/types";
+import { doctorTranslations } from "./doctor/translations";
+import { parseBookingNotes, getAuthHeaders } from "./doctor/utils";
+import DoctorSidebar from "./doctor/DoctorSidebar";
+import DoctorScheduleTab from "./doctor/tabs/DoctorScheduleTab";
+import DoctorOngoingSessionTab from "./doctor/tabs/DoctorOngoingSessionTab";
+import DoctorPatientsTab from "./doctor/tabs/DoctorPatientsTab";
+import DoctorAnalyticsTab from "./doctor/tabs/DoctorAnalyticsTab";
+import DoctorSettingsTab from "./doctor/tabs/DoctorSettingsTab";
+import DoctorProfileTab from "./doctor/tabs/DoctorProfileTab";
+import DoctorSessionDrawer from "./doctor/modals/DoctorSessionDrawer";
+import DoctorPrescriptionModal from "./doctor/modals/DoctorPrescriptionModal";
+import DoctorPatientHistoryDrawer from "./doctor/modals/DoctorPatientHistoryDrawer";
 
 export default function DoctorAccountView({
   doctorDbId,
   doctorName = "Doctor",
   doctorEmail = "doctor@revera.com",
   doctorBranch = "Main Branch",
+  branches = [],
   initialReservations = [],
   onLogout
 }: DoctorAccountViewProps) {
+  const [lang, setLang] = useState<"en" | "ar">("en");
+  const t = doctorTranslations[lang];
   const [activeTab, setActiveTab] = useState<DoctorTab>("schedule");
+  const [scheduleViewMode, setScheduleViewMode] = useState<"calendar" | "list">("calendar");
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
   const [reservations, setReservations] = useState<any[]>(initialReservations);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [patientSearchQuery, setPatientSearchQuery] = useState("");
+  const [selectedPatientHistory, setSelectedPatientHistory] = useState<DoctorPatient | null>(null);
+  const [branchList, setBranchList] = useState<any[]>(branches || []);
 
-  // Date Selector State for Schedule (Yesterday, Today, Tomorrow, Custom Date)
+  useEffect(() => {
+    if (branches && branches.length > 0) {
+      setBranchList(branches);
+    } else {
+      fetch("/api/branches")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) setBranchList(data);
+          else if (data && Array.isArray(data.branches)) setBranchList(data.branches);
+        })
+        .catch(() => {});
+    }
+  }, [branches]);
+
+  const resolvedBranchName = useMemo(() => {
+    if (!doctorBranch) return "Main Branch";
+    const match = branchList.find(
+      (b) => b.id === doctorBranch || b.name_en === doctorBranch
+    );
+    if (match) return match.name_en || match.name || "Main Branch";
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      doctorBranch.trim()
+    );
+    if (isUuid) {
+      if (branchList.length > 0) {
+        return branchList[0].name_en || branchList[0].name || "Main Branch";
+      }
+      return "Main Branch";
+    }
+    return doctorBranch;
+  }, [doctorBranch, branchList]);
+
+  // Derived Doctor Patients List from Reservations
+  const doctorPatientsList = useMemo(() => {
+    const patientMap = new Map<string, DoctorPatient>();
+
+    reservations.forEach((r) => {
+      const key = r.customer_id || r.customer_phone || r.phone || r.name || r.id;
+      if (!key) return;
+
+      const pName = r.name || r.customer_name || r.patient_name || "Patient";
+      const pPhone = r.phone || r.customer_phone || "N/A";
+      const pEmail = r.email || r.customer_email || "";
+      const serviceName = r.service_name || r.service || (Array.isArray(r.services) ? r.services.join(", ") : "Clinical Session");
+      const visitDate = r.date || "";
+
+      if (!patientMap.has(key)) {
+        patientMap.set(key, {
+          id: String(key),
+          name: pName,
+          phone: pPhone,
+          email: pEmail,
+          totalVisits: 1,
+          lastVisitDate: visitDate,
+          recentServices: [serviceName],
+          bookings: [r]
+        });
+      } else {
+        const existing = patientMap.get(key)!;
+        existing.totalVisits += 1;
+        existing.bookings.push(r);
+        if (serviceName && !existing.recentServices.includes(serviceName)) {
+          existing.recentServices.push(serviceName);
+        }
+        if (visitDate && visitDate > existing.lastVisitDate) {
+          existing.lastVisitDate = visitDate;
+        }
+      }
+    });
+
+    return Array.from(patientMap.values());
+  }, [reservations]);
+
+  const filteredPatients = useMemo(() => {
+    if (!patientSearchQuery.trim()) return doctorPatientsList;
+    const q = patientSearchQuery.toLowerCase();
+    return doctorPatientsList.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.phone.toLowerCase().includes(q) ||
+        p.email.toLowerCase().includes(q) ||
+        p.recentServices.some((s) => s.toLowerCase().includes(q))
+    );
+  }, [doctorPatientsList, patientSearchQuery]);
+
+  // Derived Analytics Data
+  const analyticsData = useMemo(() => {
+    let totalRevenue = 0;
+    let completedCount = 0;
+    let pendingCount = 0;
+    let confirmedCount = 0;
+    let cancelledCount = 0;
+    const serviceBreakdown: Record<string, { count: number; revenue: number }> = {};
+    const monthlyRevenue: Record<string, { month: string; revenue: number; count: number }> = {};
+
+    reservations.forEach((r) => {
+      const price = Number(r.total_price || r.amount || r.price || 0);
+      const status = (r.status || "pending").toLowerCase();
+      const serviceName = r.service_name || r.service || (Array.isArray(r.services) ? r.services.join(", ") : "Clinical Session");
+      const dateStr = r.date || new Date().toISOString().slice(0, 10);
+      const monthKey = dateStr.slice(0, 7);
+
+      if (status === "completed") {
+        totalRevenue += price;
+        completedCount += 1;
+
+        if (!serviceBreakdown[serviceName]) {
+          serviceBreakdown[serviceName] = { count: 0, revenue: 0 };
+        }
+        serviceBreakdown[serviceName].count += 1;
+        serviceBreakdown[serviceName].revenue += price;
+
+        if (!monthlyRevenue[monthKey]) {
+          const dateObj = new Date(dateStr + "T00:00:00");
+          const monthLabel = isNaN(dateObj.getTime())
+            ? monthKey
+            : dateObj.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+          monthlyRevenue[monthKey] = { month: monthLabel, revenue: 0, count: 0 };
+        }
+        monthlyRevenue[monthKey].revenue += price;
+        monthlyRevenue[monthKey].count += 1;
+      } else if (status === "confirmed" || status === "started" || status === "approved") {
+        confirmedCount += 1;
+      } else if (status === "cancelled" || status === "rejected") {
+        cancelledCount += 1;
+      } else {
+        pendingCount += 1;
+      }
+    });
+
+    const avgSessionValue = completedCount > 0 ? Math.round(totalRevenue / completedCount) : 0;
+    const totalBookings = reservations.length;
+    const completionRate = totalBookings > 0 ? Math.round((completedCount / totalBookings) * 100) : 0;
+
+    const topServices = Object.entries(serviceBreakdown)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    const monthlyTrend = Object.values(monthlyRevenue).sort((a, b) => a.month.localeCompare(b.month));
+
+    return {
+      totalRevenue,
+      completedCount,
+      confirmedCount,
+      pendingCount,
+      cancelledCount,
+      totalBookings,
+      avgSessionValue,
+      completionRate,
+      topServices,
+      monthlyTrend
+    };
+  }, [reservations]);
+
+  // Date Selector State for Schedule
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const yesterdayStr = useMemo(() => {
@@ -78,7 +213,31 @@ export default function DoctorAccountView({
   const [activeSessionBooking, setActiveSessionBooking] = useState<any | null>(null);
   const [clinicalNote, setClinicalNote] = useState("");
   const [medicalRecord, setMedicalRecord] = useState<any | null>(null);
+  const [medicalRecordLoading, setMedicalRecordLoading] = useState(false);
+  const [resolvedCustomerId, setResolvedCustomerId] = useState<string | null>(null);
   const [savingNote, setSavingNote] = useState(false);
+
+  // Catalog State (Services, Inventory Products & Devices)
+  const [servicesList, setServicesList] = useState<any[]>([]);
+  const [productsList, setProductsList] = useState<any[]>([]);
+  const [devicesList, setDevicesList] = useState<any[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [selectedProductQty, setSelectedProductQty] = useState<number>(1);
+  const [usedProducts, setUsedProducts] = useState<UsedProduct[]>([]);
+
+  // Extra Device Pulses State
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
+  const [extraPulsesCount, setExtraPulsesCount] = useState<number>(0);
+  const [pricePerPulse, setPricePerPulse] = useState<number>(0);
+
+  // Medical Record Form State
+  const [showMedicalForm, setShowMedicalForm] = useState(false);
+  const [formSkinType, setFormSkinType] = useState("Normal");
+  const [formAllergies, setFormAllergies] = useState("");
+  const [formMedicationDetails, setFormMedicationDetails] = useState("");
+  const [formMedicalConditionsDetails, setFormMedicalConditionsDetails] = useState("");
+  const [formPreviousTreatmentsDetails, setFormPreviousTreatmentsDetails] = useState("");
+  const [savingMedicalRecord, setSavingMedicalRecord] = useState(false);
 
   // In-Page Session Modal State (Schedule Tab)
   const [scheduleModalBooking, setScheduleModalBooking] = useState<any | null>(null);
@@ -86,7 +245,7 @@ export default function DoctorAccountView({
   // Prescription Modal State
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [rxDiagnosis, setRxDiagnosis] = useState("");
-  const [rxMedications, setRxMedications] = useState<{ name: string; dosage: string; frequency: string; duration: string }[]>([
+  const [rxMedications, setRxMedications] = useState<MedicationItem[]>([
     { name: "", dosage: "", frequency: "", duration: "" }
   ]);
   const [rxGeneralNotes, setRxGeneralNotes] = useState("");
@@ -96,159 +255,442 @@ export default function DoctorAccountView({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Auth headers helper for staff access verification
-  const getAuthHeaders = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json"
+  // Fetch inventory products, devices & services catalog on mount
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const headers = await getAuthHeaders();
+        const [prodRes, devRes, srvRes] = await Promise.all([
+          fetch("/api/inventory/products", { headers }),
+          fetch("/api/inventory/devices", { headers }),
+          fetch("/api/services", { headers })
+        ]);
+        if (prodRes.ok) {
+          const pData = await prodRes.json();
+          setProductsList(Array.isArray(pData) ? pData : pData.products || []);
+        }
+        if (devRes.ok) {
+          const dData = await devRes.json();
+          setDevicesList(Array.isArray(dData) ? dData : dData.devices || []);
+        }
+        if (srvRes.ok) {
+          const sData = await srvRes.json();
+          setServicesList(Array.isArray(sData) ? sData : sData.services || []);
+        }
+      } catch (err) {
+        console.error("Error loading doctor catalog:", err);
+      }
     };
-    if (session?.access_token) {
-      headers["Authorization"] = `Bearer ${session.access_token}`;
-    }
-    return headers;
-  };
+    fetchInventory();
+  }, []);
 
-  // Fetch real reservations from DB with polling for live updates
-  const fetchDoctorReservations = async () => {
-    setLoading(true);
+  // Fetch Doctor Reservations from DB
+  const fetchDoctorReservations = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
+      let queryUrl = "/api/reservations?limit=150";
+      if (doctorDbId) {
+        queryUrl += `&doctorId=${encodeURIComponent(doctorDbId)}`;
+      } else if (doctorName && doctorName !== "Doctor") {
+        queryUrl += `&doctorName=${encodeURIComponent(doctorName)}`;
+      }
+
       const headers = await getAuthHeaders();
-      const res = await fetch("/api/reservations", { headers, cache: "no-store" });
+      const res = await fetch(queryUrl, { headers });
       if (res.ok) {
         const data = await res.json();
-        setReservations(Array.isArray(data) ? data : []);
+        let resList = Array.isArray(data) ? data : data.reservations || [];
+        if (doctorName && doctorName !== "Doctor" && resList.length > 0) {
+          const docLower = doctorName.toLowerCase().replace(/^dr\.?\s*/i, "").trim();
+          resList = resList.filter((r: any) => {
+            if (!r.doctorName) return true;
+            const rDocLower = String(r.doctorName).toLowerCase().replace(/^dr\.?\s*/i, "").trim();
+            return rDocLower.includes(docLower) || docLower.includes(rDocLower);
+          });
+        }
+        setReservations(resList);
       }
     } catch (err) {
       console.error("Error fetching doctor reservations:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
+  // Silent 3-second background polling for instant session start detection
   useEffect(() => {
     fetchDoctorReservations();
-    // Auto-refresh schedule every 10 seconds to catch receptionist "Start Session" clicks live
-    const interval = setInterval(fetchDoctorReservations, 10000);
+    const interval = setInterval(() => {
+      fetchDoctorReservations(true);
+    }, 3000);
     return () => clearInterval(interval);
+  }, [doctorDbId, doctorName]);
+
+  // Persistent Real-time Subscriptions for Started Sessions & Bookings
+  useEffect(() => {
+    const channel = supabase
+      .channel("doctor-realtime-reservations")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reservations" },
+        (payload: any) => {
+          if (payload.new) {
+            const updated: any = payload.new;
+            setReservations((prev) => {
+              const idx = prev.findIndex((item) => item.id === updated.id);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = { ...next[idx], ...updated };
+                return next;
+              }
+              return [updated, ...prev];
+            });
+
+            const st = String(updated.status || "").toLowerCase().trim();
+            const isActive = st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
+            if (isActive) {
+              setActiveSessionBooking((curr: any) => {
+                if (!curr || curr.status === "completed" || curr.id === updated.id) {
+                  return updated;
+                }
+                return curr;
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  // Filter reservations for Selected Date & Doctor assignment
-  const selectedDateReservations = useMemo(() => {
-    return reservations.filter((r) => {
-      const resDate = r.date ? String(r.date).slice(0, 10) : "";
-      if (resDate !== selectedDateStr) return false;
-
-      // Filter by doctor name/ID if set
-      if (r.doctor && doctorName && r.doctor.toLowerCase() !== doctorName.toLowerCase()) {
-        if (r.doctor.trim() && r.doctor.toLowerCase() !== "doctor" && r.doctor.toLowerCase() !== "any") {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [reservations, selectedDateStr, doctorName]);
-
-  // Today's reservations specifically for receptionist auto-link
-  const todaysReservations = useMemo(() => {
-    return reservations.filter((r) => {
-      const resDate = r.date ? String(r.date).slice(0, 10) : "";
-      if (resDate !== todayStr) return false;
-
-      if (r.doctor && doctorName && r.doctor.toLowerCase() !== doctorName.toLowerCase()) {
-        if (r.doctor.trim() && r.doctor.toLowerCase() !== "doctor" && r.doctor.toLowerCase() !== "any") {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [reservations, todayStr, doctorName]);
-
-  // AUTO-DETECT SESSION STARTED BY RECEPTIONIST ("started" or "in-progress" status)
+  // Receptionist Started Session Auto-Detect
   const receptionistStartedSession = useMemo(() => {
-    return (
-      todaysReservations.find((r) => r.status === "started" || r.status === "in-progress") ||
-      reservations.find((r) => r.status === "started" || r.status === "in-progress") ||
-      null
-    );
-  }, [todaysReservations, reservations]);
+    return reservations.find((r) => {
+      const st = String(r.status || "").toLowerCase().trim();
+      return st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
+    });
+  }, [reservations]);
 
-  // Sync activeSessionBooking automatically when receptionist starts a session
   useEffect(() => {
     if (receptionistStartedSession) {
       if (!activeSessionBooking || activeSessionBooking.status === "completed" || activeSessionBooking.id !== receptionistStartedSession.id) {
         setActiveSessionBooking(receptionistStartedSession);
-        setClinicalNote(receptionistStartedSession.notes || "");
-      }
-    } else {
-      if (activeSessionBooking && activeSessionBooking.status === "completed") {
-        setActiveSessionBooking(null);
       }
     }
-  }, [receptionistStartedSession]);
+  }, [receptionistStartedSession, activeSessionBooking]);
 
-  // Statistics derived dynamically for the selected date
-  const stats = useMemo(() => {
-    const total = selectedDateReservations.length;
-    const completed = selectedDateReservations.filter((r) => r.status === "completed" || r.status === "done").length;
-    const inProgress = selectedDateReservations.filter((r) => r.status === "started" || r.status === "in-progress").length;
-    const upcoming = selectedDateReservations.filter((r) => ["pending", "approved", "confirmed"].includes(r.status)).length;
-    return { total, completed, inProgress, upcoming };
-  }, [selectedDateReservations]);
+  // Global Patient Records & Prescriptions Cache Map
+  const [medicalRecordsMap, setMedicalRecordsMap] = useState<Record<string, any>>({});
+  const [prescriptionsMap, setPrescriptionsMap] = useState<Record<string, any[]>>({});
 
-  // Filtered schedule by search query
-  const filteredSchedule = useMemo(() => {
-    if (!searchQuery.trim()) return selectedDateReservations;
-    const q = searchQuery.toLowerCase();
-    return selectedDateReservations.filter(
-      (r) =>
-        (r.name || r.customer_name || "").toLowerCase().includes(q) ||
-        (r.service || r.service_name || "").toLowerCase().includes(q) ||
-        (r.phone || "").includes(q)
-    );
-  }, [selectedDateReservations, searchQuery]);
+  // Load Patient Medical Record & Prescriptions whenever target booking changes
+  const targetBookingForMedicalRecord = activeSessionBooking || scheduleModalBooking;
 
-  // Open session details in Modal on SAME PAGE (Schedule tab)
-  const handleOpenScheduleModal = async (booking: any) => {
-    setScheduleModalBooking(booking);
-    setClinicalNote(booking.notes || "");
+  useEffect(() => {
+    if (!targetBookingForMedicalRecord) {
+      setMedicalRecord(null);
+      setResolvedCustomerId(null);
+      return;
+    }
 
-    // Fetch medical intake record for this patient
-    const customerId = booking.customer_id || booking.customerId || booking.id;
-    if (customerId) {
+    const loadMedicalRecord = async () => {
+      setMedicalRecordLoading(true);
       try {
+        let custId = targetBookingForMedicalRecord.customer_id || targetBookingForMedicalRecord.customerId;
+        const custPhone = targetBookingForMedicalRecord.phone || targetBookingForMedicalRecord.customer_phone;
         const headers = await getAuthHeaders();
-        const res = await fetch(`/api/medical-records?customerId=${encodeURIComponent(customerId)}`, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          setMedicalRecord(data.form || null);
+
+        if (!custId && custPhone) {
+          const custRes = await fetch(`/api/customers?phone=${encodeURIComponent(custPhone)}`, { headers });
+          if (custRes.ok) {
+            const custData = await custRes.json();
+            const matchingCust = Array.isArray(custData) ? custData[0] : custData.customers?.[0];
+            if (matchingCust?.id) {
+              custId = matchingCust.id;
+            }
+          }
+        }
+
+        setResolvedCustomerId(custId || null);
+
+        if (custId) {
+          // Check local cache first
+          if (medicalRecordsMap[custId]) {
+            const cached = medicalRecordsMap[custId];
+            setMedicalRecord(cached);
+            setFormSkinType(cached.skin_type || "Normal");
+            setFormAllergies(cached.allergies || "");
+            setFormMedicationDetails(cached.medication_details || "");
+            setFormMedicalConditionsDetails(cached.medical_conditions_details || "");
+            setFormPreviousTreatmentsDetails(cached.previous_treatments_details || "");
+            setShowMedicalForm(false);
+          }
+
+          const medRes = await fetch(`/api/medical-records?customer_id=${encodeURIComponent(custId)}`, { headers });
+          if (medRes.ok) {
+            const medData = await medRes.json();
+            const record = Array.isArray(medData) ? medData[0] : medData.medicalRecord || medData.record || medData.form;
+            if (record && (record.skin_type || record.allergies || record.medication_details || record.medical_conditions_details || record.previous_treatments_details)) {
+              setMedicalRecord(record);
+              setMedicalRecordsMap((prev) => ({ ...prev, [custId]: record }));
+              setFormSkinType(record.skin_type || "Normal");
+              setFormAllergies(record.allergies || "");
+              setFormMedicationDetails(record.medication_details || "");
+              setFormMedicalConditionsDetails(record.medical_conditions_details || "");
+              setFormPreviousTreatmentsDetails(record.previous_treatments_details || "");
+              setShowMedicalForm(false);
+            } else if (!medicalRecordsMap[custId]) {
+              setMedicalRecord(null);
+              setShowMedicalForm(true);
+            }
+          }
+
+          // Fetch Prescriptions for customer / booking
+          const rxRes = await fetch(`/api/prescriptions?customer_id=${encodeURIComponent(custId)}`, { headers });
+          if (rxRes.ok) {
+            const rxData = await rxRes.json();
+            const list = Array.isArray(rxData) ? rxData : rxData.prescriptions || [];
+            setPrescriptionsMap((prev) => ({ ...prev, [custId]: list }));
+          }
+        } else {
+          setMedicalRecord(null);
+          setShowMedicalForm(true);
         }
       } catch (err) {
-        console.error("Error loading patient medical records:", err);
+        console.error("Error loading medical record:", err);
+      } finally {
+        setMedicalRecordLoading(false);
       }
+    };
+
+    loadMedicalRecord();
+  }, [targetBookingForMedicalRecord]);
+
+  // Load existing Doctor Notes into editor
+  useEffect(() => {
+    const target = activeSessionBooking || scheduleModalBooking;
+    if (target) {
+      const parsed = parseBookingNotes(target.notes || "");
+      setClinicalNote(parsed.cleanDoctorNote);
+    } else {
+      setClinicalNote("");
+    }
+    setUsedProducts([]);
+    setSelectedProductId("");
+    setSelectedProductQty(1);
+    setSelectedDeviceId("");
+    setExtraPulsesCount(0);
+    setPricePerPulse(0);
+  }, [activeSessionBooking, scheduleModalBooking]);
+
+  // Calendar Navigation Handlers
+  const handlePrevCalendarMonth = () => {
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+  const handleNextCalendarMonth = () => {
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+  const handleTodayCalendarMonth = () => {
+    setCalendarMonth(new Date());
+    setSelectedDateStr(todayStr);
+  };
+
+  // Group reservations by date
+  const reservationsByDate = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    reservations.forEach((r) => {
+      const dStr = r.date || todayStr;
+      if (!map[dStr]) map[dStr] = [];
+      map[dStr].push(r);
+    });
+    return map;
+  }, [reservations, todayStr]);
+
+  // Generate calendar days for month grid
+  const calendarDaysList = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const prevMonthDays = new Date(year, month, 0).getDate();
+
+    const days: { dateStr: string; dayNum: number; isCurrentMonth: boolean }[] = [];
+
+    // Prev month padding
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const dayNum = prevMonthDays - i;
+      const d = new Date(year, month - 1, dayNum);
+      days.push({
+        dateStr: d.toISOString().slice(0, 10),
+        dayNum,
+        isCurrentMonth: false
+      });
+    }
+
+    // Current month days
+    for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+      const d = new Date(year, month, dayNum);
+      days.push({
+        dateStr: d.toISOString().slice(0, 10),
+        dayNum,
+        isCurrentMonth: true
+      });
+    }
+
+    // Next month padding to fill 35/42 cells grid
+    const totalCells = days.length > 35 ? 42 : 35;
+    const remaining = totalCells - days.length;
+    for (let dayNum = 1; dayNum <= remaining; dayNum++) {
+      const d = new Date(year, month + 1, dayNum);
+      days.push({
+        dateStr: d.toISOString().slice(0, 10),
+        dayNum,
+        isCurrentMonth: false
+      });
+    }
+
+    return days;
+  }, [calendarMonth]);
+
+  // Filter appointments for selected date & search query
+  const filteredSchedule = useMemo(() => {
+    const listForDate = reservationsByDate[selectedDateStr] || [];
+    if (!searchQuery.trim()) return listForDate;
+    const q = searchQuery.toLowerCase();
+    return listForDate.filter((r) => {
+      const pName = (r.name || r.customer_name || "").toLowerCase();
+      const sName = (r.service || r.service_name || "").toLowerCase();
+      const rName = (r.room || r.room_name || "").toLowerCase();
+      const phone = (r.phone || "").toLowerCase();
+      return pName.includes(q) || sName.includes(q) || rName.includes(q) || phone.includes(q);
+    });
+  }, [reservationsByDate, selectedDateStr, searchQuery]);
+
+  // Quick stats summary
+  const stats = useMemo(() => {
+    let list = reservations;
+    if (scheduleViewMode === "calendar") {
+      const currentMonthKey = calendarMonth.toISOString().slice(0, 7);
+      list = reservations.filter((r) => (r.date || "").startsWith(currentMonthKey));
+    }
+    const total = list.length;
+    const completed = list.filter((r) => r.status === "completed" || r.status === "done").length;
+    const inProgress = list.filter((r) => r.status === "started" || r.status === "in-progress").length;
+    const upcoming = list.filter((r) => ["pending", "approved", "confirmed", "arrived"].includes(r.status)).length;
+    return { total, completed, inProgress, upcoming };
+  }, [reservations, scheduleViewMode, calendarMonth]);
+
+  // Open Schedule Details Drawer Modal
+  const handleOpenScheduleModal = (booking: any) => {
+    setScheduleModalBooking(booking);
+  };
+
+  // Add Product to Session Consumables
+  const handleAddProductToSession = () => {
+    if (!selectedProductId) return;
+    const prod = productsList.find((p) => p.id === selectedProductId);
+    if (!prod) return;
+
+    const unitPrice = Number(prod.price || prod.unit_price || prod.selling_price || 0);
+    const total = unitPrice * selectedProductQty;
+
+    setUsedProducts((prev) => [
+      ...prev,
+      {
+        id: prod.id,
+        name: prod.name,
+        qty: selectedProductQty,
+        unitPrice,
+        total
+      }
+    ]);
+    setSelectedProductId("");
+    setSelectedProductQty(1);
+  };
+
+  const handleRemoveProductFromSession = (index: number) => {
+    setUsedProducts((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Financial Calculations for Active Session
+  const activeBookingTarget = activeSessionBooking || scheduleModalBooking;
+  const baseBookingPrice = Number(activeBookingTarget?.total_price || activeBookingTarget?.amount || activeBookingTarget?.price || 0);
+  const productsSubtotal = usedProducts.reduce((sum, item) => sum + item.total, 0);
+  const extraPulsesSubtotal = extraPulsesCount * pricePerPulse;
+  const updatedInvoiceTotal = baseBookingPrice + productsSubtotal + extraPulsesSubtotal;
+
+  // Save Medical Record
+  const handleSaveMedicalRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetBooking = activeSessionBooking || scheduleModalBooking;
+    if (!targetBooking) return;
+
+    setSavingMedicalRecord(true);
+    try {
+      const custId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/medical-records", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          customer_id: custId,
+          patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
+          skin_type: formSkinType,
+          allergies: formAllergies,
+          medication_details: formMedicationDetails,
+          medical_conditions_details: formMedicalConditionsDetails,
+          previous_treatments_details: formPreviousTreatmentsDetails
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMedicalRecord(data.medicalRecord || data.record || data);
+        setShowMedicalForm(false);
+        alert("Patient medical record saved successfully!");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || err.message || "Failed to save medical record.");
+      }
+    } catch (err: any) {
+      console.error("Error saving medical record:", err);
+      alert(err.message || "Error saving medical record.");
+    } finally {
+      setSavingMedicalRecord(false);
     }
   };
 
-  // Save clinical notes to database
+  // Save Clinical Note only
   const handleSaveClinicalNote = async (targetBooking: any) => {
     if (!targetBooking) return;
     setSavingNote(true);
     try {
+      const parsedOld = parseBookingNotes(targetBooking.notes || "");
+      let fullNotes = clinicalNote.trim();
+      if (parsedOld.instaPayLog) fullNotes += `\n${parsedOld.instaPayLog}`;
+      if (parsedOld.productsLog) fullNotes += `\n${parsedOld.productsLog}`;
+      if (parsedOld.invoiceLog) fullNotes += `\n${parsedOld.invoiceLog}`;
+      if (parsedOld.extraLogs.length > 0) fullNotes += `\n${parsedOld.extraLogs.join("\n")}`;
+
       const headers = await getAuthHeaders();
       const res = await fetch(`/api/reservations?id=${encodeURIComponent(targetBooking.id)}`, {
         method: "PATCH",
         headers,
         body: JSON.stringify({
-          status: targetBooking.status,
-          notes: clinicalNote
+          notes: fullNotes
         })
       });
 
       if (res.ok) {
-        alert("Clinical notes saved successfully!");
+        alert("Doctor clinical notes saved successfully!");
         fetchDoctorReservations();
       } else {
-        const errData = await res.json().catch(() => ({}));
-        alert(errData.error || errData.message || "Failed to save clinical notes.");
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || err.message || "Failed to save clinical note.");
       }
     } catch (err: any) {
       console.error("Error saving clinical note:", err);
@@ -258,10 +700,50 @@ export default function DoctorAccountView({
     }
   };
 
-  // Complete treatment status in database & CLOSE SESSION FROM ONGOING
+  // Complete Treatment Session
   const handleCompleteTreatment = async (targetBooking: any) => {
     if (!targetBooking) return;
-    if (!confirm(`Mark treatment session as COMPLETED for ${targetBooking.name || "Patient"}?`)) return;
+
+    // Auto-save medical record intake if doctor filled form fields
+    if (!medicalRecord && (formAllergies || formMedicationDetails || formMedicalConditionsDetails || formPreviousTreatmentsDetails)) {
+      try {
+        const custId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
+        const headers = await getAuthHeaders();
+        const medRes = await fetch("/api/medical-records", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            customer_id: custId,
+            patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
+            skin_type: formSkinType,
+            allergies: formAllergies,
+            medication_details: formMedicationDetails,
+            medical_conditions_details: formMedicalConditionsDetails,
+            previous_treatments_details: formPreviousTreatmentsDetails
+          })
+        });
+        if (medRes.ok) {
+          const mData = await medRes.json();
+          setMedicalRecord(mData.medicalRecord || mData);
+        }
+      } catch (e) {
+        console.error("Auto-save medical record error:", e);
+      }
+    }
+
+    let sessionAddonsSummary = "";
+    if (usedProducts.length > 0) {
+      sessionAddonsSummary += `\n[Products Used During Session]: ${usedProducts.map((p) => `${p.name} (Qty: ${p.qty} x ${p.unitPrice} EGP = ${p.total} EGP)`).join(", ")}`;
+    }
+    if (extraPulsesCount > 0 && selectedDeviceId) {
+      const devObj = devicesList.find((d) => d.id === selectedDeviceId);
+      sessionAddonsSummary += `\n[Extra Device Pulses]: ${devObj?.name || 'Device'} — ${extraPulsesCount} pulses @ ${pricePerPulse} EGP/pulse (+${extraPulsesSubtotal} EGP)`;
+    }
+    if (productsSubtotal + extraPulsesSubtotal > 0) {
+      sessionAddonsSummary += `\n[Invoice Total Updated]: ${updatedInvoiceTotal} EGP (Base: ${baseBookingPrice} EGP + Consumables: ${productsSubtotal + extraPulsesSubtotal} EGP)`;
+    }
+
+    const finalNotes = (clinicalNote || "") + sessionAddonsSummary;
 
     try {
       const headers = await getAuthHeaders();
@@ -270,14 +752,28 @@ export default function DoctorAccountView({
         headers,
         body: JSON.stringify({
           status: "completed",
-          notes: clinicalNote
+          notes: finalNotes,
+          amountLeft: updatedInvoiceTotal - Number(targetBooking.amount_paid || 0),
+          attachedProducts: usedProducts
         })
       });
 
       if (res.ok) {
-        alert("Treatment session marked as COMPLETED!");
+        alert(`Treatment session marked as COMPLETED!\nInvoice Total Updated to: ${updatedInvoiceTotal} EGP`);
+        
+        // Immediately close ongoing active session workspace
         setActiveSessionBooking(null);
         setScheduleModalBooking(null);
+        setClinicalNote("");
+        setUsedProducts([]);
+        setExtraPulsesCount(0);
+        setMedicalRecord(null);
+
+        // Update reservations state locally so status='completed' is immediately reflected
+        setReservations((prev) =>
+          prev.map((r) => (String(r.id) === String(targetBooking.id) ? { ...r, status: "completed", notes: finalNotes } : r))
+        );
+
         fetchDoctorReservations();
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -294,7 +790,7 @@ export default function DoctorAccountView({
     e.preventDefault();
     if (!targetBooking) return;
 
-    const customerId = targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
+    const customerId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
     const patientName = targetBooking.name || targetBooking.customer_name || "Patient";
 
     setSavingRx(true);
@@ -333,776 +829,203 @@ export default function DoctorAccountView({
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col">
-      {/* ── TOP HEADER & FLOATING NAVIGATION BAR (FULL SCREEN WIDTH) ── */}
-      <header className="sticky top-0 z-50 w-full bg-[#F4F5F1]/90 backdrop-blur-md px-8 py-4 transition-all border-b border-[#414E36]/10 shadow-sm">
-        <div className="w-full flex items-center justify-between gap-4">
-          
-          {/* Left: Brand Logo & Doctor Badge */}
-          <div className="flex items-center gap-3">
-            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-[#414E36] p-2 shadow-md">
-              <Image
-                src="/images/main_logo.png"
-                alt="Revera Clinics"
-                fill
-                style={{ objectFit: "contain", padding: "2px" }}
-              />
-            </div>
-            <div className="hidden sm:flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-extrabold uppercase tracking-widest text-[#414E36]">
-                  Doctor Portal
-                </span>
-                <span className="inline-flex items-center rounded-md bg-[#414E36]/10 px-2 py-0.5 text-[10px] font-bold text-[#414E36]">
-                  <MapPin size={10} className="mr-1 inline" />
-                  {doctorBranch}
-                </span>
-              </div>
-              <h1 className="text-sm font-bold text-[#1F251A]">{doctorName}</h1>
-            </div>
-          </div>
+    <div className="h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
+      {/* SIDEBAR NAVIGATION */}
+      <DoctorSidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        doctorName={doctorName}
+        doctorEmail={doctorEmail}
+        doctorPatientsCount={doctorPatientsList.length}
+        receptionistStartedSession={!!receptionistStartedSession}
+        activeSessionBooking={activeSessionBooking}
+        loading={loading}
+        t={t}
+        lang={lang}
+        setLang={setLang}
+        onFetchReservations={fetchDoctorReservations}
+        onLogout={onLogout}
+      />
 
-          {/* ── CENTER FLOATING NAV BAR ── */}
-          <nav className="flex items-center justify-center">
-            <div className="flex items-center gap-1.5 rounded-full border border-[#414E36]/20 bg-white/95 p-1.5 shadow-[0_12px_40px_rgba(65,78,54,0.1)] backdrop-blur-2xl transition-all duration-300 hover:border-[#414E36]/40 hover:shadow-[0_16px_50px_rgba(65,78,54,0.16)]">
-              
-              {/* Tab 1: Schedule */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("schedule")}
-                title="Schedule"
-                className={`group relative flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
-                  activeTab === "schedule"
-                    ? "bg-[#414E36] px-5 py-2.5 text-white shadow-md shadow-[#414E36]/30 font-bold text-xs gap-2"
-                    : "px-3.5 py-2.5 text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
-                }`}
-              >
-                <CalendarDays size={18} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
-                {activeTab === "schedule" && (
-                  <span className="animate-fadeIn whitespace-nowrap tracking-wide">Schedule</span>
-                )}
-              </button>
-
-              {/* Tab 2: Ongoing Session */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("ongoing")}
-                title="Ongoing Session"
-                className={`group relative flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
-                  activeTab === "ongoing"
-                    ? "bg-[#414E36] px-5 py-2.5 text-white shadow-md shadow-[#414E36]/30 font-bold text-xs gap-2"
-                    : "px-3.5 py-2.5 text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
-                }`}
-              >
-                <Stethoscope size={18} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
-                {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
-                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-                  </span>
-                )}
-                {activeTab === "ongoing" && (
-                  <span className="animate-fadeIn whitespace-nowrap tracking-wide flex items-center gap-1">
-                    Ongoing Session
-                    {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
-                      <span className="rounded-full bg-amber-400 h-2 w-2"></span>
-                    )}
-                  </span>
-                )}
-              </button>
-
-              {/* Tab 3: Settings */}
-              <button
-                type="button"
-                onClick={() => setActiveTab("settings")}
-                title="Settings"
-                className={`group relative flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
-                  activeTab === "settings"
-                    ? "bg-[#414E36] px-5 py-2.5 text-white shadow-md shadow-[#414E36]/30 font-bold text-xs gap-2"
-                    : "px-3.5 py-2.5 text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
-                }`}
-              >
-                <Settings size={18} className="shrink-0 transition-transform duration-300 group-hover:scale-110" />
-                {activeTab === "settings" && (
-                  <span className="animate-fadeIn whitespace-nowrap tracking-wide">Settings</span>
-                )}
-              </button>
-
-            </div>
-          </nav>
-
-          {/* Right: Refined Doctor Profile Box & Logout */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={fetchDoctorReservations}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
-              title="Refresh Schedule"
-            >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-            </button>
-
-            {/* Premium Doctor Account Profile Box */}
-            <div className="flex items-center gap-3 rounded-full border border-[#414E36]/20 bg-white/95 px-4 py-1.5 shadow-[0_4px_20px_rgba(65,78,54,0.06)] backdrop-blur-md hover:border-[#414E36]/40 transition-all">
-              <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[#414E36] text-white font-black text-xs shadow-md border-2 border-white">
-                {(doctorName.replace(/^Dr\.?\s*/i, '') || "D").slice(0, 2).toUpperCase()}
-                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
-              </div>
-              <div className="text-left hidden md:block">
-                <p className="text-xs font-black text-[#1F251A] tracking-tight leading-tight">{doctorName}</p>
-                <p className="text-[10px] font-semibold text-[#5A6A51] leading-none mt-0.5">{doctorEmail}</p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={onLogout}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50/60 text-rose-700 hover:bg-rose-100 hover:text-rose-800 transition shadow-sm"
-              title="Sign Out"
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
-
-        </div>
-      </header>
-
-      {/* ── MAIN CONTENT AREA (FULL SCREEN WIDTH) ── */}
-      <main className="flex-1 w-full px-8 py-6 animate-fadeIn flex flex-col">
-        
-        {/* ── TAB 1: SCHEDULE VIEW ── */}
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 w-full h-full overflow-y-auto px-6 md:px-8 py-6 animate-fadeIn flex flex-col">
+        {/* TAB 1: SCHEDULE VIEW */}
         {activeTab === "schedule" && (
-          <div className="space-y-6 w-full">
-            
-            {/* Header Title & Search */}
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-bold text-[#1F251A]">
-                  {selectedDateStr === todayStr
-                    ? "Today's Appointments & Patient Queue"
-                    : selectedDateStr === yesterdayStr
-                    ? "Yesterday's Appointments & History"
-                    : selectedDateStr === tomorrowStr
-                    ? "Tomorrow's Upcoming Appointments"
-                    : `Appointments for ${selectedDateStr}`}
-                </h2>
-                <p className="text-xs text-[#5A6A51] mt-1">
-                  Structured shift schedule, patient arrivals, and completed treatment history.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <Search size={14} className="absolute left-3 top-3 text-[#5A6A51]" />
-                  <input
-                    type="text"
-                    placeholder="Search patient or service..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="rounded-2xl border border-[#414E36]/15 bg-white pl-9 pr-4 py-2 text-xs text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] w-64"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Structured Date Navigation Pills Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-3xl border border-[#414E36]/10 shadow-sm w-full">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedDateStr(yesterdayStr)}
-                  className={`px-4 py-2 text-xs font-bold rounded-2xl transition ${
-                    selectedDateStr === yesterdayStr
-                      ? "bg-[#414E36] text-white shadow-sm"
-                      : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
-                  }`}
-                >
-                  Yesterday ({yesterdayStr})
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedDateStr(todayStr)}
-                  className={`px-4 py-2 text-xs font-bold rounded-2xl transition ${
-                    selectedDateStr === todayStr
-                      ? "bg-[#414E36] text-white shadow-sm"
-                      : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
-                  }`}
-                >
-                  Today ({todayStr})
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedDateStr(tomorrowStr)}
-                  className={`px-4 py-2 text-xs font-bold rounded-2xl transition ${
-                    selectedDateStr === tomorrowStr
-                      ? "bg-[#414E36] text-white shadow-sm"
-                      : "bg-[#F4F5F1] text-[#5A6A51] hover:bg-[#414E36]/10 hover:text-[#414E36]"
-                  }`}
-                >
-                  Tomorrow ({tomorrowStr})
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[#5A6A51]">Jump to Date:</span>
-                <input
-                  type="date"
-                  value={selectedDateStr}
-                  onChange={(e) => setSelectedDateStr(e.target.value)}
-                  className="rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-1.5 text-xs font-bold text-[#414E36] outline-none focus:border-[#414E36]"
-                />
-              </div>
-            </div>
-
-            {/* Quick Dynamic Stats Cards (Recalculated for Selected Date) */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
-              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Total Scheduled</span>
-                <div className="mt-2 text-3xl font-extrabold text-[#1F251A]">{stats.total} Patients</div>
-              </div>
-              <div className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Completed</span>
-                <div className="mt-2 text-3xl font-extrabold text-emerald-800">{stats.completed} Sessions</div>
-              </div>
-              <div className="rounded-3xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-700">In Treatment</span>
-                <div className="mt-2 text-3xl font-extrabold text-amber-800">{stats.inProgress} Active</div>
-              </div>
-              <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Upcoming Queue</span>
-                <div className="mt-2 text-3xl font-extrabold text-slate-700">{stats.upcoming} Waiting</div>
-              </div>
-            </div>
-
-            {/* Real Patients Schedule Table */}
-            <div className="overflow-hidden rounded-[32px] border border-[#414E36]/10 bg-white shadow-[0_20px_50px_rgba(47,61,41,0.05)] w-full">
-              <div className="overflow-x-auto w-full">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-xs uppercase tracking-wider text-[#5A6A51]">
-                    <tr>
-                      <th className="px-6 py-4 font-bold">Time Slot</th>
-                      <th className="px-6 py-4 font-bold">Patient Name</th>
-                      <th className="px-6 py-4 font-bold">Requested Service</th>
-                      <th className="px-6 py-4 font-bold">Room / Location</th>
-                      <th className="px-6 py-4 font-bold text-center">Status</th>
-                      <th className="px-6 py-4 font-bold text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#414E36]/05 text-[#1F251A]">
-                    {filteredSchedule.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">
-                          <div className="flex flex-col items-center gap-2">
-                            <CalendarDays size={32} className="text-[#414E36]/30" />
-                            <p className="font-bold text-sm text-[#1F251A]">No appointments scheduled for {selectedDateStr}</p>
-                            <p className="text-xs text-[#5A6A51]">
-                              All patient bookings for this date will appear here automatically.
-                            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredSchedule.map((item, idx) => (
-                        <tr key={item.id || idx} className="hover:bg-[#FBFBF9]/80 transition">
-                          <td className="px-6 py-4 font-bold text-[#414E36]">
-                            {item.time || item.time_slot || item.timeSlot || "09:00 AM"}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="font-bold text-sm text-[#1F251A]">
-                              {item.name || item.customer_name || "Patient"}
-                            </div>
-                            {item.phone && <div className="text-[10px] text-[#5A6A51] font-mono">{item.phone}</div>}
-                          </td>
-                          <td className="px-6 py-4 font-medium text-[#5A6A51]">
-                            {item.service || item.service_name || "Consultation"}
-                          </td>
-                          <td className="px-6 py-4 font-semibold text-[#414E36]">
-                            {item.room || item.room_name || "Treatment Room"}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            {(item.status === "completed" || item.status === "done") && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-800">
-                                <CheckCircle2 size={12} /> Completed
-                              </span>
-                            )}
-                            {(item.status === "started" || item.status === "in-progress") && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-800 animate-pulse">
-                                <Play size={12} /> In Session
-                              </span>
-                            )}
-                            {item.status === "arrived" && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-[11px] font-bold text-blue-800">
-                                <UserCheck size={12} /> Arrived
-                              </span>
-                            )}
-                            {["pending", "approved", "confirmed"].includes(item.status) && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700 capitalize">
-                                {item.status}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenScheduleModal(item)}
-                              className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 bg-white px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-sm"
-                            >
-                              <Info size={14} /> Info
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+          <DoctorScheduleTab
+            selectedDateStr={selectedDateStr}
+            setSelectedDateStr={setSelectedDateStr}
+            todayStr={todayStr}
+            yesterdayStr={yesterdayStr}
+            tomorrowStr={tomorrowStr}
+            lang={lang}
+            setLang={setLang}
+            scheduleViewMode={scheduleViewMode}
+            setScheduleViewMode={setScheduleViewMode}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            calendarMonth={calendarMonth}
+            handlePrevCalendarMonth={handlePrevCalendarMonth}
+            handleTodayCalendarMonth={handleTodayCalendarMonth}
+            handleNextCalendarMonth={handleNextCalendarMonth}
+            calendarDaysList={calendarDaysList}
+            reservationsByDate={reservationsByDate}
+            stats={stats}
+            filteredSchedule={filteredSchedule}
+            handleOpenScheduleModal={handleOpenScheduleModal}
+            t={t}
+          />
         )}
 
-        {/* ── TAB 2: ONGOING SESSION VIEW ── */}
+        {/* TAB 2: ONGOING SESSION VIEW */}
         {activeTab === "ongoing" && (
-          <div className="space-y-6 w-full">
-            
-            {activeSessionBooking && activeSessionBooking.status !== "completed" ? (
-              <>
-                {/* Active Patient Card */}
-                <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 border border-[#414E36]/10 shadow-sm w-full">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#414E36] text-white font-bold text-xl shadow-md">
-                      {(activeSessionBooking.name || "P").slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-2xl font-bold text-[#1F251A]">
-                          {activeSessionBooking.name || activeSessionBooking.customer_name || "Patient"}
-                        </h2>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800 animate-pulse">
-                          <Play size={12} /> Session Started by Reception
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#5A6A51] mt-1">
-                        {activeSessionBooking.service || activeSessionBooking.service_name} • {activeSessionBooking.time || activeSessionBooking.time_slot || "Today"} • <strong className="text-[#414E36]">{activeSessionBooking.room || "Treatment Room"}</strong>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowPrescriptionModal(true)}
-                      className="flex items-center gap-2 rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
-                    >
-                      <FileText size={14} /> Write Prescription
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleCompleteTreatment(activeSessionBooking)}
-                      className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
-                    >
-                      <Check size={16} /> Complete Treatment
-                    </button>
-                  </div>
-                </div>
-
-                {/* Treatment Details & Notes */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
-                  
-                  {/* Patient Intake & Medical History */}
-                  <div className="space-y-6">
-                    <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm">
-                      <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider mb-4 flex items-center gap-2">
-                        <AlertCircle size={16} className="text-[#414E36]" /> Patient Clinical Intake
-                      </h3>
-                      
-                      {medicalRecord ? (
-                        <div className="space-y-3 text-xs">
-                          <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                            <span className="font-bold text-[#5A6A51]">Skin Type:</span>
-                            <span className="font-bold text-[#1F251A]">{medicalRecord.skin_type || "Normal"}</span>
-                          </div>
-                          <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                            <span className="font-bold text-[#5A6A51]">Allergies:</span>
-                            <span className="font-bold text-rose-700">{medicalRecord.allergies || "None reported"}</span>
-                          </div>
-                          <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
-                            <span className="font-bold text-[#5A6A51]">Medication:</span>
-                            <span className="font-semibold text-[#1F251A]">{medicalRecord.medication_details || "None"}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-[#5A6A51]">No intake form recorded yet for this patient.</p>
-                      )}
-
-                      <div className="mt-6 border-t border-[#414E36]/10 pt-4 space-y-2">
-                        <span className="text-xs font-bold text-[#5A6A51]">Booking Notes:</span>
-                        <p className="text-xs text-[#1F251A] leading-relaxed bg-[#F4F5F1] p-3 rounded-2xl font-mono">
-                          {activeSessionBooking.notes || "No booking notes provided."}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Doctor Clinical Notes Editor */}
-                  <div className="lg:col-span-2 space-y-6">
-                    <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4">
-                      <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                        <FileText size={16} className="text-[#414E36]" /> Doctor Procedure Observations & Medical Notes
-                      </h3>
-                      <textarea
-                        rows={8}
-                        value={clinicalNote}
-                        onChange={(e) => setClinicalNote(e.target.value)}
-                        placeholder="Enter clinical observations, laser pulse parameters, skin reactions, and post-procedure recommendations..."
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans"
-                      />
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => handleSaveClinicalNote(activeSessionBooking)}
-                          disabled={savingNote}
-                          className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50"
-                        >
-                          {savingNote ? "Saving..." : "Save Clinical Notes"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              </>
-            ) : (
-              <div className="rounded-3xl border border-[#414E36]/10 bg-white p-12 text-center text-[#5A6A51] space-y-4">
-                <div className="h-16 w-16 mx-auto flex items-center justify-center rounded-full bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
-                  <Play size={28} />
-                </div>
-                <h3 className="text-xl font-bold text-[#1F251A]">Waiting for Receptionist to Start Session</h3>
-                <p className="text-xs text-[#5A6A51] max-w-md mx-auto leading-relaxed">
-                  When the receptionist clicks <strong>&quot;Start Session&quot;</strong> on a patient booking assigned to you, the patient treatment portal will automatically open here in real-time.
-                </p>
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("schedule")}
-                    className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
-                  >
-                    View Today&apos;s Patient Queue
-                  </button>
-                </div>
-              </div>
-            )}
-
-          </div>
+          <DoctorOngoingSessionTab
+            activeSessionBooking={activeSessionBooking}
+            setShowPrescriptionModal={setShowPrescriptionModal}
+            handleCompleteTreatment={handleCompleteTreatment}
+            medicalRecord={medicalRecord}
+            medicalRecordLoading={medicalRecordLoading}
+            showMedicalForm={showMedicalForm}
+            setShowMedicalForm={setShowMedicalForm}
+            formSkinType={formSkinType}
+            setFormSkinType={setFormSkinType}
+            formAllergies={formAllergies}
+            setFormAllergies={setFormAllergies}
+            formMedicationDetails={formMedicationDetails}
+            setFormMedicationDetails={setFormMedicationDetails}
+            formMedicalConditionsDetails={formMedicalConditionsDetails}
+            setFormMedicalConditionsDetails={setFormMedicalConditionsDetails}
+            formPreviousTreatmentsDetails={formPreviousTreatmentsDetails}
+            setFormPreviousTreatmentsDetails={setFormPreviousTreatmentsDetails}
+            savingMedicalRecord={savingMedicalRecord}
+            handleSaveMedicalRecord={handleSaveMedicalRecord}
+            servicesList={servicesList}
+            productsList={productsList}
+            devicesList={devicesList}
+            selectedProductId={selectedProductId}
+            setSelectedProductId={setSelectedProductId}
+            selectedProductQty={selectedProductQty}
+            setSelectedProductQty={setSelectedProductQty}
+            usedProducts={usedProducts}
+            handleAddProductToSession={handleAddProductToSession}
+            handleRemoveProductFromSession={handleRemoveProductFromSession}
+            selectedDeviceId={selectedDeviceId}
+            setSelectedDeviceId={setSelectedDeviceId}
+            extraPulsesCount={extraPulsesCount}
+            setExtraPulsesCount={setExtraPulsesCount}
+            pricePerPulse={pricePerPulse}
+            setPricePerPulse={setPricePerPulse}
+            baseBookingPrice={baseBookingPrice}
+            productsSubtotal={productsSubtotal}
+            extraPulsesSubtotal={extraPulsesSubtotal}
+            updatedInvoiceTotal={updatedInvoiceTotal}
+            clinicalNote={clinicalNote}
+            setClinicalNote={setClinicalNote}
+            handleSaveClinicalNote={handleSaveClinicalNote}
+            savingNote={savingNote}
+            setActiveTab={setActiveTab}
+            reservations={reservations}
+            setActiveSessionBooking={setActiveSessionBooking}
+            t={t}
+          />
         )}
 
-        {/* ── TAB 3: SETTINGS VIEW ── */}
-        {activeTab === "settings" && (
-          <div className="w-full space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-[#1F251A]">Doctor Profile & Security Settings</h2>
-              <p className="text-xs text-[#5A6A51] mt-1">
-                Manage your credentials, branch details, and security options.
-              </p>
-            </div>
-
-            {/* Profile Card */}
-            <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm flex items-center justify-between gap-4 w-full">
-              <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#414E36] text-white font-extrabold text-xl shadow-md">
-                  Dr
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-[#1F251A]">{doctorName}</h3>
-                  <p className="text-xs text-[#5A6A51]">{doctorEmail}</p>
-                  <span className="mt-2 inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-bold text-[#414E36]">
-                    Assigned Branch: {doctorBranch}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Password Update Form */}
-            <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-4 w-full">
-              <h3 className="text-sm font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                <Lock size={16} className="text-[#414E36]" /> Security & Account Password
-              </h3>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-[#5A6A51] mb-1">New Password</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#5A6A51] mb-1">Confirm Password</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm new password"
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!newPassword || newPassword !== confirmPassword) {
-                    alert("Passwords do not match or are empty.");
-                    return;
-                  }
-                  alert("Password updated successfully!");
-                  setNewPassword("");
-                  setConfirmPassword("");
-                }}
-                className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition"
-              >
-                Update Password
-              </button>
-            </div>
-          </div>
+        {/* TAB 3: PATIENTS DIRECTORY VIEW */}
+        {activeTab === "patients" && (
+          <DoctorPatientsTab
+            patientSearchQuery={patientSearchQuery}
+            setPatientSearchQuery={setPatientSearchQuery}
+            doctorPatientsList={doctorPatientsList}
+            filteredPatients={filteredPatients}
+            reservations={reservations}
+            setSelectedPatientHistory={setSelectedPatientHistory}
+            t={t}
+          />
         )}
 
+        {/* TAB 4: ANALYTICS & FINANCIAL ANALYSIS VIEW */}
+        {activeTab === "analytics" && (
+          <DoctorAnalyticsTab
+            analyticsData={analyticsData}
+            doctorPatientsList={doctorPatientsList}
+            reservations={reservations}
+            t={t}
+          />
+        )}
+
+        {/* TAB 5: SETTINGS VIEW */}
+        {activeTab === "settings" && <DoctorSettingsTab t={t} />}
+
+        {/* TAB 6: DOCTOR PROFILE VIEW */}
+        {activeTab === "profile" && (
+          <DoctorProfileTab
+            doctorName={doctorName}
+            doctorEmail={doctorEmail}
+            resolvedBranchName={resolvedBranchName}
+            newPassword={newPassword}
+            setNewPassword={setNewPassword}
+            confirmPassword={confirmPassword}
+            setConfirmPassword={setConfirmPassword}
+            t={t}
+          />
+        )}
       </main>
 
-      {/* ── IN-PAGE SESSION MODAL (SCHEDULE TAB - SAME PAGE) ── */}
-      {scheduleModalBooking && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[32px] bg-white p-6 shadow-2xl space-y-6 border border-[#414E36]/20">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#414E36] text-white font-bold text-lg shadow-md">
-                  {(scheduleModalBooking.name || "P").slice(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-[#1F251A]">
-                    {scheduleModalBooking.name || scheduleModalBooking.customer_name || "Patient Session"}
-                  </h3>
-                  <p className="text-xs text-[#5A6A51] mt-0.5">
-                    {scheduleModalBooking.service || scheduleModalBooking.service_name} • {scheduleModalBooking.time || scheduleModalBooking.time_slot} • <strong className="text-[#414E36]">{scheduleModalBooking.room || "Treatment Room"}</strong>
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setScheduleModalBooking(null)}
-                className="rounded-full p-2 text-[#5A6A51] hover:bg-[#F4F5F1] transition"
-              >
-                <X size={20} />
-              </button>
-            </div>
+      {/* MODALS & DRAWERS */}
+      <DoctorSessionDrawer
+        scheduleModalBooking={scheduleModalBooking}
+        setScheduleModalBooking={setScheduleModalBooking}
+        selectedDateStr={selectedDateStr}
+        medicalRecord={medicalRecord}
+        medicalRecordLoading={medicalRecordLoading}
+        showMedicalForm={showMedicalForm}
+        setShowMedicalForm={setShowMedicalForm}
+        formSkinType={formSkinType}
+        setFormSkinType={setFormSkinType}
+        formAllergies={formAllergies}
+        setFormAllergies={setFormAllergies}
+        formMedicationDetails={formMedicationDetails}
+        setFormMedicationDetails={setFormMedicationDetails}
+        formMedicalConditionsDetails={formMedicalConditionsDetails}
+        setFormMedicalConditionsDetails={setFormMedicalConditionsDetails}
+        formPreviousTreatmentsDetails={formPreviousTreatmentsDetails}
+        setFormPreviousTreatmentsDetails={setFormPreviousTreatmentsDetails}
+        savingMedicalRecord={savingMedicalRecord}
+        handleSaveMedicalRecord={handleSaveMedicalRecord}
+        clinicalNote={clinicalNote}
+        setClinicalNote={setClinicalNote}
+        handleSaveClinicalNote={handleSaveClinicalNote}
+        savingNote={savingNote}
+        setShowPrescriptionModal={setShowPrescriptionModal}
+        handleCompleteTreatment={handleCompleteTreatment}
+        setActiveSessionBooking={setActiveSessionBooking}
+        setActiveTab={setActiveTab}
+        prescriptionsMap={prescriptionsMap}
+        t={t}
+      />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Intake Form */}
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 space-y-3">
-                  <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                    <AlertCircle size={14} className="text-[#414E36]" /> Clinical Intake
-                  </h4>
-                  {medicalRecord ? (
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between border-b border-[#414E36]/10 pb-1.5">
-                        <span className="text-[#5A6A51]">Skin Type:</span>
-                        <span className="font-bold text-[#1F251A]">{medicalRecord.skin_type || "Normal"}</span>
-                      </div>
-                      <div className="flex justify-between border-b border-[#414E36]/10 pb-1.5">
-                        <span className="text-[#5A6A51]">Allergies:</span>
-                        <span className="font-bold text-rose-700">{medicalRecord.allergies || "None"}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-[#5A6A51]">No intake form on record.</p>
-                  )}
+      <DoctorPrescriptionModal
+        showPrescriptionModal={showPrescriptionModal}
+        setShowPrescriptionModal={setShowPrescriptionModal}
+        targetBooking={activeSessionBooking || scheduleModalBooking}
+        rxDiagnosis={rxDiagnosis}
+        setRxDiagnosis={setRxDiagnosis}
+        rxMedications={rxMedications}
+        setRxMedications={setRxMedications}
+        rxGeneralNotes={rxGeneralNotes}
+        setRxGeneralNotes={setRxGeneralNotes}
+        savingRx={savingRx}
+        handleCreatePrescription={handleCreatePrescription}
+        t={t}
+      />
 
-                  <div className="pt-2 border-t border-[#414E36]/10">
-                    <span className="text-xs font-bold text-[#5A6A51]">Notes:</span>
-                    <p className="text-xs text-[#1F251A] mt-1 bg-white p-2.5 rounded-xl border border-[#414E36]/10 font-mono">
-                      {scheduleModalBooking.notes || "No notes."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Notes Editor & Actions */}
-              <div className="lg:col-span-2 space-y-4">
-                <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                  <FileText size={14} className="text-[#414E36]" /> Procedure Observations & Notes
-                </h4>
-                <textarea
-                  rows={6}
-                  value={clinicalNote}
-                  onChange={(e) => setClinicalNote(e.target.value)}
-                  placeholder="Enter clinical observations, laser parameters, post-procedure advice..."
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-4 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                />
-                
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSaveClinicalNote(scheduleModalBooking)}
-                    disabled={savingNote}
-                    className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition disabled:opacity-50"
-                  >
-                    {savingNote ? "Saving..." : "Save Notes"}
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowPrescriptionModal(true)}
-                      className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition"
-                    >
-                      Write Prescription
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleCompleteTreatment(scheduleModalBooking)}
-                      className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
-                    >
-                      Complete Treatment
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── PRESCRIPTION MODAL ── */}
-      {showPrescriptionModal && (activeSessionBooking || scheduleModalBooking) && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl rounded-[32px] bg-white p-6 shadow-2xl space-y-5 border border-[#414E36]/20">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-              <div>
-                <h3 className="text-lg font-bold text-[#1F251A]">Write Digital Prescription</h3>
-                <p className="text-xs text-[#5A6A51]">
-                  Patient: <strong className="text-[#414E36]">{(activeSessionBooking || scheduleModalBooking).name || (activeSessionBooking || scheduleModalBooking).customer_name}</strong>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowPrescriptionModal(false)}
-                className="rounded-full p-2 text-[#5A6A51] hover:bg-[#F4F5F1]"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={(e) => handleCreatePrescription(e, activeSessionBooking || scheduleModalBooking)} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1">Clinical Diagnosis</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Post-laser inflammation, Acne Vulgaris Grade II"
-                  value={rxDiagnosis}
-                  onChange={(e) => setRxDiagnosis(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                />
-              </div>
-
-              {/* Medications List */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-[#5A6A51]">Prescribed Medications</label>
-                {rxMedications.map((med, idx) => (
-                  <div key={idx} className="grid grid-cols-4 gap-2">
-                    <input
-                      type="text"
-                      placeholder="Medication Name"
-                      value={med.name}
-                      onChange={(e) => {
-                        const updated = [...rxMedications];
-                        updated[idx].name = e.target.value;
-                        setRxMedications(updated);
-                      }}
-                      className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Dosage (e.g. 500mg)"
-                      value={med.dosage}
-                      onChange={(e) => {
-                        const updated = [...rxMedications];
-                        updated[idx].dosage = e.target.value;
-                        setRxMedications(updated);
-                      }}
-                      className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Frequency (e.g. 2x Daily)"
-                      value={med.frequency}
-                      onChange={(e) => {
-                        const updated = [...rxMedications];
-                        updated[idx].frequency = e.target.value;
-                        setRxMedications(updated);
-                      }}
-                      className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Duration (e.g. 7 Days)"
-                      value={med.duration}
-                      onChange={(e) => {
-                        const updated = [...rxMedications];
-                        updated[idx].duration = e.target.value;
-                        setRxMedications(updated);
-                      }}
-                      className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                    />
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setRxMedications([...rxMedications, { name: "", dosage: "", frequency: "", duration: "" }])}
-                  className="text-xs font-bold text-[#414E36] flex items-center gap-1 mt-1 hover:underline"
-                >
-                  <Plus size={14} /> Add Another Medication
-                </button>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#5A6A51] mb-1">General Patient Instructions</label>
-                <textarea
-                  rows={3}
-                  placeholder="e.g. Apply sunscreen SPF 50 daily, avoid direct sun exposure for 48 hours..."
-                  value={rxGeneralNotes}
-                  onChange={(e) => setRxGeneralNotes(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowPrescriptionModal(false)}
-                  className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 text-xs font-bold text-[#5A6A51] hover:bg-[#F4F5F1]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingRx}
-                  className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50"
-                >
-                  {savingRx ? "Saving..." : "Save & Print Prescription"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
+      <DoctorPatientHistoryDrawer
+        selectedPatientHistory={selectedPatientHistory}
+        setSelectedPatientHistory={setSelectedPatientHistory}
+        handleOpenScheduleModal={handleOpenScheduleModal}
+        medicalRecordsMap={medicalRecordsMap}
+        prescriptionsMap={prescriptionsMap}
+        t={t}
+      />
     </div>
   );
 }

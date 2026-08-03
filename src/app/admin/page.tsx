@@ -1294,6 +1294,143 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Req | null>(null);
   const [viewingBooking, setViewingBooking] = useState<Req | null>(null);
+  const [drawerPrescriptions, setDrawerPrescriptions] = useState<any[]>([]);
+  const [showDrawerPrescriptionModal, setShowDrawerPrescriptionModal] = useState(false);
+  const [showDrawerProductModal, setShowDrawerProductModal] = useState(false);
+  const [selectedDrawerProductId, setSelectedDrawerProductId] = useState("");
+  const [selectedDrawerProductQty, setSelectedDrawerProductQty] = useState(1);
+  const [drawerRxDiagnosis, setDrawerRxDiagnosis] = useState("");
+  const [drawerRxMeds, setDrawerRxMeds] = useState<{ name: string; dosage: string; frequency: string; duration: string }[]>([
+    { name: "", dosage: "", frequency: "", duration: "" }
+  ]);
+  const [drawerRxNotes, setDrawerRxNotes] = useState("");
+  const [savingDrawerRx, setSavingDrawerRx] = useState(false);
+
+  useEffect(() => {
+    if (viewingBooking) {
+      const custId = viewingBooking.customerId || viewingBooking.id;
+      if (custId) {
+        fetch(`/api/prescriptions?customerId=${encodeURIComponent(custId)}`)
+          .then((res) => (res.ok ? res.json() : []))
+          .then((data) => setDrawerPrescriptions(Array.isArray(data) ? data : []))
+          .catch((err) => console.warn("Error fetching drawer prescriptions:", err));
+      }
+    } else {
+      setDrawerPrescriptions([]);
+    }
+  }, [viewingBooking]);
+
+  const handleSaveDrawerPrescription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!viewingBooking) return;
+    setSavingDrawerRx(true);
+    try {
+      const custId = viewingBooking.customerId || viewingBooking.id;
+      const res = await fetch("/api/prescriptions", {
+        method: "POST",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify({
+          customer_id: String(custId),
+          patient_name: viewingBooking.name || "Patient",
+          date: new Date().toISOString().slice(0, 10),
+          diagnosis: drawerRxDiagnosis,
+          medications: drawerRxMeds.filter((m) => m.name.trim() !== ""),
+          general_notes: drawerRxNotes,
+          doctor_notes: viewingBooking.notes || ""
+        })
+      });
+
+      if (res.ok) {
+        alert("Digital Prescription saved successfully!");
+        setShowDrawerPrescriptionModal(false);
+        setDrawerRxDiagnosis("");
+        setDrawerRxMeds([{ name: "", dosage: "", frequency: "", duration: "" }]);
+        setDrawerRxNotes("");
+
+        const rxRes = await fetch(`/api/prescriptions?customerId=${encodeURIComponent(custId)}`);
+        if (rxRes.ok) {
+          const rxData = await rxRes.json();
+          setDrawerPrescriptions(Array.isArray(rxData) ? rxData : []);
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Failed to save prescription.");
+      }
+    } catch (err: any) {
+      console.error("Error saving prescription:", err);
+      alert(err.message || "Error saving prescription.");
+    } finally {
+      setSavingDrawerRx(false);
+    }
+  };
+
+  const handleAddProductToViewingBooking = async () => {
+    if (!viewingBooking || !selectedDrawerProductId) return;
+    const prod = (inventoryProducts || []).find((p: any) => String(p.id) === String(selectedDrawerProductId));
+    if (!prod) return;
+
+    const unitPrice = Number(prod.price || prod.unit_price || prod.selling_price || 0);
+    const qty = Number(selectedDrawerProductQty) || 1;
+    const total = unitPrice * qty;
+
+    const currentProducts = Array.isArray((viewingBooking as any).attachedProducts) ? [...(viewingBooking as any).attachedProducts] : [];
+    currentProducts.push({
+      id: String(prod.id),
+      name: prod.name,
+      qty,
+      unitPrice,
+      total
+    });
+
+    // Calculate total base services cost
+    const svcIds = Array.isArray(viewingBooking.serviceIds) ? viewingBooking.serviceIds : (viewingBooking.serviceId ? [viewingBooking.serviceId] : []);
+    const baseServicesCost = svcIds.reduce((sum: number, id: number) => {
+      const s = localServices.find(srv => srv.id === id);
+      return sum + (s ? getEffectiveServicePrice(s, viewingBooking.branchId, branches) : 500);
+    }, 0);
+
+    // Calculate total attached products cost including newly added product
+    const totalProductsCost = currentProducts.reduce((sum: number, p: any) => sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unitPrice || p.price || 0))), 0);
+    const grandTotalCost = baseServicesCost + totalProductsCost;
+
+    const sessionPaid = Number(viewingBooking.amountPaid || 0);
+    const newLeft = Math.max(0, grandTotalCost - sessionPaid);
+
+    const updatedNotes = (viewingBooking.notes || "") + `\n[Added Product]: ${prod.name} (x${qty}) - ${total} EGP`;
+
+    try {
+      const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+        method: "PATCH",
+        headers: authenticatedJsonHeaders,
+        body: JSON.stringify({
+          amountLeft: newLeft,
+          notes: updatedNotes,
+          attachedProducts: currentProducts
+        })
+      });
+
+      if (res.ok) {
+        setViewingBooking((prev) =>
+          prev
+            ? {
+                ...prev,
+                amountLeft: newLeft,
+                amount_left: newLeft,
+                notes: updatedNotes,
+                attachedProducts: currentProducts
+              }
+            : null
+        );
+        setShowDrawerProductModal(false);
+        setSelectedDrawerProductId("");
+        setSelectedDrawerProductQty(1);
+        fetchAllReservations();
+        alert(`Product "${prod.name}" added to booking invoice!`);
+      }
+    } catch (err) {
+      console.error("Error adding product to booking:", err);
+    }
+  };
   const [isEditingService, setIsEditingService] = useState(false);
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
@@ -3332,7 +3469,13 @@ export default function AdminPage() {
     { id: 'TC-020', name: 'Clinic Asset Depreciation Engine', category: 'Expenses & Assets', endpoint: '/api/assets', description: 'Validates capital asset valuation and straight-line depreciation.', status: 'idle' },
     { id: 'TC-021', name: 'Clinic Loans & Repayment Schedules', category: 'Expenses & Assets', endpoint: '/api/loans', description: 'Tests financial loans, interest schedules, and repayment logs.', status: 'idle' },
     { id: 'TC-022', name: 'Terms & Conditions Policy Config', category: 'System & Settings', endpoint: '/api/terms', description: 'Verifies deposit terms, cancellation policies, and clinic terms.', status: 'idle' },
-    { id: 'TC-023', name: 'HR Missing Check-in Warning Alerts', category: 'HR & Payroll', endpoint: '/api/hr/alerts', description: 'Tests missing clock-in detection and automated HR warning alerts.', status: 'idle' }
+    { id: 'TC-023', name: 'HR Missing Check-in Warning Alerts', category: 'HR & Payroll', endpoint: '/api/hr/alerts', description: 'Tests missing clock-in detection and automated HR warning alerts.', status: 'idle' },
+    { id: 'TC-024', name: 'Customer Balances & Ledger Reconciliation', category: 'Medical & Patients', endpoint: '/api/customers/reconcile', description: 'Reconciles stored customer scalar balances against ledger transaction history.', status: 'idle' },
+    { id: 'TC-025', name: 'Booking Products & Consumables Invoice Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies attached products & session consumables price recalculation and session left updates.', status: 'idle' },
+    { id: 'TC-026', name: 'Doctor Schedule & Calendar View Data Pipeline', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies doctor schedule reservations data pipeline and month/day calendar timeline structure.', status: 'idle' },
+    { id: 'TC-027', name: 'Doctor Portal Bilingual & RTL Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Doctor Portal English View and Arabic View toggle, localized dictionary copy, and RTL layout engine.', status: 'idle' },
+    { id: 'TC-028', name: 'Doctor Portal Right Session Drawer & Notes Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Right Slide-Over Session Drawer, clean doctor-written notes isolation, and structured payment/consumables callout cards.', status: 'idle' },
+    { id: 'TC-029', name: 'Doctor Portal Patient Full Visit History Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Patient Full Visit History Right Drawer, listing all historical visits, dates, services, and doctor clinical notes.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -7693,7 +7836,12 @@ export default function AdminPage() {
         doctorDbId={loggedEmpAccount?.id || adminDbId}
         doctorName={loggedEmpAccount?.name || adminEmail || "Doctor"}
         doctorEmail={adminEmail}
-        doctorBranch={loggedEmpAccount?.branch_id || "Main Branch"}
+        doctorBranch={
+          branches.find((b) => b.id === loggedEmpAccount?.branch_id)?.name_en ||
+          loggedEmpAccount?.branch_id ||
+          "Main Branch"
+        }
+        branches={branches}
         initialReservations={allReservations}
         onLogout={handleLogout}
         onSwitchToAdmin={(adminRole === "superadmin" || adminRole === "admin") ? () => setForceAdminView(true) : undefined}
@@ -24111,7 +24259,54 @@ export default function AdminPage() {
         });
 
         const serviceNames = bookingServices.map(bs => bs.name).join(", ");
-        const cost = bookingServices.reduce((sum, bs) => sum + bs.price, 0);
+        const servicesCost = bookingServices.reduce((sum, bs) => sum + bs.price, 0);
+
+        // Compute products cost from attachedProducts and notes
+        const drawerAttachedList: any[] = Array.isArray((viewingBooking as any).attachedProducts)
+          ? [...(viewingBooking as any).attachedProducts]
+          : [];
+        const drawerExistingNames = new Set(drawerAttachedList.map((p: any) => (p.name || '').trim().toLowerCase()));
+
+        if (viewingBooking.notes) {
+          const notesStr = viewingBooking.notes;
+          const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
+          for (const match of doctorMatches) {
+            const name = match[1].trim();
+            const qty = Number(match[2]);
+            const unitPrice = Number(match[3]);
+            if (!drawerExistingNames.has(name.toLowerCase())) {
+              drawerExistingNames.add(name.toLowerCase());
+              drawerAttachedList.push({ name, qty, unitPrice, total: qty * unitPrice });
+            }
+          }
+          const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)\s+\(x(\d+)\)\s+-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+          for (const match of receptionistMatches) {
+            const name = match[1].trim();
+            const qty = Number(match[2]);
+            const total = Number(match[3]);
+            const unitPrice = qty > 0 ? total / qty : total;
+            if (!drawerExistingNames.has(name.toLowerCase())) {
+              drawerExistingNames.add(name.toLowerCase());
+              drawerAttachedList.push({ name, qty, unitPrice, total });
+            }
+          }
+        }
+
+        const productsCost = drawerAttachedList.reduce((sum, p) => sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unitPrice || p.price || 0))), 0);
+        const totalPrice = servicesCost + productsCost;
+
+        const sessionPaid = Number(viewingBooking.amountPaid || 0);
+        const rawLeft = viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null
+          ? Number(viewingBooking.amountLeft)
+          : ((viewingBooking as any).amount_left !== undefined && (viewingBooking as any).amount_left !== null
+              ? Number((viewingBooking as any).amount_left)
+              : null);
+
+        const sessionLeft = (rawLeft !== null && rawLeft > 0)
+          ? rawLeft
+          : Math.max(0, totalPrice - sessionPaid);
+
+        const isInvoicePaid = sessionLeft <= 0 || (sessionPaid >= totalPrice && totalPrice > 0);
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4">
@@ -24208,11 +24403,29 @@ export default function AdminPage() {
                       </div>
                       <div className="flex justify-between font-semibold text-[#1F251A]">
                         <span>Service Cost</span>
-                        <span>{cost} EGP</span>
+                        <span>{servicesCost} EGP</span>
                       </div>
+                      {productsCost > 0 && (
+                        <div className="flex justify-between font-semibold text-[#414E36]">
+                          <span>Products & Consumables</span>
+                          <span>+{productsCost} EGP</span>
+                        </div>
+                      )}
                       <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
                         <span>Total Price</span>
-                        <span>{cost} EGP</span>
+                        <span>{totalPrice} EGP</span>
+                      </div>
+                      <div className="border-t border-[#414E36]/10 pt-2 grid grid-cols-2 gap-2 text-xs font-semibold">
+                        <div className="flex flex-col">
+                          <span className="text-[#5A6A51]">Session Paid</span>
+                          <span className="text-green-600 font-bold text-sm">EGP {sessionPaid.toFixed(0)}</span>
+                        </div>
+                        <div className="flex flex-col text-right">
+                          <span className="text-[#5A6A51]">Session Outstanding</span>
+                          <span className={sessionLeft > 0 ? "text-red-600 font-bold text-sm" : "text-green-600 font-bold text-sm"}>
+                            EGP {sessionLeft.toFixed(0)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -24379,69 +24592,168 @@ export default function AdminPage() {
                    * - Where: Located inside the booking details drawer under 'Products'.
                    * - Why: Consolidates clinical services and related products into a single final invoice for the patient.
                    */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS</p>
-                      <p className="text-sm text-[#5A6A51] mt-1">No products added</p>
-                    </div>
-                    <button
-                      disabled={true}
-                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-gray-400 bg-gray-50 cursor-not-allowed opacity-50 flex items-center gap-1"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                      See Products
-                    </button>
-                  </div>
+                  {/* Products Card */}
+                  {(() => {
+                    const list: any[] = Array.isArray((viewingBooking as any).attachedProducts)
+                      ? [...(viewingBooking as any).attachedProducts]
+                      : [];
+                    const existingNames = new Set(list.map((p: any) => (p.name || '').trim().toLowerCase()));
 
-                  {/* Prescriptions */}
-                  {/*
-                   * Dev Notes:
-                   * - Implementation: Requires a 'prescriptions' table with foreign keys to doctor, patient, and reservation, plus a 'prescription_items' table.
-                   *   The frontend should present a clean autocomplete selector for medicines, dosage rules, and duration.
-                   * - Technical Caveat / Gap: Needs integration with a drugs database API or static dictionary, and validation for active substance overlaps.
-                   * - Last Updated: July 5, 2026 2:45 PM
-                   * - Milestone: Postponed / Phase 2
-                   * - Module: Medical / Clinical
-                   * - Parent Feature: E-Prescriptions System
-                   * - Place: Booking Details drawer / Prescriptions Section
-                   * - End Dev: Pending DB Schema
-                   * - Priority: High
-                   * - Started Dev: July 5, 2026 2:00 PM
-                   * - Status: Locked
-                   * - Sub-Features: Autocomplete Drug Search, PDF Exporter
-                   * - User Role: Doctor / Clinician
-                   * - What: Digital prescription builder for writing treatment plans and medical prescriptions.
-                   * - Where: Located inside the booking details drawer under 'Prescriptions'.
-                   * - Why: Digitizes clinical workflows and allows patient records to keep a history of prescribed items.
-                   */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-sm font-bold text-[#1F251A]">Prescriptions</p>
+                    if (viewingBooking.notes) {
+                      const notesStr = viewingBooking.notes;
+
+                      // Doctor session notes pattern: "- Product Name (xQty) @ Price EGP = Total EGP"
+                      const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
+                      for (const match of doctorMatches) {
+                        const name = match[1].trim();
+                        const qty = Number(match[2]);
+                        const unitPrice = Number(match[3]);
+                        if (!existingNames.has(name.toLowerCase())) {
+                          existingNames.add(name.toLowerCase());
+                          list.push({
+                            id: name,
+                            name,
+                            qty,
+                            unitPrice,
+                            total: qty * unitPrice,
+                            addedBy: 'Doctor Session'
+                          });
+                        }
+                      }
+
+                      // Receptionist notes pattern: "[Added Product]: Product Name (xQty) - Total EGP"
+                      const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)\s+\(x(\d+)\)\s+-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+                      for (const match of receptionistMatches) {
+                        const name = match[1].trim();
+                        const qty = Number(match[2]);
+                        const total = Number(match[3]);
+                        const unitPrice = qty > 0 ? total / qty : total;
+                        if (!existingNames.has(name.toLowerCase())) {
+                          existingNames.add(name.toLowerCase());
+                          list.push({
+                            id: name,
+                            name,
+                            qty,
+                            unitPrice,
+                            total,
+                            addedBy: 'Receptionist'
+                          });
+                        }
+                      }
+                    }
+
+                    return (
+                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS & SESSION CONSUMABLES</p>
+                            <p className="text-sm font-bold text-[#1F251A] mt-0.5">
+                              {list.length > 0
+                                ? `${list.length} Product(s) Attached`
+                                : "No products added"}
+                            </p>
+                          </div>
+                          <button
+                            disabled={isInvoicePaid}
+                            onClick={() => !isInvoicePaid && setShowDrawerProductModal(true)}
+                            title={isInvoicePaid ? "Session is already paid and settled" : "Add retail product to booking"}
+                            className={`rounded-2xl border border-[#414E36]/20 px-3.5 py-1.5 text-xs font-bold transition flex items-center gap-1.5 shadow-sm ${
+                              isInvoicePaid
+                                ? "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-300"
+                                : "bg-[#414E36] text-white hover:bg-[#343F2B]"
+                            }`}
+                          >
+                            + Add Product
+                          </button>
+                        </div>
+
+                        {list.length > 0 ? (
+                          <div className="space-y-2">
+                            {list.map((prod: any, pIdx: number) => (
+                              <div key={pIdx} className="flex items-center justify-between p-2.5 rounded-xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-[#1F251A]">{prod.name}</span>
+                                    {prod.addedBy && (
+                                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                                        {prod.addedBy}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[11px] text-[#5A6A51] block mt-0.5">
+                                    Qty: {prod.qty} x {prod.unitPrice || prod.price} EGP
+                                  </span>
+                                </div>
+                                <span className="font-extrabold text-[#414E36]">{(prod.total || (prod.qty * (prod.unitPrice || prod.price))) || 0} EGP</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-[#5A6A51]">No retail or procedure products linked to this booking yet.</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Prescriptions Card */}
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-sm font-bold text-[#1F251A]">Prescriptions</p>
+                        <p className="text-xs text-[#5A6A51]">Patient digital prescriptions record</p>
+                      </div>
                       <button
-                        disabled={true}
-                        className="rounded-2xl bg-[#414E36]/50 px-3 py-1 text-xs font-semibold text-[#FBFBF9]/80 cursor-not-allowed flex items-center gap-1"
+                        onClick={() => setShowDrawerPrescriptionModal(true)}
+                        className="rounded-2xl bg-[#414E36] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center gap-1.5 shadow-sm"
                       >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                         + Add Prescription
                       </button>
                     </div>
-                    <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                        <line x1="16" y1="13" x2="8" y2="13" />
-                        <line x1="16" y1="17" x2="8" y2="17" />
-                        <polyline points="10 9 9 9 8 9" />
-                      </svg>
-                      <p className="text-xs font-semibold">no prescriptions yet</p>
-                      <button
-                        disabled={true}
-                        className="mt-2 text-xs font-bold text-gray-400 cursor-not-allowed flex items-center gap-1"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                        + Create First Prescription
-                      </button>
-                    </div>
+
+                    {drawerPrescriptions.length > 0 ? (
+                      <div className="space-y-3 pt-2">
+                        {drawerPrescriptions.map((rx: any, rxIdx: number) => (
+                          <div key={rx.id || rxIdx} className="rounded-xl bg-[#FBFBF9] border border-[#414E36]/10 p-3 text-xs space-y-1.5">
+                            <div className="flex justify-between items-center font-bold text-[#1F251A]">
+                              <span>Diagnosis: {rx.diagnosis || "Medical Prescription"}</span>
+                              <span className="text-[10px] text-[#5A6A51] font-mono">{rx.date ? String(rx.date).slice(0, 10) : "Today"}</span>
+                            </div>
+                            {rx.medications && Array.isArray(rx.medications) && (
+                              <div className="space-y-1 pt-1 border-t border-[#414E36]/10">
+                                {rx.medications.map((m: any, mIdx: number) => (
+                                  <div key={mIdx} className="flex justify-between text-[11px] text-[#5A6A51]">
+                                    <span className="font-semibold text-[#1F251A]">• {m.name || m.medicine} ({m.dosage})</span>
+                                    <span>{m.frequency} - {m.duration}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {rx.general_notes && (
+                              <p className="text-[11px] text-[#5A6A51] italic pt-1 font-sans">
+                                Notes: {rx.general_notes}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="16" y1="13" x2="8" y2="13" />
+                          <line x1="16" y1="17" x2="8" y2="17" />
+                          <polyline points="10 9 9 9 8 9" />
+                        </svg>
+                        <p className="text-xs font-semibold text-[#1F251A]">No prescriptions recorded yet</p>
+                        <button
+                          onClick={() => setShowDrawerPrescriptionModal(true)}
+                          className="mt-2 text-xs font-bold text-[#414E36] hover:underline flex items-center gap-1"
+                        >
+                          + Create First Prescription
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Notes */}
@@ -24764,25 +25076,47 @@ export default function AdminPage() {
                   )}
 
                   {viewingBooking.status === 'completed' && hasPermission("bookings.edit") && (
-                    <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-900">Treatment Completed</p>
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-200/80 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-900">
-                          Ready for Payment
-                        </span>
+                    !isInvoicePaid ? (
+                      <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-900">Treatment Completed</p>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/80 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-900">
+                            Ready for Payment
+                          </span>
+                        </div>
+                        <p className="text-xs text-emerald-800 leading-relaxed">
+                          The doctor has completed the treatment. Settle invoice and collect remaining payment from patient.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setCheckoutBooking(viewingBooking);
+                          }}
+                          className="w-full rounded-2xl bg-[#414E36] py-3 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center justify-center gap-2 shadow-md"
+                        >
+                          Pay &amp; Settle Invoice
+                        </button>
                       </div>
-                      <p className="text-xs text-emerald-800 leading-relaxed">
-                        The doctor has completed the treatment. Settle invoice and collect payment from patient.
-                      </p>
-                      <button
-                        onClick={() => {
-                          setCheckoutBooking(viewingBooking);
-                        }}
-                        className="w-full rounded-2xl bg-[#414E36] py-3 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center justify-center gap-2 shadow-md"
-                      >
-                        Pay &amp; Settle Invoice
-                      </button>
-                    </div>
+                    ) : (
+                      <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-100/70 p-5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-950">Treatment Completed</p>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-300 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-950">
+                            ✓ Invoice Settled &amp; Paid
+                          </span>
+                        </div>
+                        <p className="text-xs text-emerald-900 leading-relaxed font-medium">
+                          The invoice for this treatment session has been fully paid and settled.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setInvoiceBooking(viewingBooking);
+                          }}
+                          className="w-full rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center justify-center gap-2 shadow-sm"
+                        >
+                          View Invoice &amp; Print PDF
+                        </button>
+                      </div>
+                    )
                   )}
 
                   {!['completed', 'cancelled', 'rejected', 'no_show', 'started'].includes(viewingBooking.status) && hasPermission("bookings.edit") && (
@@ -24856,8 +25190,8 @@ export default function AdminPage() {
                   {(() => {
                     const customerRecord = dbCustomers.find(c => c.id === viewingBooking.customerId || c.phone === viewingBooking.phone);
                     const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
-                    const spentAmount = customerRecord ? Number(customerRecord.spent || customerRecord.spent_amount || 0) : 0;
-                    const outstandingAmount = customerRecord ? Number(customerRecord.outstanding || 0) : 0;
+                    const customerHistorySpent = customerRecord ? Number(customerRecord.spent_amount || customerRecord.spent || (customerRecord as any).total_spent || 0) : 0;
+                    const customerHistoryOutstanding = customerRecord ? Number(customerRecord.outstanding || 0) : 0;
 
                     return (
                       <div className="overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white">
@@ -24883,12 +25217,12 @@ export default function AdminPage() {
                               <p className="mt-0.5 font-bold text-[#C4AE7C]">EGP {walletBalance.toFixed(0)}</p>
                             </div>
                             <div>
-                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Total Spent</p>
-                              <p className="mt-0.5 font-bold text-green-600">EGP {spentAmount.toFixed(0)}</p>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold" title="Total spent by this customer across all completed visits">Total Spent</p>
+                              <p className="mt-0.5 font-bold text-green-600">EGP {customerHistorySpent.toFixed(0)}</p>
                             </div>
                             <div>
-                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold">Outstanding</p>
-                              <p className="mt-0.5 font-bold text-red-600">EGP {outstandingAmount.toFixed(0)}</p>
+                              <p className="text-xs uppercase tracking-wider text-[#5A6A51] font-semibold" title="Total outstanding balance owed by this customer across all visits">Outstanding</p>
+                              <p className="mt-0.5 font-bold text-red-600">EGP {customerHistoryOutstanding.toFixed(0)}</p>
                             </div>
                           </div>
                         </div>
@@ -25086,6 +25420,109 @@ export default function AdminPage() {
           </div>
         );
       })()}
+
+      {/* Add Product Modal for Booking Drawer */}
+      {showDrawerProductModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4 animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+              <h3 className="text-base font-bold text-[#1F251A]">Add Product / Session Consumable</h3>
+              <button
+                onClick={() => {
+                  setShowDrawerProductModal(false);
+                  setSelectedDrawerProductId("");
+                  setSelectedDrawerProductQty(1);
+                }}
+                className="rounded-full bg-gray-100 p-1.5 text-gray-500 hover:bg-gray-200 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-[#1F251A] mb-1">Select Skincare / Medical Product</label>
+                <select
+                  value={selectedDrawerProductId}
+                  onChange={(e) => setSelectedDrawerProductId(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#414E36]"
+                >
+                  <option value="">-- Select Product --</option>
+                  {(inventoryProducts || [])
+                    .filter((p: any) => p.role !== 'consumable')
+                    .map((p: any) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} — EGP {p.price || p.unit_price || p.selling_price || 0} (Stock: {p.stock ?? p.quantity ?? p.stock_quantity ?? 'N/A'})
+                      </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedDrawerProductId && (() => {
+                const selectedProd = (inventoryProducts || [])
+                  .find((p: any) => String(p.id) === String(selectedDrawerProductId));
+                const unitPrice = Number(selectedProd?.price || selectedProd?.unit_price || selectedProd?.selling_price || 0);
+                const totalCost = unitPrice * selectedDrawerProductQty;
+
+                return (
+                  <div className="rounded-xl bg-[#FBFBF9] p-3 space-y-2 border border-[#414E36]/10">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-gray-600">Quantity:</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDrawerProductQty(Math.max(1, selectedDrawerProductQty - 1))}
+                          className="w-7 h-7 rounded-lg bg-gray-200 font-bold flex items-center justify-center hover:bg-gray-300 transition text-sm"
+                        >
+                          -
+                        </button>
+                        <span className="font-bold text-[#1F251A] px-2 text-sm">{selectedDrawerProductQty}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDrawerProductQty(selectedDrawerProductQty + 1)}
+                          className="w-7 h-7 rounded-lg bg-gray-200 font-bold flex items-center justify-center hover:bg-gray-300 transition text-sm"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-xs border-t border-gray-200 pt-2">
+                      <span className="font-semibold text-gray-600">Unit Price:</span>
+                      <span className="font-bold text-[#1F251A]">{unitPrice} EGP</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-extrabold border-t border-gray-200 pt-2 text-[#414E36]">
+                      <span>Added to Invoice:</span>
+                      <span>{totalCost} EGP</span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDrawerProductModal(false);
+                  setSelectedDrawerProductId("");
+                  setSelectedDrawerProductQty(1);
+                }}
+                className="w-1/2 rounded-xl border border-gray-300 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!selectedDrawerProductId}
+                onClick={handleAddProductToViewingBooking}
+                className="w-1/2 rounded-xl bg-[#414E36] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 shadow-sm"
+              >
+                Add to Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 1. Cancellations Modal */}
       {showCancellationsModal && (
@@ -27149,11 +27586,20 @@ export default function AdminPage() {
               redeemableItem,
             };
           });
-          const totalCost = bookingServicesList.reduce(
+          const baseServicesTotal = bookingServicesList.reduce(
             (sum: number, s: any) => redeemedPackageItems[s.serviceId] ? sum : sum + s.price,
             0
           );
 
+          // Calculate extra session add-ons (products added during doctor session / extra pulses / custom products)
+          let extraAddonsCost = 0;
+          const leftVal = Number(checkoutBooking.amountLeft !== undefined ? checkoutBooking.amountLeft : (checkoutBooking.amount_left || 0));
+          const totalExpectedOnBooking = leftVal + depositAlreadyPaid;
+          if (totalExpectedOnBooking > baseServicesTotal) {
+            extraAddonsCost = totalExpectedOnBooking - baseServicesTotal;
+          }
+
+          const totalCost = baseServicesTotal + extraAddonsCost;
           const balanceDue = Math.max(0, totalCost - depositAlreadyPaid);
 
           // 2. Fetch customer details
@@ -27173,8 +27619,6 @@ export default function AdminPage() {
           // computeSettledBalances (src/lib/billing.ts) treats amountPaid on the completing PATCH
           // as the booking's final total paid, not a delta for just this step — it must include
           // the deposit already collected, or that deposit silently never reaches
-          // customers.spent_amount. remainingAmount already correctly nets out wallet + this
-          // payment against the deposit-adjusted netDue, so amountLeft needs no separate formula.
           const totalPaidIncludingDeposit = depositAlreadyPaid + amountPaidNum;
 
           const handleConfirmCheckout = async () => {
@@ -27189,18 +27633,10 @@ export default function AdminPage() {
                   amountLeft: remainingAmount,
                   walletWithdrawal: walletDeduction,
                   walletDeposit: changeAmount > 0 && depositChangeToWallet ? changeAmount : 0,
-                  // RISK-035: without this, checkout invoices every service at full price even
-                  // when it's covered by a package the patient already paid for — the server has
-                  // no other way to know which lines in this booking are package redemptions.
                   redeemedServiceIds: Object.keys(redeemedPackageItems).map(Number)
                 })
               });
               if (res.ok) {
-                // The reservation is now 'completed' server-side — only now will
-                // /api/packages/consume accept it. Fire one call per redeemed line; a failure
-                // here (e.g. a race on the last remaining session) must NOT undo the checkout
-                // that already succeeded — the booking stays completed and correctly charged
-                // for the non-redeemed amount. Surface failures so staff can reconcile manually.
                 const redeemedEntries = Object.entries(redeemedPackageItems);
                 const consumeFailures: string[] = [];
                 for (const [serviceIdStr, customerPackageItemId] of redeemedEntries) {
@@ -27227,10 +27663,8 @@ export default function AdminPage() {
                 setUseWalletBalance(false);
                 setDepositChangeToWallet(false);
                 setRedeemedPackageItems({});
-                // Refresh list and details
                 fetchAllReservations();
                 fetchCustomers();
-                // Close the viewing booking drawer if open
                 setViewingBooking(null);
 
                 if (consumeFailures.length > 0) {
@@ -27251,10 +27685,10 @@ export default function AdminPage() {
           };
 
           return (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="w-full max-w-lg rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+              <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto my-auto rounded-3xl bg-[#FBFBF9] p-6 sm:p-8 shadow-2xl border border-[#414E36]/10 space-y-6">
                 {/* Header */}
-                <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Invoice Checkout</p>
                     <h3 className="text-xl font-bold text-[#1F251A] mt-1">Payment Settlement</h3>
@@ -27283,32 +27717,32 @@ export default function AdminPage() {
                   </div>
 
                   {/* Services Invoice details */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-[#EDF1EC]/30 p-4 space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-[#5A6A51] mb-1">Services List / الخدمات</p>
-                    {bookingServicesList.map((svc: any, idx: number) => {
+                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Services List / الخدمات</p>
+                    {bookingServicesList.map((svc: any) => {
                       const isRedeemed = !!redeemedPackageItems[svc.serviceId];
                       return (
-                        <div key={idx} className="space-y-1">
-                          <div className="flex justify-between font-medium items-center gap-2">
-                            <span className="text-[#1F251A] flex items-center gap-1.5 flex-wrap">
-                              {svc.name}
+                        <div key={svc.serviceId} className="border-b border-[#414E36]/10 pb-2 space-y-1">
+                          <div className="flex justify-between items-center text-sm font-semibold">
+                            <span className="flex items-center gap-2">
+                              <span>{svc.name}</span>
                               {svc.hasPromotion && !isRedeemed && (
-                                <span className="inline-flex rounded-full bg-[#C4AE7C] text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                                  {svc.promotionText}
+                                <span className="text-[10px] font-bold bg-[#C4AE7C] text-white px-2 py-0.5 rounded-full">
+                                  {svc.promotionText || "OFFER"}
                                 </span>
                               )}
                             </span>
-                            <span className={isRedeemed ? "text-emerald-700 font-bold" : ""}>
-                              {isRedeemed ? "FREE (Package)" : `${svc.price} EGP`}
+                            <span className={isRedeemed ? "line-through text-[#5A6A51]" : ""}>
+                              {svc.price} EGP
                             </span>
                           </div>
                           {svc.redeemableItem && (
-                            <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] text-emerald-800 bg-emerald-50/60 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+                            <label className="flex items-center gap-2 text-xs bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-lg p-2 cursor-pointer font-medium">
                               <input
                                 type="checkbox"
                                 checked={isRedeemed}
                                 onChange={(e) => {
-                                  setRedeemedPackageItems((prev) => {
+                                  setRedeemedPackageItems((prev: any) => {
                                     const next = { ...prev };
                                     if (e.target.checked) {
                                       next[svc.serviceId] = svc.redeemableItem.id;
@@ -27318,10 +27752,10 @@ export default function AdminPage() {
                                     return next;
                                   });
                                 }}
-                                className="h-3.5 w-3.5 rounded border-emerald-300 text-emerald-700 focus:ring-emerald-500"
+                                className="h-4 w-4 rounded accent-emerald-700"
                               />
-                              <span className="font-semibold">
-                                Apply from package: {svc.redeemableItem.packageName} ({svc.redeemableItem.qtyRemaining} left)
+                              <span>
+                                Apply from package: <strong>{svc.redeemableItem.packageName}</strong> ({svc.redeemableItem.qtyRemaining} left)
                               </span>
                             </label>
                           )}
@@ -27333,6 +27767,113 @@ export default function AdminPage() {
                         Package redemption is unavailable — a deposit was already paid on this booking.
                       </p>
                     )}
+                    {(() => {
+                      if (extraAddonsCost <= 0) return null;
+
+                      const attached = Array.isArray((checkoutBooking as any).attachedProducts) ? (checkoutBooking as any).attachedProducts : [];
+                      const notesStr = String(checkoutBooking.notes || "");
+
+                      const parsedItems: Array<{ title: string; subtitle?: string; cost?: number; icon: string }> = [];
+                      let accountedCost = 0;
+
+                      attached.forEach((prod: any) => {
+                        const qty = Number(prod.qty) || 1;
+                        const price = Number(prod.unitPrice || prod.price || 0);
+                        const itemCost = Number(prod.total) || (qty * price);
+                        parsedItems.push({
+                          title: prod.name || "Product Consumable",
+                          subtitle: `Qty: ${qty}${price ? ` × ${price} EGP` : ''}`,
+                          cost: itemCost,
+                          icon: "📦"
+                        });
+                        accountedCost += itemCost;
+                      });
+
+                      if (notesStr) {
+                        const lines = notesStr.split('\n');
+                        lines.forEach(l => {
+                          const trimmed = l.trim();
+                          if (!trimmed) return;
+
+                          if (trimmed.includes('[Extra Device Pulses]:')) {
+                            const pulseMatch = trimmed.match(/\[Extra Device Pulses\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/i);
+                            if (pulseMatch) {
+                              const detailText = pulseMatch[1].trim();
+                              const itemCost = parseFloat(pulseMatch[2]) || 0;
+                              if (!parsedItems.some(i => i.title === "Extra Device Pulses")) {
+                                parsedItems.push({
+                                  title: "Extra Device Pulses",
+                                  subtitle: detailText,
+                                  cost: itemCost,
+                                  icon: "⚡"
+                                });
+                                accountedCost += itemCost;
+                              }
+                            } else if (!parsedItems.some(i => i.title === "Extra Device Pulses")) {
+                              parsedItems.push({
+                                title: "Extra Device Pulses",
+                                subtitle: trimmed.replace('[Extra Device Pulses]:', '').trim(),
+                                icon: "⚡"
+                              });
+                            }
+                          } else if (trimmed.includes('[Added Product]:')) {
+                            const prodMatch = trimmed.match(/\[Added Product\]:\s*(.*?)(?:\s*\(x(\d+)\))?\s*-\s*(\d+(?:\.\d+)?)\s*EGP/i);
+                            if (prodMatch) {
+                              const pName = prodMatch[1].trim();
+                              const pQty = prodMatch[2] || "1";
+                              const itemCost = parseFloat(prodMatch[3]) || 0;
+                              if (!parsedItems.some(i => i.title.toLowerCase().includes(pName.toLowerCase()))) {
+                                parsedItems.push({
+                                  title: pName,
+                                  subtitle: `Qty: ${pQty}`,
+                                  cost: itemCost,
+                                  icon: "📦"
+                                });
+                                accountedCost += itemCost;
+                              }
+                            }
+                          }
+                        });
+                      }
+
+                      // 3. Fallback or remaining unaccounted amount
+                      const remainingCost = Math.max(0, extraAddonsCost - accountedCost);
+
+                      return (
+                        <div className="mt-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 space-y-2 text-xs">
+                          <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-1.5">
+                            <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                              <span>✨</span> Session Add-ons & Consumables / المستلزمات والإضافات
+                            </span>
+                            <span className="font-bold text-[#414E36]">+{extraAddonsCost} EGP</span>
+                          </div>
+
+                          <div className="space-y-1.5 pt-0.5">
+                            {parsedItems.map((item, iIdx) => (
+                              <div key={iIdx} className="flex items-start justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 shadow-2xs">
+                                <div className="flex items-start gap-2">
+                                  <span className="text-sm mt-0.5">{item.icon}</span>
+                                  <div>
+                                    <p className="font-bold text-[#1F251A]">{item.title}</p>
+                                    {item.subtitle && <p className="text-[11px] text-[#5A6A51]">{item.subtitle}</p>}
+                                  </div>
+                                </div>
+                                {item.cost !== undefined && item.cost > 0 && (
+                                  <span className="font-extrabold text-[#414E36] mt-0.5">+{item.cost} EGP</span>
+                                )}
+                              </div>
+                            ))}
+
+                            {remainingCost > 0 && parsedItems.length > 0 && (
+                              <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 text-[11px] text-[#5A6A51]">
+                                <span>Other Session Add-ons / إضافات أخرى</span>
+                                <span className="font-bold text-[#414E36]">+{remainingCost} EGP</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
                       <span>Total Cost / الإجمالي</span>
                       <span>{totalCost} EGP</span>
@@ -27473,17 +28014,88 @@ export default function AdminPage() {
       {invoiceBooking && (
         (() => {
           // 1. Calculate service cost
-          const svcIds = Array.isArray(invoiceBooking.serviceIds) ? invoiceBooking.serviceIds : [invoiceBooking.serviceId];
-          const bookingServicesList = svcIds.map((id: number) => {
+          const svcIds = Array.isArray(invoiceBooking.serviceIds) ? invoiceBooking.serviceIds : (invoiceBooking.serviceId ? [invoiceBooking.serviceId] : []);
+          const baseServicesList = svcIds.map((id: number) => {
             const s = localServices.find(srv => srv.id === id);
+            const price = s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500;
             return {
               name: s?.en || `Service #${id}`,
               nameAr: s?.ar || `خدمة #${id}`,
-              price: s ? getEffectiveServicePrice(s, invoiceBooking.branchId, branches) : 500
+              qty: 1,
+              unitPrice: price,
+              price: price,
+              total: price
             };
           });
-          const totalCost = bookingServicesList.reduce((sum: number, s: any) => sum + s.price, 0);
-          
+
+          // Extract attached products/consumables/add-ons
+          const invoiceAttachedList: Array<{ name: string; qty: number; unitPrice: number; total: number }> = [];
+          const existingNames = new Set<string>();
+
+          if (Array.isArray(invoiceBooking.attachedProducts)) {
+            for (const prod of invoiceBooking.attachedProducts) {
+              const name = String(prod.name || 'Product / Consumable').trim();
+              const qty = Number(prod.qty) || 1;
+              const unitPrice = Number(prod.unitPrice || prod.price || (prod.total && qty ? prod.total / qty : 0));
+              const total = Number(prod.total) || (qty * unitPrice);
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                invoiceAttachedList.push({ name, qty, unitPrice, total });
+              }
+            }
+          }
+
+          if (invoiceBooking.notes) {
+            const notesStr = String(invoiceBooking.notes);
+
+            const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
+            for (const match of doctorMatches) {
+              const name = match[1].trim();
+              const qty = Number(match[2]);
+              const unitPrice = Number(match[3]);
+              const total = qty * unitPrice;
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                invoiceAttachedList.push({ name, qty, unitPrice, total });
+              }
+            }
+
+            const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+            for (const match of receptionistMatches) {
+              const name = match[1].trim();
+              const qty = match[2] ? Number(match[2]) : 1;
+              const total = Number(match[3]);
+              const unitPrice = qty > 0 ? total / qty : total;
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                invoiceAttachedList.push({ name, qty, unitPrice, total });
+              }
+            }
+
+            const pulseMatches = notesStr.matchAll(/\[Extra Device Pulses\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+            for (const match of pulseMatches) {
+              const detail = match[1].trim();
+              const total = Number(match[2]);
+              const name = `Extra Device Pulses (${detail})`;
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                invoiceAttachedList.push({ name, qty: 1, unitPrice: total, total });
+              }
+            }
+          }
+
+          const invoiceProductsList = invoiceAttachedList.map((p) => ({
+            name: `${p.name} (Add-on)`,
+            nameAr: `${p.name} (إضافة)`,
+            qty: p.qty,
+            unitPrice: p.unitPrice,
+            price: p.unitPrice,
+            total: p.total
+          }));
+
+          const allInvoiceItems = [...baseServicesList, ...invoiceProductsList];
+          const totalCost = allInvoiceItems.reduce((sum: number, item: any) => sum + item.total, 0);
+
           // 2. Fetch customer and branch details
           const walletUsed = Math.max(0, totalCost - (invoiceBooking.amountPaid ?? 0) - (invoiceBooking.amountLeft ?? 0));
           const branch = branches.find(b => b.id === invoiceBooking.branchId);
@@ -27541,24 +28153,24 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {/* Table of Services */}
+                  {/* Table of Services & Add-ons */}
                   <div className="overflow-x-auto my-6 border border-gray-100 rounded-2xl bg-white">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-100">
-                          <th className="p-3 text-left">Service Rendered</th>
+                          <th className="p-3 text-left">Service / Item Rendered</th>
                           <th className="p-3 text-center w-16">Qty</th>
                           <th className="p-3 text-right w-24">Unit Price</th>
                           <th className="p-3 text-right w-24">Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {bookingServicesList.map((s: any, idx: number) => (
+                        {allInvoiceItems.map((item: any, idx: number) => (
                           <tr key={idx} className="hover:bg-gray-50/50">
-                            <td className="p-3 font-semibold text-[#1F251A]">{s.name}</td>
-                            <td className="p-3 text-center text-gray-500">1</td>
-                            <td className="p-3 text-right text-gray-600">EGP {s.price.toLocaleString()}</td>
-                            <td className="p-3 text-right font-bold text-[#1F251A]">EGP {s.price.toLocaleString()}</td>
+                            <td className="p-3 font-semibold text-[#1F251A]">{item.name}</td>
+                            <td className="p-3 text-center text-gray-500">{item.qty}</td>
+                            <td className="p-3 text-right text-gray-600">EGP {item.unitPrice.toLocaleString()}</td>
+                            <td className="p-3 text-right font-bold text-[#1F251A]">EGP {item.total.toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -27606,7 +28218,7 @@ export default function AdminPage() {
                     Close
                   </button>
                   <button
-                    onClick={() => handlePrintInvoice(invoiceBooking, bookingServicesList, totalCost, walletUsed, branchName)}
+                    onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName)}
                     className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

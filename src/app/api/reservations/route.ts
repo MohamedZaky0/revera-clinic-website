@@ -1107,6 +1107,37 @@ export async function PATCH(req: Request) {
       if (newDate !== undefined) updates.date = newDate;
       if (newDate !== undefined && timeSlot) updates.time_slot = timeSlot;
 
+      // Determine total service cost to accurately resolve amount_left if null or missing
+      const effectiveServiceIds: number[] =
+        serviceIds !== undefined && Array.isArray(serviceIds)
+          ? serviceIds.map(Number)
+          : Array.isArray(target.service_ids) && target.service_ids.length > 0
+            ? target.service_ids.map(Number)
+            : (serviceId !== undefined ? Number(serviceId) : target.service_id)
+              ? [serviceId !== undefined ? Number(serviceId) : Number(target.service_id)]
+              : [];
+
+      let derivedTotalCost = 0;
+      if (effectiveServiceIds.length > 0) {
+        const { data: svcs } = await supabaseServer
+          .from('services')
+          .select('id, price')
+          .in('id', effectiveServiceIds);
+        if (svcs && svcs.length > 0) {
+          derivedTotalCost = svcs.reduce((sum: number, s: any) => sum + Number(s.price || 0), 0);
+        }
+      }
+
+      const effectivePaid = amountPaid !== undefined ? Number(amountPaid) : Number(target.amount_paid || 0);
+
+      // When completing a reservation, if amount_left wasn't explicitly provided, calculate it as total cost minus amount paid
+      if (amountLeft === undefined && (status === 'completed' || target.amount_left === null || target.amount_left === undefined)) {
+        const calculatedLeft = Math.max(0, derivedTotalCost - effectivePaid);
+        if (status === 'completed' || target.amount_left === null || target.amount_left === undefined) {
+          updates.amount_left = calculatedLeft;
+        }
+      }
+
       const { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
         .update(updates)
@@ -1118,7 +1149,7 @@ export async function PATCH(req: Request) {
 
       // Settle customer balances when the booking is being completed, or when money
       // fields change on one that is already completed (paying down an outstanding
-      // balance later). The second case has no UI yet — see FINANCE_TRACKER.md 0.5.
+      // balance later).
       const isSettlement =
         status === 'completed' ||
         (target.status === 'completed' && (amountPaid !== undefined || amountLeft !== undefined));
@@ -1133,7 +1164,16 @@ export async function PATCH(req: Request) {
 
           if (!fetchCustErr && customer) {
             const oldPaid = Number(target.amount_paid || 0);
-            const oldLeft = Number(target.amount_left || 0);
+            const oldLeft = target.amount_left !== null && target.amount_left !== undefined
+              ? Number(target.amount_left)
+              : Math.max(0, derivedTotalCost - oldPaid);
+
+            const newPaid = amountPaid !== undefined ? Number(amountPaid) : oldPaid;
+            const newLeft = updates.amount_left !== undefined
+              ? Number(updates.amount_left)
+              : amountLeft !== undefined
+                ? Number(amountLeft)
+                : Math.max(0, derivedTotalCost - newPaid);
 
             const settled = computeSettledBalances({
               current: {
@@ -1144,8 +1184,8 @@ export async function PATCH(req: Request) {
               wasCompleted: target.status === 'completed',
               oldPaid,
               oldLeft,
-              newPaid: amountPaid !== undefined ? Number(amountPaid) : oldPaid,
-              newLeft: amountLeft !== undefined ? Number(amountLeft) : oldLeft,
+              newPaid,
+              newLeft,
               walletDeposit: Number(walletDeposit || 0),
               walletWithdrawal: Number(walletWithdrawal || 0),
             });

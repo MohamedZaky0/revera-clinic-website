@@ -599,6 +599,22 @@ deferred balance       = Σ price_paid × qty_remaining / qty_total
 
 ---
 
+## DEC-024: Attached Products & Consumables Included in Booking Invoice Total
+
+**Date:** 2026-07-30
+**Status:** Decided — active
+
+**Context:**
+Previously, when doctors or receptionists attached products/consumables to a booking drawer or via clinical notes, the products were listed but the booking `amountLeft` / session outstanding and overall `Total Price` did not incorporate the cost of attached products.
+
+**Chosen Option:**
+1. Compute `productsCost` dynamically from `viewingBooking.attachedProducts` array and note entries.
+2. Calculate `totalPrice = servicesCost + productsCost`.
+3. Recalculate `sessionLeft = Math.max(0, totalPrice - sessionPaid)` when adding products or opening the booking drawer.
+4. Added test `TC-025` to the System Test Suite in Admin Settings to verify attached products recalculate total invoice price and session outstanding balance.
+
+---
+
 ## DEC-024: Opening Balances Are Bidirectional And Generic Across Clinics
 
 **Date:** 2026-07-25
@@ -1155,4 +1171,26 @@ and consuming it silently at checkout. Deliberately left open: it requires a rec
 points at the product (staff can't newly pick a deleted product from a recipe editor's dropdown
 today), so the blast radius is narrower than the sell/purchase paths that were closed. Revisit if
 this surfaces in practice.
+
+---
+
+## DEC-039: Doctor Portal Session Flow, Consumables & Receptionist Checkout Settlement
+
+**Date:** 2026-07-30
+**Status:** Decided — active
+**Note:** Landed on a separate remote session's branch as "DEC-036" — that number was already
+taken by the Promotions/Packages Marketing-nav decision above, so this entry was renumbered to
+DEC-039 while merging that branch into `dev` on 2026-08-03.
+
+**Context:**
+The clinic required improvements to doctor and receptionist roles:
+1. Receptionists start treatment sessions ("Start Session"); Doctors end sessions via "Complete Treatment". Session remains ongoing until ended by Doctor.
+2. Doctor schedule view provides structured date filtering (`Yesterday`, `Today`, `Tomorrow`, Date Picker) and replaces "Open Session" with an `Info` modal.
+3. First-time patients require completing a Patient Medical Record intake before Doctor can complete treatment. Returning patients display full medical history.
+4. Doctors can add session consumables (products from inventory) and extra device pulses during sessions, dynamically updating total booking cost.
+5. In Admin Booking Details drawer, Products and Prescriptions sections are unlocked and connected to clinic inventory & prescription engine.
+6. In Receptionist Checkout, attached session add-ons (products & extra pulses) display as line items and adjust remaining balance. Customer Information displays deposit paid as "Total Spent" and balance remaining as "Outstanding", updating to 0 upon checkout completion.
+
+**Reason:**
+Ensures clinic inventory tracking, medical compliance, and accurate financial record keeping across receptionist and doctor workflows.
 

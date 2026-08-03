@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-07-26
+> **Last Updated:** 2026-07-31
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 
@@ -72,6 +72,7 @@ After that, check task-specific files:
 - Booking modal (MD3 Date & Time pickers, single-step Service+Date+Time selection) → `reservations` table (real Supabase writes with customer_id links)
 - Admin booking management — calendar, list, approve/reject, full lifecycle stages, inline notes editor
 - Admin Bookings "Schedule" view — single-day grid, doctors as rows, 15-min time slots as columns
+- Doctor Portal Schedule & Patients Tab — dual view system (Month/Day Calendar & Queue List), global bilingual EN/AR toggle, Right Slide-Over Session Drawer, clean doctor notes isolation, integrated Patient Medical Record Intake with clinical notes, customer-indexed medical record caching, saved Digital Prescription display in visit history, Service-based pulse counter with additional services manager, and Patient Full Visit History Drawer (refactored into modular sub-components under `src/components/admin/doctor/`)
 - Booking lifecycle stages: `pending → approved → confirmed → started → completed`
 - Customer Wallet Ledgers — real writes updating spent_amount, outstanding, and wallet_balance during checkout
 - Payment settlement drawer inside admin booking details
