@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-07-31
+> **Last Updated:** 2026-08-03
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 
@@ -26,13 +26,20 @@ Follow this order on first contact with this codebase:
 After that, check task-specific files:
 
 ```
-7. API_CONTRACT.md   → When touching API routes or writing new endpoints
-8. PROPOSALS.md      → Before starting any refactor (must read before executing)
+7. API_CONTRACT.md      → When touching API routes or writing new endpoints
+8. SECURITY.md          → Before adding a route, or touching auth/RLS/middleware
+9. TESTING.md           → Before deciding a task is "done" — what verification is actually expected
+10. PROPOSALS.md        → Before starting any refactor (must read before executing)
+11. FINANCE_TRACKER.md  → Only when working inside the Finance module (PROPOSAL-002)
 ```
 
 ---
 
 ## File Index
+
+Every file that exists in this folder is listed below — nothing is left unexplained. If a new
+`.md` file is added to `ai_docs/`, add a row for it here in the same change (this is itself a
+`CLAUDE.md`-rule: docs must never silently drift from what's actually in the folder).
 
 ### Core Context (always read)
 
@@ -42,16 +49,25 @@ After that, check task-specific files:
 | `ARCHITECTURE.md` | Full stack, folder structure, data flow, brand token system, i18n | New folders/patterns introduced, Supabase tables added, auth added |
 | `DB_SCHEMA.md` | All Supabase tables with columns, types, and relationships | Any schema change (add table, add column, change type) — must match `supabase/migrations/` |
 | `PRODUCT_RULES.md` | Business logic **actually enforced in code** — nothing aspirational | Any time a rule is added, removed, or changed in an API route or component |
-| `DECISIONS.md` | Decision log — what was decided, why, what was rejected | Any architectural or strategic decision is made or reversed |
-| `RISKS.md` | Risk register — known problems with file/line references | New risks found; existing risks mitigated; hardcoded values changed |
+| `DECISIONS.md` | Decision log (ADR-style) — what was decided, why, what was rejected. Entries are numbered `DEC-NNN`; check the last number used before adding a new one to avoid a duplicate ID | Any architectural or strategic decision is made or reversed |
+| `RISKS.md` | Risk register — known problems with file/line references, numbered `RISK-NNN`. This is the *log* (what broke, when, why it was fixed) | New risks found; existing risks mitigated; hardcoded values changed |
 
 ### Task-Specific (read when relevant)
 
 | File | Purpose | Update When |
 |---|---|---|
 | `API_CONTRACT.md` | All API routes — methods, params, responses | Any API route added, changed, or deleted |
+| `SECURITY.md` | **Current-state snapshot** of the auth model: what `middleware.ts`/`access.ts` actually check, a per-route table of which routes are role-gated vs. open, RLS posture, secrets handling, and a checklist for adding a new route safely. Complements `RISKS.md` — that file is the history of security bugs found and fixed; this file is "what's true right now," so you don't have to reconstruct it from `RISKS.md`'s narrative | Any route's auth changes; a new unauthenticated gap is found (log it in `RISKS.md` too); `middleware.ts`/`access.ts` change; RLS policy changes |
+| `TESTING.md` | The actual testing approach (there is no automated test suite): static checks (`npm run check`), ad hoc `scratch/*.ts` regression scripts, and the `manual_tests/` checklist format — plus what "Done" requires per `CLAUDE.md` | The testing approach itself changes (e.g. a real test framework is introduced) |
 | `PROPOSALS.md` | Proposed refactors awaiting approval — do not execute without review | A new refactor is proposed; an approved proposal is completed (mark it done) |
-| `AGENTS.md` | Quick-start rules for AI agents specifically | Agent workflow changes; new rules for what agents must/must not do |
+| `FINANCE_TRACKER.md` | Execution tracker for `PROPOSALS.md` → PROPOSAL-002 (the Finance & Management Accounting module) — task-by-task status, what's done/blocked, exact requirements per task | Any Finance-module task's status changes; read `PROPOSALS.md` PROPOSAL-002 and `RISKS.md` RISK-010…RISK-020 first, per this file's own header |
+| `AGENTS.md` | Quick-start rules for AI agents specifically | Agent workflow changes; new rules for what agents must/must not do. **Known stale as of 2026-08-03** — written 2026-07-21, predates the auth/RLS hardening work and the fork-per-client framing now in `CLAUDE.md`; treat its security/single-tenant claims as superseded by `CLAUDE.md` and `SECURITY.md`, not as current fact |
+
+### Manual test evidence (not narrative docs — click-through records)
+
+| Location | Purpose |
+|---|---|
+| `manual_tests/*.md` | One file per feature/fix (e.g. `RISK_029_MANUAL_TESTS.md`, `FINANCE_PHASE_3B_MANUAL_TESTS.md`) — an evidence-log table plus a per-scenario `- [ ]` checklist, per the format `TESTING.md` documents. Referenced from the `RISKS.md`/`DECISIONS.md` entry for that feature, and as the Test Note in every Dev Notes block |
 
 ### Externally Managed (do not populate here)
 
@@ -102,8 +118,8 @@ After that, check task-specific files:
 - Full RBAC enforcement on API routes (selected sensitive routes validate bearer tokens, but coverage is not universal)
 
 ### Critical Gaps (do not assume these work)
-- **API authorization is incomplete** — selected sensitive mutation routes validate tokens, but direct calls to unreviewed routes remain unprotected (RISK-018)
-- **Patient OTP auth is simulated** — no SMS sent, no user created (RISK-003)
+- **API authorization is still incomplete** — most finance/inventory-relevant routes are now role-gated (RISK-018, RISK-021), but `medical-records`, `prescriptions`, and several config/CMS routes (`branches`, `categories`, `providers`, `rooms`, `terms`, `page-settings`, `customer-avatars`, `provider-attendance`) have **no server-side authorization at all** — see `SECURITY.md` §3 and RISK-036 (found 2026-08-03, not yet fixed)
+- **Patient auth is real, not simulated** — corrected 2026-07-22 (RISK-003). `AuthModal` sends/verifies OTPs through actual Supabase Auth; there is no `123456` demo bypass anymore. Do not trust the older claim that this is UI-only
 - Doctor shifts and availability — not built; derived only from existing bookings
 - Waitlist — not built
 
@@ -111,7 +127,7 @@ After that, check task-specific files:
 
 ## Architecture in One Paragraph
 
-Next.js 15 (App Router) + TypeScript on Vercel. Single app serving both the public Revera website and the `/admin` panel. Supabase (PostgreSQL) as the database, accessed via a service role key from all API routes. No RLS enforcement. Brand colors centralized in `globals.css` as CSS custom properties — but many components bypass these with raw hex Tailwind JIT classes (see RISK-001 in `RISKS.md`). All UI copy (EN/AR) lives in `src/lib/translations.ts`. The admin panel is a single ~550KB client component at `src/app/admin/page.tsx`.
+Next.js 15 (App Router) + TypeScript on Vercel. Single app serving both the public Revera website and the `/admin` panel. Supabase (PostgreSQL) as the database, accessed via a service role key from all API routes. **RLS is enabled on every `public` table as of 2026-07-25** (`20260722140000_enable_row_level_security.sql`), though it's a backstop against accidental anon-key access, not an authorization layer — the service role key bypasses it entirely, so per-route authorization in `access.ts`/`middleware.ts` is what actually matters; see `SECURITY.md` for the full current picture. Brand colors centralized in `globals.css` as CSS custom properties — but many components bypass these with raw hex Tailwind JIT classes (see RISK-001 in `RISKS.md`). All UI copy (EN/AR) lives in `src/lib/translations.ts`. The admin panel is a single ~550KB client component at `src/app/admin/page.tsx`.
 
 ---
 
@@ -139,8 +155,10 @@ Next.js 15 (App Router) + TypeScript on Vercel. Single app serving both the publ
 | New business rule enforced in code | `PRODUCT_RULES.md` |
 | Architectural decision made | `DECISIONS.md` |
 | New risk identified (hardcoding, security, data integrity) | `RISKS.md` |
+| New route added, or a route's auth changes | `SECURITY.md` §3 route table (and `API_CONTRACT.md`) — if it's a newly-found *gap*, also log it in `RISKS.md` |
+| Testing approach changes (e.g. a real test framework is introduced) | `TESTING.md` |
 | Mock section becomes real (Supabase-backed) | `PROJECT.md` status snapshot + `PRODUCT_RULES.md` |
-| Admin auth added | `PROJECT.md`, `ARCHITECTURE.md`, `RISKS.md` (close RISK-002), `DECISIONS.md` |
+| Admin auth added | `PROJECT.md`, `ARCHITECTURE.md`, `SECURITY.md`, `RISKS.md` (close RISK-002), `DECISIONS.md` |
 | PROPOSAL-001 executed | `PROPOSALS.md` (mark done), `RISKS.md` (close RISK-001), `ARCHITECTURE.md` |
 | Fork for new client created | `DECISIONS.md` (log the new client), `PROPOSALS.md` (confirm PROPOSAL-001 was applied) |
 

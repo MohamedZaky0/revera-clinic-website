@@ -1483,6 +1483,48 @@ outstanding — 10/10 checks pass. Separately confirmed a normal (non-package) c
 
 ---
 
+## RISK-036: Several PHI and Config-Mutating Routes Have No Server-Side Authorization At All
+
+**Severity:** High (medical-records/prescriptions) / Medium (config/CMS routes) · **Type:** Security
+**Found:** 2026-08-03, during an audit written while producing `ai_docs/SECURITY.md`
+
+**What it is:** RISK-018 (2026-07-25/26) authorized every *finance-relevant* unauthenticated route
+it found, but was explicitly scoped to money-mutating routes. A follow-up audit — grepping all 69
+`route.ts` files for the `access.ts` helpers, then checking each unprotected file's exported HTTP
+methods — found it missed a second, non-finance group that is still fully open:
+
+- **`medical-records` and `prescriptions`** (GET/POST/DELETE, no auth of any kind): PHI. Anyone who
+  knows or guesses a `customer_id` can read, overwrite, or delete another patient's medical intake
+  form, uploaded reports, or prescription history.
+- **`branches`, `categories`, `providers`, `rooms`, `service-rooms`, `terms`, `clinic-settings`,
+  `page-settings`, `customer-avatars`, `provider-attendance`** (various POST/PATCH/DELETE, no auth):
+  anyone can create/edit/delete branches, categories, doctor records, rooms, room-service links,
+  the public Terms & Conditions text, CMS content (defacement), a customer's avatar, or forge a
+  doctor attendance record.
+- **`hr/alerts`, `hr/attendance`, `hr/doctor-payroll`, `hr/leaves`, `hr/payroll`, `hr/performance`,
+  `providers/schedule-audit-logs`** are covered by `middleware.ts`'s `PROTECTED_API_PREFIXES`, but
+  that only proves "a valid Supabase session" — since patient OTP login is real Supabase Auth
+  (RISK-003), a logged-in *patient* token satisfies this middleware. There is no route-level role
+  check confirming the caller is staff.
+- `translate` (POST, no auth): if this proxies a paid third-party API, it's an open cost-abuse
+  vector, not a data-exposure one.
+
+Full per-route table with methods: `ai_docs/SECURITY.md` §3.
+
+**Not yet fixed** — this entry documents the finding, matching this project's own rule that a new
+security gap gets logged in `RISKS.md` as soon as it's found, not silently left implicit. Fixing it
+is the same shape of change RISK-018/RISK-021 already made (wrap each handler in
+`requireStaffAccess`/`requireAdministratorAccess`, or a patient-identity-scoped check where the
+route has a legitimate patient caller) — no new pattern needs inventing, it's applying the existing
+one to the routes RISK-018 didn't reach.
+
+**Suggested priority if picked up:** `medical-records`/`prescriptions` first (PHI, highest
+severity), then the CMS/config routes, then re-evaluate whether `hr/*` needs a dedicated
+`requireAdministratorAccess` call or whether `PROTECTED_API_PREFIXES` should be split into
+"authenticated" vs. "staff-only" tiers so middleware can express the difference directly.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:
