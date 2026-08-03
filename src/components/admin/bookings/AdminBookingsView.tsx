@@ -171,7 +171,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 6, 20)); // Default to July 20, 2026 as per mockup
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date(2026, 6, 1));
   const [activeMenuId, setActiveMenuId] = useState<string | number | null>(null);
-  const [rowsPerPage, setRowsPerPage] = useState<number>(10);
+  const [rowsPerPage, setRowsPerPage] = useState<number>(5);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [statusFilter, setStatusFilter] = useState<string>("All");
 
@@ -237,6 +237,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     }
     return dayList;
   }, [mergedAppointments, selectedDateStr, statusFilter, allReservations]);
+
+  // Pagination calculation
+  const totalAppointments = selectedDayAppointments.length;
+  const totalPages = Math.max(1, Math.ceil(totalAppointments / rowsPerPage));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * rowsPerPage;
+
+  const paginatedAppointments = useMemo(() => {
+    return selectedDayAppointments.slice(startIndex, startIndex + rowsPerPage);
+  }, [selectedDayAppointments, startIndex, rowsPerPage]);
 
   // Analytics counts calculation
   const stats = useMemo(() => {
@@ -665,30 +675,30 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             </div>
 
             {/* Table Container */}
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto scrollbar-none">
               <table className="w-full border-collapse text-left text-xs">
                 <thead>
                   <tr className="border-b border-gray-100 text-[11px] uppercase tracking-wider text-[#9CA3AF]">
-                    <th className="py-3 px-3 font-semibold">Time</th>
-                    <th className="py-3 px-3 font-semibold">Patient</th>
-                    <th className="py-3 px-3 font-semibold">Phone</th>
-                    <th className="py-3 px-3 font-semibold">Service</th>
-                    <th className="py-3 px-3 font-semibold">Doctor</th>
-                    <th className="py-3 px-3 font-semibold">Room</th>
-                    <th className="py-3 px-3 font-semibold">Status</th>
-                    <th className="py-3 px-3 font-semibold">Payment</th>
-                    <th className="py-3 px-2 font-semibold text-center">Actions</th>
+                    <th className="py-3 px-2 font-semibold">Time</th>
+                    <th className="py-3 px-2 font-semibold">Patient</th>
+                    <th className="py-3 px-2 font-semibold">Phone</th>
+                    <th className="py-3 px-2 font-semibold">Service</th>
+                    <th className="py-3 px-2 font-semibold">Doctor</th>
+                    <th className="py-3 px-2 font-semibold">Room</th>
+                    <th className="py-3 px-2 font-semibold">Status</th>
+                    <th className="py-3 px-2 font-semibold">Payment</th>
+                    <th className="py-3 px-1 font-semibold text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {selectedDayAppointments.length === 0 ? (
+                  {paginatedAppointments.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="py-12 text-center text-sm text-[#6B7280]">
                         No appointments scheduled for this date.
                       </td>
                     </tr>
                   ) : (
-                    selectedDayAppointments.map((row) => {
+                    paginatedAppointments.map((row) => {
                       const stConfig = getStatusConfig(row.status);
                       const payStyle = getPaymentStyle(row.paymentStatus);
 
@@ -698,86 +708,86 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           className={`group transition hover:bg-gray-50/80 border-l-4 ${stConfig.border}`}
                         >
                           {/* Time */}
-                          <td className="py-3.5 px-3 whitespace-nowrap font-bold text-[#111827]">
+                          <td className="py-3 px-2 whitespace-nowrap font-bold text-[#111827]">
                             {row.time || "09:00 AM"}
                           </td>
 
                           {/* Patient */}
-                          <td className="py-3.5 px-3 whitespace-nowrap">
-                            <div className="flex items-center gap-2.5">
+                          <td className="py-3 px-2 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
                               {row.avatar_url ? (
                                 <img
                                   src={row.avatar_url}
                                   alt={row.customer_name}
-                                  className="h-7 w-7 rounded-full object-cover border border-gray-200"
+                                  className="h-7 w-7 rounded-full object-cover border border-gray-200 shrink-0"
                                 />
                               ) : (
-                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 font-bold text-[#374151]">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 font-bold text-[#374151] shrink-0 text-xs">
                                   {(row.customer_name || "P").charAt(0)}
                                 </div>
                               )}
-                              <span className="font-semibold text-[#111827]">
+                              <span className="font-semibold text-[#111827] truncate max-w-[130px]">
                                 {row.customer_name}
                               </span>
                             </div>
                           </td>
 
                           {/* Phone */}
-                          <td className="py-3.5 px-3 whitespace-nowrap text-[#6B7280] font-medium">
+                          <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium text-[11px]">
                             {row.customer_phone}
                           </td>
 
                           {/* Service */}
-                          <td className="py-3.5 px-3">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-[#111827]">{row.service_name}</span>
-                              <span className="text-[11px] font-medium text-[#9CA3AF]">
+                          <td className="py-3 px-2">
+                            <div className="flex flex-col max-w-[130px]">
+                              <span className="font-bold text-[#111827] truncate">{row.service_name}</span>
+                              <span className="text-[10px] font-medium text-[#9CA3AF] truncate">
                                 {row.service_variant}
                               </span>
                             </div>
                           </td>
 
                           {/* Doctor */}
-                          <td className="py-3.5 px-3 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
+                          <td className="py-3 px-2 whitespace-nowrap">
+                            <div className="flex items-center gap-2 max-w-[130px]">
                               {row.doctor_avatar ? (
                                 <img
                                   src={row.doctor_avatar}
                                   alt={row.doctor_name}
-                                  className="h-6 w-6 rounded-full object-cover border border-gray-200"
+                                  className="h-6 w-6 rounded-full object-cover border border-gray-200 shrink-0"
                                 />
                               ) : (
-                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-800">
+                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-800 shrink-0">
                                   {(row.doctor_name || "D").charAt(3) || "D"}
                                 </div>
                               )}
-                              <span className="font-medium text-[#374151]">
+                              <span className="font-medium text-[#374151] truncate">
                                 {row.doctor_name}
                               </span>
                             </div>
                           </td>
 
                           {/* Room */}
-                          <td className="py-3.5 px-3 whitespace-nowrap text-[#6B7280] font-medium">
+                          <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium">
                             {row.room || "Room 1"}
                           </td>
 
                           {/* Status */}
-                          <td className="py-3.5 px-3 whitespace-nowrap">
+                          <td className="py-3 px-2 whitespace-nowrap">
                             <span
-                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${stConfig.bg} ${stConfig.text}`}
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${stConfig.bg} ${stConfig.text}`}
                             >
                               {stConfig.label}
                             </span>
                           </td>
 
                           {/* Payment */}
-                          <td className="py-3.5 px-3 whitespace-nowrap">
+                          <td className="py-3 px-2 whitespace-nowrap text-xs">
                             <span className={payStyle}>{row.paymentStatus}</span>
                           </td>
 
                           {/* Actions */}
-                          <td className="py-3.5 px-2 text-center whitespace-nowrap relative">
+                          <td className="py-3 px-1 text-center whitespace-nowrap relative">
                             <button
                               onClick={() =>
                                 setActiveMenuId(activeMenuId === row.id ? null : row.id)
@@ -814,34 +824,44 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             {/* Table Footer */}
             <div className="mt-5 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between text-xs text-[#6B7280]">
               <div>
-                Showing <span className="font-semibold text-[#111827]">1</span> to{" "}
+                Showing <span className="font-semibold text-[#111827]">{totalAppointments === 0 ? 0 : startIndex + 1}</span> to{" "}
                 <span className="font-semibold text-[#111827]">
-                  {Math.min(selectedDayAppointments.length, rowsPerPage)}
+                  {Math.min(startIndex + rowsPerPage, totalAppointments)}
                 </span>{" "}
-                of <span className="font-semibold text-[#111827]">{selectedDayAppointments.length || 18}</span> appointments
+                of <span className="font-semibold text-[#111827]">{totalAppointments}</span> appointments
               </div>
 
               <div className="flex items-center gap-6">
                 {/* Pagination */}
                 <div className="flex items-center gap-1">
                   <button
+                    disabled={safePage <= 1}
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="Previous Page"
                   >
                     <ChevronLeft size={14} />
                   </button>
-                  <button className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1E3A2B] font-semibold text-white">
-                    1
-                  </button>
-                  <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 font-semibold text-[#374151]">
-                    2
-                  </button>
-                  <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 font-semibold text-[#374151]">
-                    3
-                  </button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
+                    <button
+                      key={pg}
+                      onClick={() => setCurrentPage(pg)}
+                      className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-semibold transition ${
+                        pg === safePage
+                          ? "bg-[#1E3A2B] text-white shadow-xs"
+                          : "border border-gray-200 text-[#374151] hover:bg-gray-50"
+                      }`}
+                    >
+                      {pg}
+                    </button>
+                  ))}
+
                   <button
-                    onClick={() => setCurrentPage(p => p + 1)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    title="Next Page"
                   >
                     <ChevronRight size={14} />
                   </button>
@@ -852,9 +872,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   <span>Rows per page:</span>
                   <select
                     value={rowsPerPage}
-                    onChange={(e) => setRowsPerPage(Number(e.target.value))}
+                    onChange={(e) => {
+                      setRowsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
                     className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-[#374151] focus:outline-none"
                   >
+                    <option value={5}>5</option>
                     <option value={10}>10</option>
                     <option value={20}>20</option>
                     <option value={50}>50</option>
