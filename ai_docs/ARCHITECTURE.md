@@ -73,7 +73,9 @@ src/
 ├── components/                   Public website UI components and admin submodules
 │   ├── admin/                     Required location for every new admin section; legacy sections are extracted here incrementally
 │   │   ├── DoctorAccountView.tsx  Doctor portal root coordinator
-│   │   └── doctor/                Doctor portal sub-modules (types.ts, DoctorSidebar, DoctorScheduleTab, DoctorOngoingSessionTab, DoctorPatientsTab, DoctorAnalyticsTab, DoctorSettingsTab, DoctorProfileTab, modals)
+│   │   ├── doctor/                Doctor portal sub-modules (types.ts, DoctorSidebar, DoctorScheduleTab, DoctorOngoingSessionTab, DoctorPatientsTab, DoctorAnalyticsTab, DoctorSettingsTab, DoctorProfileTab, modals)
+│   │   ├── bookings/              Bookings section sub-modules (AdminBookingsView.tsx, AdminBookingsTabs.tsx, AdminBookingsFilterDrawer.tsx, AdminBookingsPendingBanner.tsx, AdminBookingsStatsCards.tsx, AdminBookingsCalendarView.tsx, AdminBookingsListView.tsx, AdminBookingsScheduleView.tsx)
+│   │   └── patient-drawer/        Patient drawer sub-modules (AdminPatientDrawer.tsx, PatientFinancialTab.tsx, PatientVisitsTab.tsx, PatientOverviewTab.tsx, PatientMedicalRecordTab.tsx)
 │   ├── Navbar.tsx
 │   ├── HeroSlider.tsx
 │   ├── ServicesSection.tsx        Services catalog + WhatsApp CTA

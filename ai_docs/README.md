@@ -86,8 +86,7 @@ Every file that exists in this folder is listed below — nothing is left unexpl
 - Public website (homepage, about, services, contact, blog stub)
 - Patient Profile (`/profile`) — persistent customer profile details, wallet ledgers, and visit logs history
 - Booking modal (MD3 Date & Time pickers, single-step Service+Date+Time selection) → `reservations` table (real Supabase writes with customer_id links)
-- Admin booking management — calendar, list, approve/reject, full lifecycle stages, inline notes editor
-- Admin Bookings "Schedule" view — single-day grid, doctors as rows, 15-min time slots as columns
+- Admin Bookings view — modular component (`src/components/admin/bookings/AdminBookingsView.tsx`) housing 3 view tabs (Calendar Month Grid, Operations List View, and Daily Schedule Grid) with 4 analytic status cards, full filter drawer, pending approval banner, inline actions, patient drawer integration, and CSV export functionality.
 - Doctor Portal Schedule & Patients Tab — dual view system (Month/Day Calendar & Queue List), global bilingual EN/AR toggle, Right Slide-Over Session Drawer, clean doctor notes isolation, integrated Patient Medical Record Intake with clinical notes, customer-indexed medical record caching, saved Digital Prescription display in visit history, Service-based pulse counter with additional services manager, and Patient Full Visit History Drawer (refactored into modular sub-components under `src/components/admin/doctor/`)
 - Booking lifecycle stages: `pending → approved → confirmed → started → completed`
 - Customer Wallet Ledgers — real writes updating spent_amount, outstanding, and wallet_balance during checkout
