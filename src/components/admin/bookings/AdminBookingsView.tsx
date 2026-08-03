@@ -21,7 +21,7 @@ export interface ReservationItem {
   id: string | number;
   date?: string;
   time?: string;
-  timeSlot?: string;
+  timeSlot?: string | null;
   customer_name?: string;
   clientName?: string;
   name?: string;
@@ -29,6 +29,7 @@ export interface ReservationItem {
   customer_phone?: string;
   phone?: string;
   mobile?: string;
+  email?: string | null;
   serviceId?: number | string;
   service?: string;
   service_name?: string;
@@ -38,25 +39,23 @@ export interface ReservationItem {
   doctor?: string;
   room?: string;
   room_name?: string;
-  status?: string; // pending, approved, confirmed, checked_in, waiting, in_progress, completed, canceled, no_show
-  paymentStatus?: "Paid" | "Deposit Paid" | "Unpaid" | string;
-  payment_status?: string;
+  status?: string;
+  paymentStatus?: string;
   avatar_url?: string;
   doctor_avatar?: string;
-  notes?: string;
   [key: string]: any;
 }
 
-interface AdminBookingsViewProps {
-  allReservations?: ReservationItem[];
-  requests?: ReservationItem[];
+export interface AdminBookingsViewProps {
+  allReservations?: any[];
+  requests?: any[];
   providers?: any[];
   localServices?: any[];
   userName?: string;
   onNewBooking?: () => void;
   onPendingApprovalsClick?: () => void;
   onFilterClick?: () => void;
-  onViewBookingDetails?: (booking: ReservationItem) => void;
+  onViewBookingDetails?: (booking: any) => void;
   onPrint?: () => void;
   onExportCSV?: () => void;
 }
