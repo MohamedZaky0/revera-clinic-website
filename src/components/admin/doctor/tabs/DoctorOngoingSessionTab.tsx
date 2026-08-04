@@ -263,7 +263,7 @@ export default function DoctorOngoingSessionTab({
 
   return (
     <div className="space-y-6 w-full">
-      {activeSessionBooking && activeSessionBooking.status !== "completed" ? (
+      {activeSessionBooking && activeSessionBooking.status !== "completed" && activeSessionBooking.status !== "done" ? (
         <>
           {/* Active Patient Header Card */}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 border border-[#414E36]/10 shadow-sm w-full">

@@ -374,13 +374,13 @@ export default function DoctorAccountView({
       if (!activeSessionBooking || activeSessionBooking.id !== receptionistStartedSession.id) {
         setActiveSessionBooking(receptionistStartedSession);
       }
-    } else {
-      const currentTodayBooking = reservations.find((r) => (r.date === todayStr || !r.date) && r.status !== "completed");
-      if (currentTodayBooking && !activeSessionBooking) {
-        setActiveSessionBooking(currentTodayBooking);
+    } else if (activeSessionBooking) {
+      const st = String(activeSessionBooking.status || "").toLowerCase().trim();
+      if (st === "completed" || st === "done" || st === "cancelled" || st === "canceled") {
+        setActiveSessionBooking(null);
       }
     }
-  }, [receptionistStartedSession, reservations, todayStr, activeSessionBooking]);
+  }, [receptionistStartedSession, reservations, activeSessionBooking]);
 
   // Sync active session clinical notes
   useEffect(() => {
@@ -683,12 +683,64 @@ export default function DoctorAccountView({
       }
     }
 
+    // 2. Deduct Used Products from Inventory Stock DB via /api/inventory/products/sales
+    if (usedProducts && usedProducts.length > 0) {
+      try {
+        const headers = await getAuthHeaders();
+        for (const item of usedProducts) {
+          const prodId = item.id || (item as any).productId;
+          if (prodId) {
+            await fetch("/api/inventory/products/sales", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                product_id: prodId,
+                product_name: item.name,
+                quantity: Number(item.qty) || 1,
+                unit_price: Number(item.unitPrice) || 0,
+                total_amount: Number(item.total) || 0,
+                customer_id: targetBooking.customer_id || targetBooking.customerId || "",
+                customer_name: targetBooking.name || targetBooking.customer_name || "Patient",
+                customer_mobile: targetBooking.phone || targetBooking.customer_phone || "N/A",
+                notes: `Consumable deducted during clinical session (Booking #${targetBooking.id})`
+              })
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Error deducting used products from inventory stock:", e);
+      }
+    }
+
+    // 3. Deduct Device Pulses from DB via PUT /api/inventory/devices
+    if (selectedDeviceId && extraPulsesCount > 0) {
+      try {
+        const headers = await getAuthHeaders();
+        const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceId));
+        if (devObj) {
+          const currentPulses = Number(devObj.current_pulse_count || devObj.total_pulses || 0);
+          const newPulseCount = currentPulses + Number(extraPulsesCount);
+          await fetch("/api/inventory/devices", {
+            method: "PUT",
+            headers,
+            body: JSON.stringify({
+              id: devObj.id,
+              current_pulse_count: newPulseCount,
+              notes: `Session pulse usage for ${targetBooking.name || 'Patient'}`
+            })
+          });
+        }
+      } catch (e) {
+        console.error("Error updating device pulses in DB:", e);
+      }
+    }
+
     let sessionAddonsSummary = "";
     if (usedProducts.length > 0) {
       sessionAddonsSummary += `\n[Products Used During Session]: ${usedProducts.map((p) => `${p.name} (Qty: ${p.qty} x ${p.unitPrice} EGP = ${p.total} EGP)`).join(", ")}`;
     }
     if (extraPulsesCount > 0 && selectedDeviceId) {
-      const devObj = devicesList.find((d) => d.id === selectedDeviceId);
+      const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceId));
       sessionAddonsSummary += `\n[Extra Device Pulses]: ${devObj?.name || 'Device'} — ${extraPulsesCount} pulses @ ${pricePerPulse} EGP/pulse (+${extraPulsesSubtotal} EGP)`;
     }
     if (productsSubtotal + extraPulsesSubtotal > 0) {
@@ -710,11 +762,12 @@ export default function DoctorAccountView({
       });
 
       if (res.ok) {
-        alert("Session completed successfully!");
+        alert("Session completed successfully! Product stock & device pulses deducted.");
         setActiveSessionBooking(null);
         setUsedProducts([]);
         setExtraPulsesCount(0);
         setSelectedDeviceId("");
+        setClinicalNote("");
         fetchDoctorReservations();
       } else {
         const err = await res.json().catch(() => ({}));
