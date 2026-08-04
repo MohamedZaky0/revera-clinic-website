@@ -17,8 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  X,
-  Stethoscope
+  X
 } from "lucide-react";
 
 export interface DoctorProfileDetailsViewProps {
@@ -46,160 +45,108 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("All");
 
-  // Doctor Data Normalization
-  const doctorName = doctor?.name || "Dr. Sara El Gamel";
-  const doctorSpecialty = doctor?.specialty || "Dermatologist • Laser Specialist";
-  const doctorSubSpecialty = doctor?.sub_specialty || "Dermatologist";
-  const doctorEmployeeId = doctor?.employee_id || doctor?.id ? `DOC-${String(doctor?.id).slice(-3).padStart(3, "0")}` : "DOC-002";
-  const doctorAvatar = doctor?.avatar || doctor?.avatar_url || "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=300&auto=format&fit=crop&q=80";
-  const roomName = doctor?.room || doctor?.room_name || "Room 4";
-  const yearsExp = doctor?.years_of_experience || "8 Years";
+  // Real Doctor Data Normalization
+  const doctorName = doctor?.name || "Doctor";
+  const doctorSpecialty = doctor?.specialty || doctor?.department || "General Specialist";
+  const doctorSubSpecialty = doctor?.sub_specialty || doctor?.specialty || doctor?.role || "Dermatology";
+  const doctorEmployeeId = doctor?.employee_id || (doctor?.id ? `DOC-${String(doctor?.id).slice(-3).padStart(3, "0")}` : "DOC-PROV");
+  const doctorAvatar = doctor?.image || doctor?.avatar || doctor?.avatar_url || doctor?.photo || null;
+  const roomName = doctor?.room || doctor?.room_name || doctor?.room_id || "Not assigned";
+  const yearsExp = doctor?.years_of_experience || doctor?.yearsExp ? `${doctor.years_of_experience || doctor.yearsExp} Years` : (doctor?.age ? `${Math.max(1, Number(doctor.age) - 25)} Years` : "Not specified");
   const languages = doctor?.languages || "Arabic, English";
-  const employmentType = doctor?.employment_type || "Full Time";
+  const employmentType = doctor?.employment_type || doctor?.employmentType || "Full Time";
 
-  // Working Hours Mock / Real Data
-  const defaultSchedule = [
-    { day: "Sunday", hours: "09:00 AM - 01:00 PM", hours2: "03:00 PM - 07:00 PM" },
-    { day: "Monday", hours: "10:00 AM - 06:00 PM" },
-    { day: "Tuesday", hours: "Off" },
-    { day: "Wednesday", hours: "09:00 AM - 01:00 PM", hours2: "03:00 PM - 07:00 PM" },
-    { day: "Thursday", hours: "10:00 AM - 06:00 PM" },
-    { day: "Friday", hours: "09:00 AM - 01:00 PM", hours2: "03:00 PM - 07:00 PM" },
-    { day: "Saturday", hours: "10:00 AM - 02:00 PM" },
-  ];
-
-  // Services Provided
-  const servicesProvided = useMemo(() => {
-    if (Array.isArray(doctor?.services) && doctor.services.length > 0) {
-      return doctor.services;
+  // Working Hours (from DB or default standard hours)
+  const defaultSchedule = useMemo(() => {
+    const raw = doctor?.workingDaysHours || doctor?.working_days_hours || doctor?.schedule;
+    if (raw) {
+      if (typeof raw === "string") {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {
+          // ignore
+        }
+      } else if (Array.isArray(raw) && raw.length > 0) {
+        return raw;
+      }
     }
     return [
-      "Laser Hair Removal",
-      "Botox",
-      "Fillers",
-      "PRP",
-      "Skin Rejuvenation",
-      "Chemical Peels",
-      "Microneedling",
-      "Acne Treatment",
-      "Mesotherapy"
+      { day: "Sunday", hours: "10:00 AM - 06:00 PM" },
+      { day: "Monday", hours: "10:00 AM - 06:00 PM" },
+      { day: "Tuesday", hours: "10:00 AM - 06:00 PM" },
+      { day: "Wednesday", hours: "10:00 AM - 06:00 PM" },
+      { day: "Thursday", hours: "10:00 AM - 06:00 PM" },
+      { day: "Friday", hours: "Off" },
+      { day: "Saturday", hours: "10:00 AM - 04:00 PM" },
     ];
   }, [doctor]);
 
+  // Services Provided (Derived from real doctor.services / doctor.service_ids or localServices)
+  const servicesProvided = useMemo(() => {
+    const rawServices = doctor?.services || doctor?.service_ids || [];
+    if (Array.isArray(rawServices) && rawServices.length > 0) {
+      return rawServices.map((s: any) => {
+        if (typeof s === "string") return s;
+        if ((typeof s === "number" || typeof s === "string") && Array.isArray(localServices) && localServices.length > 0) {
+          const found = localServices.find((ls: any) => String(ls.id) === String(s));
+          if (found) return found.name || found.name_en;
+        }
+        return s?.name || s?.title || String(s);
+      });
+    }
+    return [];
+  }, [doctor, localServices]);
+
   // Doctor Branches
   const doctorBranches = useMemo(() => {
-    if (branches && branches.length > 0) {
-      return branches.slice(0, 3).map((b) => b.name_en || b.name || "Branch");
+    const bIds = doctor?.branch_ids || doctor?.branchIds || (doctor?.branch_id || doctor?.branchId ? [doctor.branch_id || doctor.branchId] : []);
+    if (Array.isArray(bIds) && bIds.length > 0 && Array.isArray(branches) && branches.length > 0) {
+      const mapped = bIds.map((id: any) => {
+        const found = branches.find((b: any) => String(b.id) === String(id) || String(b.branch_id) === String(id));
+        return found ? (found.name_en || found.name || `Branch ${id}`) : null;
+      }).filter(Boolean);
+      if (mapped.length > 0) return mapped;
     }
-    return ["New Cairo Branch", "Nasr City Branch", "Sheikh Zayed Branch"];
-  }, [branches]);
-
-  // Demo Visit History
-  const demoVisits = [
-    {
-      id: "V-101",
-      date: "03 Aug 2026",
-      patientName: "Mohamed Ahmed",
-      patientPhone: "01012345678",
-      service: "Laser Hair Removal",
-      variant: "Full Body",
-      branch: "New Cairo Branch",
-      sessionType: "In-Clinic",
-      status: "Completed",
-      notes: "Full body session completed smoothly. Next touchup in 4 weeks."
-    },
-    {
-      id: "V-102",
-      date: "02 Aug 2026",
-      patientName: "Ahmed Ali",
-      patientPhone: "01123456789",
-      service: "Botox",
-      variant: "Face",
-      branch: "New Cairo Branch",
-      sessionType: "In-Clinic",
-      status: "Completed",
-      notes: "Forehead and crow's feet injection (24 units)."
-    },
-    {
-      id: "V-103",
-      date: "01 Aug 2026",
-      patientName: "Sara Hassan",
-      patientPhone: "01098765432",
-      service: "PRP",
-      variant: "Hair",
-      branch: "Sheikh Zayed Branch",
-      sessionType: "In-Clinic",
-      status: "Completed",
-      notes: "Scalp PRP session 2 of 4."
-    },
-    {
-      id: "V-104",
-      date: "30 Jul 2026",
-      patientName: "Omar Tarek",
-      patientPhone: "01024681357",
-      service: "Fillers",
-      variant: "Lips",
-      branch: "Nasr City Branch",
-      sessionType: "In-Clinic",
-      status: "Completed",
-      notes: "1ml Juvederm lip contouring."
-    },
-    {
-      id: "V-105",
-      date: "29 Jul 2026",
-      patientName: "Mariam Adel",
-      patientPhone: "01011223344",
-      service: "Skin Rejuvenation",
-      variant: "Face",
-      branch: "New Cairo Branch",
-      sessionType: "In-Clinic",
-      status: "Completed",
-      notes: "Dermapen session with hyaluronic serum."
-    },
-    {
-      id: "V-106",
-      date: "28 Jul 2026",
-      patientName: "Khaled Youssef",
-      patientPhone: "01234567890",
-      service: "Acne Treatment",
-      variant: "Face",
-      branch: "New Cairo Branch",
-      sessionType: "In-Clinic",
-      status: "Completed",
-      notes: "Salicylic peel applied."
+    if (Array.isArray(branches) && branches.length > 0) {
+      return branches.map((b: any) => b.name_en || b.name || "Branch");
     }
-  ];
+    return ["All Clinic Branches"];
+  }, [doctor, branches]);
 
-  // Combined Visit List (Filter real reservations matching doctor or fallback demoVisits)
+  // Real Database Visit History (Filtered for this specific doctor)
   const allVisits = useMemo(() => {
-    if (Array.isArray(reservations) && reservations.length > 0) {
-      const filtered = reservations.filter((r) => {
-        if (!r) return false;
-        const docMatch = r.doctor_name || r.doctor || "";
-        return docMatch.toLowerCase().includes(doctorName.toLowerCase()) || docMatch.toLowerCase().includes("sara");
-      });
-      if (filtered.length > 0) {
-        return filtered.map((r, idx) => ({
-          id: r.id || `RES-${idx}`,
-          date: r.date || "03 Aug 2026",
-          patientName: r.customer_name || r.clientName || r.patientName || "Patient",
-          patientPhone: r.customer_phone || r.phone || r.mobile || "01012345678",
-          service: r.service_name || r.service || "Dermatology Session",
-          variant: r.service_variant || "Standard",
-          branch: r.branch_name || "New Cairo Branch",
-          sessionType: "In-Clinic",
-          status: r.status ? (r.status.charAt(0).toUpperCase() + r.status.slice(1)) : "Completed",
-          notes: r.notes || "Routine clinical session."
-        }));
-      }
-    }
-    return demoVisits;
-  }, [reservations, doctorName]);
+    if (!Array.isArray(reservations) || reservations.length === 0) return [];
+    const docNameClean = (doctor?.name || "").trim().toLowerCase();
+    const docIdStr = String(doctor?.id || "").trim();
+
+    const matched = reservations.filter((r: any) => {
+      if (!r) return false;
+      const rDocName = (r.doctorName || r.doctor_name || r.doctor || r.provider_name || "").trim().toLowerCase();
+      const rDocId = String(r.doctor_id || r.doctorId || r.provider_id || "").trim();
+
+      if (docIdStr && rDocId && rDocId === docIdStr) return true;
+      if (docNameClean && rDocName && (rDocName === docNameClean || rDocName.includes(docNameClean) || docNameClean.includes(rDocName))) return true;
+      return false;
+    });
+
+    return matched.map((r: any, idx: number) => ({
+      id: r.id || `RES-${idx + 1}`,
+      date: r.date || (r.created_at ? new Date(r.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "-"),
+      patientName: r.customer_name || r.clientName || r.patientName || r.name || "Patient",
+      patientPhone: r.customer_phone || r.phone || r.mobile || "-",
+      service: r.service_name || r.serviceName || r.service || "Clinical Session",
+      variant: r.service_variant || r.variant || "-",
+      branch: r.branch_name || r.branchName || r.branch || "-",
+      sessionType: r.session_type || r.type || "In-Clinic",
+      status: r.status ? (r.status.charAt(0).toUpperCase() + r.status.slice(1)) : "Confirmed",
+      notes: r.notes || r.doctor_notes || r.comments || "Session recorded in system."
+    }));
+  }, [reservations, doctor]);
 
   // Filter visits
   const filteredVisits = useMemo(() => {
     return allVisits.filter((v) => {
-      // Search term
       if (visitSearch.trim()) {
         const query = visitSearch.toLowerCase();
         const matchesSearch =
@@ -209,7 +156,6 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
           v.branch.toLowerCase().includes(query);
         if (!matchesSearch) return false;
       }
-      // Status filter
       if (statusFilter !== "All" && v.status.toLowerCase() !== statusFilter.toLowerCase()) {
         return false;
       }
@@ -276,11 +222,17 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
           {/* Avatar with Status Dot */}
           <div className="relative h-20 w-20 shrink-0">
-            <img
-              src={doctorAvatar}
-              alt={doctorName}
-              className="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md"
-            />
+            {doctorAvatar && typeof doctorAvatar === "string" && doctorAvatar.trim() ? (
+              <img
+                src={doctorAvatar}
+                alt={doctorName}
+                className="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md"
+              />
+            ) : (
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#1E3A2B] text-white text-2xl font-bold uppercase border-2 border-white shadow-md">
+                {doctorName ? doctorName.replace(/^Dr\.\s*/i, "").charAt(0) : "D"}
+              </div>
+            )}
             <span
               className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-emerald-500 border-2 border-white"
               title="Active / Online"
@@ -408,18 +360,18 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 text-[#374151]">
-                {defaultSchedule.map((item) => (
-                  <tr key={item.day} className="hover:bg-gray-50/50">
+                {defaultSchedule.map((item: any, idx: number) => (
+                  <tr key={item.day || idx} className="hover:bg-gray-50/50">
                     <td className="py-2.5 px-4 font-semibold text-[#1F251A]">{item.day}</td>
                     <td className="py-2.5 px-4 font-medium">
-                      {item.hours === "Off" ? (
+                      {item.hours === "Off" || item.off ? (
                         <span className="inline-block rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
                           Off
                         </span>
                       ) : (
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="rounded-md bg-[#F2EFE9]/70 px-2 py-0.5 text-[11px] font-semibold text-[#1E3A2B]">
-                            {item.hours}
+                            {item.hours || item.working_hours || "10:00 AM - 06:00 PM"}
                           </span>
                           {item.hours2 && (
                             <span className="rounded-md bg-[#F2EFE9]/70 px-2 py-0.5 text-[11px] font-semibold text-[#1E3A2B]">
@@ -454,17 +406,25 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
             </h3>
 
             <div className="flex flex-wrap items-center gap-2 pt-1">
-              {servicesProvided.map((service: string, idx: number) => (
-                <span
-                  key={idx}
-                  className="rounded-xl border border-gray-100 bg-[#F7F7F9] px-3.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#F2EFE9] transition"
-                >
-                  {service}
+              {servicesProvided.length === 0 ? (
+                <span className="text-xs font-medium text-[#9CA3AF]">
+                  No specific services assigned to this provider.
                 </span>
-              ))}
-              <span className="rounded-xl bg-[#EDE4C8] px-3 py-1.5 text-xs font-bold text-[#414E36]">
-                + 8 More
-              </span>
+              ) : (
+                servicesProvided.map((service: string, idx: number) => (
+                  <span
+                    key={idx}
+                    className="rounded-xl border border-gray-100 bg-[#F7F7F9] px-3.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#F2EFE9] transition"
+                  >
+                    {service}
+                  </span>
+                ))
+              )}
+              {doctor?.more && Number(doctor.more) > 0 ? (
+                <span className="rounded-xl bg-[#EDE4C8] px-3 py-1.5 text-xs font-bold text-[#414E36]">
+                  + {doctor.more} More
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -594,8 +554,8 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
             <tbody className="divide-y divide-gray-50 text-[#374151]">
               {paginatedVisits.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-xs text-[#9CA3AF]">
-                    No patient visits recorded for this period.
+                  <td colSpan={7} className="py-12 text-center text-xs font-medium text-[#9CA3AF]">
+                    No visit history found in database for this doctor.
                   </td>
                 </tr>
               ) : (
