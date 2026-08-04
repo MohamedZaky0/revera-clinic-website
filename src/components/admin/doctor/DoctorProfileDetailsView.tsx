@@ -39,6 +39,8 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
   const [scheduleType, setScheduleType] = useState<"In-Clinic" | "Online">("In-Clinic");
   const [visitSearch, setVisitSearch] = useState("");
   const [dateFilter, setDateFilter] = useState<"Today" | "This Week" | "This Month" | "Custom">("This Month");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
   const [rowsPerPage, setRowsPerPage] = useState<number>(5);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [selectedVisit, setSelectedVisit] = useState<any | null>(null);
@@ -56,31 +58,119 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
   const languages = doctor?.languages || "Arabic, English";
   const employmentType = doctor?.employment_type || doctor?.employmentType || "Full Time";
 
-  // Working Hours (from DB or default standard hours)
-  const defaultSchedule = useMemo(() => {
-    const raw = doctor?.workingDaysHours || doctor?.working_days_hours || doctor?.schedule;
-    if (raw) {
-      if (typeof raw === "string") {
-        try {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        } catch (e) {
-          // ignore
+  // Formatted & Interactive Doctor Branches
+  const doctorBranches = useMemo(() => {
+    let bIds: string[] = [];
+    const rawSched = doctor?.workingDaysHours || doctor?.working_days_hours;
+    if (rawSched && typeof rawSched === "object" && Array.isArray(rawSched.branch_ids)) {
+      bIds = rawSched.branch_ids;
+    } else if (doctor?.branch_ids || doctor?.branchIds) {
+      bIds = doctor?.branch_ids || doctor?.branchIds;
+    } else if (doctor?.branch_id || doctor?.branchId) {
+      bIds = [doctor.branch_id || doctor.branchId];
+    }
+
+    const formatBranchName = (str: string) => {
+      if (!str) return "Branch";
+      const lower = str.trim().toLowerCase();
+      if (lower === "home") return "Home Visit / In-Home Care";
+      if (lower === "main") return "Main Branch";
+      return str.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    };
+
+    if (Array.isArray(bIds) && bIds.length > 0) {
+      const mapped = bIds.map((id: any) => {
+        const found = branches.find((b: any) => String(b.id) === String(id) || String(b.branch_id) === String(id) || String(b.name).toLowerCase() === String(id).toLowerCase());
+        if (found) {
+          return formatBranchName(found.name_en || found.name || `Branch ${id}`);
         }
-      } else if (Array.isArray(raw) && raw.length > 0) {
-        return raw;
+        return formatBranchName(String(id));
+      }).filter(Boolean);
+      if (mapped.length > 0) return mapped;
+    }
+
+    if (Array.isArray(branches) && branches.length > 0) {
+      return branches.map((b: any) => formatBranchName(b.name_en || b.name || "Branch"));
+    }
+
+    return ["Main Clinic Branch"];
+  }, [doctor, branches]);
+
+  // Working Hours parser supporting In-Clinic vs Online mode & branch schedules
+  const activeSchedule = useMemo(() => {
+    const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const rawSched = doctor?.workingDaysHours || doctor?.working_days_hours || doctor?.schedule;
+
+    if (!rawSched) {
+      return daysOfWeek.map((day) => ({
+        day,
+        hours: day === "Friday" ? "Off" : "10:00 AM - 06:00 PM"
+      }));
+    }
+
+    let parsed = rawSched;
+    if (typeof parsed === "string") {
+      try { parsed = JSON.parse(parsed); } catch (e) {}
+    }
+
+    let modeSched: any = null;
+    if (parsed && typeof parsed === "object") {
+      const branchScheds = parsed.branch_schedules || {};
+      const firstBranchKey = Object.keys(branchScheds)[0];
+      const targetBranchSched = firstBranchKey ? branchScheds[firstBranchKey] : null;
+
+      if (targetBranchSched) {
+        modeSched = scheduleType === "In-Clinic" ? targetBranchSched.in_person : targetBranchSched.online;
+      }
+      if (!modeSched) {
+        modeSched = scheduleType === "In-Clinic" ? (parsed.in_person || parsed) : (parsed.online || parsed);
       }
     }
-    return [
-      { day: "Sunday", hours: "10:00 AM - 06:00 PM" },
-      { day: "Monday", hours: "10:00 AM - 06:00 PM" },
-      { day: "Tuesday", hours: "10:00 AM - 06:00 PM" },
-      { day: "Wednesday", hours: "10:00 AM - 06:00 PM" },
-      { day: "Thursday", hours: "10:00 AM - 06:00 PM" },
-      { day: "Friday", hours: "Off" },
-      { day: "Saturday", hours: "10:00 AM - 04:00 PM" },
-    ];
-  }, [doctor]);
+
+    if (Array.isArray(modeSched) && modeSched.length > 0) {
+      return modeSched;
+    }
+
+    if (modeSched && typeof modeSched === "object") {
+      return daysOfWeek.map((day) => {
+        const dayData = modeSched[day] || modeSched[day.toLowerCase()];
+        if (!dayData) {
+          return { day, hours: day === "Friday" ? "Off" : "10:00 AM - 06:00 PM" };
+        }
+        if (typeof dayData === "string") {
+          return { day, hours: dayData };
+        }
+        const isOpen = dayData.isOpen ?? dayData.active ?? dayData.open ?? true;
+        if (!isOpen || dayData.hours === "Off" || dayData.off) {
+          return { day, hours: "Off" };
+        }
+
+        const formatTime = (t: string) => {
+          if (!t) return "";
+          if (t.includes("AM") || t.includes("PM")) return t;
+          const [h, m] = t.split(":").map(Number);
+          if (isNaN(h)) return t;
+          const ampm = h >= 12 ? "PM" : "AM";
+          const h12 = h % 12 || 12;
+          return `${String(h12).padStart(2, "0")}:${String(m || 0).padStart(2, "0")} ${ampm}`;
+        };
+
+        const start = dayData.start || dayData.start_time || "10:00";
+        const end = dayData.end || dayData.end_time || "18:00";
+
+        return {
+          day,
+          hours: `${formatTime(start)} - ${formatTime(end)}`,
+          hours2: dayData.hours2 ? formatTime(dayData.hours2) : undefined
+        };
+      });
+    }
+
+    return daysOfWeek.map((day) => ({
+      day,
+      hours: day === "Friday" ? "Off" : "10:00 AM - 06:00 PM"
+    }));
+  }, [doctor, scheduleType]);
 
   // Services Provided (Derived from real doctor.services / doctor.service_ids or localServices)
   const servicesProvided = useMemo(() => {
@@ -97,22 +187,6 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
     }
     return [];
   }, [doctor, localServices]);
-
-  // Doctor Branches
-  const doctorBranches = useMemo(() => {
-    const bIds = doctor?.branch_ids || doctor?.branchIds || (doctor?.branch_id || doctor?.branchId ? [doctor.branch_id || doctor.branchId] : []);
-    if (Array.isArray(bIds) && bIds.length > 0 && Array.isArray(branches) && branches.length > 0) {
-      const mapped = bIds.map((id: any) => {
-        const found = branches.find((b: any) => String(b.id) === String(id) || String(b.branch_id) === String(id));
-        return found ? (found.name_en || found.name || `Branch ${id}`) : null;
-      }).filter(Boolean);
-      if (mapped.length > 0) return mapped;
-    }
-    if (Array.isArray(branches) && branches.length > 0) {
-      return branches.map((b: any) => b.name_en || b.name || "Branch");
-    }
-    return ["All Clinic Branches"];
-  }, [doctor, branches]);
 
   // Real Database Visit History (Filtered for this specific doctor)
   const allVisits = useMemo(() => {
@@ -144,9 +218,22 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
     }));
   }, [reservations, doctor]);
 
-  // Filter visits
+  // Filter visits (Search, Status, and Interactive Date Filter)
   const filteredVisits = useMemo(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    
+    // Start of current week
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    // Start of current month
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
     return allVisits.filter((v) => {
+      // 1. Search filter
       if (visitSearch.trim()) {
         const query = visitSearch.toLowerCase();
         const matchesSearch =
@@ -156,12 +243,41 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
           v.branch.toLowerCase().includes(query);
         if (!matchesSearch) return false;
       }
+
+      // 2. Status filter
       if (statusFilter !== "All" && v.status.toLowerCase() !== statusFilter.toLowerCase()) {
         return false;
       }
+
+      // 3. Date range filter
+      if (v.date && v.date !== "-") {
+        const visitDate = new Date(v.date);
+        if (!isNaN(visitDate.getTime())) {
+          if (dateFilter === "Today") {
+            const vDateStr = visitDate.toISOString().slice(0, 10);
+            if (vDateStr !== todayStr) return false;
+          } else if (dateFilter === "This Week") {
+            if (visitDate < startOfWeek) return false;
+          } else if (dateFilter === "This Month") {
+            if (visitDate < startOfMonth) return false;
+          } else if (dateFilter === "Custom") {
+            if (customStartDate) {
+              const start = new Date(customStartDate);
+              start.setHours(0, 0, 0, 0);
+              if (visitDate < start) return false;
+            }
+            if (customEndDate) {
+              const end = new Date(customEndDate);
+              end.setHours(23, 59, 59, 999);
+              if (visitDate > end) return false;
+            }
+          }
+        }
+      }
+
       return true;
     });
-  }, [allVisits, visitSearch, statusFilter]);
+  }, [allVisits, visitSearch, statusFilter, dateFilter, customStartDate, customEndDate]);
 
   // Pagination
   const totalResults = filteredVisits.length;
@@ -356,11 +472,11 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
               <thead>
                 <tr className="bg-[#F7F7F9] text-[11px] font-semibold text-[#9CA3AF] border-b border-gray-100">
                   <th className="py-2.5 px-4 font-semibold">Day</th>
-                  <th className="py-2.5 px-4 font-semibold">Working Hours</th>
+                  <th className="py-2.5 px-4 font-semibold">Working Hours ({scheduleType})</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 text-[#374151]">
-                {defaultSchedule.map((item: any, idx: number) => (
+                {activeSchedule.map((item: any, idx: number) => (
                   <tr key={item.day || idx} className="hover:bg-gray-50/50">
                     <td className="py-2.5 px-4 font-semibold text-[#1F251A]">{item.day}</td>
                     <td className="py-2.5 px-4 font-medium">
@@ -502,39 +618,86 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
         </div>
 
         {/* Search & Date Filter Bar */}
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-5">
-          {/* Search Input */}
-          <div className="relative max-w-sm flex-1">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
-            <input
-              type="text"
-              value={visitSearch}
-              onChange={(e) => {
-                setVisitSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Search by patient name or phone..."
-              className="w-full rounded-2xl border border-gray-200 bg-white py-2 pl-9 pr-4 text-xs outline-none transition focus:border-[#1E3A2B] focus:ring-1 focus:ring-[#1E3A2B]"
-            />
+        <div className="flex flex-col gap-3 mb-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            {/* Search Input */}
+            <div className="relative max-w-sm flex-1">
+              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+              <input
+                type="text"
+                value={visitSearch}
+                onChange={(e) => {
+                  setVisitSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search by patient name or phone..."
+                className="w-full rounded-2xl border border-gray-200 bg-white py-2 pl-9 pr-4 text-xs outline-none transition focus:border-[#1E3A2B] focus:ring-1 focus:ring-[#1E3A2B]"
+              />
+            </div>
+
+            {/* Date Pills */}
+            <div className="flex flex-wrap items-center gap-1.5 bg-[#F7F7F9] p-1 rounded-2xl border border-gray-100">
+              {(["Today", "This Week", "This Month", "Custom"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => {
+                    setDateFilter(tab);
+                    setCurrentPage(1);
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+                    dateFilter === tab
+                      ? "bg-white text-[#1E3A2B] border border-gray-200 shadow-xs"
+                      : "text-[#6B7280] hover:text-[#1F251A]"
+                  }`}
+                >
+                  {tab === "Custom" && <Calendar size={12} />}
+                  <span>{tab === "Custom" ? "Custom Date" : tab}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Date Pills */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-[#F7F7F9] p-1 rounded-2xl border border-gray-100">
-            {(["Today", "This Week", "This Month", "Custom"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setDateFilter(tab)}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
-                  dateFilter === tab
-                    ? "bg-white text-[#1E3A2B] border border-gray-200 shadow-xs"
-                    : "text-[#6B7280] hover:text-[#1F251A]"
-                }`}
-              >
-                {tab === "Custom" && <Calendar size={12} />}
-                <span>{tab === "Custom" ? "Custom Date" : tab}</span>
-              </button>
-            ))}
-          </div>
+          {/* Custom Date Inputs Range */}
+          {dateFilter === "Custom" && (
+            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-[#6B7280]">From:</span>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => {
+                    setCustomStartDate(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#1E3A2B]"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-[#6B7280]">To:</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => {
+                    setCustomEndDate(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#1E3A2B]"
+                />
+              </div>
+              {(customStartDate || customEndDate) && (
+                <button
+                  onClick={() => {
+                    setCustomStartDate("");
+                    setCustomEndDate("");
+                    setCurrentPage(1);
+                  }}
+                  className="text-xs font-semibold text-red-600 hover:underline"
+                >
+                  Clear Range
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Table Container */}
@@ -555,7 +718,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
               {paginatedVisits.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-xs font-medium text-[#9CA3AF]">
-                    No visit history found in database for this doctor.
+                    No visit history found in database for this doctor for the selected period.
                   </td>
                 </tr>
               ) : (
