@@ -99,15 +99,19 @@ export default function DoctorPatientsTab({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredPatients.map((patient) => (
-            <div key={patient.id} className="rounded-3xl border border-[#414E36]/12 bg-white p-5 shadow-sm hover:shadow-md hover:border-[#414E36]/30 transition-all flex flex-col justify-between space-y-4">
+            <div
+              key={patient.id}
+              onClick={() => setSelectedPatientHistory(patient)}
+              className="rounded-3xl border border-[#414E36]/12 bg-white p-5 shadow-sm hover:shadow-md hover:border-[#414E36]/40 hover:scale-[1.01] cursor-pointer transition-all flex flex-col justify-between space-y-4 group"
+            >
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#414E36] text-white font-extrabold text-sm shadow-sm">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#414E36] text-white font-extrabold text-sm shadow-sm group-hover:scale-105 transition-transform">
                       {patient.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-sm font-bold text-[#1F251A] truncate">{patient.name}</h4>
+                      <h4 className="text-sm font-bold text-[#1F251A] truncate group-hover:text-[#414E36] transition-colors">{patient.name}</h4>
                       <p className="text-xs text-[#5A6A51] truncate">{patient.phone}</p>
                     </div>
                   </div>
@@ -134,14 +138,10 @@ export default function DoctorPatientsTab({
                 <span className="text-[11px] text-[#5A6A51]">
                   {t.lastVisitLabel} <strong>{patient.lastVisitDate || "N/A"}</strong>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedPatientHistory(patient)}
-                  className="rounded-xl bg-[#414E36]/10 hover:bg-[#414E36] text-[#414E36] hover:text-white px-3.5 py-1.5 font-bold transition flex items-center gap-1.5 text-xs shadow-sm"
-                >
+                <div className="rounded-xl bg-[#414E36]/10 group-hover:bg-[#414E36] text-[#414E36] group-hover:text-white px-3.5 py-1.5 font-bold transition flex items-center gap-1.5 text-xs shadow-sm">
                   <span>{t.viewDetailsBtn} ({patient.totalVisits} {patient.totalVisits === 1 ? t.visit : t.visits})</span>
-                  <ChevronRight size={13} className="rtl:rotate-180 transition-transform" />
-                </button>
+                  <ChevronRight size={13} className="rtl:rotate-180 transition-transform group-hover:translate-x-0.5" />
+                </div>
               </div>
             </div>
           ))}
