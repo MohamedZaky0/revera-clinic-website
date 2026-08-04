@@ -829,7 +829,7 @@ export default function DoctorAccountView({
   };
 
   return (
-    <div className="h-screen w-full bg-[#F4F5F1] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
+    <div className="min-h-screen w-full bg-[#FBFBF9] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-x-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
       {/* SIDEBAR NAVIGATION */}
       <DoctorSidebar
         activeTab={activeTab}
