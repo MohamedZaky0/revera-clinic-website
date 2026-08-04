@@ -16,6 +16,14 @@ import DoctorSessionDrawer from "./doctor/modals/DoctorSessionDrawer";
 import DoctorPrescriptionModal from "./doctor/modals/DoctorPrescriptionModal";
 import DoctorPatientHistoryDrawer from "./doctor/modals/DoctorPatientHistoryDrawer";
 
+// Local Date Helper to avoid UTC conversion shifts
+const getLocalDateString = (d: Date = new Date()): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 export default function DoctorAccountView({
   doctorDbId,
   doctorName = "Doctor",
@@ -98,20 +106,21 @@ export default function DoctorAccountView({
       } else {
         const existing = patientMap.get(key)!;
         existing.totalVisits += 1;
-        existing.bookings.push(r);
-        if (serviceName && !existing.recentServices.includes(serviceName)) {
-          existing.recentServices.push(serviceName);
-        }
-        if (visitDate && visitDate > existing.lastVisitDate) {
+        if (visitDate && visitDate > (existing.lastVisitDate || "")) {
           existing.lastVisitDate = visitDate;
         }
+        if (!existing.recentServices.includes(serviceName)) {
+          existing.recentServices.push(serviceName);
+        }
+        existing.bookings.push(r);
       }
     });
 
     return Array.from(patientMap.values());
   }, [reservations]);
 
-  const filteredPatients = useMemo(() => {
+  // Filtered Patients List for Search
+  const filteredPatientsList = useMemo(() => {
     if (!patientSearchQuery.trim()) return doctorPatientsList;
     const q = patientSearchQuery.toLowerCase();
     return doctorPatientsList.filter(
@@ -123,60 +132,51 @@ export default function DoctorAccountView({
     );
   }, [doctorPatientsList, patientSearchQuery]);
 
-  // Derived Analytics Data
+  // Analytics Metrics Computation
   const analyticsData = useMemo(() => {
+    const totalBookings = reservations.length;
     let totalRevenue = 0;
     let completedCount = 0;
-    let pendingCount = 0;
     let confirmedCount = 0;
+    let pendingCount = 0;
     let cancelledCount = 0;
-    const serviceBreakdown: Record<string, { count: number; revenue: number }> = {};
-    const monthlyRevenue: Record<string, { month: string; revenue: number; count: number }> = {};
+    const serviceDataMap: Record<string, { count: number; revenue: number }> = {};
+    const monthlyDataMap: Record<string, { count: number; revenue: number }> = {};
 
     reservations.forEach((r) => {
-      const price = Number(r.total_price || r.amount || r.price || 0);
-      const status = (r.status || "pending").toLowerCase();
-      const serviceName = r.service_name || r.service || (Array.isArray(r.services) ? r.services.join(", ") : "Clinical Session");
-      const dateStr = r.date || new Date().toISOString().slice(0, 10);
-      const monthKey = dateStr.slice(0, 7);
+      const price = Number(r.price || r.total_price || r.amount || 0);
+      totalRevenue += price;
 
-      if (status === "completed") {
-        totalRevenue += price;
-        completedCount += 1;
+      const st = String(r.status || "confirmed").toLowerCase();
+      if (st === "completed" || st === "done") completedCount++;
+      else if (st === "confirmed" || st === "arrived" || st === "started") confirmedCount++;
+      else if (st === "pending") pendingCount++;
+      else if (st === "cancelled" || st === "canceled") cancelledCount++;
 
-        if (!serviceBreakdown[serviceName]) {
-          serviceBreakdown[serviceName] = { count: 0, revenue: 0 };
-        }
-        serviceBreakdown[serviceName].count += 1;
-        serviceBreakdown[serviceName].revenue += price;
+      const serviceName = r.service_name || r.service || "Clinical Consultation";
+      if (!serviceDataMap[serviceName]) serviceDataMap[serviceName] = { count: 0, revenue: 0 };
+      serviceDataMap[serviceName].count += 1;
+      serviceDataMap[serviceName].revenue += price;
 
-        if (!monthlyRevenue[monthKey]) {
-          const dateObj = new Date(dateStr + "T00:00:00");
-          const monthLabel = isNaN(dateObj.getTime())
-            ? monthKey
-            : dateObj.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-          monthlyRevenue[monthKey] = { month: monthLabel, revenue: 0, count: 0 };
-        }
-        monthlyRevenue[monthKey].revenue += price;
-        monthlyRevenue[monthKey].count += 1;
-      } else if (status === "confirmed" || status === "started" || status === "approved") {
-        confirmedCount += 1;
-      } else if (status === "cancelled" || status === "rejected") {
-        cancelledCount += 1;
-      } else {
-        pendingCount += 1;
+      const monthKey = (r.date || "").slice(0, 7);
+      if (monthKey) {
+        if (!monthlyDataMap[monthKey]) monthlyDataMap[monthKey] = { count: 0, revenue: 0 };
+        monthlyDataMap[monthKey].count += 1;
+        monthlyDataMap[monthKey].revenue += price;
       }
     });
 
     const avgSessionValue = completedCount > 0 ? Math.round(totalRevenue / completedCount) : 0;
-    const totalBookings = reservations.length;
     const completionRate = totalBookings > 0 ? Math.round((completedCount / totalBookings) * 100) : 0;
 
-    const topServices = Object.entries(serviceBreakdown)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.revenue - a.revenue);
+    const topServices = Object.entries(serviceDataMap)
+      .map(([name, data]) => ({ name, count: data.count, revenue: data.revenue }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
 
-    const monthlyTrend = Object.values(monthlyRevenue).sort((a, b) => a.month.localeCompare(b.month));
+    const monthlyTrend = Object.entries(monthlyDataMap)
+      .map(([month, data]) => ({ month, revenue: data.revenue, count: data.count }))
+      .sort((a, b) => a.month.localeCompare(b.month));
 
     return {
       totalRevenue,
@@ -192,19 +192,19 @@ export default function DoctorAccountView({
     };
   }, [reservations]);
 
-  // Date Selector State for Schedule
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  // Date Selector State for Schedule (Using local date strings to prevent day shifts)
+  const todayStr = useMemo(() => getLocalDateString(new Date()), []);
 
   const yesterdayStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.toISOString().slice(0, 10);
+    return getLocalDateString(d);
   }, []);
 
   const tomorrowStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
+    return getLocalDateString(d);
   }, []);
 
   const [selectedDateStr, setSelectedDateStr] = useState<string>(todayStr);
@@ -317,7 +317,7 @@ export default function DoctorAccountView({
     }
   };
 
-  // Silent 3-second background polling for instant session start detection
+  // Silent 3-second background polling
   useEffect(() => {
     fetchDoctorReservations();
     const interval = setInterval(() => {
@@ -349,12 +349,7 @@ export default function DoctorAccountView({
             const st = String(updated.status || "").toLowerCase().trim();
             const isActive = st === "started" || st === "in-progress" || st === "in_progress" || st === "active" || st === "in treatment";
             if (isActive) {
-              setActiveSessionBooking((curr: any) => {
-                if (!curr || curr.status === "completed" || curr.id === updated.id) {
-                  return updated;
-                }
-                return curr;
-              });
+              setActiveSessionBooking(updated);
             }
           }
         }
@@ -366,7 +361,7 @@ export default function DoctorAccountView({
     };
   }, []);
 
-  // Receptionist Started Session Auto-Detect
+  // Auto-detect receptionist started session
   const receptionistStartedSession = useMemo(() => {
     return reservations.find((r) => {
       const st = String(r.status || "").toLowerCase().trim();
@@ -376,88 +371,52 @@ export default function DoctorAccountView({
 
   useEffect(() => {
     if (receptionistStartedSession) {
-      if (!activeSessionBooking || activeSessionBooking.status === "completed" || activeSessionBooking.id !== receptionistStartedSession.id) {
+      if (!activeSessionBooking || activeSessionBooking.id !== receptionistStartedSession.id) {
         setActiveSessionBooking(receptionistStartedSession);
       }
+    } else {
+      const currentTodayBooking = reservations.find((r) => (r.date === todayStr || !r.date) && r.status !== "completed");
+      if (currentTodayBooking && !activeSessionBooking) {
+        setActiveSessionBooking(currentTodayBooking);
+      }
     }
-  }, [receptionistStartedSession, activeSessionBooking]);
+  }, [receptionistStartedSession, reservations, todayStr, activeSessionBooking]);
 
-  // Global Patient Records & Prescriptions Cache Map
-  const [medicalRecordsMap, setMedicalRecordsMap] = useState<Record<string, any>>({});
-  const [prescriptionsMap, setPrescriptionsMap] = useState<Record<string, any[]>>({});
-
-  // Load Patient Medical Record & Prescriptions whenever target booking changes
-  const targetBookingForMedicalRecord = activeSessionBooking || scheduleModalBooking;
-
+  // Sync active session clinical notes
   useEffect(() => {
-    if (!targetBookingForMedicalRecord) {
-      setMedicalRecord(null);
-      setResolvedCustomerId(null);
-      return;
+    if (activeSessionBooking) {
+      const existingNotes = activeSessionBooking.notes || activeSessionBooking.doctor_notes || "";
+      const parsed = parseBookingNotes(existingNotes);
+      setClinicalNote(parsed.cleanDoctorNote || (parsed as any).cleanNote || "");
     }
+  }, [activeSessionBooking]);
 
-    const loadMedicalRecord = async () => {
+  // Auto-fetch Patient Medical Record
+  useEffect(() => {
+    const fetchPatientMedicalRecord = async () => {
+      if (!activeSessionBooking) return;
+
+      const custId = activeSessionBooking.customer_id || activeSessionBooking.customerId || activeSessionBooking.id;
+      if (!custId) return;
+
+      setResolvedCustomerId(custId);
       setMedicalRecordLoading(true);
+
       try {
-        let custId = targetBookingForMedicalRecord.customer_id || targetBookingForMedicalRecord.customerId;
-        const custPhone = targetBookingForMedicalRecord.phone || targetBookingForMedicalRecord.customer_phone;
         const headers = await getAuthHeaders();
+        const res = await fetch(`/api/medical-records?customerId=${encodeURIComponent(custId)}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const record = data.medicalRecord || (Array.isArray(data) ? data[0] : null);
+          setMedicalRecord(record);
 
-        if (!custId && custPhone) {
-          const custRes = await fetch(`/api/customers?phone=${encodeURIComponent(custPhone)}`, { headers });
-          if (custRes.ok) {
-            const custData = await custRes.json();
-            const matchingCust = Array.isArray(custData) ? custData[0] : custData.customers?.[0];
-            if (matchingCust?.id) {
-              custId = matchingCust.id;
-            }
+          if (record) {
+            setFormSkinType(record.skin_type || "Normal");
+            setFormAllergies(record.allergies || "");
+            setFormMedicationDetails(record.medication_details || "");
+            setFormMedicalConditionsDetails(record.medical_conditions_details || "");
+            setFormPreviousTreatmentsDetails(record.previous_treatments_details || "");
           }
-        }
-
-        setResolvedCustomerId(custId || null);
-
-        if (custId) {
-          // Check local cache first
-          if (medicalRecordsMap[custId]) {
-            const cached = medicalRecordsMap[custId];
-            setMedicalRecord(cached);
-            setFormSkinType(cached.skin_type || "Normal");
-            setFormAllergies(cached.allergies || "");
-            setFormMedicationDetails(cached.medication_details || "");
-            setFormMedicalConditionsDetails(cached.medical_conditions_details || "");
-            setFormPreviousTreatmentsDetails(cached.previous_treatments_details || "");
-            setShowMedicalForm(false);
-          }
-
-          const medRes = await fetch(`/api/medical-records?customer_id=${encodeURIComponent(custId)}`, { headers });
-          if (medRes.ok) {
-            const medData = await medRes.json();
-            const record = Array.isArray(medData) ? medData[0] : medData.medicalRecord || medData.record || medData.form;
-            if (record && (record.skin_type || record.allergies || record.medication_details || record.medical_conditions_details || record.previous_treatments_details)) {
-              setMedicalRecord(record);
-              setMedicalRecordsMap((prev) => ({ ...prev, [custId]: record }));
-              setFormSkinType(record.skin_type || "Normal");
-              setFormAllergies(record.allergies || "");
-              setFormMedicationDetails(record.medication_details || "");
-              setFormMedicalConditionsDetails(record.medical_conditions_details || "");
-              setFormPreviousTreatmentsDetails(record.previous_treatments_details || "");
-              setShowMedicalForm(false);
-            } else if (!medicalRecordsMap[custId]) {
-              setMedicalRecord(null);
-              setShowMedicalForm(true);
-            }
-          }
-
-          // Fetch Prescriptions for customer / booking
-          const rxRes = await fetch(`/api/prescriptions?customer_id=${encodeURIComponent(custId)}`, { headers });
-          if (rxRes.ok) {
-            const rxData = await rxRes.json();
-            const list = Array.isArray(rxData) ? rxData : rxData.prescriptions || [];
-            setPrescriptionsMap((prev) => ({ ...prev, [custId]: list }));
-          }
-        } else {
-          setMedicalRecord(null);
-          setShowMedicalForm(true);
         }
       } catch (err) {
         console.error("Error loading medical record:", err);
@@ -466,27 +425,10 @@ export default function DoctorAccountView({
       }
     };
 
-    loadMedicalRecord();
-  }, [targetBookingForMedicalRecord]);
+    fetchPatientMedicalRecord();
+  }, [activeSessionBooking]);
 
-  // Load existing Doctor Notes into editor
-  useEffect(() => {
-    const target = activeSessionBooking || scheduleModalBooking;
-    if (target) {
-      const parsed = parseBookingNotes(target.notes || "");
-      setClinicalNote(parsed.cleanDoctorNote);
-    } else {
-      setClinicalNote("");
-    }
-    setUsedProducts([]);
-    setSelectedProductId("");
-    setSelectedProductQty(1);
-    setSelectedDeviceId("");
-    setExtraPulsesCount(0);
-    setPricePerPulse(0);
-  }, [activeSessionBooking, scheduleModalBooking]);
-
-  // Calendar Navigation Handlers
+  // Month navigation handlers
   const handlePrevCalendarMonth = () => {
     setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
@@ -509,7 +451,7 @@ export default function DoctorAccountView({
     return map;
   }, [reservations, todayStr]);
 
-  // Generate calendar days for month grid
+  // Generate calendar days for month grid using local date strings
   const calendarDaysList = useMemo(() => {
     const year = calendarMonth.getFullYear();
     const month = calendarMonth.getMonth();
@@ -525,7 +467,7 @@ export default function DoctorAccountView({
       const dayNum = prevMonthDays - i;
       const d = new Date(year, month - 1, dayNum);
       days.push({
-        dateStr: d.toISOString().slice(0, 10),
+        dateStr: getLocalDateString(d),
         dayNum,
         isCurrentMonth: false
       });
@@ -535,7 +477,7 @@ export default function DoctorAccountView({
     for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
       const d = new Date(year, month, dayNum);
       days.push({
-        dateStr: d.toISOString().slice(0, 10),
+        dateStr: getLocalDateString(d),
         dayNum,
         isCurrentMonth: true
       });
@@ -547,7 +489,7 @@ export default function DoctorAccountView({
     for (let dayNum = 1; dayNum <= remaining; dayNum++) {
       const d = new Date(year, month + 1, dayNum);
       days.push({
-        dateStr: d.toISOString().slice(0, 10),
+        dateStr: getLocalDateString(d),
         dayNum,
         isCurrentMonth: false
       });
@@ -570,19 +512,23 @@ export default function DoctorAccountView({
     });
   }, [reservationsByDate, selectedDateStr, searchQuery]);
 
-  // Quick stats summary
+  // Quick stats summary (Properly contextualized for Calendar Month vs Queue List Date)
   const stats = useMemo(() => {
     let list = reservations;
     if (scheduleViewMode === "calendar") {
-      const currentMonthKey = calendarMonth.toISOString().slice(0, 7);
+      // Month view stats
+      const currentMonthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, "0")}`;
       list = reservations.filter((r) => (r.date || "").startsWith(currentMonthKey));
+    } else {
+      // Queue List view stats: filter by selectedDateStr
+      list = reservationsByDate[selectedDateStr] || [];
     }
     const total = list.length;
     const completed = list.filter((r) => r.status === "completed" || r.status === "done").length;
     const inProgress = list.filter((r) => r.status === "started" || r.status === "in-progress").length;
     const upcoming = list.filter((r) => ["pending", "approved", "confirmed", "arrived"].includes(r.status)).length;
     return { total, completed, inProgress, upcoming };
-  }, [reservations, scheduleViewMode, calendarMonth]);
+  }, [reservations, scheduleViewMode, calendarMonth, selectedDateStr, reservationsByDate]);
 
   // Open Schedule Details Drawer Modal
   const handleOpenScheduleModal = (booking: any) => {
@@ -612,33 +558,32 @@ export default function DoctorAccountView({
     setSelectedProductQty(1);
   };
 
-  const handleRemoveProductFromSession = (index: number) => {
-    setUsedProducts((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveProductFromSession = (idx: number) => {
+    setUsedProducts((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  // Financial Calculations for Active Session
-  const activeBookingTarget = activeSessionBooking || scheduleModalBooking;
-  const baseBookingPrice = Number(activeBookingTarget?.total_price || activeBookingTarget?.amount || activeBookingTarget?.price || 0);
+  // Subtotals
+  const baseBookingPrice = Number(
+    activeSessionBooking?.price || activeSessionBooking?.total_price || activeSessionBooking?.amount || 0
+  );
   const productsSubtotal = usedProducts.reduce((sum, item) => sum + item.total, 0);
   const extraPulsesSubtotal = extraPulsesCount * pricePerPulse;
   const updatedInvoiceTotal = baseBookingPrice + productsSubtotal + extraPulsesSubtotal;
 
-  // Save Medical Record
-  const handleSaveMedicalRecord = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const targetBooking = activeSessionBooking || scheduleModalBooking;
-    if (!targetBooking) return;
+  // Save Medical Record Intake
+  const handleSaveMedicalRecord = async () => {
+    if (!activeSessionBooking) return;
+    const custId = resolvedCustomerId || activeSessionBooking.customer_id || activeSessionBooking.customerId || activeSessionBooking.id;
 
     setSavingMedicalRecord(true);
     try {
-      const custId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
       const headers = await getAuthHeaders();
       const res = await fetch("/api/medical-records", {
         method: "POST",
         headers,
         body: JSON.stringify({
           customer_id: custId,
-          patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
+          patient_name: activeSessionBooking.name || activeSessionBooking.customer_name || "Patient",
           skin_type: formSkinType,
           allergies: formAllergies,
           medication_details: formMedicationDetails,
@@ -649,9 +594,9 @@ export default function DoctorAccountView({
 
       if (res.ok) {
         const data = await res.json();
-        setMedicalRecord(data.medicalRecord || data.record || data);
-        setShowMedicalForm(false);
+        setMedicalRecord(data.medicalRecord || data);
         alert("Patient medical record saved successfully!");
+        setShowMedicalForm(false);
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.error || err.message || "Failed to save medical record.");
@@ -664,18 +609,26 @@ export default function DoctorAccountView({
     }
   };
 
-  // Save Clinical Note only
+  // Save Doctor Clinical Notes
   const handleSaveClinicalNote = async (targetBooking: any) => {
     if (!targetBooking) return;
-    setSavingNote(true);
-    try {
-      const parsedOld = parseBookingNotes(targetBooking.notes || "");
-      let fullNotes = clinicalNote.trim();
-      if (parsedOld.instaPayLog) fullNotes += `\n${parsedOld.instaPayLog}`;
-      if (parsedOld.productsLog) fullNotes += `\n${parsedOld.productsLog}`;
-      if (parsedOld.invoiceLog) fullNotes += `\n${parsedOld.invoiceLog}`;
-      if (parsedOld.extraLogs.length > 0) fullNotes += `\n${parsedOld.extraLogs.join("\n")}`;
 
+    setSavingNote(true);
+    let sessionAddonsSummary = "";
+    if (usedProducts.length > 0) {
+      sessionAddonsSummary += `\n[Products Used During Session]: ${usedProducts.map((p) => `${p.name} (Qty: ${p.qty} x ${p.unitPrice} EGP = ${p.total} EGP)`).join(", ")}`;
+    }
+    if (extraPulsesCount > 0 && selectedDeviceId) {
+      const devObj = devicesList.find((d) => d.id === selectedDeviceId);
+      sessionAddonsSummary += `\n[Extra Device Pulses]: ${devObj?.name || 'Device'} — ${extraPulsesCount} pulses @ ${pricePerPulse} EGP/pulse (+${extraPulsesSubtotal} EGP)`;
+    }
+    if (productsSubtotal + extraPulsesSubtotal > 0) {
+      sessionAddonsSummary += `\n[Invoice Total Updated]: ${updatedInvoiceTotal} EGP (Base: ${baseBookingPrice} EGP + Consumables: ${productsSubtotal + extraPulsesSubtotal} EGP)`;
+    }
+
+    const fullNotes = (clinicalNote || "") + sessionAddonsSummary;
+
+    try {
       const headers = await getAuthHeaders();
       const res = await fetch(`/api/reservations?id=${encodeURIComponent(targetBooking.id)}`, {
         method: "PATCH",
@@ -704,7 +657,6 @@ export default function DoctorAccountView({
   const handleCompleteTreatment = async (targetBooking: any) => {
     if (!targetBooking) return;
 
-    // Auto-save medical record intake if doctor filled form fields
     if (!medicalRecord && (formAllergies || formMedicationDetails || formMedicalConditionsDetails || formPreviousTreatmentsDetails)) {
       try {
         const custId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
@@ -753,45 +705,35 @@ export default function DoctorAccountView({
         body: JSON.stringify({
           status: "completed",
           notes: finalNotes,
-          amountLeft: updatedInvoiceTotal - Number(targetBooking.amount_paid || 0),
-          attachedProducts: usedProducts
+          price: updatedInvoiceTotal
         })
       });
 
       if (res.ok) {
-        alert(`Treatment session marked as COMPLETED!\nInvoice Total Updated to: ${updatedInvoiceTotal} EGP`);
-        
-        // Immediately close ongoing active session workspace
+        alert("Session completed successfully!");
         setActiveSessionBooking(null);
-        setScheduleModalBooking(null);
-        setClinicalNote("");
         setUsedProducts([]);
         setExtraPulsesCount(0);
-        setMedicalRecord(null);
-
-        // Update reservations state locally so status='completed' is immediately reflected
-        setReservations((prev) =>
-          prev.map((r) => (String(r.id) === String(targetBooking.id) ? { ...r, status: "completed", notes: finalNotes } : r))
-        );
-
+        setSelectedDeviceId("");
         fetchDoctorReservations();
       } else {
-        const errData = await res.json().catch(() => ({}));
-        alert(errData.error || errData.message || "Failed to complete treatment.");
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || err.message || "Failed to complete treatment session.");
       }
     } catch (err: any) {
-      console.error("Error completing treatment:", err);
-      alert(err.message || "Error completing treatment.");
+      console.error("Error completing session:", err);
+      alert(err.message || "Error completing session.");
     }
   };
 
-  // Create real prescription in DB
-  const handleCreatePrescription = async (e: React.FormEvent, targetBooking: any) => {
-    e.preventDefault();
-    if (!targetBooking) return;
+  // Add Medication to Prescription
+  const handleAddMedication = () => {
+    setRxMedications((prev) => [...prev, { name: "", dosage: "", frequency: "", duration: "" }]);
+  };
 
-    const customerId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
-    const patientName = targetBooking.name || targetBooking.customer_name || "Patient";
+  // Save Digital Prescription
+  const handleSavePrescription = async (patientName: string, customerId?: string) => {
+    if (!patientName) return;
 
     setSavingRx(true);
     try {
@@ -802,7 +744,7 @@ export default function DoctorAccountView({
         body: JSON.stringify({
           customer_id: customerId,
           patient_name: patientName,
-          date: new Date().toISOString().slice(0, 10),
+          date: getLocalDateString(new Date()),
           diagnosis: rxDiagnosis,
           medications: rxMedications.filter((m) => m.name.trim() !== ""),
           general_notes: rxGeneralNotes,
@@ -829,7 +771,7 @@ export default function DoctorAccountView({
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#FBFBF9] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-x-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
+    <div className="h-screen w-full bg-[#FBFBF9] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
       {/* SIDEBAR NAVIGATION */}
       <DoctorSidebar
         activeTab={activeTab}
@@ -848,7 +790,7 @@ export default function DoctorAccountView({
       />
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 w-full h-full overflow-y-auto px-6 md:px-8 py-6 animate-fadeIn flex flex-col">
+      <main className="flex-1 w-full h-full overflow-y-auto px-6 md:px-8 py-6 animate-fadeIn flex flex-col min-w-0">
         {/* TAB 1: SCHEDULE VIEW */}
         {activeTab === "schedule" && (
           <DoctorScheduleTab
@@ -898,16 +840,20 @@ export default function DoctorAccountView({
             setFormPreviousTreatmentsDetails={setFormPreviousTreatmentsDetails}
             savingMedicalRecord={savingMedicalRecord}
             handleSaveMedicalRecord={handleSaveMedicalRecord}
-            servicesList={servicesList}
+            clinicalNote={clinicalNote}
+            setClinicalNote={setClinicalNote}
+            savingNote={savingNote}
+            handleSaveClinicalNote={handleSaveClinicalNote}
             productsList={productsList}
-            devicesList={devicesList}
             selectedProductId={selectedProductId}
             setSelectedProductId={setSelectedProductId}
             selectedProductQty={selectedProductQty}
             setSelectedProductQty={setSelectedProductQty}
-            usedProducts={usedProducts}
             handleAddProductToSession={handleAddProductToSession}
             handleRemoveProductFromSession={handleRemoveProductFromSession}
+            setActiveTab={setActiveTab}
+            usedProducts={usedProducts}
+            devicesList={devicesList}
             selectedDeviceId={selectedDeviceId}
             setSelectedDeviceId={setSelectedDeviceId}
             extraPulsesCount={extraPulsesCount}
@@ -918,13 +864,6 @@ export default function DoctorAccountView({
             productsSubtotal={productsSubtotal}
             extraPulsesSubtotal={extraPulsesSubtotal}
             updatedInvoiceTotal={updatedInvoiceTotal}
-            clinicalNote={clinicalNote}
-            setClinicalNote={setClinicalNote}
-            handleSaveClinicalNote={handleSaveClinicalNote}
-            savingNote={savingNote}
-            setActiveTab={setActiveTab}
-            reservations={reservations}
-            setActiveSessionBooking={setActiveSessionBooking}
             t={t}
           />
         )}
@@ -934,28 +873,25 @@ export default function DoctorAccountView({
           <DoctorPatientsTab
             patientSearchQuery={patientSearchQuery}
             setPatientSearchQuery={setPatientSearchQuery}
+            filteredPatients={filteredPatientsList}
             doctorPatientsList={doctorPatientsList}
-            filteredPatients={filteredPatients}
             reservations={reservations}
             setSelectedPatientHistory={setSelectedPatientHistory}
             t={t}
           />
         )}
 
-        {/* TAB 4: ANALYTICS & FINANCIAL ANALYSIS VIEW */}
+        {/* TAB 4: ANALYTICS & INSIGHTS VIEW */}
         {activeTab === "analytics" && (
-          <DoctorAnalyticsTab
-            analyticsData={analyticsData}
-            doctorPatientsList={doctorPatientsList}
-            reservations={reservations}
-            t={t}
-          />
+          <DoctorAnalyticsTab analyticsData={analyticsData} doctorPatientsList={doctorPatientsList} reservations={reservations} t={t} />
         )}
 
-        {/* TAB 5: SETTINGS VIEW */}
-        {activeTab === "settings" && <DoctorSettingsTab t={t} />}
+        {/* TAB 5: ACCOUNT & SYSTEM SETTINGS VIEW */}
+        {activeTab === "settings" && (
+          <DoctorSettingsTab t={t} />
+        )}
 
-        {/* TAB 6: DOCTOR PROFILE VIEW */}
+        {/* TAB 6: SECURITY & PASSWORD SETTINGS VIEW */}
         {activeTab === "profile" && (
           <DoctorProfileTab
             doctorName={doctorName}
@@ -970,62 +906,72 @@ export default function DoctorAccountView({
         )}
       </main>
 
-      {/* MODALS & DRAWERS */}
-      <DoctorSessionDrawer
-        scheduleModalBooking={scheduleModalBooking}
-        setScheduleModalBooking={setScheduleModalBooking}
-        selectedDateStr={selectedDateStr}
-        medicalRecord={medicalRecord}
-        medicalRecordLoading={medicalRecordLoading}
-        showMedicalForm={showMedicalForm}
-        setShowMedicalForm={setShowMedicalForm}
-        formSkinType={formSkinType}
-        setFormSkinType={setFormSkinType}
-        formAllergies={formAllergies}
-        setFormAllergies={setFormAllergies}
-        formMedicationDetails={formMedicationDetails}
-        setFormMedicationDetails={setFormMedicationDetails}
-        formMedicalConditionsDetails={formMedicalConditionsDetails}
-        setFormMedicalConditionsDetails={setFormMedicalConditionsDetails}
-        formPreviousTreatmentsDetails={formPreviousTreatmentsDetails}
-        setFormPreviousTreatmentsDetails={setFormPreviousTreatmentsDetails}
-        savingMedicalRecord={savingMedicalRecord}
-        handleSaveMedicalRecord={handleSaveMedicalRecord}
-        clinicalNote={clinicalNote}
-        setClinicalNote={setClinicalNote}
-        handleSaveClinicalNote={handleSaveClinicalNote}
-        savingNote={savingNote}
-        setShowPrescriptionModal={setShowPrescriptionModal}
-        handleCompleteTreatment={handleCompleteTreatment}
-        setActiveSessionBooking={setActiveSessionBooking}
-        setActiveTab={setActiveTab}
-        prescriptionsMap={prescriptionsMap}
-        t={t}
-      />
+      {/* MODAL 1: SCHEDULE DETAILS DRAWER */}
+      {scheduleModalBooking && (
+        <DoctorSessionDrawer
+          scheduleModalBooking={scheduleModalBooking}
+          setScheduleModalBooking={setScheduleModalBooking}
+          selectedDateStr={selectedDateStr}
+          medicalRecord={medicalRecord}
+          medicalRecordLoading={medicalRecordLoading}
+          showMedicalForm={showMedicalForm}
+          setShowMedicalForm={setShowMedicalForm}
+          formSkinType={formSkinType}
+          setFormSkinType={setFormSkinType}
+          formAllergies={formAllergies}
+          setFormAllergies={setFormAllergies}
+          formMedicationDetails={formMedicationDetails}
+          setFormMedicationDetails={setFormMedicationDetails}
+          formMedicalConditionsDetails={formMedicalConditionsDetails}
+          setFormMedicalConditionsDetails={setFormMedicalConditionsDetails}
+          formPreviousTreatmentsDetails={formPreviousTreatmentsDetails}
+          setFormPreviousTreatmentsDetails={setFormPreviousTreatmentsDetails}
+          savingMedicalRecord={savingMedicalRecord}
+          handleSaveMedicalRecord={handleSaveMedicalRecord}
+          clinicalNote={clinicalNote}
+          setClinicalNote={setClinicalNote}
+          handleSaveClinicalNote={handleSaveClinicalNote}
+          savingNote={savingNote}
+          setShowPrescriptionModal={setShowPrescriptionModal}
+          handleCompleteTreatment={handleCompleteTreatment}
+          setActiveSessionBooking={setActiveSessionBooking}
+          setActiveTab={setActiveTab}
+          t={t}
+        />
+      )}
 
-      <DoctorPrescriptionModal
-        showPrescriptionModal={showPrescriptionModal}
-        setShowPrescriptionModal={setShowPrescriptionModal}
-        targetBooking={activeSessionBooking || scheduleModalBooking}
-        rxDiagnosis={rxDiagnosis}
-        setRxDiagnosis={setRxDiagnosis}
-        rxMedications={rxMedications}
-        setRxMedications={setRxMedications}
-        rxGeneralNotes={rxGeneralNotes}
-        setRxGeneralNotes={setRxGeneralNotes}
-        savingRx={savingRx}
-        handleCreatePrescription={handleCreatePrescription}
-        t={t}
-      />
+      {/* MODAL 2: DIGITAL PRESCRIPTION MODAL */}
+      {showPrescriptionModal && activeSessionBooking && (
+        <DoctorPrescriptionModal
+          showPrescriptionModal={showPrescriptionModal}
+          setShowPrescriptionModal={setShowPrescriptionModal}
+          targetBooking={activeSessionBooking}
+          rxDiagnosis={rxDiagnosis}
+          setRxDiagnosis={setRxDiagnosis}
+          rxMedications={rxMedications}
+          setRxMedications={setRxMedications}
+          rxGeneralNotes={rxGeneralNotes}
+          setRxGeneralNotes={setRxGeneralNotes}
+          savingRx={savingRx}
+          handleCreatePrescription={(e, booking) => {
+            if (e && e.preventDefault) e.preventDefault();
+            const pName = booking?.name || booking?.customer_name || "Patient";
+            const cId = booking?.customer_id || booking?.customerId || booking?.id;
+            handleSavePrescription(pName, cId);
+          }}
+          t={t}
+        />
+      )}
 
-      <DoctorPatientHistoryDrawer
-        selectedPatientHistory={selectedPatientHistory}
-        setSelectedPatientHistory={setSelectedPatientHistory}
-        handleOpenScheduleModal={handleOpenScheduleModal}
-        medicalRecordsMap={medicalRecordsMap}
-        prescriptionsMap={prescriptionsMap}
-        t={t}
-      />
+      {/* MODAL 3: PATIENT HISTORY & VISITS DRAWER */}
+      {selectedPatientHistory && (
+        <DoctorPatientHistoryDrawer
+          selectedPatientHistory={selectedPatientHistory}
+          setSelectedPatientHistory={setSelectedPatientHistory}
+          handleOpenScheduleModal={handleOpenScheduleModal}
+          t={t}
+        />
+      )}
     </div>
   );
 }

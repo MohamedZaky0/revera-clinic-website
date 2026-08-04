@@ -126,7 +126,7 @@ export default function DoctorScheduleTab({
       </div>
 
       {/* Quick Dynamic Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
         <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
           <span className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">
             {scheduleViewMode === "calendar" ? `${t.totalScheduledCard} (${calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" })})` : t.totalScheduledCard}
@@ -138,12 +138,6 @@ export default function DoctorScheduleTab({
             {scheduleViewMode === "calendar" ? `${t.completedCard} (${calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" })})` : t.completedCard}
           </span>
           <div className="mt-2 text-3xl font-extrabold text-emerald-800">{stats.completed} {t.sessionsUnit}</div>
-        </div>
-        <div className="rounded-3xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
-            {scheduleViewMode === "calendar" ? `${t.inTreatmentCard} (${calendarMonth.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" })})` : t.inTreatmentCard}
-          </span>
-          <div className="mt-2 text-3xl font-extrabold text-amber-800">{stats.inProgress} {t.activeUnit}</div>
         </div>
         <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
