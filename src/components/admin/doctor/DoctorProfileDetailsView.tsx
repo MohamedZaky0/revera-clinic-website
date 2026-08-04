@@ -53,8 +53,6 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
   const doctorSubSpecialty = doctor?.sub_specialty || doctor?.specialty || doctor?.role || "Dermatology";
   const doctorEmployeeId = doctor?.employee_id || (doctor?.id ? `DOC-${String(doctor?.id).slice(-3).padStart(3, "0")}` : "DOC-PROV");
   const doctorAvatar = doctor?.image || doctor?.avatar || doctor?.avatar_url || doctor?.photo || null;
-  const roomName = doctor?.room || doctor?.room_name || doctor?.room_id || "Not assigned";
-  const yearsExp = doctor?.years_of_experience || doctor?.yearsExp ? `${doctor.years_of_experience || doctor.yearsExp} Years` : (doctor?.age ? `${Math.max(1, Number(doctor.age) - 25)} Years` : "Not specified");
   const languages = doctor?.languages || "Arabic, English";
   const employmentType = doctor?.employment_type || doctor?.employmentType || "Full Time";
 
@@ -506,18 +504,8 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
               </div>
 
               <div>
-                <span className="text-[#9CA3AF] block mb-1 font-medium">Years of Experience</span>
-                <span className="font-semibold text-[#1F251A]">{yearsExp}</span>
-              </div>
-
-              <div>
                 <span className="text-[#9CA3AF] block mb-1 font-medium">Languages</span>
                 <span className="font-semibold text-[#1F251A]">{languages}</span>
-              </div>
-
-              <div>
-                <span className="text-[#9CA3AF] block mb-1 font-medium">Room / Clinic</span>
-                <span className="font-semibold text-[#1F251A]">{roomName}</span>
               </div>
 
               <div>
@@ -643,11 +631,6 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                   </span>
                 ))
               )}
-              {doctor?.more && Number(doctor.more) > 0 ? (
-                <span className="rounded-xl bg-[#EDE4C8] px-3 py-1.5 text-xs font-bold text-[#414E36]">
-                  + {doctor.more} More
-                </span>
-              ) : null}
             </div>
           </div>
         </div>
@@ -776,7 +759,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                     setCustomStartDate(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#1E3A2B]"
+                  className="rounded-xl border border-gray-200 bg-[#FFFFFF] px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#1E3A2B]"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -788,7 +771,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                     setCustomEndDate(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#1E3A2B]"
+                  className="rounded-xl border border-gray-200 bg-[#FFFFFF] px-3 py-1.5 text-xs text-[#1F251A] outline-none focus:border-[#1E3A2B]"
                 />
               </div>
               {(customStartDate || customEndDate) && (
