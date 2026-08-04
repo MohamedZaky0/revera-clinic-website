@@ -73,7 +73,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
     const formatBranchName = (str: string) => {
       if (!str) return "Branch";
       const lower = str.trim().toLowerCase();
-      if (lower === "home") return "Home Visit / In-Home Care";
+      if (lower === "home") return "Home Visit";
       if (lower === "main") return "Main Branch";
       return str.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     };
@@ -96,7 +96,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
     return ["Main Clinic Branch"];
   }, [doctor, branches]);
 
-  // Aggregated Multi-Shift Schedule Across ALL Assigned Branches
+  // Aggregated Multi-Shift Schedule (Sorted Chronologically with Branch Names per Shift)
   const activeSchedule = useMemo(() => {
     const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const rawSched = doctor?.workingDaysHours || doctor?.working_days_hours || doctor?.schedule;
@@ -105,6 +105,22 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
     if (typeof parsed === "string") {
       try { parsed = JSON.parse(parsed); } catch (e) {}
     }
+
+    const parseTimeToMinutes = (tStr: string): number => {
+      if (!tStr) return 0;
+      const clean = tStr.trim().toUpperCase();
+      const isPM = clean.includes("PM");
+      const isAM = clean.includes("AM");
+      const numPart = clean.replace(/AM|PM/g, "").trim();
+      const parts = numPart.split(":").map(Number);
+      let hours = parts[0] || 0;
+      const mins = parts[1] || 0;
+
+      if (isPM && hours < 12) hours += 12;
+      if (isAM && hours === 12) hours = 0;
+
+      return hours * 60 + mins;
+    };
 
     const formatTime = (t: string) => {
       if (!t) return "";
@@ -116,36 +132,54 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
       return `${String(h12).padStart(2, "0")}:${String(m || 0).padStart(2, "0")} ${ampm}`;
     };
 
-    const extractShiftsFromNode = (dayData: any): string[] => {
+    const getBranchLabel = (bId: string) => {
+      if (!bId || bId === "default") return "";
+      const found = branches.find((b: any) => String(b.id) === String(bId) || String(b.branch_id) === String(bId) || String(b.name).toLowerCase() === String(bId).toLowerCase());
+      if (found) return found.name_en || found.name || `Branch ${bId}`;
+      const lower = String(bId).trim().toLowerCase();
+      if (lower === "home") return "Home Visit";
+      if (lower === "main") return "Main Branch";
+      return String(bId).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    };
+
+    const extractShiftsFromNode = (dayData: any, branchLabel: string): Array<{ branchName: string; timeStr: string; startMinutes: number }> => {
       if (!dayData) return [];
       if (typeof dayData === "string") {
         if (dayData.toLowerCase() === "off") return [];
-        return [dayData];
+        const startMins = parseTimeToMinutes(dayData.split("-")[0]);
+        return [{ branchName: branchLabel, timeStr: dayData, startMinutes: startMins }];
       }
+
       const isOpen = dayData.isOpen ?? dayData.active ?? dayData.open ?? true;
       if (!isOpen || dayData.hours === "Off" || dayData.off) return [];
 
-      const shifts: string[] = [];
+      const result: Array<{ branchName: string; timeStr: string; startMinutes: number }> = [];
+
       if (Array.isArray(dayData.shifts) && dayData.shifts.length > 0) {
         dayData.shifts.forEach((s: any) => {
           if (s.start && s.end) {
-            shifts.push(`${formatTime(s.start)} - ${formatTime(s.end)}`);
+            const tStr = `${formatTime(s.start)} - ${formatTime(s.end)}`;
+            result.push({ branchName: branchLabel, timeStr: tStr, startMinutes: parseTimeToMinutes(s.start) });
           } else if (typeof s === "string") {
-            shifts.push(s);
+            result.push({ branchName: branchLabel, timeStr: s, startMinutes: parseTimeToMinutes(s) });
           }
         });
       } else if (dayData.start && dayData.end) {
-        shifts.push(`${formatTime(dayData.start)} - ${formatTime(dayData.end)}`);
+        const tStr = `${formatTime(dayData.start)} - ${formatTime(dayData.end)}`;
+        result.push({ branchName: branchLabel, timeStr: tStr, startMinutes: parseTimeToMinutes(dayData.start) });
       } else if (dayData.hours && dayData.hours !== "Off") {
-        shifts.push(dayData.hours);
+        result.push({ branchName: branchLabel, timeStr: dayData.hours, startMinutes: parseTimeToMinutes(dayData.hours) });
       }
+
       if (dayData.hours2) {
-        shifts.push(formatTime(dayData.hours2));
+        const tStr = formatTime(dayData.hours2);
+        result.push({ branchName: branchLabel, timeStr: tStr, startMinutes: parseTimeToMinutes(dayData.hours2) });
       }
-      return shifts;
+
+      return result;
     };
 
-    const dayShiftsMap: Record<string, string[]> = {
+    const dayShiftsMap: Record<string, Array<{ branchName: string; timeStr: string; startMinutes: number }>> = {
       Sunday: [],
       Monday: [],
       Tuesday: [],
@@ -155,20 +189,25 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
       Saturday: [],
     };
 
+    let isConfiguredInDb = false;
+
     if (parsed && typeof parsed === "object") {
-      // 1. Aggregate from branch_schedules (scans ALL branches)
       const branchScheds = parsed.branch_schedules;
-      if (branchScheds && typeof branchScheds === "object") {
-        Object.entries(branchScheds).forEach(([, bSched]: [string, any]) => {
+      if (branchScheds && typeof branchScheds === "object" && Object.keys(branchScheds).length > 0) {
+        isConfiguredInDb = true;
+        Object.entries(branchScheds).forEach(([bId, bSched]: [string, any]) => {
           if (!bSched || typeof bSched !== "object") return;
-          const modeNode = scheduleType === "In-Clinic" ? (bSched.in_person || bSched) : (bSched.online || bSched);
+          const modeNode = scheduleType === "In-Clinic" ? bSched.in_person : bSched.online;
+          const bLabel = getBranchLabel(bId);
+
           if (modeNode && typeof modeNode === "object") {
             daysOfWeek.forEach((day) => {
               const dayData = modeNode[day] || modeNode[day.toLowerCase()];
               if (dayData) {
-                const extracted = extractShiftsFromNode(dayData);
+                const extracted = extractShiftsFromNode(dayData, bLabel);
                 extracted.forEach((s) => {
-                  if (!dayShiftsMap[day].includes(s)) {
+                  const exists = dayShiftsMap[day].some((existing) => existing.timeStr === s.timeStr && existing.branchName === s.branchName);
+                  if (!exists) {
                     dayShiftsMap[day].push(s);
                   }
                 });
@@ -176,54 +215,62 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
             });
           }
         });
-      }
-
-      // 2. Aggregate from top-level in_person / online or root schedule node
-      const topNode = scheduleType === "In-Clinic" ? (parsed.in_person || parsed) : (parsed.online || parsed);
-      if (topNode && typeof topNode === "object" && !parsed.branch_schedules) {
-        daysOfWeek.forEach((day) => {
-          const dayData = topNode[day] || topNode[day.toLowerCase()];
-          if (dayData) {
-            const extracted = extractShiftsFromNode(dayData);
-            extracted.forEach((s) => {
-              if (!dayShiftsMap[day].includes(s)) {
-                dayShiftsMap[day].push(s);
-              }
-            });
-          }
-        });
+      } else {
+        const topNode = scheduleType === "In-Clinic" ? (parsed.in_person || parsed) : parsed.online;
+        if (topNode && typeof topNode === "object") {
+          isConfiguredInDb = true;
+          const defaultBranchLabel = doctorBranches[0] || "Clinic";
+          daysOfWeek.forEach((day) => {
+            const dayData = topNode[day] || topNode[day.toLowerCase()];
+            if (dayData) {
+              const extracted = extractShiftsFromNode(dayData, defaultBranchLabel);
+              extracted.forEach((s) => {
+                const exists = dayShiftsMap[day].some((existing) => existing.timeStr === s.timeStr && existing.branchName === s.branchName);
+                if (!exists) {
+                  dayShiftsMap[day].push(s);
+                }
+              });
+            }
+          });
+        }
       }
     }
 
     if (Array.isArray(parsed) && parsed.length > 0) {
+      isConfiguredInDb = true;
+      const defaultBranchLabel = doctorBranches[0] || "Clinic";
       parsed.forEach((item: any) => {
         if (item.day && dayShiftsMap[item.day]) {
           if (item.hours && item.hours !== "Off") {
-            dayShiftsMap[item.day].push(item.hours);
-          }
-          if (item.hours2) {
-            dayShiftsMap[item.day].push(item.hours2);
+            dayShiftsMap[item.day].push({
+              branchName: defaultBranchLabel,
+              timeStr: item.hours,
+              startMinutes: parseTimeToMinutes(item.hours)
+            });
           }
         }
       });
     }
 
-    const hasAtLeastOneShift = Object.values(dayShiftsMap).some((arr) => arr.length > 0);
-
     return daysOfWeek.map((day) => {
-      const shifts = dayShiftsMap[day];
-      if (shifts && shifts.length > 0) {
+      const shifts = [...dayShiftsMap[day]];
+      // Sort shifts chronologically by startMinutes ascending (09:00 AM before 04:00 PM)
+      shifts.sort((a, b) => a.startMinutes - b.startMinutes);
+
+      if (shifts.length > 0) {
         return { day, shifts };
       }
-      // Standard default clinic working shifts fallback if no custom schedule configured
-      if (!hasAtLeastOneShift) {
+
+      // Default clinic hours ONLY if no schedule configured in DB at all for In-Clinic
+      if (!isConfiguredInDb && scheduleType === "In-Clinic") {
         if (day === "Friday") return { day, shifts: [] };
-        if (day === "Saturday") return { day, shifts: ["10:00 AM - 04:00 PM"] };
-        return { day, shifts: ["10:00 AM - 06:00 PM"] };
+        if (day === "Saturday") return { day, shifts: [{ branchName: doctorBranches[0] || "Main Clinic", timeStr: "10:00 AM - 04:00 PM", startMinutes: 600 }] };
+        return { day, shifts: [{ branchName: doctorBranches[0] || "Main Clinic", timeStr: "10:00 AM - 06:00 PM", startMinutes: 600 }] };
       }
+
       return { day, shifts: [] };
     });
-  }, [doctor, scheduleType]);
+  }, [doctor, scheduleType, branches, doctorBranches]);
 
   // Services Provided (Derived from real doctor.services / doctor.service_ids or localServices)
   const servicesProvided = useMemo(() => {
@@ -524,28 +571,35 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-[#F7F7F9] text-[11px] font-semibold text-[#9CA3AF] border-b border-gray-100">
-                  <th className="py-2.5 px-4 font-semibold">Day</th>
-                  <th className="py-2.5 px-4 font-semibold">Working Hours ({scheduleType})</th>
+                  <th className="py-2.5 px-4 font-semibold w-1/4">Day</th>
+                  <th className="py-2.5 px-4 font-semibold w-3/4">Working Hours ({scheduleType})</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 text-[#374151]">
                 {activeSchedule.map((item: any, idx: number) => (
                   <tr key={item.day || idx} className="hover:bg-gray-50/50">
-                    <td className="py-2.5 px-4 font-semibold text-[#1F251A]">{item.day}</td>
-                    <td className="py-2.5 px-4 font-medium">
+                    <td className="py-3 px-4 font-semibold text-[#1F251A] align-middle">{item.day}</td>
+                    <td className="py-3 px-4 font-medium align-middle">
                       {!item.shifts || item.shifts.length === 0 ? (
                         <span className="inline-block rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
                           Off
                         </span>
                       ) : (
-                        <div className="flex flex-wrap items-center gap-2">
-                          {item.shifts.map((shiftStr: string, sIdx: number) => (
-                            <span
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          {item.shifts.map((shiftObj: any, sIdx: number) => (
+                            <div
                               key={sIdx}
-                              className="rounded-md bg-[#F2EFE9]/70 px-2.5 py-1 text-[11px] font-semibold text-[#1E3A2B] border border-[#E6E9EB]"
+                              className="flex flex-col gap-0.5 rounded-xl border border-[#E6E9EB] bg-[#F2EFE9]/60 px-3 py-1.5 transition hover:bg-[#F2EFE9]"
                             >
-                              {shiftStr}
-                            </span>
+                              {shiftObj.branchName ? (
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                                  {shiftObj.branchName}
+                                </span>
+                              ) : null}
+                              <span className="text-xs font-semibold text-[#1E3A2B]">
+                                {shiftObj.timeStr}
+                              </span>
+                            </div>
                           ))}
                         </div>
                       )}
