@@ -116,6 +116,7 @@ import { FinanceSection } from "@/components/admin/Finance/FinanceSection";
 import { DoctorServiceCommissionEditor, ServiceCommissionEntry, DefaultCommissionType } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import DoctorAccountView from "@/components/admin/DoctorAccountView";
 import { AdminBookingsView } from "@/components/admin/bookings/AdminBookingsView";
+import { DoctorProfileDetailsView } from "@/components/admin/doctor/DoctorProfileDetailsView";
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
@@ -4396,6 +4397,7 @@ export default function AdminPage() {
 
   // Custom provider inline & modal states
   const [editingDoctorInline, setEditingDoctorInline] = useState<any | null>(null);
+  const [viewingDoctorDetails, setViewingDoctorDetails] = useState<any | null>(null);
   const [departmentsList, setDepartmentsList] = useState<string[]>(["Receptionist", "Doctors"]);
   const [newDeptInput, setNewDeptInput] = useState("");
   const [showProviderModal, setShowProviderModal] = useState(false);
@@ -8346,7 +8348,15 @@ export default function AdminPage() {
           {/* ── PROVIDERS VIEW ── */}
           {activeNav === "Doctors" && (
             <section className="space-y-6">
-              {editingDoctorInline ? (
+              {viewingDoctorDetails ? (
+                <DoctorProfileDetailsView
+                  doctor={viewingDoctorDetails}
+                  onBack={() => setViewingDoctorDetails(null)}
+                  reservations={allReservations}
+                  branches={branches}
+                  localServices={localServices}
+                />
+              ) : editingDoctorInline ? (
                 <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
                   <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
                     <div>
@@ -8899,6 +8909,13 @@ export default function AdminPage() {
                                 {provider.rating}
                               </span>
                               <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setViewingDoctorDetails(provider)}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
+                                  title="Doctor Info Details"
+                                >
+                                  <Info size={15} />
+                                </button>
                                 {provider.id && hasPermission("providers.delete") && (
                                   <button
                                     onClick={() => handleDeleteProvider(provider.id)}

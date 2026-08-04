@@ -1259,5 +1259,26 @@ module** — forking this repo already makes it portable, same as every other ro
   they share `BookingModal`'s internals via the `variant` prop specifically to minimize this risk,
   but the wrapper JSX/close-button/success-action branches are still hand-kept in sync.
 
-**Manual test checklist:** `ai_docs/manual_tests/BOOKING_PAGE_MANUAL_TESTS.md`.
 
+---
+
+### DEC-025: Doctor Profile Details View in Admin Doctors Tab
+
+**Date:** 2026-08-04  
+**Status:** Approved & Implemented  
+**Scope:** `src/components/admin/doctor/DoctorProfileDetailsView.tsx`, `src/app/admin/page.tsx`
+
+**Context:**  
+The Admin Doctors section previously listed doctors with edit/delete actions, but lacked a dedicated comprehensive detail view for reviewing a doctor's profile, contact details, work schedule, assigned branches, financial summary metrics, completed visits, and patient history without opening full inline edit mode.
+
+**Decision:**  
+1. Built `DoctorProfileDetailsView` with a multi-tab design:
+   - Header with doctor metadata, status badge, action buttons (Print Profile, Back).
+   - Metrics cards: Total Patients, Completed Sessions, Attendance Rate, Rating.
+   - Profile Details side panel: Contact info, work schedule, assigned services, assigned branches.
+   - Primary interactive tabs:
+     - **Patient Visits & Appointments**: Filterable visit log (Today, This Week, This Month, Custom Date Range), search bar by patient name/phone, pagination, and single-click view modal for full visit drawer details (clinical notes, session type, branch).
+     - **Performance & Analytics**: Summary cards and performance distribution breakdown.
+     - **Export & Reports**: CSV report generation with custom date range selection and download.
+2. Added an **Info** (`<Info size={15} />`) action button next to Delete/Edit buttons in the Doctors table row in `src/app/admin/page.tsx`.
+3. Added system test suite integration for doctor profile detail view diagnostics.
