@@ -22792,7 +22792,7 @@ export default function AdminPage() {
                 onPendingApprovalsClick={() => setShowTodayBookingsModal(true)}
                 onFilterClick={() => setShowFilterModal(true)}
                 onViewBookingDetails={(booking: any) => {
-                  setSelected(booking as any);
+                  setViewingBooking(booking as any);
                 }}
                 onPrint={() => window.print()}
                 onExportCSV={handleExportBookingsCSV}
