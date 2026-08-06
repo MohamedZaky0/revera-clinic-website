@@ -15178,9 +15178,30 @@ export default function AdminPage() {
                   avatarUrl: customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"] || null
                 }}
                 onUpdateUser={async (updated) => {
-                  if (updated.name) setProfileName(updated.name);
+                  if (updated.email) setAdminEmail(updated.email);
                   if (updated.phone) setProfilePhone(updated.phone);
                   if (updated.address) setProfileAddress(updated.address);
+                  
+                  const targetEmp = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
+                  if (targetEmp?.id) {
+                    try {
+                      await fetch("/api/employees", {
+                        method: "PATCH",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${session?.access_token || ''}`
+                        },
+                        body: JSON.stringify({
+                          id: targetEmp.id,
+                          phone: (updated.phone !== undefined ? updated.phone : profilePhone).trim(),
+                          address: (updated.address !== undefined ? updated.address : profileAddress).trim()
+                        })
+                      });
+                      fetchRolesAndEmployees();
+                    } catch (e) {
+                      console.error("Failed to save profile changes:", e);
+                    }
+                  }
                 }}
                 onUpdatePassword={async (pwd) => {
                   setProfilePassword(pwd);

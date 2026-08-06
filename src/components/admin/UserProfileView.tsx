@@ -21,9 +21,7 @@ import {
   Printer,
   Lock,
   X,
-  FileText,
-  DollarSign,
-  AlertCircle
+  DollarSign
 } from "lucide-react";
 
 export interface UserProfileData {
@@ -34,8 +32,6 @@ export interface UserProfileData {
   email: string;
   phone?: string;
   address?: string;
-  emergencyContact?: string;
-  emergencyPhone?: string;
   role: string;
   department?: string;
   branch?: string;
@@ -74,27 +70,13 @@ export default function UserProfileView({
 }: UserProfileViewProps) {
   // Local edit states
   const [showEditPersonalModal, setShowEditPersonalModal] = useState(false);
-  const [showEditWorkModal, setShowEditWorkModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showAttendanceHistoryModal, setShowAttendanceHistoryModal] = useState(false);
 
-  // Form states
-  const [editFirstName, setEditFirstName] = useState(user.firstName || user.name.split(" ")[0] || "");
-  const [editLastName, setEditLastName] = useState(user.lastName || user.name.split(" ").slice(1).join(" ") || "");
+  // Form states - Only Email, Phone, Address can be edited
   const [editEmail, setEditEmail] = useState(user.email || "");
   const [editPhone, setEditPhone] = useState(user.phone || "");
   const [editAddress, setEditAddress] = useState(user.address || "");
-  const [editEmergencyContact, setEditEmergencyContact] = useState(user.emergencyContact || "");
-  const [editEmergencyPhone, setEditEmergencyPhone] = useState(user.emergencyPhone || "");
-
-  // Work form states
-  const [editDepartment, setEditDepartment] = useState(user.department || (isDoctorView ? "Medical Services" : "Reception"));
-  const [editBranch, setEditBranch] = useState(user.branch || "Main Branch");
-  const [editEmploymentType, setEditEmploymentType] = useState(user.employmentType || "Full Time");
-  const [editShiftType, setEditShiftType] = useState(user.shiftType || "Day");
-  const [editWorkingDays, setEditWorkingDays] = useState(user.workingDays || "Sunday – Thursday");
-  const [editWorkingHours, setEditWorkingHours] = useState(user.workingHours || "09:00 AM – 05:00 PM");
-  const [editBreakTime, setEditBreakTime] = useState(user.breakTime || "01:00 PM – 02:00 PM");
 
   // Password modal states
   const [newPassword, setNewPassword] = useState("");
@@ -108,14 +90,19 @@ export default function UserProfileView({
   const [attendancePeriod, setAttendancePeriod] = useState("This Month");
   const [payrollPeriod, setPayrollPeriod] = useState("This Month");
 
-  const displayName = user.name || `${editFirstName} ${editLastName}`.trim() || "User Profile";
-  const displayRole = user.role || (isDoctorView ? "Doctor" : "Staff");
+  // Name resolution
+  const nameParts = (user.name || "").trim().split(" ");
+  const firstName = user.firstName || nameParts[0] || "saifuldeen";
+  const lastName = user.lastName || nameParts.slice(1).join(" ") || "Naser";
+  const displayName = user.name || `${firstName} ${lastName}`.trim();
+
+  const displayRole = user.role || (isDoctorView ? "Doctor" : "Superadmin");
   const displayBranch = user.branch || "New Cairo Branch";
-  const displayEmployeeId = user.employeeId || (isDoctorView ? "DOC-001" : "EMP-001");
+  const displayEmployeeId = user.employeeId || (isDoctorView ? "DOC-001" : "EMP-SUPER");
   const displayJoiningDate = user.joiningDate || "July 21, 2026";
   const displayDepartment = user.department || (isDoctorView ? "Medical Services" : "Reception");
 
-  // Financial calculations
+  // Financial calculations from real user data
   const basicSalary = Number(user.basicSalary || (isDoctorView ? 15000 : 8000));
   const bonuses = Number(user.bonuses || (isDoctorView ? 1200 : 500));
   const deductions = Number(user.deductions || (isDoctorView ? 300 : 150));
@@ -124,48 +111,27 @@ export default function UserProfileView({
   const targetProgressAmount = Number(user.targetProgressAmount || 22000);
   const targetPct = Math.min(100, Math.round((targetProgressAmount / monthlyTarget) * 100));
 
+  const handleOpenEditPersonal = () => {
+    setEditEmail(user.email || "");
+    setEditPhone(user.phone || "");
+    setEditAddress(user.address || "");
+    setShowEditPersonalModal(true);
+  };
+
   const handleSavePersonalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingUser(true);
     try {
       if (onUpdateUser) {
         await onUpdateUser({
-          name: `${editFirstName} ${editLastName}`.trim(),
-          firstName: editFirstName,
-          lastName: editLastName,
           email: editEmail,
           phone: editPhone,
-          address: editAddress,
-          emergencyContact: editEmergencyContact,
-          emergencyPhone: editEmergencyPhone
+          address: editAddress
         });
       }
       setShowEditPersonalModal(false);
     } catch (err) {
       console.error("Error updating personal profile:", err);
-    } finally {
-      setSavingUser(false);
-    }
-  };
-
-  const handleSaveWorkSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingUser(true);
-    try {
-      if (onUpdateUser) {
-        await onUpdateUser({
-          department: editDepartment,
-          branch: editBranch,
-          employmentType: editEmploymentType,
-          shiftType: editShiftType,
-          workingDays: editWorkingDays,
-          workingHours: editWorkingHours,
-          breakTime: editBreakTime
-        });
-      }
-      setShowEditWorkModal(false);
-    } catch (err) {
-      console.error("Error updating work profile:", err);
     } finally {
       setSavingUser(false);
     }
@@ -312,7 +278,7 @@ export default function UserProfileView({
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">Employment Type</span>
-              <span className="font-extrabold text-[#1F251A]">{editEmploymentType}</span>
+              <span className="font-extrabold text-[#1F251A]">{user.employmentType || "Full Time"}</span>
             </div>
           </div>
 
@@ -341,7 +307,7 @@ export default function UserProfileView({
           </div>
           <button
             type="button"
-            onClick={() => setShowEditPersonalModal(true)}
+            onClick={handleOpenEditPersonal}
             className="flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 bg-white px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs"
           >
             <Edit2 size={13} />
@@ -354,7 +320,7 @@ export default function UserProfileView({
             <User size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">First Name</span>
-              <span className="font-extrabold text-[#1F251A]">{editFirstName || "—"}</span>
+              <span className="font-extrabold text-[#1F251A]">{firstName}</span>
             </div>
           </div>
 
@@ -362,7 +328,7 @@ export default function UserProfileView({
             <MapPin size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Address</span>
-              <span className="font-extrabold text-[#1F251A]">{editAddress || "—"}</span>
+              <span className="font-extrabold text-[#1F251A]">{user.address || "—"}</span>
             </div>
           </div>
 
@@ -370,31 +336,7 @@ export default function UserProfileView({
             <User size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Last Name</span>
-              <span className="font-extrabold text-[#1F251A]">{editLastName || "—"}</span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <User size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
-            <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Emergency Contact</span>
-              <span className="font-extrabold text-[#1F251A]">{editEmergencyContact || "—"}</span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <Mail size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
-            <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Email</span>
-              <span className="font-extrabold text-[#1F251A] break-all">{editEmail || "—"}</span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <Phone size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
-            <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Emergency Contact Phone</span>
-              <span className="font-extrabold text-[#1F251A] font-mono">{editEmergencyPhone || "—"}</span>
+              <span className="font-extrabold text-[#1F251A]">{lastName}</span>
             </div>
           </div>
 
@@ -402,13 +344,21 @@ export default function UserProfileView({
             <Phone size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Phone Number</span>
-              <span className="font-extrabold text-[#1F251A] font-mono">{editPhone || "—"}</span>
+              <span className="font-extrabold text-[#1F251A] font-mono">{user.phone || "—"}</span>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <Mail size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
+            <div>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">Email</span>
+              <span className="font-extrabold text-[#1F251A] break-all">{user.email || "—"}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── SECTION 2: WORK INFORMATION ── */}
+      {/* ── SECTION 2: WORK INFORMATION (VIEW ONLY - CANNOT BE EDITED) ── */}
       <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div className="flex items-center gap-3">
@@ -419,14 +369,7 @@ export default function UserProfileView({
               Work Information
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowEditWorkModal(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 bg-white px-3.5 py-1.5 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs"
-          >
-            <Edit2 size={13} />
-            <span>Edit</span>
-          </button>
+          {/* Work Information is view-only, Edit button removed per prompt instructions */}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-xs md:text-sm">
@@ -434,7 +377,7 @@ export default function UserProfileView({
             <Briefcase size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Department</span>
-              <span className="font-extrabold text-[#1F251A]">{editDepartment}</span>
+              <span className="font-extrabold text-[#1F251A]">{displayDepartment}</span>
             </div>
           </div>
 
@@ -442,7 +385,7 @@ export default function UserProfileView({
             <Clock size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Shift Type</span>
-              <span className="font-extrabold text-[#1F251A]">{editShiftType}</span>
+              <span className="font-extrabold text-[#1F251A]">{user.shiftType || "Day"}</span>
             </div>
           </div>
 
@@ -450,7 +393,7 @@ export default function UserProfileView({
             <MapPin size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Current Branch</span>
-              <span className="font-extrabold text-[#1F251A]">{editBranch}</span>
+              <span className="font-extrabold text-[#1F251A]">{displayBranch}</span>
             </div>
           </div>
 
@@ -458,7 +401,7 @@ export default function UserProfileView({
             <Calendar size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Working Days</span>
-              <span className="font-extrabold text-[#1F251A]">{editWorkingDays}</span>
+              <span className="font-extrabold text-[#1F251A]">{user.workingDays || "Sunday – Thursday"}</span>
             </div>
           </div>
 
@@ -466,7 +409,7 @@ export default function UserProfileView({
             <Briefcase size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Employment Type</span>
-              <span className="font-extrabold text-[#1F251A]">{editEmploymentType}</span>
+              <span className="font-extrabold text-[#1F251A]">{user.employmentType || "Full Time"}</span>
             </div>
           </div>
 
@@ -474,7 +417,7 @@ export default function UserProfileView({
             <Clock size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Working Hours</span>
-              <span className="font-extrabold text-[#1F251A]">{editWorkingHours}</span>
+              <span className="font-extrabold text-[#1F251A]">{user.workingHours || "09:00 AM – 05:00 PM"}</span>
             </div>
           </div>
 
@@ -482,7 +425,7 @@ export default function UserProfileView({
             <Clock3 size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Break Time</span>
-              <span className="font-extrabold text-[#1F251A]">{editBreakTime}</span>
+              <span className="font-extrabold text-[#1F251A]">{user.breakTime || "01:00 PM – 02:00 PM"}</span>
             </div>
           </div>
         </div>
@@ -661,49 +604,39 @@ export default function UserProfileView({
         </button>
       </div>
 
-      {/* ── MODAL 1: EDIT PERSONAL INFORMATION ── */}
+      {/* ── MODAL 1: EDIT PERSONAL INFORMATION (EMAIL, PHONE & ADDRESS ONLY) ── */}
       {showEditPersonalModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
           <div className="relative w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl space-y-5 border border-[#414E36]/15">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-              <h3 className="text-sm font-black uppercase tracking-wider text-[#1F251A]">Edit Personal Information</h3>
+              <h3 className="text-sm font-black uppercase tracking-wider text-[#1F251A]">Edit Contact Information</h3>
               <button onClick={() => setShowEditPersonalModal(false)} className="p-2 rounded-xl text-[#5A6A51] hover:bg-[#FBFBF9]">
                 <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleSavePersonalSubmit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              {/* Display Read-Only Name */}
+              <div className="grid grid-cols-2 gap-3 bg-[#FBFBF9] p-3 rounded-2xl border border-[#414E36]/10">
                 <div>
-                  <label className="block font-bold text-[#5A6A51] mb-1">First Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={editFirstName}
-                    onChange={(e) => setEditFirstName(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
-                  />
+                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">First Name</span>
+                  <span className="font-extrabold text-[#1F251A]">{firstName}</span>
                 </div>
                 <div>
-                  <label className="block font-bold text-[#5A6A51] mb-1">Last Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={editLastName}
-                    onChange={(e) => setEditLastName(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
-                  />
+                  <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Last Name</span>
+                  <span className="font-extrabold text-[#1F251A]">{lastName}</span>
                 </div>
               </div>
 
+              {/* Editable Fields: Email, Phone, Address */}
               <div>
-                <label className="block font-bold text-[#5A6A51] mb-1">Email Address</label>
+                <label className="block font-bold text-[#5A6A51] mb-1">Email Address *</label>
                 <input
                   type="email"
                   required
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
+                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                 />
               </div>
 
@@ -713,7 +646,8 @@ export default function UserProfileView({
                   type="text"
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none font-mono"
+                  placeholder="e.g. 01012345678"
+                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none focus:border-[#C4AE7C] font-mono"
                 />
               </div>
 
@@ -723,29 +657,9 @@ export default function UserProfileView({
                   type="text"
                   value={editAddress}
                   onChange={(e) => setEditAddress(e.target.value)}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
+                  placeholder="e.g. New Cairo, Cairo, Egypt"
+                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#5A6A51] mb-1">Emergency Contact</label>
-                  <input
-                    type="text"
-                    value={editEmergencyContact}
-                    onChange={(e) => setEditEmergencyContact(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-[#5A6A51] mb-1">Emergency Phone</label>
-                  <input
-                    type="text"
-                    value={editEmergencyPhone}
-                    onChange={(e) => setEditEmergencyPhone(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none font-mono"
-                  />
-                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-[#414E36]/10">
@@ -759,7 +673,7 @@ export default function UserProfileView({
                 <button
                   type="submit"
                   disabled={savingUser}
-                  className="rounded-xl bg-[#414E36] px-5 py-2 font-bold text-white hover:bg-[#2e3a26]"
+                  className="rounded-xl bg-[#414E36] px-5 py-2 font-bold text-white hover:bg-[#2e3a26] transition disabled:opacity-50"
                 >
                   {savingUser ? "Saving..." : "Save Changes"}
                 </button>
@@ -769,119 +683,7 @@ export default function UserProfileView({
         </div>
       )}
 
-      {/* ── MODAL 2: EDIT WORK INFORMATION ── */}
-      {showEditWorkModal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
-          <div className="relative w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl space-y-5 border border-[#414E36]/15">
-            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-              <h3 className="text-sm font-black uppercase tracking-wider text-[#1F251A]">Edit Work Information</h3>
-              <button onClick={() => setShowEditWorkModal(false)} className="p-2 rounded-xl text-[#5A6A51] hover:bg-[#FBFBF9]">
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveWorkSubmit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#5A6A51] mb-1">Department</label>
-                  <input
-                    type="text"
-                    value={editDepartment}
-                    onChange={(e) => setEditDepartment(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-[#5A6A51] mb-1">Current Branch</label>
-                  <input
-                    type="text"
-                    value={editBranch}
-                    onChange={(e) => setEditBranch(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#5A6A51] mb-1">Employment Type</label>
-                  <select
-                    value={editEmploymentType}
-                    onChange={(e) => setEditEmploymentType(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
-                  >
-                    <option value="Full Time">Full Time</option>
-                    <option value="Part Time">Part Time</option>
-                    <option value="Contract">Contract</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-bold text-[#5A6A51] mb-1">Shift Type</label>
-                  <select
-                    value={editShiftType}
-                    onChange={(e) => setEditShiftType(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
-                  >
-                    <option value="Day">Day</option>
-                    <option value="Night">Night</option>
-                    <option value="Rotating">Rotating</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#5A6A51] mb-1">Working Days</label>
-                <input
-                  type="text"
-                  value={editWorkingDays}
-                  onChange={(e) => setEditWorkingDays(e.target.value)}
-                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#5A6A51] mb-1">Working Hours</label>
-                  <input
-                    type="text"
-                    value={editWorkingHours}
-                    onChange={(e) => setEditWorkingHours(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-[#5A6A51] mb-1">Break Time</label>
-                  <input
-                    type="text"
-                    value={editBreakTime}
-                    onChange={(e) => setEditBreakTime(e.target.value)}
-                    className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-2.5 font-bold text-[#1F251A] outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-[#414E36]/10">
-                <button
-                  type="button"
-                  onClick={() => setShowEditWorkModal(false)}
-                  className="rounded-xl border border-[#414E36]/20 bg-white px-4 py-2 font-bold text-[#414E36]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingUser}
-                  className="rounded-xl bg-[#414E36] px-5 py-2 font-bold text-white hover:bg-[#2e3a26]"
-                >
-                  {savingUser ? "Saving..." : "Save Changes"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── MODAL 3: CHANGE PASSWORD ── */}
+      {/* ── MODAL 2: CHANGE PASSWORD ── */}
       {showPasswordModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
           <div className="relative w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-[#414E36]/15">
@@ -952,7 +754,7 @@ export default function UserProfileView({
         </div>
       )}
 
-      {/* ── MODAL 4: ATTENDANCE HISTORY MODAL ── */}
+      {/* ── MODAL 3: ATTENDANCE HISTORY MODAL ── */}
       {showAttendanceHistoryModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
           <div className="relative w-full max-w-2xl bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-[#414E36]/15 max-h-[85vh] flex flex-col">
