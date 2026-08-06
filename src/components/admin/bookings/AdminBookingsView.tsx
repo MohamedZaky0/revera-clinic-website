@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -80,6 +80,19 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
   const [activeMenuId, setActiveMenuId] = useState<string | number | null>(null);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close More dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
   const [rowsPerPage, setRowsPerPage] = useState<number>(5);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [statusFilter, setStatusFilter] = useState<string>("All");
@@ -582,21 +595,36 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             </button>
           </div>
 
-          <button
-            onClick={onPrint}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
-            title="Print Schedule"
-          >
-            <Printer size={16} />
-          </button>
+          {/* ── MORE DROPDOWN ── */}
+          <div className="relative" ref={moreMenuRef}>
+            <button
+              onClick={() => setIsMoreMenuOpen(prev => !prev)}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
+            >
+              <MoreVertical size={16} className="text-[#6B7280]" />
+              <span>More</span>
+            </button>
 
-          <button
-            onClick={onExportCSV}
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
-          >
-            <Download size={16} className="text-[#6B7280]" />
-            <span>Export CSV</span>
-          </button>
+            {isMoreMenuOpen && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+                <button
+                  onClick={() => { onPrint?.(); setIsMoreMenuOpen(false); }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition"
+                >
+                  <Printer size={15} className="text-[#6B7280]" />
+                  Print Schedule
+                </button>
+                <div className="mx-4 border-t border-gray-100" />
+                <button
+                  onClick={() => { onExportCSV?.(); setIsMoreMenuOpen(false); }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition"
+                >
+                  <Download size={15} className="text-[#6B7280]" />
+                  Export CSV
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
