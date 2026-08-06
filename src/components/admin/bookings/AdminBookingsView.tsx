@@ -573,7 +573,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               onClick={() => setViewMode("calendar")}
               className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
                 viewMode === "calendar"
-                  ? "bg-[#1E3A2B] text-white"
+                  ? "bg-[#C4AE7C] text-[#414E36]"
                   : "text-[#374151] hover:bg-gray-50"
               }`}
             >
