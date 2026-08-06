@@ -7,7 +7,6 @@ import {
   Stethoscope,
   Users,
   BarChart3,
-  Settings,
   RefreshCw,
   LogOut
 } from "lucide-react";
@@ -212,29 +211,6 @@ export default function DoctorSidebar({
               <BarChart3 size={18} />
             </div>
             <span className="tracking-wide text-sm">{t.analytics}</span>
-          </button>
-
-          {/* Tab 5: Settings */}
-          <button
-            type="button"
-            onClick={() => setActiveTab("settings")}
-            title={t.settings}
-            className={`group flex w-full items-center gap-3.5 rounded-3xl px-4 py-3 text-xs font-semibold transition-all duration-200 ${
-              activeTab === "settings"
-                ? "bg-[#FBFBF9] text-[#414E36] shadow-lg font-bold"
-                : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
-            }`}
-          >
-            <div
-              className={`inline-flex h-9 w-9 items-center justify-center rounded-2xl transition ${
-                activeTab === "settings"
-                  ? "bg-[#414E36]/10 text-[#414E36]"
-                  : "bg-white/10 text-[#FBFBF9] group-hover:bg-white/20"
-              }`}
-            >
-              <Settings size={18} />
-            </div>
-            <span className="tracking-wide text-sm">{t.settings}</span>
           </button>
         </nav>
       </div>
