@@ -645,7 +645,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       return (
                         <tr
                           key={row.id}
-                          className={`group transition hover:bg-gray-50/80 border-l-4 ${stConfig.border}`}
+                          onClick={() => onViewBookingDetails && onViewBookingDetails(row)}
+                          className={`group cursor-pointer transition hover:bg-emerald-50/50 border-l-4 ${stConfig.border}`}
                         >
                           {/* Time */}
                           <td className="py-3 px-2 whitespace-nowrap font-bold text-[#111827]">
