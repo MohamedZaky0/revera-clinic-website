@@ -100,20 +100,36 @@ export default function UserProfileView({
   const [attendancePeriod, setAttendancePeriod] = useState("This Month");
   const [payrollPeriod, setPayrollPeriod] = useState("This Month");
 
-  // Real Database Fetched Data
+  // Real Database Fetched Metrics (Strictly 0 defaults, NO fake numbers)
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>([]);
   const [attendanceMetrics, setAttendanceMetrics] = useState({
-    presentDays: 22,
-    absentDays: 1,
-    lateArrivals: 2,
-    earlyLeaves: 3,
-    overtimeHours: "5h",
-    totalWorkingHours: "176h"
+    presentDays: 0,
+    absentDays: 0,
+    lateArrivals: 0,
+    earlyLeaves: 0,
+    overtimeHours: "0h",
+    totalWorkingHours: "0h"
   });
 
   const [loadingPayroll, setLoadingPayroll] = useState(false);
-  const [targetRevenue, setTargetRevenue] = useState<number>(user.targetProgressAmount || 22000);
+  const [targetRevenue, setTargetRevenue] = useState<number>(0);
+  const [payrollDetails, setPayrollDetails] = useState({
+    salary: user.basicSalary || 0,
+    target: user.monthlyTarget || 0,
+    bonuses: user.bonuses || 0,
+    deductions: user.deductions || 0
+  });
+
+  // Keep payroll details synced with prop changes
+  useEffect(() => {
+    setPayrollDetails({
+      salary: user.basicSalary || 0,
+      target: user.monthlyTarget || 0,
+      bonuses: user.bonuses || 0,
+      deductions: user.deductions || 0
+    });
+  }, [user.basicSalary, user.monthlyTarget, user.bonuses, user.deductions]);
 
   // Name resolution
   const nameParts = (user.name || "").trim().split(" ");
@@ -122,9 +138,9 @@ export default function UserProfileView({
   const displayName = user.name || `${firstName} ${lastName}`.trim();
 
   const displayRole = user.role || (isDoctorView ? "Doctor" : "Staff");
-  const displayBranch = user.branch || "New Cairo Branch";
+  const displayBranch = user.branch || "Main Branch";
   const displayEmployeeId = user.employeeId || (isDoctorView ? "DOC-001" : "EMP-001");
-  const displayJoiningDate = user.joiningDate || "July 21, 2026";
+  const displayJoiningDate = user.joiningDate || "—";
   const displayDepartment = user.department || (isDoctorView ? "Medical Services" : "Reception");
 
   // Helper to get date ranges based on selected period
@@ -149,7 +165,7 @@ export default function UserProfileView({
     return { startStr, endStr };
   };
 
-  // 1. Fetch Real Attendance Summary & Logs from Database
+  // 1. Fetch Real Attendance Summary & Logs directly from Database
   useEffect(() => {
     async function fetchRealAttendance() {
       setLoadingAttendance(true);
@@ -164,7 +180,7 @@ export default function UserProfileView({
           .order("date", { ascending: false });
 
         if (user.id) {
-          query = query.eq("employee_id", user.id);
+          query = query.or(`employee_id.eq.${user.id},employee_id.eq.${user.employeeId}`);
         }
 
         const { data, error } = await query;
@@ -223,39 +239,28 @@ export default function UserProfileView({
             totalWorkingHours: `${Math.round(totalMin / 60)}h`
           });
         } else {
-          // If no records in database for this timeframe, show clear metrics
+          // Real database returns zero rows when no logs exist
           setAttendanceLogs([]);
-          if (attendancePeriod === "This Month") {
-            setAttendanceMetrics({
-              presentDays: 22,
-              absentDays: 1,
-              lateArrivals: 2,
-              earlyLeaves: 3,
-              overtimeHours: "5h",
-              totalWorkingHours: "176h"
-            });
-          } else {
-            setAttendanceMetrics({
-              presentDays: 0,
-              absentDays: 0,
-              lateArrivals: 0,
-              earlyLeaves: 0,
-              overtimeHours: "0h",
-              totalWorkingHours: "0h"
-            });
-          }
+          setAttendanceMetrics({
+            presentDays: 0,
+            absentDays: 0,
+            lateArrivals: 0,
+            earlyLeaves: 0,
+            overtimeHours: "0h",
+            totalWorkingHours: "0h"
+          });
         }
       } catch (err) {
-        console.error("Error fetching attendance records:", err);
+        console.error("Error fetching database attendance records:", err);
       } finally {
         setLoadingAttendance(false);
       }
     }
 
     fetchRealAttendance();
-  }, [attendancePeriod, user.id]);
+  }, [attendancePeriod, user.id, user.employeeId]);
 
-  // 2. Fetch Real Target Revenue / Sales Progress from Database
+  // 2. Fetch Real Target Revenue / Sales Progress directly from Database
   useEffect(() => {
     async function fetchRealPayrollTarget() {
       setLoadingPayroll(true);
@@ -264,23 +269,33 @@ export default function UserProfileView({
         
         let query = supabase
           .from("reservations")
-          .select("amount_paid, price")
+          .select("amount_paid, price, status, date, doctor_name, provider_id, created_by_employee_id")
           .gte("date", startStr)
-          .lte("date", endStr);
+          .lte("date", endStr)
+          .in("status", ["completed", "confirmed", "approved", "started"]);
 
-        if (isDoctorView && user.name) {
-          query = query.ilike("doctor_name", `%${user.name.replace(/^Dr\.?\s*/i, "")}%`);
-        } else if (user.id) {
-          query = query.eq("created_by_employee_id", user.id);
-        }
+        const cleanName = user.name ? user.name.replace(/^Dr\.?\s*/i, "").trim() : "";
 
         const { data, error } = await query;
 
         if (!error && data && data.length > 0) {
-          const totalRev = data.reduce((sum: number, r: any) => sum + Number(r.amount_paid || r.price || 0), 0);
+          const userRev = data.filter((r: any) => {
+            if (isDoctorView && cleanName) {
+              return (
+                (r.doctor_name && r.doctor_name.toLowerCase().includes(cleanName.toLowerCase())) ||
+                r.provider_id === user.id
+              );
+            }
+            if (user.id) {
+              return r.created_by_employee_id === user.id || r.provider_id === user.id;
+            }
+            return true;
+          });
+
+          const totalRev = userRev.reduce((sum: number, r: any) => sum + Number(r.amount_paid || r.price || 0), 0);
           setTargetRevenue(totalRev);
         } else {
-          setTargetRevenue(payrollPeriod === "This Month" ? (user.targetProgressAmount || (isDoctorView ? 38000 : 22000)) : 0);
+          setTargetRevenue(0);
         }
       } catch (err) {
         console.error("Error fetching target revenue progress:", err);
@@ -292,14 +307,14 @@ export default function UserProfileView({
     fetchRealPayrollTarget();
   }, [payrollPeriod, user.id, user.name, isDoctorView]);
 
-  // Financial calculations
-  const basicSalary = Number(user.basicSalary || (isDoctorView ? 15000 : 8000));
-  const bonuses = Number(user.bonuses || (isDoctorView ? 1200 : 500));
-  const deductions = Number(user.deductions || (isDoctorView ? 300 : 150));
+  // Financial calculations strictly based on database metrics
+  const basicSalary = Number(payrollDetails.salary || 0);
+  const bonuses = Number(payrollDetails.bonuses || 0);
+  const deductions = Number(payrollDetails.deductions || 0);
   const netSalary = basicSalary + bonuses - deductions;
-  const monthlyTarget = Number(user.monthlyTarget || (isDoctorView ? 60000 : 50000));
+  const monthlyTarget = Number(payrollDetails.target || 0);
   const targetProgressAmount = targetRevenue;
-  const targetPct = Math.min(100, Math.round((targetProgressAmount / monthlyTarget) * 100));
+  const targetPct = monthlyTarget > 0 ? Math.min(100, Math.round((targetProgressAmount / monthlyTarget) * 100)) : 0;
 
   const handleOpenEditPersonal = () => {
     setEditEmail(user.email || "");
@@ -544,7 +559,7 @@ export default function UserProfileView({
         </div>
       </div>
 
-      {/* ── SECTION 2: WORK INFORMATION (VIEW ONLY - CANNOT BE EDITED) ── */}
+      {/* ── SECTION 2: WORK INFORMATION (REAL DATABASE DATA - VIEW ONLY) ── */}
       <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div className="flex items-center gap-3">
@@ -640,7 +655,7 @@ export default function UserProfileView({
           </select>
         </div>
 
-        {/* 6 Attendance Metric Cards */}
+        {/* 6 Attendance Metric Cards (Strict Real Data from DB) */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3.5 text-center">
           <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-2">
             <div className="h-9 w-9 mx-auto flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
@@ -770,7 +785,7 @@ export default function UserProfileView({
         </div>
       </div>
 
-      {/* ── BOTTOM ACTION BUTTON: CHANGE PASSWORD (PRINT PROFILE BUTTON REMOVED) ── */}
+      {/* ── BOTTOM ACTION BUTTON: CHANGE PASSWORD ── */}
       <div className="pt-2 print:hidden">
         <button
           type="button"
@@ -952,7 +967,7 @@ export default function UserProfileView({
                 </div>
               ) : attendanceLogs.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 font-medium">
-                  No attendance records found for {attendancePeriod}.
+                  No attendance records logged in database for {attendancePeriod}.
                 </div>
               ) : (
                 attendanceLogs.map((log, idx) => (

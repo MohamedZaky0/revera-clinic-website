@@ -15170,11 +15170,10 @@ export default function AdminPage() {
                   joiningDate: profileEmployee?.created_at
                     ? new Date(profileEmployee.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
                     : "July 21, 2026",
-                  basicSalary: Number(profileEmployee?.salary || 8000),
-                  bonuses: 500,
-                  deductions: 150,
-                  monthlyTarget: 50000,
-                  targetProgressAmount: 22000,
+                  basicSalary: Number(profileEmployee?.salary || 0),
+                  bonuses: Number(profileEmployee?.bonus || 0),
+                  deductions: Number(profileEmployee?.deductions || 0),
+                  monthlyTarget: Number(profileEmployee?.required_target_amount || 0),
                   avatarUrl: customerAvatars[profileEmployee?.id || profileEmployee?.employee_id || adminEmail || "my-profile"] || null
                 }}
                 onUpdateUser={async (updated) => {

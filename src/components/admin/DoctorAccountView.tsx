@@ -69,6 +69,29 @@ export default function DoctorAccountView({
     }
   }, [branches]);
 
+  const [providerRecord, setProviderRecord] = useState<any>(null);
+
+  useEffect(() => {
+    async function loadProviderDetails() {
+      try {
+        const cleanName = doctorName ? doctorName.replace(/^Dr\.?\s*/i, "").trim() : "";
+        let query = supabase.from("providers").select("*");
+        if (doctorDbId) {
+          query = query.eq("id", doctorDbId);
+        } else if (cleanName) {
+          query = query.ilike("name", `%${cleanName}%`);
+        }
+        const { data } = await query.maybeSingle();
+        if (data) {
+          setProviderRecord(data);
+        }
+      } catch (e) {
+        console.error("Error loading doctor database provider record:", e);
+      }
+    }
+    loadProviderDetails();
+  }, [doctorDbId, doctorName]);
+
   const resolvedBranchName = useMemo(() => {
     if (!doctorBranch) return "Main Branch";
     const match = branchList.find(
@@ -962,18 +985,26 @@ export default function DoctorAccountView({
         {activeTab === "profile" && (
           <UserProfileView
             user={{
-              name: doctorName,
-              email: doctorEmail,
+              id: doctorDbId || providerRecord?.id,
+              name: doctorName || providerRecord?.name || "Doctor Account",
+              email: doctorEmail || providerRecord?.email || "",
+              phone: providerRecord?.phone || "",
+              address: providerRecord?.address || "",
               role: "Doctor / Specialist",
               branch: resolvedBranchName,
-              department: "Dermatology & Medical Services",
-              employeeId: doctorDbId ? `DOC-${String(doctorDbId).slice(-3).toUpperCase()}` : "DOC-001",
-              joiningDate: "July 21, 2026",
-              basicSalary: 15000,
-              bonuses: 1200,
-              deductions: 300,
-              monthlyTarget: 60000,
-              targetProgressAmount: 38000
+              department: providerRecord?.specialty || "Dermatology & Medical Services",
+              employeeId: doctorDbId ? `DOC-${String(doctorDbId).slice(0, 5).toUpperCase()}` : (providerRecord?.id ? `DOC-${providerRecord.id.slice(0, 5).toUpperCase()}` : "DOC-001"),
+              joiningDate: providerRecord?.created_at
+                ? new Date(providerRecord.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                : "—",
+              shiftType: providerRecord?.shift || "Day",
+              workingDays: providerRecord?.working_days || "Sunday – Thursday",
+              workingHours: providerRecord?.working_hours || "09:00 AM – 05:00 PM",
+              breakTime: providerRecord?.break_time || "01:00 PM – 02:00 PM",
+              basicSalary: Number(providerRecord?.fixed_salary || providerRecord?.salary || 0),
+              bonuses: 0,
+              deductions: 0,
+              monthlyTarget: Number(providerRecord?.target_amount || providerRecord?.required_target_amount || 0)
             }}
             isDoctorView={true}
           />
