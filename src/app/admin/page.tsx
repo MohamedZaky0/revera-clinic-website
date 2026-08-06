@@ -22778,6 +22778,7 @@ export default function AdminPage() {
                 }}
                 services={localServices}
                 providers={providers}
+                customers={dbCustomers}
               />
             ) : (
               <AdminBookingsView
@@ -22806,6 +22807,7 @@ export default function AdminPage() {
               }}
               services={localServices}
               providers={providers}
+              customers={dbCustomers}
             />
           )}
         </>

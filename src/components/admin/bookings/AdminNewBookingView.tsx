@@ -16,7 +16,8 @@ import {
   ChevronDown,
   Loader2,
   Search,
-  Users
+  Users,
+  Check
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -56,6 +57,7 @@ interface AdminNewBookingViewProps {
   onBookingCreated?: () => void;
   services?: any[];
   providers?: any[];
+  customers?: any[];
 }
 
 // Helper to extract service name cleanly
@@ -88,12 +90,13 @@ export default function AdminNewBookingView({
   onClose,
   onBookingCreated,
   services = [],
-  providers = []
+  providers = [],
+  customers = []
 }: AdminNewBookingViewProps) {
   // Patient Search & Selection State
   const [patientSearchQuery, setPatientSearchQuery] = useState("");
-  const [customerList, setCustomerList] = useState<CustomerItem[]>([]);
-  const [allCustomers, setAllCustomers] = useState<CustomerItem[]>([]);
+  const [customerList, setCustomerList] = useState<CustomerItem[]>(customers);
+  const [allCustomers, setAllCustomers] = useState<CustomerItem[]>(customers);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
 
@@ -132,32 +135,35 @@ export default function AdminNewBookingView({
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitMenu, setShowSubmitMenu] = useState(false);
 
-  // 1. Fetch Services & Providers & Existing Customers from Supabase on mount
+  // 1. Load Services, Providers, & Customers from Supabase on mount
   useEffect(() => {
     async function loadData() {
       try {
-        // Fetch Services
-        const { data: sData } = await supabase.from("services").select("*").order("sort_order", { ascending: true });
-        if (sData && sData.length > 0) {
-          setDbServices(sData);
+        // Fetch Services if empty
+        if (dbServices.length === 0) {
+          const { data: sData } = await supabase.from("services").select("*").order("sort_order", { ascending: true });
+          if (sData && sData.length > 0) setDbServices(sData);
         }
 
-        // Fetch Providers
-        const { data: pData } = await supabase.from("providers").select("*").order("name", { ascending: true });
-        if (pData && pData.length > 0) {
-          setDbDoctors(pData);
+        // Fetch Providers if empty
+        if (dbDoctors.length === 0) {
+          const { data: pData } = await supabase.from("providers").select("*").order("name", { ascending: true });
+          if (pData && pData.length > 0) setDbDoctors(pData);
         }
 
-        // Fetch Customers List directly from Supabase
+        // Fetch Customers List from Supabase
         const { data: cData } = await supabase
           .from("customers")
           .select("id, name, first_name, last_name, full_name, mobile, phone, email, whatsapp")
           .order("created_at", { ascending: false })
-          .limit(50);
+          .limit(100);
         
         if (cData && cData.length > 0) {
-          setCustomerList(cData);
           setAllCustomers(cData);
+          setCustomerList(cData);
+        } else if (customers.length > 0) {
+          setAllCustomers(customers);
+          setCustomerList(customers);
         }
       } catch (err) {
         console.error("Error initializing New Booking View data:", err);
@@ -165,6 +171,14 @@ export default function AdminNewBookingView({
     }
     loadData();
   }, []);
+
+  // Update customer list when prop updates
+  useEffect(() => {
+    if (customers && customers.length > 0 && allCustomers.length === 0) {
+      setAllCustomers(customers);
+      setCustomerList(customers);
+    }
+  }, [customers]);
 
   // Set default selected service & provider
   useEffect(() => {
@@ -185,45 +199,20 @@ export default function AdminNewBookingView({
 
   // 2. Real-time Customer Search & Filter
   useEffect(() => {
-    async function searchCustomers() {
-      const q = patientSearchQuery.trim().toLowerCase();
-      if (!q) {
-        setCustomerList(allCustomers);
-        return;
-      }
-      setSearchingCustomer(true);
-
-      try {
-        const filtered = allCustomers.filter(c => {
-          const nameMatch = (c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`).toLowerCase().includes(q);
-          const phoneMatch = (c.mobile || c.phone || "").toLowerCase().includes(q);
-          const emailMatch = (c.email || "").toLowerCase().includes(q);
-          return nameMatch || phoneMatch || emailMatch;
-        });
-
-        if (filtered.length > 0) {
-          setCustomerList(filtered);
-        } else {
-          // Query Supabase directly if client filter returns empty
-          const { data } = await supabase
-            .from("customers")
-            .select("id, name, first_name, last_name, full_name, mobile, phone, email, whatsapp")
-            .or(`name.ilike.%${q}%,full_name.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%,mobile.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`)
-            .limit(15);
-
-          if (data) {
-            setCustomerList(data);
-          }
-        }
-      } catch (err) {
-        console.error("Customer search error:", err);
-      } finally {
-        setSearchingCustomer(false);
-      }
+    const q = patientSearchQuery.trim().toLowerCase();
+    if (!q) {
+      setCustomerList(allCustomers);
+      return;
     }
 
-    const timer = setTimeout(searchCustomers, 250);
-    return () => clearTimeout(timer);
+    const filtered = allCustomers.filter(c => {
+      const nameMatch = (c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`).toLowerCase().includes(q);
+      const phoneMatch = (c.mobile || c.phone || "").toLowerCase().includes(q);
+      const emailMatch = (c.email || "").toLowerCase().includes(q);
+      return nameMatch || phoneMatch || emailMatch;
+    });
+
+    setCustomerList(filtered);
   }, [patientSearchQuery, allCustomers]);
 
   // Handle Select Customer from List
@@ -387,10 +376,12 @@ export default function AdminNewBookingView({
         serviceId: selectedServiceObj?.id,
         doctorId: selectedDoctorObj?.id,
         date: bookingDate,
-        timeSlot: selectedTime,
+        requestedTime: selectedTime,
         sessionType: sessionType === "in_person" ? "in_person" : "online",
         notes: notes || null,
-        customerId: foundCustomer?.id || null
+        isManual: true,
+        status: "approved",
+        explicitCustomerId: foundCustomer?.id || null
       };
 
       let success = false;
@@ -531,70 +522,93 @@ export default function AdminNewBookingView({
               )}
             </div>
 
-            {/* 🔍 SEARCH EXISTING PATIENTS AUTOCOMPLETE DROP-DOWN */}
-            <div className="relative">
-              <label className="block font-bold text-[#1F251A] mb-1.5 flex items-center gap-2">
-                <Search size={14} className="text-emerald-700" />
-                <span>Search Existing Patient (Name, Phone, or Email)</span>
-              </label>
+            {/* 🔍 SEARCH & SELECT EXISTING PATIENT DROPDOWN */}
+            <div className="relative space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="font-bold text-[#1F251A] text-xs flex items-center gap-2">
+                  <Search size={14} className="text-emerald-700" />
+                  <span>Search Existing Patient (Name, Phone, or Email)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerDropdown(!showCustomerDropdown)}
+                  className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
+                >
+                  <Users size={13} />
+                  <span>{showCustomerDropdown ? "Hide Patients List" : "Browse All Patients"}</span>
+                  <ChevronDown size={13} />
+                </button>
+              </div>
+
               <div className="relative">
                 <input
                   type="text"
                   value={patientSearchQuery}
+                  onClick={() => setShowCustomerDropdown(true)}
                   onChange={(e) => {
                     setPatientSearchQuery(e.target.value);
                     setShowCustomerDropdown(true);
                   }}
-                  onFocus={() => setShowCustomerDropdown(true)}
-                  placeholder="Type patient name or phone number to search database..."
-                  className="w-full rounded-2xl border border-[#414E36]/20 bg-[#FBFBF9] pl-10 pr-10 py-2.5 text-xs font-bold text-[#1F251A] outline-none focus:border-emerald-700 focus:bg-white"
+                  placeholder="Click here or type patient name/phone to pick from database..."
+                  className="w-full rounded-2xl border border-[#414E36]/20 bg-[#FBFBF9] pl-10 pr-10 py-2.5 text-xs font-bold text-[#1F251A] outline-none focus:border-emerald-700 focus:bg-white cursor-pointer"
                 />
-                <Users size={16} className="absolute left-3.5 top-3 text-[#5A6A51]" />
+                <Search size={16} className="absolute left-3.5 top-3 text-[#5A6A51]" />
                 {patientSearchQuery ? (
                   <button
                     type="button"
                     onClick={() => {
                       setPatientSearchQuery("");
-                      setShowCustomerDropdown(false);
+                      setShowCustomerDropdown(true);
                     }}
                     className="absolute right-3.5 top-3 text-[#5A6A51] hover:text-[#1F251A]"
                   >
                     <X size={14} />
                   </button>
-                ) : searchingCustomer ? (
-                  <Loader2 size={16} className="absolute right-3.5 top-3 animate-spin text-emerald-700" />
                 ) : null}
               </div>
 
-              {/* Matching Customers Floating Dropdown List */}
-              {showCustomerDropdown && customerList.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-[100] max-h-64 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/15 shadow-2xl p-2 space-y-1">
-                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#414E36]/10 flex justify-between items-center">
-                    <span>Database Customers ({customerList.length})</span>
-                    <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] font-bold">Close</button>
+              {/* Scrollable Floating Customer List Dropdown */}
+              {showCustomerDropdown && (
+                <div className="absolute left-0 right-0 top-full mt-1 z-[100] max-h-64 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/20 shadow-2xl p-2 space-y-1">
+                  <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-xl flex justify-between items-center mb-1">
+                    <span>Database Patients ({customerList.length})</span>
+                    <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] font-bold text-xs">Close ✕</button>
                   </div>
-                  {customerList.map((c) => {
-                    const cName = c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Patient Account";
-                    const cPhone = c.mobile || c.phone || "No Phone";
+                  
+                  {customerList.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-[#5A6A51] font-semibold">
+                      No matching patients found. Type details below to create a new patient.
+                    </div>
+                  ) : (
+                    customerList.map((c) => {
+                      const cName = c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Patient Account";
+                      const cPhone = c.mobile || c.phone || "No Phone";
+                      const isSelected = foundCustomer?.id === c.id;
 
-                    return (
-                      <div
-                        key={c.id}
-                        onClick={() => handleSelectCustomer(c)}
-                        className="p-2.5 rounded-xl hover:bg-emerald-50/70 cursor-pointer transition flex items-center justify-between border-b border-gray-50 last:border-0 text-xs"
-                      >
-                        <div>
-                          <span className="font-extrabold text-[#1F251A] block">{cName}</span>
-                          <span className="text-[11px] font-mono text-[#5A6A51]">
-                            {cPhone} {c.email ? `• ${c.email}` : ""}
+                      return (
+                        <div
+                          key={c.id}
+                          onClick={() => handleSelectCustomer(c)}
+                          className={`p-3 rounded-xl cursor-pointer transition flex items-center justify-between border-b border-gray-100 last:border-0 ${
+                            isSelected ? "bg-emerald-100/70 border-emerald-300" : "hover:bg-emerald-50/70"
+                          }`}
+                        >
+                          <div>
+                            <span className="font-extrabold text-[#1F251A] text-xs block">{cName}</span>
+                            <span className="text-[11px] font-mono text-[#5A6A51]">
+                              {cPhone} {c.email ? `• ${c.email}` : ""}
+                            </span>
+                          </div>
+                          <span className={`text-[11px] font-bold px-3 py-1 rounded-xl flex items-center gap-1 ${
+                            isSelected ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800"
+                          }`}>
+                            {isSelected ? <Check size={12} /> : null}
+                            {isSelected ? "Selected" : "Select"}
                           </span>
                         </div>
-                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/60 px-2.5 py-1 rounded-lg">
-                          Select Patient
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               )}
             </div>
