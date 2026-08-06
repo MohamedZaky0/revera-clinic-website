@@ -70,6 +70,7 @@ export default function DoctorAccountView({
   }, [branches]);
 
   const [providerRecord, setProviderRecord] = useState<any>(null);
+  const [providerBranches, setProviderBranches] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadProviderDetails() {
@@ -84,6 +85,29 @@ export default function DoctorAccountView({
         const { data } = await query.maybeSingle();
         if (data) {
           setProviderRecord(data);
+
+          // Extract multi-branch assignments from provider record
+          let bIds: string[] = [];
+          if (data.working_days_hours && typeof data.working_days_hours === "object" && Array.isArray(data.working_days_hours.branch_ids)) {
+            bIds = data.working_days_hours.branch_ids;
+          } else if (Array.isArray(data.branch_ids)) {
+            bIds = data.branch_ids;
+          } else if (data.branch_id) {
+            bIds = [data.branch_id];
+          }
+
+          if (bIds.length > 0) {
+            const { data: branchRows } = await supabase.from("branches").select("id, name_en, name");
+            const names = bIds.map((id: any) => {
+              const match = (branchRows || []).find((b: any) => String(b.id) === String(id) || String(b.name_en).toLowerCase() === String(id).toLowerCase());
+              if (match) return match.name_en || match.name;
+              const lower = String(id).toLowerCase().trim();
+              if (lower === "home") return "Home Visit";
+              if (lower === "main") return "Main Branch";
+              return String(id);
+            });
+            setProviderBranches(names);
+          }
         }
       } catch (e) {
         console.error("Error loading doctor database provider record:", e);
@@ -991,16 +1015,17 @@ export default function DoctorAccountView({
               phone: providerRecord?.phone || "",
               address: providerRecord?.address || "",
               role: "Doctor / Specialist",
-              branch: resolvedBranchName,
+              branch: providerBranches.length > 0 ? providerBranches.join(", ") : resolvedBranchName,
+              branchesList: providerBranches.length > 0 ? providerBranches : [resolvedBranchName],
               department: providerRecord?.specialty || "Dermatology & Medical Services",
               employeeId: doctorDbId ? `DOC-${String(doctorDbId).slice(0, 5).toUpperCase()}` : (providerRecord?.id ? `DOC-${providerRecord.id.slice(0, 5).toUpperCase()}` : "DOC-001"),
               joiningDate: providerRecord?.created_at
                 ? new Date(providerRecord.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
                 : "—",
-              shiftType: providerRecord?.shift || "Day",
+              shiftType: providerRecord?.shift || (providerRecord?.working_days_hours ? "Multi-Shift Schedule" : "Day"),
               workingDays: providerRecord?.working_days || "Sunday – Thursday",
               workingHours: providerRecord?.working_hours || "09:00 AM – 05:00 PM",
-              breakTime: providerRecord?.break_time || "01:00 PM – 02:00 PM",
+              workingDaysHours: providerRecord?.working_days_hours,
               basicSalary: Number(providerRecord?.fixed_salary || providerRecord?.salary || 0),
               bonuses: 0,
               deductions: 0,

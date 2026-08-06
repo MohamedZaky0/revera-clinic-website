@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   User,
   Camera,
@@ -36,13 +36,14 @@ export interface UserProfileData {
   role: string;
   department?: string;
   branch?: string;
+  branchesList?: string[];
   employeeId?: string;
   employmentType?: string;
   joiningDate?: string;
   shiftType?: string;
   workingDays?: string;
   workingHours?: string;
-  breakTime?: string;
+  workingDaysHours?: any;
   basicSalary?: number;
   bonuses?: number;
   deductions?: number;
@@ -138,10 +139,80 @@ export default function UserProfileView({
   const displayName = user.name || `${firstName} ${lastName}`.trim();
 
   const displayRole = user.role || (isDoctorView ? "Doctor" : "Staff");
-  const displayBranch = user.branch || "Main Branch";
   const displayEmployeeId = user.employeeId || (isDoctorView ? "DOC-001" : "EMP-001");
   const displayJoiningDate = user.joiningDate || "—";
   const displayDepartment = user.department || (isDoctorView ? "Medical Services" : "Reception");
+
+  // Formatted Multi-Branch Display (Normalizing raw "home", "main", or branch lists)
+  const displayBranches = useMemo(() => {
+    if (Array.isArray(user.branchesList) && user.branchesList.length > 0) {
+      return user.branchesList.map(b => {
+        const clean = String(b).trim().toLowerCase();
+        if (clean === "home") return "Home Visit";
+        if (clean === "main") return "Main Branch";
+        return b;
+      }).join(", ");
+    }
+
+    const rawSched = user.workingDaysHours;
+    if (rawSched && typeof rawSched === "object" && Array.isArray(rawSched.branch_ids) && rawSched.branch_ids.length > 0) {
+      return rawSched.branch_ids.map((bId: any) => {
+        const clean = String(bId).trim().toLowerCase();
+        if (clean === "home") return "Home Visit";
+        if (clean === "main") return "Main Branch";
+        return String(bId);
+      }).join(", ");
+    }
+
+    if (user.branch) {
+      const clean = String(user.branch).trim().toLowerCase();
+      if (clean === "home") return "Home Visit";
+      if (clean === "main") return "Main Branch";
+      return user.branch;
+    }
+
+    return "Main Branch";
+  }, [user.branch, user.branchesList, user.workingDaysHours]);
+
+  // Formatted Multi-Shift & Working Hours Schedule Display
+  const displayWorkingSchedule = useMemo(() => {
+    const rawSched = user.workingDaysHours;
+    if (rawSched) {
+      let parsed: any = rawSched;
+      if (typeof parsed === "string") {
+        try { parsed = JSON.parse(parsed); } catch (e) {}
+      }
+
+      if (parsed && typeof parsed === "object") {
+        const dayKeys = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        const activeDays: string[] = [];
+        const timeSlots: string[] = [];
+
+        dayKeys.forEach(d => {
+          const dayData = parsed[d] || parsed[d.toLowerCase()];
+          if (dayData && dayData.active !== false && (dayData.start || dayData.hours)) {
+            const hoursLabel = dayData.hours || `${dayData.start || "09:00"} – ${dayData.end || "17:00"}`;
+            activeDays.push(d.slice(0, 3));
+            if (!timeSlots.includes(hoursLabel)) {
+              timeSlots.push(hoursLabel);
+            }
+          }
+        });
+
+        if (activeDays.length > 0) {
+          return {
+            days: activeDays.join(", "),
+            hours: timeSlots.join(" | ")
+          };
+        }
+      }
+    }
+
+    return {
+      days: user.workingDays || "Sunday – Thursday",
+      hours: user.workingHours || "09:00 AM – 05:00 PM"
+    };
+  }, [user.workingDaysHours, user.workingDays, user.workingHours]);
 
   // Helper to get date ranges based on selected period
   const getDateRange = (periodStr: string) => {
@@ -239,7 +310,6 @@ export default function UserProfileView({
             totalWorkingHours: `${Math.round(totalMin / 60)}h`
           });
         } else {
-          // Real database returns zero rows when no logs exist
           setAttendanceLogs([]);
           setAttendanceMetrics({
             presentDays: 0,
@@ -447,7 +517,7 @@ export default function UserProfileView({
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] block">Current Branch</span>
-              <span className="font-extrabold text-[#1F251A]">{displayBranch}</span>
+              <span className="font-extrabold text-[#1F251A]">{displayBranches}</span>
             </div>
           </div>
 
@@ -559,7 +629,7 @@ export default function UserProfileView({
         </div>
       </div>
 
-      {/* ── SECTION 2: WORK INFORMATION (REAL DATABASE DATA - VIEW ONLY) ── */}
+      {/* ── SECTION 2: WORK INFORMATION (REAL DATABASE DATA - VIEW ONLY, BREAK TIME REMOVED) ── */}
       <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div className="flex items-center gap-3">
@@ -592,8 +662,8 @@ export default function UserProfileView({
           <div className="flex items-start gap-3">
             <MapPin size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Current Branch</span>
-              <span className="font-extrabold text-[#1F251A]">{displayBranch}</span>
+              <span className="text-[11px] font-bold text-[#5A6A51] block">Assigned Branches</span>
+              <span className="font-extrabold text-[#1F251A]">{displayBranches}</span>
             </div>
           </div>
 
@@ -601,7 +671,7 @@ export default function UserProfileView({
             <Calendar size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Working Days</span>
-              <span className="font-extrabold text-[#1F251A]">{user.workingDays || "Sunday – Thursday"}</span>
+              <span className="font-extrabold text-[#1F251A]">{displayWorkingSchedule.days}</span>
             </div>
           </div>
 
@@ -617,15 +687,7 @@ export default function UserProfileView({
             <Clock size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Working Hours</span>
-              <span className="font-extrabold text-[#1F251A]">{user.workingHours || "09:00 AM – 05:00 PM"}</span>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 md:col-start-2">
-            <Clock3 size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
-            <div>
-              <span className="text-[11px] font-bold text-[#5A6A51] block">Break Time</span>
-              <span className="font-extrabold text-[#1F251A]">{user.breakTime || "01:00 PM – 02:00 PM"}</span>
+              <span className="font-extrabold text-[#1F251A]">{displayWorkingSchedule.hours}</span>
             </div>
           </div>
         </div>
