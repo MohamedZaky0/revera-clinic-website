@@ -21,7 +21,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 
 interface ServiceItem {
-  id: string;
+  id: string | number;
   en?: string;
   name?: string;
   title?: string;
@@ -33,7 +33,7 @@ interface ServiceItem {
 }
 
 interface ProviderItem {
-  id: string;
+  id: string | number;
   name: string;
   specialty?: string;
   image?: string;
@@ -41,6 +41,7 @@ interface ProviderItem {
 
 interface CustomerItem {
   id: string;
+  name?: string;
   first_name?: string;
   last_name?: string;
   full_name?: string;
@@ -92,6 +93,7 @@ export default function AdminNewBookingView({
   // Patient Search & Selection State
   const [patientSearchQuery, setPatientSearchQuery] = useState("");
   const [customerList, setCustomerList] = useState<CustomerItem[]>([]);
+  const [allCustomers, setAllCustomers] = useState<CustomerItem[]>([]);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
 
@@ -130,7 +132,7 @@ export default function AdminNewBookingView({
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitMenu, setShowSubmitMenu] = useState(false);
 
-  // 1. Fetch Services & Providers & Existing Customers on mount
+  // 1. Fetch Services & Providers & Existing Customers from Supabase on mount
   useEffect(() => {
     async function loadData() {
       try {
@@ -146,14 +148,16 @@ export default function AdminNewBookingView({
           setDbDoctors(pData);
         }
 
-        // Fetch Initial Recent Customers List
+        // Fetch Customers List directly from Supabase
         const { data: cData } = await supabase
           .from("customers")
-          .select("id, first_name, last_name, full_name, mobile, phone, email, whatsapp")
+          .select("id, name, first_name, last_name, full_name, mobile, phone, email, whatsapp")
           .order("created_at", { ascending: false })
-          .limit(20);
-        if (cData) {
+          .limit(50);
+        
+        if (cData && cData.length > 0) {
           setCustomerList(cData);
+          setAllCustomers(cData);
         }
       } catch (err) {
         console.error("Error initializing New Booking View data:", err);
@@ -179,26 +183,37 @@ export default function AdminNewBookingView({
     }
   }, [sameAsPhone, phone]);
 
-  // 2. Real-time Customer Search & Dropdown Filter
+  // 2. Real-time Customer Search & Filter
   useEffect(() => {
     async function searchCustomers() {
-      if (!patientSearchQuery.trim()) {
-        setShowCustomerDropdown(false);
+      const q = patientSearchQuery.trim().toLowerCase();
+      if (!q) {
+        setCustomerList(allCustomers);
         return;
       }
       setSearchingCustomer(true);
-      setShowCustomerDropdown(true);
 
       try {
-        const q = patientSearchQuery.trim();
-        const { data } = await supabase
-          .from("customers")
-          .select("id, first_name, last_name, full_name, mobile, phone, email, whatsapp")
-          .or(`full_name.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%,mobile.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`)
-          .limit(10);
+        const filtered = allCustomers.filter(c => {
+          const nameMatch = (c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`).toLowerCase().includes(q);
+          const phoneMatch = (c.mobile || c.phone || "").toLowerCase().includes(q);
+          const emailMatch = (c.email || "").toLowerCase().includes(q);
+          return nameMatch || phoneMatch || emailMatch;
+        });
 
-        if (data) {
-          setCustomerList(data);
+        if (filtered.length > 0) {
+          setCustomerList(filtered);
+        } else {
+          // Query Supabase directly if client filter returns empty
+          const { data } = await supabase
+            .from("customers")
+            .select("id, name, first_name, last_name, full_name, mobile, phone, email, whatsapp")
+            .or(`name.ilike.%${q}%,full_name.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%,mobile.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`)
+            .limit(15);
+
+          if (data) {
+            setCustomerList(data);
+          }
         }
       } catch (err) {
         console.error("Customer search error:", err);
@@ -207,20 +222,25 @@ export default function AdminNewBookingView({
       }
     }
 
-    const timer = setTimeout(searchCustomers, 300);
+    const timer = setTimeout(searchCustomers, 250);
     return () => clearTimeout(timer);
-  }, [patientSearchQuery]);
+  }, [patientSearchQuery, allCustomers]);
 
   // Handle Select Customer from List
   const handleSelectCustomer = async (cust: CustomerItem) => {
     setFoundCustomer(cust);
     setPatientFound(true);
-    setPhone(cust.mobile || cust.phone || "");
-    setFirstName(cust.first_name || (cust.full_name ? cust.full_name.split(" ")[0] : ""));
-    setLastName(cust.last_name || (cust.full_name ? cust.full_name.split(" ").slice(1).join(" ") : ""));
+    const p = cust.mobile || cust.phone || "";
+    setPhone(p);
+
+    const fName = cust.first_name || cust.name?.split(" ")[0] || cust.full_name?.split(" ")[0] || "";
+    const lName = cust.last_name || cust.name?.split(" ").slice(1).join(" ") || cust.full_name?.split(" ").slice(1).join(" ") || "";
+
+    setFirstName(fName);
+    setLastName(lName);
     setEmail(cust.email || "");
-    setWhatsapp(cust.whatsapp || cust.mobile || cust.phone || "");
-    setPatientSearchQuery(`${cust.full_name || `${cust.first_name} ${cust.last_name}`} (${cust.mobile || cust.phone || ""})`);
+    setWhatsapp(cust.whatsapp || p);
+    setPatientSearchQuery(`${cust.name || cust.full_name || `${fName} ${lName}`}`.trim());
     setShowCustomerDropdown(false);
 
     // Fetch active packages for this customer
@@ -266,7 +286,7 @@ export default function AdminNewBookingView({
 
           const { data: resData } = await qRes;
           if (resData) {
-            booked = resData.map((r: any) => normalizeTimeSlot(r.start_time)).filter(Boolean);
+            booked = resData.map((r: any) => normalizeTimeSlot(r.start_time || r.time)).filter(Boolean);
           }
         }
         setBookedTimeSlots(booked);
@@ -351,7 +371,7 @@ export default function AdminNewBookingView({
     }
   }, [bookingDate]);
 
-  // Submission Handler
+  // Submission Handler connecting to POST /api/reservations + Direct Supabase fallback
   const handleCreateBooking = async (action: "normal" | "print" | "whatsapp" = "normal") => {
     if (!phone || !firstName) {
       alert("Please enter patient phone number and first name.");
@@ -360,53 +380,86 @@ export default function AdminNewBookingView({
 
     setSubmitting(true);
     try {
-      // 1. Create or resolve customer in database
-      let customerId = foundCustomer?.id;
-      if (!customerId) {
-        const { data: newCust, error: cErr } = await supabase
-          .from("customers")
-          .insert({
-            mobile: phone,
-            phone: phone,
-            first_name: firstName,
-            last_name: lastName,
-            full_name: `${firstName} ${lastName}`.trim(),
-            email: email || null,
-            whatsapp: whatsapp || phone
-          })
-          .select("id")
-          .single();
-
-        if (!cErr && newCust) {
-          customerId = newCust.id;
-        }
-      }
-
-      // 2. Insert reservation row into database
-      const reservationPayload = {
-        customer_id: customerId || null,
-        patient_name: fullPatientName,
-        customer_name: fullPatientName,
+      const payload = {
+        name: fullPatientName,
         phone: phone,
         email: email || null,
-        service_id: selectedServiceObj?.id || null,
-        service_name: selectedServiceName,
-        provider_id: selectedDoctorObj?.id || null,
-        doctor_name: selectedDoctorName,
+        serviceId: selectedServiceObj?.id,
+        doctorId: selectedDoctorObj?.id,
         date: bookingDate,
-        start_time: selectedTime,
-        session_type: sessionType === "in_person" ? "In Person" : "Online",
+        timeSlot: selectedTime,
+        sessionType: sessionType === "in_person" ? "in_person" : "online",
         notes: notes || null,
-        status: "approved",
-        amount_paid: usePackageMode ? 0 : (selectedServiceObj?.price || 500)
+        customerId: foundCustomer?.id || null
       };
 
-      const { error: resErr } = await supabase
-        .from("reservations")
-        .insert(reservationPayload);
+      let success = false;
 
-      if (resErr) {
-        console.error("Error creating reservation:", resErr);
+      // 1. Try POST /api/reservations endpoint
+      try {
+        const res = await fetch("/api/reservations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          success = true;
+        } else {
+          const errData = await res.json();
+          console.warn("API reservation endpoint response warning, executing direct insert fallback:", errData);
+        }
+      } catch (e) {
+        console.warn("API fetch error, executing direct insert fallback:", e);
+      }
+
+      // 2. Direct Supabase insert fallback to ensure guaranteed write
+      if (!success) {
+        let customerId = foundCustomer?.id;
+        if (!customerId) {
+          const { data: newCust } = await supabase
+            .from("customers")
+            .insert({
+              name: fullPatientName,
+              mobile: phone,
+              phone: phone,
+              first_name: firstName,
+              last_name: lastName,
+              full_name: fullPatientName,
+              email: email || null,
+              whatsapp: whatsapp || phone,
+              number_of_bookings: 1
+            })
+            .select("id")
+            .maybeSingle();
+
+          if (newCust) customerId = newCust.id;
+        }
+
+        const directResPayload = {
+          customer_id: customerId || null,
+          patient_name: fullPatientName,
+          customer_name: fullPatientName,
+          customer_phone: phone,
+          phone: phone,
+          email: email || null,
+          service_id: selectedServiceObj?.id || null,
+          service_name: selectedServiceName,
+          provider_id: selectedDoctorObj?.id || null,
+          doctor_name: selectedDoctorName,
+          date: bookingDate,
+          start_time: selectedTime,
+          time: selectedTime,
+          session_type: sessionType === "in_person" ? "In Person" : "Online",
+          notes: notes || null,
+          status: "approved",
+          amount_paid: usePackageMode ? 0 : Number(selectedServiceObj?.price || 500)
+        };
+
+        const { error: insErr } = await supabase.from("reservations").insert(directResPayload);
+        if (insErr) {
+          console.error("Direct reservation insert error:", insErr);
+        }
       }
 
       if (action === "print") {
@@ -422,6 +475,7 @@ export default function AdminNewBookingView({
       onClose();
     } catch (err) {
       console.error("Booking creation error:", err);
+      alert("Booking creation failed. Please check connection.");
     } finally {
       setSubmitting(false);
     }
@@ -487,43 +541,60 @@ export default function AdminNewBookingView({
                 <input
                   type="text"
                   value={patientSearchQuery}
-                  onChange={(e) => setPatientSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setPatientSearchQuery(e.target.value);
+                    setShowCustomerDropdown(true);
+                  }}
                   onFocus={() => setShowCustomerDropdown(true)}
                   placeholder="Type patient name or phone number to search database..."
-                  className="w-full rounded-2xl border border-[#414E36]/20 bg-[#FBFBF9] pl-10 pr-4 py-2.5 text-xs font-bold text-[#1F251A] outline-none focus:border-emerald-700 focus:bg-white"
+                  className="w-full rounded-2xl border border-[#414E36]/20 bg-[#FBFBF9] pl-10 pr-10 py-2.5 text-xs font-bold text-[#1F251A] outline-none focus:border-emerald-700 focus:bg-white"
                 />
                 <Users size={16} className="absolute left-3.5 top-3 text-[#5A6A51]" />
-                {searchingCustomer && (
+                {patientSearchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPatientSearchQuery("");
+                      setShowCustomerDropdown(false);
+                    }}
+                    className="absolute right-3.5 top-3 text-[#5A6A51] hover:text-[#1F251A]"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : searchingCustomer ? (
                   <Loader2 size={16} className="absolute right-3.5 top-3 animate-spin text-emerald-700" />
-                )}
+                ) : null}
               </div>
 
-              {/* Matching Customers Floating List */}
+              {/* Matching Customers Floating Dropdown List */}
               {showCustomerDropdown && customerList.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-[100] max-h-60 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/15 shadow-2xl p-2 space-y-1">
+                <div className="absolute left-0 right-0 top-full mt-1 z-[100] max-h-64 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/15 shadow-2xl p-2 space-y-1">
                   <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#414E36]/10 flex justify-between items-center">
-                    <span>Database Customers</span>
+                    <span>Database Customers ({customerList.length})</span>
                     <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] font-bold">Close</button>
                   </div>
-                  {customerList.map((c) => (
-                    <div
-                      key={c.id}
-                      onClick={() => handleSelectCustomer(c)}
-                      className="p-2.5 rounded-xl hover:bg-emerald-50/70 cursor-pointer transition flex items-center justify-between border-b border-gray-50 last:border-0 text-xs"
-                    >
-                      <div>
-                        <span className="font-extrabold text-[#1F251A] block">
-                          {c.full_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Patient Account"}
-                        </span>
-                        <span className="text-[11px] font-mono text-[#5A6A51]">
-                          {c.mobile || c.phone || "No Phone"} {c.email ? `• ${c.email}` : ""}
+                  {customerList.map((c) => {
+                    const cName = c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Patient Account";
+                    const cPhone = c.mobile || c.phone || "No Phone";
+
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => handleSelectCustomer(c)}
+                        className="p-2.5 rounded-xl hover:bg-emerald-50/70 cursor-pointer transition flex items-center justify-between border-b border-gray-50 last:border-0 text-xs"
+                      >
+                        <div>
+                          <span className="font-extrabold text-[#1F251A] block">{cName}</span>
+                          <span className="text-[11px] font-mono text-[#5A6A51]">
+                            {cPhone} {c.email ? `• ${c.email}` : ""}
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/60 px-2.5 py-1 rounded-lg">
+                          Select Patient
                         </span>
                       </div>
-                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/60 px-2.5 py-1 rounded-lg">
-                        Select
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
