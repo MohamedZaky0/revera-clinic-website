@@ -1002,7 +1002,7 @@ Caught by `scratch/phase1packagecheck.ts` on the first implementation attempt.
 | `id` | UUID | Primary key |
 | `customer_package_id` | UUID | FK → customer_packages.id ON DELETE CASCADE |
 | `customer_package_item_id` | UUID | FK → customer_package_items.id ON DELETE CASCADE |
-| `reservation_id` | UUID | FK → reservations.id ON DELETE RESTRICT; one row per delivered package service session |
+| `reservation_id` | UUID | FK → reservations.id ON DELETE CASCADE (updated 2026-08-06 by `20260806202500_cascade_delete_package_revenue_recognitions.sql`); one row per delivered package service session |
 | `recognised_at` | timestamptz | Default now() |
 | `recognised_amount` | numeric | Non-negative amount released from deferred revenue |
 | `reason` | text | Default `'session'`, CHECK IN (`'session'`, `'expiry_breakage'`) |
