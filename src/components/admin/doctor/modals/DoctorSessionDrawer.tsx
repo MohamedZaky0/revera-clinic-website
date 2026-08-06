@@ -92,15 +92,15 @@ export default function DoctorSessionDrawer({
   const activeRx = customerRxList.length > 0 ? customerRxList[0] : null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-end bg-black/50 backdrop-blur-sm transition-opacity animate-fadeIn">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-6 bg-black/60 backdrop-blur-md transition-opacity animate-fadeIn">
       {/* Click backdrop overlay to close */}
       <div 
         className="absolute inset-0 cursor-pointer" 
         onClick={() => setScheduleModalBooking(null)} 
       />
 
-      {/* Right Drawer Panel */}
-      <div className="relative w-full max-w-2xl h-full bg-white shadow-2xl z-10 flex flex-col overflow-hidden border-l border-[#414E36]/15 animate-slideLeft">
+      {/* Centered Modal Panel */}
+      <div className="relative w-full max-w-3xl max-h-[90vh] bg-white shadow-2xl rounded-3xl z-10 flex flex-col overflow-hidden border border-[#414E36]/15 animate-scaleUp">
         
         {/* Drawer Header */}
         <div className="flex items-center justify-between p-5 px-6 border-b border-[#414E36]/10 bg-[#FBFBF9]">

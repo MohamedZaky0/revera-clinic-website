@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Clock, CheckCircle2, Play, ChevronRight, Pill, FileText, Package, AlertCircle, User, Phone, Mail, Calendar, ShieldAlert, MapPin, Hash, Sparkles, Plus } from "lucide-react";
 import { DoctorPatient } from "../types";
 import { parseBookingNotes, getAuthHeaders } from "../utils";
@@ -27,6 +27,14 @@ export default function DoctorPatientHistoryDrawer({
   const [customerFullData, setCustomerFullData] = useState<any | null>(null);
   const [loadingCustomerData, setLoadingCustomerData] = useState(false);
   const [activeTab, setActiveTab] = useState<"history" | "medical" | "personal">("history");
+
+  const validBookings = useMemo(() => {
+    if (!selectedPatientHistory?.bookings) return [];
+    return selectedPatientHistory.bookings.filter((b: any) => {
+      const st = String(b.status || "").toLowerCase().trim();
+      return st !== "rejected" && st !== "cancelled" && st !== "canceled";
+    });
+  }, [selectedPatientHistory]);
 
   useEffect(() => {
     if (!selectedPatientHistory) {
@@ -236,11 +244,11 @@ export default function DoctorPatientHistoryDrawer({
                 <Clock size={18} className="text-[#414E36]" /> {t.patientHistoryDrawerTitle}
               </h3>
               <span className="text-xs font-bold text-[#414E36] bg-[#414E36]/10 px-3 py-1 rounded-full">
-                {selectedPatientHistory.bookings.length} {t.totalScheduledCard}
+                {validBookings.length} {t.totalScheduledCard}
               </span>
             </div>
 
-            {selectedPatientHistory.bookings.map((booking: any, idx: number) => {
+            {validBookings.map((booking: any, idx: number) => {
               const parsed = parseBookingNotes(booking.notes || "");
               const isCompleted = booking.status === "completed" || booking.status === "done";
               const isInSession = booking.status === "started" || booking.status === "in-progress";
@@ -259,7 +267,7 @@ export default function DoctorPatientHistoryDrawer({
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-4">
                     <div className="flex items-center gap-3">
                       <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#414E36] text-white font-black text-sm shadow-xs">
-                        #{selectedPatientHistory.bookings.length - idx}
+                        #{validBookings.length - idx}
                       </span>
                       <div>
                         <span className="text-base font-bold text-[#1F251A]">
@@ -291,7 +299,6 @@ export default function DoctorPatientHistoryDrawer({
                       <button
                         type="button"
                         onClick={() => {
-                          setSelectedPatientHistory(null);
                           handleOpenScheduleModal(booking);
                         }}
                         className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2 text-xs font-bold text-[#414E36] hover:bg-[#414E36] hover:text-white transition shadow-xs flex items-center gap-1.5"

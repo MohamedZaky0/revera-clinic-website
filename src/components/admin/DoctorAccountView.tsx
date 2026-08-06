@@ -38,7 +38,16 @@ export default function DoctorAccountView({
   const [activeTab, setActiveTab] = useState<DoctorTab>("schedule");
   const [scheduleViewMode, setScheduleViewMode] = useState<"calendar" | "list">("calendar");
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
-  const [reservations, setReservations] = useState<any[]>(initialReservations);
+  // Helper to exclude rejected and cancelled bookings from doctor view
+  const filterValidDoctorBookings = (list: any[]) => {
+    if (!Array.isArray(list)) return [];
+    return list.filter((r: any) => {
+      const st = String(r?.status || "").toLowerCase().trim();
+      return st !== "rejected" && st !== "cancelled" && st !== "canceled";
+    });
+  };
+
+  const [reservations, setReservations] = useState<any[]>(() => filterValidDoctorBookings(initialReservations));
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [patientSearchQuery, setPatientSearchQuery] = useState("");
@@ -300,6 +309,7 @@ export default function DoctorAccountView({
       if (res.ok) {
         const data = await res.json();
         let resList = Array.isArray(data) ? data : data.reservations || [];
+        resList = filterValidDoctorBookings(resList);
         if (doctorName && doctorName !== "Doctor" && resList.length > 0) {
           const docLower = doctorName.toLowerCase().replace(/^dr\.?\s*/i, "").trim();
           resList = resList.filter((r: any) => {
