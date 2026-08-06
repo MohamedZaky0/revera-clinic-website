@@ -113,7 +113,7 @@ export default function DoctorPatientHistoryDrawer({
   const memberSince = customerFullData?.created_at ? customerFullData.created_at.slice(0, 10) : "N/A";
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#FBFBF9] overflow-y-auto flex flex-col w-full h-full animate-fadeIn text-[#1F251A]">
+    <div className="fixed top-0 bottom-0 [inset-inline-start:0] md:[inset-inline-start:280px] [inset-inline-end:0] z-40 bg-[#FBFBF9] overflow-y-auto flex flex-col h-full animate-fadeIn text-[#1F251A]">
       
       {/* Top Sticky Header Bar */}
       <div className="sticky top-0 z-20 bg-white border-b border-[#414E36]/12 px-6 py-4 flex items-center justify-between shadow-xs">

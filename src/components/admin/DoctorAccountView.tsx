@@ -828,7 +828,10 @@ export default function DoctorAccountView({
       {/* SIDEBAR NAVIGATION */}
       <DoctorSidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setSelectedPatientHistory(null);
+          setActiveTab(tab);
+        }}
         doctorName={doctorName}
         doctorEmail={doctorEmail}
         doctorPatientsCount={doctorPatientsList.length}
