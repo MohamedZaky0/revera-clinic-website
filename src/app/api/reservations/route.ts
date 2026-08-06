@@ -897,11 +897,21 @@ export async function PATCH(req: Request) {
           }
         }
 
-        if (availableRooms.length === 0) {
-          return NextResponse.json({ error: 'No clinical rooms are available at this time slot.' }, { status: 400 });
+        let chosenRoom: any = null;
+
+        if (body.roomId) {
+          chosenRoom = branchRooms.find((r: any) => String(r.id) === String(body.roomId));
         }
 
-        let chosenRoom = availableRooms[0];
+        if (!chosenRoom) {
+          if (availableRooms.length > 0) {
+            chosenRoom = availableRooms[0];
+          } else if (body.isManual) {
+            chosenRoom = serviceCompRooms[0] || branchRooms[0] || { id: '00000000-0000-0000-0000-000000000000', name: 'Room 1' };
+          } else {
+            return NextResponse.json({ error: 'No clinical rooms are available at this time slot.' }, { status: 400 });
+          }
+        }
 
         // Priority algorithm: if more than 1 room is available, select the room with the fewest exclusive services
         if (availableRooms.length > 1) {

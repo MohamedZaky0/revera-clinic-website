@@ -18,7 +18,8 @@ import {
   Search,
   Users,
   Check,
-  Building2
+  Building2,
+  DoorOpen
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -60,6 +61,14 @@ interface BranchItem {
   name?: string;
 }
 
+interface RoomItem {
+  id: string;
+  name: string;
+  branchId?: string;
+  type?: string;
+  status?: string;
+}
+
 interface AdminNewBookingViewProps {
   onClose: () => void;
   onBookingCreated?: () => void;
@@ -67,6 +76,7 @@ interface AdminNewBookingViewProps {
   providers?: any[];
   customers?: any[];
   branches?: any[];
+  rooms?: any[];
 }
 
 // Helper to extract service name cleanly
@@ -101,7 +111,8 @@ export default function AdminNewBookingView({
   services = [],
   providers = [],
   customers = [],
-  branches = []
+  branches = [],
+  rooms = []
 }: AdminNewBookingViewProps) {
   // Patient Search & Selection State
   const [patientSearchQuery, setPatientSearchQuery] = useState("");
@@ -128,6 +139,7 @@ export default function AdminNewBookingView({
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
+  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [bookingDate, setBookingDate] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
@@ -143,10 +155,11 @@ export default function AdminNewBookingView({
   const [dbServices, setDbServices] = useState<ServiceItem[]>(services);
   const [dbDoctors, setDbDoctors] = useState<ProviderItem[]>(providers);
   const [dbBranches, setDbBranches] = useState<BranchItem[]>(branches);
+  const [dbRooms, setDbRooms] = useState<RoomItem[]>(rooms);
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitMenu, setShowSubmitMenu] = useState(false);
 
-  // 1. Load Services, Providers, Customers & Branches from Supabase on mount
+  // 1. Load Services, Providers, Customers, Branches & Rooms from Supabase on mount
   useEffect(() => {
     async function loadData() {
       try {
@@ -166,6 +179,23 @@ export default function AdminNewBookingView({
         if (dbBranches.length === 0) {
           const { data: bData } = await supabase.from("branches").select("*").order("name_en", { ascending: true });
           if (bData && bData.length > 0) setDbBranches(bData);
+        }
+
+        // Fetch Rooms from API / Supabase
+        if (dbRooms.length === 0) {
+          try {
+            const res = await fetch("/api/rooms");
+            if (res.ok) {
+              const rData = await res.json();
+              if (Array.isArray(rData) && rData.length > 0) setDbRooms(rData);
+            } else {
+              const { data: rawRooms } = await supabase.from("rooms").select("*");
+              if (rawRooms) setDbRooms(rawRooms);
+            }
+          } catch (e) {
+            const { data: rawRooms } = await supabase.from("rooms").select("*");
+            if (rawRooms) setDbRooms(rawRooms);
+          }
         }
 
         // Fetch Customers List from Supabase
@@ -198,7 +228,10 @@ export default function AdminNewBookingView({
     if (branches && branches.length > 0 && dbBranches.length === 0) {
       setDbBranches(branches);
     }
-  }, [customers, branches]);
+    if (rooms && rooms.length > 0 && dbRooms.length === 0) {
+      setDbRooms(rooms);
+    }
+  }, [customers, branches, rooms]);
 
   // Set default selected branch, service & provider
   useEffect(() => {
@@ -212,6 +245,12 @@ export default function AdminNewBookingView({
       setSelectedDoctorId(String(dbDoctors[0].id));
     }
   }, [dbBranches, dbServices, dbDoctors]);
+
+  // Filter rooms by selected branch
+  const filteredRooms = useMemo(() => {
+    if (!selectedBranchId) return dbRooms;
+    return dbRooms.filter(r => !r.branchId || String(r.branchId) === String(selectedBranchId));
+  }, [dbRooms, selectedBranchId]);
 
   // Sync WhatsApp number if checkboxed
   useEffect(() => {
@@ -367,10 +406,12 @@ export default function AdminNewBookingView({
   const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
   const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
   const selectedBranchObj = dbBranches.find(b => String(b.id) === String(selectedBranchId)) || dbBranches[0];
+  const selectedRoomObj = dbRooms.find(r => String(r.id) === String(selectedRoomId));
 
   const selectedServiceName = getServiceName(selectedServiceObj);
   const selectedDoctorName = selectedDoctorObj?.name || "Doctor";
   const selectedBranchName = selectedBranchObj?.name_en || selectedBranchObj?.name || selectedBranchObj?.name_ar || "Clinic Branch";
+  const selectedRoomName = selectedRoomObj?.name || "Room 1 (Auto)";
 
   const fullPatientName = `${firstName} ${lastName}`.trim() || "Patient Name";
 
@@ -402,6 +443,7 @@ export default function AdminNewBookingView({
         serviceId: selectedServiceObj?.id,
         doctorId: selectedDoctorObj?.id,
         branchId: selectedBranchObj?.id || null,
+        roomId: selectedRoomId || null,
         date: bookingDate,
         requestedTime: selectedTime,
         sessionType: sessionType === "in_person" ? "in_person" : "online",
@@ -466,6 +508,8 @@ export default function AdminNewBookingView({
           provider_id: selectedDoctorObj?.id || null,
           doctor_name: selectedDoctorName,
           branch_id: selectedBranchObj?.id || null,
+          room_id: selectedRoomId || null,
+          room: selectedRoomName,
           date: bookingDate,
           start_time: selectedTime,
           time: selectedTime,
@@ -748,14 +792,14 @@ export default function AdminNewBookingView({
             </div>
 
             <div className="space-y-5 text-xs md:text-sm">
-              {/* Branch, Service, Doctor, Date Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Branch, Room, Service, Doctor, Date Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                 <div>
                   <label className="block font-bold text-[#1F251A] mb-1.5">Branch *</label>
                   <select
                     value={selectedBranchId}
                     onChange={(e) => setSelectedBranchId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
                   >
                     {dbBranches.map(b => (
                       <option key={b.id} value={b.id}>
@@ -766,11 +810,27 @@ export default function AdminNewBookingView({
                 </div>
 
                 <div>
+                  <label className="block font-bold text-[#1F251A] mb-1.5">Room (Optional)</label>
+                  <select
+                    value={selectedRoomId}
+                    onChange={(e) => setSelectedRoomId(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                  >
+                    <option value="">Auto-Assign Room</option>
+                    {filteredRooms.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
                   <label className="block font-bold text-[#1F251A] mb-1.5">Service *</label>
                   <select
                     value={selectedServiceId}
                     onChange={(e) => setSelectedServiceId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
                   >
                     {dbServices.map(s => (
                       <option key={s.id} value={s.id}>
@@ -785,7 +845,7 @@ export default function AdminNewBookingView({
                   <select
                     value={selectedDoctorId}
                     onChange={(e) => setSelectedDoctorId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
                   >
                     {dbDoctors.map(d => (
                       <option key={d.id} value={d.id}>{d.name}</option>
@@ -800,7 +860,7 @@ export default function AdminNewBookingView({
                     required
                     value={bookingDate}
                     onChange={(e) => setBookingDate(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 cursor-pointer"
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 cursor-pointer"
                   />
                 </div>
               </div>
@@ -961,6 +1021,11 @@ export default function AdminNewBookingView({
               <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
                 <span className="text-[#5A6A51] font-bold">Branch</span>
                 <span className="font-extrabold text-[#1F251A]">{selectedBranchName}</span>
+              </div>
+
+              <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
+                <span className="text-[#5A6A51] font-bold">Room</span>
+                <span className="font-extrabold text-[#1F251A]">{selectedRoomName}</span>
               </div>
 
               <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
