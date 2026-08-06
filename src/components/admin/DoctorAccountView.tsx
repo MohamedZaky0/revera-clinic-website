@@ -1029,9 +1029,9 @@ export default function DoctorAccountView({
               joiningDate: providerRecord?.created_at
                 ? new Date(providerRecord.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
                 : "—",
-              shiftType: providerRecord?.shift || "Multi-Shift Schedule",
-              workingDays: providerRecord?.working_days || "Saturday, Sunday, Monday, Tuesday, Thursday",
-              workingHours: providerRecord?.working_hours || "09:00 AM – 02:00 PM (Morning) | 05:00 PM – 09:00 PM (Evening)",
+              shiftType: providerRecord?.shift || (providerRecord?.working_days_hours ? "Multi-Shift Schedule" : "Day"),
+              workingDays: providerRecord?.working_days || null,
+              workingHours: providerRecord?.working_hours || null,
               workingDaysHours: providerRecord?.working_days_hours,
               basicSalary: Number(providerRecord?.fixed_salary || providerRecord?.salary || 0),
               bonuses: 0,

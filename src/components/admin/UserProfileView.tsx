@@ -160,15 +160,15 @@ export default function UserProfileView({
   const displayEmployeeId = user.employeeId || (isDoctorView ? "DOC-001" : "EMP-001");
   const displayJoiningDate = user.joiningDate || "—";
   
-  // Department logic: Exactly "Doctor" for doctors, "Receptionist" for reception/staff
-  const displayDepartment = isDoctorView ? "Doctor" : (user.department || "Receptionist");
+  // Department logic: Strictly from database record or Doctor/Receptionist
+  const displayDepartment = user.department || (isDoctorView ? "Doctor" : "Receptionist");
 
-  // Formatted Multi-Branch Display (Normalizing raw "home", "main", or resolving all clinic branches)
+  // Formatted Multi-Branch Display (Normalizing raw "home", "main", or resolving database branches)
   const displayBranches = useMemo(() => {
     if (Array.isArray(user.branchesList) && user.branchesList.length > 0) {
       const filtered = user.branchesList.map(b => {
         const clean = String(b).trim().toLowerCase();
-        if (clean === "home") return "Home Visit";
+        if (clean === "home") return null;
         if (clean === "main") return "Main Branch";
         return b;
       }).filter(Boolean);
@@ -179,15 +179,11 @@ export default function UserProfileView({
     if (rawSched && typeof rawSched === "object" && Array.isArray(rawSched.branch_ids) && rawSched.branch_ids.length > 0) {
       const filtered = rawSched.branch_ids.map((bId: any) => {
         const clean = String(bId).trim().toLowerCase();
-        if (clean === "home") return "Home Visit";
+        if (clean === "home") return null;
         if (clean === "main") return "Main Branch";
         return String(bId);
       }).filter(Boolean);
       if (filtered.length > 0) return filtered.join(", ");
-    }
-
-    if (isDoctorView && allSystemBranches.length > 0) {
-      return allSystemBranches.join(", ");
     }
 
     if (user.branch && user.branch.toLowerCase() !== "home") {
@@ -195,9 +191,9 @@ export default function UserProfileView({
     }
 
     return allSystemBranches.length > 0 ? allSystemBranches.join(", ") : "Main Branch";
-  }, [user.branch, user.branchesList, user.workingDaysHours, isDoctorView, allSystemBranches]);
+  }, [user.branch, user.branchesList, user.workingDaysHours, allSystemBranches]);
 
-  // Formatted Multi-Shift & Working Hours Schedule Display
+  // Formatted Working Schedule strictly parsed from Database Response
   const displayWorkingSchedule = useMemo(() => {
     const rawSched = user.workingDaysHours;
     if (rawSched) {
@@ -214,9 +210,11 @@ export default function UserProfileView({
         dayKeys.forEach(d => {
           const dayData = parsed[d] || parsed[d.toLowerCase()];
           if (dayData && dayData.active !== false && (dayData.start || dayData.hours)) {
-            const hoursLabel = dayData.hours || `${dayData.start || "09:00"} – ${dayData.end || "17:00"}`;
+            // Strip any artificial parenthesized annotations like (Morning) / (Evening)
+            let hoursLabel = dayData.hours || `${dayData.start || "09:00"} – ${dayData.end || "17:00"}`;
+            hoursLabel = hoursLabel.replace(/\s*\([^)]*\)/g, "").trim();
             activeDays.push(d);
-            if (!timeSlots.includes(hoursLabel)) {
+            if (hoursLabel && !timeSlots.includes(hoursLabel)) {
               timeSlots.push(hoursLabel);
             }
           }
@@ -232,20 +230,15 @@ export default function UserProfileView({
       }
     }
 
-    if (isDoctorView) {
-      return {
-        days: user.workingDays || "Saturday, Sunday, Monday, Tuesday, Thursday",
-        hours: user.workingHours || "09:00 AM – 02:00 PM (Morning) | 05:00 PM – 09:00 PM (Evening)",
-        shiftType: user.shiftType || "Multi-Shift Schedule"
-      };
-    }
+    // Clean hours string without artificial parentheses annotations
+    let rawHours = (user.workingHours || "—").replace(/\s*\([^)]*\)/g, "").trim();
 
     return {
-      days: user.workingDays || "Sunday – Thursday",
-      hours: user.workingHours || "09:00 AM – 05:00 PM",
+      days: user.workingDays || "—",
+      hours: rawHours || "—",
       shiftType: user.shiftType || "Day"
     };
-  }, [user.workingDaysHours, user.workingDays, user.workingHours, user.shiftType, isDoctorView]);
+  }, [user.workingDaysHours, user.workingDays, user.workingHours, user.shiftType]);
 
   // Helper to get date ranges based on selected period
   const getDateRange = (periodStr: string) => {
@@ -534,7 +527,7 @@ export default function UserProfileView({
 
         {/* Quick Details Grid (2 rows x 3 columns) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-[#414E36]/10 text-xs">
-          <div className="bg-white p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/10 text-[#414E36]">
               <Briefcase size={16} />
             </div>
@@ -544,7 +537,7 @@ export default function UserProfileView({
             </div>
           </div>
 
-          <div className="bg-white p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/10 text-[#414E36]">
               <MapPin size={16} />
             </div>
@@ -554,7 +547,7 @@ export default function UserProfileView({
             </div>
           </div>
 
-          <div className="bg-white p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
               <CheckCircle2 size={16} />
             </div>
@@ -566,7 +559,7 @@ export default function UserProfileView({
             </div>
           </div>
 
-          <div className="bg-white p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/10 text-[#414E36]">
               <User size={16} />
             </div>
@@ -576,7 +569,7 @@ export default function UserProfileView({
             </div>
           </div>
 
-          <div className="bg-white p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/10 text-[#414E36]">
               <Briefcase size={16} />
             </div>
@@ -586,7 +579,7 @@ export default function UserProfileView({
             </div>
           </div>
 
-          <div className="bg-white p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
+          <div className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#414E36]/10 text-[#414E36]">
               <Calendar size={16} />
             </div>
@@ -662,7 +655,7 @@ export default function UserProfileView({
         </div>
       </div>
 
-      {/* ── SECTION 2: WORK INFORMATION (REAL DATABASE DATA - VIEW ONLY, BREAK TIME REMOVED) ── */}
+      {/* ── SECTION 2: WORK INFORMATION (REAL DATABASE RESPONSE - VIEW ONLY, BREAK TIME REMOVED) ── */}
       <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div className="flex items-center gap-3">
