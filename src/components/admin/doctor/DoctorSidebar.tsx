@@ -7,7 +7,6 @@ import {
   Stethoscope,
   Users,
   BarChart3,
-  RefreshCw,
   LogOut
 } from "lucide-react";
 import { DoctorTab } from "./types";
@@ -260,21 +259,12 @@ export default function DoctorSidebar({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onFetchReservations}
-            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-xl border border-white/10 bg-white/10 text-[#FBFBF9] hover:bg-white/20 transition text-xs font-semibold"
-            title={t.refresh}
-          >
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            <span>{t.refresh}</span>
-          </button>
-
-          <button
-            type="button"
             onClick={onLogout}
-            className="flex h-9 w-9 items-center justify-center shrink-0 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-white transition"
+            className="w-full flex items-center justify-center gap-2 h-9 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-white transition text-xs font-semibold"
             title={t.signOut}
           >
             <LogOut size={15} />
+            <span>{t.signOut}</span>
           </button>
         </div>
       </div>

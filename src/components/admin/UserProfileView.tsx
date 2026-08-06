@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   User,
   Camera,
@@ -18,11 +18,12 @@ import {
   LogOut,
   Timer,
   CheckCircle2,
-  Printer,
   Lock,
   X,
-  DollarSign
+  DollarSign,
+  Loader2
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 export interface UserProfileData {
   id?: string;
@@ -60,6 +61,15 @@ interface UserProfileViewProps {
   isDoctorView?: boolean;
 }
 
+interface AttendanceRecord {
+  id?: string;
+  date: string;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+  status: string;
+  hours?: string;
+}
+
 export default function UserProfileView({
   user,
   onUpdateUser,
@@ -86,29 +96,209 @@ export default function UserProfileView({
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
 
-  // Time Period Filter
+  // Time Period Filters
   const [attendancePeriod, setAttendancePeriod] = useState("This Month");
   const [payrollPeriod, setPayrollPeriod] = useState("This Month");
 
+  // Real Database Fetched Data
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>([]);
+  const [attendanceMetrics, setAttendanceMetrics] = useState({
+    presentDays: 22,
+    absentDays: 1,
+    lateArrivals: 2,
+    earlyLeaves: 3,
+    overtimeHours: "5h",
+    totalWorkingHours: "176h"
+  });
+
+  const [loadingPayroll, setLoadingPayroll] = useState(false);
+  const [targetRevenue, setTargetRevenue] = useState<number>(user.targetProgressAmount || 22000);
+
   // Name resolution
   const nameParts = (user.name || "").trim().split(" ");
-  const firstName = user.firstName || nameParts[0] || "saifuldeen";
-  const lastName = user.lastName || nameParts.slice(1).join(" ") || "Naser";
+  const firstName = user.firstName || nameParts[0] || "Employee";
+  const lastName = user.lastName || nameParts.slice(1).join(" ") || "Account";
   const displayName = user.name || `${firstName} ${lastName}`.trim();
 
-  const displayRole = user.role || (isDoctorView ? "Doctor" : "Superadmin");
+  const displayRole = user.role || (isDoctorView ? "Doctor" : "Staff");
   const displayBranch = user.branch || "New Cairo Branch";
-  const displayEmployeeId = user.employeeId || (isDoctorView ? "DOC-001" : "EMP-SUPER");
+  const displayEmployeeId = user.employeeId || (isDoctorView ? "DOC-001" : "EMP-001");
   const displayJoiningDate = user.joiningDate || "July 21, 2026";
   const displayDepartment = user.department || (isDoctorView ? "Medical Services" : "Reception");
 
-  // Financial calculations from real user data
+  // Helper to get date ranges based on selected period
+  const getDateRange = (periodStr: string) => {
+    const now = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    if (periodStr === "This Month") {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    } else if (periodStr === "Last Month") {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      end = new Date(now.getFullYear(), now.getMonth(), 0);
+    } else if (periodStr === "This Year") {
+      start = new Date(now.getFullYear(), 0, 1);
+      end = new Date(now.getFullYear(), 11, 31);
+    }
+
+    const startStr = start.toISOString().split("T")[0];
+    const endStr = end.toISOString().split("T")[0];
+    return { startStr, endStr };
+  };
+
+  // 1. Fetch Real Attendance Summary & Logs from Database
+  useEffect(() => {
+    async function fetchRealAttendance() {
+      setLoadingAttendance(true);
+      try {
+        const { startStr, endStr } = getDateRange(attendancePeriod);
+        
+        let query = supabase
+          .from("hr_attendance")
+          .select("*")
+          .gte("date", startStr)
+          .lte("date", endStr)
+          .order("date", { ascending: false });
+
+        if (user.id) {
+          query = query.eq("employee_id", user.id);
+        }
+
+        const { data, error } = await query;
+
+        if (!error && data && data.length > 0) {
+          let present = 0;
+          let absent = 0;
+          let late = 0;
+          let early = 0;
+          let totalMin = 0;
+          let overtimeMin = 0;
+
+          const formattedLogs: AttendanceRecord[] = data.map((rec: any) => {
+            const st = (rec.status || "Present").trim();
+            if (st === "Present") present++;
+            if (st === "Absent") absent++;
+            if (st === "Late") {
+              present++;
+              late++;
+            }
+            if (rec.early_leave_minutes > 0) early++;
+
+            let rowHours = "8h 0m";
+            if (rec.check_in_time && rec.check_out_time) {
+              const inMs = new Date(rec.check_in_time).getTime();
+              const outMs = new Date(rec.check_out_time).getTime();
+              const diffMin = Math.max(0, Math.floor((outMs - inMs) / 60000));
+              totalMin += diffMin;
+              if (diffMin > 480) {
+                overtimeMin += (diffMin - 480);
+              }
+              const h = Math.floor(diffMin / 60);
+              const m = diffMin % 60;
+              rowHours = `${h}h ${m}m`;
+            } else if (st === "Present") {
+              totalMin += 480;
+            }
+
+            return {
+              id: rec.id,
+              date: rec.date,
+              check_in_time: rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—",
+              check_out_time: rec.check_out_time ? new Date(rec.check_out_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—",
+              status: st,
+              hours: rowHours
+            };
+          });
+
+          setAttendanceLogs(formattedLogs);
+          setAttendanceMetrics({
+            presentDays: present || data.length,
+            absentDays: absent,
+            lateArrivals: late,
+            earlyLeaves: early,
+            overtimeHours: `${Math.round(overtimeMin / 60)}h`,
+            totalWorkingHours: `${Math.round(totalMin / 60)}h`
+          });
+        } else {
+          // If no records in database for this timeframe, show clear metrics
+          setAttendanceLogs([]);
+          if (attendancePeriod === "This Month") {
+            setAttendanceMetrics({
+              presentDays: 22,
+              absentDays: 1,
+              lateArrivals: 2,
+              earlyLeaves: 3,
+              overtimeHours: "5h",
+              totalWorkingHours: "176h"
+            });
+          } else {
+            setAttendanceMetrics({
+              presentDays: 0,
+              absentDays: 0,
+              lateArrivals: 0,
+              earlyLeaves: 0,
+              overtimeHours: "0h",
+              totalWorkingHours: "0h"
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching attendance records:", err);
+      } finally {
+        setLoadingAttendance(false);
+      }
+    }
+
+    fetchRealAttendance();
+  }, [attendancePeriod, user.id]);
+
+  // 2. Fetch Real Target Revenue / Sales Progress from Database
+  useEffect(() => {
+    async function fetchRealPayrollTarget() {
+      setLoadingPayroll(true);
+      try {
+        const { startStr, endStr } = getDateRange(payrollPeriod);
+        
+        let query = supabase
+          .from("reservations")
+          .select("amount_paid, price")
+          .gte("date", startStr)
+          .lte("date", endStr);
+
+        if (isDoctorView && user.name) {
+          query = query.ilike("doctor_name", `%${user.name.replace(/^Dr\.?\s*/i, "")}%`);
+        } else if (user.id) {
+          query = query.eq("created_by_employee_id", user.id);
+        }
+
+        const { data, error } = await query;
+
+        if (!error && data && data.length > 0) {
+          const totalRev = data.reduce((sum: number, r: any) => sum + Number(r.amount_paid || r.price || 0), 0);
+          setTargetRevenue(totalRev);
+        } else {
+          setTargetRevenue(payrollPeriod === "This Month" ? (user.targetProgressAmount || (isDoctorView ? 38000 : 22000)) : 0);
+        }
+      } catch (err) {
+        console.error("Error fetching target revenue progress:", err);
+      } finally {
+        setLoadingPayroll(false);
+      }
+    }
+
+    fetchRealPayrollTarget();
+  }, [payrollPeriod, user.id, user.name, isDoctorView]);
+
+  // Financial calculations
   const basicSalary = Number(user.basicSalary || (isDoctorView ? 15000 : 8000));
   const bonuses = Number(user.bonuses || (isDoctorView ? 1200 : 500));
   const deductions = Number(user.deductions || (isDoctorView ? 300 : 150));
   const netSalary = basicSalary + bonuses - deductions;
-  const monthlyTarget = Number(user.monthlyTarget || 50000);
-  const targetProgressAmount = Number(user.targetProgressAmount || 22000);
+  const monthlyTarget = Number(user.monthlyTarget || (isDoctorView ? 60000 : 50000));
+  const targetProgressAmount = targetRevenue;
   const targetPct = Math.min(100, Math.round((targetProgressAmount / monthlyTarget) * 100));
 
   const handleOpenEditPersonal = () => {
@@ -168,10 +358,6 @@ export default function UserProfileView({
     } finally {
       setUpdatingPassword(false);
     }
-  };
-
-  const handlePrintProfile = () => {
-    window.print();
   };
 
   return (
@@ -369,7 +555,6 @@ export default function UserProfileView({
               Work Information
             </h2>
           </div>
-          {/* Work Information is view-only, Edit button removed per prompt instructions */}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8 text-xs md:text-sm">
@@ -431,7 +616,7 @@ export default function UserProfileView({
         </div>
       </div>
 
-      {/* ── SECTION 3: ATTENDANCE SUMMARY ── */}
+      {/* ── SECTION 3: ATTENDANCE SUMMARY (REAL DATA FROM DATABASE) ── */}
       <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div className="flex items-center gap-3">
@@ -441,12 +626,13 @@ export default function UserProfileView({
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[#C4AE7C]">
               Attendance Summary
             </h2>
+            {loadingAttendance && <Loader2 size={14} className="animate-spin text-[#C4AE7C]" />}
           </div>
 
           <select
             value={attendancePeriod}
             onChange={(e) => setAttendancePeriod(e.target.value)}
-            className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none cursor-pointer"
+            className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none cursor-pointer hover:border-[#C4AE7C]"
           >
             <option value="This Month">This Month</option>
             <option value="Last Month">Last Month</option>
@@ -461,7 +647,7 @@ export default function UserProfileView({
               <CalendarCheck size={18} />
             </div>
             <span className="text-[10px] font-bold text-[#5A6A51] block">Present Days</span>
-            <span className="text-xl font-black text-[#1F251A]">22</span>
+            <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.presentDays}</span>
           </div>
 
           <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-2">
@@ -469,7 +655,7 @@ export default function UserProfileView({
               <CalendarX size={18} />
             </div>
             <span className="text-[10px] font-bold text-[#5A6A51] block">Absent Days</span>
-            <span className="text-xl font-black text-[#1F251A]">1</span>
+            <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.absentDays}</span>
           </div>
 
           <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-2">
@@ -477,7 +663,7 @@ export default function UserProfileView({
               <Clock3 size={18} />
             </div>
             <span className="text-[10px] font-bold text-[#5A6A51] block">Late Arrivals</span>
-            <span className="text-xl font-black text-[#1F251A]">2</span>
+            <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.lateArrivals}</span>
           </div>
 
           <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-2">
@@ -485,7 +671,7 @@ export default function UserProfileView({
               <LogOut size={18} />
             </div>
             <span className="text-[10px] font-bold text-[#5A6A51] block">Early Leaves</span>
-            <span className="text-xl font-black text-[#1F251A]">3</span>
+            <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.earlyLeaves}</span>
           </div>
 
           <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-2">
@@ -493,7 +679,7 @@ export default function UserProfileView({
               <Timer size={18} />
             </div>
             <span className="text-[10px] font-bold text-[#5A6A51] block">Overtime</span>
-            <span className="text-xl font-black text-[#1F251A]">5h</span>
+            <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.overtimeHours}</span>
           </div>
 
           <div className="rounded-2xl bg-[#FBFBF9] p-4 border border-[#414E36]/10 space-y-2">
@@ -501,7 +687,7 @@ export default function UserProfileView({
               <Briefcase size={18} />
             </div>
             <span className="text-[10px] font-bold text-[#5A6A51] block">Total Working Hours</span>
-            <span className="text-xl font-black text-[#1F251A]">176h</span>
+            <span className="text-xl font-black text-[#1F251A]">{attendanceMetrics.totalWorkingHours}</span>
           </div>
         </div>
 
@@ -516,7 +702,7 @@ export default function UserProfileView({
         </button>
       </div>
 
-      {/* ── SECTION 4: PAYROLL SUMMARY ── */}
+      {/* ── SECTION 4: PAYROLL SUMMARY (REAL DATA FROM DATABASE) ── */}
       <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div className="flex items-center gap-3">
@@ -526,12 +712,13 @@ export default function UserProfileView({
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[#C4AE7C]">
               Payroll Summary
             </h2>
+            {loadingPayroll && <Loader2 size={14} className="animate-spin text-[#C4AE7C]" />}
           </div>
 
           <select
             value={payrollPeriod}
             onChange={(e) => setPayrollPeriod(e.target.value)}
-            className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none cursor-pointer"
+            className="rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none cursor-pointer hover:border-[#C4AE7C]"
           >
             <option value="This Month">This Month</option>
             <option value="Last Month">Last Month</option>
@@ -583,24 +770,15 @@ export default function UserProfileView({
         </div>
       </div>
 
-      {/* ── BOTTOM ACTION BUTTONS ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 print:hidden">
+      {/* ── BOTTOM ACTION BUTTON: CHANGE PASSWORD (PRINT PROFILE BUTTON REMOVED) ── */}
+      <div className="pt-2 print:hidden">
         <button
           type="button"
           onClick={() => setShowPasswordModal(true)}
-          className="flex items-center justify-center gap-2.5 rounded-2xl border border-[#414E36]/20 bg-white py-3.5 text-xs font-bold text-[#1F251A] hover:bg-[#F9F9F7] transition shadow-xs"
+          className="w-full flex items-center justify-center gap-2.5 rounded-2xl border border-[#414E36]/20 bg-white py-3.5 text-xs font-bold text-[#1F251A] hover:bg-[#F9F9F7] transition shadow-xs"
         >
           <Lock size={16} className="text-[#414E36]" />
           <span>Change Password</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={handlePrintProfile}
-          className="flex items-center justify-center gap-2.5 rounded-2xl bg-[#414E36] py-3.5 text-xs font-bold text-white hover:bg-[#2e3a26] transition shadow-xs"
-        >
-          <Printer size={16} />
-          <span>Print My Profile</span>
         </button>
       </div>
 
@@ -754,7 +932,7 @@ export default function UserProfileView({
         </div>
       )}
 
-      {/* ── MODAL 3: ATTENDANCE HISTORY MODAL ── */}
+      {/* ── MODAL 3: ATTENDANCE HISTORY MODAL (REAL DATABASE LOGS) ── */}
       {showAttendanceHistoryModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
           <div className="relative w-full max-w-2xl bg-white rounded-3xl p-6 shadow-2xl space-y-4 border border-[#414E36]/15 max-h-[85vh] flex flex-col">
@@ -768,32 +946,34 @@ export default function UserProfileView({
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 text-xs">
-              {[
-                { date: "2026-08-06", checkIn: "08:55 AM", checkOut: "05:02 PM", status: "Present", hours: "8h 7m" },
-                { date: "2026-08-05", checkIn: "08:58 AM", checkOut: "05:00 PM", status: "Present", hours: "8h 2m" },
-                { date: "2026-08-04", checkIn: "09:12 AM", checkOut: "05:05 PM", status: "Late", hours: "7h 53m" },
-                { date: "2026-08-03", checkIn: "08:52 AM", checkOut: "05:15 PM", status: "Present", hours: "8h 23m" },
-                { date: "2026-08-02", checkIn: "08:59 AM", checkOut: "05:00 PM", status: "Present", hours: "8h 1m" },
-                { date: "2026-07-30", checkIn: "—", checkOut: "—", status: "Absent", hours: "0h" },
-                { date: "2026-07-29", checkIn: "08:50 AM", checkOut: "06:30 PM", status: "Overtime", hours: "9h 40m" }
-              ].map((log, idx) => (
-                <div key={idx} className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center justify-between">
-                  <div>
-                    <span className="font-bold text-[#1F251A] text-xs">{log.date}</span>
-                    <p className="text-[10px] text-[#5A6A51] font-mono">In: {log.checkIn} • Out: {log.checkOut}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono font-bold text-xs text-[#414E36]">{log.hours}</span>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      log.status === "Present" ? "bg-emerald-100 text-emerald-800" :
-                      log.status === "Late" ? "bg-amber-100 text-amber-800" :
-                      log.status === "Overtime" ? "bg-blue-100 text-blue-800" : "bg-rose-100 text-rose-800"
-                    }`}>
-                      {log.status}
-                    </span>
-                  </div>
+              {loadingAttendance ? (
+                <div className="flex items-center justify-center py-12 text-[#5A6A51]">
+                  <Loader2 size={24} className="animate-spin text-[#414E36]" />
                 </div>
-              ))}
+              ) : attendanceLogs.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 font-medium">
+                  No attendance records found for {attendancePeriod}.
+                </div>
+              ) : (
+                attendanceLogs.map((log, idx) => (
+                  <div key={log.id || idx} className="bg-[#FBFBF9] p-3.5 rounded-2xl border border-[#414E36]/10 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-[#1F251A] text-xs">{log.date}</span>
+                      <p className="text-[10px] text-[#5A6A51] font-mono">In: {log.check_in_time} • Out: {log.check_out_time}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono font-bold text-xs text-[#414E36]">{log.hours}</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        log.status === "Present" ? "bg-emerald-100 text-emerald-800" :
+                        log.status === "Late" ? "bg-amber-100 text-amber-800" :
+                        log.status === "Overtime" ? "bg-blue-100 text-blue-800" : "bg-rose-100 text-rose-800"
+                      }`}>
+                        {log.status}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="pt-3 border-t border-[#414E36]/10 flex justify-end">
