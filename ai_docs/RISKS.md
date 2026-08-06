@@ -1525,6 +1525,46 @@ severity), then the CMS/config routes, then re-evaluate whether `hr/*` needs a d
 
 ---
 
+## RISK-037: AdminBookingsView Buttons Scrolled Away, Table Had Horizontal Overflow, Status Colors Were Ambiguous (RESOLVED)
+
+**Severity:** Low (UX)
+**Type:** UI / Usability
+**Found:** 2026-08-07
+
+**Description:**
+Three usability problems were present in `src/components/admin/bookings/AdminBookingsView.tsx`:
+
+1. **Sticky header not set** — the top action bar (New Booking / Pending / Calendar View / More buttons)
+   scrolled out of view as the user scrolled down the appointments table, forcing them to scroll back
+   to the top to change view or create a booking.
+
+2. **Horizontal scroll on both tables** — the Pending Approvals table and the Calendar Schedule table
+   used `overflow-x-auto` with `whitespace-nowrap` on every cell. On typical admin panel widths the
+   tables overflowed the container, hiding the STATUS column behind a horizontal scrollbar.
+
+3. **Status badge colors too similar to distinguish at a glance** — several statuses shared
+   visually close hues (orange ≈ orange-50 for Pending, blue-50 for Checked In, purple-50 for In
+   Progress, indigo-50 for Postponed — all low-saturation, hard to tell apart quickly).
+
+**Fix applied — 2026-08-07 (commit d3122ca → dev):**
+- Top bar changed to `sticky top-0 z-30` with `backdrop-blur-md` frosted background.
+- Both tables switched to `table-fixed` with `<colgroup>` percentage widths and `truncate` on all
+  text cells — no horizontal scroll needed.
+- `getStatusConfig()` updated with fully distinct, vivid per-status colors:
+  - Pending → Amber `#F59E0B`
+  - Confirmed → Cyan `#06B6D4`
+  - Checked In → Sky Blue `#0EA5E9`
+  - In Progress → Fuchsia `#D946EF`
+  - Completed → Emerald `#10B981`
+  - Postponed → Violet `#8B5CF6`
+  - Canceled → Rose `#E11D48`
+  - No Show → Slate `#64748B`
+- Calendar legend dots updated to match the new color palette.
+
+**Files changed:** `src/components/admin/bookings/AdminBookingsView.tsx`
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:
