@@ -22789,7 +22789,10 @@ export default function AdminPage() {
                 localServices={localServices}
                 userName={loggedEmpAccount?.name?.split(" ")[0] || "Sara"}
                 onNewBooking={() => setShowFullViewNewBooking(true)}
-                onPendingApprovalsClick={() => setShowTodayBookingsModal(true)}
+                onPendingApprovalsClick={() => {
+                  const el = document.getElementById("pending-approvals-section");
+                  if (el) el.scrollIntoView({ behavior: "smooth" });
+                }}
                 onFilterClick={() => setShowFilterModal(true)}
                 onViewBookingDetails={(booking: any) => {
                   setViewingBooking(booking as any);
