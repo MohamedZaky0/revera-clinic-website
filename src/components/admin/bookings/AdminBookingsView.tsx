@@ -1,52 +1,49 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Calendar as CalendarIcon,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Plus,
-  Printer,
-  MoreVertical,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Plus,
+  Clock,
   Filter,
   ArrowRight,
-  Eye
+  Printer,
+  Download,
+  MoreVertical,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Eye,
+  Check,
+  X,
+  User,
+  Phone,
+  Sparkles,
+  Search,
+  ChevronDown,
+  Loader2
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
-export interface ReservationItem {
+interface ReservationItem {
   id: string | number;
-  date?: string;
+  date: string;
   time?: string;
-  timeSlot?: string | null;
-  customer_name?: string;
-  clientName?: string;
-  name?: string;
-  patientName?: string;
-  customer_phone?: string;
-  phone?: string;
-  mobile?: string;
-  email?: string | null;
-  serviceId?: number | string;
-  service?: string;
-  service_name?: string;
+  customer_name: string;
+  customer_phone: string;
+  service_name: string;
   service_variant?: string;
-  doctorId?: number | string;
-  doctor_name?: string;
-  doctor?: string;
+  doctor_name: string;
   room?: string;
-  room_name?: string;
-  status?: string;
-  paymentStatus?: string;
+  status: string; // checked_in, waiting, in_progress, confirmed, completed, canceled, no_show
+  paymentStatus?: string; // Paid, Deposit Paid, Unpaid
   avatar_url?: string;
   doctor_avatar?: string;
-  [key: string]: any;
 }
 
-export interface AdminBookingsViewProps {
+interface AdminBookingsViewProps {
   allReservations?: any[];
   requests?: any[];
   providers?: any[];
@@ -59,100 +56,6 @@ export interface AdminBookingsViewProps {
   onPrint?: () => void;
   onExportCSV?: () => void;
 }
-
-// Sample fallback appointments if database has few/no entries for demonstration matching mockup
-const INITIAL_DEMO_APPOINTMENTS: ReservationItem[] = [
-  {
-    id: "demo-1",
-    date: "2026-07-20",
-    time: "09:00 AM",
-    customer_name: "Mohamed Ali",
-    customer_phone: "0101 234 5678",
-    service_name: "Laser Hair Removal",
-    service_variant: "Session",
-    doctor_name: "Dr. Sara Ahmed",
-    room: "Room 1",
-    status: "checked_in",
-    paymentStatus: "Paid",
-    avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-    doctor_avatar: "https://images.unsplash.com/photo-1594824813566-8185b378772a?w=150&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "demo-2",
-    date: "2026-07-20",
-    time: "09:30 AM",
-    customer_name: "Nada Hassan",
-    customer_phone: "0102 345 6789",
-    service_name: "Hydra Facial",
-    service_variant: "Basic",
-    doctor_name: "Dr. Ahmed Samir",
-    room: "Room 2",
-    status: "waiting",
-    paymentStatus: "Deposit Paid",
-    avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-    doctor_avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "demo-3",
-    date: "2026-07-20",
-    time: "10:00 AM",
-    customer_name: "Youssef Mohamed",
-    customer_phone: "0103 456 7890",
-    service_name: "PRP Hair",
-    service_variant: "Session",
-    doctor_name: "Dr. Omar Khaled",
-    room: "Room 1",
-    status: "in_progress",
-    paymentStatus: "Unpaid",
-    avatar_url: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
-    doctor_avatar: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "demo-4",
-    date: "2026-07-20",
-    time: "10:30 AM",
-    customer_name: "Mai Mostafa",
-    customer_phone: "0104 567 8901",
-    service_name: "Laser Toning",
-    service_variant: "Full Face",
-    doctor_name: "Dr. Sara Ahmed",
-    room: "Room 1",
-    status: "confirmed",
-    paymentStatus: "Deposit Paid",
-    avatar_url: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80",
-    doctor_avatar: "https://images.unsplash.com/photo-1594824813566-8185b378772a?w=150&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "demo-5",
-    date: "2026-07-20",
-    time: "11:00 AM",
-    customer_name: "Ahmed Reda",
-    customer_phone: "0105 678 9012",
-    service_name: "Consultation",
-    service_variant: "General",
-    doctor_name: "Dr. Ahmed Samir",
-    room: "Room 2",
-    status: "confirmed",
-    paymentStatus: "Paid",
-    avatar_url: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80",
-    doctor_avatar: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "demo-6",
-    date: "2026-07-20",
-    time: "11:30 AM",
-    customer_name: "Esraa Ahmed",
-    customer_phone: "0106 789 0123",
-    service_name: "Microneedling",
-    service_variant: "Face",
-    doctor_name: "Dr. Sara Ahmed",
-    room: "Room 3",
-    status: "confirmed",
-    paymentStatus: "Unpaid",
-    avatar_url: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80",
-    doctor_avatar: "https://images.unsplash.com/photo-1594824813566-8185b378772a?w=150&auto=format&fit=crop&q=80"
-  }
-];
 
 export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   allReservations = [],
@@ -167,13 +70,39 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   onPrint,
   onExportCSV
 }) => {
-  // Mini calendar state
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 6, 20)); // Default to July 20, 2026 as per mockup
-  const [currentMonth, setCurrentMonth] = useState<Date>(new Date(2026, 6, 1));
+  // Mini calendar state - Default to REAL CURRENT DATE
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
   const [activeMenuId, setActiveMenuId] = useState<string | number | null>(null);
   const [rowsPerPage, setRowsPerPage] = useState<number>(5);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [statusFilter, setStatusFilter] = useState<string>("All");
+
+  // Direct Supabase database fallback state
+  const [dbReservations, setDbReservations] = useState<any[]>([]);
+  const [loadingDb, setLoadingDb] = useState(false);
+
+  // Fetch real reservations directly from database on mount
+  useEffect(() => {
+    async function fetchRealReservations() {
+      setLoadingDb(true);
+      try {
+        const { data, error } = await supabase
+          .from("reservations")
+          .select("*")
+          .order("date", { ascending: false });
+
+        if (!error && data) {
+          setDbReservations(data);
+        }
+      } catch (err) {
+        console.error("Error fetching database reservations:", err);
+      } finally {
+        setLoadingDb(false);
+      }
+    }
+    fetchRealReservations();
+  }, []);
 
   // Helper to format date string YYYY-MM-DD
   const formatDateISO = (d: Date) => {
@@ -185,19 +114,33 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   const selectedDateStr = useMemo(() => formatDateISO(selectedDate), [selectedDate]);
 
-  // Combine real database reservations with demo items if database is empty or sparse for preview
+  // Combine prop reservations with database reservations (strict real data)
   const mergedAppointments = useMemo(() => {
-    if (!allReservations || allReservations.length === 0) {
-      return INITIAL_DEMO_APPOINTMENTS;
-    }
+    const combinedMap = new Map<string, any>();
+
+    // Add items from allReservations prop
+    (allReservations || []).forEach((r, idx) => {
+      const id = String(r.id || `prop-${idx}`);
+      combinedMap.set(id, r);
+    });
+
+    // Add items from dbReservations state
+    (dbReservations || []).forEach((r, idx) => {
+      const id = String(r.id || `db-${idx}`);
+      if (!combinedMap.has(id)) {
+        combinedMap.set(id, r);
+      }
+    });
+
+    const rawList = Array.from(combinedMap.values());
 
     // Map real reservations to clean structure
-    const mapped = allReservations.map((r, idx) => {
-      const pName = r.customer_name || r.clientName || r.patientName || r.name || `Patient #${r.id || idx + 1}`;
-      const phone = r.customer_phone || r.phone || r.mobile || "0100 000 0000";
-      const sName = r.service_name || r.service || (localServices.find(s => s.id === r.serviceId)?.title) || "Clinic Session";
-      const sVariant = r.service_variant || (localServices.find(s => s.id === r.serviceId)?.category) || "Session";
-      const doc = r.doctor_name || r.doctor || (providers.find(p => p.id === r.doctorId)?.name) || "Dr. Sara Ahmed";
+    return rawList.map((r, idx) => {
+      const pName = r.customer_name || r.patient_name || r.clientName || r.patientName || r.name || `Patient #${r.id || idx + 1}`;
+      const phone = r.customer_phone || r.phone || r.mobile || "—";
+      const sName = r.service_name || r.service || (localServices.find(s => String(s.id) === String(r.service_id || r.serviceId))?.en) || "Clinic Session";
+      const sVariant = r.service_variant || (localServices.find(s => String(s.id) === String(r.service_id || r.serviceId))?.cat) || "Session";
+      const doc = r.doctor_name || r.doctor || (providers.find(p => String(p.id) === String(r.provider_id || r.doctorId))?.name) || "Doctor";
       const rm = r.room || r.room_name || `Room ${(idx % 3) + 1}`;
       
       let st = (r.status || "confirmed").toLowerCase();
@@ -210,7 +153,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         ...r,
         id: r.id || `res-${idx}`,
         date: String(r.date || selectedDateStr).slice(0, 10),
-        time: r.time || r.timeSlot || "09:00 AM",
+        time: r.start_time || r.time || r.timeSlot || "09:00 AM",
         customer_name: pName,
         customer_phone: phone,
         service_name: sName,
@@ -221,22 +164,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         paymentStatus: paySt
       };
     });
+  }, [allReservations, dbReservations, localServices, providers, selectedDateStr]);
 
-    return mapped;
-  }, [allReservations, localServices, providers, selectedDateStr]);
-
-  // Filter appointments for the selected date
+  // Filter appointments strictly for the selected date
   const selectedDayAppointments = useMemo(() => {
     const dayList = mergedAppointments.filter(r => r.date === selectedDateStr);
-    // If no appointments on this exact date in demo mode, return the demo list so user sees data
-    if (dayList.length === 0 && (!allReservations || allReservations.length === 0)) {
-      return INITIAL_DEMO_APPOINTMENTS;
-    }
     if (statusFilter !== "All") {
       return dayList.filter(r => r.status === statusFilter);
     }
     return dayList;
-  }, [mergedAppointments, selectedDateStr, statusFilter, allReservations]);
+  }, [mergedAppointments, selectedDateStr, statusFilter]);
 
   // Pagination calculation
   const totalAppointments = selectedDayAppointments.length;
@@ -248,55 +185,56 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     return selectedDayAppointments.slice(startIndex, startIndex + rowsPerPage);
   }, [selectedDayAppointments, startIndex, rowsPerPage]);
 
-  // Analytics counts calculation
+  // Analytics counts calculation (Strict DB data)
   const stats = useMemo(() => {
     const todays = mergedAppointments.filter(r => r.date === selectedDateStr);
     const upcoming = mergedAppointments.filter(r => ["confirmed", "approved", "waiting", "checked_in"].includes(r.status || ""));
     const completed = mergedAppointments.filter(r => r.status === "completed");
     const canceled = mergedAppointments.filter(r => ["canceled", "cancelled"].includes(r.status || ""));
 
-    // Find next appointment time today
     const upcomingToday = todays.filter(r => ["confirmed", "waiting", "checked_in"].includes(r.status || ""));
-    const nextTime = upcomingToday.length > 0 ? (upcomingToday[0].time || "09:30 AM") : "09:30 AM";
+    const nextTime = upcomingToday.length > 0 ? (upcomingToday[0].time || "09:30 AM") : "—";
 
     return {
-      todaysCount: todays.length || 18,
-      upcomingCount: upcoming.length || 11,
-      nextTime,
-      completedCount: completed.length || 7,
-      canceledCount: canceled.length || 2
+      todayCount: todays.length,
+      nextTime: nextTime,
+      upcomingCount: upcoming.length,
+      completedCount: completed.length,
+      canceledCount: canceled.length
     };
   }, [mergedAppointments, selectedDateStr]);
 
-  // Calendar calculations
-  const calendarData = useMemo(() => {
+  // Pending approvals count
+  const pendingApprovalsCount = useMemo(() => {
+    if (requests && requests.length > 0) return requests.length;
+    return mergedAppointments.filter(r => r.status === "pending").length;
+  }, [requests, mergedAppointments]);
+
+  // Mini Calendar grid generation
+  const calendarCells = useMemo(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay(); // 0 = Sun
 
-    // Previous month trailing days
-    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sunday
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
     const prevDays: { day: number; currentMonth: boolean; dateStr: string }[] = [];
-    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
-      const d = prevMonthLastDay - i;
+    for (let i = firstDayIndex - 1; i >= 0; i--) {
+      const d = daysInPrevMonth - i;
       const prevDate = new Date(year, month - 1, d);
       prevDays.push({ day: d, currentMonth: false, dateStr: formatDateISO(prevDate) });
     }
 
-    // Current month days
     const currentDays: { day: number; currentMonth: boolean; dateStr: string }[] = [];
     for (let d = 1; d <= daysInMonth; d++) {
-      const currDate = new Date(year, month, d);
-      currentDays.push({ day: d, currentMonth: true, dateStr: formatDateISO(currDate) });
+      const cDate = new Date(year, month, d);
+      currentDays.push({ day: d, currentMonth: true, dateStr: formatDateISO(cDate) });
     }
 
-    // Next month leading days to fill grid (total 35 or 42 cells)
     const totalCellsSoFar = prevDays.length + currentDays.length;
     const totalGridCells = totalCellsSoFar > 35 ? 42 : 35;
+
     const nextDays: { day: number; currentMonth: boolean; dateStr: string }[] = [];
     for (let d = 1; d <= totalGridCells - totalCellsSoFar; d++) {
       const nextDate = new Date(year, month + 1, d);
@@ -306,11 +244,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     return [...prevDays, ...currentDays, ...nextDays];
   }, [currentMonth]);
 
-  // Appointment dots mapping per date
+  // Real Database Appointment dots mapping per date
   const appointmentsByDate = useMemo(() => {
     const map: Record<string, string[]> = {};
 
-    // Populate dots for demo/real appointments
     mergedAppointments.forEach(app => {
       if (!app.date) return;
       if (!map[app.date]) map[app.date] = [];
@@ -327,26 +264,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       }
     });
 
-    // Provide default dots for demo calendar aesthetic if sparse
-    if (Object.keys(map).length < 5) {
-      const monthPrefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}`;
-      map[`${monthPrefix}-20`] = ["#22C55E", "#3B82F6", "#F97316"];
-      map[`${monthPrefix}-21`] = ["#22C55E", "#3B82F6", "#A855F7"];
-      map[`${monthPrefix}-22`] = ["#F97316", "#3B82F6"];
-      map[`${monthPrefix}-23`] = ["#22C55E", "#A855F7"];
-      map[`${monthPrefix}-24`] = ["#3B82F6", "#F97316"];
-      map[`${monthPrefix}-26`] = ["#3B82F6"];
-      map[`${monthPrefix}-27`] = ["#22C55E", "#EF4444"];
-      map[`${monthPrefix}-28`] = ["#3B82F6", "#F97316"];
-      map[`${monthPrefix}-29`] = ["#22C55E", "#A855F7"];
-      map[`${monthPrefix}-30`] = ["#3B82F6", "#F97316"];
-      map[`${monthPrefix}-31`] = ["#22C55E", "#6B7280"];
-    }
-
     return map;
-  }, [mergedAppointments, currentMonth]);
+  }, [mergedAppointments]);
 
-  // Format header date string (e.g. "Monday, 20 July 2026")
+  // Format header date string (e.g. "Wednesday, 6 August 2026")
   const formattedHeaderDate = useMemo(() => {
     return selectedDate.toLocaleDateString("en-GB", {
       weekday: "long",
@@ -358,74 +279,43 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   // Helper status color details
   const getStatusConfig = (status?: string) => {
-    const st = (status || "confirmed").toLowerCase();
-    switch (st) {
+    switch (status) {
       case "checked_in":
-        return {
-          label: "Checked In",
-          bg: "bg-[#EBF3FF]",
-          text: "text-[#2563EB]",
-          border: "border-l-[#3B82F6]"
-        };
+        return { label: "Checked In", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", border: "border-l-blue-500" };
       case "waiting":
-        return {
-          label: "Waiting",
-          bg: "bg-[#FFF4E5]",
-          text: "text-[#D97706]",
-          border: "border-l-[#F97316]"
-        };
+        return { label: "Waiting", bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500", border: "border-l-orange-500" };
       case "in_progress":
-        return {
-          label: "In Progress",
-          bg: "bg-[#F3EBFD]",
-          text: "text-[#7C3AED]",
-          border: "border-l-[#A855F7]"
-        };
+        return { label: "In Progress", bg: "bg-purple-50", text: "text-purple-700", dot: "bg-purple-500", border: "border-l-purple-500" };
       case "completed":
-        return {
-          label: "Completed",
-          bg: "bg-[#E6F4F1]",
-          text: "text-[#0D9488]",
-          border: "border-l-[#0D9488]"
-        };
+        return { label: "Completed", bg: "bg-teal-50", text: "text-teal-700", dot: "bg-teal-500", border: "border-l-teal-500" };
       case "canceled":
       case "cancelled":
-        return {
-          label: "Canceled",
-          bg: "bg-[#FDEBEB]",
-          text: "text-[#DC2626]",
-          border: "border-l-[#EF4444]"
-        };
+        return { label: "Canceled", bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500", border: "border-l-rose-500" };
       case "no_show":
-        return {
-          label: "No Show",
-          bg: "bg-[#F3F4F6]",
-          text: "text-[#4B5563]",
-          border: "border-l-[#6B7280]"
-        };
+        return { label: "No Show", bg: "bg-gray-100", text: "text-gray-700", dot: "bg-gray-500", border: "border-l-gray-500" };
       case "confirmed":
-      case "approved":
       default:
-        return {
-          label: "Confirmed",
-          bg: "bg-[#EAF5EA]",
-          text: "text-[#16A34A]",
-          border: "border-l-[#22C55E]"
-        };
+        return { label: "Confirmed", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", border: "border-l-emerald-500" };
     }
   };
 
   const getPaymentStyle = (payStatus?: string) => {
-    const st = payStatus || "Unpaid";
-    if (st === "Paid") return "text-[#16A34A] font-semibold";
-    if (st === "Deposit Paid") return "text-[#2D5A27] font-semibold";
-    return "text-[#DC2626] font-semibold";
+    if (payStatus === "Paid") return "bg-emerald-100 text-emerald-800 border-emerald-200";
+    if (payStatus === "Deposit Paid") return "bg-amber-100 text-amber-800 border-amber-200";
+    return "bg-gray-100 text-gray-700 border-gray-200";
   };
 
-  const pendingApprovalsCount = requests.length || 3;
+  const handlePrevMonth = () => {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
 
   return (
-    <div className="w-full space-y-6 text-[#1F251A]">
+    <div className="w-full space-y-6 animate-fadeIn pb-12 text-[#1F251A]">
+      
       {/* ── TOP HEADER BAR ── */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -458,125 +348,158 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </button>
 
           <button
-            onClick={onPrint || (() => window.print())}
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
-            title="Print schedule"
+            onClick={onPrint}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
+            title="Print Schedule"
           >
-            <Printer size={16} className="text-[#6B7280]" />
-            <span>Print</span>
+            <Printer size={16} />
           </button>
 
           <button
             onClick={onExportCSV}
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
-            title="More Options"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
           >
-            <MoreVertical size={16} className="text-[#6B7280]" />
-            <span>More</span>
+            <Download size={16} className="text-[#6B7280]" />
+            <span>Export CSV</span>
           </button>
         </div>
       </div>
 
-      {/* ── 4 ANALYTIC CARDS (PERCENTAGES REMOVED) ── */}
+      {/* ── 4 ANALYTIC SUMMARY CARDS ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1: Today's Bookings */}
-        <div className="flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EAF5EA] text-[#16A34A]">
-              <CalendarIcon size={22} />
+        
+        {/* Card 1: Today's Appointments */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+              Today's Appointments
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-[#1E3A2B]">
+              <CalendarIcon size={18} />
             </div>
-            <span className="text-sm font-medium text-[#4B5563]">Today's Bookings</span>
           </div>
-          <div className="mt-4">
-            <p className="text-3xl font-bold text-[#111827]">{stats.todaysCount}</p>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-[#111827]">{stats.todayCount}</span>
+            <span className="text-xs font-medium text-[#6B7280]">Next: {stats.nextTime}</span>
           </div>
         </div>
 
-        {/* Card 2: Upcoming Appointments */}
-        <div className="flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EBF3FF] text-[#2563EB]">
-              <Clock size={22} />
+        {/* Card 2: Upcoming */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+              Upcoming
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Clock size={18} />
             </div>
-            <span className="text-sm font-medium text-[#4B5563]">Upcoming Appointments</span>
           </div>
-          <div className="mt-4 flex items-baseline justify-between">
-            <p className="text-3xl font-bold text-[#111827]">{stats.upcomingCount}</p>
-            <span className="text-xs font-semibold text-[#2563EB]">Next: {stats.nextTime}</span>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-[#111827]">{stats.upcomingCount}</span>
+            <span className="text-xs font-semibold text-blue-600">Active</span>
           </div>
         </div>
 
-        {/* Card 3: Completed Bookings */}
-        <div className="flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F3EBFD] text-[#7C3AED]">
-              <CheckCircle2 size={22} />
+        {/* Card 3: Completed */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+              Completed
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
+              <CheckCircle2 size={18} />
             </div>
-            <span className="text-sm font-medium text-[#4B5563]">Completed Bookings</span>
           </div>
-          <div className="mt-4">
-            <p className="text-3xl font-bold text-[#111827]">{stats.completedCount}</p>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-[#111827]">{stats.completedCount}</span>
+            <span className="text-xs font-semibold text-teal-600">Sessions</span>
           </div>
         </div>
 
-        {/* Card 4: Canceled Bookings */}
-        <div className="flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FDEBEB] text-[#DC2626]">
-              <XCircle size={22} />
+        {/* Card 4: Canceled */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+              Canceled
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+              <XCircle size={18} />
             </div>
-            <span className="text-sm font-medium text-[#4B5563]">Canceled Bookings</span>
           </div>
-          <div className="mt-4">
-            <p className="text-3xl font-bold text-[#111827]">{stats.canceledCount}</p>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-[#111827]">{stats.canceledCount}</span>
+            <span className="text-xs font-semibold text-rose-600">Cancellations</span>
           </div>
         </div>
+
       </div>
 
-      {/* ── MAIN CONTENT (2 COLUMNS: MINI CALENDAR & TODAY'S SCHEDULE TABLE) ── */}
+      {/* ── MAIN CONTENT GRID: MINI CALENDAR (4 COLS) + SCHEDULE TABLE (8 COLS) ── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* ── LEFT COLUMN: MINI MONTH CALENDAR & LEGEND (4 Cols) ── */}
-        <div className="space-y-6 lg:col-span-4">
+
+        {/* ── LEFT COLUMN: MINI CALENDAR WIDGET (4 Cols) ── */}
+        <div className="space-y-4 lg:col-span-4">
           <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-            {/* Header: Month title + Monthly dropdown */}
+            
+            {/* Month & View Switcher Header */}
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-[#111827]">
-                {currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-              </h2>
-              <div className="relative">
-                <button className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-[#374151] hover:bg-gray-100">
-                  <span>Monthly</span>
-                  <ChevronDown size={14} />
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handlePrevMonth}
+                  className="rounded-lg p-1 text-[#6B7280] hover:bg-gray-100"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <h3 className="text-base font-bold text-[#111827]">
+                  {currentMonth.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
+                </h3>
+                <button
+                  onClick={handleNextMonth}
+                  className="rounded-lg p-1 text-[#6B7280] hover:bg-gray-100"
+                >
+                  <ChevronRight size={18} />
                 </button>
               </div>
+
+              <select className="rounded-xl border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-semibold text-[#374151] outline-none">
+                <option value="Monthly">Monthly</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Daily">Daily</option>
+              </select>
             </div>
 
-            {/* Calendar Weekdays */}
-            <div className="mb-2 grid grid-cols-7 text-center text-xs font-semibold text-[#6B7280]">
-              <div>Sun</div>
-              <div>Mon</div>
-              <div>Tue</div>
-              <div>Wed</div>
-              <div>Thu</div>
-              <div>Fri</div>
-              <div>Sat</div>
+            {/* Weekday Labels (Sun to Sat) */}
+            <div className="grid grid-cols-7 text-center text-xs font-semibold text-[#6B7280] mb-2">
+              <span>Sun</span>
+              <span>Mon</span>
+              <span>Tue</span>
+              <span>Wed</span>
+              <span>Thu</span>
+              <span>Fri</span>
+              <span>Sat</span>
             </div>
 
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-y-1 text-center text-xs font-medium">
-              {calendarData.map((cell, idx) => {
+            {/* 35/42 Grid Days */}
+            <div className="grid grid-cols-7 gap-1">
+              {calendarCells.map((cell, idx) => {
                 const isSelected = cell.dateStr === selectedDateStr;
                 const dots = appointmentsByDate[cell.dateStr] || [];
 
                 return (
                   <button
                     key={idx}
+                    type="button"
                     onClick={() => {
                       const [y, m, d] = cell.dateStr.split("-").map(Number);
                       setSelectedDate(new Date(y, m - 1, d));
+                      setCurrentPage(1);
                     }}
-                    className={`relative flex flex-col items-center justify-center rounded-xl py-2 transition ${
-                      !cell.currentMonth ? "text-gray-300" : "text-[#111827] hover:bg-gray-100"
+                    className={`flex flex-col items-center justify-center rounded-xl p-2 py-2.5 transition text-xs ${
+                      !cell.currentMonth
+                        ? "text-gray-300"
+                        : isSelected
+                        ? "bg-emerald-50 text-[#1E3A2B] font-black ring-2 ring-[#1E3A2B]"
+                        : "text-[#374151] hover:bg-gray-50 font-semibold"
                     }`}
                   >
                     <div
@@ -691,10 +614,27 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {paginatedAppointments.length === 0 ? (
+                  {loadingDb ? (
+                    <tr>
+                      <td colSpan={9} className="py-12 text-center text-xs text-[#5A6A51]">
+                        <Loader2 size={20} className="animate-spin mx-auto mb-2 text-[#1E3A2B]" />
+                        Loading database appointments...
+                      </td>
+                    </tr>
+                  ) : paginatedAppointments.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="py-12 text-center text-sm text-[#6B7280]">
-                        No appointments scheduled for this date.
+                        <div className="max-w-sm mx-auto space-y-3">
+                          <p className="font-semibold text-[#111827]">No appointments scheduled for {formattedHeaderDate}.</p>
+                          <button
+                            type="button"
+                            onClick={onNewBooking}
+                            className="inline-flex items-center gap-2 rounded-xl bg-[#1E3A2B] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#162C20]"
+                          >
+                            <Plus size={14} />
+                            <span>Create New Booking</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -758,7 +698,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                                 />
                               ) : (
                                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-800 shrink-0">
-                                  {(row.doctor_name || "D").charAt(3) || "D"}
+                                  {(row.doctor_name || "D").charAt(0)}
                                 </div>
                               )}
                               <span className="font-medium text-[#374151] truncate">
@@ -768,50 +708,36 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           </td>
 
                           {/* Room */}
-                          <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium">
-                            {row.room || "Room 1"}
+                          <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium text-xs">
+                            {row.room}
                           </td>
 
                           {/* Status */}
                           <td className="py-3 px-2 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${stConfig.bg} ${stConfig.text}`}
-                            >
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${stConfig.bg} ${stConfig.text}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${stConfig.dot}`}></span>
                               {stConfig.label}
                             </span>
                           </td>
 
                           {/* Payment */}
-                          <td className="py-3 px-2 whitespace-nowrap text-xs">
-                            <span className={payStyle}>{row.paymentStatus}</span>
+                          <td className="py-3 px-2 whitespace-nowrap">
+                            <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-bold ${payStyle}`}>
+                              {row.paymentStatus}
+                            </span>
                           </td>
 
                           {/* Actions */}
-                          <td className="py-3 px-1 text-center whitespace-nowrap relative">
-                            <button
-                              onClick={() =>
-                                setActiveMenuId(activeMenuId === row.id ? null : row.id)
-                              }
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                            >
-                              <MoreVertical size={16} />
-                            </button>
-
-                            {/* Dropdown Action Menu */}
-                            {activeMenuId === row.id && (
-                              <div className="absolute right-0 top-10 z-20 w-44 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl text-left">
-                                <button
-                                  onClick={() => {
-                                    setActiveMenuId(null);
-                                    if (onViewBookingDetails) onViewBookingDetails(row);
-                                  }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-[#374151] hover:bg-gray-50"
-                                >
-                                  <Eye size={14} className="text-gray-400" />
-                                  <span>View Details</span>
-                                </button>
-                              </div>
-                            )}
+                          <td className="py-3 px-1 whitespace-nowrap text-center">
+                            <div className="relative inline-block text-left">
+                              <button
+                                onClick={() => onViewBookingDetails && onViewBookingDetails(row)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#6B7280] hover:bg-gray-100 hover:text-[#111827] transition"
+                                title="View Details"
+                              >
+                                <Eye size={15} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -821,53 +747,17 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               </table>
             </div>
 
-            {/* Table Footer */}
-            <div className="mt-5 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between text-xs text-[#6B7280]">
+            {/* Pagination Controls */}
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-[#6B7280] border-t border-gray-100 pt-3">
               <div>
-                Showing <span className="font-semibold text-[#111827]">{totalAppointments === 0 ? 0 : startIndex + 1}</span> to{" "}
+                Showing <span className="font-semibold text-[#111827]">{totalAppointments > 0 ? startIndex + 1 : 0}</span> to{" "}
                 <span className="font-semibold text-[#111827]">
                   {Math.min(startIndex + rowsPerPage, totalAppointments)}
                 </span>{" "}
                 of <span className="font-semibold text-[#111827]">{totalAppointments}</span> appointments
               </div>
 
-              <div className="flex items-center gap-6">
-                {/* Pagination */}
-                <div className="flex items-center gap-1">
-                  <button
-                    disabled={safePage <= 1}
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                    title="Previous Page"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                    <button
-                      key={pg}
-                      onClick={() => setCurrentPage(pg)}
-                      className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-semibold transition ${
-                        pg === safePage
-                          ? "bg-[#1E3A2B] text-white shadow-xs"
-                          : "border border-gray-200 text-[#374151] hover:bg-gray-50"
-                      }`}
-                    >
-                      {pg}
-                    </button>
-                  ))}
-
-                  <button
-                    disabled={safePage >= totalPages}
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                    title="Next Page"
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-
-                {/* Rows per page */}
+              <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <span>Rows per page:</span>
                   <select
@@ -876,19 +766,43 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       setRowsPerPage(Number(e.target.value));
                       setCurrentPage(1);
                     }}
-                    className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-[#374151] focus:outline-none"
+                    className="rounded-lg border border-gray-200 bg-white px-2 py-1 font-semibold text-[#374151] outline-none"
                   >
                     <option value={5}>5</option>
                     <option value={10}>10</option>
                     <option value={20}>20</option>
-                    <option value={50}>50</option>
                   </select>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={safePage <= 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-[#374151] hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+
+                  <span className="px-2 font-semibold text-[#111827]">
+                    Page {safePage} of {totalPages}
+                  </span>
+
+                  <button
+                    disabled={safePage >= totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-[#374151] hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
                 </div>
               </div>
             </div>
+
           </div>
         </div>
+
       </div>
+
     </div>
   );
 };
