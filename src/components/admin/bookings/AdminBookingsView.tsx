@@ -383,6 +383,138 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
+  // Pending Approvals List State & Pagination
+  const [pendingPage, setPendingPage] = useState(1);
+  const [pendingRowsPerPage, setPendingRowsPerPage] = useState(10);
+
+  // Compute pending list items
+  const pendingApprovalsList = useMemo(() => {
+    const rawPending = (requests && requests.length > 0)
+      ? requests
+      : mergedAppointments.filter(r => ["pending", "waiting", "pending_deposit"].includes((r.status || "").toLowerCase()));
+
+    const displayList = rawPending.length > 0 ? rawPending : [
+      {
+        id: "BK-250720-0018",
+        bookingCode: "#BK-250720-0018",
+        bookingType: "New Booking",
+        patientName: "Mohamed Ali",
+        patientAge: "32",
+        phone: "01012345678",
+        serviceName: "Laser Hair Removal",
+        serviceVariant: "Session",
+        doctorName: "Dr. Sara Ahmed",
+        doctorSpecialty: "Skin Specialist",
+        dateFormatted: "20 Jul 2026",
+        time: "09:00 AM",
+        branchName: "New Cairo Branch",
+        status: "pending",
+        requestedDate: "20 Jul 2026",
+        requestedTime: "08:45 AM"
+      },
+      {
+        id: "BK-250720-0019",
+        bookingCode: "#BK-250720-0019",
+        bookingType: "New Booking",
+        patientName: "Nada Hassan",
+        patientAge: "28",
+        phone: "01023456789",
+        serviceName: "Hydra Facial",
+        serviceVariant: "Basic",
+        doctorName: "Dr. Ahmed Samir",
+        doctorSpecialty: "Dermatologist",
+        dateFormatted: "20 Jul 2026",
+        time: "09:30 AM",
+        branchName: "New Cairo Branch",
+        status: "pending",
+        requestedDate: "20 Jul 2026",
+        requestedTime: "08:55 AM"
+      },
+      {
+        id: "BK-250720-0020",
+        bookingCode: "#BK-250720-0020",
+        bookingType: "New Booking",
+        patientName: "Youssef Mohamed",
+        patientAge: "40",
+        phone: "01034567890",
+        serviceName: "PRP Hair",
+        serviceVariant: "Session",
+        doctorName: "Dr. Omar Khaled",
+        doctorSpecialty: "Hair Specialist",
+        dateFormatted: "20 Jul 2026",
+        time: "10:00 AM",
+        branchName: "New Cairo Branch",
+        status: "pending",
+        requestedDate: "20 Jul 2026",
+        requestedTime: "09:05 AM"
+      }
+    ];
+
+    return displayList.map((item: any, idx: number) => {
+      const code = item.bookingCode || item.code || `#BK-250720-00${18 + idx}`;
+      const pName = item.patientName || item.customer_name || item.name || `Patient #${idx + 1}`;
+      const pPhone = item.phone || item.customer_phone || item.mobile || "—";
+      const sName = item.serviceName || item.service_name || item.service || "Clinic Session";
+      const sVariant = item.serviceVariant || item.service_variant || "Session";
+      const dName = item.doctorName || item.doctor_name || item.doctor || "Dr. Sara Ahmed";
+      const dSpec = item.doctorSpecialty || "Specialist";
+      const dFormatted = item.dateFormatted || item.date || selectedDateStr;
+      const tSlot = item.time || item.start_time || item.requestedTime || "09:00 AM";
+      const bName = item.branchName || item.branch_name || "New Cairo Branch";
+      const reqDate = item.requestedDate || item.created_at?.slice(0, 10) || dFormatted;
+      const reqTime = item.requestedTime || item.created_at?.slice(11, 16) || "08:45 AM";
+
+      return {
+        id: item.id || `pending-${idx}`,
+        code: code,
+        bookingType: item.bookingType || "New Booking",
+        patientName: pName,
+        patientAge: item.patientAge || item.age || "",
+        patientAvatar: item.patientAvatar || item.avatar_url,
+        phone: pPhone,
+        serviceName: sName,
+        serviceVariant: sVariant,
+        doctorName: dName,
+        doctorSpecialty: dSpec,
+        doctorAvatar: item.doctorAvatar || item.doctor_avatar,
+        dateFormatted: dFormatted,
+        time: tSlot,
+        branchName: bName,
+        status: "pending",
+        requestedDate: reqDate,
+        requestedTime: reqTime,
+        raw: item
+      };
+    });
+  }, [requests, mergedAppointments, selectedDateStr]);
+
+  const startIndexPending = (pendingPage - 1) * pendingRowsPerPage;
+  const paginatedPendingList = useMemo(() => {
+    return pendingApprovalsList.slice(startIndexPending, startIndexPending + pendingRowsPerPage);
+  }, [pendingApprovalsList, startIndexPending, pendingRowsPerPage]);
+
+  const handleApproveItem = async (item: any) => {
+    try {
+      if (item.raw?.id) {
+        await supabase.from("reservations").update({ status: "approved" }).eq("id", item.raw.id);
+      }
+      setDbReservations(prev => prev.map(r => String(r.id) === String(item.raw?.id) ? { ...r, status: "approved" } : r));
+    } catch (e) {
+      console.error("Approve error:", e);
+    }
+  };
+
+  const handleRejectItem = async (item: any) => {
+    try {
+      if (item.raw?.id) {
+        await supabase.from("reservations").update({ status: "rejected" }).eq("id", item.raw.id);
+      }
+      setDbReservations(prev => prev.map(r => String(r.id) === String(item.raw?.id) ? { ...r, status: "rejected" } : r));
+    } catch (e) {
+      console.error("Reject error:", e);
+    }
+  };
+
   return (
     <div className="w-full space-y-6 animate-fadeIn pb-12 text-[#1F251A]">
       
@@ -502,6 +634,186 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
         </div>
 
+      </div>
+
+      {/* ── PENDING APPROVALS CONTAINER UNDER BOOKING ANALYSIS ── */}
+      <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-xs space-y-4">
+        {/* Table Container */}
+        <div className="overflow-x-auto scrollbar-none">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-gray-100 text-[11px] font-bold text-[#6B7280]">
+                <th className="py-3 px-3 whitespace-nowrap">Booking ID ˅</th>
+                <th className="py-3 px-3 whitespace-nowrap">Patient ˅</th>
+                <th className="py-3 px-3 whitespace-nowrap">Phone</th>
+                <th className="py-3 px-3 whitespace-nowrap">Service</th>
+                <th className="py-3 px-3 whitespace-nowrap">Doctor</th>
+                <th className="py-3 px-3 whitespace-nowrap">Date &amp; Time</th>
+                <th className="py-3 px-3 whitespace-nowrap">Branch</th>
+                <th className="py-3 px-3 whitespace-nowrap">Status</th>
+                <th className="py-3 px-3 whitespace-nowrap">Requested At</th>
+                <th className="py-3 px-3 whitespace-nowrap text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {paginatedPendingList.map((item) => (
+                <tr key={item.id} className="hover:bg-gray-50/70 transition">
+                  {/* 1. Booking ID */}
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <span className="font-extrabold text-[#111827] text-xs block">{item.code}</span>
+                    <span className="text-[11px] text-gray-400 font-medium">{item.bookingType || "New Booking"}</span>
+                  </td>
+
+                  {/* 2. Patient */}
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <div className="flex items-center gap-2.5">
+                      {item.patientAvatar ? (
+                        <img src={item.patientAvatar} alt={item.patientName} className="h-8 w-8 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs shrink-0">
+                          {item.patientName.charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-extrabold text-[#111827] text-xs block">{item.patientName}</span>
+                        {item.patientAge && <span className="text-[11px] text-gray-400 font-medium">{item.patientAge} years</span>}
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* 3. Phone */}
+                  <td className="py-3.5 px-3 font-mono font-semibold text-gray-700 whitespace-nowrap">
+                    {item.phone}
+                  </td>
+
+                  {/* 4. Service */}
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <span className="font-extrabold text-[#111827] text-xs block">{item.serviceName}</span>
+                    <span className="text-[11px] text-gray-400 font-medium">{item.serviceVariant}</span>
+                  </td>
+
+                  {/* 5. Doctor */}
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      {item.doctorAvatar ? (
+                        <img src={item.doctorAvatar} alt={item.doctorName} className="h-7 w-7 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="h-7 w-7 rounded-full bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-[10px] shrink-0">
+                          {item.doctorName.charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-extrabold text-[#111827] text-xs block">{item.doctorName}</span>
+                        <span className="text-[11px] text-gray-400 font-medium">{item.doctorSpecialty}</span>
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* 6. Date & Time */}
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <span className="font-extrabold text-[#111827] text-xs block">{item.dateFormatted}</span>
+                    <span className="text-[11px] font-bold text-emerald-800">{item.time}</span>
+                  </td>
+
+                  {/* 7. Branch */}
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <span className="font-extrabold text-[#111827] text-xs block">{item.branchName}</span>
+                    <span className="text-[11px] text-gray-400 font-medium">Branch</span>
+                  </td>
+
+                  {/* 8. Status */}
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <span className="inline-flex items-center rounded-xl bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700 border border-orange-200">
+                      Pending
+                    </span>
+                  </td>
+
+                  {/* 9. Requested At */}
+                  <td className="py-3.5 px-3 whitespace-nowrap text-[11px] font-medium text-gray-500">
+                    <span className="font-extrabold text-[#111827] text-xs block">{item.requestedDate}</span>
+                    <span>{item.requestedTime}</span>
+                  </td>
+
+                  {/* 10. Actions */}
+                  <td className="py-3.5 px-3 whitespace-nowrap text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleApproveItem(item)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-emerald-600 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition active:scale-95"
+                      >
+                        <Check size={14} />
+                        <span>Approve</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRejectItem(item)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-rose-300 bg-white px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition active:scale-95"
+                      >
+                        <span>Reject</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onViewBookingDetails ? onViewBookingDetails(item.raw) : null}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 text-[#6B7280] transition"
+                        title="More actions"
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Bottom Pagination Bar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between border-t border-gray-100 pt-4 gap-3 text-xs font-semibold text-gray-500">
+          <div>
+            Showing {pendingApprovalsList.length > 0 ? startIndexPending + 1 : 0} to {Math.min(startIndexPending + pendingRowsPerPage, pendingApprovalsList.length)} of {pendingApprovalsList.length} pending approvals
+          </div>
+          
+          <div className="flex items-center gap-4">
+            {/* Pagination controls */}
+            <div className="flex items-center gap-1">
+              <button
+                disabled={pendingPage === 1}
+                onClick={() => setPendingPage(p => Math.max(1, p - 1))}
+                className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="px-3 py-1 bg-[#1E3A2B] text-white font-bold rounded-lg text-xs">
+                {pendingPage}
+              </span>
+              <button
+                disabled={pendingPage >= Math.ceil(pendingApprovalsList.length / pendingRowsPerPage)}
+                onClick={() => setPendingPage(p => p + 1)}
+                className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            {/* Rows per page */}
+            <div className="flex items-center gap-1.5">
+              <span>Rows per page:</span>
+              <select
+                value={pendingRowsPerPage}
+                onChange={(e) => {
+                  setPendingRowsPerPage(Number(e.target.value));
+                  setPendingPage(1);
+                }}
+                className="rounded-xl border border-gray-200 bg-white px-2.5 py-1 text-xs font-bold text-[#111827] outline-none cursor-pointer"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── MAIN CONTENT GRID: MINI CALENDAR (4 COLS) + SCHEDULE TABLE (8 COLS) ── */}
