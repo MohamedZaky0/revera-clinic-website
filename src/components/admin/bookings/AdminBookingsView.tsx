@@ -563,9 +563,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               <Clock size={15} />
               <span>Pending</span>
               {pendingApprovalsCount > 0 && (
-                <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
-                  viewMode === "pending" ? "bg-[#414E36] text-white" : "bg-[#EF4444] text-white"
-                }`}>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold bg-[#EF4444] text-white">
                   {pendingApprovalsCount}
                 </span>
               )}
