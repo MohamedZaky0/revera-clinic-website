@@ -22799,6 +22799,21 @@ export default function AdminPage() {
                 }}
                 onPrint={() => window.print()}
                 onExportCSV={handleExportBookingsCSV}
+                onApproveBooking={(booking: any) => {
+                  // Opens the existing Approve modal (date/time/doctor assignment)
+                  setSelected(booking as any);
+                }}
+                onRejectBooking={async (booking: any) => {
+                  try {
+                    if (booking?.id) {
+                      await supabase.from("reservations").update({ status: "rejected" }).eq("id", booking.id);
+                      setRequests(prev => prev.filter(r => String(r.id) !== String(booking.id)));
+                      setAllReservations(prev => prev.map(r => String(r.id) === String(booking.id) ? { ...r, status: "rejected" } : r));
+                    }
+                  } catch (e) {
+                    console.error("Reject error:", e);
+                  }
+                }}
               />
             )
           )}

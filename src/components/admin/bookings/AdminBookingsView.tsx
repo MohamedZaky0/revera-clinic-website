@@ -55,6 +55,8 @@ interface AdminBookingsViewProps {
   onViewBookingDetails?: (booking: any) => void;
   onPrint?: () => void;
   onExportCSV?: () => void;
+  onApproveBooking?: (booking: any) => void;
+  onRejectBooking?: (booking: any) => void;
 }
 
 export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
@@ -68,8 +70,12 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   onFilterClick,
   onViewBookingDetails,
   onPrint,
-  onExportCSV
+  onExportCSV,
+  onApproveBooking,
+  onRejectBooking
 }) => {
+  // View Mode State: 'pending' (Default) vs 'calendar' (Schedule & Mini-Calendar View)
+  const [viewMode, setViewMode] = useState<"pending" | "calendar">("pending");
   // Mini calendar state - Default to REAL CURRENT DATE
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
@@ -499,6 +505,9 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         await supabase.from("reservations").update({ status: "approved" }).eq("id", item.raw.id);
       }
       setDbReservations(prev => prev.map(r => String(r.id) === String(item.raw?.id) ? { ...r, status: "approved" } : r));
+      if (onApproveBooking) {
+        onApproveBooking(item.raw);
+      }
     } catch (e) {
       console.error("Approve error:", e);
     }
@@ -510,6 +519,9 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         await supabase.from("reservations").update({ status: "rejected" }).eq("id", item.raw.id);
       }
       setDbReservations(prev => prev.map(r => String(r.id) === String(item.raw?.id) ? { ...r, status: "rejected" } : r));
+      if (onRejectBooking) {
+        onRejectBooking(item.raw);
+      }
     } catch (e) {
       console.error("Reject error:", e);
     }
@@ -538,16 +550,39 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             <span>New Booking</span>
           </button>
 
-          <button
-            onClick={onPendingApprovalsClick}
-            className="relative inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
-          >
-            <Clock size={16} className="text-[#6B7280]" />
-            <span>Pending Approvals</span>
-            <span className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#EF4444] text-[11px] font-bold text-white">
-              {pendingApprovalsCount}
-            </span>
-          </button>
+          {/* ── VIEW MODE TOGGLE ── */}
+          <div className="inline-flex items-center rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <button
+              onClick={() => setViewMode("pending")}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
+                viewMode === "pending"
+                  ? "bg-[#1E3A2B] text-white"
+                  : "text-[#374151] hover:bg-gray-50"
+              }`}
+            >
+              <Clock size={15} />
+              <span>Pending</span>
+              {pendingApprovalsCount > 0 && (
+                <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
+                  viewMode === "pending" ? "bg-white text-[#1E3A2B]" : "bg-[#EF4444] text-white"
+                }`}>
+                  {pendingApprovalsCount}
+                </span>
+              )}
+            </button>
+            <div className="w-px h-8 bg-gray-200" />
+            <button
+              onClick={() => setViewMode("calendar")}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
+                viewMode === "calendar"
+                  ? "bg-[#1E3A2B] text-white"
+                  : "text-[#374151] hover:bg-gray-50"
+              }`}
+            >
+              <CalendarIcon size={15} />
+              <span>Calendar View</span>
+            </button>
+          </div>
 
           <button
             onClick={onPrint}
@@ -636,8 +671,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
       </div>
 
-      {/* ── PENDING APPROVALS CONTAINER UNDER BOOKING ANALYSIS ── */}
+      {/* ── CONDITIONAL VIEW: PENDING APPROVALS or CALENDAR+SCHEDULE ── */}
+      {viewMode === "pending" ? (
       <div id="pending-approvals-section" className="rounded-3xl border border-gray-100 bg-white p-6 shadow-xs space-y-4">
+        {/* Section Header */}
+        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-bold text-[#111827]">Pending Approvals</h2>
+            <p className="text-xs text-[#6B7280] mt-0.5">{pendingApprovalsList.length} booking{pendingApprovalsList.length !== 1 ? 's' : ''} awaiting review</p>
+          </div>
+        </div>
         {/* Table Container */}
         <div className="overflow-x-auto scrollbar-none">
           <table className="w-full text-left text-xs border-collapse">
@@ -815,6 +858,289 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
         </div>
       </div>
+      ) : (
+        /* ── CALENDAR VIEW: MINI CALENDAR + TODAY'S SCHEDULE ── */
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+
+          {/* ── LEFT: MINI CALENDAR ── */}
+          <div className="space-y-4 lg:col-span-4">
+            <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              {/* Month & View Switcher Header */}
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <button onClick={handlePrevMonth} className="rounded-lg p-1 text-[#6B7280] hover:bg-gray-100">
+                    <ChevronLeft size={18} />
+                  </button>
+                  <h3 className="text-base font-bold text-[#111827]">
+                    {currentMonth.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
+                  </h3>
+                  <button onClick={handleNextMonth} className="rounded-lg p-1 text-[#6B7280] hover:bg-gray-100">
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedDate(new Date());
+                    setCurrentMonth(new Date());
+                  }}
+                  className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-[#374151] hover:bg-gray-50 transition"
+                >
+                  Today
+                </button>
+              </div>
+
+              {/* Weekday Labels */}
+              <div className="grid grid-cols-7 text-center text-xs font-semibold text-[#6B7280] mb-2">
+                {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => <span key={d}>{d}</span>)}
+              </div>
+
+              {/* Day Grid */}
+              <div className="grid grid-cols-7 gap-1">
+                {calendarCells.map((cell, idx) => {
+                  const isSelected = cell.dateStr === selectedDateStr;
+                  const dots = appointmentsByDate[cell.dateStr] || [];
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        const [y, m, d] = cell.dateStr.split("-").map(Number);
+                        setSelectedDate(new Date(y, m - 1, d));
+                        setCurrentPage(1);
+                      }}
+                      className={`flex flex-col items-center justify-center rounded-xl p-2 py-2.5 transition text-xs ${
+                        !cell.currentMonth
+                          ? "text-gray-300"
+                          : isSelected
+                          ? "bg-emerald-50 text-[#1E3A2B] font-black ring-2 ring-[#1E3A2B]"
+                          : "text-[#374151] hover:bg-gray-50 font-semibold"
+                      }`}
+                    >
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition ${
+                        isSelected ? "bg-[#1E3A2B] text-white shadow-sm" : ""
+                      }`}>
+                        {cell.day}
+                      </div>
+                      <div className="mt-1 flex h-1.5 items-center justify-center gap-0.5">
+                        {isSelected ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-white"></span>
+                        ) : (
+                          dots.map((dotColor, dIdx) => (
+                            <span key={dIdx} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: dotColor }}></span>
+                          ))
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="mt-6 border-t border-gray-100 pt-4">
+                <div className="grid grid-cols-2 gap-y-2.5 gap-x-2 text-xs font-medium text-[#4B5563]">
+                  {[
+                    { color: "#F97316", label: "Pending" },
+                    { color: "#22C55E", label: "Confirmed" },
+                    { color: "#3B82F6", label: "Checked In" },
+                    { color: "#A855F7", label: "In Progress" },
+                    { color: "#0D9488", label: "Completed" },
+                    { color: "#6366F1", label: "Postponed" },
+                    { color: "#EF4444", label: "Canceled" },
+                    { color: "#6B7280", label: "No Show" },
+                  ].map(({ color, label }) => (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}></span>
+                      <span>{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── RIGHT: TODAY'S SCHEDULE TABLE ── */}
+          <div className="space-y-4 lg:col-span-8">
+            <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              {/* Header */}
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-[#111827]">Today's Schedule</h2>
+                  <p className="text-xs font-medium text-[#6B7280]">{formattedHeaderDate}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setStatusFilter("All")}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#374151] hover:bg-gray-50 active:scale-95"
+                  >
+                    <span>All Appointments</span>
+                    <ArrowRight size={14} />
+                  </button>
+                  <button
+                    onClick={onFilterClick}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#374151] hover:bg-gray-50 active:scale-95"
+                  >
+                    <Filter size={14} />
+                    <span>Filter</span>
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto scrollbar-none">
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-[11px] uppercase tracking-wider text-[#9CA3AF]">
+                      <th className="py-3 px-2 font-semibold">Time</th>
+                      <th className="py-3 px-2 font-semibold">Patient</th>
+                      <th className="py-3 px-2 font-semibold">Phone</th>
+                      <th className="py-3 px-2 font-semibold">Service</th>
+                      <th className="py-3 px-2 font-semibold">Doctor</th>
+                      <th className="py-3 px-2 font-semibold">Room</th>
+                      <th className="py-3 px-2 font-semibold">Status</th>
+                      <th className="py-3 px-2 font-semibold">Payment</th>
+                      <th className="py-3 px-1 font-semibold text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {loadingDb ? (
+                      <tr>
+                        <td colSpan={9} className="py-12 text-center text-xs text-[#5A6A51]">
+                          <Loader2 size={20} className="animate-spin mx-auto mb-2 text-[#1E3A2B]" />
+                          Loading appointments...
+                        </td>
+                      </tr>
+                    ) : paginatedAppointments.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-12 text-center text-sm text-[#6B7280]">
+                          <div className="max-w-sm mx-auto space-y-3">
+                            <p className="font-semibold text-[#111827]">No appointments for {formattedHeaderDate}.</p>
+                            <button
+                              type="button"
+                              onClick={onNewBooking}
+                              className="inline-flex items-center gap-2 rounded-xl bg-[#1E3A2B] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#162C20]"
+                            >
+                              <Plus size={14} />
+                              <span>Create New Booking</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedAppointments.map((row) => {
+                        const stConfig = getStatusConfig(row.status);
+                        const payStyle = getPaymentStyle(row.paymentStatus);
+                        return (
+                          <tr
+                            key={row.id}
+                            onClick={() => onViewBookingDetails && onViewBookingDetails(row)}
+                            className={`group cursor-pointer transition hover:bg-emerald-50/50 border-l-4 ${stConfig.border}`}
+                          >
+                            <td className="py-3 px-2 whitespace-nowrap font-bold text-[#111827]">{row.time || "09:00 AM"}</td>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                {row.avatar_url ? (
+                                  <img src={row.avatar_url} alt={row.customer_name} className="h-7 w-7 rounded-full object-cover border border-gray-200 shrink-0" />
+                                ) : (
+                                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 font-bold text-[#374151] shrink-0 text-xs">
+                                    {(row.customer_name || "P").charAt(0)}
+                                  </div>
+                                )}
+                                <span className="font-semibold text-[#111827] truncate max-w-[120px]">{row.customer_name}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium text-[11px]">{row.customer_phone}</td>
+                            <td className="py-3 px-2">
+                              <div className="flex flex-col max-w-[120px]">
+                                <span className="font-bold text-[#111827] truncate">{row.service_name}</span>
+                                <span className="text-[10px] font-medium text-[#9CA3AF] truncate">{row.service_variant}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <div className="flex items-center gap-2 max-w-[120px]">
+                                {row.doctor_avatar ? (
+                                  <img src={row.doctor_avatar} alt={row.doctor_name} className="h-6 w-6 rounded-full object-cover border border-gray-200 shrink-0" />
+                                ) : (
+                                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-800 shrink-0">
+                                    {(row.doctor_name || "D").charAt(0)}
+                                  </div>
+                                )}
+                                <span className="font-medium text-[#374151] truncate">{row.doctor_name}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium text-xs">{row.room}</td>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${stConfig.bg} ${stConfig.text}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${stConfig.dot}`}></span>
+                                {stConfig.label}
+                              </span>
+                            </td>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-bold ${payStyle}`}>
+                                {row.paymentStatus}
+                              </span>
+                            </td>
+                            <td className="py-3 px-1 whitespace-nowrap text-center">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onViewBookingDetails && onViewBookingDetails(row); }}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#6B7280] hover:bg-gray-100 hover:text-[#111827] transition"
+                                title="View Details"
+                              >
+                                <Eye size={15} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-[#6B7280] border-t border-gray-100 pt-3">
+                <div>
+                  Showing <span className="font-semibold text-[#111827]">{totalAppointments > 0 ? startIndex + 1 : 0}</span> to{" "}
+                  <span className="font-semibold text-[#111827]">{Math.min(startIndex + rowsPerPage, totalAppointments)}</span>{" "}
+                  of <span className="font-semibold text-[#111827]">{totalAppointments}</span> appointments
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span>Rows per page:</span>
+                    <select
+                      value={rowsPerPage}
+                      onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                      className="rounded-lg border border-gray-200 bg-white px-2 py-1 font-semibold text-[#374151] outline-none"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      disabled={safePage <= 1}
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-[#374151] hover:bg-gray-50 disabled:opacity-40"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="px-2 font-semibold text-[#111827]">Page {safePage} of {totalPages}</span>
+                    <button
+                      disabled={safePage >= totalPages}
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-[#374151] hover:bg-gray-50 disabled:opacity-40"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
 
     </div>
   );
