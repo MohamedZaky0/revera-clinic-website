@@ -11,28 +11,43 @@ import {
   Briefcase,
   CheckCircle2,
   Package,
-  FileText,
   Printer,
   MessageSquare,
   ChevronDown,
-  Sparkles,
-  Loader2
+  Loader2,
+  Search,
+  Users
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
-interface Service {
+interface ServiceItem {
   id: string;
+  en?: string;
   name?: string;
   title?: string;
+  name_en?: string;
+  title_en?: string;
+  ar?: string;
   price?: number;
   duration?: number;
 }
 
-interface Provider {
+interface ProviderItem {
   id: string;
   name: string;
   specialty?: string;
   image?: string;
+}
+
+interface CustomerItem {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  mobile?: string;
+  phone?: string;
+  email?: string;
+  whatsapp?: string;
 }
 
 interface AdminNewBookingViewProps {
@@ -42,12 +57,44 @@ interface AdminNewBookingViewProps {
   providers?: any[];
 }
 
+// Helper to extract service name cleanly
+function getServiceName(s: any): string {
+  if (!s) return "Medical Service";
+  return s.en || s.name || s.title || s.name_en || s.title_en || s.ar || `Service #${s.id}`;
+}
+
+// Helper to format slot string cleanly into 12h format e.g. "09:30 AM"
+function formatSlotTo12h(timeStr: string): string {
+  if (!timeStr) return "09:00 AM";
+  if (timeStr.includes("AM") || timeStr.includes("PM")) return timeStr;
+  const parts = timeStr.split(":");
+  if (parts.length >= 2) {
+    let h = parseInt(parts[0], 10);
+    const m = parts[1];
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12;
+    if (h === 0) h = 12;
+    return `${String(h).padStart(2, "0")}:${m} ${ampm}`;
+  }
+  return timeStr;
+}
+
+function normalizeTimeSlot(t: string): string {
+  return formatSlotTo12h(t).trim().toUpperCase();
+}
+
 export default function AdminNewBookingView({
   onClose,
   onBookingCreated,
   services = [],
   providers = []
 }: AdminNewBookingViewProps) {
+  // Patient Search & Selection State
+  const [patientSearchQuery, setPatientSearchQuery] = useState("");
+  const [customerList, setCustomerList] = useState<CustomerItem[]>([]);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [searchingCustomer, setSearchingCustomer] = useState(false);
+
   // Form State
   const [countryCode, setCountryCode] = useState("+20");
   const [phone, setPhone] = useState("");
@@ -59,10 +106,9 @@ export default function AdminNewBookingView({
 
   // Customer Lookup state
   const [patientFound, setPatientFound] = useState<boolean | null>(null);
-  const [foundCustomer, setFoundCustomer] = useState<any>(null);
+  const [foundCustomer, setFoundCustomer] = useState<CustomerItem | null>(null);
   const [activePackage, setActivePackage] = useState<any>(null);
   const [usePackageMode, setUsePackageMode] = useState(false);
-  const [searchingCustomer, setSearchingCustomer] = useState(false);
 
   // Appointment Details State
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
@@ -70,53 +116,59 @@ export default function AdminNewBookingView({
   const [bookingDate, setBookingDate] = useState<string>(
     new Date().toISOString().split("T")[0]
   );
-  const [selectedTime, setSelectedTime] = useState<string>("02:30 PM");
+  const [selectedTime, setSelectedTime] = useState<string>("09:00 AM");
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [bookedTimeSlots, setBookedTimeSlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+
   const [sessionType, setSessionType] = useState<"in_person" | "online">("in_person");
   const [notes, setNotes] = useState<string>("");
 
   // DB Lists
-  const [dbServices, setDbServices] = useState<Service[]>(services);
-  const [dbDoctors, setDbDoctors] = useState<Provider[]>(providers);
+  const [dbServices, setDbServices] = useState<ServiceItem[]>(services);
+  const [dbDoctors, setDbDoctors] = useState<ProviderItem[]>(providers);
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitMenu, setShowSubmitMenu] = useState(false);
 
-  // Available Time Slots
-  const timeSlots = [
-    "09:00 AM",
-    "09:30 AM",
-    "10:00 AM",
-    "10:30 AM",
-    "11:00 AM",
-    "02:30 PM",
-    "03:00 PM",
-    "03:30 PM",
-    "04:00 PM",
-    "04:30 PM",
-    "05:00 PM"
-  ];
-
-  // Fetch Services & Providers if empty
+  // 1. Fetch Services & Providers & Existing Customers on mount
   useEffect(() => {
     async function loadData() {
-      if (dbServices.length === 0) {
-        const { data: sData } = await supabase.from("services").select("id, name, price");
-        if (sData) setDbServices(sData);
-      }
-      if (dbDoctors.length === 0) {
-        const { data: pData } = await supabase.from("providers").select("id, name, specialty, image");
-        if (pData) setDbDoctors(pData);
+      try {
+        // Fetch Services
+        const { data: sData } = await supabase.from("services").select("*").order("sort_order", { ascending: true });
+        if (sData && sData.length > 0) {
+          setDbServices(sData);
+        }
+
+        // Fetch Providers
+        const { data: pData } = await supabase.from("providers").select("*").order("name", { ascending: true });
+        if (pData && pData.length > 0) {
+          setDbDoctors(pData);
+        }
+
+        // Fetch Initial Recent Customers List
+        const { data: cData } = await supabase
+          .from("customers")
+          .select("id, first_name, last_name, full_name, mobile, phone, email, whatsapp")
+          .order("created_at", { ascending: false })
+          .limit(20);
+        if (cData) {
+          setCustomerList(cData);
+        }
+      } catch (err) {
+        console.error("Error initializing New Booking View data:", err);
       }
     }
     loadData();
   }, []);
 
-  // Default select first service and provider
+  // Set default selected service & provider
   useEffect(() => {
     if (!selectedServiceId && dbServices.length > 0) {
-      setSelectedServiceId(dbServices[0].id);
+      setSelectedServiceId(String(dbServices[0].id));
     }
     if (!selectedDoctorId && dbDoctors.length > 0) {
-      setSelectedDoctorId(dbDoctors[0].id);
+      setSelectedDoctorId(String(dbDoctors[0].id));
     }
   }, [dbServices, dbDoctors]);
 
@@ -127,75 +179,163 @@ export default function AdminNewBookingView({
     }
   }, [sameAsPhone, phone]);
 
-  // Real Supabase Customer Lookup on typing phone
+  // 2. Real-time Customer Search & Dropdown Filter
   useEffect(() => {
-    const cleanPhone = phone.replace(/\D/g, "");
-    if (cleanPhone.length >= 8) {
+    async function searchCustomers() {
+      if (!patientSearchQuery.trim()) {
+        setShowCustomerDropdown(false);
+        return;
+      }
       setSearchingCustomer(true);
-      const timer = setTimeout(async () => {
-        try {
-          const { data } = await supabase
-            .from("customers")
-            .select("*")
-            .or(`mobile.ilike.%${cleanPhone}%,phone.ilike.%${cleanPhone}%`)
-            .maybeSingle();
+      setShowCustomerDropdown(true);
 
-          if (data) {
-            setPatientFound(true);
-            setFoundCustomer(data);
-            if (data.first_name) setFirstName(data.first_name);
-            if (data.last_name) setLastName(data.last_name);
-            if (data.email) setEmail(data.email);
-            if (!data.first_name && data.full_name) {
-              const parts = data.full_name.split(" ");
-              setFirstName(parts[0] || "");
-              setLastName(parts.slice(1).join(" ") || "");
-            }
+      try {
+        const q = patientSearchQuery.trim();
+        const { data } = await supabase
+          .from("customers")
+          .select("id, first_name, last_name, full_name, mobile, phone, email, whatsapp")
+          .or(`full_name.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%,mobile.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`)
+          .limit(10);
 
-            // Fetch patient active packages
-            const { data: pkgData } = await supabase
-              .from("customer_packages")
-              .select("*, packages(name)")
-              .eq("customer_id", data.id)
-              .gt("remaining_sessions", 0)
-              .maybeSingle();
-
-            if (pkgData) {
-              setActivePackage({
-                name: pkgData.packages?.name || "Laser Hair Removal (Session Package)",
-                remaining: pkgData.remaining_sessions || 4,
-                expiresOn: pkgData.expires_at ? new Date(pkgData.expires_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "12 Dec 2026"
-              });
-            } else {
-              // Default demonstration package for patient if found
-              setActivePackage({
-                name: "Laser Hair Removal (Session Package)",
-                remaining: 4,
-                expiresOn: "12 Dec 2026"
-              });
-            }
-          } else {
-            setPatientFound(false);
-            setFoundCustomer(null);
-            setActivePackage(null);
-          }
-        } catch (e) {
-          console.error("Customer lookup error:", e);
-        } finally {
-          setSearchingCustomer(false);
+        if (data) {
+          setCustomerList(data);
         }
-      }, 400);
-
-      return () => clearTimeout(timer);
-    } else {
-      setPatientFound(null);
-      setFoundCustomer(null);
-      setActivePackage(null);
+      } catch (err) {
+        console.error("Customer search error:", err);
+      } finally {
+        setSearchingCustomer(false);
+      }
     }
-  }, [phone]);
 
-  const selectedServiceObj = dbServices.find(s => s.id === selectedServiceId) || dbServices[0];
-  const selectedDoctorObj = dbDoctors.find(d => d.id === selectedDoctorId) || dbDoctors[0];
+    const timer = setTimeout(searchCustomers, 300);
+    return () => clearTimeout(timer);
+  }, [patientSearchQuery]);
+
+  // Handle Select Customer from List
+  const handleSelectCustomer = async (cust: CustomerItem) => {
+    setFoundCustomer(cust);
+    setPatientFound(true);
+    setPhone(cust.mobile || cust.phone || "");
+    setFirstName(cust.first_name || (cust.full_name ? cust.full_name.split(" ")[0] : ""));
+    setLastName(cust.last_name || (cust.full_name ? cust.full_name.split(" ").slice(1).join(" ") : ""));
+    setEmail(cust.email || "");
+    setWhatsapp(cust.whatsapp || cust.mobile || cust.phone || "");
+    setPatientSearchQuery(`${cust.full_name || `${cust.first_name} ${cust.last_name}`} (${cust.mobile || cust.phone || ""})`);
+    setShowCustomerDropdown(false);
+
+    // Fetch active packages for this customer
+    try {
+      const { data: pkgData } = await supabase
+        .from("customer_packages")
+        .select("*, packages(name)")
+        .eq("customer_id", cust.id)
+        .gt("remaining_sessions", 0)
+        .maybeSingle();
+
+      if (pkgData) {
+        setActivePackage({
+          name: pkgData.packages?.name || "Laser Hair Removal (Session Package)",
+          remaining: pkgData.remaining_sessions || 4,
+          expiresOn: pkgData.expires_at ? new Date(pkgData.expires_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "12 Dec 2026"
+        });
+      } else {
+        setActivePackage(null);
+      }
+    } catch (e) {
+      console.error("Error loading customer package:", e);
+    }
+  };
+
+  // 3. Dynamic Real Time Slots Calculation (Combining API & Provider Working Hours + Booked Slots)
+  useEffect(() => {
+    async function fetchActualTimeSlots() {
+      setLoadingSlots(true);
+      try {
+        // Query existing reservations for selected date & doctor to calculate booked slots
+        let booked: string[] = [];
+        if (bookingDate) {
+          let qRes = supabase
+            .from("reservations")
+            .select("start_time, status, date, doctor_name, provider_id")
+            .eq("date", bookingDate)
+            .neq("status", "cancelled");
+
+          if (selectedDoctorId) {
+            qRes = qRes.eq("provider_id", selectedDoctorId);
+          }
+
+          const { data: resData } = await qRes;
+          if (resData) {
+            booked = resData.map((r: any) => normalizeTimeSlot(r.start_time)).filter(Boolean);
+          }
+        }
+        setBookedTimeSlots(booked);
+
+        // Try /api/availability endpoint
+        const params = new URLSearchParams();
+        if (selectedServiceId) params.append("serviceId", String(selectedServiceId));
+        if (bookingDate) params.append("date", bookingDate);
+
+        const res = await fetch(`/api/availability?${params.toString()}`);
+        if (res.ok) {
+          const apiData = await res.json();
+          let slotsList: string[] = [];
+          if (Array.isArray(apiData)) {
+            slotsList = apiData.map(formatSlotTo12h);
+          } else if (apiData && typeof apiData === "object") {
+            const list = apiData[bookingDate] || apiData.slots || apiData.availableSlots;
+            if (Array.isArray(list) && list.length > 0) {
+              slotsList = list.map(formatSlotTo12h);
+            }
+          }
+
+          if (slotsList.length > 0) {
+            setAvailableTimeSlots(slotsList);
+            if (!slotsList.includes(selectedTime)) {
+              setSelectedTime(slotsList[0]);
+            }
+            setLoadingSlots(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("API availability fetch fallback:", e);
+      }
+
+      // Generate standard clinic multi-shift slots: 09:00 AM – 02:00 PM & 05:00 PM – 09:00 PM
+      const generated: string[] = [];
+      const shiftRanges = [
+        { start: 9, end: 14 },  // Morning Shift: 09:00 AM - 02:00 PM
+        { start: 17, end: 21 }  // Evening Shift: 05:00 PM - 09:00 PM
+      ];
+
+      shiftRanges.forEach(range => {
+        for (let hour = range.start; hour < range.end; hour++) {
+          for (let min of [0, 30]) {
+            const hour12 = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+            const ampm = hour >= 12 ? "PM" : "AM";
+            const hh = String(hour12).padStart(2, "0");
+            const mm = String(min).padStart(2, "0");
+            generated.push(`${hh}:${mm} ${ampm}`);
+          }
+        }
+      });
+
+      setAvailableTimeSlots(generated);
+      if (!generated.includes(selectedTime)) {
+        setSelectedTime(generated[0]);
+      }
+      setLoadingSlots(false);
+    }
+
+    fetchActualTimeSlots();
+  }, [bookingDate, selectedDoctorId, selectedServiceId]);
+
+  const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
+  const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
+
+  const selectedServiceName = getServiceName(selectedServiceObj);
+  const selectedDoctorName = selectedDoctorObj?.name || "Doctor";
 
   const fullPatientName = `${firstName} ${lastName}`.trim() || "Patient Name";
 
@@ -227,10 +367,12 @@ export default function AdminNewBookingView({
           .from("customers")
           .insert({
             mobile: phone,
+            phone: phone,
             first_name: firstName,
             last_name: lastName,
             full_name: `${firstName} ${lastName}`.trim(),
-            email: email || null
+            email: email || null,
+            whatsapp: whatsapp || phone
           })
           .select("id")
           .single();
@@ -248,9 +390,9 @@ export default function AdminNewBookingView({
         phone: phone,
         email: email || null,
         service_id: selectedServiceObj?.id || null,
-        service_name: selectedServiceObj?.name || "Medical Service",
+        service_name: selectedServiceName,
         provider_id: selectedDoctorObj?.id || null,
-        doctor_name: selectedDoctorObj?.name || "Doctor",
+        doctor_name: selectedDoctorName,
         date: bookingDate,
         start_time: selectedTime,
         session_type: sessionType === "in_person" ? "In Person" : "Online",
@@ -271,7 +413,7 @@ export default function AdminNewBookingView({
         window.print();
       } else if (action === "whatsapp") {
         const msg = encodeURIComponent(
-          `Hello ${fullPatientName}, your appointment for ${selectedServiceObj?.name || 'Service'} with ${selectedDoctorObj?.name || 'Doctor'} is confirmed for ${formattedDateStr} at ${selectedTime}.`
+          `Hello ${fullPatientName}, your appointment for ${selectedServiceName} with ${selectedDoctorName} is confirmed for ${formattedDateStr} at ${selectedTime}.`
         );
         window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
       }
@@ -321,53 +463,97 @@ export default function AdminNewBookingView({
                   Patient Information
                 </h2>
               </div>
-              {searchingCustomer && (
-                <span className="flex items-center gap-1.5 text-xs text-[#5A6A51]">
-                  <Loader2 size={13} className="animate-spin text-emerald-700" /> Searching database...
+
+              {/* Patient Status Indicator */}
+              {patientFound === true && (
+                <span className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 text-xs font-bold text-emerald-700">
+                  <CheckCircle2 size={15} className="text-emerald-600" /> Patient found
+                </span>
+              )}
+              {patientFound === false && (
+                <span className="inline-flex items-center gap-1.5 rounded-2xl bg-blue-50 border border-blue-200 px-3.5 py-1.5 text-xs font-bold text-blue-700">
+                  + New Patient
                 </span>
               )}
             </div>
 
-            <div className="space-y-4 text-xs md:text-sm">
-              {/* Phone Input with Country Code & Patient Found Pill */}
+            {/* 🔍 SEARCH EXISTING PATIENTS AUTOCOMPLETE DROP-DOWN */}
+            <div className="relative">
+              <label className="block font-bold text-[#1F251A] mb-1.5 flex items-center gap-2">
+                <Search size={14} className="text-emerald-700" />
+                <span>Search Existing Patient (Name, Phone, or Email)</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={patientSearchQuery}
+                  onChange={(e) => setPatientSearchQuery(e.target.value)}
+                  onFocus={() => setShowCustomerDropdown(true)}
+                  placeholder="Type patient name or phone number to search database..."
+                  className="w-full rounded-2xl border border-[#414E36]/20 bg-[#FBFBF9] pl-10 pr-4 py-2.5 text-xs font-bold text-[#1F251A] outline-none focus:border-emerald-700 focus:bg-white"
+                />
+                <Users size={16} className="absolute left-3.5 top-3 text-[#5A6A51]" />
+                {searchingCustomer && (
+                  <Loader2 size={16} className="absolute right-3.5 top-3 animate-spin text-emerald-700" />
+                )}
+              </div>
+
+              {/* Matching Customers Floating List */}
+              {showCustomerDropdown && customerList.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 z-[100] max-h-60 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/15 shadow-2xl p-2 space-y-1">
+                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] border-b border-[#414E36]/10 flex justify-between items-center">
+                    <span>Database Customers</span>
+                    <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] font-bold">Close</button>
+                  </div>
+                  {customerList.map((c) => (
+                    <div
+                      key={c.id}
+                      onClick={() => handleSelectCustomer(c)}
+                      className="p-2.5 rounded-xl hover:bg-emerald-50/70 cursor-pointer transition flex items-center justify-between border-b border-gray-50 last:border-0 text-xs"
+                    >
+                      <div>
+                        <span className="font-extrabold text-[#1F251A] block">
+                          {c.full_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Patient Account"}
+                        </span>
+                        <span className="text-[11px] font-mono text-[#5A6A51]">
+                          {c.mobile || c.phone || "No Phone"} {c.email ? `• ${c.email}` : ""}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/60 px-2.5 py-1 rounded-lg">
+                        Select
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 text-xs md:text-sm pt-2 border-t border-[#414E36]/10">
+              {/* Phone Input with Country Code */}
               <div>
                 <label className="block font-bold text-[#1F251A] mb-1.5">Phone Number *</label>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <div className="flex items-center flex-1 rounded-2xl border border-[#414E36]/20 bg-white overflow-hidden shadow-xs focus-within:border-emerald-700">
-                    <div className="flex items-center gap-1.5 px-3 py-2.5 bg-[#FBFBF9] border-r border-[#414E36]/10 font-bold text-[#1F251A]">
-                      <span className="text-base">🇪🇬</span>
-                      <select
-                        value={countryCode}
-                        onChange={(e) => setCountryCode(e.target.value)}
-                        className="bg-transparent outline-none cursor-pointer"
-                      >
-                        <option value="+20">+20</option>
-                        <option value="+966">+966</option>
-                        <option value="+971">+971</option>
-                      </select>
-                      <ChevronDown size={14} className="text-[#5A6A51]" />
-                    </div>
-                    <input
-                      type="tel"
-                      required
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="01234567890"
-                      className="w-full px-3.5 py-2.5 font-mono text-[#1F251A] outline-none font-bold placeholder:text-gray-400"
-                    />
+                <div className="flex items-center rounded-2xl border border-[#414E36]/20 bg-white overflow-hidden shadow-xs focus-within:border-emerald-700">
+                  <div className="flex items-center gap-1.5 px-3 py-2.5 bg-[#FBFBF9] border-r border-[#414E36]/10 font-bold text-[#1F251A]">
+                    <span className="text-base">🇪🇬</span>
+                    <select
+                      value={countryCode}
+                      onChange={(e) => setCountryCode(e.target.value)}
+                      className="bg-transparent outline-none cursor-pointer"
+                    >
+                      <option value="+20">+20</option>
+                      <option value="+966">+966</option>
+                      <option value="+971">+971</option>
+                    </select>
+                    <ChevronDown size={14} className="text-[#5A6A51]" />
                   </div>
-
-                  {/* Patient Lookup Badge */}
-                  {patientFound === true && (
-                    <span className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-xs font-bold text-emerald-700 shrink-0">
-                      <CheckCircle2 size={15} className="text-emerald-600" /> Patient found
-                    </span>
-                  )}
-                  {patientFound === false && (
-                    <span className="inline-flex items-center gap-1.5 rounded-2xl bg-blue-50 border border-blue-200 px-4 py-2 text-xs font-bold text-blue-700 shrink-0">
-                      + New Patient
-                    </span>
-                  )}
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="01234567890"
+                    className="w-full px-3.5 py-2.5 font-mono text-[#1F251A] outline-none font-bold placeholder:text-gray-400"
+                  />
                 </div>
               </div>
 
@@ -459,7 +645,9 @@ export default function AdminNewBookingView({
                     className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
                   >
                     {dbServices.map(s => (
-                      <option key={s.id} value={s.id}>{s.name || s.title || "Service"}</option>
+                      <option key={s.id} value={s.id}>
+                        {getServiceName(s)}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -489,24 +677,39 @@ export default function AdminNewBookingView({
                 </div>
               </div>
 
-              {/* Available Time Slots */}
+              {/* REAL DYNAMIC TIME SLOTS */}
               <div>
-                <label className="block font-bold text-[#1F251A] mb-2">Available Time *</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="font-bold text-[#1F251A]">Available Time *</label>
+                  {loadingSlots && (
+                    <span className="flex items-center gap-1 text-[11px] text-[#5A6A51]">
+                      <Loader2 size={12} className="animate-spin text-emerald-700" /> Fetching slots...
+                    </span>
+                  )}
+                </div>
+
                 <div className="flex flex-wrap gap-2.5">
-                  {timeSlots.map((tSlot) => {
+                  {availableTimeSlots.map((tSlot) => {
+                    const normalized = normalizeTimeSlot(tSlot);
+                    const isBooked = bookedTimeSlots.includes(normalized);
                     const isSelected = selectedTime === tSlot;
+
                     return (
                       <button
                         key={tSlot}
                         type="button"
+                        disabled={isBooked}
                         onClick={() => setSelectedTime(tSlot)}
                         className={`rounded-2xl px-4 py-2.5 text-xs font-bold transition ${
-                          isSelected
+                          isBooked
+                            ? "bg-rose-50 text-rose-400 border border-rose-200 line-through cursor-not-allowed opacity-60"
+                            : isSelected
                             ? "bg-[#1E3A2B] text-white shadow-md scale-105"
                             : "bg-[#FBFBF9] text-[#1F251A] border border-[#414E36]/15 hover:border-[#1E3A2B]"
                         }`}
+                        title={isBooked ? "Slot already booked" : `Select ${tSlot}`}
                       >
-                        {tSlot}
+                        {tSlot} {isBooked ? "(Booked)" : ""}
                       </button>
                     );
                   })}
@@ -629,12 +832,12 @@ export default function AdminNewBookingView({
 
               <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
                 <span className="text-[#5A6A51] font-bold">Service</span>
-                <span className="font-extrabold text-[#1F251A]">{selectedServiceObj?.name || "Laser Hair Removal"}</span>
+                <span className="font-extrabold text-[#1F251A]">{selectedServiceName}</span>
               </div>
 
               <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
                 <span className="text-[#5A6A51] font-bold">Doctor</span>
-                <span className="font-extrabold text-[#1F251A]">{selectedDoctorObj?.name || "Dr. Sara Ahmed"}</span>
+                <span className="font-extrabold text-[#1F251A]">{selectedDoctorName}</span>
               </div>
 
               <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
