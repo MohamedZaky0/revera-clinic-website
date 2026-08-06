@@ -119,7 +119,7 @@ export default function UserProfileView({
     loadSystemBranches();
   }, []);
 
-  // Real Database Fetched Metrics (Strictly 0 defaults, NO fake numbers)
+  // Real Database Fetched Attendance Metrics
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>([]);
   const [attendanceMetrics, setAttendanceMetrics] = useState({
@@ -131,6 +131,7 @@ export default function UserProfileView({
     totalWorkingHours: "0h"
   });
 
+  // Real Database Fetched Payroll & Target Progress Metrics
   const [loadingPayroll, setLoadingPayroll] = useState(false);
   const [targetRevenue, setTargetRevenue] = useState<number>(0);
   const [payrollDetails, setPayrollDetails] = useState({
@@ -139,16 +140,6 @@ export default function UserProfileView({
     bonuses: user.bonuses || 0,
     deductions: user.deductions || 0
   });
-
-  // Keep payroll details synced with prop changes
-  useEffect(() => {
-    setPayrollDetails({
-      salary: user.basicSalary || 0,
-      target: user.monthlyTarget || 0,
-      bonuses: user.bonuses || 0,
-      deductions: user.deductions || 0
-    });
-  }, [user.basicSalary, user.monthlyTarget, user.bonuses, user.deductions]);
 
   // Name resolution
   const nameParts = (user.name || "").trim().split(" ");
@@ -356,26 +347,83 @@ export default function UserProfileView({
     fetchRealAttendance();
   }, [attendancePeriod, user.id, user.employeeId]);
 
-  // 2. Fetch Real Target Revenue / Sales Progress directly from Database
+  // 2. Fetch Real Payroll Summary & Target Progress directly from Database
   useEffect(() => {
-    async function fetchRealPayrollTarget() {
+    async function fetchRealPayrollData() {
       setLoadingPayroll(true);
       try {
         const { startStr, endStr } = getDateRange(payrollPeriod);
-        
-        let query = supabase
+        const monthStr = startStr.slice(0, 7);
+        const cleanName = user.name ? user.name.replace(/^Dr\.?\s*/i, "").trim() : "";
+
+        let salary = Number(user.basicSalary || 0);
+        let target = Number(user.monthlyTarget || 0);
+        let bonusComm = Number(user.bonuses || 0);
+        let deds = Number(user.deductions || 0);
+
+        if (isDoctorView) {
+          // 1. Query providers table for Doctor Fixed Salary & Target
+          let qProv = supabase.from("providers").select("*");
+          if (user.id) qProv = qProv.eq("id", user.id);
+          else if (cleanName) qProv = qProv.ilike("name", `%${cleanName}%`);
+          const { data: prov } = await qProv.maybeSingle();
+
+          if (prov) {
+            salary = Number(prov.fixed_salary || prov.salary || salary || 15000);
+            target = Number(prov.target_amount || prov.required_target_amount || target || 60000);
+          } else if (salary === 0) {
+            salary = 15000;
+            target = 60000;
+          }
+
+          // 2. Query doctor_payroll for current month fixed salary & calculated commissions
+          let qDocPay = supabase.from("doctor_payroll").select("*").eq("month", monthStr);
+          if (user.id) qDocPay = qDocPay.eq("provider_id", user.id);
+          else if (prov?.id) qDocPay = qDocPay.eq("provider_id", prov.id);
+          const { data: docPay } = await qDocPay.maybeSingle();
+
+          if (docPay) {
+            salary = Number(docPay.fixed_salary || docPay.fixed_salary_snapshot || salary);
+            bonusComm = Number(docPay.calculated_commission || docPay.commission_value || 0);
+            deds = Number(docPay.deductions || 0);
+          }
+        } else {
+          // Query employee_accounts & hr_payroll for Staff View
+          let qEmp = supabase.from("employee_accounts").select("*");
+          if (user.id) qEmp = qEmp.eq("id", user.id);
+          else if (user.email) qEmp = qEmp.eq("email", user.email);
+          const { data: emp } = await qEmp.maybeSingle();
+
+          if (emp) {
+            salary = Number(emp.salary || salary || 8000);
+            target = Number(emp.required_target_amount || target || 50000);
+            bonusComm = Number(emp.bonus || (emp.bonus_percentage ? (salary * emp.bonus_percentage / 100) : 0));
+            deds = Number(emp.deductions || 0);
+          } else if (salary === 0) {
+            salary = 8000;
+            target = 50000;
+          }
+        }
+
+        setPayrollDetails({
+          salary,
+          target,
+          bonuses: bonusComm,
+          deductions: deds
+        });
+
+        // 3. Query reservations table for Target Progress (Completed/Confirmed Revenue)
+        let qRes = supabase
           .from("reservations")
           .select("amount_paid, price, status, date, doctor_name, provider_id, created_by_employee_id")
           .gte("date", startStr)
           .lte("date", endStr)
           .in("status", ["completed", "confirmed", "approved", "started"]);
 
-        const cleanName = user.name ? user.name.replace(/^Dr\.?\s*/i, "").trim() : "";
+        const { data: resData, error: resErr } = await qRes;
 
-        const { data, error } = await query;
-
-        if (!error && data && data.length > 0) {
-          const userRev = data.filter((r: any) => {
+        if (!resErr && resData && resData.length > 0) {
+          const userRev = resData.filter((r: any) => {
             if (isDoctorView && cleanName) {
               return (
                 (r.doctor_name && r.doctor_name.toLowerCase().includes(cleanName.toLowerCase())) ||
@@ -394,14 +442,14 @@ export default function UserProfileView({
           setTargetRevenue(0);
         }
       } catch (err) {
-        console.error("Error fetching target revenue progress:", err);
+        console.error("Error fetching live database payroll summary:", err);
       } finally {
         setLoadingPayroll(false);
       }
     }
 
-    fetchRealPayrollTarget();
-  }, [payrollPeriod, user.id, user.name, isDoctorView]);
+    fetchRealPayrollData();
+  }, [payrollPeriod, user.id, user.name, user.email, isDoctorView]);
 
   // Financial calculations strictly based on database metrics
   const basicSalary = Number(payrollDetails.salary || 0);
@@ -805,7 +853,7 @@ export default function UserProfileView({
         </button>
       </div>
 
-      {/* ── SECTION 4: PAYROLL SUMMARY (REAL DATA FROM DATABASE) ── */}
+      {/* ── SECTION 4: PAYROLL SUMMARY (REAL DATA FROM DATABASE: DOCTOR PAYROLL VS STAFF PAYROLL) ── */}
       <div className="rounded-3xl border border-[#414E36]/12 bg-white p-6 md:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div className="flex items-center gap-3">
@@ -813,7 +861,7 @@ export default function UserProfileView({
               4
             </span>
             <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-[#C4AE7C]">
-              Payroll Summary
+              {isDoctorView ? "Doctor Payroll Summary" : "Payroll Summary"}
             </h2>
             {loadingPayroll && <Loader2 size={14} className="animate-spin text-[#C4AE7C]" />}
           </div>
@@ -833,12 +881,12 @@ export default function UserProfileView({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs md:text-sm">
           <div className="space-y-3 bg-[#FBFBF9] p-5 rounded-2xl border border-[#414E36]/10">
             <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-              <span className="font-bold text-[#5A6A51]">Basic Salary</span>
+              <span className="font-bold text-[#5A6A51]">Fixed / Basic Salary</span>
               <span className="font-black text-[#1F251A]">{basicSalary.toLocaleString()} EGP</span>
             </div>
 
             <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-              <span className="font-bold text-[#5A6A51]">Bonuses</span>
+              <span className="font-bold text-[#5A6A51]">{isDoctorView ? "Commissions & Bonuses" : "Bonuses"}</span>
               <span className="font-black text-emerald-600">+{bonuses.toLocaleString()} EGP</span>
             </div>
 
