@@ -117,6 +117,7 @@ import { FinanceSection } from "@/components/admin/Finance/FinanceSection";
 import { DoctorServiceCommissionEditor, ServiceCommissionEntry, DefaultCommissionType } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import DoctorAccountView from "@/components/admin/DoctorAccountView";
 import { AdminBookingsView } from "@/components/admin/bookings/AdminBookingsView";
+import AdminNewBookingView from "@/components/admin/bookings/AdminNewBookingView";
 import { DoctorProfileDetailsView } from "@/components/admin/doctor/DoctorProfileDetailsView";
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
@@ -1895,6 +1896,7 @@ export default function AdminPage() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showActionsMenuModal, setShowActionsMenuModal] = useState(false);
   const [showAddBookingModal, setShowAddBookingModal] = useState(false);
+  const [showFullViewNewBooking, setShowFullViewNewBooking] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -22765,16 +22767,26 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── BOOKINGS VIEW ── */}
+          {/* ── BOOKINGS & NEW BOOKING FULL VIEW ── */}
           {activeNav === "Bookings" && (
-            <>
+            showFullViewNewBooking ? (
+              <AdminNewBookingView
+                onClose={() => setShowFullViewNewBooking(false)}
+                onBookingCreated={() => {
+                  fetchAllReservations();
+                  setShowFullViewNewBooking(false);
+                }}
+                services={localServices}
+                providers={providers}
+              />
+            ) : (
               <AdminBookingsView
                 allReservations={allReservations as any}
                 requests={requests as any}
                 providers={providers}
                 localServices={localServices}
                 userName={loggedEmpAccount?.name?.split(" ")[0] || "Sara"}
-                onNewBooking={() => setShowAddBookingModal(true)}
+                onNewBooking={() => setShowFullViewNewBooking(true)}
                 onPendingApprovalsClick={() => setShowTodayBookingsModal(true)}
                 onFilterClick={() => setShowFilterModal(true)}
                 onViewBookingDetails={(booking: any) => {
@@ -22783,7 +22795,18 @@ export default function AdminPage() {
                 onPrint={() => window.print()}
                 onExportCSV={handleExportBookingsCSV}
               />
-            </>
+            )
+          )}
+          {activeNav === "New Booking" && (
+            <AdminNewBookingView
+              onClose={() => setActiveNav("Bookings")}
+              onBookingCreated={() => {
+                fetchAllReservations();
+                setActiveNav("Bookings");
+              }}
+              services={localServices}
+              providers={providers}
+            />
           )}
         </>
       )}
