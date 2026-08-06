@@ -12,6 +12,7 @@ import DoctorPatientsTab from "./doctor/tabs/DoctorPatientsTab";
 import DoctorAnalyticsTab from "./doctor/tabs/DoctorAnalyticsTab";
 import DoctorSettingsTab from "./doctor/tabs/DoctorSettingsTab";
 import DoctorProfileTab from "./doctor/tabs/DoctorProfileTab";
+import UserProfileView from "./UserProfileView";
 import DoctorSessionDrawer from "./doctor/modals/DoctorSessionDrawer";
 import DoctorPrescriptionModal from "./doctor/modals/DoctorPrescriptionModal";
 import DoctorPatientHistoryDrawer from "./doctor/modals/DoctorPatientHistoryDrawer";
@@ -957,17 +958,24 @@ export default function DoctorAccountView({
           <DoctorSettingsTab t={t} />
         )}
 
-        {/* TAB 6: SECURITY & PASSWORD SETTINGS VIEW */}
+        {/* TAB 6: SECURITY & PROFILE VIEW */}
         {activeTab === "profile" && (
-          <DoctorProfileTab
-            doctorName={doctorName}
-            doctorEmail={doctorEmail}
-            resolvedBranchName={resolvedBranchName}
-            newPassword={newPassword}
-            setNewPassword={setNewPassword}
-            confirmPassword={confirmPassword}
-            setConfirmPassword={setConfirmPassword}
-            t={t}
+          <UserProfileView
+            user={{
+              name: doctorName,
+              email: doctorEmail,
+              role: "Doctor / Specialist",
+              branch: resolvedBranchName,
+              department: "Dermatology & Medical Services",
+              employeeId: doctorDbId ? `DOC-${String(doctorDbId).slice(-3).toUpperCase()}` : "DOC-001",
+              joiningDate: "July 21, 2026",
+              basicSalary: 15000,
+              bonuses: 1200,
+              deductions: 300,
+              monthlyTarget: 60000,
+              targetProgressAmount: 38000
+            }}
+            isDoctorView={true}
           />
         )}
       </main>
