@@ -101,6 +101,24 @@ export default function UserProfileView({
   const [attendancePeriod, setAttendancePeriod] = useState("This Month");
   const [payrollPeriod, setPayrollPeriod] = useState("This Month");
 
+  // System Branches List
+  const [allSystemBranches, setAllSystemBranches] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function loadSystemBranches() {
+      try {
+        const { data } = await supabase.from("branches").select("id, name_en, name");
+        if (data && data.length > 0) {
+          const names = data.map((b: any) => b.name_en || b.name).filter(Boolean);
+          setAllSystemBranches(names);
+        }
+      } catch (err) {
+        console.error("Error fetching system branches:", err);
+      }
+    }
+    loadSystemBranches();
+  }, []);
+
   // Real Database Fetched Metrics (Strictly 0 defaults, NO fake numbers)
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>([]);
@@ -141,38 +159,43 @@ export default function UserProfileView({
   const displayRole = user.role || (isDoctorView ? "Doctor" : "Staff");
   const displayEmployeeId = user.employeeId || (isDoctorView ? "DOC-001" : "EMP-001");
   const displayJoiningDate = user.joiningDate || "—";
-  const displayDepartment = user.department || (isDoctorView ? "Medical Services" : "Reception");
+  
+  // Department logic: Exactly "Doctor" for doctors, "Receptionist" for reception/staff
+  const displayDepartment = isDoctorView ? "Doctor" : (user.department || "Receptionist");
 
-  // Formatted Multi-Branch Display (Normalizing raw "home", "main", or branch lists)
+  // Formatted Multi-Branch Display (Normalizing raw "home", "main", or resolving all clinic branches)
   const displayBranches = useMemo(() => {
     if (Array.isArray(user.branchesList) && user.branchesList.length > 0) {
-      return user.branchesList.map(b => {
+      const filtered = user.branchesList.map(b => {
         const clean = String(b).trim().toLowerCase();
         if (clean === "home") return "Home Visit";
         if (clean === "main") return "Main Branch";
         return b;
-      }).join(", ");
+      }).filter(Boolean);
+      if (filtered.length > 0) return filtered.join(", ");
     }
 
     const rawSched = user.workingDaysHours;
     if (rawSched && typeof rawSched === "object" && Array.isArray(rawSched.branch_ids) && rawSched.branch_ids.length > 0) {
-      return rawSched.branch_ids.map((bId: any) => {
+      const filtered = rawSched.branch_ids.map((bId: any) => {
         const clean = String(bId).trim().toLowerCase();
         if (clean === "home") return "Home Visit";
         if (clean === "main") return "Main Branch";
         return String(bId);
-      }).join(", ");
+      }).filter(Boolean);
+      if (filtered.length > 0) return filtered.join(", ");
     }
 
-    if (user.branch) {
-      const clean = String(user.branch).trim().toLowerCase();
-      if (clean === "home") return "Home Visit";
-      if (clean === "main") return "Main Branch";
+    if (isDoctorView && allSystemBranches.length > 0) {
+      return allSystemBranches.join(", ");
+    }
+
+    if (user.branch && user.branch.toLowerCase() !== "home") {
       return user.branch;
     }
 
-    return "Main Branch";
-  }, [user.branch, user.branchesList, user.workingDaysHours]);
+    return allSystemBranches.length > 0 ? allSystemBranches.join(", ") : "Main Branch";
+  }, [user.branch, user.branchesList, user.workingDaysHours, isDoctorView, allSystemBranches]);
 
   // Formatted Multi-Shift & Working Hours Schedule Display
   const displayWorkingSchedule = useMemo(() => {
@@ -192,7 +215,7 @@ export default function UserProfileView({
           const dayData = parsed[d] || parsed[d.toLowerCase()];
           if (dayData && dayData.active !== false && (dayData.start || dayData.hours)) {
             const hoursLabel = dayData.hours || `${dayData.start || "09:00"} – ${dayData.end || "17:00"}`;
-            activeDays.push(d.slice(0, 3));
+            activeDays.push(d);
             if (!timeSlots.includes(hoursLabel)) {
               timeSlots.push(hoursLabel);
             }
@@ -202,17 +225,27 @@ export default function UserProfileView({
         if (activeDays.length > 0) {
           return {
             days: activeDays.join(", "),
-            hours: timeSlots.join(" | ")
+            hours: timeSlots.join(" | "),
+            shiftType: timeSlots.length > 1 ? "Multi-Shift Schedule" : (user.shiftType || "Day")
           };
         }
       }
     }
 
+    if (isDoctorView) {
+      return {
+        days: user.workingDays || "Saturday, Sunday, Monday, Tuesday, Thursday",
+        hours: user.workingHours || "09:00 AM – 02:00 PM (Morning) | 05:00 PM – 09:00 PM (Evening)",
+        shiftType: user.shiftType || "Multi-Shift Schedule"
+      };
+    }
+
     return {
       days: user.workingDays || "Sunday – Thursday",
-      hours: user.workingHours || "09:00 AM – 05:00 PM"
+      hours: user.workingHours || "09:00 AM – 05:00 PM",
+      shiftType: user.shiftType || "Day"
     };
-  }, [user.workingDaysHours, user.workingDays, user.workingHours]);
+  }, [user.workingDaysHours, user.workingDays, user.workingHours, user.shiftType, isDoctorView]);
 
   // Helper to get date ranges based on selected period
   const getDateRange = (periodStr: string) => {
@@ -655,7 +688,7 @@ export default function UserProfileView({
             <Clock size={16} className="text-[#5A6A51] mt-0.5 shrink-0" />
             <div>
               <span className="text-[11px] font-bold text-[#5A6A51] block">Shift Type</span>
-              <span className="font-extrabold text-[#1F251A]">{user.shiftType || "Day"}</span>
+              <span className="font-extrabold text-[#1F251A]">{displayWorkingSchedule.shiftType}</span>
             </div>
           </div>
 
