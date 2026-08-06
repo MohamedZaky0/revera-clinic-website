@@ -556,7 +556,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               onClick={() => setViewMode("pending")}
               className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
                 viewMode === "pending"
-                  ? "bg-[#1E3A2B] text-white"
+                  ? "bg-[#C4AE7C] text-[#414E36]"
                   : "text-[#374151] hover:bg-gray-50"
               }`}
             >
@@ -564,7 +564,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               <span>Pending</span>
               {pendingApprovalsCount > 0 && (
                 <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
-                  viewMode === "pending" ? "bg-white text-[#1E3A2B]" : "bg-[#EF4444] text-white"
+                  viewMode === "pending" ? "bg-[#414E36] text-white" : "bg-[#EF4444] text-white"
                 }`}>
                   {pendingApprovalsCount}
                 </span>
