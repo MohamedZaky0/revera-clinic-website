@@ -191,13 +191,47 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     });
   }, [allReservations, dbReservations, dbProviders, localServices, providers, selectedDateStr]);
 
-  // Filter appointments strictly for the selected date
+  // Chronological Booking Flow Order
+  const FLOW_ORDER: Record<string, number> = {
+    pending: 1,
+    waiting: 1,
+    pending_deposit: 1,
+    confirmed: 2,
+    approved: 2,
+    checked_in: 3,
+    in_progress: 4,
+    started: 4,
+    completed: 5,
+    postponed: 6,
+    rescheduled: 6,
+    canceled: 7,
+    cancelled: 7,
+    rejected: 7,
+    no_show: 8
+  };
+
+  // Filter & sort appointments strictly for the selected date according to Flow Order
   const selectedDayAppointments = useMemo(() => {
-    const dayList = mergedAppointments.filter(r => r.date === selectedDateStr);
+    let dayList = mergedAppointments.filter(r => r.date === selectedDateStr);
     if (statusFilter !== "All") {
-      return dayList.filter(r => r.status === statusFilter);
+      dayList = dayList.filter(r => {
+        const st = (r.status || "").toLowerCase();
+        if (statusFilter === "pending") return ["pending", "waiting", "pending_deposit"].includes(st);
+        if (statusFilter === "confirmed") return ["confirmed", "approved"].includes(st);
+        if (statusFilter === "in_progress") return ["in_progress", "started"].includes(st);
+        if (statusFilter === "postponed") return ["postponed", "rescheduled"].includes(st);
+        if (statusFilter === "canceled") return ["canceled", "cancelled", "rejected"].includes(st);
+        return st === statusFilter.toLowerCase();
+      });
     }
-    return dayList;
+
+    // Sort by Flow Order rank then time
+    return [...dayList].sort((a, b) => {
+      const rankA = FLOW_ORDER[(a.status || "").toLowerCase()] || 99;
+      const rankB = FLOW_ORDER[(b.status || "").toLowerCase()] || 99;
+      if (rankA !== rankB) return rankA - rankB;
+      return (a.time || "").localeCompare(b.time || "");
+    });
   }, [mergedAppointments, selectedDateStr, statusFilter]);
 
   // Pagination calculation
@@ -213,11 +247,11 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   // Analytics counts calculation (Strict DB data)
   const stats = useMemo(() => {
     const todays = mergedAppointments.filter(r => r.date === selectedDateStr);
-    const upcoming = mergedAppointments.filter(r => ["confirmed", "approved", "waiting", "checked_in"].includes(r.status || ""));
+    const upcoming = mergedAppointments.filter(r => ["confirmed", "approved", "pending", "waiting", "checked_in"].includes(r.status || ""));
     const completed = mergedAppointments.filter(r => r.status === "completed");
-    const canceled = mergedAppointments.filter(r => ["canceled", "cancelled"].includes(r.status || ""));
+    const canceled = mergedAppointments.filter(r => ["canceled", "cancelled", "postponed"].includes(r.status || ""));
 
-    const upcomingToday = todays.filter(r => ["confirmed", "waiting", "checked_in"].includes(r.status || ""));
+    const upcomingToday = todays.filter(r => ["confirmed", "approved", "pending", "waiting", "checked_in"].includes(r.status || ""));
     const nextTime = upcomingToday.length > 0 ? (upcomingToday[0].time || "09:30 AM") : "—";
 
     return {
@@ -232,7 +266,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   // Pending approvals count
   const pendingApprovalsCount = useMemo(() => {
     if (requests && requests.length > 0) return requests.length;
-    return mergedAppointments.filter(r => r.status === "pending").length;
+    return mergedAppointments.filter(r => ["pending", "waiting", "pending_deposit"].includes((r.status || "").toLowerCase())).length;
   }, [requests, mergedAppointments]);
 
   // Mini Calendar grid generation
@@ -276,13 +310,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     mergedAppointments.forEach(app => {
       if (!app.date) return;
       if (!map[app.date]) map[app.date] = [];
-      let color = "#22C55E"; // default green
-      if (app.status === "checked_in") color = "#3B82F6"; // blue
-      else if (app.status === "waiting") color = "#F97316"; // orange
-      else if (app.status === "in_progress") color = "#A855F7"; // purple
-      else if (app.status === "completed") color = "#0D9488"; // teal
-      else if (app.status === "canceled" || app.status === "cancelled") color = "#EF4444"; // red
-      else if (app.status === "no_show") color = "#6B7280"; // gray
+      const st = (app.status || "").toLowerCase();
+
+      let color = "#22C55E"; // green for confirmed/approved
+      if (st === "pending" || st === "waiting" || st === "pending_deposit") color = "#F97316"; // orange
+      else if (st === "checked_in") color = "#3B82F6"; // blue
+      else if (st === "in_progress" || st === "started") color = "#A855F7"; // purple
+      else if (st === "completed") color = "#0D9488"; // teal
+      else if (st === "postponed" || st === "rescheduled") color = "#6366F1"; // indigo
+      else if (st === "canceled" || st === "cancelled" || st === "rejected") color = "#EF4444"; // red
+      else if (st === "no_show") color = "#6B7280"; // gray
 
       if (!map[app.date].includes(color) && map[app.date].length < 3) {
         map[app.date].push(color);
@@ -302,23 +339,31 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     });
   }, [selectedDate]);
 
-  // Helper status color details
+  // Helper status color details (Flow Order: Pending -> Confirmed -> Checked In -> In Progress -> Completed -> Postponed -> Canceled -> No Show)
   const getStatusConfig = (status?: string) => {
-    switch (status) {
+    switch ((status || "").toLowerCase()) {
+      case "pending":
+      case "waiting":
+      case "pending_deposit":
+        return { label: "Pending", bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500", border: "border-l-orange-500" };
       case "checked_in":
         return { label: "Checked In", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", border: "border-l-blue-500" };
-      case "waiting":
-        return { label: "Waiting", bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500", border: "border-l-orange-500" };
       case "in_progress":
+      case "started":
         return { label: "In Progress", bg: "bg-purple-50", text: "text-purple-700", dot: "bg-purple-500", border: "border-l-purple-500" };
       case "completed":
         return { label: "Completed", bg: "bg-teal-50", text: "text-teal-700", dot: "bg-teal-500", border: "border-l-teal-500" };
+      case "postponed":
+      case "rescheduled":
+        return { label: "Postponed", bg: "bg-indigo-50", text: "text-indigo-700", dot: "bg-indigo-500", border: "border-l-indigo-500" };
       case "canceled":
       case "cancelled":
+      case "rejected":
         return { label: "Canceled", bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500", border: "border-l-rose-500" };
       case "no_show":
         return { label: "No Show", bg: "bg-gray-100", text: "text-gray-700", dot: "bg-gray-500", border: "border-l-gray-500" };
       case "confirmed":
+      case "approved":
       default:
         return { label: "Confirmed", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", border: "border-l-emerald-500" };
     }
@@ -560,6 +605,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             <div className="mt-6 border-t border-gray-100 pt-4">
               <div className="grid grid-cols-2 gap-y-2.5 gap-x-2 text-xs font-medium text-[#4B5563]">
                 <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#F97316]"></span>
+                  <span>Pending</span>
+                </div>
+                <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#22C55E]"></span>
                   <span>Confirmed</span>
                 </div>
@@ -572,12 +621,12 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   <span>In Progress</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#F97316]"></span>
-                  <span>Waiting</span>
-                </div>
-                <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#0D9488]"></span>
                   <span>Completed</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#6366F1]"></span>
+                  <span>Postponed</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#EF4444]"></span>
