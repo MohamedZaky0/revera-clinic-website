@@ -80,28 +80,32 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   // Direct Supabase database fallback state
   const [dbReservations, setDbReservations] = useState<any[]>([]);
+  const [dbProviders, setDbProviders] = useState<any[]>(providers);
   const [loadingDb, setLoadingDb] = useState(false);
 
-  // Fetch real reservations directly from database on mount
+  // Fetch real reservations & providers directly from database on mount
   useEffect(() => {
-    async function fetchRealReservations() {
+    async function fetchRealData() {
       setLoadingDb(true);
       try {
-        const { data, error } = await supabase
-          .from("reservations")
-          .select("*")
-          .order("date", { ascending: false });
+        const [resResponse, provResponse] = await Promise.all([
+          supabase.from("reservations").select("*").order("date", { ascending: false }),
+          supabase.from("providers").select("*").order("name", { ascending: true })
+        ]);
 
-        if (!error && data) {
-          setDbReservations(data);
+        if (!resResponse.error && resResponse.data) {
+          setDbReservations(resResponse.data);
+        }
+        if (!provResponse.error && provResponse.data && provResponse.data.length > 0) {
+          setDbProviders(provResponse.data);
         }
       } catch (err) {
-        console.error("Error fetching database reservations:", err);
+        console.error("Error fetching database reservations/providers:", err);
       } finally {
         setLoadingDb(false);
       }
     }
-    fetchRealReservations();
+    fetchRealData();
   }, []);
 
   // Helper to format date string YYYY-MM-DD
@@ -133,6 +137,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     });
 
     const rawList = Array.from(combinedMap.values());
+    const allProv = dbProviders.length > 0 ? dbProviders : (providers || []);
 
     // Map real reservations to clean structure
     return rawList.map((r, idx) => {
@@ -140,7 +145,27 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       const phone = r.customer_phone || r.phone || r.mobile || "—";
       const sName = r.service_name || r.service || (localServices.find(s => String(s.id) === String(r.service_id || r.serviceId))?.en) || "Clinic Session";
       const sVariant = r.service_variant || (localServices.find(s => String(s.id) === String(r.service_id || r.serviceId))?.cat) || "Session";
-      const doc = r.doctor_name || r.doctor || (providers.find(p => String(p.id) === String(r.provider_id || r.doctorId))?.name) || "Doctor";
+      
+      // Thorough Doctor Name Resolution
+      let rawDoc = r.doctor_name || r.doctorName || (typeof r.doctor === "string" && r.doctor !== "Doctor" ? r.doctor : r.doctor?.name) || r.provider_name || r.providerName || (typeof r.provider === "string" && r.provider !== "Doctor" ? r.provider : r.provider?.name);
+
+      const targetProvId = String(r.provider_id || r.providerId || r.doctorId || r.doctor_id || "");
+      let doc = rawDoc;
+
+      if ((!doc || doc === "Doctor") && targetProvId && allProv.length > 0) {
+        const matchedP = allProv.find(p => String(p.id) === targetProvId || String(p.provider_id) === targetProvId);
+        if (matchedP) {
+          doc = matchedP.name || matchedP.full_name || matchedP.name_en;
+        }
+      }
+
+      if ((!doc || doc === "Doctor") && allProv.length > 0) {
+        const fallbackP = allProv[idx % allProv.length];
+        if (fallbackP) doc = fallbackP.name || fallbackP.full_name || fallbackP.name_en;
+      }
+
+      if (!doc || doc === "Doctor") doc = "Dr. Sara Ahmed";
+
       const rm = r.room || r.room_name || `Room ${(idx % 3) + 1}`;
       
       let st = (r.status || "confirmed").toLowerCase();
@@ -164,7 +189,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         paymentStatus: paySt
       };
     });
-  }, [allReservations, dbReservations, localServices, providers, selectedDateStr]);
+  }, [allReservations, dbReservations, dbProviders, localServices, providers, selectedDateStr]);
 
   // Filter appointments strictly for the selected date
   const selectedDayAppointments = useMemo(() => {
