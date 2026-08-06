@@ -17,7 +17,8 @@ import {
   Loader2,
   Search,
   Users,
-  Check
+  Check,
+  Building2
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -52,12 +53,20 @@ interface CustomerItem {
   whatsapp?: string;
 }
 
+interface BranchItem {
+  id: string;
+  name_en?: string;
+  name_ar?: string;
+  name?: string;
+}
+
 interface AdminNewBookingViewProps {
   onClose: () => void;
   onBookingCreated?: () => void;
   services?: any[];
   providers?: any[];
   customers?: any[];
+  branches?: any[];
 }
 
 // Helper to extract service name cleanly
@@ -91,14 +100,14 @@ export default function AdminNewBookingView({
   onBookingCreated,
   services = [],
   providers = [],
-  customers = []
+  customers = [],
+  branches = []
 }: AdminNewBookingViewProps) {
   // Patient Search & Selection State
   const [patientSearchQuery, setPatientSearchQuery] = useState("");
   const [customerList, setCustomerList] = useState<CustomerItem[]>(customers);
   const [allCustomers, setAllCustomers] = useState<CustomerItem[]>(customers);
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [searchingCustomer, setSearchingCustomer] = useState(false);
 
   // Form State
   const [countryCode, setCountryCode] = useState("+20");
@@ -116,6 +125,7 @@ export default function AdminNewBookingView({
   const [usePackageMode, setUsePackageMode] = useState(false);
 
   // Appointment Details State
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
   const [bookingDate, setBookingDate] = useState<string>(
@@ -132,10 +142,11 @@ export default function AdminNewBookingView({
   // DB Lists
   const [dbServices, setDbServices] = useState<ServiceItem[]>(services);
   const [dbDoctors, setDbDoctors] = useState<ProviderItem[]>(providers);
+  const [dbBranches, setDbBranches] = useState<BranchItem[]>(branches);
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitMenu, setShowSubmitMenu] = useState(false);
 
-  // 1. Load Services, Providers, & Customers from Supabase on mount
+  // 1. Load Services, Providers, Customers & Branches from Supabase on mount
   useEffect(() => {
     async function loadData() {
       try {
@@ -149,6 +160,12 @@ export default function AdminNewBookingView({
         if (dbDoctors.length === 0) {
           const { data: pData } = await supabase.from("providers").select("*").order("name", { ascending: true });
           if (pData && pData.length > 0) setDbDoctors(pData);
+        }
+
+        // Fetch Branches if empty
+        if (dbBranches.length === 0) {
+          const { data: bData } = await supabase.from("branches").select("*").order("name_en", { ascending: true });
+          if (bData && bData.length > 0) setDbBranches(bData);
         }
 
         // Fetch Customers List from Supabase
@@ -172,23 +189,29 @@ export default function AdminNewBookingView({
     loadData();
   }, []);
 
-  // Update customer list when prop updates
+  // Update lists when props update
   useEffect(() => {
     if (customers && customers.length > 0 && allCustomers.length === 0) {
       setAllCustomers(customers);
       setCustomerList(customers);
     }
-  }, [customers]);
+    if (branches && branches.length > 0 && dbBranches.length === 0) {
+      setDbBranches(branches);
+    }
+  }, [customers, branches]);
 
-  // Set default selected service & provider
+  // Set default selected branch, service & provider
   useEffect(() => {
+    if (!selectedBranchId && dbBranches.length > 0) {
+      setSelectedBranchId(String(dbBranches[0].id));
+    }
     if (!selectedServiceId && dbServices.length > 0) {
       setSelectedServiceId(String(dbServices[0].id));
     }
     if (!selectedDoctorId && dbDoctors.length > 0) {
       setSelectedDoctorId(String(dbDoctors[0].id));
     }
-  }, [dbServices, dbDoctors]);
+  }, [dbBranches, dbServices, dbDoctors]);
 
   // Sync WhatsApp number if checkboxed
   useEffect(() => {
@@ -284,6 +307,7 @@ export default function AdminNewBookingView({
         const params = new URLSearchParams();
         if (selectedServiceId) params.append("serviceId", String(selectedServiceId));
         if (bookingDate) params.append("date", bookingDate);
+        if (selectedBranchId) params.append("branchId", String(selectedBranchId));
 
         const res = await fetch(`/api/availability?${params.toString()}`);
         if (res.ok) {
@@ -338,13 +362,15 @@ export default function AdminNewBookingView({
     }
 
     fetchActualTimeSlots();
-  }, [bookingDate, selectedDoctorId, selectedServiceId]);
+  }, [bookingDate, selectedDoctorId, selectedServiceId, selectedBranchId]);
 
   const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
   const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
+  const selectedBranchObj = dbBranches.find(b => String(b.id) === String(selectedBranchId)) || dbBranches[0];
 
   const selectedServiceName = getServiceName(selectedServiceObj);
   const selectedDoctorName = selectedDoctorObj?.name || "Doctor";
+  const selectedBranchName = selectedBranchObj?.name_en || selectedBranchObj?.name || selectedBranchObj?.name_ar || "Clinic Branch";
 
   const fullPatientName = `${firstName} ${lastName}`.trim() || "Patient Name";
 
@@ -375,6 +401,7 @@ export default function AdminNewBookingView({
         email: email || null,
         serviceId: selectedServiceObj?.id,
         doctorId: selectedDoctorObj?.id,
+        branchId: selectedBranchObj?.id || null,
         date: bookingDate,
         requestedTime: selectedTime,
         sessionType: sessionType === "in_person" ? "in_person" : "online",
@@ -438,6 +465,7 @@ export default function AdminNewBookingView({
           service_name: selectedServiceName,
           provider_id: selectedDoctorObj?.id || null,
           doctor_name: selectedDoctorName,
+          branch_id: selectedBranchObj?.id || null,
           date: bookingDate,
           start_time: selectedTime,
           time: selectedTime,
@@ -457,7 +485,7 @@ export default function AdminNewBookingView({
         window.print();
       } else if (action === "whatsapp") {
         const msg = encodeURIComponent(
-          `Hello ${fullPatientName}, your appointment for ${selectedServiceName} with ${selectedDoctorName} is confirmed for ${formattedDateStr} at ${selectedTime}.`
+          `Hello ${fullPatientName}, your appointment for ${selectedServiceName} at ${selectedBranchName} with ${selectedDoctorName} is confirmed for ${formattedDateStr} at ${selectedTime}.`
         );
         window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
       }
@@ -720,8 +748,23 @@ export default function AdminNewBookingView({
             </div>
 
             <div className="space-y-5 text-xs md:text-sm">
-              {/* Service, Doctor, Date Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Branch, Service, Doctor, Date Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block font-bold text-[#1F251A] mb-1.5">Branch *</label>
+                  <select
+                    value={selectedBranchId}
+                    onChange={(e) => setSelectedBranchId(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                  >
+                    {dbBranches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.name_en || b.name || b.name_ar || `Branch #${b.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block font-bold text-[#1F251A] mb-1.5">Service *</label>
                   <select
@@ -913,6 +956,11 @@ export default function AdminNewBookingView({
               <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
                 <span className="text-[#5A6A51] font-bold">Patient</span>
                 <span className="font-extrabold text-[#1F251A]">{fullPatientName}</span>
+              </div>
+
+              <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
+                <span className="text-[#5A6A51] font-bold">Branch</span>
+                <span className="font-extrabold text-[#1F251A]">{selectedBranchName}</span>
               </div>
 
               <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
