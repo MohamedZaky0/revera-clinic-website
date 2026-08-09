@@ -155,17 +155,26 @@ export default function DoctorSessionDrawer({
               <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
                 <FileText size={14} className="text-[#414E36]" /> {t.primaryBookingService || "Primary Reserved Service"}
               </span>
-              <span className="font-extrabold text-[#414E36]">{scheduleModalBooking.price || 0} EGP</span>
+              <span className="font-extrabold text-[#414E36]">{scheduleModalBooking.price || scheduleModalBooking.total_price || 0} EGP</span>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs bg-white p-3 rounded-2xl border border-[#414E36]/10 gap-2">
               <div className="flex-1 w-full">
                 <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Selected Patient Service (Changeable)</label>
                 <select
-                  value={scheduleModalBooking.service_id || ""}
+                  value={
+                    scheduleModalBooking.service_id ||
+                    servicesList.find((s) => {
+                      const sName = (s.en || s.name || s.title || s.name_en || s.ar || "").toLowerCase().trim();
+                      const bName = (scheduleModalBooking.service || scheduleModalBooking.service_name || scheduleModalBooking.service_title || "").toLowerCase().trim();
+                      return sName && bName && (sName === bName || sName.includes(bName) || bName.includes(sName));
+                    })?.id || ""
+                  }
                   onChange={(e) => handleChangePrimaryService && handleChangePrimaryService(scheduleModalBooking, e.target.value)}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
                 >
-                  <option value="">{scheduleModalBooking.service || scheduleModalBooking.service_name || "Select Service"}</option>
+                  {!(scheduleModalBooking.service || scheduleModalBooking.service_name) && (
+                    <option value="">Select Service</option>
+                  )}
                   {servicesList.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.en || s.name || s.title || s.name_en || s.ar} ({s.price || 0} EGP)

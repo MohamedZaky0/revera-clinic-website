@@ -595,7 +595,7 @@ export default function DoctorOngoingSessionTab({
                 </form>
               </div>
 
-              {/* 2. DYNAMIC SERVICES & AUTOMATIC PULSES COUNTER SECTION */}
+              {/* 2. SERVICES, DEVICES & PULSES MANAGER SECTION */}
               <div className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#414E36]/10 pb-3">
                   <div>
@@ -618,17 +618,26 @@ export default function DoctorOngoingSessionTab({
                     <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
                       <Layers size={14} className="text-[#414E36]" /> {t.primaryBookingService}
                     </span>
-                    <span className="font-extrabold text-[#414E36]">{baseBookingPrice} EGP</span>
+                    <span className="font-extrabold text-[#414E36]">{baseBookingPrice || activeSessionBooking.price || activeSessionBooking.total_price || 0} EGP</span>
                   </div>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
                     <div className="flex-1 w-full">
                       <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Selected Patient Service (Changeable)</label>
                       <select
-                        value={activeSessionBooking.service_id || ""}
+                        value={
+                          activeSessionBooking.service_id ||
+                          servicesList.find((s) => {
+                            const sName = (s.en || s.name || s.title || s.name_en || s.ar || "").toLowerCase().trim();
+                            const bName = (activeSessionBooking.service || activeSessionBooking.service_name || activeSessionBooking.service_title || "").toLowerCase().trim();
+                            return sName && bName && (sName === bName || sName.includes(bName) || bName.includes(sName));
+                          })?.id || ""
+                        }
                         onChange={(e) => handleChangePrimaryService && handleChangePrimaryService(activeSessionBooking, e.target.value)}
                         className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
                       >
-                        <option value="">{activeSessionBooking.service || activeSessionBooking.service_name || "Select Service"}</option>
+                        {!(activeSessionBooking.service || activeSessionBooking.service_name) && (
+                          <option value="">Select Service</option>
+                        )}
                         {servicesList.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.en || s.name || s.title || s.name_en || s.ar} ({s.price || 0} EGP)

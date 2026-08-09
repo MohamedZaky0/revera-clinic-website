@@ -706,16 +706,15 @@ export default function DoctorAccountView({
 
       if (res.ok) {
         const data = await res.json();
-        setMedicalRecord(data.medicalRecord || data.form || data);
-        alert("Patient medical record saved successfully!");
+        const savedRecord = data.medicalRecord || data.form || data;
+        setMedicalRecord(savedRecord);
         setShowMedicalForm(false);
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(err.error || err.message || "Failed to save medical record.");
+        console.error("Error saving medical record:", err);
       }
     } catch (err: any) {
       console.error("Error saving medical record:", err);
-      alert(err.message || "Error saving medical record.");
     } finally {
       setSavingMedicalRecord(false);
     }
