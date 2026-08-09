@@ -53,8 +53,9 @@ interface DoctorOngoingSessionTabProps {
   formPreviousTreatmentsDetails: string;
   setFormPreviousTreatmentsDetails: (val: string) => void;
   savingMedicalRecord: boolean;
-  handleSaveMedicalRecord: (e: React.FormEvent) => void;
+  handleSaveMedicalRecord: (e?: React.FormEvent) => void;
   servicesList?: any[];
+  handleChangePrimaryService?: (targetBooking: any, newServiceId: string) => void;
   productsList: any[];
   devicesList: any[];
   selectedProductId: string;
@@ -105,6 +106,7 @@ export default function DoctorOngoingSessionTab({
   savingMedicalRecord,
   handleSaveMedicalRecord,
   servicesList = [],
+  handleChangePrimaryService,
   productsList = [],
   devicesList = [],
   selectedProductId,
@@ -618,11 +620,23 @@ export default function DoctorOngoingSessionTab({
                     </span>
                     <span className="font-extrabold text-[#414E36]">{baseBookingPrice} EGP</span>
                   </div>
-                  <div className="flex items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10">
-                    <span className="font-bold text-[#1F251A]">
-                      {activeSessionBooking.service || activeSessionBooking.service_name}
-                    </span>
-                    <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs bg-white p-3 rounded-xl border border-[#414E36]/10 gap-2">
+                    <div className="flex-1 w-full">
+                      <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Selected Patient Service (Changeable)</label>
+                      <select
+                        value={activeSessionBooking.service_id || ""}
+                        onChange={(e) => handleChangePrimaryService && handleChangePrimaryService(activeSessionBooking, e.target.value)}
+                        className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                      >
+                        <option value="">{activeSessionBooking.service || activeSessionBooking.service_name || "Select Service"}</option>
+                        {servicesList.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.en || s.name || s.title || s.name_en || s.ar} ({s.price || 0} EGP)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-lg shrink-0">
                       {extraPulsesCount || 100} {t.pulsesLabel}
                     </span>
                   </div>
@@ -644,7 +658,7 @@ export default function DoctorOngoingSessionTab({
                       <option value="">{t.selectServicePlaceholder}</option>
                       {servicesList.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.en || s.name} ({s.price || 0} EGP)
+                          {s.en || s.name || s.title || s.name_en || s.ar} ({s.price || 0} EGP)
                         </option>
                       ))}
                     </select>

@@ -635,10 +635,57 @@ export default function DoctorAccountView({
   const extraPulsesSubtotal = extraPulsesCount * pricePerPulse;
   const updatedInvoiceTotal = baseBookingPrice + productsSubtotal + extraPulsesSubtotal;
 
+  // Change Primary Service for Active Session or Drawer Booking
+  const handleChangePrimaryService = async (targetBooking: any, newServiceId: string) => {
+    if (!targetBooking || !newServiceId) return;
+    const newService = servicesList.find((s) => String(s.id) === String(newServiceId));
+    if (!newService) return;
+
+    const newServiceName = newService.en || newService.name || newService.title || newService.name_en || newService.ar || "Clinical Service";
+    const newServicePrice = Number(newService.price || 0);
+
+    const updatedBooking = {
+      ...targetBooking,
+      service: newServiceName,
+      service_name: newServiceName,
+      service_id: newService.id,
+      price: newServicePrice,
+      total_price: newServicePrice
+    };
+
+    if (activeSessionBooking && String(activeSessionBooking.id) === String(targetBooking.id)) {
+      setActiveSessionBooking(updatedBooking);
+    }
+    if (scheduleModalBooking && String(scheduleModalBooking.id) === String(targetBooking.id)) {
+      setScheduleModalBooking(updatedBooking);
+    }
+
+    try {
+      const headers = await getAuthHeaders();
+      await fetch(`/api/reservations?id=${encodeURIComponent(targetBooking.id)}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          service: newServiceName,
+          service_name: newServiceName,
+          service_id: newService.id,
+          price: newServicePrice
+        })
+      });
+      fetchDoctorReservations(true);
+    } catch (err) {
+      console.error("Error updating primary booking service:", err);
+    }
+  };
+
   // Save Medical Record Intake
-  const handleSaveMedicalRecord = async () => {
-    if (!activeSessionBooking) return;
-    const custId = resolvedCustomerId || activeSessionBooking.customer_id || activeSessionBooking.customerId || activeSessionBooking.id;
+  const handleSaveMedicalRecord = async (e?: React.FormEvent) => {
+    if (e && typeof e.preventDefault === "function") {
+      e.preventDefault();
+    }
+    const targetBooking = activeSessionBooking || scheduleModalBooking;
+    if (!targetBooking) return;
+    const custId = resolvedCustomerId || targetBooking.customer_id || targetBooking.customerId || targetBooking.id;
 
     setSavingMedicalRecord(true);
     try {
@@ -648,7 +695,7 @@ export default function DoctorAccountView({
         headers,
         body: JSON.stringify({
           customer_id: custId,
-          patient_name: activeSessionBooking.name || activeSessionBooking.customer_name || "Patient",
+          patient_name: targetBooking.name || targetBooking.customer_name || "Patient",
           skin_type: formSkinType,
           allergies: formAllergies,
           medication_details: formMedicationDetails,
@@ -659,7 +706,7 @@ export default function DoctorAccountView({
 
       if (res.ok) {
         const data = await res.json();
-        setMedicalRecord(data.medicalRecord || data);
+        setMedicalRecord(data.medicalRecord || data.form || data);
         alert("Patient medical record saved successfully!");
         setShowMedicalForm(false);
       } else {
@@ -975,6 +1022,8 @@ export default function DoctorAccountView({
             setActiveTab={setActiveTab}
             usedProducts={usedProducts}
             devicesList={devicesList}
+            servicesList={servicesList}
+            handleChangePrimaryService={handleChangePrimaryService}
             selectedDeviceId={selectedDeviceId}
             setSelectedDeviceId={setSelectedDeviceId}
             extraPulsesCount={extraPulsesCount}
@@ -1073,6 +1122,8 @@ export default function DoctorAccountView({
           handleCompleteTreatment={handleCompleteTreatment}
           setActiveSessionBooking={setActiveSessionBooking}
           setActiveTab={setActiveTab}
+          servicesList={servicesList}
+          handleChangePrimaryService={handleChangePrimaryService}
           t={t}
         />
       )}

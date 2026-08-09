@@ -37,7 +37,7 @@ interface DoctorSessionDrawerProps {
   formPreviousTreatmentsDetails: string;
   setFormPreviousTreatmentsDetails: (val: string) => void;
   savingMedicalRecord: boolean;
-  handleSaveMedicalRecord: (e: React.FormEvent) => void;
+  handleSaveMedicalRecord: (e?: React.FormEvent) => void;
   clinicalNote: string;
   setClinicalNote: (note: string) => void;
   handleSaveClinicalNote: (booking: any) => void;
@@ -47,6 +47,8 @@ interface DoctorSessionDrawerProps {
   setActiveSessionBooking?: (booking: any) => void;
   setActiveTab?: (tab: any) => void;
   prescriptionsMap?: Record<string, any[]>;
+  servicesList?: any[];
+  handleChangePrimaryService?: (targetBooking: any, newServiceId: string) => void;
   t: any;
 }
 
@@ -79,6 +81,8 @@ export default function DoctorSessionDrawer({
   setActiveSessionBooking,
   setActiveTab,
   prescriptionsMap = {},
+  servicesList = [],
+  handleChangePrimaryService,
   t
 }: DoctorSessionDrawerProps) {
   if (!scheduleModalBooking) return null;
@@ -92,7 +96,7 @@ export default function DoctorSessionDrawer({
   const activeRx = customerRxList.length > 0 ? customerRxList[0] : null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-6 bg-black/60 backdrop-blur-md transition-opacity animate-fadeIn">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-6 bg-black/50 transition-opacity animate-fadeIn">
       {/* Click backdrop overlay to close */}
       <div 
         className="absolute inset-0 cursor-pointer" 
@@ -145,6 +149,33 @@ export default function DoctorSessionDrawer({
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
+          {/* Primary Reserved Service Selector Card */}
+          <div className="rounded-3xl border border-[#414E36]/10 bg-[#FBFBF9] p-4 shadow-sm space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-[#5A6A51] flex items-center gap-1.5">
+                <FileText size={14} className="text-[#414E36]" /> {t.primaryBookingService || "Primary Reserved Service"}
+              </span>
+              <span className="font-extrabold text-[#414E36]">{scheduleModalBooking.price || 0} EGP</span>
+            </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs bg-white p-3 rounded-2xl border border-[#414E36]/10 gap-2">
+              <div className="flex-1 w-full">
+                <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Selected Patient Service (Changeable)</label>
+                <select
+                  value={scheduleModalBooking.service_id || ""}
+                  onChange={(e) => handleChangePrimaryService && handleChangePrimaryService(scheduleModalBooking, e.target.value)}
+                  className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
+                >
+                  <option value="">{scheduleModalBooking.service || scheduleModalBooking.service_name || "Select Service"}</option>
+                  {servicesList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.en || s.name || s.title || s.name_en || s.ar} ({s.price || 0} EGP)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
           {/* 1. Patient Medical Record Intake Card */}
           <div className="rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
