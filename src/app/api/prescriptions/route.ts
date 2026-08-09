@@ -99,7 +99,7 @@ export async function POST(req: Request) {
   const id = body.id;
   const customerId = body.customer_id || body.customerId;
   const bookingId = body.booking_id || body.bookingId;
-  const patientName = body.patient_name || body.customer_name || "Patient";
+  const patientName = body.patient_name || body.customer_name;
   const diagnosis = body.diagnosis;
   const medications = body.medications;
   const generalNotes = body.general_notes || body.instructions || body.notes;

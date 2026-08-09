@@ -358,41 +358,33 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     });
   }, [selectedDate]);
 
-  // Helper status color details — each status gets a uniquely vivid, distinct color
+  // Helper status color details (Flow Order: Pending -> Confirmed -> Checked In -> In Progress -> Completed -> Postponed -> Canceled -> No Show)
   const getStatusConfig = (status?: string) => {
     switch ((status || "").toLowerCase()) {
       case "pending":
       case "waiting":
       case "pending_deposit":
-        // 🟠 Amber/Orange — awaiting action
-        return { label: "Pending", bg: "bg-amber-100", text: "text-amber-800", dot: "bg-amber-500", border: "border-l-amber-500", dotHex: "#F59E0B" };
+        return { label: "Pending", bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500", border: "border-l-orange-500" };
       case "checked_in":
-        // 🔵 Sky Blue — patient arrived
-        return { label: "Checked In", bg: "bg-sky-100", text: "text-sky-800", dot: "bg-sky-500", border: "border-l-sky-500", dotHex: "#0EA5E9" };
+        return { label: "Checked In", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", border: "border-l-blue-500" };
       case "in_progress":
       case "started":
-        // 🟣 Fuchsia/Hot-pink — session ongoing
-        return { label: "In Progress", bg: "bg-fuchsia-100", text: "text-fuchsia-800", dot: "bg-fuchsia-500", border: "border-l-fuchsia-500", dotHex: "#D946EF" };
+        return { label: "In Progress", bg: "bg-purple-50", text: "text-purple-700", dot: "bg-purple-500", border: "border-l-purple-500" };
       case "completed":
-        // 🟢 Emerald Green — done
-        return { label: "Completed", bg: "bg-emerald-100", text: "text-emerald-800", dot: "bg-emerald-500", border: "border-l-emerald-500", dotHex: "#10B981" };
+        return { label: "Completed", bg: "bg-teal-50", text: "text-teal-700", dot: "bg-teal-500", border: "border-l-teal-500" };
       case "postponed":
       case "rescheduled":
-        // 🔷 Violet/Indigo — deferred
-        return { label: "Postponed", bg: "bg-violet-100", text: "text-violet-800", dot: "bg-violet-500", border: "border-l-violet-500", dotHex: "#8B5CF6" };
+        return { label: "Postponed", bg: "bg-indigo-50", text: "text-indigo-700", dot: "bg-indigo-500", border: "border-l-indigo-500" };
       case "canceled":
       case "cancelled":
       case "rejected":
-        // 🔴 Rose Red — cancelled
-        return { label: "Canceled", bg: "bg-rose-100", text: "text-rose-800", dot: "bg-rose-600", border: "border-l-rose-600", dotHex: "#E11D48" };
+        return { label: "Canceled", bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500", border: "border-l-rose-500" };
       case "no_show":
-        // ⚫ Slate Gray — did not appear
-        return { label: "No Show", bg: "bg-slate-200", text: "text-slate-700", dot: "bg-slate-500", border: "border-l-slate-500", dotHex: "#64748B" };
+        return { label: "No Show", bg: "bg-gray-100", text: "text-gray-700", dot: "bg-gray-500", border: "border-l-gray-500" };
       case "confirmed":
       case "approved":
       default:
-        // 🩵 Teal Cyan — confirmed upcoming
-        return { label: "Confirmed", bg: "bg-cyan-100", text: "text-cyan-800", dot: "bg-cyan-500", border: "border-l-cyan-500", dotHex: "#06B6D4" };
+        return { label: "Confirmed", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", border: "border-l-emerald-500" };
     }
   };
 
@@ -715,141 +707,127 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             <p className="text-xs text-[#6B7280] mt-0.5">{pendingApprovalsList.length} booking{pendingApprovalsList.length !== 1 ? 's' : ''} awaiting review</p>
           </div>
         </div>
-        {/* Table Container — no horizontal scroll, columns fit within container */}
-        <div className="w-full">
-          <table className="w-full text-left text-xs border-collapse table-fixed">
-            <colgroup>
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "13%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "13%" }} />
-              <col style={{ width: "13%" }} />
-              <col style={{ width: "9%" }} />
-              <col style={{ width: "9%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "7%" }} />
-            </colgroup>
+        {/* Table Container */}
+        <div className="overflow-x-auto scrollbar-none">
+          <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-gray-100 text-[10px] font-bold text-[#6B7280] uppercase tracking-wide">
-                <th className="py-2.5 px-2">Booking ID</th>
-                <th className="py-2.5 px-2">Patient</th>
-                <th className="py-2.5 px-2">Phone</th>
-                <th className="py-2.5 px-2">Service</th>
-                <th className="py-2.5 px-2">Doctor</th>
-                <th className="py-2.5 px-2">Date & Time</th>
-                <th className="py-2.5 px-2">Branch</th>
-                <th className="py-2.5 px-2">Status</th>
-                <th className="py-2.5 px-2">Requested</th>
-                <th className="py-2.5 px-2 text-center">Actions</th>
+              <tr className="border-b border-gray-100 text-[11px] font-bold text-[#6B7280]">
+                <th className="py-3 px-3 whitespace-nowrap">Booking ID ˅</th>
+                <th className="py-3 px-3 whitespace-nowrap">Patient ˅</th>
+                <th className="py-3 px-3 whitespace-nowrap">Phone</th>
+                <th className="py-3 px-3 whitespace-nowrap">Service</th>
+                <th className="py-3 px-3 whitespace-nowrap">Doctor</th>
+                <th className="py-3 px-3 whitespace-nowrap">Date &amp; Time</th>
+                <th className="py-3 px-3 whitespace-nowrap">Branch</th>
+                <th className="py-3 px-3 whitespace-nowrap">Status</th>
+                <th className="py-3 px-3 whitespace-nowrap">Requested At</th>
+                <th className="py-3 px-3 whitespace-nowrap text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {paginatedPendingList.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50/70 transition">
                   {/* 1. Booking ID */}
-                  <td className="py-3 px-2">
-                    <span className="font-extrabold text-[#111827] text-[11px] block truncate">{item.code}</span>
-                    <span className="text-[10px] text-gray-400 font-medium truncate block">{item.bookingType || "New Booking"}</span>
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <span className="font-extrabold text-[#111827] text-xs block">{item.code}</span>
+                    <span className="text-[11px] text-gray-400 font-medium">{item.bookingType || "New Booking"}</span>
                   </td>
 
                   {/* 2. Patient */}
-                  <td className="py-3 px-2">
-                    <div className="flex items-center gap-1.5">
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <div className="flex items-center gap-2.5">
                       {item.patientAvatar ? (
-                        <img src={item.patientAvatar} alt={item.patientName} className="h-7 w-7 rounded-full object-cover shrink-0" />
+                        <img src={item.patientAvatar} alt={item.patientName} className="h-8 w-8 rounded-full object-cover shrink-0" />
                       ) : (
-                        <div className="h-7 w-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-[10px] shrink-0">
+                        <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs shrink-0">
                           {item.patientName.charAt(0)}
                         </div>
                       )}
-                      <div className="min-w-0">
-                        <span className="font-extrabold text-[#111827] text-[11px] block truncate">{item.patientName}</span>
-                        {item.patientAge && <span className="text-[10px] text-gray-400 font-medium">{item.patientAge}y</span>}
+                      <div>
+                        <span className="font-extrabold text-[#111827] text-xs block">{item.patientName}</span>
+                        {item.patientAge && <span className="text-[11px] text-gray-400 font-medium">{item.patientAge} years</span>}
                       </div>
                     </div>
                   </td>
 
                   {/* 3. Phone */}
-                  <td className="py-3 px-2 font-mono font-semibold text-gray-700 text-[11px] truncate">
+                  <td className="py-3.5 px-3 font-mono font-semibold text-gray-700 whitespace-nowrap">
                     {item.phone}
                   </td>
 
                   {/* 4. Service */}
-                  <td className="py-3 px-2">
-                    <span className="font-extrabold text-[#111827] text-[11px] block truncate">{item.serviceName}</span>
-                    <span className="text-[10px] text-gray-400 font-medium truncate block">{item.serviceVariant}</span>
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <span className="font-extrabold text-[#111827] text-xs block">{item.serviceName}</span>
+                    <span className="text-[11px] text-gray-400 font-medium">{item.serviceVariant}</span>
                   </td>
 
                   {/* 5. Doctor */}
-                  <td className="py-3 px-2">
-                    <div className="flex items-center gap-1.5">
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
                       {item.doctorAvatar ? (
-                        <img src={item.doctorAvatar} alt={item.doctorName} className="h-6 w-6 rounded-full object-cover shrink-0" />
+                        <img src={item.doctorAvatar} alt={item.doctorName} className="h-7 w-7 rounded-full object-cover shrink-0" />
                       ) : (
-                        <div className="h-6 w-6 rounded-full bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-[10px] shrink-0">
+                        <div className="h-7 w-7 rounded-full bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-[10px] shrink-0">
                           {item.doctorName.charAt(0)}
                         </div>
                       )}
-                      <div className="min-w-0">
-                        <span className="font-extrabold text-[#111827] text-[11px] block truncate">{item.doctorName}</span>
-                        <span className="text-[10px] text-gray-400 font-medium truncate block">{item.doctorSpecialty}</span>
+                      <div>
+                        <span className="font-extrabold text-[#111827] text-xs block">{item.doctorName}</span>
+                        <span className="text-[11px] text-gray-400 font-medium">{item.doctorSpecialty}</span>
                       </div>
                     </div>
                   </td>
 
                   {/* 6. Date & Time */}
-                  <td className="py-3 px-2">
-                    <span className="font-extrabold text-[#111827] text-[11px] block truncate">{item.dateFormatted}</span>
-                    <span className="text-[10px] font-bold text-emerald-700">{item.time}</span>
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <span className="font-extrabold text-[#111827] text-xs block">{item.dateFormatted}</span>
+                    <span className="text-[11px] font-bold text-emerald-800">{item.time}</span>
                   </td>
 
                   {/* 7. Branch */}
-                  <td className="py-3 px-2">
-                    <span className="font-semibold text-[#111827] text-[11px] block truncate">{item.branchName}</span>
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <span className="font-extrabold text-[#111827] text-xs block">{item.branchName}</span>
+                    <span className="text-[11px] text-gray-400 font-medium">Branch</span>
                   </td>
 
                   {/* 8. Status */}
-                  <td className="py-3 px-2">
-                    <span className="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-300">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                  <td className="py-3.5 px-3 whitespace-nowrap">
+                    <span className="inline-flex items-center rounded-xl bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700 border border-orange-200">
                       Pending
                     </span>
                   </td>
 
                   {/* 9. Requested At */}
-                  <td className="py-3 px-2 text-[10px] font-medium text-gray-500">
-                    <span className="font-extrabold text-[#111827] text-[11px] block truncate">{item.requestedDate}</span>
+                  <td className="py-3.5 px-3 whitespace-nowrap text-[11px] font-medium text-gray-500">
+                    <span className="font-extrabold text-[#111827] text-xs block">{item.requestedDate}</span>
                     <span>{item.requestedTime}</span>
                   </td>
 
                   {/* 10. Actions */}
-                  <td className="py-3 px-2 text-center">
-                    <div className="flex items-center justify-center gap-1">
+                  <td className="py-3.5 px-3 whitespace-nowrap text-center">
+                    <div className="flex items-center justify-center gap-2">
                       <button
                         type="button"
                         onClick={() => handleApproveItem(item)}
-                        className="inline-flex items-center gap-0.5 rounded-lg border border-emerald-600 bg-white px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50 transition active:scale-95"
-                        title="Approve"
+                        className="inline-flex items-center gap-1 rounded-xl border border-emerald-600 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition active:scale-95"
                       >
-                        <Check size={11} />
-                        <span>OK</span>
+                        <Check size={14} />
+                        <span>Approve</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleRejectItem(item)}
-                        className="inline-flex items-center gap-0.5 rounded-lg border border-rose-300 bg-white px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-50 transition active:scale-95"
-                        title="Reject"
+                        className="inline-flex items-center gap-1 rounded-xl border border-rose-300 bg-white px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition active:scale-95"
                       >
-                        <X size={11} />
+                        <span>Reject</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => onViewBookingDetails ? onViewBookingDetails(item.raw) : null}
-                        className="p-1 rounded-lg hover:bg-gray-100 text-[#6B7280] transition"
+                        className="p-1.5 rounded-lg hover:bg-gray-100 text-[#6B7280] transition"
                         title="More actions"
                       >
-                        <MoreVertical size={13} />
+                        <MoreVertical size={16} />
                       </button>
                     </div>
                   </td>
@@ -983,18 +961,18 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 })}
               </div>
 
-              {/* Legend — updated to match new distinct status colors */}
+              {/* Legend */}
               <div className="mt-6 border-t border-gray-100 pt-4">
-                <div className="grid grid-cols-2 gap-y-2 gap-x-2 text-xs font-medium text-[#4B5563]">
+                <div className="grid grid-cols-2 gap-y-2.5 gap-x-2 text-xs font-medium text-[#4B5563]">
                   {[
-                    { color: "#F59E0B", label: "Pending" },
-                    { color: "#06B6D4", label: "Confirmed" },
-                    { color: "#0EA5E9", label: "Checked In" },
-                    { color: "#D946EF", label: "In Progress" },
-                    { color: "#10B981", label: "Completed" },
-                    { color: "#8B5CF6", label: "Postponed" },
-                    { color: "#E11D48", label: "Canceled" },
-                    { color: "#64748B", label: "No Show" },
+                    { color: "#F97316", label: "Pending" },
+                    { color: "#22C55E", label: "Confirmed" },
+                    { color: "#3B82F6", label: "Checked In" },
+                    { color: "#A855F7", label: "In Progress" },
+                    { color: "#0D9488", label: "Completed" },
+                    { color: "#6366F1", label: "Postponed" },
+                    { color: "#EF4444", label: "Canceled" },
+                    { color: "#6B7280", label: "No Show" },
                   ].map(({ color, label }) => (
                     <div key={label} className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}></span>
@@ -1034,31 +1012,20 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 </div>
               </div>
 
-              {/* Table — fixed layout, all columns fit without horizontal scroll */}
-              <div className="w-full">
-                <table className="w-full border-collapse text-left text-xs table-fixed">
-                  <colgroup>
-                    <col style={{ width: "9%" }} />
-                    <col style={{ width: "16%" }} />
-                    <col style={{ width: "11%" }} />
-                    <col style={{ width: "16%" }} />
-                    <col style={{ width: "16%" }} />
-                    <col style={{ width: "7%" }} />
-                    <col style={{ width: "11%" }} />
-                    <col style={{ width: "9%" }} />
-                    <col style={{ width: "5%" }} />
-                  </colgroup>
+              {/* Table */}
+              <div className="overflow-x-auto scrollbar-none">
+                <table className="w-full border-collapse text-left text-xs">
                   <thead>
-                    <tr className="border-b border-gray-100 text-[10px] uppercase tracking-wider text-[#9CA3AF]">
-                      <th className="py-2.5 px-2 font-semibold">Time</th>
-                      <th className="py-2.5 px-2 font-semibold">Patient</th>
-                      <th className="py-2.5 px-2 font-semibold">Phone</th>
-                      <th className="py-2.5 px-2 font-semibold">Service</th>
-                      <th className="py-2.5 px-2 font-semibold">Doctor</th>
-                      <th className="py-2.5 px-2 font-semibold">Room</th>
-                      <th className="py-2.5 px-2 font-semibold">Status</th>
-                      <th className="py-2.5 px-2 font-semibold">Payment</th>
-                      <th className="py-2.5 px-1 font-semibold text-center">•</th>
+                    <tr className="border-b border-gray-100 text-[11px] uppercase tracking-wider text-[#9CA3AF]">
+                      <th className="py-3 px-2 font-semibold">Time</th>
+                      <th className="py-3 px-2 font-semibold">Patient</th>
+                      <th className="py-3 px-2 font-semibold">Phone</th>
+                      <th className="py-3 px-2 font-semibold">Service</th>
+                      <th className="py-3 px-2 font-semibold">Doctor</th>
+                      <th className="py-3 px-2 font-semibold">Room</th>
+                      <th className="py-3 px-2 font-semibold">Status</th>
+                      <th className="py-3 px-2 font-semibold">Payment</th>
+                      <th className="py-3 px-1 font-semibold text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -1093,28 +1060,30 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           <tr
                             key={row.id}
                             onClick={() => onViewBookingDetails && onViewBookingDetails(row)}
-                            className={`group cursor-pointer transition hover:bg-emerald-50/40 border-l-4 ${stConfig.border}`}
+                            className={`group cursor-pointer transition hover:bg-emerald-50/50 border-l-4 ${stConfig.border}`}
                           >
-                            <td className="py-2.5 px-2 font-bold text-[#111827] text-[11px] truncate">{row.time || "09:00 AM"}</td>
-                            <td className="py-2.5 px-2">
-                              <div className="flex items-center gap-1.5">
+                            <td className="py-3 px-2 whitespace-nowrap font-bold text-[#111827]">{row.time || "09:00 AM"}</td>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
                                 {row.avatar_url ? (
-                                  <img src={row.avatar_url} alt={row.customer_name} className="h-6 w-6 rounded-full object-cover border border-gray-200 shrink-0" />
+                                  <img src={row.avatar_url} alt={row.customer_name} className="h-7 w-7 rounded-full object-cover border border-gray-200 shrink-0" />
                                 ) : (
-                                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 font-bold text-[#374151] shrink-0 text-[10px]">
+                                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 font-bold text-[#374151] shrink-0 text-xs">
                                     {(row.customer_name || "P").charAt(0)}
                                   </div>
                                 )}
-                                <span className="font-semibold text-[#111827] truncate text-[11px]">{row.customer_name}</span>
+                                <span className="font-semibold text-[#111827] truncate max-w-[120px]">{row.customer_name}</span>
                               </div>
                             </td>
-                            <td className="py-2.5 px-2 text-[#6B7280] font-medium text-[10px] truncate">{row.customer_phone}</td>
-                            <td className="py-2.5 px-2">
-                              <span className="font-bold text-[#111827] text-[11px] block truncate">{row.service_name}</span>
-                              <span className="text-[10px] font-medium text-[#9CA3AF] block truncate">{row.service_variant}</span>
+                            <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium text-[11px]">{row.customer_phone}</td>
+                            <td className="py-3 px-2">
+                              <div className="flex flex-col max-w-[120px]">
+                                <span className="font-bold text-[#111827] truncate">{row.service_name}</span>
+                                <span className="text-[10px] font-medium text-[#9CA3AF] truncate">{row.service_variant}</span>
+                              </div>
                             </td>
-                            <td className="py-2.5 px-2">
-                              <div className="flex items-center gap-1.5">
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <div className="flex items-center gap-2 max-w-[120px]">
                                 {row.doctor_avatar ? (
                                   <img src={row.doctor_avatar} alt={row.doctor_name} className="h-6 w-6 rounded-full object-cover border border-gray-200 shrink-0" />
                                 ) : (
@@ -1122,29 +1091,28 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                                     {(row.doctor_name || "D").charAt(0)}
                                   </div>
                                 )}
-                                <span className="font-medium text-[#374151] truncate text-[11px]">{row.doctor_name}</span>
+                                <span className="font-medium text-[#374151] truncate">{row.doctor_name}</span>
                               </div>
                             </td>
-                            <td className="py-2.5 px-2 text-[#6B7280] font-medium text-[10px] truncate">{row.room}</td>
-                            <td className="py-2.5 px-2">
-                              <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold border ${stConfig.bg} ${stConfig.text}`}
-                                style={{ borderColor: stConfig.dotHex + "55" }}>
-                                <span className={`h-2 w-2 rounded-full shrink-0 ${stConfig.dot}`}></span>
-                                <span className="truncate">{stConfig.label}</span>
+                            <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium text-xs">{row.room}</td>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${stConfig.bg} ${stConfig.text}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${stConfig.dot}`}></span>
+                                {stConfig.label}
                               </span>
                             </td>
-                            <td className="py-2.5 px-2">
-                              <span className={`inline-flex items-center rounded-lg border px-1.5 py-0.5 text-[10px] font-bold truncate ${payStyle}`}>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-bold ${payStyle}`}>
                                 {row.paymentStatus}
                               </span>
                             </td>
-                            <td className="py-2.5 px-1 text-center">
+                            <td className="py-3 px-1 whitespace-nowrap text-center">
                               <button
                                 onClick={(e) => { e.stopPropagation(); onViewBookingDetails && onViewBookingDetails(row); }}
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-[#6B7280] hover:bg-gray-100 hover:text-[#111827] transition"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#6B7280] hover:bg-gray-100 hover:text-[#111827] transition"
                                 title="View Details"
                               >
-                                <Eye size={13} />
+                                <Eye size={15} />
                               </button>
                             </td>
                           </tr>

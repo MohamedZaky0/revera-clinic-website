@@ -1,0 +1,52 @@
+[
+  {
+    "id": "REP-1786290517592",
+    "customer_id": "test-doctor-view-1786290516944",
+    "title": "Test Medical Report",
+    "description": "Auto-generated during doctor view test suite",
+    "file_url": null,
+    "doctor_name": "Dr. Test",
+    "date": "2026-08-09",
+    "created_at": "2026-08-09T15:48:37.592Z"
+  },
+  {
+    "id": "REP-1786290352616",
+    "customer_id": "test-doctor-view-1786290349210",
+    "title": "Test Medical Report",
+    "description": "Auto-generated during doctor view test suite",
+    "file_url": null,
+    "doctor_name": "Dr. Test",
+    "date": "2026-08-09",
+    "created_at": "2026-08-09T15:45:52.616Z"
+  },
+  {
+    "id": "REP-1786290298881",
+    "customer_id": "test-doctor-view-1786290297906",
+    "title": "Test Medical Report",
+    "description": "Auto-generated during doctor view test suite",
+    "file_url": null,
+    "doctor_name": "Dr. Test",
+    "date": "2026-08-09",
+    "created_at": "2026-08-09T15:44:58.881Z"
+  },
+  {
+    "id": "REP-1786289954224",
+    "customer_id": "test-doctor-view-1786289947552",
+    "title": "Test Medical Report",
+    "description": "Auto-generated during doctor view test suite",
+    "file_url": null,
+    "doctor_name": "Dr. Test",
+    "date": "2026-08-09",
+    "created_at": "2026-08-09T15:39:14.224Z"
+  },
+  {
+    "id": "REP-1786241558313",
+    "customer_id": "test-doctor-view-1786241540299",
+    "title": "Test Medical Report",
+    "description": "Auto-generated during doctor view test suite",
+    "file_url": null,
+    "doctor_name": "Dr. Test",
+    "date": "2026-08-09",
+    "created_at": "2026-08-09T02:12:38.313Z"
+  }
+]
