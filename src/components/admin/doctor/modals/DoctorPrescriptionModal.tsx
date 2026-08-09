@@ -36,7 +36,7 @@ export default function DoctorPrescriptionModal({
   if (!showPrescriptionModal || !targetBooking) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-2xl rounded-[32px] bg-white p-6 shadow-2xl space-y-5 border border-[#414E36]/20">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
           <div>
