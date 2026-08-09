@@ -765,7 +765,7 @@ export default function DoctorAccountView({
   };
 
   // Complete Treatment Session
-  const handleCompleteTreatment = async (targetBooking: any) => {
+  const handleCompleteTreatment = async (targetBooking: any, overrideSessionPulses?: number) => {
     if (!targetBooking) return;
 
     if (!medicalRecord && (formAllergies || formMedicationDetails || formMedicalConditionsDetails || formPreviousTreatmentsDetails)) {
@@ -823,21 +823,22 @@ export default function DoctorAccountView({
       }
     }
 
-    // 3. Deduct Device Pulses from DB via PUT /api/inventory/devices
-    if (selectedDeviceId && extraPulsesCount > 0) {
+    // 3. Deduct Device Pulses from DB via PUT /api/inventory/devices (Uses Total Session Pulses)
+    const pulsesToDeduct = Number(overrideSessionPulses || extraPulsesCount || 0);
+    if (selectedDeviceId && pulsesToDeduct > 0) {
       try {
         const headers = await getAuthHeaders();
         const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceId));
         if (devObj) {
           const currentPulses = Number(devObj.current_pulse_count || devObj.total_pulses || 0);
-          const newPulseCount = currentPulses + Number(extraPulsesCount);
+          const newPulseCount = currentPulses + pulsesToDeduct;
           await fetch("/api/inventory/devices", {
             method: "PUT",
             headers,
             body: JSON.stringify({
               id: devObj.id,
               current_pulse_count: newPulseCount,
-              notes: `Session pulse usage for ${targetBooking.name || 'Patient'}`
+              notes: `Session pulse usage for ${targetBooking.name || 'Patient'} (${pulsesToDeduct} pulses deducted)`
             })
           });
         }
@@ -850,9 +851,9 @@ export default function DoctorAccountView({
     if (usedProducts.length > 0) {
       sessionAddonsSummary += `\n[Products Used During Session]: ${usedProducts.map((p) => `${p.name} (Qty: ${p.qty} x ${p.unitPrice} EGP = ${p.total} EGP)`).join(", ")}`;
     }
-    if (extraPulsesCount > 0 && selectedDeviceId) {
+    if (pulsesToDeduct > 0 && selectedDeviceId) {
       const devObj = devicesList.find((d) => String(d.id) === String(selectedDeviceId));
-      sessionAddonsSummary += `\n[Extra Device Pulses]: ${devObj?.name || 'Device'} — ${extraPulsesCount} pulses @ ${pricePerPulse} EGP/pulse (+${extraPulsesSubtotal} EGP)`;
+      sessionAddonsSummary += `\n[Device Pulses Deducted]: ${devObj?.name || 'Device'} — ${pulsesToDeduct} total session pulses deducted`;
     }
     if (productsSubtotal + extraPulsesSubtotal > 0) {
       sessionAddonsSummary += `\n[Invoice Total Updated]: ${updatedInvoiceTotal} EGP (Base: ${baseBookingPrice} EGP + Consumables: ${productsSubtotal + extraPulsesSubtotal} EGP)`;

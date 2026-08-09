@@ -43,7 +43,7 @@ interface DoctorSessionDrawerProps {
   handleSaveClinicalNote: (booking: any) => void;
   savingNote: boolean;
   setShowPrescriptionModal: (show: boolean) => void;
-  handleCompleteTreatment: (booking: any) => void;
+  handleCompleteTreatment: (booking: any, totalPulses?: number) => void;
   setActiveSessionBooking?: (booking: any) => void;
   setActiveTab?: (tab: any) => void;
   prescriptionsMap?: Record<string, any[]>;

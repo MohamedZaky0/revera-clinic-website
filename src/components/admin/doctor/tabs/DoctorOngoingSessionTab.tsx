@@ -37,7 +37,7 @@ export interface AdditionalServiceItem {
 interface DoctorOngoingSessionTabProps {
   activeSessionBooking: any;
   setShowPrescriptionModal: (show: boolean) => void;
-  handleCompleteTreatment: (booking: any) => void;
+  handleCompleteTreatment: (booking: any, totalPulses?: number) => void;
   medicalRecord: any;
   medicalRecordLoading: boolean;
   showMedicalForm: boolean;
@@ -297,8 +297,8 @@ export default function DoctorOngoingSessionTab({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => handleCompleteTreatment(activeSessionBooking)}
-                className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition"
+                onClick={() => handleCompleteTreatment(activeSessionBooking, totalSessionPulses)}
+                className="flex items-center gap-2 rounded-2xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#343F2B] transition cursor-pointer"
               >
                 <Check size={16} /> {t.completeTreatmentBtn}
               </button>
@@ -321,7 +321,7 @@ export default function DoctorOngoingSessionTab({
                       <CheckCircle2 size={10} /> {t.onFileStatus}
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800 animate-pulse">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800">
                       <AlertTriangle size={10} /> {t.intakeRequiredStatus}
                     </span>
                   )}
@@ -330,7 +330,8 @@ export default function DoctorOngoingSessionTab({
                 {medicalRecordLoading ? (
                   <p className="text-xs text-[#5A6A51]">{t.loadingMedicalRecord}</p>
                 ) : medicalRecord && !showMedicalForm ? (
-                  <div className="space-y-3 text-xs">
+                  /* Display Existing Medical Record */
+                  <div className="space-y-2 text-xs bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10">
                     <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
                       <span className="font-bold text-[#5A6A51]">{t.skinTypeLabel}:</span>
                       <span className="font-bold text-[#1F251A]">{medicalRecord.skin_type || "Normal"}</span>
@@ -347,7 +348,7 @@ export default function DoctorOngoingSessionTab({
                       <span className="font-bold text-[#5A6A51]">{t.medicalConditionsLabel}:</span>
                       <span className="font-semibold text-[#1F251A]">{medicalRecord.medical_conditions_details || "None"}</span>
                     </div>
-                    <div className="flex justify-between border-b border-[#414E36]/10 pb-2">
+                    <div className="flex justify-between">
                       <span className="font-bold text-[#5A6A51]">{t.previousTreatmentsLabel}:</span>
                       <span className="font-semibold text-[#1F251A]">{medicalRecord.previous_treatments_details || "None"}</span>
                     </div>
@@ -362,7 +363,7 @@ export default function DoctorOngoingSessionTab({
                   </div>
                 ) : (
                   /* Medical Intake Form */
-                  <form onSubmit={handleSaveMedicalRecord} className="space-y-3 border-t border-[#414E36]/10 pt-3">
+                  <div className="space-y-3 border-t border-[#414E36]/10 pt-3">
                     {!medicalRecord && (
                       <div className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200">
                         <strong className="block font-bold">{t.firstVisitDetected}</strong>
@@ -441,38 +442,43 @@ export default function DoctorOngoingSessionTab({
                         </button>
                       )}
                       <button
-                        type="submit"
+                        type="button"
                         disabled={savingMedicalRecord}
-                        className="rounded-xl bg-[#414E36] px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleSaveMedicalRecord(e);
+                        }}
+                        className="rounded-xl bg-[#414E36] px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
                       >
                         <Save size={14} /> {savingMedicalRecord ? "..." : t.saveMedicalRecordBtn}
                       </button>
                     </div>
-                  </form>
+                  </div>
                 )}
 
                 {/* DOCTOR PROCEDURE OBSERVATIONS & MEDICAL NOTES (NOW INTEGRATED IN INTAKE CARD) */}
                 <div className="mt-6 border-t border-[#414E36]/10 pt-4 space-y-3">
-                  <h4 className="text-xs font-bold text-[#1F251A] uppercase tracking-wider flex items-center gap-2">
-                    <FileText size={15} className="text-[#414E36]" /> {t.doctorNotesTitle}
-                  </h4>
-                  <textarea
-                    rows={5}
-                    value={clinicalNote}
-                    onChange={(e) => setClinicalNote(e.target.value)}
-                    placeholder={t.doctorNotesPlaceholder}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans"
-                  />
-                  <div className="flex justify-end">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-[#1F251A] uppercase tracking-wider">
+                      {t.doctorNotesTitle}
+                    </label>
                     <button
                       type="button"
                       onClick={() => handleSaveClinicalNote(activeSessionBooking)}
                       disabled={savingNote}
-                      className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50"
+                      className="rounded-xl bg-[#414E36] px-3 py-1 text-xs font-bold text-white shadow-sm hover:bg-[#343F2B] transition disabled:opacity-50 flex items-center gap-1"
                     >
-                      {savingNote ? "..." : t.saveClinicalNotesBtn}
+                      <Save size={12} /> {savingNote ? "..." : t.saveDoctorNotesBtn}
                     </button>
                   </div>
+                  <textarea
+                    rows={4}
+                    value={clinicalNote}
+                    onChange={(e) => setClinicalNote(e.target.value)}
+                    placeholder={t.doctorNotesPlaceholder}
+                    className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:ring-2 focus:ring-[#414E36]/20 font-sans leading-relaxed"
+                  />
                 </div>
 
                 <div className="mt-4 border-t border-[#414E36]/10 pt-4 space-y-2">
