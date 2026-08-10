@@ -4412,6 +4412,10 @@ export default function AdminPage() {
   // Custom provider inline & modal states
   const [editingDoctorInline, setEditingDoctorInline] = useState<any | null>(null);
   const [viewingDoctorDetails, setViewingDoctorDetails] = useState<any | null>(null);
+  const [expandedDoctorServices, setExpandedDoctorServices] = useState<Record<string, boolean>>({});
+  const toggleExpandedDoctorServices = (docKey: string) => {
+    setExpandedDoctorServices(prev => ({ ...prev, [docKey]: !prev[docKey] }));
+  };
   const [departmentsList, setDepartmentsList] = useState<string[]>(["Receptionist", "Doctors"]);
   const [newDeptInput, setNewDeptInput] = useState("");
   const [showProviderModal, setShowProviderModal] = useState(false);
@@ -8913,73 +8917,109 @@ export default function AdminPage() {
                   </div>
                 )}
 
-                  <div className="overflow-hidden rounded-[32px] border border-[#E6E9EB] bg-white">
-                    <div className="grid grid-cols-[2fr_1fr_2fr_1fr] gap-0 border-b border-[#E6E9EB] bg-[#F7F7F9] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                      <span>Name</span>
-                      <span>Bookings</span>
-                      <span>Services</span>
-                      <span>Rating</span>
-                    </div>
-                    <div className="divide-y divide-[#E6E9EB]">
-                      {filteredProviders.length === 0 ? (
-                        <div className="text-center py-16 text-gray-400 italic">No doctors/providers matching filters.</div>
-                      ) : (
-                        filteredProviders.map((provider) => (
-                          <div key={provider.id || provider.name} className="grid grid-cols-[2fr_1fr_2fr_1fr] items-center gap-0 px-6 py-5 text-sm text-[#414E36]">
-                            <span className="font-semibold text-[#1F251A]">{provider.name}</span>
-                            <span>{provider.bookings}</span>
-                            <div className="flex flex-wrap items-center gap-2">
-                              {provider.services.slice(0, 2).map((service: string) => (
-                                <span key={service} className="rounded-full border border-[#E6E9EB] bg-[#F2EFE9] px-3 py-1 text-[11px] font-medium text-[#414E36]">
-                                  {service}
-                                </span>
-                              ))}
-                              {provider.services.length > 2 && (
-                                <span
-                                  className="rounded-full bg-[#EDE4C8] px-3 py-1 text-[11px] font-semibold text-[#414E36] cursor-help"
-                                  title={provider.services.slice(2).join(", ")}
-                                >
-                                  +{provider.services.length - 2} More
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="inline-flex items-center gap-2 text-[#5A6A51]">
-                                <Star size={16} className="text-[#C4AE7C]" />
-                                {provider.rating}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => setViewingDoctorDetails(provider)}
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
-                                  title="Doctor Info Details"
-                                >
-                                  <Info size={15} />
-                                </button>
-                                {provider.id && hasPermission("providers.delete") && (
-                                  <button
-                                    onClick={() => handleDeleteProvider(provider.id)}
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100"
-                                    title="Delete Provider"
-                                  >
-                                    <Trash2 size={15} />
-                                  </button>
-                                )}
-                                {hasPermission("providers.edit") && (
-                                  <button
-                                    onClick={() => openEditProviderModal(provider)}
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#E6E9EB] bg-[#F7F7F9] text-[#414E36] transition hover:bg-[#EDF1EC]"
-                                    title="Edit Provider"
-                                  >
-                                    <Pencil size={14} />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                  <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white shadow-sm scrollbar-none">
+                    <table className="w-full min-w-[700px] text-sm">
+                      <thead>
+                        <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
+                          <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Doctor Name</th>
+                          <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Bookings</th>
+                          <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Services</th>
+                          <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Rating</th>
+                          <th className="px-4 py-3 whitespace-nowrap"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#414E36]/8">
+                        {filteredProviders.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-5 py-8 text-center text-[#5A6A51]">
+                              No doctors/providers matching filters.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredProviders.map((provider) => {
+                            const docKey = provider.id || provider.name;
+                            const isExpanded = !!expandedDoctorServices[docKey];
+                            const displayServices = isExpanded ? provider.services : provider.services.slice(0, 2);
+                            const hasMore = provider.services.length > 2;
+
+                            return (
+                              <tr key={docKey} className="transition hover:bg-[#F9F9F7]">
+                                <td className="px-5 py-4 font-semibold text-[#1F251A]">
+                                  <div className="flex items-center gap-3">
+                                    <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden">
+                                      {provider.avatar_url || provider.image ? (
+                                        <img src={provider.avatar_url || provider.image} alt={provider.name} className="h-full w-full object-cover" />
+                                      ) : (
+                                        <span>{(provider.name || "D").charAt(0).toUpperCase()}</span>
+                                      )}
+                                    </div>
+                                    <span>{provider.name}</span>
+                                  </div>
+                                </td>
+                                <td className="px-5 py-4 text-center font-medium text-[#1F251A]">{provider.bookings}</td>
+                                <td className="px-5 py-4 text-[#5A6A51]">
+                                  <div className="flex flex-wrap items-center gap-1.5 max-w-md">
+                                    {displayServices.map((service: string) => (
+                                      <span key={service} className="inline-block rounded-full border border-[#414E36]/15 bg-[#EDF1EC]/60 px-2.5 py-0.5 text-[11px] font-medium text-[#414E36]">
+                                        {service}
+                                      </span>
+                                    ))}
+                                    {hasMore && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleExpandedDoctorServices(docKey);
+                                        }}
+                                        className="inline-flex items-center gap-1 rounded-full bg-[#C4AE7C]/20 hover:bg-[#C4AE7C]/35 border border-[#C4AE7C]/40 px-2.5 py-0.5 text-[11px] font-bold text-[#414E36] transition active:scale-95 cursor-pointer shadow-2xs"
+                                        title={isExpanded ? "Click to show fewer services" : "Click to view all assigned services"}
+                                      >
+                                        {isExpanded ? "Show Less" : `+${provider.services.length - 2} More`}
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-5 py-4 text-center">
+                                  <span className="inline-flex items-center justify-center gap-1.5 text-[#1F251A] font-semibold text-xs">
+                                    <Star size={13} className="text-[#C4AE7C] fill-[#C4AE7C]" />
+                                    {provider.rating}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-4 text-center">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <button
+                                      onClick={() => setViewingDoctorDetails(provider)}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                      title="Doctor Info Details"
+                                    >
+                                      <Info size={14} />
+                                    </button>
+                                    {provider.id && hasPermission("providers.delete") && (
+                                      <button
+                                        onClick={() => handleDeleteProvider(provider.id)}
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200/60 text-red-600 transition hover:bg-red-50 hover:border-red-300"
+                                        title="Delete Provider"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    )}
+                                    {hasPermission("providers.edit") && (
+                                      <button
+                                        onClick={() => openEditProviderModal(provider)}
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                        title="Edit Provider"
+                                      >
+                                        <Pencil size={13} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
 
                 </div>
