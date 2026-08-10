@@ -412,70 +412,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       ? requests
       : mergedAppointments.filter(r => ["pending", "waiting", "pending_deposit"].includes((r.status || "").toLowerCase()));
 
-    const displayList = rawPending.length > 0 ? rawPending : [
-      {
-        id: "BK-250720-0018",
-        bookingCode: "#BK-250720-0018",
-        bookingType: "New Booking",
-        patientName: "Mohamed Ali",
-        patientAge: "32",
-        phone: "01012345678",
-        serviceName: "Laser Hair Removal",
-        serviceVariant: "Session",
-        doctorName: "Dr. Sara Ahmed",
-        doctorSpecialty: "Skin Specialist",
-        dateFormatted: "20 Jul 2026",
-        time: "09:00 AM",
-        branchName: "New Cairo Branch",
-        status: "pending",
-        requestedDate: "20 Jul 2026",
-        requestedTime: "08:45 AM"
-      },
-      {
-        id: "BK-250720-0019",
-        bookingCode: "#BK-250720-0019",
-        bookingType: "New Booking",
-        patientName: "Nada Hassan",
-        patientAge: "28",
-        phone: "01023456789",
-        serviceName: "Hydra Facial",
-        serviceVariant: "Basic",
-        doctorName: "Dr. Ahmed Samir",
-        doctorSpecialty: "Dermatologist",
-        dateFormatted: "20 Jul 2026",
-        time: "09:30 AM",
-        branchName: "New Cairo Branch",
-        status: "pending",
-        requestedDate: "20 Jul 2026",
-        requestedTime: "08:55 AM"
-      },
-      {
-        id: "BK-250720-0020",
-        bookingCode: "#BK-250720-0020",
-        bookingType: "New Booking",
-        patientName: "Youssef Mohamed",
-        patientAge: "40",
-        phone: "01034567890",
-        serviceName: "PRP Hair",
-        serviceVariant: "Session",
-        doctorName: "Dr. Omar Khaled",
-        doctorSpecialty: "Hair Specialist",
-        dateFormatted: "20 Jul 2026",
-        time: "10:00 AM",
-        branchName: "New Cairo Branch",
-        status: "pending",
-        requestedDate: "20 Jul 2026",
-        requestedTime: "09:05 AM"
-      }
-    ];
-
-    return displayList.map((item: any, idx: number) => {
-      const code = item.bookingCode || item.code || `#BK-250720-00${18 + idx}`;
+    return rawPending.map((item: any, idx: number) => {
+      const code = item.bookingCode || item.code || item.id || `#BK-${idx + 1}`;
       const pName = item.patientName || item.customer_name || item.name || `Patient #${idx + 1}`;
       const pPhone = item.phone || item.customer_phone || item.mobile || "—";
       const sName = item.serviceName || item.service_name || item.service || "Clinic Session";
       const sVariant = item.serviceVariant || item.service_variant || "Session";
-      const dName = item.doctorName || item.doctor_name || item.doctor || "Dr. Sara Ahmed";
+      const dName = item.doctorName || item.doctor_name || item.doctor || "—";
       const dSpec = item.doctorSpecialty || "Specialist";
       const dFormatted = item.dateFormatted || item.date || selectedDateStr;
       const tSlot = item.time || item.start_time || item.requestedTime || "09:00 AM";
@@ -712,7 +655,6 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-gray-100 text-[11px] font-bold text-[#6B7280]">
-                <th className="py-3 px-3 whitespace-nowrap">Booking ID ˅</th>
                 <th className="py-3 px-3 whitespace-nowrap">Patient ˅</th>
                 <th className="py-3 px-3 whitespace-nowrap">Phone</th>
                 <th className="py-3 px-3 whitespace-nowrap">Service</th>
@@ -725,15 +667,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {paginatedPendingList.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50/70 transition">
-                  {/* 1. Booking ID */}
-                  <td className="py-3.5 px-3 whitespace-nowrap">
-                    <span className="font-extrabold text-[#111827] text-xs block">{item.code}</span>
-                    <span className="text-[11px] text-gray-400 font-medium">{item.bookingType || "New Booking"}</span>
+              {paginatedPendingList.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-12 text-center text-sm text-[#6B7280]">
+                    No pending approval requests.
                   </td>
-
-                  {/* 2. Patient */}
+                </tr>
+              ) : (
+                paginatedPendingList.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50/70 transition">
+                    {/* 1. Patient */}
                   <td className="py-3.5 px-3 whitespace-nowrap">
                     <div className="flex items-center gap-2.5">
                       {item.patientAvatar ? (
@@ -832,7 +775,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+            )}
             </tbody>
           </table>
         </div>
