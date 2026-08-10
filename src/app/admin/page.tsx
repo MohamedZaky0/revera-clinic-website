@@ -24184,38 +24184,7 @@ export default function AdminPage() {
 
 
 
-                  {/* Cancel Booking Section */}
-                  {hasPermission("bookings.delete") && 
-                   viewingBooking.status !== 'started' && 
-                   viewingBooking.status !== 'completed' && 
-                   viewingBooking.status !== 'cancelled' && 
-                   viewingBooking.status !== 'rejected' && (
-                    <div className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-red-800 mb-3">Cancel Booking</p>
-                      <button
-                        onClick={async () => {
-                          if (await showConfirm("Are you sure you want to cancel this booking?")) {
-                            const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                              method: "PATCH",
-                              headers: authenticatedJsonHeaders,
-                              body: JSON.stringify({ action: "reject" }),
-                            });
-                            if (res.ok) {
-                              setViewingBooking(null);
-                              fetchRequests();
-                              fetchAllReservations();
-                              alert("Booking canceled successfully!");
-                            } else {
-                              alert("Failed to cancel booking.");
-                            }
-                          }
-                        }}
-                        className="w-full rounded-2xl bg-red-600 py-2.5 text-xs font-bold text-white hover:bg-red-700 transition"
-                      >
-                        Cancel Booking
-                      </button>
-                    </div>
-                  )}
+
 
                 </div>
 
