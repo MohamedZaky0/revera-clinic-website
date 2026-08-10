@@ -992,18 +992,18 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               </div>
 
               {/* Table */}
-              <div className="w-full overflow-hidden">
-                <table className="w-full border-collapse text-left text-xs table-fixed">
+              <div className="w-full overflow-x-auto scrollbar-none">
+                <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-gray-100 text-[10px] uppercase tracking-wider text-[#9CA3AF]">
-                      <th className="py-3 px-1 font-semibold w-[11%]">Time</th>
-                      <th className="py-3 px-1 font-semibold w-[21%]">Patient</th>
-                      <th className="py-3 px-1 font-semibold w-[21%]">Service</th>
-                      <th className="py-3 px-1 font-semibold w-[18%]">Doctor</th>
-                      <th className="py-3 px-1 font-semibold w-[9%]">Room</th>
-                      <th className="py-3 px-1 font-semibold w-[10%]">Status</th>
-                      <th className="py-3 px-1 font-semibold w-[7%]">Payment</th>
-                      <th className="py-3 px-0.5 font-semibold text-center w-[3%]">Actions</th>
+                    <tr className="border-b border-gray-100 text-[11px] font-bold uppercase tracking-wider text-[#9CA3AF]">
+                      <th className="py-3 px-2 whitespace-nowrap">Time</th>
+                      <th className="py-3 px-2 whitespace-nowrap">Patient</th>
+                      <th className="py-3 px-2 whitespace-nowrap">Service</th>
+                      <th className="py-3 px-2 whitespace-nowrap">Doctor</th>
+                      <th className="py-3 px-2 whitespace-nowrap">Room</th>
+                      <th className="py-3 px-2 whitespace-nowrap">Status</th>
+                      <th className="py-3 px-2 whitespace-nowrap">Payment</th>
+                      <th className="py-3 px-2 whitespace-nowrap text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -1041,59 +1041,59 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                             onClick={() => onViewBookingDetails && onViewBookingDetails(row)}
                             className={`group cursor-pointer transition hover:bg-emerald-50/50 border-l-4 ${stConfig.border}`}
                           >
-                            <td className="py-2.5 px-1 font-bold text-[#111827] text-[11px] whitespace-nowrap">{displayTimeStr}</td>
-                            <td className="py-2.5 px-1">
-                              <div className="flex items-center gap-1.5 overflow-hidden">
+                            <td className="py-3 px-2 whitespace-nowrap font-bold text-[#111827] text-xs">{displayTimeStr}</td>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
                                 {row.avatar_url ? (
-                                  <img src={row.avatar_url} alt={row.customer_name} className="h-6 w-6 rounded-full object-cover border border-gray-200 shrink-0" />
+                                  <img src={row.avatar_url} alt={row.customer_name} className="h-7 w-7 rounded-full object-cover border border-gray-200 shrink-0" />
                                 ) : (
-                                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 font-bold text-[#374151] shrink-0 text-[10px]">
+                                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 font-bold text-[#374151] shrink-0 text-xs">
                                     {(row.customer_name || "P").charAt(0)}
                                   </div>
                                 )}
-                                <div className="min-w-0">
-                                  <span className="font-semibold text-[#111827] block text-xs truncate">{row.customer_name}</span>
-                                  <span className="text-[10px] font-mono text-gray-500 font-medium block truncate">{row.customer_phone}</span>
+                                <div>
+                                  <span className="font-bold text-[#111827] block text-xs">{row.customer_name}</span>
+                                  <span className="text-[11px] font-mono text-gray-500 font-medium block">{row.customer_phone}</span>
                                 </div>
                               </div>
                             </td>
-                            <td className="py-2.5 px-1">
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-bold text-[#111827] text-xs truncate">{row.service_name}</span>
-                                <span className="text-[10px] font-medium text-[#9CA3AF] truncate">{row.service_variant}</span>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-[#111827] text-xs">{row.service_name}</span>
+                                <span className="text-[10px] font-medium text-[#9CA3AF]">{row.service_variant}</span>
                               </div>
                             </td>
-                            <td className="py-2.5 px-1">
-                              <div className="flex items-center gap-1 min-w-0">
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
                                 {row.doctor_avatar ? (
-                                  <img src={row.doctor_avatar} alt={row.doctor_name} className="h-5 w-5 rounded-full object-cover border border-gray-200 shrink-0" />
+                                  <img src={row.doctor_avatar} alt={row.doctor_name} className="h-6 w-6 rounded-full object-cover border border-gray-200 shrink-0" />
                                 ) : (
-                                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-50 text-[9px] font-bold text-emerald-800 shrink-0">
+                                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-800 shrink-0">
                                     {(row.doctor_name || "D").charAt(0)}
                                   </div>
                                 )}
-                                <span className="font-medium text-[#374151] text-xs truncate">{row.doctor_name}</span>
+                                <span className="font-medium text-[#374151] text-xs">{row.doctor_name}</span>
                               </div>
                             </td>
-                            <td className="py-2.5 px-1 text-[#6B7280] font-medium text-xs truncate">{row.room}</td>
-                            <td className="py-2.5 px-1">
-                              <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${stConfig.bg} ${stConfig.text} whitespace-nowrap`}>
+                            <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium text-xs">{row.room}</td>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${stConfig.bg} ${stConfig.text}`}>
                                 <span className={`h-1.5 w-1.5 rounded-full ${stConfig.dot}`}></span>
                                 {stConfig.label}
                               </span>
                             </td>
-                            <td className="py-2.5 px-1">
-                              <span className={`inline-flex items-center rounded-lg border px-1 py-0.5 text-[9px] font-bold ${payStyle} whitespace-nowrap`}>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[11px] font-bold ${payStyle}`}>
                                 {row.paymentStatus}
                               </span>
                             </td>
-                            <td className="py-2.5 px-0.5 text-center">
+                            <td className="py-3 px-2 whitespace-nowrap text-center">
                               <button
                                 onClick={(e) => { e.stopPropagation(); onViewBookingDetails && onViewBookingDetails(row); }}
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-[#6B7280] hover:bg-gray-100 hover:text-[#111827] transition"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#6B7280] hover:bg-gray-100 hover:text-[#111827] transition"
                                 title="View Details"
                               >
-                                <Eye size={14} />
+                                <Eye size={15} />
                               </button>
                             </td>
                           </tr>
