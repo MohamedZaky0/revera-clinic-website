@@ -23777,7 +23777,7 @@ export default function AdminPage() {
                   {((viewingBooking.status === 'confirmed') || (viewingBooking.status === 'approved' && viewingBooking.isManual)) && hasPermission("bookings.edit") && (
                     <div className="rounded-2xl border border-[#C4AE7C]/30 bg-white p-5">
                       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Session Flow</p>
-                      <p className="text-xs text-[#5A6A51] mb-4">The customer is ready to begin their clinical session.</p>
+                      <p className="text-xs text-[#5A6A51] mb-4">The customer has arrived at the clinic and is ready for check-in.</p>
                       <div className="flex gap-3">
                         {viewingBooking.status === 'approved' && (
                           <button
@@ -23802,6 +23802,36 @@ export default function AdminPage() {
                             Confirm
                           </button>
                         )}
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/reservations?id=${viewingBooking.id}`, {
+                                  method: 'PATCH',
+                                  headers: authenticatedJsonHeaders,
+                                  body: JSON.stringify({ status: 'checked_in' })
+                              });
+                              if (res.ok) {
+                                const updated = await res.json();
+                                setViewingBooking(updated);
+                                fetchAllReservations();
+                              }
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          className="flex-1 rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center justify-center gap-1.5"
+                        >
+                          Check In
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {viewingBooking.status === 'checked_in' && hasPermission("bookings.edit") && (
+                    <div className="rounded-2xl border border-[#C4AE7C]/30 bg-white p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#1F251A] mb-2">Session Flow</p>
+                      <p className="text-xs text-[#5A6A51] mb-4">The customer is checked in and ready to begin their clinical session.</p>
+                      <div className="flex gap-3">
                         <button
                           onClick={async () => {
                             try {
