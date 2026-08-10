@@ -2216,6 +2216,17 @@ export default function AdminPage() {
     }
   }, [activeNav, adminRole, adminPermissions, hasPermission, calendarView, providerTab]);
 
+  // Close page-level dropdowns when any other dropdown is toggled
+  useEffect(() => {
+    const handleCloseDropdowns = (e: any) => {
+      const origin = e.detail;
+      if (origin !== "quickAction") setShowQuickActionMenu(false);
+      if (origin !== "notifications") setShowNotificationMenu(false);
+    };
+    window.addEventListener("close-admin-dropdowns", handleCloseDropdowns);
+    return () => window.removeEventListener("close-admin-dropdowns", handleCloseDropdowns);
+  }, []);
+
   async function handleSetupPassword(e: React.FormEvent) {
     e.preventDefault();
     if (!setupPassword || !setupConfirmPassword) {
@@ -8158,7 +8169,13 @@ export default function AdminPage() {
               <div className="relative">
                 <button
                   onClick={() => {
-                    setShowQuickActionMenu(prev => !prev);
+                    setShowQuickActionMenu(prev => {
+                      const nextState = !prev;
+                      if (nextState) {
+                        window.dispatchEvent(new CustomEvent("close-admin-dropdowns", { detail: "quickAction" }));
+                      }
+                      return nextState;
+                    });
                     setShowNotificationMenu(false);
                   }}
                   className={`inline-flex h-9 w-9 items-center justify-center rounded-xl text-[#FBFBF9] shadow-sm transition ${
@@ -8225,7 +8242,13 @@ export default function AdminPage() {
               <div className="relative">
                 <button
                   onClick={() => {
-                    setShowNotificationMenu(prev => !prev);
+                    setShowNotificationMenu(prev => {
+                      const nextState = !prev;
+                      if (nextState) {
+                        window.dispatchEvent(new CustomEvent("close-admin-dropdowns", { detail: "notifications" }));
+                      }
+                      return nextState;
+                    });
                     setShowQuickActionMenu(false);
                   }}
                   className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${

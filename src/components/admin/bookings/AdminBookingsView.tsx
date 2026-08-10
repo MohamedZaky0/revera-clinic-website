@@ -83,15 +83,24 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close More dropdown on outside click
+  // Close More dropdown on outside click or global dropdown toggle
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
         setIsMoreMenuOpen(false);
       }
     };
+    const globalHandler = (e: any) => {
+      if (e.detail !== "bookingsMore") {
+        setIsMoreMenuOpen(false);
+      }
+    };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    window.addEventListener("close-admin-dropdowns", globalHandler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      window.removeEventListener("close-admin-dropdowns", globalHandler);
+    };
   }, []);
   const [rowsPerPage, setRowsPerPage] = useState<number>(5);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -541,7 +550,15 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           {/* ── MORE DROPDOWN ── */}
           <div className="relative" ref={moreMenuRef}>
             <button
-              onClick={() => setIsMoreMenuOpen(prev => !prev)}
+              onClick={() => {
+                setIsMoreMenuOpen(prev => {
+                  const nextState = !prev;
+                  if (nextState) {
+                    window.dispatchEvent(new CustomEvent("close-admin-dropdowns", { detail: "bookingsMore" }));
+                  }
+                  return nextState;
+                });
+              }}
               className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
             >
               <MoreVertical size={16} className="text-[#6B7280]" />
