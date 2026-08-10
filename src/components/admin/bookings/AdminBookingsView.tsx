@@ -59,6 +59,28 @@ interface AdminBookingsViewProps {
   onRejectBooking?: (booking: any) => void;
 }
 
+const formatDisplayTime = (timeStr?: string): string => {
+  if (!timeStr) return "09:00 AM";
+  const trimmed = String(timeStr).trim();
+  if (!trimmed) return "09:00 AM";
+  if (trimmed.toLowerCase().includes("am") || trimmed.toLowerCase().includes("pm")) {
+    return trimmed;
+  }
+  const startPart = trimmed.split("-")[0].trim();
+  const parts = startPart.split(":");
+  if (parts.length >= 2) {
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1].slice(0, 2);
+    if (!isNaN(hours)) {
+      const period = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12 || 12;
+      const formattedHours = String(hours).padStart(2, "0");
+      return `${formattedHours}:${minutes} ${period}`;
+    }
+  }
+  return trimmed;
+};
+
 export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   allReservations = [],
   requests = [],
@@ -206,7 +228,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         ...r,
         id: r.id || `res-${idx}`,
         date: String(r.date || selectedDateStr).slice(0, 10),
-        time: r.start_time || r.time || r.timeSlot || "09:00 AM",
+        time: formatDisplayTime(r.start_time || r.time || r.timeSlot || r.time_slot),
         customer_name: pName,
         customer_phone: phone,
         service_name: sName,
@@ -970,18 +992,18 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               </div>
 
               {/* Table */}
-              <div className="overflow-x-auto scrollbar-none">
-                <table className="w-full border-collapse text-left text-xs">
+              <div className="w-full overflow-x-auto scrollbar-none">
+                <table className="w-full border-collapse text-left text-xs table-fixed">
                   <thead>
-                    <tr className="border-b border-gray-100 text-[11px] uppercase tracking-wider text-[#9CA3AF]">
-                      <th className="py-3 px-2 font-semibold">Time</th>
-                      <th className="py-3 px-2 font-semibold">Patient</th>
-                      <th className="py-3 px-2 font-semibold">Service</th>
-                      <th className="py-3 px-2 font-semibold">Doctor</th>
-                      <th className="py-3 px-2 font-semibold">Room</th>
-                      <th className="py-3 px-2 font-semibold">Status</th>
-                      <th className="py-3 px-2 font-semibold">Payment</th>
-                      <th className="py-3 px-1 font-semibold text-center">Actions</th>
+                    <tr className="border-b border-gray-100 text-[10px] uppercase tracking-wider text-[#9CA3AF]">
+                      <th className="py-3 px-1.5 font-semibold w-[90px]">Time</th>
+                      <th className="py-3 px-1.5 font-semibold w-[22%]">Patient</th>
+                      <th className="py-3 px-1.5 font-semibold w-[22%]">Service</th>
+                      <th className="py-3 px-1.5 font-semibold w-[20%]">Doctor</th>
+                      <th className="py-3 px-1.5 font-semibold w-[70px]">Room</th>
+                      <th className="py-3 px-1.5 font-semibold w-[110px]">Status</th>
+                      <th className="py-3 px-1.5 font-semibold w-[90px]">Payment</th>
+                      <th className="py-3 px-1 font-semibold text-center w-[45px]">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -1012,15 +1034,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       paginatedAppointments.map((row) => {
                         const stConfig = getStatusConfig(row.status);
                         const payStyle = getPaymentStyle(row.paymentStatus);
+                        const displayTimeStr = formatDisplayTime(row.time);
                         return (
                           <tr
                             key={row.id}
                             onClick={() => onViewBookingDetails && onViewBookingDetails(row)}
                             className={`group cursor-pointer transition hover:bg-emerald-50/50 border-l-4 ${stConfig.border}`}
                           >
-                            <td className="py-3 px-2 whitespace-nowrap font-bold text-[#111827]">{row.time || "09:00 AM"}</td>
-                            <td className="py-3 px-2 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
+                            <td className="py-2.5 px-1.5 font-bold text-[#111827] text-[11px] whitespace-nowrap">{displayTimeStr}</td>
+                            <td className="py-2.5 px-1.5">
+                              <div className="flex items-center gap-2 overflow-hidden">
                                 {row.avatar_url ? (
                                   <img src={row.avatar_url} alt={row.customer_name} className="h-7 w-7 rounded-full object-cover border border-gray-200 shrink-0" />
                                 ) : (
@@ -1028,20 +1051,20 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                                     {(row.customer_name || "P").charAt(0)}
                                   </div>
                                 )}
-                                <div>
-                                  <span className="font-semibold text-[#111827] block text-xs">{row.customer_name}</span>
-                                  <span className="text-[11px] font-mono text-gray-500 font-medium block">{row.customer_phone}</span>
+                                <div className="min-w-0">
+                                  <span className="font-semibold text-[#111827] block text-xs truncate">{row.customer_name}</span>
+                                  <span className="text-[10px] font-mono text-gray-500 font-medium block truncate">{row.customer_phone}</span>
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3 px-2 whitespace-nowrap">
-                              <div className="flex flex-col">
-                                <span className="font-bold text-[#111827] text-xs">{row.service_name}</span>
-                                <span className="text-[10px] font-medium text-[#9CA3AF]">{row.service_variant}</span>
+                            <td className="py-2.5 px-1.5">
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-bold text-[#111827] text-xs truncate">{row.service_name}</span>
+                                <span className="text-[10px] font-medium text-[#9CA3AF] truncate">{row.service_variant}</span>
                               </div>
                             </td>
-                            <td className="py-3 px-2 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
+                            <td className="py-2.5 px-1.5">
+                              <div className="flex items-center gap-1.5 min-w-0">
                                 {row.doctor_avatar ? (
                                   <img src={row.doctor_avatar} alt={row.doctor_name} className="h-6 w-6 rounded-full object-cover border border-gray-200 shrink-0" />
                                 ) : (
@@ -1049,28 +1072,28 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                                     {(row.doctor_name || "D").charAt(0)}
                                   </div>
                                 )}
-                                <span className="font-medium text-[#374151] text-xs">{row.doctor_name}</span>
+                                <span className="font-medium text-[#374151] text-xs truncate">{row.doctor_name}</span>
                               </div>
                             </td>
-                            <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium text-xs">{row.room}</td>
-                            <td className="py-3 px-2 whitespace-nowrap">
-                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${stConfig.bg} ${stConfig.text}`}>
+                            <td className="py-2.5 px-1.5 text-[#6B7280] font-medium text-xs truncate">{row.room}</td>
+                            <td className="py-2.5 px-1.5">
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${stConfig.bg} ${stConfig.text} whitespace-nowrap`}>
                                 <span className={`h-1.5 w-1.5 rounded-full ${stConfig.dot}`}></span>
                                 {stConfig.label}
                               </span>
                             </td>
-                            <td className="py-3 px-2 whitespace-nowrap">
-                              <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-bold ${payStyle}`}>
+                            <td className="py-2.5 px-1.5">
+                              <span className={`inline-flex items-center rounded-lg border px-1.5 py-0.5 text-[9px] font-bold ${payStyle} whitespace-nowrap`}>
                                 {row.paymentStatus}
                               </span>
                             </td>
-                            <td className="py-3 px-1 whitespace-nowrap text-center">
+                            <td className="py-2.5 px-1 text-center">
                               <button
                                 onClick={(e) => { e.stopPropagation(); onViewBookingDetails && onViewBookingDetails(row); }}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#6B7280] hover:bg-gray-100 hover:text-[#111827] transition"
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-[#6B7280] hover:bg-gray-100 hover:text-[#111827] transition"
                                 title="View Details"
                               >
-                                <Eye size={15} />
+                                <Eye size={14} />
                               </button>
                             </td>
                           </tr>
