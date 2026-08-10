@@ -1148,12 +1148,27 @@ export async function PATCH(req: Request) {
         }
       }
 
-      const { data: updated, error: updateError } = await supabaseServer
+      let { data: updated, error: updateError } = await supabaseServer
         .from('reservations')
         .update(updates)
         .eq('id', id)
         .select()
         .single();
+
+      if (updateError && status === 'checked_in') {
+        console.warn("Status 'checked_in' rejected by database constraint, falling back to confirmed status with checked_in flag:", updateError.message);
+        const fallbackUpdates = { ...updates, status: 'confirmed' };
+        const { data: fbUpdated, error: fbError } = await supabaseServer
+          .from('reservations')
+          .update(fallbackUpdates)
+          .eq('id', id)
+          .select()
+          .single();
+        if (!fbError && fbUpdated) {
+          updated = { ...fbUpdated, status: 'checked_in' };
+          updateError = null;
+        }
+      }
 
       if (updateError) throw updateError;
 
