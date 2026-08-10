@@ -673,7 +673,6 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             <thead>
               <tr className="border-b border-gray-100 text-[11px] font-bold text-[#6B7280]">
                 <th className="py-3 px-3 whitespace-nowrap">Patient ˅</th>
-                <th className="py-3 px-3 whitespace-nowrap">Phone</th>
                 <th className="py-3 px-3 whitespace-nowrap">Service</th>
                 <th className="py-3 px-3 whitespace-nowrap">Doctor</th>
                 <th className="py-3 px-3 whitespace-nowrap">Date &amp; Time</th>
@@ -686,7 +685,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             <tbody className="divide-y divide-gray-50">
               {paginatedPendingList.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-sm text-[#6B7280]">
+                  <td colSpan={8} className="py-12 text-center text-sm text-[#6B7280]">
                     No pending approval requests.
                   </td>
                 </tr>
@@ -705,14 +704,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       )}
                       <div>
                         <span className="font-extrabold text-[#111827] text-xs block">{item.patientName}</span>
+                        <span className="text-[11px] font-mono text-gray-500 font-medium block">{item.phone}</span>
                         {item.patientAge && <span className="text-[11px] text-gray-400 font-medium">{item.patientAge} years</span>}
                       </div>
                     </div>
-                  </td>
-
-                  {/* 3. Phone */}
-                  <td className="py-3.5 px-3 font-mono font-semibold text-gray-700 whitespace-nowrap">
-                    {item.phone}
                   </td>
 
                   {/* 4. Service */}
@@ -981,7 +976,6 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     <tr className="border-b border-gray-100 text-[11px] uppercase tracking-wider text-[#9CA3AF]">
                       <th className="py-3 px-2 font-semibold">Time</th>
                       <th className="py-3 px-2 font-semibold">Patient</th>
-                      <th className="py-3 px-2 font-semibold">Phone</th>
                       <th className="py-3 px-2 font-semibold">Service</th>
                       <th className="py-3 px-2 font-semibold">Doctor</th>
                       <th className="py-3 px-2 font-semibold">Room</th>
@@ -993,14 +987,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   <tbody className="divide-y divide-gray-50">
                     {loadingDb ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-xs text-[#5A6A51]">
+                        <td colSpan={8} className="py-12 text-center text-xs text-[#5A6A51]">
                           <Loader2 size={20} className="animate-spin mx-auto mb-2 text-[#1E3A2B]" />
                           Loading appointments...
                         </td>
                       </tr>
                     ) : paginatedAppointments.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-sm text-[#6B7280]">
+                        <td colSpan={8} className="py-12 text-center text-sm text-[#6B7280]">
                           <div className="max-w-sm mx-auto space-y-3">
                             <p className="font-semibold text-[#111827]">No appointments for {formattedHeaderDate}.</p>
                             <button
@@ -1034,18 +1028,20 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                                     {(row.customer_name || "P").charAt(0)}
                                   </div>
                                 )}
-                                <span className="font-semibold text-[#111827] truncate max-w-[120px]">{row.customer_name}</span>
-                              </div>
-                            </td>
-                            <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium text-[11px]">{row.customer_phone}</td>
-                            <td className="py-3 px-2">
-                              <div className="flex flex-col max-w-[120px]">
-                                <span className="font-bold text-[#111827] truncate">{row.service_name}</span>
-                                <span className="text-[10px] font-medium text-[#9CA3AF] truncate">{row.service_variant}</span>
+                                <div>
+                                  <span className="font-semibold text-[#111827] block text-xs">{row.customer_name}</span>
+                                  <span className="text-[11px] font-mono text-gray-500 font-medium block">{row.customer_phone}</span>
+                                </div>
                               </div>
                             </td>
                             <td className="py-3 px-2 whitespace-nowrap">
-                              <div className="flex items-center gap-2 max-w-[120px]">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-[#111827] text-xs">{row.service_name}</span>
+                                <span className="text-[10px] font-medium text-[#9CA3AF]">{row.service_variant}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
                                 {row.doctor_avatar ? (
                                   <img src={row.doctor_avatar} alt={row.doctor_name} className="h-6 w-6 rounded-full object-cover border border-gray-200 shrink-0" />
                                 ) : (
@@ -1053,7 +1049,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                                     {(row.doctor_name || "D").charAt(0)}
                                   </div>
                                 )}
-                                <span className="font-medium text-[#374151] truncate">{row.doctor_name}</span>
+                                <span className="font-medium text-[#374151] text-xs">{row.doctor_name}</span>
                               </div>
                             </td>
                             <td className="py-3 px-2 whitespace-nowrap text-[#6B7280] font-medium text-xs">{row.room}</td>
