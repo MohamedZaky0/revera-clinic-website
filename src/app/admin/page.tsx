@@ -182,7 +182,7 @@ const SLOTS = ALL_15MIN_SLOTS;
 
 const SIDEBAR_ITEMS = [
   { label: "Bookings", icon: CalendarDays },
-  { label: "Customers", icon: Users },
+  { label: "Patients", icon: Users },
   { label: "Doctors", icon: ShieldCheck },
   { label: "Services", icon: Layers },
   { label: "Inventory", icon: PackageCheck },
@@ -776,7 +776,7 @@ export default function AdminPage() {
 
     const parentScreenMap: Record<string, string> = {
       "bookings": "Bookings",
-      "customers": "Customers",
+      "customers": "Patients",
       "providers": "Doctors",
       "services": "Services",
       "finance": "Finance",
@@ -802,7 +802,7 @@ export default function AdminPage() {
       
       const parentScreenMap: Record<string, string> = {
         "Bookings": "bookings",
-        "Customers": "customers",
+        "Patients": "customers",
         "Doctors": "providers",
         "Services": "services",
         "Inventory": "inventory",
@@ -2157,7 +2157,7 @@ export default function AdminPage() {
         } else {
           const parentScreenMap: Record<string, string> = {
             "Bookings": "bookings",
-            "Customers": "customers",
+            "Patients": "customers",
             "Doctors": "providers",
             "Services": "services",
             "Promotions": "services",
@@ -3266,7 +3266,7 @@ export default function AdminPage() {
     
     const parentScreenMap: Record<string, string> = {
       "Bookings": "bookings",
-      "Customers": "customers",
+      "Patients": "customers",
       "Doctors": "providers",
       "Services": "services",
       "Promotions": "services",
@@ -3652,7 +3652,7 @@ export default function AdminPage() {
   }, [session]);
 
   useEffect(() => {
-    if (activeNav === "Inventory" || activeNav === "Products" || activeNav === "Point of Sale" || activeNav === "Customers" || viewingCustomerProfile) {
+    if (activeNav === "Inventory" || activeNav === "Products" || activeNav === "Point of Sale" || activeNav === "Patients" || viewingCustomerProfile) {
       fetchInventoryProducts();
     }
   }, [activeNav, viewingCustomerProfile, fetchInventoryProducts]);
@@ -5036,7 +5036,7 @@ export default function AdminPage() {
 
     return [
       { label: "Active bookings", value: String(activeBookingsCount), accent: "bg-[#C4AE7C]/10", icon: CalendarDays },
-      { label: "New customers", value: String(newCustomersCount), accent: "bg-[#C4AE7C]/10", icon: Users },
+      { label: "New patients", value: String(newCustomersCount), accent: "bg-[#C4AE7C]/10", icon: Users },
       { label: "Revenue", value: formattedRevenue, accent: "bg-[#C4AE7C]/10", icon: DollarSign },
       { label: "Open requests", value: String(openRequestsCount), accent: "bg-[#C4AE7C]/10", icon: FileText },
     ];
@@ -10669,14 +10669,14 @@ export default function AdminPage() {
                 <div className="space-y-6">
                   <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-sm">
                     <div className="mb-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Total Customers</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Total Patients</p>
                     </div>
                     <div className="relative mx-auto flex h-[280px] w-[280px] items-center justify-center rounded-full border-8 border-[#10B981]/70 bg-transparent">
                       <div className="absolute inset-10 rounded-full border-8 border-[#7C5CBF]/80" />
                       <div className="absolute inset-20 rounded-full bg-[#FBFBF9] shadow-inner"></div>
                       <div className="relative text-center">
                         <p className="text-4xl font-semibold text-[#1F251A]">22</p>
-                        <p className="text-sm text-[#5A6A51]">Total Customers</p>
+                        <p className="text-sm text-[#5A6A51]">Total Patients</p>
                       </div>
                     </div>
                     <div className="mt-6 grid gap-3">
@@ -10967,7 +10967,7 @@ export default function AdminPage() {
           )}
 
           {/* ── CUSTOMERS VIEW ── */}
-          {activeNav === "Customers" && (
+          {activeNav === "Patients" && (
             <div>
 
               {/* ── INLINE: View Customer Profile ── */}
@@ -10979,7 +10979,7 @@ export default function AdminPage() {
                       onClick={() => setViewingCustomerProfile(null)}
                       className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
                     >
-                      <ArrowLeft size={14} /> Back to Customers
+                      <ArrowLeft size={14} /> Back to Patients
                     </button>
                     {hasPermission("customers.edit") && (
                       <button
@@ -12556,7 +12556,7 @@ export default function AdminPage() {
                       onClick={() => setShowCustomerFormModal(false)}
                       className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
                     >
-                      <ArrowLeft size={14} /> Back to Customers
+                      <ArrowLeft size={14} /> Back to Patients
                     </button>
                   </div>
                   <div className="w-full bg-white rounded-3xl border border-[#414E36]/10 p-8 shadow-sm">
@@ -19033,228 +19033,221 @@ export default function AdminPage() {
               </div>
 
               {/* Table */}
-              <div className="rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-sm">
-                    <thead>
-                      <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
-                        <th className="px-6 py-4">ID</th>
-                        <th className="px-6 py-4">Employee Info</th>
-                        <th className="px-6 py-4">Phone</th>
-                        <th className="px-6 py-4">Department</th>
-                        <th className="px-6 py-4">Branch</th>
-                        <th className="px-6 py-4">Shift</th>
-                        <th className="px-6 py-4">Salary</th>
-
-                        <th className="px-6 py-4 text-center">Status</th>
-                        <th className="px-6 py-4 text-right">Actions</th>
+              <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white shadow-sm scrollbar-none">
+                <table className="w-full min-w-[800px] text-sm">
+                  <thead>
+                    <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Employee Info</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Phone</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Department</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Branch</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Shift</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Salary</th>
+                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Status</th>
+                      <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#414E36]/5">
+                    {loadingRolesAndEmployees ? (
+                      <tr>
+                        <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                          Loading employees...
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#414E36]/5">
-                      {loadingRolesAndEmployees ? (
-                        <tr>
-                          <td colSpan={9} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
-                            Loading employees...
-                          </td>
-                        </tr>
-                      ) : (() => {
-                        const filtered = employeesList.filter((emp: any) => {
-                          const isSuperadmin =
-                            emp.role_name === 'superadmin' ||
-                            emp.employee_id === 'superadmin';
-                          if (isSuperadmin) return false;
-                          if (employeeFilterDepartment !== "All" && emp.department !== employeeFilterDepartment) return false;
-                          if (employeeFilterShift !== "All") {
-                            const empShift = (emp.shift || "").toLowerCase();
-                            const filterVal = employeeFilterShift.toLowerCase();
-                            if (filterVal === "day") {
-                              if (!empShift.includes("day") && !empShift.includes("am") && (empShift.includes("night") || empShift.includes("pm"))) {
-                                return false;
-                              }
-                            } else if (filterVal === "night") {
-                              if (!empShift.includes("night") && !empShift.includes("pm")) {
-                                return false;
-                              }
-                            } else if (emp.shift !== employeeFilterShift) {
+                    ) : (() => {
+                      const filtered = employeesList.filter((emp: any) => {
+                        const isSuperadmin =
+                          emp.role_name === 'superadmin' ||
+                          emp.employee_id === 'superadmin';
+                        if (isSuperadmin) return false;
+                        if (employeeFilterDepartment !== "All" && emp.department !== employeeFilterDepartment) return false;
+                        if (employeeFilterShift !== "All") {
+                          const empShift = (emp.shift || "").toLowerCase();
+                          const filterVal = employeeFilterShift.toLowerCase();
+                          if (filterVal === "day") {
+                            if (!empShift.includes("day") && !empShift.includes("am") && (empShift.includes("night") || empShift.includes("pm"))) {
                               return false;
                             }
+                          } else if (filterVal === "night") {
+                            if (!empShift.includes("night") && !empShift.includes("pm")) {
+                              return false;
+                            }
+                          } else if (emp.shift !== employeeFilterShift) {
+                            return false;
                           }
-                          if (employeeSearchQuery.trim()) {
-                            const q = employeeSearchQuery.toLowerCase();
-                            if (
-                              !emp.name?.toLowerCase().includes(q) &&
-                              !emp.email?.toLowerCase().includes(q) &&
-                              !emp.phone?.toLowerCase().includes(q) &&
-                              !emp.employee_id?.toLowerCase().includes(q)
-                            ) return false;
-                          }
-                          return true;
-                        });
-                        if (filtered.length === 0) {
-                          return (
-                            <tr>
-                              <td colSpan={9} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
-                                No employees match your filters.
-                              </td>
-                            </tr>
-                          );
                         }
-                        return filtered.map((emp: any) => {
-                          const isSuperadmin = emp.employee_id === "superadmin";
-                          const shortId = emp.employee_id?.includes("@")
-                            ? emp.employee_id.split("@")[0]
-                            : emp.id?.slice(0, 8);
-                          const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
-                          const effectiveSalary = matchProv ? (matchProv.fixedSalary ?? matchProv.fixed_salary ?? emp.salary ?? 0) : (emp.salary || 0);
-                          return (
-                            <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
-                              <td className="px-6 py-4 text-xs font-mono font-bold text-[#5A6A51]">{shortId}</td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-xs font-bold font-serif overflow-hidden shrink-0">
-                                    {customerAvatars[emp.id || emp.employee_id] || emp.photo_url || emp.avatar_url ? (
-                                      <img src={customerAvatars[emp.id || emp.employee_id] || emp.photo_url || emp.avatar_url} alt={emp.name} className="h-full w-full object-cover" />
-                                    ) : (
-                                      <span>{emp.name ? emp.name.charAt(0).toUpperCase() : "E"}</span>
-                                    )}
-                                  </div>
-                                  <div>
-                                    <div className="font-semibold text-[#1F251A] text-sm">{emp.name || <span className="italic text-gray-400">No name</span>}</div>
-                                    <div className="text-xs text-[#5A6A51]">{emp.email}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.phone || "—"}</td>
-                              <td className="px-6 py-4">
-                                <span className="inline-block rounded-xl bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold text-[#8B7544]">
-                                  {emp.department || "Reception"}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className="inline-block rounded-xl bg-[#414E36]/10 px-3 py-1 text-xs font-semibold text-[#414E36]">
-                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`inline-block rounded-xl px-3 py-1 text-xs font-semibold ${(emp.shift || "").toLowerCase().includes("night") || (emp.shift || "").toLowerCase().includes("pm") ? "bg-indigo-50 text-indigo-700 border border-indigo-150" : "bg-amber-50 text-amber-700 border border-amber-150"}`}>
-                                  {emp.shift || "Day"}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-xs font-bold text-[#1F251A]">
-                                {Number(effectiveSalary).toLocaleString()} EGP
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
-                                  {emp.email_confirmed_at ? "Active" : "Invited"}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center justify-end gap-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => setViewingEmployee(emp)}
-                                    className="text-[#5A6A51] hover:text-[#414E36] transition"
-                                    title="View Info"
-                                  >
-                                    <Info size={16} />
-                                  </button>
-                                  {!isSuperadmin && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setEditingEmployee(emp);
-                                          setNewEmployeeName(emp.name || "");
-                                          setNewEmployeeEmail(emp.email || "");
-                                          setNewEmployeeRole(emp.role_name || "");
-                                          setNewEmployeePhone(emp.phone || "");
-                                          setNewEmployeeDepartment(emp.department || "Reception");
-                                          updateShiftState(emp.shift || "Day");
-                                          setNewEmployeeSalary(String(effectiveSalary));
-                                          setNewEmployeeNationalId(emp.national_id || "");
-                                          setNewEmployeeNationalIdFront(emp.national_id_front || "");
-                                          setNewEmployeeNationalIdBack(emp.national_id_back || "");
-                                          applyAddressToState(emp.address || "");
-                                          setNewEmployeeBranchId(emp.branch_id || "");
-                                          const rawContract = emp.contract_file || "";
-                                          let contractUrl = "";
-                                          let additionalList: any[] = [];
-                                          try {
-                                            if (rawContract.startsWith('{')) {
-                                              const parsed = JSON.parse(rawContract);
-                                              contractUrl = parsed.contract || "";
-                                              additionalList = parsed.additional || [];
-                                            } else {
-                                              contractUrl = rawContract;
-                                            }
-                                          } catch (e) {
-                                            contractUrl = rawContract;
-                                          }
-                                          setNewEmployeeContract(contractUrl);
-                                          setNewEmployeeContractName(emp.contract_file_name || "");
-                                          setNewEmployeeAdditionalFiles(additionalList);
-                                          setNewEmployeeRequiredTargetAmount(String(emp.requiredTargetAmount || 0));
-                                          setNewEmployeeBonusPercentage(String(emp.bonusPercentage || 0));
-                                          const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
-                                          setNewEmployeeSpecialty(matchProv?.specialty || "");
-                                          setNewEmployeeSelectedServices(matchProv?.services || []);
-                                          setNewEmployeeRating(String(matchProv?.rating || 5));
-                                          setNewEmployeeCommissionType(matchProv?.commissionType || "none");
-                                          setNewEmployeeCommissionValue(String(matchProv?.commissionValue || 0));
-                                          setNewEmployeeCommissionBase((matchProv?.commissionBase as "gross" | "net_of_materials") || "gross");
-                                          setNewEmployeeCommissionFixedComponent(String(matchProv?.commissionFixedComponent || 0));
-                                          setNewEmployeeServiceCommissions(Array.isArray(matchProv?.serviceCommissions) ? matchProv.serviceCommissions : []);
-                                          let bIds: string[] = [];
-                                          if (matchProv?.workingDaysHours?.branch_ids && Array.isArray(matchProv.workingDaysHours.branch_ids)) {
-                                            bIds = matchProv.workingDaysHours.branch_ids;
-                                          } else if (emp.branch_id) {
-                                            bIds = [emp.branch_id];
-                                          } else if (branches.length > 0) {
-                                            bIds = [branches[0].id];
-                                          }
-                                          setNewEmployeeBranchIds(bIds);
-                                          let sched = matchProv?.workingDaysHours?.branch_schedules?.[bIds[0]]?.in_person || matchProv?.workingDaysHours?.in_person || matchProv?.workingDaysHours;
-                                          if (!sched || typeof sched !== 'object') {
-                                            sched = {
-                                              Sunday: { isOpen: true, start: "09:00", end: "17:00" },
-                                              Monday: { isOpen: true, start: "09:00", end: "17:00" },
-                                              Tuesday: { isOpen: true, start: "09:00", end: "17:00" },
-                                              Wednesday: { isOpen: true, start: "09:00", end: "17:00" },
-                                              Thursday: { isOpen: true, start: "09:00", end: "17:00" },
-                                              Friday: { isOpen: false, start: "09:00", end: "17:00" },
-                                              Saturday: { isOpen: true, start: "09:00", end: "17:00" }
-                                            };
-                                          }
-                                          setNewEmployeeWorkingDaysHours(sched);
-                                          setIsEditingEmployeeModalOpen(true);
-                                        }}
-                                        className="text-[#C4AE7C] hover:text-[#a38f61] transition"
-                                        title="Edit Employee"
-                                      >
-                                        <Pencil size={15} />
-                                      </button>
-                                      {!emp.email_confirmed_at && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleResendInvitation(emp.id)}
-                                          className="text-xs font-semibold text-amber-600 hover:underline transition"
-                                          title="Resend invitation email"
-                                        >
-                                          Resend
-                                        </button>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteEmployee(emp.id)}
-                                        className="text-red-500 hover:text-red-700 transition"
-                                        title="Revoke access"
-                                      >
-                                        <Trash2 size={15} />
-                                      </button>
-                                    </>
+                        if (employeeSearchQuery.trim()) {
+                          const q = employeeSearchQuery.toLowerCase();
+                          if (
+                            !emp.name?.toLowerCase().includes(q) &&
+                            !emp.email?.toLowerCase().includes(q) &&
+                            !emp.phone?.toLowerCase().includes(q) &&
+                            !emp.employee_id?.toLowerCase().includes(q)
+                          ) return false;
+                        }
+                        return true;
+                      });
+                      if (filtered.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={8} className="px-6 py-16 text-center text-sm text-[#5A6A51] font-medium">
+                              No employees match your filters.
+                            </td>
+                          </tr>
+                        );
+                      }
+                      return filtered.map((emp: any) => {
+                        const isSuperadmin = emp.employee_id === "superadmin";
+                        const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
+                        const effectiveSalary = matchProv ? (matchProv.fixedSalary ?? matchProv.fixed_salary ?? emp.salary ?? 0) : (emp.salary || 0);
+                        return (
+                          <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-xs font-bold font-serif overflow-hidden shrink-0">
+                                  {customerAvatars[emp.id || emp.employee_id] || emp.photo_url || emp.avatar_url ? (
+                                    <img src={customerAvatars[emp.id || emp.employee_id] || emp.photo_url || emp.avatar_url} alt={emp.name} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <span>{emp.name ? emp.name.charAt(0).toUpperCase() : "E"}</span>
                                   )}
                                 </div>
-                              </td>
+                                <div>
+                                  <div className="font-semibold text-[#1F251A] text-sm">{emp.name || <span className="italic text-gray-400">No name</span>}</div>
+                                  <div className="text-xs text-[#5A6A51]">{emp.email}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 whitespace-nowrap text-xs font-medium text-[#1F251A]">{emp.phone || "—"}</td>
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              <span className="inline-block rounded-lg bg-[#C4AE7C]/15 px-2.5 py-1 text-xs font-semibold text-[#8B7544]">
+                                {emp.department || "Reception"}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              <span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-1 text-xs font-semibold text-[#414E36]">
+                                {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              <span className={`inline-block rounded-lg px-2.5 py-1 text-xs font-semibold ${(emp.shift || "").toLowerCase().includes("night") || (emp.shift || "").toLowerCase().includes("pm") ? "bg-indigo-50 text-indigo-700 border border-indigo-150" : "bg-amber-50 text-amber-700 border border-amber-150"}`}>
+                                {emp.shift || "Day"}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 whitespace-nowrap text-xs font-bold text-[#1F251A]">
+                              {Number(effectiveSalary).toLocaleString()} EGP
+                            </td>
+                            <td className="px-5 py-4 text-center whitespace-nowrap">
+                              <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${emp.email_confirmed_at ? "bg-green-50 text-green-700 border-green-200/50" : "bg-amber-50 text-amber-700 border-amber-200/50"}`}>
+                                {emp.email_confirmed_at ? "Active" : "Invited"}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingEmployee(emp)}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                  title="View Info"
+                                >
+                                  <Info size={14} />
+                                </button>
+                                {!isSuperadmin && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingEmployee(emp);
+                                        setNewEmployeeName(emp.name || "");
+                                        setNewEmployeeEmail(emp.email || "");
+                                        setNewEmployeeRole(emp.role_name || "");
+                                        setNewEmployeePhone(emp.phone || "");
+                                        setNewEmployeeDepartment(emp.department || "Reception");
+                                        updateShiftState(emp.shift || "Day");
+                                        setNewEmployeeSalary(String(effectiveSalary));
+                                        setNewEmployeeNationalId(emp.national_id || "");
+                                        setNewEmployeeNationalIdFront(emp.national_id_front || "");
+                                        setNewEmployeeNationalIdBack(emp.national_id_back || "");
+                                        applyAddressToState(emp.address || "");
+                                        setNewEmployeeBranchId(emp.branch_id || "");
+                                        const rawContract = emp.contract_file || "";
+                                        let contractUrl = "";
+                                        let additionalList: any[] = [];
+                                        try {
+                                          if (rawContract.startsWith('{')) {
+                                            const parsed = JSON.parse(rawContract);
+                                            contractUrl = parsed.contract || "";
+                                            additionalList = parsed.additional || [];
+                                          } else {
+                                            contractUrl = rawContract;
+                                          }
+                                        } catch (e) {
+                                          contractUrl = rawContract;
+                                        }
+                                        setNewEmployeeContract(contractUrl);
+                                        setNewEmployeeContractName(emp.contract_file_name || "");
+                                        setNewEmployeeAdditionalFiles(additionalList);
+                                        setNewEmployeeRequiredTargetAmount(String(emp.requiredTargetAmount || 0));
+                                        setNewEmployeeBonusPercentage(String(emp.bonusPercentage || 0));
+                                        const matchProv = providers.find(p => (p.name && emp.name && p.name.trim().toLowerCase() === emp.name.trim().toLowerCase()) || (p.phone && emp.phone && p.phone === emp.phone));
+                                        setNewEmployeeSpecialty(matchProv?.specialty || "");
+                                        setNewEmployeeSelectedServices(matchProv?.services || []);
+                                        setNewEmployeeRating(String(matchProv?.rating || 5));
+                                        setNewEmployeeCommissionType(matchProv?.commissionType || "none");
+                                        setNewEmployeeCommissionValue(String(matchProv?.commissionValue || 0));
+                                        setNewEmployeeCommissionBase((matchProv?.commissionBase as "gross" | "net_of_materials") || "gross");
+                                        setNewEmployeeCommissionFixedComponent(String(matchProv?.commissionFixedComponent || 0));
+                                        setNewEmployeeServiceCommissions(Array.isArray(matchProv?.serviceCommissions) ? matchProv.serviceCommissions : []);
+                                        let bIds: string[] = [];
+                                        if (matchProv?.workingDaysHours?.branch_ids && Array.isArray(matchProv.workingDaysHours.branch_ids)) {
+                                          bIds = matchProv.workingDaysHours.branch_ids;
+                                        } else if (emp.branch_id) {
+                                          bIds = [emp.branch_id];
+                                        } else if (branches.length > 0) {
+                                          bIds = [branches[0].id];
+                                        }
+                                        setNewEmployeeBranchIds(bIds);
+                                        let sched = matchProv?.workingDaysHours?.branch_schedules?.[bIds[0]]?.in_person || matchProv?.workingDaysHours?.in_person || matchProv?.workingDaysHours;
+                                        if (!sched || typeof sched !== 'object') {
+                                          sched = {
+                                            Sunday: { isOpen: true, start: "09:00", end: "17:00" },
+                                            Monday: { isOpen: true, start: "09:00", end: "17:00" },
+                                            Tuesday: { isOpen: true, start: "09:00", end: "17:00" },
+                                            Wednesday: { isOpen: true, start: "09:00", end: "17:00" },
+                                            Thursday: { isOpen: true, start: "09:00", end: "17:00" },
+                                            Friday: { isOpen: false, start: "09:00", end: "17:00" },
+                                            Saturday: { isOpen: true, start: "09:00", end: "17:00" }
+                                          };
+                                        }
+                                        setNewEmployeeWorkingDaysHours(sched);
+                                        setIsEditingEmployeeModalOpen(true);
+                                      }}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                      title="Edit Employee"
+                                    >
+                                      <Pencil size={13} />
+                                    </button>
+                                    {!emp.email_confirmed_at && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleResendInvitation(emp.id)}
+                                        className="inline-flex h-7 px-2.5 items-center justify-center rounded-full border border-amber-200/60 bg-amber-50/50 text-xs font-semibold text-amber-700 transition hover:bg-amber-100/80"
+                                        title="Resend invitation email"
+                                      >
+                                        Resend
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteEmployee(emp.id)}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200/60 text-red-600 transition hover:bg-red-50 hover:border-red-300"
+                                      title="Revoke access"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
                             </tr>
                           );
                         });
@@ -19262,7 +19255,6 @@ export default function AdminPage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
               </>
               )}
 
@@ -21315,13 +21307,13 @@ export default function AdminPage() {
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse text-left text-sm">
                         <thead>
-                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
-                            <th className="px-6 py-4">Employee Info</th>
-                            <th className="px-6 py-4">Department</th>
-                            <th className="px-6 py-4">System Role</th>
-                            <th className="px-6 py-4">Branch</th>
-                            <th className="px-6 py-4">Base Salary</th>
-                          </tr>
+                           <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
+                             <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Employee Info</th>
+                             <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Department</th>
+                             <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">System Role</th>
+                             <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Branch</th>
+                             <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Base Salary</th>
+                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#414E36]/5">
                           {employeesList.length === 0 ? (
@@ -21332,20 +21324,25 @@ export default function AdminPage() {
                             </tr>
                           ) : (
                             employeesList.map((emp: any) => (
-                              <tr key={emp.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
-                                <td className="px-6 py-4">
-                                  <div className="font-semibold text-[#1F251A]">{emp.name}</div>
-                                  <div className="text-xs text-[#5A6A51]">{emp.email}</div>
-                                </td>
-                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.department || "—"}</td>
-                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{emp.role_name || "—"}</td>
-                                <td className="px-6 py-4 text-xs text-[#5A6A51]">
-                                  {branches.find(b => b.id === emp.branch_id)?.name_en || "—"}
-                                </td>
-                                <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
-                                  EGP {Number(emp.salary || 0).toLocaleString()}
-                                </td>
-                              </tr>
+                               <tr key={emp.id} className="transition hover:bg-[#F9F9F7]">
+                                 <td className="px-5 py-4">
+                                   <div className="flex items-center gap-3">
+                                     <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-xs font-bold font-serif shrink-0">
+                                       {emp.name ? emp.name.charAt(0).toUpperCase() : "E"}
+                                     </div>
+                                     <div>
+                                       <div className="font-semibold text-[#1F251A] text-sm">{emp.name}</div>
+                                       <div className="text-xs text-[#5A6A51]">{emp.email}</div>
+                                     </div>
+                                   </div>
+                                 </td>
+                                 <td className="px-5 py-4"><span className="inline-block rounded-lg bg-[#C4AE7C]/15 px-2.5 py-1 text-xs font-semibold text-[#8B7544]">{emp.department || "—"}</span></td>
+                                 <td className="px-5 py-4 text-xs font-semibold text-[#1F251A]">{emp.role_name || "—"}</td>
+                                 <td className="px-5 py-4"><span className="inline-block rounded-lg bg-[#414E36]/10 px-2.5 py-1 text-xs font-semibold text-[#414E36]">{branches.find(b => b.id === emp.branch_id)?.name_en || "—"}</span></td>
+                                 <td className="px-5 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                   EGP {Number(emp.salary || 0).toLocaleString()}
+                                 </td>
+                               </tr>
                             ))
                           )}
                         </tbody>
@@ -21557,22 +21554,21 @@ export default function AdminPage() {
                       <div className="overflow-x-auto">
                         <table className="w-full border-collapse text-left text-sm">
                           <thead>
-                            <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
-                              <th className="px-6 py-4">Employee ID</th>
-                              <th className="px-6 py-4">Employee Name</th>
-                              <th className="px-6 py-4">Department</th>
-                              <th className="px-6 py-4">Role</th>
-                              <th className="px-6 py-4">Working Hours</th>
-                              <th className="px-6 py-4">Basic Salary</th>
-                              <th className="px-6 py-4">Target Progress</th>
-                              <th className="px-6 py-4">Perf. Bonus</th>
-                              <th className="px-6 py-4">Bonuses</th>
-                              <th className="px-6 py-4">Deductions</th>
-                              <th className="px-6 py-4">Net Salary</th>
-                              <th className="px-6 py-4 text-center">Payment Status</th>
-                              <th className="px-6 py-4">Payment Date</th>
-                              <th className="px-6 py-4 text-right">Actions</th>
-                            </tr>
+                             <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Employee</th>
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Department</th>
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Role</th>
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Working Hours</th>
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Basic Salary</th>
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Bonuses</th>
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Deductions</th>
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Target</th>
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Perf. Bonus</th>
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Net Salary</th>
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap text-center">Status</th>
+                               <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Date</th>
+                               <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Actions</th>
+                             </tr>
                           </thead>
                           <tbody className="divide-y divide-[#414E36]/5">
                             {paged.length === 0 ? (
@@ -21591,13 +21587,9 @@ export default function AdminPage() {
                                 const initials = empObj.name ? empObj.name.split(" ").slice(0, 2).map((n: string) => n[0]).join("").toUpperCase() : "EM";
 
                                 return (
-                                  <tr key={pay.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
-                                    {/* Employee ID */}
-                                    <td className="px-6 py-4 text-xs font-mono font-bold text-[#5A6A51] uppercase">
-                                      {empObj.employee_id || `EMP-${pay.id?.slice(0, 3)}`}
-                                    </td>
+                                  <tr key={pay.id} className="transition hover:bg-[#F9F9F7]">
                                     {/* Employee Name (Avatar + Name + Email) */}
-                                    <td className="px-6 py-4">
+                                    <td className="px-5 py-4">
                                       <div className="flex items-center gap-3">
                                         <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-[10px] font-bold shrink-0">
                                           {initials}
@@ -21609,24 +21601,24 @@ export default function AdminPage() {
                                       </div>
                                     </td>
                                     {/* Department */}
-                                    <td className="px-6 py-4">
-                                      <span className="inline-block rounded-xl bg-[#C4AE7C]/15 px-3 py-1 text-xs font-semibold text-[#8B7544]">
+                                    <td className="px-5 py-4 whitespace-nowrap">
+                                      <span className="inline-block rounded-lg bg-[#C4AE7C]/15 px-2.5 py-1 text-xs font-semibold text-[#8B7544]">
                                         {empObj.department || "Reception"}
                                       </span>
                                     </td>
                                     {/* Role */}
-                                    <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">
+                                    <td className="px-5 py-4 whitespace-nowrap text-xs font-semibold text-[#1F251A]">
                                       {empObj.role_name || "Staff"}
                                     </td>
                                     {/* Working Hours */}
-                                    <td className="px-6 py-4">
+                                    <td className="px-5 py-4 whitespace-nowrap">
                                       <div className="text-xs font-semibold text-[#1F251A]">Sun - Thu</div>
                                       <div className="text-[10px] text-[#5A6A51]">
                                         {empObj.shift === "Night" ? "05:00 PM - 01:00 AM" : "09:00 AM - 05:00 PM"}
                                       </div>
                                     </td>
                                     {/* Basic Salary */}
-                                    <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                    <td className="px-5 py-4 whitespace-nowrap text-xs font-mono font-bold text-[#1F251A]">
                                       EGP {Number(pay.basic_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                     {/* Bonuses */}
@@ -21704,7 +21696,7 @@ export default function AdminPage() {
                                       </div>
                                     </td>
                                     {/* Net Salary */}
-                                    <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">
+                                    <td className="px-5 py-4 whitespace-nowrap text-xs font-mono font-bold text-[#1F251A]">
                                       EGP {Number(pay.net_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                     {/* Payment Status (Badges with Dot) */}
@@ -21727,54 +21719,51 @@ export default function AdminPage() {
                                       {isPaid ? getPaymentDate(pay.month) : "—"}
                                     </td>
                                     {/* Actions */}
-                                    <td className="px-6 py-4 text-right">
-                                      <div className="flex items-center justify-end gap-2">
-                                        <button
-                                          onClick={() => {
-                                            if (empObj.id) {
-                                              setViewingEmployee(empObj);
-                                            }
-                                          }}
-                                          title="View Details"
-                                          className="p-2 text-gray-500 hover:text-[#414E36] hover:bg-gray-100 rounded-xl transition"
-                                        >
-                                          <Eye size={14} />
-                                        </button>
-                                        
-                                        {!isPaid ? (
-                                          <button
-                                            onClick={async () => {
-                                              if (!(await showConfirm(`Are you sure you want to mark ${empObj.name || "this employee"}'s payroll as PAID?`))) return;
-                                              try {
-                                                const res = await fetch('/api/hr/payroll', {
-                                                  method: 'PATCH',
-                                                  headers: {
-                                                    'Content-Type': 'application/json',
-                                                    'Authorization': `Bearer ${session?.access_token}`
-                                                  },
-                                                  body: JSON.stringify({ id: pay.id, status: 'Paid' })
-                                                });
-                                                if (res.ok) {
-                                                  fetchHrPayroll();
-                                                }
-                                              } catch (e) {
-                                                alert("Failed to pay payroll.");
-                                              }
-                                            }}
-                                            className="p-2 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition font-bold text-xs"
-                                          >
-                                            Pay
-                                          </button>
-                                        ) : (
-                                          <button
-                                            disabled
-                                            className="p-2 text-gray-300 cursor-not-allowed"
-                                          >
-                                            <MoreVertical size={14} />
-                                          </button>
-                                        )}
-                                      </div>
-                                    </td>
+                                     <td className="px-5 py-4 text-right whitespace-nowrap">
+                                       <div className="flex items-center justify-end gap-1.5">
+                                         <button
+                                           onClick={() => {
+                                             if (empObj.id) {
+                                               setViewingEmployee(empObj);
+                                             }
+                                           }}
+                                           title="View Details"
+                                           className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                         >
+                                           <Eye size={14} />
+                                         </button>
+                                         
+                                         {!isPaid ? (
+                                           <button
+                                             onClick={async () => {
+                                               if (!(await showConfirm(`Are you sure you want to mark ${empObj.name || "this employee"}'s payroll as PAID?`))) return;
+                                               try {
+                                                 const res = await fetch('/api/hr/payroll', {
+                                                   method: 'PATCH',
+                                                   headers: {
+                                                     'Content-Type': 'application/json',
+                                                     'Authorization': `Bearer ${session?.access_token}`
+                                                   },
+                                                   body: JSON.stringify({ id: pay.id, status: 'Paid' })
+                                                 });
+                                                 if (res.ok) {
+                                                   fetchHrPayroll();
+                                                 }
+                                               } catch (e) {
+                                                 alert("Failed to pay payroll.");
+                                               }
+                                             }}
+                                             className="inline-flex h-7 px-2.5 items-center justify-center rounded-full border border-emerald-200/60 bg-emerald-50/50 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100/80"
+                                           >
+                                             Pay
+                                           </button>
+                                         ) : (
+                                           <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-green-200/60 bg-green-50 text-green-700">
+                                             <Check size={13} />
+                                           </span>
+                                         )}
+                                       </div>
+                                     </td>
                                   </tr>
                                 );
                               })
@@ -22166,21 +22155,21 @@ export default function AdminPage() {
               {hrActiveSubTab === "leaves" && (
                 <div className="grid gap-6 lg:grid-cols-3">
                   {/* Leave Request List */}
-                  <div className="lg:col-span-2 rounded-[32px] bg-white border border-[#414E36]/10 shadow-[0_20px_60px_rgba(47,61,41,0.06)] overflow-hidden">
-                    <div className="p-6 border-b border-[#414E36]/10 flex items-center justify-between">
-                      <h3 className="text-lg font-bold text-[#1F251A]">Leave Requests</h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse text-left text-sm">
+                  <div className="lg:col-span-2">
+                    <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white shadow-sm">
+                      <div className="px-5 py-4 border-b border-[#414E36]/10 flex items-center justify-between">
+                        <h3 className="text-base font-bold text-[#1F251A]">Leave Requests</h3>
+                      </div>
+                      <table className="w-full min-w-[700px] text-sm">
                         <thead>
-                          <tr className="bg-[#EDF1EC] text-[10px] font-bold uppercase tracking-widest text-[#414E36] border-b border-[#414E36]/10">
-                            <th className="px-6 py-4">Employee</th>
-                            <th className="px-6 py-4">Type</th>
-                            <th className="px-6 py-4">Dates</th>
-                            <th className="px-6 py-4">Days</th>
-                            <th className="px-6 py-4">Reason</th>
-                            <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4 text-right">Actions</th>
+                          <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
+                            <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Employee</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Type</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Dates</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Days</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Reason</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Status</th>
+                            <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#414E36]/5">
@@ -22192,29 +22181,36 @@ export default function AdminPage() {
                             </tr>
                           ) : (
                             leavesList.map((leave: any) => (
-                              <tr key={leave.id} className="hover:bg-[#EDF1EC]/30 transition-colors">
-                                <td className="px-6 py-4">
-                                  <div className="font-semibold text-[#1F251A]">{leave.employee_accounts?.name || "—"}</div>
-                                  <div className="text-xs text-[#5A6A51]">{leave.employee_accounts?.role_name || "—"}</div>
+                              <tr key={leave.id} className="transition hover:bg-[#F9F9F7]">
+                                <td className="px-5 py-4 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-7 w-7 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-xs font-bold font-serif shrink-0">
+                                      {leave.employee_accounts?.name ? leave.employee_accounts.name.charAt(0).toUpperCase() : "E"}
+                                    </div>
+                                    <div>
+                                      <div className="font-semibold text-[#1F251A] text-sm">{leave.employee_accounts?.name || "—"}</div>
+                                      <div className="text-xs text-[#5A6A51]">{leave.employee_accounts?.role_name || "—"}</div>
+                                    </div>
+                                  </div>
                                 </td>
-                                <td className="px-6 py-4 text-xs font-semibold text-[#1F251A]">{leave.leave_type}</td>
-                                <td className="px-6 py-4 text-xs text-[#1F251A]">
-                                  {leave.start_date} to {leave.end_date}
+                                <td className="px-5 py-4 whitespace-nowrap text-xs font-semibold text-[#1F251A]">{leave.leave_type}</td>
+                                <td className="px-5 py-4 whitespace-nowrap text-xs text-[#1F251A]">
+                                  {leave.start_date} → {leave.end_date}
                                 </td>
-                                <td className="px-6 py-4 text-xs font-mono font-bold text-[#1F251A]">{leave.days_count}</td>
-                                <td className="px-6 py-4 text-xs text-[#5A6A51] max-w-[150px] truncate" title={leave.reason}>{leave.reason || "—"}</td>
-                                <td className="px-6 py-4">
-                                  <span className={`inline-block rounded-xl px-2.5 py-1 text-xs font-bold ${
-                                    leave.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                    leave.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                                    'bg-amber-50 text-amber-700 border border-amber-100'
+                                <td className="px-5 py-4 whitespace-nowrap text-xs font-mono font-bold text-[#1F251A]">{leave.days_count}d</td>
+                                <td className="px-5 py-4 text-xs text-[#5A6A51] max-w-[140px] truncate" title={leave.reason}>{leave.reason || "—"}</td>
+                                <td className="px-5 py-4 whitespace-nowrap">
+                                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${
+                                    leave.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' :
+                                    leave.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border-rose-200/60' :
+                                    'bg-amber-50 text-amber-700 border-amber-200/60'
                                   }`}>
                                     {leave.status}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
-                                  {leave.status === "Pending" && (
-                                    <>
+                                <td className="px-5 py-4 text-right whitespace-nowrap">
+                                  {leave.status === "Pending" ? (
+                                    <div className="flex items-center justify-end gap-1.5">
                                       <button
                                         onClick={async () => {
                                           const profileEmployee = employeesList.find(emp => emp.email?.toLowerCase() === adminEmail?.toLowerCase());
@@ -22228,9 +22224,10 @@ export default function AdminPage() {
                                           });
                                           fetchHrLeaves();
                                         }}
-                                        className="rounded-xl bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                                        title="Approve"
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-emerald-200/60 text-emerald-700 bg-emerald-50 transition hover:bg-emerald-100"
                                       >
-                                        Approve
+                                        <Check size={14} />
                                       </button>
                                       <button
                                         onClick={async () => {
@@ -22245,11 +22242,14 @@ export default function AdminPage() {
                                           });
                                           fetchHrLeaves();
                                         }}
-                                        className="rounded-xl bg-rose-600 px-2 py-1 text-xs font-bold text-white hover:bg-rose-700 transition"
+                                        title="Reject"
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-rose-200/60 text-rose-700 bg-rose-50 transition hover:bg-rose-100"
                                       >
-                                        Reject
+                                        <X size={14} />
                                       </button>
-                                    </>
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-[#5A6A51]/50 font-medium">—</span>
                                   )}
                                 </td>
                               </tr>
@@ -25909,7 +25909,7 @@ export default function AdminPage() {
               <div className="grid grid-cols-3 gap-3 rounded-xl border border-[#414E36]/10 bg-[#F9F9F7] p-4">
                 <div className="text-center">
                   <p className="text-xl font-bold text-[#1F251A]">{customers.length}</p>
-                  <p className="text-xs text-[#5A6A51] mt-0.5">Total Customers</p>
+                  <p className="text-xs text-[#5A6A51] mt-0.5">Total Patients</p>
                 </div>
                 <div className="text-center border-x border-[#414E36]/10">
                   <p className="text-xl font-bold text-[#1F251A]">16</p>
