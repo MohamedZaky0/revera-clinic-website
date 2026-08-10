@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   X,
   Phone,
@@ -259,9 +259,22 @@ export default function AdminNewBookingView({
     }
   }, [sameAsPhone, phone]);
 
-  // 2. Real-time Customer Search & Filter
+  const phoneDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close customer dropdown on click outside
   useEffect(() => {
-    const q = patientSearchQuery.trim().toLowerCase();
+    const handler = (e: MouseEvent) => {
+      if (phoneDropdownRef.current && !phoneDropdownRef.current.contains(e.target as Node)) {
+        setShowCustomerDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // 2. Real-time Customer Search & Filter based on Phone Number field
+  useEffect(() => {
+    const q = phone.trim().toLowerCase();
     if (!q) {
       setCustomerList(allCustomers);
       return;
@@ -275,7 +288,7 @@ export default function AdminNewBookingView({
     });
 
     setCustomerList(filtered);
-  }, [patientSearchQuery, allCustomers]);
+  }, [phone, allCustomers]);
 
   // Handle Select Customer from List
   const handleSelectCustomer = async (cust: CustomerItem) => {
@@ -594,101 +607,22 @@ export default function AdminNewBookingView({
               )}
             </div>
 
-            {/* 🔍 SEARCH & SELECT EXISTING PATIENT DROPDOWN */}
-            <div className="relative space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="font-bold text-[#1F251A] text-xs flex items-center gap-2">
-                  <Search size={14} className="text-emerald-700" />
-                  <span>Search Existing Patient (Name, Phone, or Email)</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowCustomerDropdown(!showCustomerDropdown)}
-                  className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
-                >
-                  <Users size={13} />
-                  <span>{showCustomerDropdown ? "Hide Patients List" : "Browse All Patients"}</span>
-                  <ChevronDown size={13} />
-                </button>
-              </div>
-
-              <div className="relative">
-                <input
-                  type="text"
-                  value={patientSearchQuery}
-                  onClick={() => setShowCustomerDropdown(true)}
-                  onChange={(e) => {
-                    setPatientSearchQuery(e.target.value);
-                    setShowCustomerDropdown(true);
-                  }}
-                  placeholder="Click here or type patient name/phone to pick from database..."
-                  className="w-full rounded-2xl border border-[#414E36]/20 bg-[#FBFBF9] pl-10 pr-10 py-2.5 text-xs font-bold text-[#1F251A] outline-none focus:border-emerald-700 focus:bg-white cursor-pointer"
-                />
-                <Search size={16} className="absolute left-3.5 top-3 text-[#5A6A51]" />
-                {patientSearchQuery ? (
+            <div className="space-y-4 text-xs md:text-sm">
+              {/* Phone Input with Country Code & Integrated Patients Dropdown */}
+              <div className="relative" ref={phoneDropdownRef}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block font-bold text-[#1F251A]">Phone Number *</label>
                   <button
                     type="button"
-                    onClick={() => {
-                      setPatientSearchQuery("");
-                      setShowCustomerDropdown(true);
-                    }}
-                    className="absolute right-3.5 top-3 text-[#5A6A51] hover:text-[#1F251A]"
+                    onClick={() => setShowCustomerDropdown(prev => !prev)}
+                    className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
                   >
-                    <X size={14} />
+                    <Users size={13} />
+                    <span>{showCustomerDropdown ? "Hide Patients List" : "Browse All Patients"}</span>
+                    <ChevronDown size={13} />
                   </button>
-                ) : null}
-              </div>
-
-              {/* Scrollable Floating Customer List Dropdown */}
-              {showCustomerDropdown && (
-                <div className="absolute left-0 right-0 top-full mt-1 z-[100] max-h-64 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/20 shadow-2xl p-2 space-y-1">
-                  <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-xl flex justify-between items-center mb-1">
-                    <span>Database Patients ({customerList.length})</span>
-                    <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] font-bold text-xs">Close ✕</button>
-                  </div>
-                  
-                  {customerList.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-[#5A6A51] font-semibold">
-                      No matching patients found. Type details below to create a new patient.
-                    </div>
-                  ) : (
-                    customerList.map((c) => {
-                      const cName = c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Patient Account";
-                      const cPhone = c.mobile || c.phone || "No Phone";
-                      const isSelected = foundCustomer?.id === c.id;
-
-                      return (
-                        <div
-                          key={c.id}
-                          onClick={() => handleSelectCustomer(c)}
-                          className={`p-3 rounded-xl cursor-pointer transition flex items-center justify-between border-b border-gray-100 last:border-0 ${
-                            isSelected ? "bg-emerald-100/70 border-emerald-300" : "hover:bg-emerald-50/70"
-                          }`}
-                        >
-                          <div>
-                            <span className="font-extrabold text-[#1F251A] text-xs block">{cName}</span>
-                            <span className="text-[11px] font-mono text-[#5A6A51]">
-                              {cPhone} {c.email ? `• ${c.email}` : ""}
-                            </span>
-                          </div>
-                          <span className={`text-[11px] font-bold px-3 py-1 rounded-xl flex items-center gap-1 ${
-                            isSelected ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800"
-                          }`}>
-                            {isSelected ? <Check size={12} /> : null}
-                            {isSelected ? "Selected" : "Select"}
-                          </span>
-                        </div>
-                      );
-                    })
-                  )}
                 </div>
-              )}
-            </div>
 
-            <div className="space-y-4 text-xs md:text-sm pt-2 border-t border-[#414E36]/10">
-              {/* Phone Input with Country Code */}
-              <div>
-                <label className="block font-bold text-[#1F251A] mb-1.5">Phone Number *</label>
                 <div className="flex items-center rounded-2xl border border-[#414E36]/20 bg-white overflow-hidden shadow-xs focus-within:border-emerald-700">
                   <div className="flex items-center gap-1.5 px-3 py-2.5 bg-[#FBFBF9] border-r border-[#414E36]/10 font-bold text-[#1F251A]">
                     <span className="text-base">🇪🇬</span>
@@ -707,11 +641,74 @@ export default function AdminNewBookingView({
                     type="tel"
                     required
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="01234567890"
-                    className="w-full px-3.5 py-2.5 font-mono text-[#1F251A] outline-none font-bold placeholder:text-gray-400"
+                    onFocus={() => setShowCustomerDropdown(true)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      setShowCustomerDropdown(true);
+                    }}
+                    placeholder="01234567890 (type to search existing patient)"
+                    className="w-full px-3.5 py-2.5 font-mono text-[#1F251A] outline-none font-bold placeholder:text-gray-400 placeholder:font-sans"
                   />
+                  {phone ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPhone("");
+                        setFoundCustomer(null);
+                        setPatientFound(null);
+                        setShowCustomerDropdown(true);
+                      }}
+                      className="pr-3 text-[#5A6A51] hover:text-[#1F251A]"
+                    >
+                      <X size={14} />
+                    </button>
+                  ) : null}
                 </div>
+
+                {/* Scrollable Floating Customer List Dropdown */}
+                {showCustomerDropdown && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-[100] max-h-64 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/20 shadow-2xl p-2 space-y-1">
+                    <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-xl flex justify-between items-center mb-1">
+                      <span>Database Patients ({customerList.length})</span>
+                      <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] font-bold text-xs">Close ✕</button>
+                    </div>
+                    
+                    {customerList.length === 0 ? (
+                      <div className="p-4 text-center text-xs text-[#5A6A51] font-semibold">
+                        No matching patients found. Type details below to create a new patient.
+                      </div>
+                    ) : (
+                      customerList.map((c) => {
+                        const cName = c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Patient Account";
+                        const cPhone = c.mobile || c.phone || "No Phone";
+                        const isSelected = foundCustomer?.id === c.id;
+
+                        return (
+                          <div
+                            key={c.id}
+                            onClick={() => handleSelectCustomer(c)}
+                            className={`p-3 rounded-xl cursor-pointer transition flex items-center justify-between border-b border-gray-100 last:border-0 ${
+                              isSelected ? "bg-emerald-100/70 border-emerald-300" : "hover:bg-emerald-50/70"
+                            }`}
+                          >
+                            <div>
+                              <span className="font-extrabold text-[#1F251A] text-xs block">{cName}</span>
+                              <span className="text-[11px] font-mono text-[#5A6A51]">
+                                {cPhone} {c.email ? `• ${c.email}` : ""}
+                              </span>
+                            </div>
+                            <span className={`text-[11px] font-bold px-3 py-1 rounded-xl flex items-center gap-1 ${
+                              isSelected ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800"
+                            }`}>
+                              {isSelected ? <Check size={12} /> : null}
+                              {isSelected ? "Selected" : "Select"}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* First Name & Last Name Grid */}
