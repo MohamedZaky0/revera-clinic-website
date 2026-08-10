@@ -74,8 +74,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   onApproveBooking,
   onRejectBooking
 }) => {
-  // View Mode State: 'pending' (Default) vs 'calendar' (Schedule & Mini-Calendar View)
-  const [viewMode, setViewMode] = useState<"pending" | "calendar">("pending");
+  // View Mode State: 'calendar' (Default main view) vs 'pending'
+  const [viewMode, setViewMode] = useState<"pending" | "calendar">("calendar");
   // Mini calendar state - Default to REAL CURRENT DATE
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
