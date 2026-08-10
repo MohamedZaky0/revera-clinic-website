@@ -23,6 +23,7 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowDown,
+  ArrowUpDown,
   Camera,
   BarChart3,
   Bell,
@@ -1659,8 +1660,8 @@ export default function AdminPage() {
   const [couponSearch, setCouponSearch] = useState("");
   const [couponDate, setCouponDate] = useState("");
   const [couponStatus, setCouponStatus] = useState("All");
-  const [serviceTab, setServiceTab] = useState<"Services" | "Sort Services">("Services");
   const [serviceSearch, setServiceSearch] = useState("");
+  const [serviceSortBy, setServiceSortBy] = useState<"custom" | "name_asc" | "name_desc" | "price_asc" | "price_desc" | "newest">("custom");
   const [servicePage, setServicePage] = useState(1);
   const SERVICE_PAGE_SIZE = 10;
 
@@ -9022,7 +9023,6 @@ export default function AdminPage() {
                       </tbody>
                     </table>
                   </div>
-
                 </div>
               )}
             </section>
@@ -9030,9 +9030,8 @@ export default function AdminPage() {
 
           {/* ── SERVICES VIEW ── */}
           {activeNav === "Services" && (
-             <div>
-               {/* Header */}
-               <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
                 <h2 className="text-2xl font-semibold text-[#1F251A]">Services</h2>
                 <div className="flex flex-wrap items-center gap-2">
                   <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#f5f4f0]">
@@ -9050,42 +9049,65 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Tabs */}
-              <div className="mb-5 flex items-center gap-1 border-b border-[#414E36]/10">
-                {(["Services", "Sort Services"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setServiceTab(tab)}
-                    className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                      serviceTab === tab
-                        ? "border-[#414E36] text-[#414E36]"
-                        : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
+              {/* Controls Bar: Search & Sort */}
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3 flex-1">
+                  <div className="relative max-w-xs flex-1 min-w-[220px]">
+                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                    <input
+                      value={serviceSearch}
+                      onChange={(e) => { setServiceSearch(e.target.value); }}
+                      placeholder="Search services…"
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 shadow-2xs"
+                    />
+                  </div>
 
-              <>
-
-              {/* Search */}
-              <div className="mb-5 flex items-center gap-3">
-                <div className="relative max-w-xs flex-1">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
-                  <input
-                    value={serviceSearch}
-                    onChange={(e) => { setServiceSearch(e.target.value); }}
-                    placeholder="Search services…"
-                    className="w-full rounded-lg border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
-                  />
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown size={14} className="text-[#5A6A51]" />
+                    <select
+                      value={serviceSortBy}
+                      onChange={(e) => setServiceSortBy(e.target.value as any)}
+                      className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#414E36] outline-none transition focus:border-[#C4AE7C] shadow-2xs cursor-pointer"
+                    >
+                      <option value="custom">Sort: Default / Drag Order</option>
+                      <option value="name_asc">Sort: Name (A to Z)</option>
+                      <option value="name_desc">Sort: Name (Z to A)</option>
+                      <option value="price_asc">Sort: Price (Low to High)</option>
+                      <option value="price_desc">Sort: Price (High to Low)</option>
+                      <option value="newest">Sort: Newest First</option>
+                    </select>
+                  </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allExpanded = localCategories.every(c => expandedCategories[c.key] ?? true);
+                    const newStates = Object.fromEntries(localCategories.map(c => [c.key, !allExpanded]));
+                    setExpandedCategories(newStates);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#F9F9F7] transition shadow-2xs"
+                >
+                  {localCategories.every(c => expandedCategories[c.key] ?? true) ? "Collapse All" : "Expand All"}
+                </button>
               </div>
 
               {/* Category Accordions */}
               <div className="flex flex-col gap-4">
                 {localCategories.map((cat) => {
-                  const catServices = (groupedServices[cat.key] ?? []).filter((svc) => (serviceToggles[svc.id]?.visible ?? true));
+                  const catServicesRaw = (groupedServices[cat.key] ?? []).filter((svc) => (serviceToggles[svc.id]?.visible ?? true));
+                  const catServices = [...catServicesRaw].sort((a, b) => {
+                    if (serviceSortBy === "name_asc") return (a.en || "").localeCompare(b.en || "");
+                    if (serviceSortBy === "name_desc") return (b.en || "").localeCompare(a.en || "");
+                    if (serviceSortBy === "price_asc") return (a.price ?? 0) - (b.price ?? 0);
+                    if (serviceSortBy === "price_desc") return (b.price ?? 0) - (a.price ?? 0);
+                    if (serviceSortBy === "newest") {
+                      const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                      const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                      return tB - tA;
+                    }
+                    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+                  });
                   const isExpanded = expandedCategories[cat.key] ?? true;
                   const hasMatch = catServices.length > 0;
                   if (serviceSearch.trim() && !hasMatch) return null;
@@ -9376,7 +9398,6 @@ export default function AdminPage() {
                   Expand All
                 </button>
               </div>
-              </>
 
               {/* ── DELETE CATEGORY CONFIRMATION MODAL ── */}
               {deleteCategoryTarget && (
