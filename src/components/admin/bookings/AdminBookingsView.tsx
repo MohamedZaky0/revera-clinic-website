@@ -996,14 +996,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 <table className="w-full text-left border-collapse text-xs table-fixed">
                   <thead>
                     <tr className="border-b border-gray-100 text-[10px] uppercase font-bold tracking-tight text-[#9CA3AF]">
-                      <th className="py-2.5 px-1 font-bold w-[11%]">Time</th>
-                      <th className="py-2.5 px-1 font-bold w-[21%]">Patient</th>
-                      <th className="py-2.5 px-1 font-bold w-[21%]">Service</th>
-                      <th className="py-2.5 px-1 font-bold w-[18%]">Doctor</th>
-                      <th className="py-2.5 px-1 font-bold w-[9%]">Room</th>
-                      <th className="py-2.5 px-1 font-bold w-[11%]">Status</th>
-                      <th className="py-2.5 px-1 font-bold w-[8%]">Payment</th>
-                      <th className="py-2.5 px-0.5 font-bold text-center w-[3%]">Actions</th>
+                      <th className="py-2.5 px-1 font-bold w-[10%]">Time</th>
+                      <th className="py-2.5 px-1 font-bold w-[17%]">Patient</th>
+                      <th className="py-2.5 px-1 font-bold w-[17%]">Service</th>
+                      <th className="py-2.5 px-1 font-bold w-[15%]">Doctor</th>
+                      <th className="py-2.5 px-1 font-bold w-[8%]">Room</th>
+                      <th className="py-2.5 px-1 font-bold w-[13%]">Status</th>
+                      <th className="py-2.5 px-1 font-bold w-[13%]">Payment</th>
+                      <th className="py-2.5 px-0.5 font-bold text-center w-[7%]">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
