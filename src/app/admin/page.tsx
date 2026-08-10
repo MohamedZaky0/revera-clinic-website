@@ -12765,13 +12765,13 @@ export default function AdminPage() {
                 <table className="w-full min-w-[700px] text-sm">
                   <thead>
                     <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Customer</th>
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Phone</th>
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Email</th>
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Created At</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Bookings</th>
-                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51]">Active</th>
-                      <th className="px-4 py-3"></th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Customer</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Phone</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Email</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Created At</th>
+                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Bookings</th>
+                      <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Active</th>
+                      <th className="px-4 py-3 whitespace-nowrap"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#414E36]/8">
