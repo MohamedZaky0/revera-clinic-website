@@ -8807,24 +8807,25 @@ export default function AdminPage() {
                   </div>
                 </div>
               ) : (
-                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)]">
-                  <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div className="space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <h1 className="text-4xl font-semibold text-[#1F251A]">Doctors</h1>
+                      <h2 className="text-xl font-bold text-[#1F251A]">Doctors</h2>
+                      <p className="text-xs text-[#5A6A51]">Manage doctor schedules, services, and ratings</p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={() => setShowProviderFilterPanel(prev => !prev)}
-                        className={`inline-flex items-center gap-2 rounded-3xl border px-4 py-3 text-sm font-semibold transition ${
+                        className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
                           showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()
                             ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
-                            : "border-[#E6E9EB] bg-white text-[#414E36] hover:border-[#C4AE7C]/40 hover:bg-[#FBFBF9]"
+                            : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
                         }`}
                       >
-                        <Filter size={16} /> Filter
+                        <Filter size={14} /> Filter
                         {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()) && (
-                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#414E36] text-[10px] font-bold text-white">!</span>
+                          <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
                         )}
                       </button>
 
@@ -8833,16 +8834,16 @@ export default function AdminPage() {
                           fetchAuditLogs();
                           setShowAuditLogsModal(true);
                         }}
-                        className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/30 bg-white px-5 py-3 text-sm font-semibold text-[#414E36] hover:bg-[#F2EFE9] transition shadow-sm"
+                        className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
                       >
-                        <ClipboardList size={16} /> Audit Logs
+                        <ClipboardList size={14} /> Audit Logs
                       </button>
                     </div>
                   </div>
 
                 {/* Dynamic Filters Drawer */}
                 {showProviderFilterPanel && (
-                  <div className="mb-6 grid grid-cols-1 gap-4 rounded-[24px] border border-[#E6E9EB] bg-[#F7F7F9] p-5 md:grid-cols-4 items-end shadow-sm">
+                  <div className="mb-6 grid grid-cols-1 gap-4 rounded-3xl border border-[#414E36]/10 bg-[#F9F9F7] p-5 md:grid-cols-4 items-end shadow-sm animate-fadeIn">
                     {/* Search Input */}
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Search Doctor</label>
