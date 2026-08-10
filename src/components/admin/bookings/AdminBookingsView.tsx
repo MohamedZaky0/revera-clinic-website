@@ -752,17 +752,18 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handleApproveItem(item)}
-                        className="inline-flex items-center gap-1 rounded-xl border border-emerald-600 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 transition active:scale-95"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-600 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition active:scale-95 shadow-xs"
+                        title="Approve"
                       >
-                        <Check size={14} />
-                        <span>Approve</span>
+                        <Check size={16} strokeWidth={2.5} />
                       </button>
                       <button
                         type="button"
                         onClick={() => handleRejectItem(item)}
-                        className="inline-flex items-center gap-1 rounded-xl border border-rose-300 bg-white px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition active:scale-95"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition active:scale-95 shadow-xs"
+                        title="Reject"
                       >
-                        <span>Reject</span>
+                        <X size={16} strokeWidth={2.5} />
                       </button>
                       <button
                         type="button"
