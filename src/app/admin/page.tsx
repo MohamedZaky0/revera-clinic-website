@@ -8106,7 +8106,7 @@ export default function AdminPage() {
 
         <main className="flex flex-col px-4 md:px-8 py-0 min-w-0">
           {/* Top Navigation Bar */}
-          <div className="sticky top-0 z-30 flex items-center justify-between border-b border-[#414E36]/10 bg-[#F2EFE9]/90 px-2 py-3 backdrop-blur-md gap-3">
+          <div className="sticky top-0 z-40 flex items-center justify-between border-b border-[#414E36]/10 bg-[#F2EFE9]/90 px-2 py-3 backdrop-blur-md gap-3">
             {/* Left: language toggle + branch selector */}
             <div className="flex items-center gap-3">
               <button
@@ -23886,7 +23886,9 @@ export default function AdminPage() {
                         </p>
                         <button
                           onClick={() => {
-                            setCheckoutBooking(viewingBooking);
+                            const b = viewingBooking;
+                            setViewingBooking(null);
+                            setCheckoutBooking(b);
                           }}
                           className="w-full rounded-2xl bg-[#414E36] py-3 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center justify-center gap-2 shadow-md"
                         >
@@ -23906,7 +23908,9 @@ export default function AdminPage() {
                         </p>
                         <button
                           onClick={() => {
-                            setInvoiceBooking(viewingBooking);
+                            const b = viewingBooking;
+                            setViewingBooking(null);
+                            setInvoiceBooking(b);
                           }}
                           className="w-full rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center justify-center gap-2 shadow-sm"
                         >
@@ -24166,7 +24170,11 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => setInvoiceBooking(viewingBooking)}
+                        onClick={() => {
+                          const b = viewingBooking;
+                          setViewingBooking(null);
+                          setInvoiceBooking(b);
+                        }}
                         className="mt-4 w-full rounded-2xl bg-[#414E36] py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
                       >
                         Download Invoice

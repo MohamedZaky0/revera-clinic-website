@@ -486,8 +486,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   return (
     <div className="w-full space-y-6 animate-fadeIn pb-12 text-[#1F251A] relative">
       
-      {/* ── TOP HEADER BAR (sticky) ── */}
-      <div className="sticky top-0 z-30 -mx-1 px-1 pt-1 pb-3 bg-[#F5F3EF]/95 backdrop-blur-md border-b border-gray-200/60 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      {/* ── TOP HEADER BAR ── */}
+      <div className="relative z-10 -mx-1 px-1 pt-1 pb-3 bg-[#F5F3EF]/95 border-b border-gray-200/60 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2 sm:text-2xl">
             Good morning, {userName} <span className="inline-block animate-bounce">👋</span>
@@ -549,7 +549,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             </button>
 
             {isMoreMenuOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+              <div className="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
                 <button
                   onClick={() => { onPrint?.(); setIsMoreMenuOpen(false); }}
                   className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition"
