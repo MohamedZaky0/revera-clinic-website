@@ -701,7 +701,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 <th className="py-3 px-3 whitespace-nowrap">Branch</th>
                 <th className="py-3 px-3 whitespace-nowrap">Status</th>
                 <th className="py-3 px-3 whitespace-nowrap">Requested At</th>
-                <th className="py-3 px-3 whitespace-nowrap text-center">Actions</th>
+                <th className="py-3 px-3 whitespace-nowrap text-left">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -713,22 +713,17 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 </tr>
               ) : (
                 paginatedPendingList.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50/70 transition">
+                  <tr
+                    key={item.id}
+                    onClick={() => onViewBookingDetails ? onViewBookingDetails(item.raw) : null}
+                    className="hover:bg-gray-50/70 transition cursor-pointer"
+                  >
                     {/* 1. Patient */}
                   <td className="py-3.5 px-3 whitespace-nowrap">
-                    <div className="flex items-center gap-2.5">
-                      {item.patientAvatar ? (
-                        <img src={item.patientAvatar} alt={item.patientName} className="h-8 w-8 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs shrink-0">
-                          {item.patientName.charAt(0)}
-                        </div>
-                      )}
-                      <div>
-                        <span className="font-extrabold text-[#111827] text-xs block">{item.patientName}</span>
-                        <span className="text-[11px] font-mono text-gray-500 font-medium block">{item.phone}</span>
-                        {item.patientAge && <span className="text-[11px] text-gray-400 font-medium">{item.patientAge} years</span>}
-                      </div>
+                    <div>
+                      <span className="font-extrabold text-[#111827] text-xs block">{item.patientName}</span>
+                      <span className="text-[11px] font-mono text-gray-500 font-medium block">{item.phone}</span>
+                      {item.patientAge && <span className="text-[11px] text-gray-400 font-medium">{item.patientAge} years</span>}
                     </div>
                   </td>
 
@@ -764,7 +759,6 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   {/* 7. Branch */}
                   <td className="py-3.5 px-3 whitespace-nowrap">
                     <span className="font-extrabold text-[#111827] text-xs block">{item.branchName}</span>
-                    <span className="text-[11px] text-gray-400 font-medium">Branch</span>
                   </td>
 
                   {/* 8. Status */}
@@ -781,11 +775,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   </td>
 
                   {/* 10. Actions */}
-                  <td className="py-3.5 px-3 whitespace-nowrap text-center">
-                    <div className="flex items-center justify-center gap-2">
+                  <td className="py-3.5 px-3 whitespace-nowrap text-left">
+                    <div className="flex items-center justify-start gap-2">
                       <button
                         type="button"
-                        onClick={() => handleApproveItem(item)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleApproveItem(item);
+                        }}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-600 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition active:scale-95 shadow-xs"
                         title="Approve"
                       >
@@ -793,7 +790,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleRejectItem(item)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRejectItem(item);
+                        }}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition active:scale-95 shadow-xs"
                         title="Reject"
                       >
@@ -801,7 +801,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => onViewBookingDetails ? onViewBookingDetails(item.raw) : null}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onViewBookingDetails) onViewBookingDetails(item.raw);
+                        }}
                         className="p-1.5 rounded-lg hover:bg-gray-100 text-[#6B7280] transition"
                         title="More actions"
                       >
