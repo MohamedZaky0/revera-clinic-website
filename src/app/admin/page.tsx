@@ -7874,7 +7874,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#F2EFE9] text-[#1F251A]">
-      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[280px_1fr]">
+      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[220px_1fr]">
         {/* Backdrop for mobile sidebar */}
         {sidebarOpen && (
           <div
@@ -7882,37 +7882,37 @@ export default function AdminPage() {
             onClick={() => setSidebarOpen(false)}
           />
         )}
-        <aside className={`fixed inset-y-0 left-0 z-50 flex w-[280px] h-screen flex-col bg-[#414E36] px-6 py-8 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:sticky md:top-0 md:translate-x-0 ${
+        <aside className={`fixed inset-y-0 left-0 z-50 flex w-[220px] h-screen flex-col bg-[#414E36] px-3.5 py-5 text-[#FBFBF9] shadow-[0_0_70px_rgba(0,0,0,0.08)] transition-transform duration-300 md:sticky md:top-0 md:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}>
-          <div className="mb-10 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-white shadow-md p-2">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-md p-1.5">
                 <Image
                   src="/images/main_logo.png"
                   alt="Revera Clinics"
                   fill
-                  style={{ objectFit: "contain", padding: "4px" }}
+                  style={{ objectFit: "contain", padding: "2px" }}
                 />
               </div>
               <div className="flex flex-col justify-center">
-                <p className="text-[10px] uppercase tracking-[0.3em] text-[#FBFBF9]/60 leading-none mb-1">
+                <p className="text-[9px] uppercase tracking-[0.2em] text-[#FBFBF9]/60 leading-none mb-0.5">
                   Revera Clinics
                 </p>
-                <h1 className="text-xl font-semibold leading-tight">Admin</h1>
+                <h1 className="text-base font-bold leading-tight">Admin</h1>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setSidebarOpen(false)}
-              className="md:hidden flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10 text-[#FBFBF9]/80 hover:text-[#FBFBF9] transition text-xl font-bold"
+              className="md:hidden flex h-7 w-7 items-center justify-center rounded-full hover:bg-white/10 text-[#FBFBF9]/80 hover:text-[#FBFBF9] transition text-lg font-bold"
               title="Close sidebar"
             >
               ×
             </button>
           </div>
 
-          <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
+          <nav className="flex-1 space-y-1 overflow-y-auto pr-0.5">
             {permittedSidebarItems.map((item) => {
               if (item.label === "Settings") {
                 const Icon = item.icon;
@@ -7937,31 +7937,31 @@ export default function AdminPage() {
                       onClick={() => {
                         setSettingsExpanded(!settingsExpanded);
                       }}
-                      className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
+                      className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-left text-xs font-semibold transition-all duration-200 ${
                         active
                           ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
                           : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <span
-                          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
+                          className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
                             active ? "bg-[#C4AE7C]/20 text-[#414E36]" : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
                           }`}
                         >
-                          <Icon size={18} />
+                          <Icon size={16} />
                         </span>
-                        <span>{item.label}</span>
+                        <span className="truncate">{item.label}</span>
                       </div>
                       <ChevronDown
-                        size={16}
+                        size={14}
                         className={`text-current transition-transform duration-200 ${
                           settingsExpanded ? "" : "-rotate-90"
                         }`}
                       />
                     </button>
                     {settingsExpanded && (
-                      <div className="mt-1 space-y-1 overflow-hidden rounded-2xl bg-black/15 py-1.5 pl-3 pr-1">
+                      <div className="mt-1 space-y-0.5 overflow-hidden rounded-xl bg-black/15 py-1 pl-2 pr-1">
                         {[
                           { label: "Clinic Profile", icon: Store, perm: "settings.profile" },
                           { label: "Service Hours", icon: Clock, perm: "settings.service_hours" },
@@ -7988,14 +7988,14 @@ export default function AdminPage() {
                               key={sub.label}
                               type="button"
                               onClick={() => setActiveNav(sub.label)}
-                              className={`group relative flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-xs font-semibold transition-all duration-200 ${
+                              className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] font-medium transition-all duration-200 ${
                                 subActive
-                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-3 rounded-l-none"
+                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-2 rounded-l-none"
                                   : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
                               }`}
                             >
-                              <SubIcon size={14} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
-                              <span>{sub.label}</span>
+                              <SubIcon size={13} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
+                              <span className="truncate">{sub.label}</span>
                             </button>
                           );
                         })}
@@ -8015,31 +8015,31 @@ export default function AdminPage() {
                       onClick={() => {
                         setMarketingExpanded(!marketingExpanded);
                       }}
-                      className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
+                      className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-left text-xs font-semibold transition-all duration-200 ${
                         active
                           ? "bg-[#FBFBF9] text-[#414E36] shadow-lg"
                           : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         <span
-                          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
+                          className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
                             active ? "bg-[#C4AE7C]/20 text-[#414E36]" : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
                           }`}
                         >
-                          <Icon size={18} />
+                          <Icon size={16} />
                         </span>
-                        <span>{item.label}</span>
+                        <span className="truncate">{item.label}</span>
                       </div>
                       <ChevronDown
-                        size={16}
+                        size={14}
                         className={`text-current transition-transform duration-200 ${
                           marketingExpanded ? "" : "-rotate-90"
                         }`}
                       />
                     </button>
                     {marketingExpanded && (
-                      <div className="mt-1 space-y-1 overflow-hidden rounded-2xl bg-black/15 py-1.5 pl-3 pr-1">
+                      <div className="mt-1 space-y-0.5 overflow-hidden rounded-xl bg-black/15 py-1 pl-2 pr-1">
                         {[
                           { label: "Promotions", icon: Tag, perm: null },
                           { label: "Packages", icon: Package, perm: null },
@@ -8051,14 +8051,14 @@ export default function AdminPage() {
                               key={sub.label}
                               type="button"
                               onClick={() => setActiveNav(sub.label)}
-                              className={`group relative flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-xs font-semibold transition-all duration-200 ${
+                              className={`group relative flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] font-medium transition-all duration-200 ${
                                 subActive
-                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-3 rounded-l-none"
+                                  ? "bg-[#FBFBF9]/10 text-[#FBFBF9] border-l-[3px] border-[#C4AE7C] pl-2 rounded-l-none"
                                   : "text-[#FBFBF9]/70 hover:bg-[#FBFBF9]/5 hover:text-[#FBFBF9]"
                               }`}
                             >
-                              <SubIcon size={14} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
-                              <span>{sub.label}</span>
+                              <SubIcon size={13} className={subActive ? "text-[#C4AE7C]" : "text-[#FBFBF9]/60"} />
+                              <span className="truncate">{sub.label}</span>
                             </button>
                           );
                         })}
@@ -8089,7 +8089,7 @@ export default function AdminPage() {
                       setActiveNav(item.label);
                     }
                   }}
-                  className={`group flex w-full items-center justify-between gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition-all duration-200 ${
+                  className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-left text-xs font-semibold transition-all duration-200 ${
                     isComingSoon
                       ? "cursor-not-allowed opacity-50 text-[#FBFBF9]/50"
                       : active
@@ -8097,9 +8097,9 @@ export default function AdminPage() {
                       : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <span
-                      className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
+                      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
                         isComingSoon
                           ? "bg-[#FBFBF9]/5 text-[#FBFBF9]/40"
                           : active
@@ -8107,12 +8107,12 @@ export default function AdminPage() {
                           : "bg-[#FBFBF9]/10 text-[#FBFBF9] group-hover:bg-[#C4AE7C]/15"
                       }`}
                     >
-                      <Icon size={18} />
+                      <Icon size={16} />
                     </span>
-                    <span>{item.label}</span>
+                    <span className="truncate">{item.label}</span>
                   </div>
                   {isComingSoon || item.submenu ? (
-                    <ChevronRight size={18} className="text-[#FBFBF9]/60" />
+                    <ChevronRight size={14} className="text-[#FBFBF9]/60" />
                   ) : null}
                 </button>
               );

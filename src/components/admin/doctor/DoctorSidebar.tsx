@@ -43,35 +43,35 @@ export default function DoctorSidebar({
   onLogout
 }: DoctorSidebarProps) {
   return (
-    <aside className="w-full md:w-[280px] bg-[#414E36] text-[#FBFBF9] flex flex-col justify-between shrink-0 h-auto md:h-screen sticky top-0 px-6 py-8 shadow-[0_0_70px_rgba(0,0,0,0.08)] overflow-y-auto">
+    <aside className="w-full md:w-[220px] bg-[#414E36] text-[#FBFBF9] flex flex-col justify-between shrink-0 h-auto md:h-screen sticky top-0 px-3.5 py-5 shadow-[0_0_70px_rgba(0,0,0,0.08)] overflow-y-auto">
       {/* Top: Logo & Branding */}
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Logo Header */}
-        <div className="flex items-center gap-3 pb-2 border-b border-white/10">
-          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-white shadow-md p-2">
+        <div className="flex items-center gap-2.5 pb-2 border-b border-white/10">
+          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-md p-1.5">
             <Image
               src="/images/main_logo.png"
               alt="Revera Clinics"
               fill
-              style={{ objectFit: "contain", padding: "4px" }}
+              style={{ objectFit: "contain", padding: "2px" }}
             />
           </div>
           <div className="flex flex-col justify-center min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-[#FBFBF9]/60 leading-none mb-1">
+            <p className="text-[9px] uppercase tracking-[0.2em] text-[#FBFBF9]/60 leading-none mb-0.5">
               Revera Clinics
             </p>
-            <h1 className="text-lg font-bold text-[#FBFBF9] leading-tight truncate">
+            <h1 className="text-base font-bold text-[#FBFBF9] leading-tight truncate">
               {t.portalTitle}
             </h1>
           </div>
         </div>
 
         {/* Global Language Toggle Switcher */}
-        <div className="flex items-center rounded-2xl bg-black/20 p-1 border border-white/10 shadow-inner w-full">
+        <div className="flex items-center rounded-xl bg-black/20 p-1 border border-white/10 shadow-inner w-full">
           <button
             type="button"
             onClick={() => setLang("en")}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition text-center ${
+            className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition text-center ${
               lang === "en"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-sm"
                 : "text-[#FBFBF9]/70 hover:text-white hover:bg-white/10"
@@ -82,7 +82,7 @@ export default function DoctorSidebar({
           <button
             type="button"
             onClick={() => setLang("ar")}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition text-center ${
+            className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition text-center ${
               lang === "ar"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-sm"
                 : "text-[#FBFBF9]/70 hover:text-white hover:bg-white/10"
@@ -93,8 +93,8 @@ export default function DoctorSidebar({
         </div>
 
         {/* Navigation Links */}
-        <nav className="space-y-1.5">
-          <p className="px-3 text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#FBFBF9]/50 mb-2">
+        <nav className="space-y-1">
+          <p className="px-2 text-[9px] font-extrabold uppercase tracking-[0.2em] text-[#FBFBF9]/50 mb-1.5">
             {t.menu}
           </p>
 
@@ -103,22 +103,22 @@ export default function DoctorSidebar({
             type="button"
             onClick={() => setActiveTab("schedule")}
             title={t.schedule}
-            className={`group flex w-full items-center gap-3.5 rounded-3xl px-4 py-3 text-xs font-semibold transition-all duration-200 ${
+            className={`group flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 ${
               activeTab === "schedule"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-lg font-bold"
                 : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
             }`}
           >
             <div
-              className={`inline-flex h-9 w-9 items-center justify-center rounded-2xl transition ${
+              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${
                 activeTab === "schedule"
                   ? "bg-[#414E36]/10 text-[#414E36]"
                   : "bg-white/10 text-[#FBFBF9] group-hover:bg-white/20"
               }`}
             >
-              <CalendarDays size={18} />
+              <CalendarDays size={16} />
             </div>
-            <span className="tracking-wide text-sm">{t.schedule}</span>
+            <span className="tracking-wide text-xs truncate">{t.schedule}</span>
           </button>
 
           {/* Tab 2: Ongoing Session */}
@@ -126,21 +126,21 @@ export default function DoctorSidebar({
             type="button"
             onClick={() => setActiveTab("ongoing")}
             title={t.ongoingSession}
-            className={`group flex w-full items-center justify-between gap-3.5 rounded-3xl px-4 py-3 text-xs font-semibold transition-all duration-200 ${
+            className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 ${
               activeTab === "ongoing"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-lg font-bold"
                 : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
             }`}
           >
-            <div className="flex items-center gap-3.5 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div
-                className={`relative inline-flex h-9 w-9 items-center justify-center rounded-2xl transition ${
+                className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${
                   activeTab === "ongoing"
                     ? "bg-[#414E36]/10 text-[#414E36]"
                     : "bg-white/10 text-[#FBFBF9] group-hover:bg-white/20"
                 }`}
               >
-                <Stethoscope size={18} />
+                <Stethoscope size={16} />
                 {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
                   <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -148,7 +148,7 @@ export default function DoctorSidebar({
                   </span>
                 )}
               </div>
-              <span className="tracking-wide text-sm truncate">{t.ongoingSession}</span>
+              <span className="tracking-wide text-xs truncate">{t.ongoingSession}</span>
             </div>
             {receptionistStartedSession && activeSessionBooking?.status !== "completed" && (
               <span className="rounded-full bg-amber-400 h-2 w-2 shrink-0"></span>
@@ -160,26 +160,26 @@ export default function DoctorSidebar({
             type="button"
             onClick={() => setActiveTab("patients")}
             title={t.patients}
-            className={`group flex w-full items-center justify-between gap-3.5 rounded-3xl px-4 py-3 text-xs font-semibold transition-all duration-200 ${
+            className={`group flex w-full items-center justify-between gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 ${
               activeTab === "patients"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-lg font-bold"
                 : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
             }`}
           >
-            <div className="flex items-center gap-3.5 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div
-                className={`inline-flex h-9 w-9 items-center justify-center rounded-2xl transition ${
+                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${
                   activeTab === "patients"
                     ? "bg-[#414E36]/10 text-[#414E36]"
                     : "bg-white/10 text-[#FBFBF9] group-hover:bg-white/20"
                 }`}
               >
-                <Users size={18} />
+                <Users size={16} />
               </div>
-              <span className="tracking-wide text-sm truncate">{t.patients}</span>
+              <span className="tracking-wide text-xs truncate">{t.patients}</span>
             </div>
             <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
                 activeTab === "patients"
                   ? "bg-[#414E36]/15 text-[#414E36]"
                   : "bg-white/15 text-[#FBFBF9]"
@@ -194,59 +194,59 @@ export default function DoctorSidebar({
             type="button"
             onClick={() => setActiveTab("analytics")}
             title={t.analytics}
-            className={`group flex w-full items-center gap-3.5 rounded-3xl px-4 py-3 text-xs font-semibold transition-all duration-200 ${
+            className={`group flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-xs font-semibold transition-all duration-200 ${
               activeTab === "analytics"
                 ? "bg-[#FBFBF9] text-[#414E36] shadow-lg font-bold"
                 : "text-[#FBFBF9]/80 hover:bg-[#FBFBF9]/10 hover:text-[#FBFBF9]"
             }`}
           >
             <div
-              className={`inline-flex h-9 w-9 items-center justify-center rounded-2xl transition ${
+              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${
                 activeTab === "analytics"
                   ? "bg-[#414E36]/10 text-[#414E36]"
                   : "bg-white/10 text-[#FBFBF9] group-hover:bg-white/20"
               }`}
             >
-              <BarChart3 size={18} />
+              <BarChart3 size={16} />
             </div>
-            <span className="tracking-wide text-sm">{t.analytics}</span>
+            <span className="tracking-wide text-xs truncate">{t.analytics}</span>
           </button>
         </nav>
       </div>
 
       {/* Bottom: Doctor Profile & Actions */}
-      <div className="pt-4 border-t border-white/10 space-y-3 mt-6">
+      <div className="pt-3 border-t border-white/10 space-y-2 mt-4">
         {/* Doctor Account Card */}
         <button
           type="button"
           onClick={() => setActiveTab("profile")}
           title="View Doctor Profile & Security Settings"
-          className={`flex w-full items-center gap-3 rounded-2xl p-3 transition-all text-left group cursor-pointer ${
+          className={`flex w-full items-center gap-2 rounded-xl p-2 transition-all text-left group cursor-pointer ${
             activeTab === "profile"
               ? "bg-[#FBFBF9] text-[#414E36] shadow-md"
               : "bg-black/20 text-[#FBFBF9] border border-white/10 hover:bg-white/10"
           }`}
         >
           <div
-            className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl font-bold text-xs shadow-xs transition-transform group-hover:scale-105 ${
+            className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-bold text-[11px] shadow-xs transition-transform group-hover:scale-105 ${
               activeTab === "profile"
                 ? "bg-[#414E36] text-[#FBFBF9]"
                 : "bg-[#FBFBF9] text-[#414E36]"
             }`}
           >
             {(doctorName.replace(/^Dr\.?\s*/i, '') || "D").slice(0, 2).toUpperCase()}
-            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#414E36]" />
+            <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-[#414E36]" />
           </div>
           <div className="text-left min-w-0 flex-1">
             <p
-              className={`text-xs font-bold tracking-tight leading-tight truncate ${
+              className={`text-[11px] font-bold tracking-tight leading-tight truncate ${
                 activeTab === "profile" ? "text-[#414E36]" : "text-[#FBFBF9]"
               }`}
             >
               {doctorName}
             </p>
             <p
-              className={`text-[10px] font-medium leading-none mt-0.5 truncate ${
+              className={`text-[9px] font-medium leading-none mt-0.5 truncate ${
                 activeTab === "profile" ? "text-[#414E36]/70" : "text-[#FBFBF9]/60"
               }`}
             >
@@ -260,10 +260,10 @@ export default function DoctorSidebar({
           <button
             type="button"
             onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 h-9 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-white transition text-xs font-semibold"
+            className="w-full flex items-center justify-center gap-1.5 h-8 rounded-lg border border-rose-500/20 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 hover:text-white transition text-xs font-semibold"
             title={t.signOut}
           >
-            <LogOut size={15} />
+            <LogOut size={14} />
             <span>{t.signOut}</span>
           </button>
         </div>

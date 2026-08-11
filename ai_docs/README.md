@@ -107,6 +107,7 @@ Every file that exists in this folder is listed below — nothing is left unexpl
 - Employee accounts and roles (`employee_accounts` + `roles` tables) with `/api/auth/me` permission lookup
 - Superadmin/admin bypass for daily GPS check-in
 - WhatsApp confirmation step for website bookings (English only)
+- Compact Admin & Doctor Sidebar UI — redesigned sidebars in `src/app/admin/page.tsx`, `DoctorSidebar.tsx`, and `DoctorPatientHistoryDrawer.tsx` from `280px` down to a sleeker `220px` width with optimized container paddings (`px-3.5 py-5`), compact logo size (`h-10 w-10`), smaller item icon boxes (`h-8 w-8`, `size={16}`), and text sizes (`text-xs font-semibold`), maximizing horizontal dashboard screen area for core content.
 - Booking origin badges (website vs other sources)
 
 ### Disabled Placeholder Nav Items (Coming Soon, superadmin-only)
