@@ -157,7 +157,7 @@ export default function AdminNewBookingView({
   const [dbBranches, setDbBranches] = useState<BranchItem[]>(branches);
   const [dbRooms, setDbRooms] = useState<RoomItem[]>(rooms);
   const [submitting, setSubmitting] = useState(false);
-  const [showSubmitMenu, setShowSubmitMenu] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // 1. Load Services, Providers, Customers, Branches & Rooms from Supabase on mount
   useEffect(() => {
@@ -439,6 +439,26 @@ export default function AdminNewBookingView({
       return bookingDate;
     }
   }, [bookingDate]);
+
+  const handleOpenSummaryModal = () => {
+    if (!phone || !firstName) {
+      alert("Please enter patient phone number and first name.");
+      return;
+    }
+    if (!selectedServiceId) {
+      alert("Please select a service.");
+      return;
+    }
+    if (!selectedDoctorId) {
+      alert("Please select a doctor.");
+      return;
+    }
+    if (!selectedTime) {
+      alert("Please select an available time slot.");
+      return;
+    }
+    setShowConfirmModal(true);
+  };
 
   // Submission Handler connecting to POST /api/reservations + Direct Supabase fallback
   const handleCreateBooking = async (action: "normal" | "print" | "whatsapp" = "normal") => {
@@ -1068,69 +1088,132 @@ export default function AdminNewBookingView({
           Cancel
         </button>
 
-        {/* Primary Split Button for Create Booking */}
-        <div className="relative w-full sm:w-auto flex items-center">
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={() => handleCreateBooking("normal")}
-            className="flex-1 sm:flex-none px-7 py-3 rounded-l-2xl bg-[#1E3A2B] text-white font-bold text-xs hover:bg-[#162C20] transition disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {submitting ? <Loader2 size={15} className="animate-spin" /> : null}
-            <span>{submitting ? "Creating..." : "Create Booking"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowSubmitMenu(!showSubmitMenu)}
-            className="px-3 py-3 rounded-r-2xl bg-[#162C20] text-white hover:bg-[#0f1e16] border-l border-white/20 transition"
-          >
-            <ChevronDown size={16} />
-          </button>
-
-          {/* Dropdown Options */}
-          {showSubmitMenu && (
-            <div className="absolute right-0 bottom-14 z-50 w-56 bg-white rounded-2xl shadow-2xl border border-[#414E36]/15 p-2 space-y-1 text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowSubmitMenu(false);
-                  handleCreateBooking("normal");
-                }}
-                className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2"
-              >
-                <CheckCircle2 size={14} className="text-emerald-700" />
-                <span>Create Booking</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowSubmitMenu(false);
-                  handleCreateBooking("print");
-                }}
-                className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2"
-              >
-                <Printer size={14} className="text-blue-700" />
-                <span>Create &amp; Print</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowSubmitMenu(false);
-                  handleCreateBooking("whatsapp");
-                }}
-                className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2"
-              >
-                <MessageSquare size={14} className="text-emerald-600" />
-                <span>Create &amp; Send WhatsApp</span>
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Single Full Create Booking Button */}
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={handleOpenSummaryModal}
+          className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[#1E3A2B] text-white font-extrabold text-xs hover:bg-[#162C20] transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+        >
+          {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+          <span>Create Booking</span>
+        </button>
       </div>
 
+      {/* ── BOOKING SUMMARY CONFIRMATION POPUP MODAL ── */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-[#414E36]/15 space-y-6 relative">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
+              <div className="flex items-center gap-2.5 text-[#1E3A2B]">
+                <div className="h-9 w-9 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-800 shrink-0">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[#1F251A]">Confirm Booking Summary</h3>
+                  <p className="text-[11px] text-[#5A6A51] font-medium">Review appointment details before final submission</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={submitting}
+                className="h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Content Details Grid */}
+            <div className="bg-[#FBFBF9] rounded-2xl p-4 border border-[#414E36]/10 space-y-3 text-xs">
+              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
+                <span className="text-[#5A6A51] font-semibold">Patient Name</span>
+                <span className="font-extrabold text-[#1F251A] text-right">{fullPatientName}</span>
+              </div>
+
+              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
+                <span className="text-[#5A6A51] font-semibold">Phone Number</span>
+                <span className="font-mono font-bold text-[#1F251A] text-right">{phone}</span>
+              </div>
+
+              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
+                <span className="text-[#5A6A51] font-semibold">Service</span>
+                <span className="font-extrabold text-[#1F251A] text-right">{selectedServiceName}</span>
+              </div>
+
+              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
+                <span className="text-[#5A6A51] font-semibold">Doctor</span>
+                <span className="font-extrabold text-[#1F251A] text-right">{selectedDoctorName}</span>
+              </div>
+
+              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
+                <span className="text-[#5A6A51] font-semibold">Branch / Room</span>
+                <span className="font-extrabold text-[#1F251A] text-right">
+                  {selectedBranchName} {selectedRoomName !== "—" ? `(${selectedRoomName})` : ""}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
+                <span className="text-[#5A6A51] font-semibold">Date &amp; Time</span>
+                <span className="font-extrabold text-emerald-800 text-right">
+                  {formattedDateStr} at {selectedTime}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
+                <span className="text-[#5A6A51] font-semibold">Session Type</span>
+                <span className="font-bold text-[#1F251A] text-right">
+                  {sessionType === "in_person" ? "In Person / في العيادة" : "Online / أونلاين"}
+                </span>
+              </div>
+
+              {usePackageMode ? (
+                <div className="flex justify-between items-center pt-0.5 text-emerald-800 font-extrabold">
+                  <span>Price / Payment</span>
+                  <span>0 EGP (Active Package)</span>
+                </div>
+              ) : (
+                <div className="flex justify-between items-center pt-0.5 font-extrabold text-[#1F251A]">
+                  <span className="text-[#5A6A51] font-semibold">Service Price</span>
+                  <span className="text-emerald-800">{selectedServiceObj?.price || 500} EGP</span>
+                </div>
+              )}
+
+              {notes && (
+                <div className="pt-2 border-t border-[#414E36]/10">
+                  <span className="text-[#5A6A51] font-semibold block mb-1">Notes</span>
+                  <p className="text-[11px] text-[#1F251A] bg-white p-2.5 rounded-xl border border-[#414E36]/10">{notes}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => setShowConfirmModal(false)}
+                className="px-5 py-3 rounded-2xl border border-[#414E36]/20 bg-white font-bold text-xs text-[#1F251A] hover:bg-[#FBFBF9] transition cursor-pointer"
+              >
+                Back to Edit
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={async () => {
+                  await handleCreateBooking("normal");
+                  setShowConfirmModal(false);
+                }}
+                className="px-6 py-3 rounded-2xl bg-[#1E3A2B] text-white font-extrabold text-xs hover:bg-[#162C20] transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md cursor-pointer"
+              >
+                {submitting ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+                <span>{submitting ? "Creating..." : "Confirm & Create Booking"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
