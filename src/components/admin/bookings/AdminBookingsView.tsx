@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Eye,
   Check,
   X,
   User,
@@ -990,27 +989,26 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 <table className="w-full text-left border-collapse text-xs table-fixed">
                   <thead>
                     <tr className="border-b border-gray-100 text-[10px] uppercase font-bold tracking-tight text-[#9CA3AF]">
-                      <th className="py-2.5 px-1 font-bold w-[10%]">Time</th>
-                      <th className="py-2.5 px-1 font-bold w-[17%]">Patient</th>
-                      <th className="py-2.5 px-1 font-bold w-[17%]">Service</th>
-                      <th className="py-2.5 px-1 font-bold w-[15%]">Doctor</th>
-                      <th className="py-2.5 px-1 font-bold w-[8%]">Room</th>
+                      <th className="py-2.5 px-1 font-bold w-[11%]">Time</th>
+                      <th className="py-2.5 px-1 font-bold w-[19%]">Patient</th>
+                      <th className="py-2.5 px-1 font-bold w-[19%]">Service</th>
+                      <th className="py-2.5 px-1 font-bold w-[16%]">Doctor</th>
+                      <th className="py-2.5 px-1 font-bold w-[9%]">Room</th>
                       <th className="py-2.5 px-1 font-bold w-[13%]">Status</th>
                       <th className="py-2.5 px-1 font-bold w-[13%]">Payment</th>
-                      <th className="py-2.5 px-0.5 font-bold text-center w-[7%]">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {loadingDb ? (
                       <tr>
-                        <td colSpan={8} className="py-12 text-center text-xs text-[#5A6A51]">
+                        <td colSpan={7} className="py-12 text-center text-xs text-[#5A6A51]">
                           <Loader2 size={20} className="animate-spin mx-auto mb-2 text-[#1E3A2B]" />
                           Loading appointments...
                         </td>
                       </tr>
                     ) : paginatedAppointments.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-12 text-center text-sm text-[#6B7280]">
+                        <td colSpan={7} className="py-12 text-center text-sm text-[#6B7280]">
                           <div className="max-w-sm mx-auto space-y-3">
                             <p className="font-semibold text-[#111827]">No appointments for {formattedHeaderDate}.</p>
                             <button
@@ -1062,15 +1060,6 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                               <span className={`inline-flex items-center rounded-md border px-1 py-0.5 text-[9px] font-bold ${payStyle} whitespace-nowrap`}>
                                 {row.paymentStatus}
                               </span>
-                            </td>
-                            <td className="py-2.5 px-0.5 text-center">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); onViewBookingDetails && onViewBookingDetails(row); }}
-                                className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-[#6B7280] hover:bg-gray-100 hover:text-[#111827] transition"
-                                title="View Details"
-                              >
-                                <Eye size={13} />
-                              </button>
                             </td>
                           </tr>
                         );
