@@ -1478,6 +1478,7 @@ export default function AdminPage() {
   const [customerFilterStatus, setCustomerFilterStatus] = useState("All");
   const [customerFilterReferral, setCustomerFilterReferral] = useState("All");
   const [showImportCustomersModal, setShowImportCustomersModal] = useState(false);
+  const [showCustomerMoreMenu, setShowCustomerMoreMenu] = useState(false);
 
   // Customer Add/Edit Form states
   const [showCustomerFormModal, setShowCustomerFormModal] = useState(false);
@@ -12710,21 +12711,47 @@ export default function AdminPage() {
                       )}
                     </button>
                     
-                    <button
-                      onClick={() => setShowExportCustomersModal(true)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
-                    >
-                      <Download size={14} /> Export
-                    </button>
-                    
-                    {hasPermission("customers.import") && (
+                    {/* 3-Dots Actions Menu for Export & Import */}
+                    <div className="relative">
                       <button
-                        onClick={() => setShowImportCustomersModal(true)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
+                        type="button"
+                        onClick={() => setShowCustomerMoreMenu(prev => !prev)}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#414E36]/15 bg-white text-[#414E36] transition hover:bg-[#FBFBF9] cursor-pointer"
+                        title="More Actions"
                       >
-                        <Upload size={14} /> Import
+                        <MoreVertical size={16} />
                       </button>
-                    )}
+
+                      {showCustomerMoreMenu && (
+                        <div className="absolute right-0 top-11 z-50 w-44 rounded-2xl bg-white p-1.5 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCustomerMoreMenu(false);
+                              setShowExportCustomersModal(true);
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                          >
+                            <Download size={14} className="text-[#5A6A51]" />
+                            <span>Export Patients</span>
+                          </button>
+
+                          {hasPermission("customers.import") && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowCustomerMoreMenu(false);
+                                setShowImportCustomersModal(true);
+                              }}
+                              className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                            >
+                              <Upload size={14} className="text-[#5A6A51]" />
+                              <span>Import Patients</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     
                     {hasPermission("customers.create") && (
                       <button
