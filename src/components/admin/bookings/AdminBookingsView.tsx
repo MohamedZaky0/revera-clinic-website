@@ -517,7 +517,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     <div className="w-full space-y-6 animate-fadeIn pb-12 text-[#1F251A] relative">
       
       {/* ── TOP HEADER BAR ── */}
-      <div className="relative z-10 -mx-1 px-1 pt-1 pb-3 bg-[#F5F3EF]/95 border-b border-gray-200/60 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="relative z-10 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2 sm:text-2xl">
             Good morning, {userName} <span className="inline-block animate-bounce">👋</span>
