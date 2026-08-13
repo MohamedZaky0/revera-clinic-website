@@ -1479,6 +1479,17 @@ export default function AdminPage() {
   const [customerFilterReferral, setCustomerFilterReferral] = useState("All");
   const [showImportCustomersModal, setShowImportCustomersModal] = useState(false);
   const [showCustomerMoreMenu, setShowCustomerMoreMenu] = useState(false);
+  const customerMoreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (customerMoreMenuRef.current && !customerMoreMenuRef.current.contains(event.target as Node)) {
+        setShowCustomerMoreMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Customer Add/Edit Form states
   const [showCustomerFormModal, setShowCustomerFormModal] = useState(false);
@@ -12699,7 +12710,7 @@ export default function AdminPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => setShowCustomerFilterPanel(prev => !prev)}
-                      className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                      className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition cursor-pointer ${
                         showCustomerFilterPanel || customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All"
                           ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
                           : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
@@ -12710,57 +12721,66 @@ export default function AdminPage() {
                         <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
                       )}
                     </button>
+
+                    {hasPermission("customers.create") && (
+                      <button
+                        onClick={handleOpenAddCustomer}
+                        className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] cursor-pointer"
+                      >
+                        <Plus size={14} /> Add Patient
+                      </button>
+                    )}
                     
-                    {/* 3-Dots Actions Menu for Export & Import */}
-                    <div className="relative">
+                    {/* 3-Dots Actions Menu for Export & Import (Positioned to the right of Add Patient) */}
+                    <div ref={customerMoreMenuRef} className="relative">
                       <button
                         type="button"
-                        onClick={() => setShowCustomerMoreMenu(prev => !prev)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#414E36]/15 bg-white text-[#414E36] transition hover:bg-[#FBFBF9] cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowCustomerMoreMenu(prev => !prev);
+                        }}
+                        className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition cursor-pointer ${
+                          showCustomerMoreMenu
+                            ? "border-[#414E36] bg-[#414E36] text-white"
+                            : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
+                        }`}
                         title="More Actions"
                       >
                         <MoreVertical size={16} />
                       </button>
 
                       {showCustomerMoreMenu && (
-                        <div className="absolute right-0 top-11 z-50 w-44 rounded-2xl bg-white p-1.5 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150">
+                        <div className="absolute right-0 top-11 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-2xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150">
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setShowCustomerMoreMenu(false);
                               setShowExportCustomersModal(true);
                             }}
-                            className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                            className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
                           >
-                            <Download size={14} className="text-[#5A6A51]" />
+                            <Download size={15} className="text-[#5A6A51]" />
                             <span>Export Patients</span>
                           </button>
 
                           {hasPermission("customers.import") && (
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setShowCustomerMoreMenu(false);
                                 setShowImportCustomersModal(true);
                               }}
-                              className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                              className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
                             >
-                              <Upload size={14} className="text-[#5A6A51]" />
+                              <Upload size={15} className="text-[#5A6A51]" />
                               <span>Import Patients</span>
                             </button>
                           )}
                         </div>
                       )}
                     </div>
-                    
-                    {hasPermission("customers.create") && (
-                      <button
-                        onClick={handleOpenAddCustomer}
-                        className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                      >
-                        <Plus size={14} /> Add Patient
-                      </button>
-                    )}
                   </div>
                 </div>
 
