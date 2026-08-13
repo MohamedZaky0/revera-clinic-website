@@ -735,18 +735,9 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
                   {/* 5. Doctor */}
                   <td className="py-3.5 px-3 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      {item.doctorAvatar ? (
-                        <img src={item.doctorAvatar} alt={item.doctorName} className="h-7 w-7 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <div className="h-7 w-7 rounded-full bg-blue-100 text-blue-800 font-bold flex items-center justify-center text-[10px] shrink-0">
-                          {item.doctorName.charAt(0)}
-                        </div>
-                      )}
-                      <div>
-                        <span className="font-extrabold text-[#111827] text-xs block">{item.doctorName}</span>
-                        <span className="text-[11px] text-gray-400 font-medium">{item.doctorSpecialty}</span>
-                      </div>
+                    <div>
+                      <span className="font-extrabold text-[#111827] text-xs block">{item.doctorName}</span>
+                      <span className="text-[11px] text-gray-400 font-medium">{item.doctorSpecialty}</span>
                     </div>
                   </td>
 
@@ -1046,18 +1037,9 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           >
                             <td className="py-2.5 px-1 font-bold text-[#111827] text-[11px] whitespace-nowrap">{displayTimeStr}</td>
                             <td className="py-2.5 px-1">
-                              <div className="flex items-center gap-1.5 overflow-hidden">
-                                {row.avatar_url ? (
-                                  <img src={row.avatar_url} alt={row.customer_name} className="h-6 w-6 rounded-full object-cover border border-gray-200 shrink-0" />
-                                ) : (
-                                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 font-bold text-[#374151] shrink-0 text-[10px]">
-                                    {(row.customer_name || "P").charAt(0)}
-                                  </div>
-                                )}
-                                <div className="min-w-0">
-                                  <span className="font-semibold text-[#111827] block text-xs truncate">{row.customer_name}</span>
-                                  <span className="text-[10px] font-mono text-gray-500 font-medium block truncate">{row.customer_phone}</span>
-                                </div>
+                              <div className="min-w-0">
+                                <span className="font-semibold text-[#111827] block text-xs truncate">{row.customer_name}</span>
+                                <span className="text-[10px] font-mono text-gray-500 font-medium block truncate">{row.customer_phone}</span>
                               </div>
                             </td>
                             <td className="py-2.5 px-1">
@@ -1067,16 +1049,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                               </div>
                             </td>
                             <td className="py-2.5 px-1">
-                              <div className="flex items-center gap-1 min-w-0">
-                                {row.doctor_avatar ? (
-                                  <img src={row.doctor_avatar} alt={row.doctor_name} className="h-5 w-5 rounded-full object-cover border border-gray-200 shrink-0" />
-                                ) : (
-                                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-50 text-[9px] font-bold text-emerald-800 shrink-0">
-                                    {(row.doctor_name || "D").charAt(0)}
-                                  </div>
-                                )}
-                                <span className="font-medium text-[#374151] text-xs truncate">{row.doctor_name}</span>
-                              </div>
+                              <span className="font-medium text-[#374151] text-xs truncate block">{row.doctor_name}</span>
                             </td>
                             <td className="py-2.5 px-1 text-[#6B7280] font-medium text-xs truncate">{row.room}</td>
                             <td className="py-2.5 px-1">
