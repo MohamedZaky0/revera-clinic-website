@@ -12850,7 +12850,11 @@ export default function AdminPage() {
                       const displayPhone = c.mobile || c.phone || "—";
                       const displayEmail = c.email || "—";
                       return (
-                        <tr key={uniqueKey} className="transition hover:bg-[#F9F9F7]">
+                        <tr
+                          key={uniqueKey}
+                          onClick={() => setViewingCustomerProfile(c)}
+                          className="transition hover:bg-[#F9F9F7] cursor-pointer"
+                        >
                           <td className="px-5 py-4 font-semibold text-[#1F251A]">
                             <div>
                               <span className="block text-sm font-extrabold text-[#1F251A]">{c.name}</span>
@@ -12871,24 +12875,18 @@ export default function AdminPage() {
                             </span>
                           </td>
                           <td className="px-4 py-4 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
+                            {hasPermission("customers.edit") && (
                               <button
-                                onClick={() => setViewingCustomerProfile(c)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditCustomer(c);
+                                }}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                title="View Customer Profile & Booking History"
+                                title="Edit Customer"
                               >
-                                <Info size={14} />
+                                <Pencil size={12} />
                               </button>
-                              {hasPermission("customers.edit") && (
-                                <button
-                                  onClick={() => handleOpenEditCustomer(c)}
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                  title="Edit Customer"
-                                >
-                                  <Pencil size={12} />
-                                </button>
-                              )}
-                            </div>
+                            )}
                           </td>
                         </tr>
                       );
