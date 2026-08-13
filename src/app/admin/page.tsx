@@ -12828,8 +12828,6 @@ export default function AdminPage() {
                   <thead>
                     <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Customer</th>
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Phone</th>
-                      <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Email</th>
                       <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Created At</th>
                       <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Bookings</th>
                       <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Active</th>
@@ -12839,7 +12837,7 @@ export default function AdminPage() {
                   <tbody className="divide-y divide-[#414E36]/8">
                     {filteredCustomers.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-5 py-8 text-center text-[#5A6A51]">
+                        <td colSpan={5} className="px-5 py-8 text-center text-[#5A6A51]">
                           No customers found.
                         </td>
                       </tr>
@@ -12854,19 +12852,14 @@ export default function AdminPage() {
                       return (
                         <tr key={uniqueKey} className="transition hover:bg-[#F9F9F7]">
                           <td className="px-5 py-4 font-semibold text-[#1F251A]">
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-xs font-bold font-serif overflow-hidden shrink-0">
-                                {(c.id && customerAvatars[c.id]) || c.avatar_url ? (
-                                  <img src={(c.id && customerAvatars[c.id]) || c.avatar_url || ""} alt={c.name} className="h-full w-full object-cover" />
-                                ) : (
-                                  <span>{c.name ? c.name.charAt(0).toUpperCase() : "P"}</span>
-                                )}
+                            <div>
+                              <span className="block text-sm font-extrabold text-[#1F251A]">{c.name}</span>
+                              <div className="flex flex-col text-xs font-normal text-[#5A6A51] mt-0.5">
+                                {displayPhone !== "—" && <span className="font-mono">{displayPhone}</span>}
+                                {displayEmail !== "—" && <span className="text-[#6B7280]">{displayEmail}</span>}
                               </div>
-                              <span>{c.name}</span>
                             </div>
                           </td>
-                          <td className="px-5 py-4 text-[#1F251A]">{displayPhone}</td>
-                          <td className="px-5 py-4 text-[#5A6A51]">{displayEmail}</td>
                           <td className="px-5 py-4 text-[#5A6A51]">
                             <span className="block font-medium text-[#1F251A]">{dateStr}</span>
                             <span className="text-xs">{timeStr}</span>
