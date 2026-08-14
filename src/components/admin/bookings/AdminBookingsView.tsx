@@ -526,16 +526,6 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             Here's what's happening at Revera Clinics today.
           </p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={onNewBooking}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#1E3A2B] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#162C20] active:scale-95"
-          >
-            <Plus size={16} />
-            <span>New Booking</span>
-          </button>
-        </div>
       </div>
 
       {/* ── 4 ANALYTIC SUMMARY CARDS ── */}
@@ -642,114 +632,56 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </button>
         </div>
 
-        {/* 3 DOTS MENU */}
-        <div className="relative" ref={moreMenuRef}>
+        {/* RIGHT ACTIONS: NEW BOOKING + 3 DOTS MENU */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              setIsMoreMenuOpen(prev => {
-                const nextState = !prev;
-                if (nextState) {
-                  window.dispatchEvent(new CustomEvent("close-admin-dropdowns", { detail: "bookingsMore" }));
-                }
-                return nextState;
-              });
-            }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
-            title="More options"
+            onClick={onNewBooking}
+            className="inline-flex items-center gap-2 rounded-xl bg-[#1E3A2B] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#162C20] active:scale-95 cursor-pointer"
           >
-            <MoreVertical size={18} className="text-[#6B7280]" />
+            <Plus size={16} />
+            <span>New Booking</span>
           </button>
 
-          {isMoreMenuOpen && (
-            <div className="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
-              <button
-                onClick={() => { onPrint?.(); setIsMoreMenuOpen(false); }}
-                className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition"
-              >
-                <Printer size={15} className="text-[#6B7280]" />
-                Print Schedule
-              </button>
-              <div className="mx-4 border-t border-gray-100" />
-              <button
-                onClick={() => { onExportCSV?.(); setIsMoreMenuOpen(false); }}
-                className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition"
-              >
-                <Download size={15} className="text-[#6B7280]" />
-                Export CSV
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+          <div className="relative" ref={moreMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsMoreMenuOpen(prev => {
+                  const nextState = !prev;
+                  if (nextState) {
+                    window.dispatchEvent(new CustomEvent("close-admin-dropdowns", { detail: "bookingsMore" }));
+                  }
+                  return nextState;
+                });
+              }}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95 cursor-pointer"
+              title="More options"
+            >
+              <MoreVertical size={18} className="text-[#6B7280]" />
+            </button>
 
-      {/* ── 4 ANALYTIC SUMMARY CARDS ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        
-        {/* Card 1: Today's Appointments */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              Today's Appointments
-            </span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-[#1E3A2B]">
-              <CalendarIcon size={18} />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-[#111827]">{stats.todayCount}</span>
-            <span className="text-xs font-medium text-[#6B7280]">Next: {stats.nextTime}</span>
-          </div>
-        </div>
-
-        {/* Card 2: Upcoming */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              Upcoming
-            </span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <Clock size={18} />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-[#111827]">{stats.upcomingCount}</span>
-            <span className="text-xs font-semibold text-blue-600">Active</span>
+            {isMoreMenuOpen && (
+              <div className="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+                <button
+                  onClick={() => { onPrint?.(); setIsMoreMenuOpen(false); }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer"
+                >
+                  <Printer size={15} className="text-[#6B7280]" />
+                  Print Schedule
+                </button>
+                <div className="mx-4 border-t border-gray-100" />
+                <button
+                  onClick={() => { onExportCSV?.(); setIsMoreMenuOpen(false); }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer"
+                >
+                  <Download size={15} className="text-[#6B7280]" />
+                  Export CSV
+                </button>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Card 3: Completed */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              Completed
-            </span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
-              <CheckCircle2 size={18} />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-[#111827]">{stats.completedCount}</span>
-            <span className="text-xs font-semibold text-teal-600">Sessions</span>
-          </div>
-        </div>
-
-        {/* Card 4: Canceled */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              Canceled
-            </span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-              <XCircle size={18} />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-[#111827]">{stats.canceledCount}</span>
-            <span className="text-xs font-semibold text-rose-600">Cancellations</span>
-          </div>
-        </div>
-
       </div>
 
       {/* ── CONDITIONAL VIEW: PENDING APPROVALS or CALENDAR+SCHEDULE ── */}
