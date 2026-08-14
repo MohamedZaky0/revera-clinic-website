@@ -229,6 +229,9 @@ type Customer = {
   street_name?: string | null;
   building_no?: string | null;
   floor_no?: string | null;
+  city?: string | null;
+  street?: string | null;
+  building?: string | null;
   note?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -11053,7 +11056,6 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <h3 className="text-2xl font-bold text-[#1F251A] leading-tight">{viewingCustomerProfile.name}</h3>
-                        <p className="text-xs text-[#5A6A51] mt-0.5">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "No phone"} • Patient Profile & Clinic Engagement History</p>
                         <div className="mt-2">
                           <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                             viewingCustomerProfile.active !== false ? "bg-[#EDF1EC] text-[#414E36]" : "bg-red-50 text-red-600"
@@ -11162,27 +11164,50 @@ export default function AdminPage() {
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
                             <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
                           </div>
-                          <div>
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Profile Status</span>
-                            <span className={`inline-flex items-center gap-1 text-xs font-bold ${
-                              viewingCustomerProfile.active !== false ? "text-green-700" : "text-gray-400"
-                            }`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-green-600" : "bg-gray-400"}`} />
-                              {viewingCustomerProfile.active !== false ? "Active Patient" : "Inactive"}
-                            </span>
-                          </div>
-                          <div className="col-span-2">
-                            <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Address</span>
-                            <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
-                              {viewingCustomerProfile.address || [
-                                viewingCustomerProfile.building_no,
-                                viewingCustomerProfile.street_name,
-                                viewingCustomerProfile.floor_no,
-                                viewingCustomerProfile.area,
-                                viewingCustomerProfile.location_name
-                              ].filter(Boolean).join(", ") || "—"}
-                            </span>
-                          </div>
+
+                          {/* Divided Address into City, Street, Building */}
+                          {(() => {
+                            let cCity = viewingCustomerProfile.city || viewingCustomerProfile.area || viewingCustomerProfile.location_name || "";
+                            let cStreet = viewingCustomerProfile.street || viewingCustomerProfile.street_name || "";
+                            let cBuilding = viewingCustomerProfile.building || viewingCustomerProfile.building_no || viewingCustomerProfile.floor_no || "";
+
+                            if (!cCity && !cStreet && !cBuilding && viewingCustomerProfile.address) {
+                              const parts = viewingCustomerProfile.address.split(",").map((s: string) => s.trim()).filter(Boolean);
+                              if (parts.length >= 3) {
+                                cCity = parts[0];
+                                cStreet = parts[1];
+                                cBuilding = parts[2];
+                              } else if (parts.length === 2) {
+                                cCity = parts[0];
+                                cStreet = parts[1];
+                              } else if (parts.length === 1) {
+                                cCity = parts[0];
+                              }
+                            }
+
+                            return (
+                              <>
+                                <div>
+                                  <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">City</span>
+                                  <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
+                                    {cCity || "—"}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Street</span>
+                                  <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
+                                    {cStreet || "—"}
+                                  </span>
+                                </div>
+                                <div className="col-span-2 sm:col-span-1">
+                                  <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Building</span>
+                                  <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
+                                    {cBuilding || "—"}
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          })()}
                           {viewingCustomerProfile.note && (
                             <div className="col-span-2">
                               <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Notes & Observations</span>
@@ -12650,9 +12675,19 @@ export default function AdminPage() {
                       <hr className="border-[#414E36]/10" />
                       <div>
                         <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Address & Location Details</h4>
-                        <div>
-                          <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Address</label>
-                          <input type="text" value={custAddress} onChange={(e) => setCustAddress(e.target.value)} placeholder="e.g. Tagamoa, Street 90, Building 14" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">City / Area</label>
+                            <input type="text" value={custArea} onChange={(e) => setCustArea(e.target.value)} placeholder="e.g. New Cairo" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Street</label>
+                            <input type="text" value={custStreet} onChange={(e) => setCustStreet(e.target.value)} placeholder="e.g. 90th Street" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Building</label>
+                            <input type="text" value={custBuilding} onChange={(e) => setCustBuilding(e.target.value)} placeholder="e.g. Building 14" className="w-full rounded-lg border border-[#414E36]/15 bg-white px-3 py-2 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C]" />
+                          </div>
                         </div>
                       </div>
                       <hr className="border-[#414E36]/10" />
