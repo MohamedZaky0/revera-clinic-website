@@ -535,77 +535,151 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             <Plus size={16} />
             <span>New Booking</span>
           </button>
+        </div>
+      </div>
 
-          {/* ── VIEW MODE TOGGLE ── */}
-          <div className="inline-flex items-center rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <button
-              onClick={() => setViewMode("pending")}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
-                viewMode === "pending"
-                  ? "bg-[#C4AE7C] text-[#414E36]"
-                  : "text-[#374151] hover:bg-gray-50"
-              }`}
-            >
-              <Clock size={15} />
-              <span>Pending</span>
-              {pendingApprovalsCount > 0 && (
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold bg-[#EF4444] text-white">
-                  {pendingApprovalsCount}
-                </span>
-              )}
-            </button>
-            <div className="w-px h-8 bg-gray-200" />
-            <button
-              onClick={() => setViewMode("calendar")}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
-                viewMode === "calendar"
-                  ? "bg-[#C4AE7C] text-[#414E36]"
-                  : "text-[#374151] hover:bg-gray-50"
-              }`}
-            >
-              <CalendarIcon size={15} />
-              <span>Calendar View</span>
-            </button>
+      {/* ── 4 ANALYTIC SUMMARY CARDS ── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        
+        {/* Card 1: Today's Appointments */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+              Today's Appointments
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-[#1E3A2B]">
+              <CalendarIcon size={18} />
+            </div>
           </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-[#111827]">{stats.todayCount}</span>
+            <span className="text-xs font-medium text-[#6B7280]">Next: {stats.nextTime}</span>
+          </div>
+        </div>
 
-          {/* ── MORE DROPDOWN ── */}
-          <div className="relative" ref={moreMenuRef}>
-            <button
-              onClick={() => {
-                setIsMoreMenuOpen(prev => {
-                  const nextState = !prev;
-                  if (nextState) {
-                    window.dispatchEvent(new CustomEvent("close-admin-dropdowns", { detail: "bookingsMore" }));
-                  }
-                  return nextState;
-                });
-              }}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
-            >
-              <MoreVertical size={16} className="text-[#6B7280]" />
-              <span>More</span>
-            </button>
+        {/* Card 2: Upcoming */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+              Upcoming
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Clock size={18} />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-[#111827]">{stats.upcomingCount}</span>
+            <span className="text-xs font-semibold text-blue-600">Active</span>
+          </div>
+        </div>
 
-            {isMoreMenuOpen && (
-              <div className="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
-                <button
-                  onClick={() => { onPrint?.(); setIsMoreMenuOpen(false); }}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition"
-                >
-                  <Printer size={15} className="text-[#6B7280]" />
-                  Print Schedule
-                </button>
-                <div className="mx-4 border-t border-gray-100" />
-                <button
-                  onClick={() => { onExportCSV?.(); setIsMoreMenuOpen(false); }}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition"
-                >
-                  <Download size={15} className="text-[#6B7280]" />
-                  Export CSV
-                </button>
-              </div>
+        {/* Card 3: Completed */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+              Completed
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
+              <CheckCircle2 size={18} />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-[#111827]">{stats.completedCount}</span>
+            <span className="text-xs font-semibold text-teal-600">Finished</span>
+          </div>
+        </div>
+
+        {/* Card 4: Canceled */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+              Canceled
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+              <XCircle size={18} />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-[#111827]">{stats.canceledCount}</span>
+            <span className="text-xs font-semibold text-rose-600">Cancelled / Postponed</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CONTROLS BAR (DIRECTLY ABOVE CALENDAR & TABLE) ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        {/* VIEW MODE TOGGLE */}
+        <div className="inline-flex items-center rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setViewMode("pending")}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
+              viewMode === "pending"
+                ? "bg-[#C4AE7C] text-[#414E36]"
+                : "text-[#374151] hover:bg-gray-50"
+            }`}
+          >
+            <Clock size={15} />
+            <span>Pending</span>
+            {pendingApprovalsCount > 0 && (
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold bg-[#EF4444] text-white">
+                {pendingApprovalsCount}
+              </span>
             )}
-          </div>
+          </button>
+          <div className="w-px h-8 bg-gray-200" />
+          <button
+            type="button"
+            onClick={() => setViewMode("calendar")}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
+              viewMode === "calendar"
+                ? "bg-[#C4AE7C] text-[#414E36]"
+                : "text-[#374151] hover:bg-gray-50"
+            }`}
+          >
+            <CalendarIcon size={15} />
+            <span>Calendar View</span>
+          </button>
+        </div>
+
+        {/* 3 DOTS MENU */}
+        <div className="relative" ref={moreMenuRef}>
+          <button
+            type="button"
+            onClick={() => {
+              setIsMoreMenuOpen(prev => {
+                const nextState = !prev;
+                if (nextState) {
+                  window.dispatchEvent(new CustomEvent("close-admin-dropdowns", { detail: "bookingsMore" }));
+                }
+                return nextState;
+              });
+            }}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95"
+            title="More options"
+          >
+            <MoreVertical size={18} className="text-[#6B7280]" />
+          </button>
+
+          {isMoreMenuOpen && (
+            <div className="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+              <button
+                onClick={() => { onPrint?.(); setIsMoreMenuOpen(false); }}
+                className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition"
+              >
+                <Printer size={15} className="text-[#6B7280]" />
+                Print Schedule
+              </button>
+              <div className="mx-4 border-t border-gray-100" />
+              <button
+                onClick={() => { onExportCSV?.(); setIsMoreMenuOpen(false); }}
+                className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition"
+              >
+                <Download size={15} className="text-[#6B7280]" />
+                Export CSV
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
