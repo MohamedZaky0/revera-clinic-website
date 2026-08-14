@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Star,
   X
 } from "lucide-react";
 
@@ -37,6 +38,7 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
 }) => {
   // State
   const [scheduleType, setScheduleType] = useState<"In-Clinic" | "Online">("In-Clinic");
+  const [selectedScheduleBranch, setSelectedScheduleBranch] = useState<string>("All");
   const [visitSearch, setVisitSearch] = useState("");
   const [dateFilter, setDateFilter] = useState<"Today" | "This Week" | "This Month" | "Custom">("This Month");
   const [customStartDate, setCustomStartDate] = useState("");
@@ -431,101 +433,107 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
         </button>
       </div>
 
-      {/* ── DOCTOR HERO CARD ── */}
-      <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-[0_10px_30px_rgba(47,61,41,0.03)]">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-          {/* Avatar with Status Dot */}
-          <div className="relative h-20 w-20 shrink-0">
-            {doctorAvatar && typeof doctorAvatar === "string" && doctorAvatar.trim() ? (
-              <img
-                src={doctorAvatar}
-                alt={doctorName}
-                className="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md"
+      {/* ── DOCTOR HERO CARD (WITH INTEGRATED PERSONAL INFORMATION) ── */}
+      <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-[0_10px_30px_rgba(47,61,41,0.03)] space-y-6">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          {/* Primary Profile Identity */}
+          <div className="flex items-center gap-5 shrink-0">
+            <div className="relative h-20 w-20 shrink-0">
+              {doctorAvatar && typeof doctorAvatar === "string" && doctorAvatar.trim() ? (
+                <img
+                  src={doctorAvatar}
+                  alt={doctorName}
+                  className="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md"
+                />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#1E3A2B] text-white text-2xl font-bold uppercase border-2 border-white shadow-md">
+                  {doctorName ? doctorName.replace(/^Dr\.\s*/i, "").charAt(0) : "D"}
+                </div>
+              )}
+              <span
+                className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-emerald-500 border-2 border-white"
+                title="Active / Online"
               />
-            ) : (
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#1E3A2B] text-white text-2xl font-bold uppercase border-2 border-white shadow-md">
-                {doctorName ? doctorName.replace(/^Dr\.\s*/i, "").charAt(0) : "D"}
-              </div>
-            )}
-            <span
-              className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-emerald-500 border-2 border-white"
-              title="Active / Online"
-            />
-          </div>
-
-          {/* Info Details */}
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-bold text-[#1F251A]">{doctorName}</h1>
-              <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200/60">
-                Active
-              </span>
             </div>
 
-            <p className="text-xs font-medium text-[#5A6A51]">
-              {doctorSpecialty}
-            </p>
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-bold text-[#1F251A]">{doctorName}</h1>
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200/60">
+                  Active
+                </span>
+              </div>
 
-            <div className="pt-1">
-              <span className="inline-flex items-center rounded-lg bg-[#F7F7F9] px-2.5 py-1 text-[11px] font-semibold text-[#374151] border border-gray-100">
-                Employee ID: {doctorEmployeeId}
+              <p className="text-xs font-medium text-[#5A6A51]">
+                {doctorSpecialty}
+              </p>
+
+              <div className="pt-1">
+                <span className="inline-flex items-center rounded-lg bg-[#F7F7F9] px-2.5 py-1 text-[11px] font-semibold text-[#374151] border border-gray-100">
+                  Employee ID: {doctorEmployeeId}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Vertical Divider for Desktop */}
+          <div className="hidden lg:block h-16 w-px bg-gray-100 mx-2" />
+
+          {/* Integrated Personal Information Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs bg-[#FBFBF9] p-4 rounded-2xl border border-gray-100 flex-1">
+            <div>
+              <span className="text-[#9CA3AF] block mb-0.5 text-[11px] font-medium">Specialty / Role</span>
+              <span className="font-semibold text-[#1F251A]">{doctorSubSpecialty}</span>
+            </div>
+
+            <div>
+              <span className="text-[#9CA3AF] block mb-0.5 text-[11px] font-medium">Employment Type</span>
+              <span className="font-semibold text-[#1F251A]">{employmentType}</span>
+            </div>
+
+            <div>
+              <span className="text-[#9CA3AF] block mb-0.5 text-[11px] font-medium">Languages</span>
+              <span className="font-semibold text-[#1F251A]">{languages}</span>
+            </div>
+
+            <div>
+              <span className="text-[#9CA3AF] block mb-0.5 text-[11px] font-medium">Rating</span>
+              <span className="inline-flex items-center gap-1 font-semibold text-[#1F251A]">
+                <Star size={12} className="text-[#C4AE7C] fill-[#C4AE7C]" />
+                {doctor?.rating || "5.0"}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── MIDDLE SECTION: PERSONAL INFO & WORKING SCHEDULE ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Card 1: Personal Information */}
-        <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-[0_10px_30px_rgba(47,61,41,0.03)] flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2.5 border-b border-gray-100 pb-4 mb-5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F2EFE9] text-[#1E3A2B]">
-                <User size={16} />
-              </div>
-              <h2 className="text-base font-bold text-[#1F251A]">Personal Information</h2>
+      {/* ── WORKING SCHEDULE (FULL WIDTH WITH BRANCH FILTER) ── */}
+      <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-[0_10px_30px_rgba(47,61,41,0.03)] w-full">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-4 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F2EFE9] text-[#1E3A2B]">
+              <Clock size={16} />
             </div>
-
-            <div className="grid grid-cols-2 gap-y-4 gap-x-4 text-xs">
-              <div>
-                <span className="text-[#9CA3AF] block mb-1 font-medium">Full Name</span>
-                <span className="font-semibold text-[#1F251A]">{doctorName}</span>
-              </div>
-
-              <div>
-                <span className="text-[#9CA3AF] block mb-1 font-medium">Specialty</span>
-                <span className="font-semibold text-[#1F251A]">{doctorSubSpecialty}</span>
-              </div>
-
-              <div>
-                <span className="text-[#9CA3AF] block mb-1 font-medium">Employment Type</span>
-                <span className="font-semibold text-[#1F251A]">{employmentType}</span>
-              </div>
-
-              <div>
-                <span className="text-[#9CA3AF] block mb-1 font-medium">Languages</span>
-                <span className="font-semibold text-[#1F251A]">{languages}</span>
-              </div>
-
-              <div>
-                <span className="text-[#9CA3AF] block mb-1 font-medium">Status</span>
-                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
-                  Active
-                </span>
-              </div>
+            <div>
+              <h2 className="text-base font-bold text-[#1F251A]">Working Schedule</h2>
+              <p className="text-[11px] text-[#5A6A51]">View weekly working hours per branch</p>
             </div>
           </div>
-        </div>
 
-        {/* Card 2: Working Schedule */}
-        <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-[0_10px_30px_rgba(47,61,41,0.03)]">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F2EFE9] text-[#1E3A2B]">
-                <Clock size={16} />
-              </div>
-              <h2 className="text-base font-bold text-[#1F251A]">Working Schedule</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Branch Filter Selector */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-[#5A6A51]">Branch:</span>
+              <select
+                value={selectedScheduleBranch}
+                onChange={(e) => setSelectedScheduleBranch(e.target.value)}
+                className="rounded-xl border border-gray-200 bg-[#F7F7F9] px-3 py-1.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] shadow-2xs cursor-pointer"
+              >
+                <option value="All">All Branches</option>
+                {doctorBranches.map((bName: string) => (
+                  <option key={bName} value={bName}>{bName}</option>
+                ))}
+              </select>
             </div>
 
             {/* In-Clinic / Online Toggle */}
@@ -553,33 +561,42 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Schedule Table */}
-          <div className="overflow-hidden rounded-2xl border border-gray-100">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-[#F7F7F9] text-[11px] font-semibold text-[#9CA3AF] border-b border-gray-100">
-                  <th className="py-2.5 px-4 font-semibold w-1/4">Day</th>
-                  <th className="py-2.5 px-4 font-semibold w-3/4">Working Hours ({scheduleType})</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 text-[#374151]">
-                {activeSchedule.map((item: any, idx: number) => (
+        {/* Schedule Table */}
+        <div className="overflow-hidden rounded-2xl border border-gray-100">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-[#F7F7F9] text-[11px] font-semibold text-[#9CA3AF] border-b border-gray-100">
+                <th className="py-2.5 px-4 font-semibold w-1/5">Day</th>
+                <th className="py-2.5 px-4 font-semibold w-4/5">
+                  Working Hours ({scheduleType} {selectedScheduleBranch !== "All" ? `• ${selectedScheduleBranch}` : ""})
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 text-[#374151]">
+              {activeSchedule.map((item: any, idx: number) => {
+                const displayShifts = item.shifts.filter((shiftObj: any) => {
+                  if (selectedScheduleBranch === "All") return true;
+                  return (shiftObj.branchName || "").toLowerCase() === selectedScheduleBranch.toLowerCase();
+                });
+
+                return (
                   <tr key={item.day || idx} className="hover:bg-gray-50/50">
                     <td className="py-3 px-4 font-semibold text-[#1F251A] align-middle">{item.day}</td>
                     <td className="py-3 px-4 font-medium align-middle">
-                      {!item.shifts || item.shifts.length === 0 ? (
+                      {displayShifts.length === 0 ? (
                         <span className="inline-block rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
                           Off
                         </span>
                       ) : (
                         <div className="flex flex-wrap items-center gap-2.5">
-                          {item.shifts.map((shiftObj: any, sIdx: number) => (
+                          {displayShifts.map((shiftObj: any, sIdx: number) => (
                             <div
                               key={sIdx}
                               className="flex flex-col gap-0.5 rounded-xl border border-[#E6E9EB] bg-[#F2EFE9]/60 px-3 py-1.5 transition hover:bg-[#F2EFE9]"
                             >
-                              {shiftObj.branchName ? (
+                              {selectedScheduleBranch === "All" && shiftObj.branchName ? (
                                 <span className="text-[9px] font-bold uppercase tracking-wider text-[#5A6A51]">
                                   {shiftObj.branchName}
                                 </span>
@@ -593,67 +610,37 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
                       )}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* ── THIRD SECTION: SERVICES & BRANCHES ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Services Provided Card (Spans 2 cols) */}
-        <div className="lg:col-span-2 rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-[0_10px_30px_rgba(47,61,41,0.03)]">
-          <div className="flex items-center gap-2.5 border-b border-gray-100 pb-4 mb-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F2EFE9] text-[#1E3A2B]">
-              <ShoppingBag size={16} />
-            </div>
-            <h2 className="text-base font-bold text-[#1F251A]">Services & Branches</h2>
+      {/* ── SERVICES PROVIDED CARD ── */}
+      <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-[0_10px_30px_rgba(47,61,41,0.03)] w-full">
+        <div className="flex items-center gap-2.5 border-b border-gray-100 pb-4 mb-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F2EFE9] text-[#1E3A2B]">
+            <ShoppingBag size={16} />
           </div>
-
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#9CA3AF]">
-              Services Provided
-            </h3>
-
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              {servicesProvided.length === 0 ? (
-                <span className="text-xs font-medium text-[#9CA3AF]">
-                  No specific services assigned to this provider.
-                </span>
-              ) : (
-                servicesProvided.map((service: string, idx: number) => (
-                  <span
-                    key={idx}
-                    className="rounded-xl border border-gray-100 bg-[#F7F7F9] px-3.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#F2EFE9] transition"
-                  >
-                    {service}
-                  </span>
-                ))
-              )}
-            </div>
-          </div>
+          <h2 className="text-base font-bold text-[#1F251A]">Services Provided</h2>
         </div>
 
-        {/* Branches Card (Spans 1 col) */}
-        <div className="rounded-[32px] border border-[#E6E9EB] bg-white p-6 shadow-[0_10px_30px_rgba(47,61,41,0.03)]">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[#9CA3AF] mb-4">
-            Branches
-          </h3>
-
-          <div className="space-y-2.5">
-            {doctorBranches.map((bName: string, idx: number) => (
-              <div
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {servicesProvided.length === 0 ? (
+            <span className="text-xs font-medium text-[#9CA3AF]">
+              No specific services assigned to this provider.
+            </span>
+          ) : (
+            servicesProvided.map((service: string, idx: number) => (
+              <span
                 key={idx}
-                className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-[#F7F7F9] p-3 transition hover:border-gray-200"
+                className="rounded-xl border border-gray-100 bg-[#F7F7F9] px-3.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#F2EFE9] transition"
               >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-white text-[#1E3A2B] shadow-xs">
-                  <MapPin size={14} />
-                </div>
-                <span className="text-xs font-bold text-[#1F251A]">{bName}</span>
-              </div>
-            ))}
-          </div>
+                {service}
+              </span>
+            ))
+          )}
         </div>
       </div>
 
