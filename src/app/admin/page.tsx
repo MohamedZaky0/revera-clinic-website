@@ -1479,6 +1479,7 @@ export default function AdminPage() {
   const [customerFilterReferral, setCustomerFilterReferral] = useState("All");
   const [showImportCustomersModal, setShowImportCustomersModal] = useState(false);
   const [showCustomerMoreMenu, setShowCustomerMoreMenu] = useState(false);
+  const [activeCustomerRowMenuId, setActiveCustomerRowMenuId] = useState<string | null>(null);
   const customerMoreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1486,6 +1487,7 @@ export default function AdminPage() {
       if (customerMoreMenuRef.current && !customerMoreMenuRef.current.contains(event.target as Node)) {
         setShowCustomerMoreMenu(false);
       }
+      setActiveCustomerRowMenuId(null);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -12708,19 +12710,9 @@ export default function AdminPage() {
                   </div>
                   
                   <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={() => setShowCustomerFilterPanel(prev => !prev)}
-                      className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition cursor-pointer ${
-                        showCustomerFilterPanel || customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All"
-                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
-                          : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
-                      }`}
-                    >
-                      <Filter size={14} /> Filter
-                      {(customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All") && (
-                        <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
-                      )}
-                    </button>
+                    <div className="text-xs text-[#5A6A51] border border-[#414E36]/15 bg-[#F9F9F7] px-3.5 py-2 rounded-xl font-medium flex items-center gap-1">
+                      Total Patients: <span className="font-bold text-[#1F251A]">{filteredCustomers.length}</span>
+                    </div>
 
                     {hasPermission("customers.create") && (
                       <button
@@ -12796,9 +12788,19 @@ export default function AdminPage() {
                       className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:bg-white focus:ring-2 focus:ring-[#C4AE7C]/15"
                     />
                   </div>
-                  <div className="text-xs text-[#5A6A51] ml-auto">
-                    Total Patients: <span className="font-bold text-[#1F251A]">{filteredCustomers.length}</span>
-                  </div>
+                  <button
+                    onClick={() => setShowCustomerFilterPanel(prev => !prev)}
+                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition cursor-pointer ml-auto ${
+                      showCustomerFilterPanel || customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All"
+                        ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                        : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
+                    }`}
+                  >
+                    <Filter size={14} /> Filter
+                    {(customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All") && (
+                      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                    )}
+                  </button>
                 </div>
               </div>
 
@@ -12922,18 +12924,54 @@ export default function AdminPage() {
                             </span>
                           </td>
                           <td className="px-4 py-4 text-center">
-                            {hasPermission("customers.edit") && (
+                            <div className="relative inline-block text-left">
                               <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleOpenEditCustomer(c);
+                                  setActiveCustomerRowMenuId(prev => prev === uniqueKey ? null : uniqueKey);
                                 }}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                title="Edit Customer"
+                                className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer ${
+                                  activeCustomerRowMenuId === uniqueKey
+                                    ? "border-[#414E36] bg-[#414E36] text-white"
+                                    : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                }`}
+                                title="Actions"
                               >
-                                <Pencil size={12} />
+                                <MoreVertical size={13} />
                               </button>
-                            )}
+
+                              {activeCustomerRowMenuId === uniqueKey && (
+                                <div className="absolute right-0 top-8 z-50 w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left">
+                                  {hasPermission("customers.edit") && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveCustomerRowMenuId(null);
+                                        handleOpenEditCustomer(c);
+                                      }}
+                                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                    >
+                                      <Pencil size={13} className="text-[#5A6A51]" />
+                                      <span>Edit Patient</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveCustomerRowMenuId(null);
+                                      setViewingCustomerProfile(c);
+                                    }}
+                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                  >
+                                    <User size={13} className="text-[#5A6A51]" />
+                                    <span>View Profile</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
