@@ -1483,6 +1483,7 @@ export default function AdminPage() {
   const [showImportCustomersModal, setShowImportCustomersModal] = useState(false);
   const [showCustomerMoreMenu, setShowCustomerMoreMenu] = useState(false);
   const [activeCustomerRowMenuId, setActiveCustomerRowMenuId] = useState<string | null>(null);
+  const [activeDoctorRowMenuId, setActiveDoctorRowMenuId] = useState<string | null>(null);
   const customerMoreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1491,6 +1492,7 @@ export default function AdminPage() {
         setShowCustomerMoreMenu(false);
       }
       setActiveCustomerRowMenuId(null);
+      setActiveDoctorRowMenuId(null);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -8836,13 +8838,13 @@ export default function AdminPage() {
                       <button
                         onClick={() => setShowProviderFilterPanel(prev => !prev)}
                         className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
-                          showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()
+                          showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All"
                             ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
                             : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
                         }`}
                       >
                         <Filter size={14} /> Filter
-                        {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All" || providerSearchQuery.trim()) && (
+                        {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All") && (
                           <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
                         )}
                       </button>
@@ -8859,24 +8861,23 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  {/* Search Bar Row above Table */}
+                  <div className="flex flex-wrap items-center gap-3 border-t border-[#414E36]/5 pt-4">
+                    <div className="relative flex-1 max-w-md">
+                      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] z-10 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={providerSearchQuery}
+                        onChange={(e) => setProviderSearchQuery(e.target.value)}
+                        placeholder="Search doctor by name, specialty..."
+                        className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:bg-white focus:ring-2 focus:ring-[#C4AE7C]/15"
+                      />
+                    </div>
+                  </div>
+
                 {/* Dynamic Filters Drawer */}
                 {showProviderFilterPanel && (
-                  <div className="mb-6 grid grid-cols-1 gap-4 rounded-3xl border border-[#414E36]/10 bg-[#F9F9F7] p-5 md:grid-cols-4 items-end shadow-sm animate-fadeIn">
-                    {/* Search Input */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Search Doctor</label>
-                      <div className="relative">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
-                        <input
-                          type="text"
-                          value={providerSearchQuery}
-                          onChange={(e) => setProviderSearchQuery(e.target.value)}
-                          placeholder="Search name, specialty..."
-                          className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-1 focus:ring-[#C4AE7C]"
-                        />
-                      </div>
-                    </div>
-
+                  <div className="mb-6 grid grid-cols-1 gap-4 rounded-3xl border border-[#414E36]/10 bg-[#F9F9F7] p-5 md:grid-cols-3 items-end shadow-sm animate-fadeIn">
                     {/* Branch Dropdown */}
                     <div className="flex flex-col gap-1.5">
                       <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Branch</label>
@@ -8962,7 +8963,11 @@ export default function AdminPage() {
                             const hasMore = provider.services.length > 2;
 
                             return (
-                              <tr key={docKey} className="transition hover:bg-[#F9F9F7]">
+                              <tr
+                                key={docKey}
+                                onClick={() => setViewingDoctorDetails(provider)}
+                                className="transition hover:bg-[#F9F9F7] cursor-pointer"
+                              >
                                 <td className="px-5 py-4 font-semibold text-[#1F251A]">
                                   <div className="flex items-center gap-3">
                                     <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden">
@@ -9005,31 +9010,54 @@ export default function AdminPage() {
                                   </span>
                                 </td>
                                 <td className="px-4 py-4 text-center">
-                                  <div className="flex items-center justify-center gap-1.5">
+                                  <div className="relative inline-block text-left">
                                     <button
-                                      onClick={() => setViewingDoctorDetails(provider)}
-                                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                      title="Doctor Info Details"
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDoctorRowMenuId(prev => prev === docKey ? null : docKey);
+                                      }}
+                                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer ${
+                                        activeDoctorRowMenuId === docKey
+                                          ? "border-[#414E36] bg-[#414E36] text-white"
+                                          : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                      }`}
+                                      title="Actions"
                                     >
-                                      <Info size={14} />
+                                      <MoreVertical size={13} />
                                     </button>
-                                    {provider.id && hasPermission("providers.delete") && (
-                                      <button
-                                        onClick={() => handleDeleteProvider(provider.id)}
-                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-red-200/60 text-red-600 transition hover:bg-red-50 hover:border-red-300"
-                                        title="Delete Provider"
-                                      >
-                                        <Trash2 size={14} />
-                                      </button>
-                                    )}
-                                    {hasPermission("providers.edit") && (
-                                      <button
-                                        onClick={() => openEditProviderModal(provider)}
-                                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                        title="Edit Provider"
-                                      >
-                                        <Pencil size={13} />
-                                      </button>
+
+                                    {activeDoctorRowMenuId === docKey && (
+                                      <div className="absolute right-0 top-8 z-50 w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left">
+                                        {hasPermission("providers.edit") && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveDoctorRowMenuId(null);
+                                              openEditProviderModal(provider);
+                                            }}
+                                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                          >
+                                            <Pencil size={13} className="text-[#5A6A51]" />
+                                            <span>Edit Doctor</span>
+                                          </button>
+                                        )}
+                                        {provider.id && hasPermission("providers.delete") && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveDoctorRowMenuId(null);
+                                              handleDeleteProvider(provider.id);
+                                            }}
+                                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
+                                          >
+                                            <Trash2 size={13} className="text-red-600" />
+                                            <span>Delete Doctor</span>
+                                          </button>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                 </td>
