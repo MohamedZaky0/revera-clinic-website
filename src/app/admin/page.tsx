@@ -1486,10 +1486,15 @@ export default function AdminPage() {
   const [activeDoctorRowMenuId, setActiveDoctorRowMenuId] = useState<string | null>(null);
   const [activeServiceRowMenuId, setActiveServiceRowMenuId] = useState<string | number | null>(null);
   const [activeDeviceRowMenuId, setActiveDeviceRowMenuId] = useState<string | number | null>(null);
+  const [activeProductRowMenuId, setActiveProductRowMenuId] = useState<string | number | null>(null);
   const customerMoreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target && target.closest(".dropdown-action-menu")) {
+        return;
+      }
       if (customerMoreMenuRef.current && !customerMoreMenuRef.current.contains(event.target as Node)) {
         setShowCustomerMoreMenu(false);
       }
@@ -1497,6 +1502,7 @@ export default function AdminPage() {
       setActiveDoctorRowMenuId(null);
       setActiveServiceRowMenuId(null);
       setActiveDeviceRowMenuId(null);
+      setActiveProductRowMenuId(null);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -9016,7 +9022,7 @@ export default function AdminPage() {
                                   </span>
                                 </td>
                                 <td className="px-4 py-4 text-center">
-                                  <div className="relative inline-block text-left">
+                                  <div className="dropdown-action-menu relative inline-block text-left">
                                     <button
                                       type="button"
                                       onClick={(e) => {
@@ -9034,7 +9040,7 @@ export default function AdminPage() {
                                     </button>
 
                                     {activeDoctorRowMenuId === docKey && (
-                                      <div className="absolute right-0 top-8 z-50 w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left">
+                                      <div className="absolute right-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left">
                                         {hasPermission("providers.edit") && (
                                           <button
                                             type="button"
@@ -13085,7 +13091,7 @@ export default function AdminPage() {
                             </span>
                           </td>
                           <td className="px-4 py-4 text-center">
-                            <div className="relative inline-block text-left">
+                            <div className="dropdown-action-menu relative inline-block text-left">
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -13103,7 +13109,7 @@ export default function AdminPage() {
                               </button>
 
                               {activeCustomerRowMenuId === uniqueKey && (
-                                <div className="absolute right-0 top-8 z-50 w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left">
+                                <div className="absolute right-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left">
                                   {hasPermission("customers.edit") && (
                                     <button
                                       type="button"
