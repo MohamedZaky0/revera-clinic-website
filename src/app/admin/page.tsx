@@ -1485,6 +1485,7 @@ export default function AdminPage() {
   const [activeCustomerRowMenuId, setActiveCustomerRowMenuId] = useState<string | null>(null);
   const [activeDoctorRowMenuId, setActiveDoctorRowMenuId] = useState<string | null>(null);
   const [activeServiceRowMenuId, setActiveServiceRowMenuId] = useState<string | number | null>(null);
+  const [activeDeviceRowMenuId, setActiveDeviceRowMenuId] = useState<string | number | null>(null);
   const customerMoreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1495,6 +1496,7 @@ export default function AdminPage() {
       setActiveCustomerRowMenuId(null);
       setActiveDoctorRowMenuId(null);
       setActiveServiceRowMenuId(null);
+      setActiveDeviceRowMenuId(null);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -17723,72 +17725,102 @@ export default function AdminPage() {
                                         : "N/A"}
                                     </td>
 
-                                    {/* Actions */}
-                                    <td className="px-6 py-5 text-right">
-                                      <div className="flex items-center justify-end gap-2">
-                                        <button
-                                          type="button"
-                                          title="Update Current Pulse Count"
-                                          onClick={() => {
-                                            setSelectedDeviceForPulses(dev);
-                                            setNewPulseCountInput(String(dev.current_pulse_count || 0));
-                                            setShowUpdatePulsesModal(true);
-                                          }}
-                                          className="inline-flex items-center gap-1 rounded-xl bg-[#EBF0E6] px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#dce5d4] transition"
-                                        >
-                                          <Gauge size={13} /> Update Pulses
-                                        </button>
+                                     {/* Actions 3-Dots Dropdown Menu */}
+                                     <td className="px-6 py-5 text-right">
+                                       <div className="relative inline-block text-left">
+                                         <button
+                                           type="button"
+                                           onClick={(e) => {
+                                             e.stopPropagation();
+                                             setActiveDeviceRowMenuId(prev => prev === dev.id ? null : dev.id);
+                                           }}
+                                           className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border transition cursor-pointer ${
+                                             activeDeviceRowMenuId === dev.id
+                                               ? "border-[#414E36] bg-[#414E36] text-white"
+                                               : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
+                                           }`}
+                                           title="Actions"
+                                         >
+                                           <MoreVertical size={14} />
+                                         </button>
 
-                                        <button
-                                          type="button"
-                                          title="Reset Pulse Counter & Record Maintenance"
-                                          onClick={() => {
-                                            setSelectedDeviceForReset(dev);
-                                            setResetReason("Routine Maintenance");
-                                            setResetPerformedBy("");
-                                            setResetNotes("");
-                                            setShowResetPulsesModal(true);
-                                          }}
-                                          className="inline-flex items-center gap-1 rounded-xl bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition"
-                                        >
-                                          <RotateCcw size={13} /> Reset Counter
-                                        </button>
+                                         {activeDeviceRowMenuId === dev.id && (
+                                           <div className="absolute right-0 top-9 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left">
+                                             <button
+                                               type="button"
+                                               onClick={(e) => {
+                                                 e.stopPropagation();
+                                                 setActiveDeviceRowMenuId(null);
+                                                 setSelectedDeviceForPulses(dev);
+                                                 setNewPulseCountInput(String(dev.current_pulse_count || 0));
+                                                 setShowUpdatePulsesModal(true);
+                                               }}
+                                               className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                             >
+                                               <Gauge size={14} className="text-[#414E36]" />
+                                               <span>Update Pulses</span>
+                                             </button>
 
-                                        <button
-                                          type="button"
-                                          title="View Maintenance History"
-                                          onClick={() => {
-                                            setSelectedDeviceForHistory(dev);
-                                            setShowDeviceHistoryModal(true);
-                                          }}
-                                          className="p-1.5 rounded-xl border border-[#E6E9EB] text-[#5A6A51] hover:bg-[#F4F6F4] transition"
-                                        >
-                                          <History size={14} />
-                                        </button>
+                                             <button
+                                               type="button"
+                                               onClick={(e) => {
+                                                 e.stopPropagation();
+                                                 setActiveDeviceRowMenuId(null);
+                                                 setSelectedDeviceForReset(dev);
+                                                 setResetReason("Routine Maintenance");
+                                                 setResetPerformedBy("");
+                                                 setResetNotes("");
+                                                 setShowResetPulsesModal(true);
+                                               }}
+                                               className="w-full text-left px-3 py-2 rounded-xl hover:bg-amber-50 font-semibold text-amber-800 flex items-center gap-2.5 transition cursor-pointer"
+                                             >
+                                               <RotateCcw size={14} className="text-amber-600" />
+                                               <span>Reset Counter</span>
+                                             </button>
 
-                                        <button
-                                          type="button"
-                                          title="Edit Device Configuration"
-                                          onClick={() => {
-                                            setEditingDevice(dev);
-                                            setDeviceName(dev.name || "");
-                                            setDeviceModel(dev.model || "");
-                                            setDeviceSerial(dev.serial_number || "");
-                                            setDeviceCategory(dev.category || "Laser Hair Removal");
-                                            setDeviceBranchId(dev.branch_id || "");
-                                            setDeviceInitialPulses(String(dev.initial_pulse_count || 0));
-                                            setDeviceWarningThreshold1(String(dev.warning_threshold_1 || 80000));
-                                            setDeviceMaintenanceThreshold2(String(dev.maintenance_threshold_2 || 100000));
-                                            setDeviceLampReplacementCost(String(dev.lamp_replacement_cost ?? 0));
-                                            setDeviceNotes(dev.notes || "");
-                                            setShowAddDeviceModal(true);
-                                          }}
-                                          className="p-1.5 rounded-xl border border-[#E6E9EB] text-[#5A6A51] hover:bg-[#F4F6F4] transition"
-                                        >
-                                          <Pencil size={14} />
-                                        </button>
-                                      </div>
-                                    </td>
+                                             <button
+                                               type="button"
+                                               onClick={(e) => {
+                                                 e.stopPropagation();
+                                                 setActiveDeviceRowMenuId(null);
+                                                 setSelectedDeviceForHistory(dev);
+                                                 setShowDeviceHistoryModal(true);
+                                               }}
+                                               className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                             >
+                                               <History size={14} className="text-[#5A6A51]" />
+                                               <span>View History</span>
+                                             </button>
+
+                                             <div className="my-1 border-t border-gray-100" />
+
+                                             <button
+                                               type="button"
+                                               onClick={(e) => {
+                                                 e.stopPropagation();
+                                                 setActiveDeviceRowMenuId(null);
+                                                 setEditingDevice(dev);
+                                                 setDeviceName(dev.name || "");
+                                                 setDeviceModel(dev.model || "");
+                                                 setDeviceSerial(dev.serial_number || "");
+                                                 setDeviceCategory(dev.category || "Laser Hair Removal");
+                                                 setDeviceBranchId(dev.branch_id || "");
+                                                 setDeviceInitialPulses(String(dev.initial_pulse_count || 0));
+                                                 setDeviceWarningThreshold1(String(dev.warning_threshold_1 || 80000));
+                                                 setDeviceMaintenanceThreshold2(String(dev.maintenance_threshold_2 || 100000));
+                                                 setDeviceLampReplacementCost(String(dev.lamp_replacement_cost ?? 0));
+                                                 setDeviceNotes(dev.notes || "");
+                                                 setShowAddDeviceModal(true);
+                                               }}
+                                               className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                             >
+                                               <Pencil size={14} className="text-[#5A6A51]" />
+                                               <span>Edit Device</span>
+                                             </button>
+                                           </div>
+                                         )}
+                                       </div>
+                                     </td>
                                   </tr>
                                 );
                               })
