@@ -912,27 +912,27 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                         setSelectedDate(new Date(y, m - 1, d));
                         setCurrentPage(1);
                       }}
-                      className={`flex flex-col items-center justify-center rounded-xl p-2 py-2.5 transition text-xs ${
-                        !cell.currentMonth
-                          ? "text-gray-300"
-                          : isSelected
-                          ? "bg-emerald-50 text-[#1E3A2B] font-black ring-2 ring-[#1E3A2B]"
-                          : "text-[#374151] hover:bg-gray-50 font-semibold"
-                      }`}
+                      className="group flex flex-col items-center justify-center py-1 transition cursor-pointer"
                     >
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition ${
-                        isSelected ? "bg-[#1E3A2B] text-white shadow-sm" : ""
-                      }`}>
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-xs transition-all ${
+                          !cell.currentMonth
+                            ? "text-gray-300 hover:bg-gray-100/60"
+                            : isSelected
+                            ? "bg-[#1E3A2B] text-white font-bold shadow-xs hover:bg-[#162C20]"
+                            : "text-[#374151] font-semibold hover:bg-gray-100 hover:text-[#111827]"
+                        }`}
+                      >
                         {cell.day}
                       </div>
-                      <div className="mt-1 flex h-1.5 items-center justify-center gap-0.5">
-                        {isSelected ? (
-                          <span className="h-1.5 w-1.5 rounded-full bg-white"></span>
-                        ) : (
-                          dots.map((dotColor, dIdx) => (
-                            <span key={dIdx} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: dotColor }}></span>
-                          ))
-                        )}
+                      <div className="mt-1 flex h-1.5 min-h-[6px] items-center justify-center gap-0.5">
+                        {dots.map((dotColor, dIdx) => (
+                          <span
+                            key={dIdx}
+                            className="h-1.5 w-1.5 rounded-full"
+                            style={{ backgroundColor: dotColor }}
+                          />
+                        ))}
                       </div>
                     </button>
                   );
