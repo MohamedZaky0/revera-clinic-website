@@ -9096,7 +9096,7 @@ export default function AdminPage() {
                   </button>
                   <button
                     onClick={() => setShowAddCategoryModal(true)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[#C4AE7C] px-4 py-2 text-sm font-semibold text-[#414E36] shadow-sm transition hover:bg-[#b59e6c]"
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-4 py-2 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer"
                   >
                     <Plus size={14} /> Add Category
                   </button>
@@ -10579,7 +10579,7 @@ export default function AdminPage() {
             <div>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <h2 className="text-2xl font-semibold text-[#1F251A]">Product Categories</h2>
-                <button className="inline-flex items-center gap-2 rounded-lg bg-[#C4AE7C] px-5 py-2.5 text-sm font-semibold text-[#414E36] shadow transition hover:bg-[#b59e6c]">
+                <button className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-5 py-2.5 text-sm font-semibold text-[#FBFBF9] shadow transition hover:bg-[#2e3a26] cursor-pointer">
                   <Plus size={16} /> Add Category
                 </button>
               </div>
