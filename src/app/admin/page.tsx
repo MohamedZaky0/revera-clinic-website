@@ -11267,9 +11267,6 @@ export default function AdminPage() {
                     {/* Tab 1: Info */}
                     {customerProfileTab === "info" && (
                       <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-                          <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Personal Profile</h4>
-                        </div>
                         <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
                           <div>
                             <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
@@ -11358,8 +11355,7 @@ export default function AdminPage() {
                     {/* Tab 2: History */}
                     {customerProfileTab === "history" && (
                       <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
-                        <div className="border-b border-[#414E36]/10 pb-3 flex items-center justify-between">
-                          <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Booking History</h4>
+                        <div className="flex items-center justify-end pb-1">
                           <span className="text-xs font-semibold bg-[#EDF1EC] text-[#414E36] px-2.5 py-1 rounded-md">
                             Total: {
                               allReservations.filter(
@@ -11829,7 +11825,6 @@ export default function AdminPage() {
                       <div className="space-y-6">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-[#414E36]/10">
                           <div className="flex items-center gap-3">
-                            <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Patient Product Balances & Cart</h4>
                             <div className="flex bg-[#EDF1EC] p-1 rounded-xl gap-1 text-xs font-semibold">
                               <button
                                 type="button"
@@ -12009,7 +12004,6 @@ export default function AdminPage() {
                       <div className="space-y-6">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-[#414E36]/10">
                           <div className="flex items-center gap-3">
-                            <h4 className="text-sm font-bold uppercase tracking-wider text-[#C4AE7C]">Purchased Packages</h4>
                             <div className="flex bg-[#EDF1EC] p-1 rounded-xl gap-1 text-xs font-semibold">
                               <button
                                 type="button"
@@ -12745,7 +12739,6 @@ export default function AdminPage() {
                     )}
                     <div className="space-y-5">
                       <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Patient Profile Details</h4>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                           <div>
                             <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Customer Name <span className="text-red-500">*</span></label>
@@ -12809,7 +12802,6 @@ export default function AdminPage() {
                       </div>
                       <hr className="border-[#414E36]/10" />
                       <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Address & Location Details</h4>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                           <div>
                             <label className="block text-xs font-semibold text-[#5A6A51] mb-1">City / Area</label>
@@ -12827,7 +12819,6 @@ export default function AdminPage() {
                       </div>
                       <hr className="border-[#414E36]/10" />
                       <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Financial Ledgers</h4>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                           <div>
                             <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Wallet Balance (EGP)</label>
@@ -12845,7 +12836,6 @@ export default function AdminPage() {
                       </div>
                       <hr className="border-[#414E36]/10" />
                       <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-3">Profile Status & Notes</h4>
                         <div className="space-y-4">
                           <div className="flex items-center">
                             <label className="flex items-center gap-2 cursor-pointer select-none">
