@@ -3421,6 +3421,7 @@ export default function AdminPage() {
   const [deviceSearchQuery, setDeviceSearchQuery] = useState("");
   const [deviceBranchFilter, setDeviceBranchFilter] = useState("all");
   const [deviceStatusFilter, setDeviceStatusFilter] = useState("all");
+  const [showDeviceFilterPanel, setShowDeviceFilterPanel] = useState(false);
 
   // Modals state for Inventory Devices
   const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
@@ -17525,44 +17526,69 @@ export default function AdminPage() {
                   </div>
 
                   {/* Filters & Search */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-[#FBFBF9] p-4 rounded-[28px] border border-[#E6E9EB]">
-                    <div className="relative flex-1">
-                      <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8C9A84]" />
+                  <div className="mb-5 flex items-center gap-2">
+                    <div className="relative flex-1 max-w-md">
+                      <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
                       <input
                         type="text"
                         placeholder="Search devices by name, model, or serial number..."
                         value={deviceSearchQuery}
                         onChange={(e) => setDeviceSearchQuery(e.target.value)}
-                        className="w-full rounded-2xl border border-[#E6E9EB] bg-white pl-10 pr-4 py-2.5 text-sm text-[#1F251A] placeholder-[#8C9A84] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+                        className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm text-[#1F251A] outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 shadow-2xs"
                       />
                     </div>
-                    <div className="flex items-center gap-3">
-                      <select
-                        value={deviceBranchFilter}
-                        onChange={(e) => setDeviceBranchFilter(e.target.value)}
-                        className="rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-medium text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
-                      >
-                        <option value="all">All Branches</option>
-                        {branches.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.name_en}
-                          </option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={deviceStatusFilter}
-                        onChange={(e) => setDeviceStatusFilter(e.target.value)}
-                        className="rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-medium text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
-                      >
-                        <option value="all">All Statuses</option>
-                        <option value="Optimal">Optimal</option>
-                        <option value="Warning">1st Warning Reached</option>
-                        <option value="Maintenance Due">Maintenance Due</option>
-                        <option value="Out of Service">Out of Service</option>
-                      </select>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowDeviceFilterPanel(prev => !prev)}
+                      title="Filter"
+                      className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
+                        showDeviceFilterPanel || deviceBranchFilter !== "all" || deviceStatusFilter !== "all"
+                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                          : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
+                      }`}
+                    >
+                      <Filter size={15} />
+                      {(deviceBranchFilter !== "all" || deviceStatusFilter !== "all") && (
+                        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                      )}
+                    </button>
                   </div>
+
+                  {/* Filter Panel Drawer */}
+                  {showDeviceFilterPanel && (
+                    <div className="mb-5 grid grid-cols-1 gap-4 rounded-2xl border border-[#414E36]/10 bg-[#F9F9F7] p-4 md:grid-cols-2 items-end shadow-sm animate-fadeIn">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Branch Filter</label>
+                        <select
+                          value={deviceBranchFilter}
+                          onChange={(e) => setDeviceBranchFilter(e.target.value)}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        >
+                          <option value="all">All Branches</option>
+                          {branches.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.name_en}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Status Filter</label>
+                        <select
+                          value={deviceStatusFilter}
+                          onChange={(e) => setDeviceStatusFilter(e.target.value)}
+                          className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                        >
+                          <option value="all">All Statuses</option>
+                          <option value="Optimal">Optimal</option>
+                          <option value="Warning">1st Warning Reached</option>
+                          <option value="Maintenance Due">Maintenance Due</option>
+                          <option value="Out of Service">Out of Service</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Devices Table */}
                   <div className="rounded-[36px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
