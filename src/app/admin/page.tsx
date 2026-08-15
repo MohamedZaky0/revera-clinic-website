@@ -17477,50 +17477,74 @@ export default function AdminPage() {
               {inventorySubTab === "devices" && (
                 <div className="space-y-6">
                   {/* Stats Summary Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="rounded-[28px] bg-white p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EBF0E6] text-[#414E36]">
-                        <Gauge size={22} />
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {/* Card 1: Total Devices */}
+                    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">
+                          Total Devices
+                        </span>
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EDF1EC] text-[#414E36]">
+                          <Gauge size={18} />
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Total Devices</p>
-                        <p className="text-2xl font-bold text-[#1F251A] mt-0.5">{inventoryDevices.length}</p>
+                      <div className="mt-3 flex items-baseline justify-between">
+                        <span className="text-3xl font-black text-[#111827]">{inventoryDevices.length}</span>
+                        <span className="text-xs font-semibold text-[#5A6A51]">Registered</span>
                       </div>
                     </div>
 
-                    <div className="rounded-[28px] bg-white p-5 border border-emerald-100 shadow-sm flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-                        <CheckCircle size={22} />
+                    {/* Card 2: Optimal Status */}
+                    <div className="rounded-2xl border border-emerald-100/60 bg-white p-5 shadow-sm transition hover:shadow-md">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                          Optimal Status
+                        </span>
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                          <CheckCircle size={18} />
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Optimal Status</p>
-                        <p className="text-2xl font-bold text-emerald-900 mt-0.5">
+                      <div className="mt-3 flex items-baseline justify-between">
+                        <span className="text-3xl font-black text-[#111827]">
                           {inventoryDevices.filter((d) => d.status === "Optimal").length}
-                        </p>
+                        </span>
+                        <span className="text-xs font-semibold text-emerald-600">Healthy</span>
                       </div>
                     </div>
 
-                    <div className="rounded-[28px] bg-white p-5 border border-amber-100 shadow-sm flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-                        <AlertTriangle size={22} />
+                    {/* Card 3: 1st Warning Reached */}
+                    <div className="rounded-2xl border border-amber-100/60 bg-white p-5 shadow-sm transition hover:shadow-md">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">
+                          1st Warning Reached
+                        </span>
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                          <AlertTriangle size={18} />
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">1st Warning Reached</p>
-                        <p className="text-2xl font-bold text-amber-900 mt-0.5">
+                      <div className="mt-3 flex items-baseline justify-between">
+                        <span className="text-3xl font-black text-[#111827]">
                           {inventoryDevices.filter((d) => d.status === "Warning").length}
-                        </p>
+                        </span>
+                        <span className="text-xs font-semibold text-amber-600">Attention</span>
                       </div>
                     </div>
 
-                    <div className="rounded-[28px] bg-white p-5 border border-red-100 shadow-sm flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600 animate-pulse">
-                        <Wrench size={22} />
+                    {/* Card 4: Maintenance Due */}
+                    <div className="rounded-2xl border border-red-100/60 bg-white p-5 shadow-sm transition hover:shadow-md">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-red-700">
+                          Maintenance Due
+                        </span>
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                          <Wrench size={18} />
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-red-700">Maintenance Due</p>
-                        <p className="text-2xl font-bold text-red-900 mt-0.5">
+                      <div className="mt-3 flex items-baseline justify-between">
+                        <span className="text-3xl font-black text-[#111827]">
                           {inventoryDevices.filter((d) => d.status === "Maintenance Due").length}
-                        </p>
+                        </span>
+                        <span className="text-xs font-semibold text-red-600">Action Needed</span>
                       </div>
                     </div>
                   </div>
