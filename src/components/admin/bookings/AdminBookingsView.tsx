@@ -981,11 +981,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   </button>
                   <button
                     onClick={onFilterClick}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#374151] hover:bg-gray-50 active:scale-95"
+                    title="Filter"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] hover:bg-gray-50 active:scale-95 cursor-pointer"
                   >
-                    <Filter size={14} />
-                    <span>Filter</span>
-                    <ChevronDown size={14} />
+                    <Filter size={15} />
                   </button>
                 </div>
               </div>

@@ -8848,20 +8848,6 @@ export default function AdminPage() {
 
                     <div className="flex flex-wrap items-center gap-2">
                       <button
-                        onClick={() => setShowProviderFilterPanel(prev => !prev)}
-                        className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition ${
-                          showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All"
-                            ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
-                            : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
-                        }`}
-                      >
-                        <Filter size={14} /> Filter
-                        {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All") && (
-                          <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
-                        )}
-                      </button>
-
-                      <button
                         onClick={() => {
                           fetchAuditLogs();
                           setShowAuditLogsModal(true);
@@ -8874,7 +8860,7 @@ export default function AdminPage() {
                   </div>
 
                   {/* Search Bar Row above Table */}
-                  <div className="flex flex-wrap items-center gap-3 border-t border-[#414E36]/5 pt-4">
+                  <div className="flex flex-wrap items-center gap-3">
                     <div className="relative flex-1 max-w-md">
                       <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] z-10 pointer-events-none" />
                       <input
@@ -8885,6 +8871,20 @@ export default function AdminPage() {
                         className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:bg-white focus:ring-2 focus:ring-[#C4AE7C]/15"
                       />
                     </div>
+                    <button
+                      onClick={() => setShowProviderFilterPanel(prev => !prev)}
+                      title="Filter"
+                      className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer ${
+                        showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All"
+                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                          : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
+                      }`}
+                    >
+                      <Filter size={16} />
+                      {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All") && (
+                        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                      )}
+                    </button>
                   </div>
 
                 {/* Dynamic Filters Drawer */}
@@ -9106,14 +9106,31 @@ export default function AdminPage() {
               {/* Controls Bar: Search, Sort, Filter, and Expand/Collapse */}
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-3 flex-1">
-                  <div className="relative max-w-xs flex-1 min-w-[220px]">
-                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
-                    <input
-                      value={serviceSearch}
-                      onChange={(e) => { setServiceSearch(e.target.value); }}
-                      placeholder="Search services…"
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 shadow-2xs"
-                    />
+                  <div className="relative max-w-xs flex-1 min-w-[220px] flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                      <input
+                        value={serviceSearch}
+                        onChange={(e) => { setServiceSearch(e.target.value); }}
+                        placeholder="Search services…"
+                        className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 shadow-2xs"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowServiceFilterPanel(prev => !prev)}
+                      title="Filter"
+                      className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
+                        showServiceFilterPanel || serviceFilterStatus !== "All"
+                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                          : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
+                      }`}
+                    >
+                      <Filter size={15} />
+                      {serviceFilterStatus !== "All" && (
+                        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                      )}
+                    </button>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -9131,21 +9148,6 @@ export default function AdminPage() {
                       <option value="newest">Sort: Newest First</option>
                     </select>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowServiceFilterPanel(prev => !prev)}
-                    className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition cursor-pointer shadow-2xs ${
-                      showServiceFilterPanel || serviceFilterStatus !== "All"
-                        ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
-                        : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
-                    }`}
-                  >
-                    <Filter size={14} /> Filter
-                    {serviceFilterStatus !== "All" && (
-                      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
-                    )}
-                  </button>
                 </div>
 
                 <button
@@ -10111,8 +10113,8 @@ export default function AdminPage() {
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <h2 className="text-2xl font-semibold text-[#1F251A]">Prescriptions</h2>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#f5f4f0]">
-                    <Filter size={14} /> Filter
+                  <button title="Filter" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#414E36]/15 bg-white text-[#414E36] shadow-sm transition hover:bg-[#f5f4f0] cursor-pointer">
+                    <Filter size={15} />
                   </button>
                   <button className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-4 py-2 text-sm font-medium text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26]">
                     <Download size={14} /> Export
@@ -10245,8 +10247,8 @@ export default function AdminPage() {
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <h2 className="text-2xl font-semibold text-[#1F251A]">Medicine Library</h2>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#f5f4f0]">
-                    <Filter size={14} /> Filter
+                  <button title="Filter" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#414E36]/15 bg-white text-[#414E36] shadow-sm transition hover:bg-[#f5f4f0] cursor-pointer">
+                    <Filter size={15} />
                   </button>
                   <button className="inline-flex items-center gap-2 rounded-lg bg-[#414E36] px-4 py-2 text-sm font-medium text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26]">
                     <Download size={14} /> Export
@@ -10770,8 +10772,8 @@ export default function AdminPage() {
                     Review provider performance, customer growth, and service trends at a glance.
                   </p>
                 </div>
-                <button className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]">
-                  <Filter size={16} /> Filter
+                <button title="Filter" className="inline-flex h-10 w-10 items-center justify-center rounded-3xl bg-[#414E36] text-[#FBFBF9] transition hover:bg-[#2e3a26] cursor-pointer">
+                  <Filter size={16} />
                 </button>
               </div>
 
@@ -10911,8 +10913,8 @@ export default function AdminPage() {
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                 <h2 className="text-2xl font-semibold text-[#1F251A]">Returns & Refunds</h2>
                 <div className="flex items-center gap-2">
-                  <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#f5f4f0]">
-                    <Filter size={14} /> Filter
+                  <button title="Filter" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#414E36]/15 bg-white text-[#414E36] shadow-sm transition hover:bg-[#f5f4f0] cursor-pointer">
+                    <Filter size={15} />
                   </button>
                 </div>
               </div>
@@ -12868,8 +12870,8 @@ export default function AdminPage() {
               {/* ── CUSTOMER TABLE (only when no inline view is active) ── */}
               {!viewingCustomerProfile && !showCustomerFormModal && (
               <>
-              {/* Page header and premium controls panel */}
-              <div className="mb-6 flex flex-col gap-4 rounded-3xl border border-[#414E36]/10 bg-white p-5 shadow-sm">
+              {/* Page header and controls panel (floating directly on background without white box) */}
+              <div className="mb-6 flex flex-col gap-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-bold text-[#1F251A]">Patients Directory</h2>
@@ -12877,20 +12879,20 @@ export default function AdminPage() {
                   </div>
                   
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="text-xs text-[#5A6A51] border border-[#414E36]/15 bg-[#F9F9F7] px-3.5 py-2 rounded-xl font-medium flex items-center gap-1">
+                    <div className="text-xs text-[#5A6A51] border border-[#414E36]/15 bg-white px-3.5 py-2 rounded-xl font-medium flex items-center gap-1 shadow-2xs">
                       Total Patients: <span className="font-bold text-[#1F251A]">{filteredCustomers.length}</span>
                     </div>
 
                     {hasPermission("customers.create") && (
                       <button
                         onClick={handleOpenAddCustomer}
-                        className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] cursor-pointer"
+                        className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] cursor-pointer shadow-2xs"
                       >
                         <Plus size={14} /> Add Patient
                       </button>
                     )}
                     
-                    {/* 3-Dots Actions Menu for Export & Import (Positioned to the right of Add Patient) */}
+                    {/* 3-Dots Actions Menu for Export & Import */}
                     <div ref={customerMoreMenuRef} className="relative">
                       <button
                         type="button"
@@ -12898,7 +12900,7 @@ export default function AdminPage() {
                           e.stopPropagation();
                           setShowCustomerMoreMenu(prev => !prev);
                         }}
-                        className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition cursor-pointer ${
+                        className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
                           showCustomerMoreMenu
                             ? "border-[#414E36] bg-[#414E36] text-white"
                             : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
@@ -12943,8 +12945,8 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Unified Search and Quick Info Bar */}
-                <div className="flex flex-wrap items-center gap-3 border-t border-[#414E36]/5 pt-4">
+                {/* Unified Search and Icon-only Filter Bar */}
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="relative flex-1 max-w-md">
                     <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] z-10 pointer-events-none" />
                     <input
@@ -12952,20 +12954,21 @@ export default function AdminPage() {
                       value={customerSearch}
                       onChange={(e) => setCustomerSearch(e.target.value)}
                       placeholder="Search by name, phone, national ID..."
-                      className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:bg-white focus:ring-2 focus:ring-[#C4AE7C]/15"
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/15 shadow-2xs"
                     />
                   </div>
                   <button
                     onClick={() => setShowCustomerFilterPanel(prev => !prev)}
-                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition cursor-pointer ml-auto ${
+                    title="Filter"
+                    className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
                       showCustomerFilterPanel || customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All"
                         ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
                         : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
                     }`}
                   >
-                    <Filter size={14} /> Filter
+                    <Filter size={16} />
                     {(customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All") && (
-                      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                      <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
                     )}
                   </button>
                 </div>
@@ -21734,9 +21737,10 @@ export default function AdminPage() {
                           <Download size={14} /> Export
                         </button>
                         <button
-                          className="rounded-xl bg-white border border-[#414E36]/15 px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#EDF1EC]/20 transition flex items-center gap-2 shadow-xs"
+                          title="Filter"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-[#414E36]/15 text-[#414E36] hover:bg-[#EDF1EC]/20 transition shadow-xs cursor-pointer"
                         >
-                          <Filter size={14} /> Filter
+                          <Filter size={15} />
                         </button>
                       </div>
                     </div>

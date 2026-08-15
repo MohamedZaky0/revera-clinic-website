@@ -659,11 +659,10 @@ export const DoctorProfileDetailsView: React.FC<DoctorProfileDetailsViewProps> =
             <div className="relative">
               <button
                 onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-[#374151] hover:bg-gray-50 transition shadow-xs"
+                title="Filter"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] hover:bg-gray-50 transition shadow-xs cursor-pointer"
               >
                 <Filter size={14} className="text-[#5A6A51]" />
-                <span>Filter</span>
-                <ChevronDown size={14} className="text-[#9CA3AF]" />
               </button>
 
               {showFilterDropdown && (
