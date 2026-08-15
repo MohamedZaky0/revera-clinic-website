@@ -9305,7 +9305,7 @@ export default function AdminPage() {
                               setEditingService(null);
                               setShowAddServiceModal(true);
                             }}
-                            className={`${hasPermission("services.create") ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-lg border border-[#414E36]/20 bg-white px-3 py-1.5 text-xs font-medium text-[#414E36] transition hover:bg-[#EDF1EC]`}
+                            className={`${hasPermission("services.create") ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-xl bg-[#414E36] px-3.5 py-1.5 text-xs font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer`}
                           >
                             <Plus size={12} /> Add Service
                           </button>
