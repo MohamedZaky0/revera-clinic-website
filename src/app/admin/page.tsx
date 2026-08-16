@@ -43,6 +43,7 @@ import {
   Info,
   Hourglass,
   Layers,
+  LayoutGrid,
   LogOut,
   MessageSquare,
   Monitor,
@@ -117,6 +118,7 @@ import { PromotionsAdminPanel } from "@/components/admin/marketing/PromotionsAdm
 import { FinanceSection } from "@/components/admin/Finance/FinanceSection";
 import { DoctorServiceCommissionEditor, ServiceCommissionEntry, DefaultCommissionType } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import DoctorAccountView from "@/components/admin/DoctorAccountView";
+import ReceptionDashboardView from "@/components/admin/reception/ReceptionDashboardView";
 import { AdminBookingsView } from "@/components/admin/bookings/AdminBookingsView";
 import AdminNewBookingView from "@/components/admin/bookings/AdminNewBookingView";
 import { DoctorProfileDetailsView } from "@/components/admin/doctor/DoctorProfileDetailsView";
@@ -181,6 +183,7 @@ function getStatusBadgeClass(status: string): string {
 const SLOTS = ALL_15MIN_SLOTS;
 
 const SIDEBAR_ITEMS = [
+  { label: "Dashboard", icon: LayoutGrid },
   { label: "Bookings", icon: CalendarDays },
   { label: "Patients", icon: Users },
   { label: "Doctors", icon: ShieldCheck },
@@ -1455,7 +1458,7 @@ export default function AdminPage() {
   const [doctorName, setDoctorName] = useState<string>("Dr. Sara El Gamel");
   const [slot, setSlot] = useState<string>("12:00");
   const [approveDate, setApproveDate] = useState<string>("");
-  const [activeNav, setActiveNav] = useState("Bookings");
+  const [activeNav, setActiveNav] = useState("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [providerTab, setProviderTab] = useState<"Doctors" | "Attendance">("Doctors");
   const [branch, setBranch] = useState<string>(""); // branch id; empty = all branches
@@ -3525,7 +3528,8 @@ export default function AdminPage() {
     { id: 'TC-027', name: 'Doctor Portal Bilingual & RTL Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Doctor Portal English View and Arabic View toggle, localized dictionary copy, and RTL layout engine.', status: 'idle' },
     { id: 'TC-028', name: 'Doctor Portal Right Session Drawer & Notes Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Right Slide-Over Session Drawer, clean doctor-written notes isolation, and structured payment/consumables callout cards.', status: 'idle' },
     { id: 'TC-029', name: 'Doctor Portal Patient Full Visit History Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Patient Full Visit History Right Drawer, listing all historical visits, dates, services, and doctor clinical notes.', status: 'idle' },
-    { id: 'TC-030', name: 'Admin Bookings View & Schedule UI Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies the redesigned Admin Bookings View, 4 analytic cards (without percentages), mini calendar date grid, and today schedule table.', status: 'idle' }
+    { id: 'TC-030', name: 'Admin Bookings View & Schedule UI Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies the redesigned Admin Bookings View, 4 analytic cards (without percentages), mini calendar date grid, and today schedule table.', status: 'idle' },
+    { id: 'TC-031', name: 'Reception Dashboard & Shift Metrics Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies receptionist shift tracking, personal target calculations, and today bookings summary.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);
@@ -23167,6 +23171,18 @@ export default function AdminPage() {
                 </button>
               </div>
             </div>
+          )}
+
+          {/* ── RECEPTION DASHBOARD VIEW ── */}
+          {activeNav === "Dashboard" && (
+            <ReceptionDashboardView
+              receptionistName={loggedEmpAccount?.name || adminEmail || "Zaki Mohamed"}
+              receptionistRole={loggedEmpAccount?.role_name || adminRole || "Receptionist"}
+              employeeId={loggedEmpAccount?.id || adminDbId}
+              email={adminEmail}
+              onNavigateTab={(tabName) => setActiveNav(tabName)}
+              onLogout={handleLogout}
+            />
           )}
 
           {/* ── BOOKINGS & NEW BOOKING FULL VIEW ── */}

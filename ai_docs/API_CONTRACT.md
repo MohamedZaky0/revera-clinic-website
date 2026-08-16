@@ -24,6 +24,26 @@ Diagnostics: checks which Supabase env vars are present and previews their value
 
 ---
 
+## GET /api/reception/dashboard
+
+Returns Reception Dashboard metrics for today including shift status, elapsed work duration, personal revenue target calculations, and today's bookings overview.
+
+**Query Params:** `employeeId` (optional), `email` (optional)
+
+**Response:** `{ success: true, receptionist: {...}, shift: {...}, target: {...}, bookings: {...} }`
+
+---
+
+## POST /api/reception/dashboard
+
+Starts or ends receptionist daily shift attendance persisted to `hr_attendance`.
+
+**Body:** `{ action: "start_shift" | "end_shift", employeeId?: string, email?: string }`
+
+**Response:** `{ success: true, action: string, attendance: object }`
+
+---
+
 ## GET /api/branches
 
 Returns all branches ordered by `sort_order`.
