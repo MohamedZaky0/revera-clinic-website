@@ -1959,6 +1959,7 @@ export default function AdminPage() {
   const [newPatientBranch, setNewPatientBranch] = useState("");
   const [newPatientCreatedByEmployeeId, setNewPatientCreatedByEmployeeId] = useState("");
   const [approveUnavailableSlots, setApproveUnavailableSlots] = useState<string[]>([]);
+  const [approveTimeWarning, setApproveTimeWarning] = useState<string>("");
   const [manualUnavailableSlots, setManualUnavailableSlots] = useState<string[]>([]);
 
   useEffect(() => {
@@ -7479,9 +7480,17 @@ export default function AdminPage() {
       });
   }
 
-  function fetchAllReservations() {
+  // Defaults to bypassing the cache. Nearly every caller here runs immediately after a write
+  // (approve, reject, cancel, check-in, start/complete session, add product, new booking), and
+  // cachedFetch has a 2s TTL with no write-invalidation — so the default of "reuse the cached
+  // array" reliably returned a list that predated the change that had just been made, which is
+  // why new bookings only appeared after a full page reload. Pass useCache=true only where a
+  // slightly stale list is genuinely acceptable.
+  function fetchAllReservations(useCache = false) {
     const branchParam = branch ? `?branchId=${branch}` : "";
-    return cachedFetch(`/api/reservations${branchParam}`, 2000)
+    const url = `/api/reservations${branchParam}`;
+    if (!useCache) clearFetchCache(url);
+    return cachedFetch(url, 2000)
       .then((data) => {
         if (Array.isArray(data)) {
           setAllReservations(data);
@@ -7551,6 +7560,10 @@ export default function AdminPage() {
 
   // Shared by the initial open and by changing the date inside the approve modal — recomputes
   // which time slots are actually pickable for whichever date is currently selected there.
+  // Returns the freshly-computed availability rather than relying on the state it sets —
+  // setApproveUnavailableSlots() does not update the caller's closure within the same tick, so a
+  // caller that read the state variable straight after awaiting this would see the *previous*
+  // booking's list (or [] on first open) and make its decision on stale data.
   async function refreshApproveAvailability(r: Req, dateStr: string) {
     const branchParam = r.branchId ? `&branchId=${r.branchId}` : "";
     const data = await fetch(`/api/availability?date=${dateStr}&serviceId=${r.serviceId}${branchParam}`).then((res) => res.json());
@@ -7563,21 +7576,29 @@ export default function AdminPage() {
     });
     const first = filteredSlots.find((s) => !unavailable.includes(s)) || filteredSlots[0] || SLOTS[0];
     setSlot(first);
+    return { unavailable, start, end };
   }
 
   async function openApprove(r: Req) {
     setLoadingApproveId(r.id);
     try {
       setApproveDate(r.date);
-      await refreshApproveAvailability(r, r.date);
+      setApproveTimeWarning("");
+      const { unavailable, start, end } = await refreshApproveAvailability(r, r.date);
 
-      // Prefer the patient's originally requested time if it's still available
+      // Always show the time the patient actually asked for. If it is not bookable, select it
+      // anyway and warn — silently substituting the first free slot (09:00) is how approvals were
+      // being confirmed at a time nobody requested.
       const requestedSlot = r.requestedTime || r.timeSlot || "";
-      if (requestedSlot && !approveUnavailableSlots.includes(requestedSlot)) {
-        const { start, end } = getDayOperatingHoursApprove({ ...r, date: r.date });
+      if (requestedSlot) {
         const norm = normaliseTo24hSlot(requestedSlot) ?? "";
-        if (norm >= start && norm < end) {
-          setSlot(requestedSlot);
+        const outsideHours = !(norm >= start && norm < end);
+        const taken = unavailable.includes(requestedSlot);
+        setSlot(requestedSlot);
+        if (taken) {
+          setApproveTimeWarning(`Requested time ${requestedSlot} is already taken — pick another slot.`);
+        } else if (outsideHours) {
+          setApproveTimeWarning(`Requested time ${requestedSlot} is outside opening hours — pick another slot.`);
         }
       }
 
@@ -7594,6 +7615,9 @@ export default function AdminPage() {
   // instead of forcing staff to reject the request just to change the date.
   async function handleApproveDateChange(newDateStr: string) {
     setApproveDate(newDateStr);
+    // Staff deliberately moved off the requested date — the requested-time warning no longer
+    // applies, and refreshApproveAvailability picks a fresh slot for the new date.
+    setApproveTimeWarning("");
     if (!selected) return;
     await refreshApproveAvailability(selected, newDateStr);
   }
@@ -23304,7 +23328,7 @@ export default function AdminPage() {
             </label>
             <select
               value={slot}
-              onChange={(e) => setSlot(e.target.value)}
+              onChange={(e) => { setSlot(e.target.value); setApproveTimeWarning(""); }}
               className="mb-4 w-full rounded-3xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#414E36] outline-none transition focus:border-[#C4AE7C]"
             >
               {(() => {
@@ -23313,7 +23337,7 @@ export default function AdminPage() {
                   const norm = normaliseTo24hSlot(s) ?? "";
                   return norm >= start && norm < end;
                 });
-                return filteredSlots.map((s) => {
+                const options = filteredSlots.map((s) => {
                   const isUnavailable = approveUnavailableSlots.includes(s);
                   return (
                     <option key={s} value={s} disabled={isUnavailable}>
@@ -23321,8 +23345,24 @@ export default function AdminPage() {
                     </option>
                   );
                 });
+                // The patient's requested time may fall outside opening hours, in which case it is
+                // not in filteredSlots and the select would render blank — hiding what was asked
+                // for. Surface it explicitly instead.
+                if (slot && !filteredSlots.includes(slot)) {
+                  options.unshift(
+                    <option key={`requested-${slot}`} value={slot}>
+                      {slot} (Requested — outside opening hours)
+                    </option>
+                  );
+                }
+                return options;
               })()}
             </select>
+            {approveTimeWarning && (
+              <p className="-mt-2 mb-4 text-xs font-semibold text-rose-600">
+                {approveTimeWarning}
+              </p>
+            )}
             {(() => {
               const { start, end } = getDayOperatingHoursApprove({ ...selected, date: approveDate || selected.date });
               const hasSlots = SLOTS.some((s) => {

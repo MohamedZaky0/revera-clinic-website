@@ -684,7 +684,12 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
       const finalNotes = isWhatsappSame
         ? notes
         : `${notes ? notes + "\n" : ""}[WhatsApp: ${whatsappNumber}]`;
+      // serviceId and date are included because the patient can go back to step 1 and change
+      // them before returning here — omitting them would leave the existing row pointing at the
+      // originally-picked service/date while the UI shows the new ones.
       const payload = {
+        serviceId,
+        date: toLocalDateStr(selectedDate),
         requestedTime: selectedTime,
         name, email, phone, notes: finalNotes,
         sessionType,

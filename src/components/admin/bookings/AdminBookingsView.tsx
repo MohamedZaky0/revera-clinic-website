@@ -217,13 +217,20 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       if (st === "approved") st = "confirmed";
       if (st === "started") st = "in_progress";
 
-      const amtPaid = Number(r.amountPaid ?? 0);
-      const amtLeft = Number(r.amountLeft ?? 0);
+      // amount_left is nullable in the DB (mapRow returns it as `?? null`), so a missing value
+      // must stay "unknown" — coercing it to 0 would render "Paid" for a booking whose balance
+      // was never recorded, which is the exact fabrication this block was rewritten to remove.
+      const rawPaid = r.amountPaid ?? r.amount_paid;
+      const rawLeft = r.amountLeft ?? r.amount_left;
+      const amtPaid = Number(rawPaid);
+      const amtLeft = Number(rawLeft);
       let paySt: string;
-      if (isNaN(amtPaid) || isNaN(amtLeft)) {
+      if (rawPaid === null || rawPaid === undefined || Number.isNaN(amtPaid)) {
         paySt = "—";
       } else if (amtPaid <= 0) {
         paySt = "Unpaid";
+      } else if (rawLeft === null || rawLeft === undefined || Number.isNaN(amtLeft)) {
+        paySt = "—";
       } else if (amtLeft > 0) {
         paySt = "Partially Paid";
       } else {

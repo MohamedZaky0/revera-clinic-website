@@ -141,7 +141,9 @@ export default function DoctorOngoingSessionTab({
   const [additionalServices, setAdditionalServices] = useState<AdditionalServiceItem[]>([]);
   const [selectedServiceIdToAdd, setSelectedServiceIdToAdd] = useState<string>("");
   const [selectedDeviceForService, setSelectedDeviceForService] = useState<string>("");
-  const [pulsesCountForService, setPulsesCountForService] = useState<number>(100);
+  // Defaults to 0, not 100: a service with no linked device has no pulses, and pre-filling a
+  // plausible-looking count meant non-laser services silently carried a fabricated charge.
+  const [pulsesCountForService, setPulsesCountForService] = useState<number>(0);
   const [loadingDeviceLinks, setLoadingDeviceLinks] = useState(false);
 
   // Inline Prescription State (positioned above services & products)
@@ -204,7 +206,7 @@ export default function DoctorOngoingSessionTab({
     onAdditionalServicesChange?.(updated);
     setSelectedServiceIdToAdd("");
     setSelectedDeviceForService("");
-    setPulsesCountForService(100);
+    setPulsesCountForService(0);
   };
 
   const handleRemoveServiceFromSession = (id: string | number) => {
@@ -664,7 +666,7 @@ export default function DoctorOngoingSessionTab({
                     </div>
                     {selectedDeviceId && (
                     <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-lg shrink-0">
-                      {extraPulsesCount || 100} {t.pulsesLabel}
+                      {extraPulsesCount} {t.pulsesLabel}
                     </span>
                     )}
                   </div>
