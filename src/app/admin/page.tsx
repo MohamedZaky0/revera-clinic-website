@@ -23311,8 +23311,12 @@ export default function AdminPage() {
                 onPrint={() => window.print()}
                 onExportCSV={handleExportBookingsCSV}
                 onApproveBooking={(booking: any) => {
-                  // Opens the existing Approve modal (date/time/doctor assignment)
-                  setSelected(booking as any);
+                  // RISK-047/052: must go through openApprove() so the modal is pre-filled from
+                  // the actual booking (requested time, requested doctor, availability) instead
+                  // of opening with whatever `slot`/`doctorName` state happened to be left over
+                  // from a previous modal use — which is how this button independently
+                  // reintroduced the hardcoded-doctor/wrong-time bug openApprove() itself fixed.
+                  openApprove(booking as any);
                 }}
                 onRejectBooking={async (booking: any) => {
                   try {
