@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Settings, X, Search, Info } from "lucide-react";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
+import { getAuthHeaders } from "@/components/admin/doctor/utils";
 
 type Room = {
   id: string;
@@ -93,9 +94,10 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
       const url = roomModal.mode === "add" ? "/api/rooms" : `/api/rooms?id=${r.id}`;
       const method = roomModal.mode === "add" ? "POST" : "PATCH";
 
+      const headers = await getAuthHeaders();
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           name: r.name,
           type: r.type,
@@ -125,7 +127,8 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`/api/rooms?id=${id}`, { method: "DELETE" });
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/rooms?id=${id}`, { method: "DELETE", headers });
       if (res.ok) {
         clearFetchCache();
         fetchRooms();
@@ -157,9 +160,10 @@ export default function RoomsManagerView({ branches, services, selectedBranchId 
 
     setSavingMapping(true);
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch("/api/service-rooms", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           roomId: room.id,
           serviceIds: selectedServiceIds,

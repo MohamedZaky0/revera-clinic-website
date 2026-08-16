@@ -1321,7 +1321,7 @@ export default function AdminPage() {
     if (viewingBooking) {
       const custId = viewingBooking.customerId || viewingBooking.id;
       if (custId) {
-        fetch(`/api/prescriptions?customerId=${encodeURIComponent(custId)}`)
+        fetch(`/api/prescriptions?customerId=${encodeURIComponent(custId)}`, { headers: authenticatedJsonHeaders })
           .then((res) => (res.ok ? res.json() : []))
           .then((data) => setDrawerPrescriptions(Array.isArray(data) ? data : []))
           .catch((err) => console.warn("Error fetching drawer prescriptions:", err));
@@ -1358,7 +1358,7 @@ export default function AdminPage() {
         setDrawerRxMeds([{ name: "", dosage: "", frequency: "", duration: "" }]);
         setDrawerRxNotes("");
 
-        const rxRes = await fetch(`/api/prescriptions?customerId=${encodeURIComponent(custId)}`);
+        const rxRes = await fetch(`/api/prescriptions?customerId=${encodeURIComponent(custId)}`, { headers: authenticatedJsonHeaders });
         if (rxRes.ok) {
           const rxData = await rxRes.json();
           setDrawerPrescriptions(Array.isArray(rxData) ? rxData : []);
@@ -1611,9 +1611,9 @@ export default function AdminPage() {
     try {
       const compressedDataUrl = await compressImage(file, 400, 400, 0.8);
       setCustomerAvatars(prev => ({ ...prev, [id]: compressedDataUrl }));
-      await fetch("/api/customer-avatars", {
+      const res = await fetch(`/api/customer-avatars`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({ id, avatar_url: compressedDataUrl })
       });
     } catch (e) {
@@ -1630,7 +1630,7 @@ export default function AdminPage() {
       });
       await fetch("/api/customer-avatars", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({ id, avatar_url: null })
       });
     } catch (e) {
@@ -1873,7 +1873,7 @@ export default function AdminPage() {
     const fetchRx = async () => {
       setLoadingPrescriptions(true);
       try {
-        const res = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`);
+        const res = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`, { headers: authenticatedJsonHeaders });
         if (res.ok) {
           const data = await res.json();
           setCustomerPrescriptions(data);
@@ -1888,7 +1888,7 @@ export default function AdminPage() {
     const fetchMedicalRecords = async () => {
       setLoadingMedicalRecords(true);
       try {
-        const res = await fetch(`/api/medical-records?customerId=${viewingCustomerProfile.id}`);
+        const res = await fetch(`/api/medical-records?customerId=${viewingCustomerProfile.id}`, { headers: authenticatedJsonHeaders });
         if (res.ok) {
           const data = await res.json();
           setMedicalRecordForm(data.form || null);
@@ -5301,7 +5301,7 @@ export default function AdminPage() {
 
       const res = await fetch("/api/provider-attendance", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify(payload)
       });
 
@@ -5683,7 +5683,8 @@ export default function AdminPage() {
     if (!id) return;
     if (await showConfirm("Are you sure you want to delete this provider?")) {
       fetch(`/api/providers?id=${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: authenticatedJsonHeaders,
       })
         .then((res) => res.json())
         .then((data) => {
@@ -5876,7 +5877,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/page-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({ departments: newList }),
       });
       if (res.ok) {
@@ -6001,7 +6002,7 @@ export default function AdminPage() {
     try {
       await fetch("/api/page-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({
           clinic: { name: clinicName, name_ar: clinicNameAr, location: clinicLocation, location_ar: clinicLocationAr, email: clinicEmail, phone: clinicPhone, whatsapp: clinicWhatsapp }
         }),
@@ -6018,7 +6019,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/page-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({
           deposit: {
             instapayName: instapayName.trim(),
@@ -6052,7 +6053,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/page-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({
           inactivity: {
             threshold: Number(inactivityThreshold),
@@ -6080,7 +6081,7 @@ export default function AdminPage() {
     try {
       await fetch("/api/page-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({
           booking: {
             minAdvance: bookingMinAdvance,
@@ -6106,7 +6107,7 @@ export default function AdminPage() {
     try {
       await fetch("/api/page-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({
           notifications: { smsOtp: notifSmsOtp, whatsapp: notifWhatsApp, email: notifEmailConfirm, smsTemplate: notifSmsTemplate, smsTemplateAr: notifSmsTemplateAr, reminderHours: notifReminderHours, staffEmail: notifStaffEmail }
         }),
@@ -6123,7 +6124,7 @@ export default function AdminPage() {
     try {
       await fetch("/api/page-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({
           queue: { virtualRoom: queueVirtualRoom, showOnScreens: queueShowOnScreens, autoCheckIn: queueAutoCheckIn, alertThreshold: queueAlertThreshold, avgSessionDuration: queueAvgSessionDuration }
         }),
@@ -6277,7 +6278,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/page-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify(fullPayload),
       });
       if (res.ok) {
@@ -6301,7 +6302,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/branches", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({
           id: selectedBranchForHoursId,
           service_hours: serviceHours
@@ -7095,7 +7096,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/prescriptions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify(payload),
       });
 
@@ -7105,7 +7106,7 @@ export default function AdminPage() {
       }
 
       // Re-fetch prescriptions
-      const rxRes = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`);
+      const rxRes = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`, { headers: authenticatedJsonHeaders });
       if (rxRes.ok) {
         const rxData = await rxRes.json();
         setCustomerPrescriptions(rxData);
@@ -7126,6 +7127,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/prescriptions?id=${id}`, {
         method: "DELETE",
+        headers: authenticatedJsonHeaders,
       });
       if (!res.ok) {
         const data = await res.json();
@@ -7134,7 +7136,7 @@ export default function AdminPage() {
 
       // Re-fetch prescriptions
       if (viewingCustomerProfile?.id) {
-        const rxRes = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`);
+        const rxRes = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`, { headers: authenticatedJsonHeaders });
         if (rxRes.ok) {
           const rxData = await rxRes.json();
           setCustomerPrescriptions(rxData);
@@ -7183,7 +7185,7 @@ export default function AdminPage() {
 
       const res = await fetch("/api/medical-records", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({ type: "form", data: payload }),
       });
 
@@ -7228,7 +7230,7 @@ export default function AdminPage() {
 
       const res = await fetch("/api/medical-records", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({ type: "report", data: payload }),
       });
 
@@ -7257,6 +7259,7 @@ export default function AdminPage() {
       setMedicalReports((prev) => prev.filter((r) => r.id !== reportId));
       await fetch(`/api/medical-records?reportId=${encodeURIComponent(reportId)}`, {
         method: "DELETE",
+        headers: authenticatedJsonHeaders,
       });
     } catch (err) {
       console.error("Error deleting medical report:", err);
@@ -15793,7 +15796,7 @@ export default function AdminPage() {
                             const newStatus = br.status === "active" ? "inactive" : "active";
                             await fetch("/api/branches", {
                               method: "POST",
-                              headers: { "Content-Type": "application/json" },
+                              headers: authenticatedJsonHeaders,
                               body: JSON.stringify({ ...br, status: newStatus }),
                             });
                             setBranches(prev => prev.map(b => b.id === br.id ? { ...b, status: newStatus } : b));
@@ -15811,7 +15814,7 @@ export default function AdminPage() {
                             onClick={async () => {
                               if (!(await showConfirm(`Delete "${br.name_en}"?`))) return;
                               setDeletingBranchId(br.id);
-                              await fetch(`/api/branches?id=${br.id}`, { method: "DELETE" });
+                              await fetch(`/api/branches?id=${br.id}`, { method: "DELETE", headers: authenticatedJsonHeaders });
                               setBranches(prev => prev.filter(b => b.id !== br.id));
                               setDeletingBranchId(null);
                             }}
@@ -15844,7 +15847,7 @@ export default function AdminPage() {
                         try {
                           const res = await fetch("/api/branches", {
                             method: "POST",
-                            headers: { "Content-Type": "application/json" },
+                            headers: authenticatedJsonHeaders,
                             body: JSON.stringify(branchModal.branch),
                           });
                           const saved = await res.json();

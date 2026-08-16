@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { getAuthHeaders } from "@/components/admin/doctor/utils";
 import { 
   Plus, 
   ArrowUp, 
@@ -176,9 +177,10 @@ export default function TermsManagerView({
     setSubmittingForm(true);
     try {
       if (modalMode === "add") {
+        const headers = await getAuthHeaders();
         const res = await fetch("/api/terms", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({
             ...formData,
             sort_order: terms.length + 1
@@ -186,9 +188,10 @@ export default function TermsManagerView({
         });
         if (!res.ok) throw new Error("Failed to add terms item");
       } else if (modalMode === "edit" && editingItem) {
+        const headers = await getAuthHeaders();
         const res = await fetch("/api/terms", {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({
             id: editingItem.id,
             ...formData
@@ -210,7 +213,8 @@ export default function TermsManagerView({
     if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
 
     try {
-      const res = await fetch(`/api/terms?id=${id}`, { method: "DELETE" });
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/terms?id=${id}`, { method: "DELETE", headers });
       if (res.ok) {
         setTerms((prev) => prev.filter((t) => t.id !== id));
       } else {
@@ -229,9 +233,10 @@ export default function TermsManagerView({
     );
 
     try {
+      const headers = await getAuthHeaders();
       await fetch("/api/terms", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ id: item.id, is_active: newStatus })
       });
     } catch (e) {
@@ -269,9 +274,10 @@ export default function TermsManagerView({
         sort_order: item.sort_order
       }));
 
+      const headers = await getAuthHeaders();
       await fetch("/api/terms", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(payload)
       });
     } catch (e) {
@@ -286,10 +292,11 @@ export default function TermsManagerView({
 
     setLoading(true);
     try {
+      const headers = await getAuthHeaders();
       for (const item of DEFAULT_TERMS_SEED) {
         await fetch("/api/terms", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify(item)
         });
       }
