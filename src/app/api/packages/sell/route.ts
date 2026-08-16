@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { requireStaffAccess } from '@/lib/access';
 import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { recordWalletMovement } from '@/lib/wallet';
+
+const VALID_PAYMENT_METHODS = ['cash', 'card', 'wallet', 'instapay', 'transfer'] as const;
+type PaymentMethod = typeof VALID_PAYMENT_METHODS[number];
 
 export const dynamic = 'force-dynamic';
 
@@ -43,10 +47,20 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { customerId, packageId, branchId } = await req.json();
+    const { customerId, packageId, branchId, paymentMethod: rawPaymentMethod } = await req.json();
     if (!customerId || !packageId) {
       return NextResponse.json(
         { error: 'customerId and packageId are required.' },
+        { status: 400 }
+      );
+    }
+
+    const paymentMethod: PaymentMethod | null = rawPaymentMethod
+      ? (VALID_PAYMENT_METHODS.includes(rawPaymentMethod) ? rawPaymentMethod : null)
+      : 'cash';
+    if (!paymentMethod) {
+      return NextResponse.json(
+        { error: `Invalid paymentMethod. Must be one of: ${VALID_PAYMENT_METHODS.join(', ')}` },
         { status: 400 }
       );
     }
@@ -101,6 +115,23 @@ export async function POST(req: Request) {
       packageId: pkg.id,
     });
     const totals = buildInvoiceTotals([line]);
+
+    // Wallet guard: check balance before proceeding, refuse with 409 if short
+    if (paymentMethod === 'wallet') {
+      const { data: walletRow, error: walletReadErr } = await supabaseServer
+        .from('customers')
+        .select('wallet_balance')
+        .eq('id', customerId)
+        .maybeSingle();
+      if (walletReadErr) throw walletReadErr;
+      const available = Number(walletRow?.wallet_balance || 0);
+      if (available < totals.grandTotal) {
+        return NextResponse.json(
+          { error: `Insufficient wallet balance — EGP ${available} available, EGP ${totals.grandTotal} required.` },
+          { status: 409 }
+        );
+      }
+    }
     const expiresAt = new Date();
     expiresAt.setUTCDate(expiresAt.getUTCDate() + validityDays);
 
@@ -168,12 +199,46 @@ export async function POST(req: Request) {
       .insert({
         invoice_id: invoice.id,
         amount: totals.grandTotal,
-        method: 'cash',
+        method: paymentMethod,
         received_by_employee_id: access.access.employee.id,
       });
     if (paymentError) {
       await removeIncompleteSale(invoice.id, customerPackage.id);
       throw paymentError;
+    }
+
+    // Update spent_amount on the customer (read-then-write, same shape as addToCustomerSpend)
+    try {
+      const { data: customer, error: readErr } = await supabaseServer
+        .from('customers')
+        .select('spent_amount, wallet_balance')
+        .eq('id', customerId)
+        .maybeSingle();
+
+      if (!readErr && customer) {
+        await supabaseServer
+          .from('customers')
+          .update({
+            spent_amount: Number(customer.spent_amount || 0) + totals.grandTotal,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', customerId);
+
+        // Deduct wallet if paying from wallet
+        if (paymentMethod === 'wallet') {
+          const newBalance = Math.max(0, Number(customer.wallet_balance || 0) - totals.grandTotal);
+          await recordWalletMovement({
+            customerId,
+            direction: 'out',
+            amount: totals.grandTotal,
+            reason: 'package sale payment',
+            newBalance,
+            invoiceId: invoice.id,
+          });
+        }
+      }
+    } catch (spendErr) {
+      console.error('Failed to update customer spent_amount after package sale:', spendErr);
     }
 
     return NextResponse.json({

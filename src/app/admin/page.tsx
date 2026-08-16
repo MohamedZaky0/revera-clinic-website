@@ -1667,6 +1667,7 @@ export default function AdminPage() {
   const [showSellPackageModal, setShowSellPackageModal] = useState(false);
   const [availablePackageOffers, setAvailablePackageOffers] = useState<any[]>([]);
   const [selectedSellPackageId, setSelectedSellPackageId] = useState<string>("");
+  const [sellPackagePaymentMethod, setSellPackagePaymentMethod] = useState<string>("cash");
   const [sellingPackage, setSellingPackage] = useState(false);
 
   // Package/promotion awareness at booking + checkout time
@@ -4061,6 +4062,7 @@ export default function AdminPage() {
           customerId,
           packageId: selectedSellPackageId,
           branchId: null,
+          paymentMethod: sellPackagePaymentMethod,
         }),
       });
       const data = await res.json();
@@ -4068,6 +4070,7 @@ export default function AdminPage() {
         await fetchCustomerProfilePackages(customerId);
         setShowSellPackageModal(false);
         setSelectedSellPackageId("");
+        setSellPackagePaymentMethod("cash");
         alert(`Package sold successfully!${data.invoice?.invoice_no ? ` Invoice ${data.invoice.invoice_no}` : ""}`);
       } else {
         alert(data.error || "Failed to sell package.");
@@ -12380,6 +12383,21 @@ export default function AdminPage() {
                                     {pkg.name} - EGP {Number(pkg.price).toLocaleString()} ({pkg.items?.length || 0} services)
                                   </option>
                                 ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Payment Method</label>
+                              <select
+                                value={sellPackagePaymentMethod}
+                                onChange={(e) => setSellPackagePaymentMethod(e.target.value)}
+                                className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
+                              >
+                                <option value="cash">Cash</option>
+                                <option value="card">Card</option>
+                                <option value="wallet">Wallet</option>
+                                <option value="instapay">InstaPay</option>
+                                <option value="transfer">Transfer</option>
                               </select>
                             </div>
 
