@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-07-25
+> **Last Updated:** 2026-08-16
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -1562,6 +1562,337 @@ Three usability problems were present in `src/components/admin/bookings/AdminBoo
 - Calendar legend dots updated to match the new color palette.
 
 **Files changed:** `src/components/admin/bookings/AdminBookingsView.tsx`
+
+---
+
+## RISK-038: The Doctor's Recalculated Session Total Never Reaches The Database
+
+**Severity:** Critical · **Type:** Data loss / Revenue
+**Found:** 2026-08-16, during a full patient-journey audit requested after the clinic owner reported
+"Critical workflow logic problems from booking to payment."
+
+**What it is:** Everything a doctor adds during a live session — additional services, products used,
+extra device pulses — is computed into an invoice total on screen, and then silently discarded when
+the session is completed. Three separate defects stack to produce this:
+
+1. `handleCompleteTreatment` (`src/components/admin/DoctorAccountView.tsx:866-874`) PATCHes
+   `{ status, notes, price: updatedInvoiceTotal }`. **`reservations` has no `price` column**, and
+   the PATCH handler's field whitelist (`src/app/api/reservations/route.ts:750`) never destructures
+   `price` — it accepts `amountPaid`/`amountLeft`. The total is dropped server-side with no error.
+2. `additionalServices` is `useState` local to `DoctorOngoingSessionTab.tsx:139` — never lifted to
+   the parent, never passed to `handleCompleteTreatment`. The parent's `updatedInvoiceTotal`
+   (`DoctorAccountView.tsx:636` = `baseBookingPrice + productsSubtotal + extraPulsesSubtotal`) has
+   no knowledge additional services exist at all. So even if (1) were fixed, added services would
+   still be missing from the number being sent.
+3. Products and pulses *do* write to their own endpoints (`/api/inventory/products/sales`,
+   `/api/inventory/devices`), so stock/device counters move — but the reservation's own
+   `amount_left`/`service_ids` are never updated to match. Only a free-text summary is appended to
+   `notes`.
+
+**Business impact:** After any session where the doctor added anything, the reservation still
+carries only the originally-booked single-service price. Reception collects the wrong amount, and
+the difference is invisible — it exists only as prose inside `notes`. This is the root cause behind
+the "payment shows wrong after session end" symptom, and it compounds RISK-039 below.
+
+**Not yet fixed.**
+
+---
+
+## RISK-039: AdminBookingsView Fabricates Payment Status, Doctor Name And Room When Real Data Is Missing
+
+**Severity:** Critical · **Type:** Data integrity / Trust
+**Found:** 2026-08-16, same audit as RISK-038.
+
+**What it is:** The row-mapping block in `src/components/admin/bookings/AdminBookingsView.tsx`
+(~lines 195-239) invents plausible-looking values whenever a field can't be resolved, and renders
+them identically to real data — there is no visual distinction:
+
+- **Payment status (line 225):**
+  `r.paymentStatus || r.payment_status || (st === "completed" ? "Paid" : idx % 2 === 0 ? "Deposit Paid" : "Unpaid")`
+  Neither `paymentStatus` nor `payment_status` exists on a reservation row (no such column — see
+  `DB_SCHEMA.md`), so the fallback **always** fires. Every booking with `status === 'completed'` is
+  unconditionally labelled **"Paid"**, without ever reading `amount_paid`/`amount_left`. Non-completed
+  bookings get "Deposit Paid" or "Unpaid" based on their *array index parity* — pure noise.
+- **Doctor name (lines 200-217):** falls back to `allProv[idx % allProv.length]` — a rotating,
+  arbitrary *other* doctor — and failing that, the hardcoded literal `"Dr. Sara Ahmed"`.
+- **Room (line 219):** falls back to `` `Room ${(idx % 3) + 1}` ``.
+
+**Business impact:** Reception can be shown a booking marked Paid that was never paid, attributed
+to a doctor who never treated the patient, in a room it was never assigned to. Because the
+fallbacks are index-derived rather than random, they are *stably* wrong — they look consistent
+across refreshes, which makes them more convincing, not less.
+
+**Note:** the underlying data is actually correct — `handleCompleteTreatment` sends no `amountPaid`,
+so `amount_paid` correctly stays at its real value and the server recomputes `amount_left` properly.
+This is purely a display-layer fabrication. Fixing the display is necessary but not sufficient while
+RISK-038 keeps the total itself wrong.
+
+**Not yet fixed.**
+
+---
+
+## RISK-040: "Cancel & Return" On The Public Deposit Step Orphans The Reservation And Duplicates It On Retry
+
+**Severity:** High · **Type:** Data integrity
+**Found:** 2026-08-16, same audit.
+
+**What it is:** The public booking flow creates the reservation row at the *end of step 2*
+(`handleConfirm`, `src/components/BookingModal.tsx:677-714`) — before the deposit is paid — and then
+advances to step 3. The "Cancel & Return" button on step 3
+(`src/components/BookingModal.tsx:1663-1674`) does:
+
+```js
+onClick={() => { setStep(2); setCreatedReservation(null); }}
+```
+
+It clears **browser state only**. The already-created `pending_deposit` row is neither cancelled nor
+deleted. If the patient then re-submits step 2, `handleConfirm` fires a fresh `POST /api/reservations`
+and a second row is created. Every round trip leaves another orphan.
+
+**Business impact:** Duplicate/phantom bookings accumulate in the pending queue, each consuming
+apparent capacity and appearing in Reception's approval list. `customers.number_of_bookings` is also
+incremented on each POST (`route.ts:563`), inflating that counter.
+
+**Not yet fixed.** Fix direction: either PATCH the existing reservation to `cancelled` on return, or
+reuse `createdReservation.id` on re-submit instead of creating a new row.
+
+---
+
+## RISK-041: Admin "New Booking" Captures No Payment And Has A Fallback Insert That Cannot Succeed
+
+**Severity:** High · **Type:** Revenue / Silent failure
+**Found:** 2026-08-16, same audit.
+
+**What it is:** Two defects in `src/components/admin/bookings/AdminNewBookingView.tsx`:
+
+1. **No payment capture (lines 472-487):** the payload sent to `POST /api/reservations` contains no
+   `amountPaid`/`amountLeft`. Combined with `isManual: true` — which skips the deposit branch
+   entirely (`route.ts:680-684`) — every staff-created booking is written with `amount_paid = 0`
+   and `amount_left = full price`. There is no field, checkbox or input anywhere in this form for
+   reception to record a deposit or cash payment actually taken at the desk.
+2. **Unreachable-success fallback (lines 509-558):** if the API POST fails, a "direct Supabase
+   insert fallback" runs using column names that **do not exist** on `reservations` —
+   `patient_name`, `customer_name`, `customer_phone`, `start_time`, `time`, `room`, `service_name`
+   (and on `customers`: `first_name`, `last_name`, `full_name`, `whatsapp`, `phone`). It cannot
+   succeed. Its error is logged but not surfaced (line 556-558), and the handler then unconditionally
+   calls `onBookingCreated()` and `onClose()` (lines 570-571) — so the UI reports success and closes
+   even when nothing was written at all.
+
+**Business impact:** Money taken at the desk is never recorded against the booking. Separately, a
+failed booking can present as a successful one.
+
+**Not yet fixed.** This is the same silent-fallback anti-pattern `route.ts:709-716` explicitly warns
+against (see RISK-020).
+
+---
+
+## RISK-042: Wallet And Package Sales Bypass The Customer Balance Fields Entirely
+
+**Severity:** High · **Type:** Accounting
+**Found:** 2026-08-16, same audit.
+
+**What it is:** Three independent gaps in the customer-level money fields
+(`customers.spent_amount` / `outstanding` / `wallet_balance`):
+
+1. **POS wallet payments never deduct the wallet** —
+   `src/app/api/inventory/products/sales/route.ts`, `addToCustomerSpend()` (lines 121-149).
+   `payment_method: 'wallet'` is accepted and recorded in the `payments` ledger, but nothing
+   anywhere subtracts from `customers.wallet_balance`. The same store credit can be spent
+   repeatedly, with no upper bound on the drift.
+2. **Package sales don't touch any of the three fields** —
+   `src/app/api/packages/sell/route.ts:100-177` writes a correct `invoices` + `invoice_lines` +
+   `payments` set, but never updates the scalar fields the Patient Profile and Customers list
+   actually display. Package revenue — likely the largest per-patient category — is invisible in
+   "Total Spent". Additionally `payments.method` is hardcoded `'cash'` (line 171) regardless of the
+   real method, corrupting payment-method reporting for every package sale.
+3. **`wallet_txns` is never written** — grep across `src/`: read in exactly one place
+   (`src/app/api/customers/reconcile/route.ts:33`), inserted nowhere. `src/lib/customerBalances.ts:77-79`
+   derives the ledger wallet balance solely from that table, so it is permanently `0`. Since
+   `wallet_balance` legitimately becomes non-zero via the cancel-refund path
+   (`reservations/route.ts:1021`), the reconcile tool reports a wallet mismatch for essentially every
+   customer who ever had a refunded deposit. **The wallet column of `GET /api/customers/reconcile`
+   is currently noise, not signal** — it cannot be used to detect real drift.
+
+**Verified sound (not a defect):** `computeSettledBalances()` in `src/lib/billing.ts`, called from
+`reservations/route.ts:1178-1235`, is correctly delta-based and idempotent; the cancel→wallet refund,
+no-show→spend forfeit, and completion settlement arithmetic all check out. The problem is the two
+write paths above that bypass it, not the settlement logic itself.
+
+**Also relevant (intentional, but a third divergence source):** `src/app/admin/page.tsx:6996` lets
+staff overwrite `wallet_balance` as an absolute value from the manual edit form.
+
+**Not yet fixed.**
+
+---
+
+## RISK-043: A "Started" Session Has No Timestamp And No Expiry — Sessions Stay Open Indefinitely
+
+**Severity:** Medium · **Type:** Data hygiene / Reporting
+**Found:** 2026-08-16, same audit. Reported symptom: a doctor was found with an ongoing session
+still open from the 10th of the month.
+
+**What it is:** Reception's "Start Session" (`src/app/admin/page.tsx:24259-24279`) PATCHes
+`{ status: 'started' }` and nothing else. **No `started_at` column exists** — confirmed absent from
+every file in `supabase/migrations/`. This is in direct contrast to `approved_at`, `completed_at`
+and `cancelled_at`, which are all set explicitly by the PATCH route (`route.ts:971`, `1097-1098`).
+
+Because no timestamp is recorded, there is no data from which a timeout, staleness warning or
+auto-close could be built — not merely "the check is missing", but "the input for any such check
+does not exist."
+
+**Business impact:** Sessions abandoned without completion stay `started` forever. They also keep
+counting toward "Upcoming" on the dashboard (see RISK-044), and hold a doctor as apparently busy.
+
+**Not yet fixed.** Fix direction: add `started_at timestamptz` (migration + `DB_SCHEMA.md` in the
+same change, per CLAUDE.md rule 6), set it on the `started` transition, then build any staleness
+surfacing on top of it.
+
+---
+
+## RISK-044: Dashboard Summary Cards Use Three Different, Mostly Unbounded Time Periods
+
+**Severity:** Medium · **Type:** Reporting correctness
+**Found:** 2026-08-16, same audit.
+
+**What it is:** In `src/components/admin/bookings/AdminBookingsView.tsx`, `mergedAppointments`
+(line 172) is fed by a query with **no date filter at all** (line 142) — every reservation ever
+created. `stats` (lines 298-314) then derives four cards from it with inconsistent scoping:
+
+| Card | Line | Actual period |
+|---|---|---|
+| Today's Appointments | 299, 308 | Single selected day |
+| Upcoming | 300, 310 | **All-time, unbounded** |
+| Completed | 301, 311 | **All-time, unbounded** |
+| Canceled | 302, 312 | **All-time, unbounded** |
+
+Two further defects in the same block:
+- **"Upcoming" has no `date >= today` condition** — a forgotten `pending`/`confirmed` booking from
+  months ago counts as Upcoming permanently. This compounds RISK-043: a stuck session also never
+  leaves this count.
+- **"Postponed" is bucketed with cancellations** (line 302:
+  `["canceled", "cancelled", "postponed"].includes(...)`). RISK-029 established `postponed` as a
+  deliberately distinct, non-terminal state that moves no money and *will still happen*. Counting it
+  as cancelled overstates lost bookings and hides genuine reschedule volume.
+
+**Note:** this is the shared Bookings screen, used regardless of role — **not**
+`ReceptionDashboardView.tsx` / `GET /api/reception/dashboard`, whose own "Today's Bookings" /
+"Pending Approval" widgets (lines 320-350) are correctly day-scoped and are not affected.
+
+**Not yet fixed.** Scoping these to a period is a contained change (a single flat array in one
+`useMemo`) — but *which* period is a product decision, not a code one, and is unresolved.
+
+---
+
+## RISK-045: Prescription Save Reports Success On Failure; Two Rival Prescription UIs
+
+**Severity:** High · **Type:** Silent failure / Clinical record
+**Found:** 2026-08-16, same audit.
+
+**What it is:** `src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx:230-235`:
+
+```js
+if (res.ok) { alert("Prescription saved successfully!"); }
+else        { alert("Prescription recorded for session."); }   // failure path
+```
+
+A failed `POST /api/prescriptions` produces a success-sounding message. There is no error state
+anywhere in the component — the doctor has no way to distinguish a saved prescription from a lost
+one.
+
+**Compounding factor:** two independent prescription editors exist with separate state — the inline
+writer in `DoctorOngoingSessionTab.tsx` (`rxDiagnosis`/`rxMedications`, lines 146-150) and the
+standalone `DoctorPrescriptionModal.tsx` (parent-level state). Filling one does not populate the
+other, so it is easy to fill the wrong one and reasonably assume it was saved.
+
+**Adjacent, lower-likelihood (same shape):** `POST /api/medical-records`
+(`src/app/api/medical-records/route.ts:171-199`) performs a genuine
+`upsert(..., { onConflict: 'customer_id' })` — repeat saves correctly update the same row, so the
+"only saves the first time" suspicion is **not** borne out by the code. However, if that upsert
+throws, it silently falls back to writing `data/medical_records.json` with no error surfaced, and on
+Vercel that file is not durably persisted.
+
+**Not yet fixed.**
+
+---
+
+## RISK-046: A Failed `checked_in` Write Returns `checked_in` Anyway, Desyncing UI From Database
+
+**Severity:** High · **Type:** Silent failure
+**Found:** 2026-08-16, same audit.
+
+**What it is:** `src/app/api/reservations/route.ts:1158-1171` — when a PATCH sets
+`status: 'checked_in'` and the update is rejected, the fallback writes **`confirmed`** to the
+database, then returns `{ ...fbUpdated, status: 'checked_in' }` to the caller. The frontend
+(`src/app/admin/page.tsx:24234`) trusts the response and sets local state to `checked_in`. UI and
+database disagree until the next hard refetch, at which point the status appears to spontaneously
+revert.
+
+The `checked_in` CHECK-constraint migration (`20260810000000_add_checked_in_reservation_status.sql`)
+looks correct, so this path may be dormant today — but RISK-020 already documents that migration
+application isn't reliably tracked here and that the dev and main databases have diverged, which is
+exactly the condition that arms this.
+
+This reintroduces, for check-in specifically, the precise anti-pattern that `route.ts:709-716`'s own
+inline comment says must never happen again.
+
+**Not yet fixed.**
+
+---
+
+## RISK-047: Approve Request Pre-Fills A Hardcoded Doctor And Discards The Patient's Requested Time
+
+**Severity:** High · **Type:** Business logic
+**Found:** 2026-08-16, same audit.
+
+**What it is:** `openApprove(r)` (`src/app/admin/page.tsx:7568-7573`) never reads `r.requestedTime` —
+the time the patient actually chose, which is populated and used elsewhere (e.g. line 23554). Instead
+`refreshApproveAvailability` (lines 7554-7566) does:
+
+```js
+const first = filteredSlots.find((s) => !unavailable.includes(s)) || filteredSlots[0] || SLOTS[0];
+setSlot(first);
+```
+
+— always the **first available slot of the day**, i.e. the clinic's opening time (09:00 by default).
+The date is filled correctly from `r.date` (line 7571); only the time is wrong.
+
+Line 7573 additionally does `setDoctorName("Dr. Sara El Gamel")` — a **hardcoded specific doctor**
+pre-selected for every approval, regardless of the reservation's own `doctorName` or that doctor's
+availability.
+
+**Business impact:** Reception is shown a plausible-looking pre-filled form whose time and doctor
+both silently contradict the request. There is no visual cue that these are defaults rather than the
+patient's actual booking, so an inattentive approval confirms the wrong slot with the wrong doctor.
+
+**Not yet fixed.**
+
+---
+
+## RISK-048: Pulse Counter Shown For Non-Laser Services; No Out-Of-Stock Indicator On Products
+
+**Severity:** Medium · **Type:** UX / Inventory
+**Found:** 2026-08-16, same audit.
+
+**What it is:** Two missing-logic gaps in
+`src/components/admin/doctor/tabs/DoctorOngoingSessionTab.tsx`:
+
+1. **Pulse counter is ungated.** The "Total Pulses Calculated" badge (lines 613-618) and the
+   per-service pulse override input render unconditionally, with no check of service type or linked
+   device. Any service added via "Add Additional Service" defaults `pulsesCountForService` to `100`
+   (line 142) even when the service has no device associated with it at all.
+2. **No stock state on the product picker.** The product `<select>` (lines 764-770) renders
+   `{p.name} ({p.price} EGP)` only — it reads no quantity field, disables nothing, and shows no
+   "Out of Stock" flag. A doctor can record consumption of a product that has none left, with no
+   warning.
+
+**Related, separate defect (same file):** *Primary Reserved Service* does not auto-select the booked
+service. Line 634 tries `activeSessionBooking.service_id`, but `mapRow()`
+(`src/app/api/reservations/route.ts:22-30`) returns the column as **`serviceId`** (camelCase) — the
+snake_case key is never present, so the direct match always misses and the code falls through to
+bidirectional `.includes()` string matching against service names, which mismatches whenever the
+stored label and current service name differ.
+
+**Not yet fixed.**
 
 ---
 

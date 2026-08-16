@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-07-25
+> **Last Updated:** 2026-08-13
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -1258,6 +1258,49 @@ module** — forking this repo already makes it portable, same as every other ro
 - If the "Quick Book" popup and the `/book` page ever drift in behavior, both now need updating —
   they share `BookingModal`'s internals via the `variant` prop specifically to minimize this risk,
   but the wrapper JSX/close-button/success-action branches are still hand-kept in sync.
+
+---
+
+## DEC-041: `customers.date_of_birth` Added Alongside Legacy `age`, No Separate "Incomplete" Flag
+
+**Date:** 2026-08-13
+**Status:** Decided — active
+
+**Context:**
+The clinic owner is digitizing years of paper client-intake forms (multiple clinics, several
+different form layouts) into a spreadsheet for later import, with the explicit goal of running
+birthday-based re-targeting campaigns (packages/offers timed around a patient's birthday). The
+existing `customers.age` column is a static integer snapshot entered once — it goes stale and
+cannot drive a recurring birthday campaign. No `date_of_birth` column existed at all. We also
+discussed and dropped a separate "origin governorate vs. current residence" field (deemed added
+complexity without a concrete use case — `area`/`address` already capture current residence,
+which is what matters for branch-proximity targeting) and a dedicated "profile incomplete" boolean
+flag.
+
+**Chosen Option:**
+- Added `customers.date_of_birth` (nullable `date`) via
+  `supabase/migrations/20260813120000_add_date_of_birth_to_customers.sql`.
+- `customers.age` is kept, unchanged, as the fallback for old records where only an age — never a
+  real birth date — was ever collected on paper.
+- No new "incomplete data" column. `date_of_birth IS NULL` is treated as the completeness marker
+  for the re-targeting campaign query, rather than duplicating that state in a second field.
+
+**Reason:**
+- A real date is required to drive a recurring (yearly) birthday campaign; an age snapshot cannot.
+- Keeping `age` avoids silently losing data for legacy patients whose paper forms never captured a
+  birth date and where a real DOB can no longer be obtained.
+- A dedicated boolean flag for "incomplete" would just restate `date_of_birth IS NULL` in a second
+  place that could drift from the real data — rejected as unnecessary complexity per current scope.
+
+**Trade-offs:**
+- `age` and `date_of_birth` are two independent, unreconciled fields — the schema does not enforce
+  or compute one from the other, so they can disagree for a given patient and nothing flags that.
+- If reception staff later need to distinguish "never asked for DOB" from "asked, patient declined
+  to share," `NULL` alone cannot tell those apart — deferred until that distinction is shown to
+  matter in practice, not built speculatively now.
+- No import tooling exists yet to load the historical spreadsheet into `customers`/`reservations` —
+  this decision only adds the destination column; building the actual import path is separate,
+  unscoped work.
 
 
 ---

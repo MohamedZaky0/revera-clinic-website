@@ -1,6 +1,6 @@
 # DB_SCHEMA.md — Revera Clinics Database Schema
 
-> **Last Updated:** 2026-07-26
+> **Last Updated:** 2026-08-13
 > **Database:** Supabase (PostgreSQL)
 > **Audited from:** `supabase/migrations/*.sql`, live API routes, and a direct linked dev schema dump on 2026-07-26
 > **Previous content was for a different project — discarded entirely**
@@ -149,7 +149,8 @@ no application code reads or writes it; do not use it until its purpose is decid
 | `building_no` | text | Building number, nullable |
 | `floor_no` | text | Floor number, nullable |
 | `note` | text | Administrative customer notes, nullable |
-| `age` | integer | Customer age, nullable |
+| `age` | integer | Customer age, nullable. Legacy/free-entry field — a static snapshot at whatever moment it was entered, not derived from `date_of_birth`. Kept for old records where only age (not a real birth date) was ever collected; new intake should prefer `date_of_birth`. |
+| `date_of_birth` | date | Nullable. **Added 2026-08-13** by `20260813120000_add_date_of_birth_to_customers.sql` (DEC-041) — the durable field for birthday-based re-targeting (packages/offers around a patient's birthday). `NULL` doubles as "incomplete" for that campaign; no separate flag column — deliberately, to avoid a second field that can drift out of sync with the real data. |
 | `national_id` | text | National ID card number, unique, nullable |
 | `address` | text | Detailed address string, nullable |
 | `referral` | text | Referral source, nullable |
