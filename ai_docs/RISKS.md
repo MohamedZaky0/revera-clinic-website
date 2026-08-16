@@ -1803,7 +1803,7 @@ until a deliberate opening-balance import is done under DEC-024 — a separate d
 
 ---
 
-## RISK-043: A "Started" Session Has No Timestamp And No Expiry — Sessions Stay Open Indefinitely
+## RISK-043: A "Started" Session Has No Timestamp And No Expiry — Sessions Stay Open Indefinitely (RESOLVED)
 
 **Severity:** Medium · **Type:** Data hygiene / Reporting
 **Found:** 2026-08-16, same audit. Reported symptom: a doctor was found with an ongoing session
@@ -1821,11 +1821,33 @@ does not exist."
 **Business impact:** Sessions abandoned without completion stay `started` forever. They also keep
 counting toward "Upcoming" on the dashboard (see RISK-044), and hold a doctor as apparently busy.
 
-**Fixed — 2026-08-16:**
+**Fixed — 2026-08-16 (data layer):**
 - `started_at` is now set to `new Date().toISOString()` on the `started` transition in
   `src/app/api/reservations/route.ts:1108-1110`, guarded so a later money-only PATCH on an
   already-started booking does not reset the clock.
 - `mapRow()` returns `startedAt` to callers (line 54).
+- Migration: `supabase/migrations/20260816120000_add_started_at_to_reservations.sql`.
+
+**Fixed — 2026-08-16 (surfacing):** the timestamp above was the *input* for a staleness check, but
+nothing consumed it — a grep for `started_at` found it only inside `reservations/route.ts` itself, so
+the reported symptom (a doctor forgetting a session open) was still live. Now:
+- `getSessionStaleness()` + `STALE_SESSION_THRESHOLD_MS` added to `src/lib/services.ts`. Threshold is
+  a **fixed 2 hours** by clinic decision, deliberately *not* derived from the service's
+  `duration_minutes`: a single number staff can reason about beat per-service accuracy here.
+- It only ever reports on `started`/`in_progress` — a completed or cancelled booking is never stale
+  regardless of how old its `started_at` is.
+- Sessions started before this migration have `started_at = null`. Rather than fabricate an elapsed
+  time, those fall back to the booking's own date: still open from an earlier day → stale with
+  `elapsedMs = null`, and the UI prints "Left open" instead of a made-up duration.
+- `AdminBookingsView`: per-row red badge under the status pill ("Open 3h" / "Open 2d"), plus a
+  **Needs Attention** panel above the table listing every stale session across all loaded
+  reservations — not just the selected day, since the whole point is to catch days nobody is looking
+  at. Each entry opens the booking so staff can complete or cancel it.
+
+**Deliberately not done:** auto-closing stale sessions. Choosing the terminal state is a business
+decision, not a code one — `completed` would run `computeSettledBalances()` and move money on a
+session nobody confirmed, and `no_show` forfeits spend; a neutral `abandoned` state would need a
+CHECK-constraint migration. Both surfacing paths keep a human on the money decision.
 
 ---
 
