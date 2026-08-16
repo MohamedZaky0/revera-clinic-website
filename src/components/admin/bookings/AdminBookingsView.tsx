@@ -912,15 +912,15 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                         setSelectedDate(new Date(y, m - 1, d));
                         setCurrentPage(1);
                       }}
-                      className="group flex flex-col items-center justify-center py-1 transition cursor-pointer"
+                      className="group flex flex-col items-center justify-center py-1 transition cursor-pointer outline-none bg-transparent hover:bg-transparent focus:bg-transparent"
                     >
                       <div
                         className={`flex h-8 w-8 items-center justify-center rounded-full text-xs transition-all ${
                           !cell.currentMonth
-                            ? "text-gray-300 hover:bg-gray-100/60"
+                            ? "text-gray-300 group-hover:bg-gray-100/60"
                             : isSelected
-                            ? "bg-[#1E3A2B] text-white font-bold shadow-xs hover:bg-[#162C20]"
-                            : "text-[#374151] font-semibold hover:bg-gray-100 hover:text-[#111827]"
+                            ? "bg-[#1E3A2B] text-white font-bold shadow-xs group-hover:bg-[#162C20]"
+                            : "text-[#374151] font-semibold group-hover:bg-gray-100 group-hover:text-[#111827]"
                         }`}
                       >
                         {cell.day}
