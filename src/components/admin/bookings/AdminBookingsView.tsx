@@ -197,7 +197,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       const sVariant = r.service_variant || (localServices.find(s => String(s.id) === String(r.service_id || r.serviceId))?.cat) || "Session";
       
       // Thorough Doctor Name Resolution
-      let rawDoc = r.doctor_name || r.doctorName || (typeof r.doctor === "string" && r.doctor !== "Doctor" ? r.doctor : r.doctor?.name) || r.provider_name || r.providerName || (typeof r.provider === "string" && r.provider !== "Doctor" ? r.provider : r.provider?.name);
+      const rawDoc = r.doctor_name || r.doctorName || (typeof r.doctor === "string" && r.doctor !== "Doctor" ? r.doctor : r.doctor?.name) || r.provider_name || r.providerName || (typeof r.provider === "string" && r.provider !== "Doctor" ? r.provider : r.provider?.name);
 
       const targetProvId = String(r.provider_id || r.providerId || r.doctorId || r.doctor_id || "");
       let doc = rawDoc;
@@ -209,20 +209,26 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         }
       }
 
-      if ((!doc || doc === "Doctor") && allProv.length > 0) {
-        const fallbackP = allProv[idx % allProv.length];
-        if (fallbackP) doc = fallbackP.name || fallbackP.full_name || fallbackP.name_en;
-      }
+      if (!doc || doc === "Doctor") doc = "—";
 
-      if (!doc || doc === "Doctor") doc = "Dr. Sara Ahmed";
-
-      const rm = r.room || r.room_name || `Room ${(idx % 3) + 1}`;
+      const rm = r.room || r.room_name || "—";
       
       let st = (r.status || "confirmed").toLowerCase();
       if (st === "approved") st = "confirmed";
       if (st === "started") st = "in_progress";
 
-      let paySt = r.paymentStatus || r.payment_status || (st === "completed" ? "Paid" : idx % 2 === 0 ? "Deposit Paid" : "Unpaid");
+      const amtPaid = Number(r.amountPaid ?? 0);
+      const amtLeft = Number(r.amountLeft ?? 0);
+      let paySt: string;
+      if (isNaN(amtPaid) || isNaN(amtLeft)) {
+        paySt = "—";
+      } else if (amtPaid <= 0) {
+        paySt = "Unpaid";
+      } else if (amtLeft > 0) {
+        paySt = "Partially Paid";
+      } else {
+        paySt = "Paid";
+      }
 
       return {
         ...r,
