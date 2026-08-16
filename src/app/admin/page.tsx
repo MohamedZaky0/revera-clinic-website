@@ -7570,7 +7570,17 @@ export default function AdminPage() {
     try {
       setApproveDate(r.date);
       await refreshApproveAvailability(r, r.date);
-      setDoctorName("Dr. Sara El Gamel");
+
+      // Prefer the patient's originally requested time if it's still available
+      const requestedSlot = r.requestedTime || r.timeSlot || "";
+      if (requestedSlot && !approveUnavailableSlots.includes(requestedSlot)) {
+        const { start, end } = getDayOperatingHoursApprove({ ...r, date: r.date });
+        const norm = normaliseTo24hSlot(requestedSlot) ?? "";
+        if (norm >= start && norm < end) {
+          setSlot(requestedSlot);
+        }
+      }
+
       setSelected(r);
     } catch (err) {
       console.error("openApprove error:", err);
