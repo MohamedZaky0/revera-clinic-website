@@ -150,6 +150,7 @@ export default function AdminNewBookingView({
 
   const [sessionType, setSessionType] = useState<"in_person" | "online">("in_person");
   const [notes, setNotes] = useState<string>("");
+  const [amountPaidNow, setAmountPaidNow] = useState<number>(0);
 
   // DB Lists
   const [dbServices, setDbServices] = useState<ServiceItem[]>(services);
@@ -396,7 +397,7 @@ export default function AdminNewBookingView({
 
       shiftRanges.forEach(range => {
         for (let hour = range.start; hour < range.end; hour++) {
-          for (let min of [0, 30]) {
+          for (const min of [0, 30]) {
             const hour12 = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
             const ampm = hour >= 12 ? "PM" : "AM";
             const hh = String(hour12).padStart(2, "0");
@@ -483,79 +484,22 @@ export default function AdminNewBookingView({
         notes: notes || null,
         isManual: true,
         status: "approved",
-        explicitCustomerId: foundCustomer?.id || null
+        explicitCustomerId: foundCustomer?.id || null,
+        amountPaid: amountPaidNow,
+        amountLeft: Number(selectedServiceObj?.price || 0) - amountPaidNow
       };
 
-      let success = false;
+      const res = await fetch("/api/reservations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-      // 1. Try POST /api/reservations endpoint
-      try {
-        const res = await fetch("/api/reservations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          success = true;
-        } else {
-          const errData = await res.json();
-          console.warn("API reservation endpoint response warning, executing direct insert fallback:", errData);
-        }
-      } catch (e) {
-        console.warn("API fetch error, executing direct insert fallback:", e);
-      }
-
-      // 2. Direct Supabase insert fallback to ensure guaranteed write
-      if (!success) {
-        let customerId = foundCustomer?.id;
-        if (!customerId) {
-          const { data: newCust } = await supabase
-            .from("customers")
-            .insert({
-              name: fullPatientName,
-              mobile: phone,
-              phone: phone,
-              first_name: firstName,
-              last_name: lastName,
-              full_name: fullPatientName,
-              email: email || null,
-              whatsapp: whatsapp || phone,
-              number_of_bookings: 1
-            })
-            .select("id")
-            .maybeSingle();
-
-          if (newCust) customerId = newCust.id;
-        }
-
-        const directResPayload = {
-          customer_id: customerId || null,
-          patient_name: fullPatientName,
-          customer_name: fullPatientName,
-          customer_phone: phone,
-          phone: phone,
-          email: email || null,
-          service_id: selectedServiceObj?.id || null,
-          service_name: selectedServiceName,
-          provider_id: selectedDoctorObj?.id || null,
-          doctor_name: selectedDoctorName,
-          branch_id: selectedBranchObj?.id || null,
-          room_id: selectedRoomId || null,
-          room: selectedRoomName,
-          date: bookingDate,
-          start_time: selectedTime,
-          time: selectedTime,
-          session_type: sessionType === "in_person" ? "In Person" : "Online",
-          notes: notes || null,
-          status: "approved",
-          amount_paid: usePackageMode ? 0 : Number(selectedServiceObj?.price || 500)
-        };
-
-        const { error: insErr } = await supabase.from("reservations").insert(directResPayload);
-        if (insErr) {
-          console.error("Direct reservation insert error:", insErr);
-        }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = (errData as any)?.error || (errData as any)?.message || "Failed to create booking. Please try again.";
+        alert(errMsg);
+        return;
       }
 
       if (action === "print") {
@@ -976,6 +920,22 @@ export default function AdminNewBookingView({
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add any notes about this appointment..."
                   className="w-full rounded-2xl border border-[#414E36]/20 bg-white p-3.5 text-xs text-[#1F251A] outline-none focus:border-emerald-700"
+                />
+              </div>
+
+              {/* Amount Paid Now */}
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="font-bold text-[#1F251A]">Amount Paid Now</label>
+                  <span className="text-[11px] text-[#5A6A51] font-mono">EGP</span>
+                </div>
+                <input
+                  type="number"
+                  min={0}
+                  value={amountPaidNow}
+                  onChange={(e) => setAmountPaidNow(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-full rounded-2xl border border-[#414E36]/20 bg-white p-3.5 text-xs text-[#1F251A] outline-none focus:border-emerald-700"
+                  placeholder="0"
                 />
               </div>
             </div>
