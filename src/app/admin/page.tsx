@@ -1214,7 +1214,9 @@ export default function AdminPage() {
           fetch(`/api/employees/notes?employeeId=${viewingEmployee.id}`, {
             headers: { Authorization: `Bearer ${session?.access_token || ''}` },
           }),
-          fetch(`/api/reservations?createdByEmployeeId=${viewingEmployee.id}`)
+          fetch(`/api/reservations?createdByEmployeeId=${viewingEmployee.id}`, {
+            headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+          })
         ]);
 
         if (notesRes.ok) {
@@ -6521,7 +6523,7 @@ export default function AdminPage() {
       setLoading(true);
     }
     const branchParam = branch ? `&branchId=${branch}` : "";
-    return cachedFetch(`/api/reservations?status=pending${branchParam}`, 2000)
+    return cachedFetch(`/api/reservations?status=pending${branchParam}`, 2000, authenticatedJsonHeaders)
       .then((data) => {
         if (Array.isArray(data)) {
           setRequests(data);
@@ -6548,7 +6550,7 @@ export default function AdminPage() {
       String(scheduleDate.getMonth() + 1).padStart(2, '0'),
       String(scheduleDate.getDate()).padStart(2, '0'),
     ].join('-');
-    fetch(`/api/reservations?date=${dateStr}`, { cache: "no-store" })
+    fetch(`/api/reservations?date=${dateStr}`, { cache: "no-store", headers: authenticatedJsonHeaders })
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data)) setScheduleReservations(data);
@@ -7501,7 +7503,7 @@ export default function AdminPage() {
     const branchParam = branch ? `?branchId=${branch}` : "";
     const url = `/api/reservations${branchParam}`;
     if (!useCache) clearFetchCache(url);
-    return cachedFetch(url, 2000)
+    return cachedFetch(url, 2000, authenticatedJsonHeaders)
       .then((data) => {
         if (Array.isArray(data)) {
           setAllReservations(data);

@@ -1,14 +1,14 @@
 const cache = new Map<string, { data: any; timestamp: number }>();
 
-export async function cachedFetch(url: string, ttl = 3000) {
+export async function cachedFetch(url: string, ttl = 3000, headers?: Record<string, string>) {
   const now = Date.now();
   const cached = cache.get(url);
-  
+
   if (cached && (now - cached.timestamp) < ttl) {
     return cached.data;
   }
-  
-  const res = await fetch(url);
+
+  const res = await fetch(url, headers ? { headers } : undefined);
   if (!res.ok) {
     throw new Error(`Fetch failed: ${res.statusText}`);
   }
