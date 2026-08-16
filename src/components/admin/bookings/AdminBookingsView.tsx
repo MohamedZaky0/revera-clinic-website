@@ -22,6 +22,7 @@ import {
   Sparkles,
   Search,
   ChevronDown,
+  Eye,
   Loader2
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
@@ -795,17 +796,60 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       >
                         <X size={16} strokeWidth={2.5} />
                       </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onViewBookingDetails) onViewBookingDetails(item.raw);
-                        }}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 text-[#6B7280] transition"
-                        title="More actions"
-                      >
-                        <MoreVertical size={16} />
-                      </button>
+                      <div className="relative dropdown-action-menu">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuId((prev) => (prev === item.id ? null : item.id));
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 text-[#6B7280] transition dropdown-action-menu cursor-pointer"
+                          title="More actions"
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+
+                        {activeMenuId === item.id && (
+                          <div className="absolute right-0 top-8 z-50 w-44 rounded-xl border border-gray-100 bg-white p-1 shadow-xl text-xs animate-in fade-in duration-150 dropdown-action-menu text-left">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuId(null);
+                                if (onViewBookingDetails) onViewBookingDetails(item.raw);
+                              }}
+                              className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition cursor-pointer"
+                            >
+                              <Eye size={14} className="text-gray-500" />
+                              <span>View Details</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuId(null);
+                                handleApproveItem(item);
+                              }}
+                              className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-emerald-50 font-semibold text-emerald-700 transition cursor-pointer"
+                            >
+                              <Check size={14} className="text-emerald-600" />
+                              <span>Approve Booking</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuId(null);
+                                handleRejectItem(item);
+                              }}
+                              className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-rose-50 font-semibold text-rose-600 transition cursor-pointer"
+                            >
+                              <X size={14} className="text-rose-500" />
+                              <span>Reject Booking</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>

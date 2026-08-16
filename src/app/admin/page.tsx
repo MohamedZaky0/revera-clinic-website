@@ -9034,7 +9034,7 @@ export default function AdminPage() {
                                         e.stopPropagation();
                                         setActiveDoctorRowMenuId(prev => prev === docKey ? null : docKey);
                                       }}
-                                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer ${
+                                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
                                         activeDoctorRowMenuId === docKey
                                           ? "border-[#414E36] bg-[#414E36] text-white"
                                           : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
@@ -9045,7 +9045,7 @@ export default function AdminPage() {
                                     </button>
 
                                     {activeDoctorRowMenuId === docKey && (
-                                      <div className="absolute right-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left">
+                                      <div className="absolute right-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left dropdown-action-menu">
                                         {hasPermission("providers.edit") && (
                                           <button
                                             type="button"
@@ -9463,7 +9463,7 @@ export default function AdminPage() {
                                                 e.stopPropagation();
                                                 setActiveServiceRowMenuId(prev => prev === svc.id ? null : svc.id);
                                               }}
-                                              className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer ${
+                                              className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
                                                 activeServiceRowMenuId === svc.id
                                                   ? "border-[#414E36] bg-[#414E36] text-white"
                                                   : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
@@ -9474,7 +9474,7 @@ export default function AdminPage() {
                                             </button>
 
                                             {activeServiceRowMenuId === svc.id && (
-                                              <div className="absolute right-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left">
+                                              <div className="absolute right-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left dropdown-action-menu">
                                                 {hasPermission("services.edit") && (
                                                   <>
                                                     <button
@@ -12895,7 +12895,7 @@ export default function AdminPage() {
                           e.stopPropagation();
                           setShowCustomerMoreMenu(prev => !prev);
                         }}
-                        className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
+                        className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs dropdown-action-menu ${
                           showCustomerMoreMenu
                             ? "border-[#414E36] bg-[#414E36] text-white"
                             : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
@@ -12906,7 +12906,7 @@ export default function AdminPage() {
                       </button>
 
                       {showCustomerMoreMenu && (
-                        <div className="absolute right-0 top-11 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-2xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150">
+                        <div className="absolute right-0 top-11 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-2xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 dropdown-action-menu">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -13096,7 +13096,7 @@ export default function AdminPage() {
                                   e.stopPropagation();
                                   setActiveCustomerRowMenuId(prev => prev === uniqueKey ? null : uniqueKey);
                                 }}
-                                className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer ${
+                                className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
                                   activeCustomerRowMenuId === uniqueKey
                                     ? "border-[#414E36] bg-[#414E36] text-white"
                                     : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
@@ -13107,7 +13107,7 @@ export default function AdminPage() {
                               </button>
 
                               {activeCustomerRowMenuId === uniqueKey && (
-                                <div className="absolute right-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left">
+                                <div className="absolute right-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left dropdown-action-menu">
                                   {hasPermission("customers.edit") && (
                                     <button
                                       type="button"
