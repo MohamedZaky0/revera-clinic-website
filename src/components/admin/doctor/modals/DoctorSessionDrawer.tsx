@@ -42,7 +42,6 @@ interface DoctorSessionDrawerProps {
   setClinicalNote: (note: string) => void;
   handleSaveClinicalNote: (booking: any) => void;
   savingNote: boolean;
-  setShowPrescriptionModal: (show: boolean) => void;
   handleCompleteTreatment: (booking: any, totalPulses?: number) => void;
   setActiveSessionBooking?: (booking: any) => void;
   setActiveTab?: (tab: any) => void;
@@ -76,7 +75,6 @@ export default function DoctorSessionDrawer({
   setClinicalNote,
   handleSaveClinicalNote,
   savingNote,
-  setShowPrescriptionModal,
   handleCompleteTreatment,
   setActiveSessionBooking,
   setActiveTab,
@@ -428,14 +426,9 @@ export default function DoctorSessionDrawer({
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPrescriptionModal(true)}
-                  className="rounded-2xl border border-[#414E36]/20 bg-white px-4 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#F4F5F1] transition shadow-sm"
-                >
-                  {t.writePrescriptionBtn}
-                </button>
-
+                {/* "Write Prescription" was removed from here — it opened a second, disconnected
+                    prescription form (customers/doctor:2026-08-16). The only prescription editor
+                    now is the one inside the Ongoing Session tab, which is what's actually used. */}
                 <button
                   type="button"
                   onClick={() => handleCompleteTreatment(scheduleModalBooking)}

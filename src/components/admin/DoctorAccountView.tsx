@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { DoctorAccountViewProps, DoctorTab, DoctorPatient, UsedProduct, MedicationItem } from "./doctor/types";
+import { DoctorAccountViewProps, DoctorTab, DoctorPatient, UsedProduct } from "./doctor/types";
 import { doctorTranslations } from "./doctor/translations";
 import { parseBookingNotes, getAuthHeaders } from "./doctor/utils";
 import DoctorSidebar from "./doctor/DoctorSidebar";
@@ -14,7 +14,6 @@ import DoctorSettingsTab from "./doctor/tabs/DoctorSettingsTab";
 import DoctorProfileTab from "./doctor/tabs/DoctorProfileTab";
 import UserProfileView from "./UserProfileView";
 import DoctorSessionDrawer from "./doctor/modals/DoctorSessionDrawer";
-import DoctorPrescriptionModal from "./doctor/modals/DoctorPrescriptionModal";
 import DoctorPatientHistoryDrawer from "./doctor/modals/DoctorPatientHistoryDrawer";
 
 // Local Date Helper to avoid UTC conversion shifts
@@ -307,14 +306,6 @@ export default function DoctorAccountView({
   // In-Page Session Modal State (Schedule Tab)
   const [scheduleModalBooking, setScheduleModalBooking] = useState<any | null>(null);
 
-  // Prescription Modal State
-  const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
-  const [rxDiagnosis, setRxDiagnosis] = useState("");
-  const [rxMedications, setRxMedications] = useState<MedicationItem[]>([
-    { name: "", dosage: "", frequency: "", duration: "" }
-  ]);
-  const [rxGeneralNotes, setRxGeneralNotes] = useState("");
-  const [savingRx, setSavingRx] = useState(false);
 
   // Password Update State
   const [newPassword, setNewPassword] = useState("");
@@ -894,50 +885,6 @@ export default function DoctorAccountView({
     }
   };
 
-  // Add Medication to Prescription
-  const handleAddMedication = () => {
-    setRxMedications((prev) => [...prev, { name: "", dosage: "", frequency: "", duration: "" }]);
-  };
-
-  // Save Digital Prescription
-  const handleSavePrescription = async (patientName: string, customerId?: string) => {
-    if (!patientName) return;
-
-    setSavingRx(true);
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch("/api/prescriptions", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          customer_id: customerId,
-          patient_name: patientName,
-          date: getLocalDateString(new Date()),
-          diagnosis: rxDiagnosis,
-          medications: rxMedications.filter((m) => m.name.trim() !== ""),
-          general_notes: rxGeneralNotes,
-          doctor_notes: clinicalNote
-        })
-      });
-
-      if (res.ok) {
-        alert("Digital Prescription created successfully!");
-        setShowPrescriptionModal(false);
-        setRxDiagnosis("");
-        setRxMedications([{ name: "", dosage: "", frequency: "", duration: "" }]);
-        setRxGeneralNotes("");
-      } else {
-        const err = await res.json().catch(() => ({}));
-        alert(err.error || err.message || "Failed to create prescription.");
-      }
-    } catch (err: any) {
-      console.error("Error creating prescription:", err);
-      alert(err.message || "Error saving prescription.");
-    } finally {
-      setSavingRx(false);
-    }
-  };
-
   return (
     <div className="h-screen w-full bg-[#FBFBF9] text-[#1F251A] font-sans flex flex-col md:flex-row overflow-hidden" dir={lang === "ar" ? "rtl" : "ltr"}>
       {/* SIDEBAR NAVIGATION */}
@@ -993,7 +940,6 @@ export default function DoctorAccountView({
         {activeTab === "ongoing" && (
           <DoctorOngoingSessionTab
             activeSessionBooking={activeSessionBooking}
-            setShowPrescriptionModal={setShowPrescriptionModal}
             handleCompleteTreatment={handleCompleteTreatment}
             medicalRecord={medicalRecord}
             medicalRecordLoading={medicalRecordLoading}
@@ -1122,35 +1068,11 @@ export default function DoctorAccountView({
           setClinicalNote={setClinicalNote}
           handleSaveClinicalNote={handleSaveClinicalNote}
           savingNote={savingNote}
-          setShowPrescriptionModal={setShowPrescriptionModal}
           handleCompleteTreatment={handleCompleteTreatment}
           setActiveSessionBooking={setActiveSessionBooking}
           setActiveTab={setActiveTab}
           servicesList={servicesList}
           handleChangePrimaryService={handleChangePrimaryService}
-          t={t}
-        />
-      )}
-
-      {/* MODAL 2: DIGITAL PRESCRIPTION MODAL */}
-      {showPrescriptionModal && activeSessionBooking && (
-        <DoctorPrescriptionModal
-          showPrescriptionModal={showPrescriptionModal}
-          setShowPrescriptionModal={setShowPrescriptionModal}
-          targetBooking={activeSessionBooking}
-          rxDiagnosis={rxDiagnosis}
-          setRxDiagnosis={setRxDiagnosis}
-          rxMedications={rxMedications}
-          setRxMedications={setRxMedications}
-          rxGeneralNotes={rxGeneralNotes}
-          setRxGeneralNotes={setRxGeneralNotes}
-          savingRx={savingRx}
-          handleCreatePrescription={(e, booking) => {
-            if (e && e.preventDefault) e.preventDefault();
-            const pName = booking?.name || booking?.customer_name || "Patient";
-            const cId = booking?.customer_id || booking?.customerId || booking?.id;
-            handleSavePrescription(pName, cId);
-          }}
           t={t}
         />
       )}

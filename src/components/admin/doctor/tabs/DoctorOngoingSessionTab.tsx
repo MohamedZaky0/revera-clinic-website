@@ -36,7 +36,6 @@ export interface AdditionalServiceItem {
 
 interface DoctorOngoingSessionTabProps {
   activeSessionBooking: any;
-  setShowPrescriptionModal: (show: boolean) => void;
   handleCompleteTreatment: (booking: any, totalPulses?: number) => void;
   medicalRecord: any;
   medicalRecordLoading: boolean;
@@ -88,7 +87,6 @@ interface DoctorOngoingSessionTabProps {
 
 export default function DoctorOngoingSessionTab({
   activeSessionBooking,
-  setShowPrescriptionModal,
   handleCompleteTreatment,
   medicalRecord,
   medicalRecordLoading,
