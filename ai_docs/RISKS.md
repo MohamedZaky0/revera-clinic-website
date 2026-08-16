@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-17 (RISK-049, RISK-050)
+> **Last Updated:** 2026-08-17 (RISK-051)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -2102,6 +2102,35 @@ present). Both require `target.status === 'pending_deposit'` — once staff have
 exactly as before. This accepts the same pre-existing risk shape the original deposit-report
 carve-out already accepted (an unauthenticated caller who knows a reservation's UUID can act on it
 while it's still unpaid) — not a new category of exposure, an extension of one already in production.
+
+---
+
+## RISK-051: Guarding `GET /api/reservations` (RISK-049) Broke The Admin Panel's Own Reads (RESOLVED)
+
+**Severity:** Critical · **Type:** Regression
+**Found:** 2026-08-17, live on `dev.reveraclinics.com`, during the manual end-to-end browser session
+the RISK-049/050 audit had flagged as still outstanding — a real booking was created and confirmed,
+then Patient Booking History and Pending Approvals both showed empty for it.
+
+**What it is:** RISK-049 correctly guarded `GET /api/reservations`. What wasn't checked at the time:
+whether the admin panel's *own* reads of that route sent an `Authorization` header. Most did not —
+`cachedFetch()` (`src/lib/fetchCache.ts`) had no `headers` parameter at all, since until RISK-049 the
+route needed none. The moment it did, `fetchAllReservations`, `fetchRequests` (Pending Approvals),
+the schedule-view fetch, and an employee-bookings lookup all started silently returning 401 —
+confirmed by reading the actual network response, not inferred from behaviour.
+
+**Fixed:** `cachedFetch` now takes an optional `headers` param; its two reservation call sites in
+`admin/page.tsx` pass `authenticatedJsonHeaders`. Two plain `fetch()` call sites with the same gap
+(`?createdByEmployeeId=`, `?date=`) fixed the same way.
+
+**Why this matters beyond the fix itself:** RISK-049/050 both went through code review, `tsc`,
+`eslint`, a full `npm run build`, and — for RISK-050 specifically — Phase 0's own test suite
+proving the guard rejects bad callers correctly. None of that surfaced this, because none of it
+exercises a legitimate internal caller's *actual* request against the *actual* running route. Only
+opening the real page and reading the real network tab did. This is the concrete case for why
+`ai_docs/ADMIN_REFACTOR_AND_I18N_PLAN.md`'s Phase 0 auth tests (TASK-0.4) are necessary but not
+sufficient — they test that a route rejects the wrong caller, not that every existing legitimate
+caller still succeeds after the route changes. Worth a distinct regression test in Phase 1.
 
 ---
 
