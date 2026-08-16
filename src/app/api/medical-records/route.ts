@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireStaffAccess } from '@/lib/access';
 import fs from 'fs';
 import path from 'path';
 
@@ -31,6 +32,11 @@ function writeLocalData(filepath: string, data: any[]) {
 }
 
 export async function GET(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customerId') || searchParams.get('customer_id');
@@ -103,6 +109,11 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await req.json();
     const type = body.type || 'form';
@@ -212,6 +223,11 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const reportId = searchParams.get('reportId');
