@@ -156,79 +156,7 @@ export default function ReceptionDashboardView({
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F7F5F0] text-[#1F251A]">
-      {/* ── Left Sidebar Navigation ── */}
-      <aside className="w-60 bg-[#26331E] p-4 text-[#FBFBF9] flex flex-col justify-between shrink-0 shadow-xl">
-        <div>
-          {/* Logo / Header */}
-          <div className="flex items-center gap-3 px-2 py-3 mb-6">
-            <div className="h-10 w-10 rounded-xl bg-[#45523A] flex items-center justify-center text-white font-bold shadow">
-              <LayoutGrid size={20} />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold tracking-wide">REVERA CLINIC</h2>
-              <p className="text-[10px] text-[#A6B29D]">Reception Desk</p>
-            </div>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="space-y-1.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isSelected = activeNav === item.label;
-
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => {
-                    setActiveNav(item.label);
-                    if (onNavigateTab && item.navTarget !== "Dashboard") {
-                      onNavigateTab(item.navTarget);
-                    }
-                  }}
-                  className={`w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                    isSelected
-                      ? "bg-[#45523A] text-white shadow-md"
-                      : "text-[#BCC6B5] hover:bg-[#324029] hover:text-white"
-                  }`}
-                >
-                  <Icon size={18} className={isSelected ? "text-white" : "text-[#9EAB95]"} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* User Profile Footer */}
-        <div className="pt-4 border-t border-[#37452E]">
-          <div className="flex items-center justify-between px-2 py-2 rounded-xl bg-[#1F2B18] border border-[#324029]">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="h-9 w-9 rounded-full bg-[#45523A] flex items-center justify-center text-white shrink-0 font-semibold text-xs border border-[#5A684F]">
-                {receptionistName.charAt(0)}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-white truncate">{dashboardData?.receptionist?.name || receptionistName}</p>
-                <p className="text-[10px] text-[#A6B29D] truncate">{dashboardData?.receptionist?.role || receptionistRole}</p>
-              </div>
-            </div>
-            {onLogout && (
-              <button
-                type="button"
-                onClick={onLogout}
-                className="text-[#A6B29D] hover:text-white p-1 rounded-lg hover:bg-[#324029] transition"
-                title="Logout"
-              >
-                <LogOut size={16} />
-              </button>
-            )}
-          </div>
-        </div>
-      </aside>
-
-      {/* ── Main Workspace Area ── */}
-      <main className="flex-1 p-8 space-y-6 overflow-y-auto">
+    <div className="space-y-6 pb-8">
         {/* ── 1. Today's Shift Card ── */}
         <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-6">
           <div className="flex items-center justify-between">
@@ -489,7 +417,6 @@ export default function ReceptionDashboardView({
             </table>
           </div>
         </div>
-      </main>
     </div>
   );
 }

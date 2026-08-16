@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     const receptionistRole = emp?.role_name || "Receptionist";
     const empId = emp?.id || null;
     const shiftSchedule = emp?.shift || "09:00 AM – 05:00 PM";
-    const targetAmount = emp?.required_target_amount !== null && emp?.required_target_amount !== undefined
+    const targetAmount = emp?.required_target_amount && Number(emp.required_target_amount) > 0
       ? Number(emp.required_target_amount)
       : 50000;
 
