@@ -133,26 +133,22 @@ export default function ReceptionDashboardView({
   const shiftInfo = dashboardData?.shift || {
     scheduleHours: "8 Hours",
     shiftFromTo: "09:00 AM – 05:00 PM",
-    actualStartingTime: "08:57 AM",
-    elapsedTime: "8h 15m",
-    status: "started"
+    actualStartingTime: "--:--",
+    elapsedTime: "0h 0m",
+    status: "not_started"
   };
 
   const targetInfo = dashboardData?.target || {
-    targetAmount: 50000,
-    achievedAmount: 36000,
-    progressPercentage: 72,
-    remainingAmount: 14000
+    targetAmount: 0,
+    achievedAmount: 0,
+    progressPercentage: 0,
+    remainingAmount: 0
   };
 
   const bookingsInfo = dashboardData?.bookings || {
-    todayCount: 12,
-    pendingCount: 3,
-    list: [
-      { id: "1", time: "10:00 AM", patientName: "Ahmed Ali", doctorName: "Dr. Sara", service: "Laser", status: "confirmed" },
-      { id: "2", time: "10:30 AM", patientName: "Sara Mohamed", doctorName: "Dr. Omar", service: "Consultation", status: "confirmed" },
-      { id: "3", time: "11:00 AM", patientName: "Mohamed Ali", doctorName: "Dr. Sara", service: "Facial", status: "pending" }
-    ]
+    todayCount: 0,
+    pendingCount: 0,
+    list: []
   };
 
   return (
@@ -367,52 +363,60 @@ export default function ReceptionDashboardView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F3F0E8] text-[#1F251A] font-medium">
-                {bookingsInfo.list.map((row: any) => {
-                  const isConfirmed = String(row.status).toLowerCase() === "confirmed" || String(row.status).toLowerCase() === "approved";
-                  return (
-                    <tr
-                      key={row.id}
-                      onClick={() => onNavigateTab && onNavigateTab("Bookings")}
-                      className="hover:bg-[#F9F8F5] transition cursor-pointer"
-                    >
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2 text-[#55634B]">
-                          <Clock size={14} />
-                          <span>{row.time}</span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 font-bold">
-                        <div className="flex items-center gap-2">
-                          <User size={14} className="text-[#8C9686]" />
-                          <span>{row.patientName}</span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <Stethoscope size={14} className="text-[#8C9686]" />
-                          <span>{row.doctorName}</span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <Sparkles size={14} className="text-[#8C9686]" />
-                          <span>{row.service}</span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold ${
-                            isConfirmed
-                              ? "bg-[#E6F4EA] text-[#1E7E34]"
-                              : "bg-[#FEF3C7] text-[#D97706]"
-                          }`}
-                        >
-                          {isConfirmed ? "Confirmed" : "Pending Approval"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {bookingsInfo.list.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-xs text-[#8C9686]">
+                      No bookings scheduled for today.
+                    </td>
+                  </tr>
+                ) : (
+                  bookingsInfo.list.map((row: any) => {
+                    const isConfirmed = String(row.status).toLowerCase() === "confirmed" || String(row.status).toLowerCase() === "approved";
+                    return (
+                      <tr
+                        key={row.id}
+                        onClick={() => onNavigateTab && onNavigateTab("Bookings")}
+                        className="hover:bg-[#F9F8F5] transition cursor-pointer"
+                      >
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2 text-[#55634B]">
+                            <Clock size={14} />
+                            <span>{row.time}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 font-bold">
+                          <div className="flex items-center gap-2">
+                            <User size={14} className="text-[#8C9686]" />
+                            <span>{row.patientName}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <Stethoscope size={14} className="text-[#8C9686]" />
+                            <span>{row.doctorName}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <Sparkles size={14} className="text-[#8C9686]" />
+                            <span>{row.service}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold ${
+                              isConfirmed
+                                ? "bg-[#E6F4EA] text-[#1E7E34]"
+                                : "bg-[#FEF3C7] text-[#D97706]"
+                            }`}
+                          >
+                            {isConfirmed ? "Confirmed" : "Pending Approval"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

@@ -9,7 +9,7 @@ export async function GET(req: Request) {
 
     const todayStr = new Date().toISOString().split("T")[0];
 
-    // 1. Resolve Receptionist Employee Account
+    // 1. Resolve Receptionist Employee Account from DB
     let employeeQuery = supabase.from("employee_accounts").select("*");
     if (employeeIdParam) {
       employeeQuery = employeeQuery.eq("id", employeeIdParam);
@@ -22,16 +22,15 @@ export async function GET(req: Request) {
     const { data: employeeData } = await employeeQuery.limit(1);
     const emp = Array.isArray(employeeData) && employeeData.length > 0 ? employeeData[0] : null;
 
-    // Default values if no specific receptionist found
-    const receptionistName = emp?.name || "Zaki Mohamed";
-    const receptionistRole = emp?.role_name || "Receptionist";
+    const receptionistName = emp?.name || emp?.email || "Receptionist";
+    const receptionistRole = emp?.role_name || emp?.department || "Receptionist";
     const empId = emp?.id || null;
     const shiftSchedule = emp?.shift || "09:00 AM – 05:00 PM";
-    const targetAmount = emp?.required_target_amount && Number(emp.required_target_amount) > 0
+    const targetAmount = emp?.required_target_amount !== null && emp?.required_target_amount !== undefined
       ? Number(emp.required_target_amount)
-      : 50000;
+      : 0;
 
-    // 2. Fetch Shift & Attendance Data
+    // 2. Fetch Real Shift & Attendance Data from DB
     let attendanceRecord: any = null;
     if (empId) {
       const { data: att } = await supabase
@@ -72,15 +71,15 @@ export async function GET(req: Request) {
       }
     }
 
-    // 3. Compute Target & Monthly Performance
+    // 3. Compute Real Target & Monthly Performance from DB
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     const startOfMonthStr = startOfMonth.toISOString().split("T")[0];
 
-    let monthlyAchieved = 36000; // Default fallback matching UI mockup baseline if no bookings exist
+    let monthlyAchieved = 0;
     let monthResQuery = supabase
       .from("reservations")
-      .select("amount_paid, amount_left, status")
+      .select("amount_paid, status")
       .gte("date", startOfMonthStr);
 
     if (empId) {
@@ -89,62 +88,67 @@ export async function GET(req: Request) {
 
     const { data: monthBookings } = await monthResQuery;
     if (Array.isArray(monthBookings) && monthBookings.length > 0) {
-      const sum = monthBookings.reduce((acc: number, curr: any) => {
+      monthlyAchieved = monthBookings.reduce((acc: number, curr: any) => {
         const status = String(curr.status || "").toLowerCase();
         if (status !== "cancelled" && status !== "rejected") {
-          return acc + (Number(curr.amount_paid) || 1500); // 1500 per booking estimation fallback if amount_paid is 0
+          return acc + (Number(curr.amount_paid) || 0);
         }
         return acc;
       }, 0);
-      if (sum > 0) monthlyAchieved = sum;
     }
 
-    const progressPct = Math.min(100, Math.max(0, Math.round((monthlyAchieved / targetAmount) * 100)));
+    const progressPct = targetAmount > 0
+      ? Math.min(100, Math.max(0, Math.round((monthlyAchieved / targetAmount) * 100)))
+      : (monthlyAchieved > 0 ? 100 : 0);
     const remainingTarget = Math.max(0, targetAmount - monthlyAchieved);
 
-    // 4. Fetch Today's Bookings
+    // 4. Fetch Real Services for title resolution
+    const { data: servicesData } = await supabase
+      .from("services")
+      .select("id, en, name, ar, title");
+
+    const servicesMap = new Map<string, string>();
+    if (Array.isArray(servicesData)) {
+      servicesData.forEach((s: any) => {
+        const title = s.en || s.name || s.title || s.ar || `Service #${s.id}`;
+        servicesMap.set(String(s.id), title);
+      });
+    }
+
+    // 5. Fetch Real Today's Bookings from DB
     const { data: reservationsToday } = await supabase
       .from("reservations")
       .select("*")
       .eq("date", todayStr)
       .order("created_at", { ascending: true });
 
-    let todayBookingsList = Array.isArray(reservationsToday) ? reservationsToday : [];
+    const realTodayBookings = Array.isArray(reservationsToday) ? reservationsToday : [];
 
-    // Fallback sample bookings if database has zero bookings today, ensuring rich preview matching design mockup
-    if (todayBookingsList.length === 0) {
-      todayBookingsList = [
-        {
-          id: "demo-1",
-          time_slot: "10:00 AM",
-          name: "Ahmed Ali",
-          doctor_name: "Dr. Sara",
-          service_title: "Laser",
-          status: "confirmed"
-        },
-        {
-          id: "demo-2",
-          time_slot: "10:30 AM",
-          name: "Sara Mohamed",
-          doctor_name: "Dr. Omar",
-          service_title: "Consultation",
-          status: "confirmed"
-        },
-        {
-          id: "demo-3",
-          time_slot: "11:00 AM",
-          name: "Mohamed Ali",
-          doctor_name: "Dr. Sara",
-          service_title: "Facial",
-          status: "pending"
-        }
-      ];
-    }
-
-    const todayBookingsCount = todayBookingsList.length;
-    const pendingApprovalCount = todayBookingsList.filter(
+    const todayBookingsCount = realTodayBookings.length;
+    const pendingApprovalCount = realTodayBookings.filter(
       (r: any) => String(r.status || "").toLowerCase() === "pending" || String(r.status || "").toLowerCase() === "pending_approval"
     ).length;
+
+    const formattedBookings = realTodayBookings.map((r: any) => {
+      let resolvedServiceTitle = r.notes || "General Service";
+      if (r.service_id && servicesMap.has(String(r.service_id))) {
+        resolvedServiceTitle = servicesMap.get(String(r.service_id))!;
+      } else if (Array.isArray(r.service_ids) && r.service_ids.length > 0) {
+        const titles = r.service_ids
+          .map((id: any) => servicesMap.get(String(id)))
+          .filter(Boolean);
+        if (titles.length > 0) resolvedServiceTitle = titles.join(", ");
+      }
+
+      return {
+        id: r.id,
+        time: r.time_slot || r.requested_time || "--:--",
+        patientName: r.name || r.patient_name || "Patient",
+        doctorName: r.doctor_name || "Unassigned",
+        service: resolvedServiceTitle,
+        status: r.status || "confirmed"
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -173,14 +177,7 @@ export async function GET(req: Request) {
       bookings: {
         todayCount: todayBookingsCount,
         pendingCount: pendingApprovalCount,
-        list: todayBookingsList.map((r: any) => ({
-          id: r.id,
-          time: r.time_slot || r.requested_time || "10:00 AM",
-          patientName: r.name || r.patient_name || "Patient",
-          doctorName: r.doctor_name || "Doctor",
-          service: r.service_title || r.notes || "Service",
-          status: r.status || "confirmed"
-        }))
+        list: formattedBookings
       }
     });
   } catch (error: any) {
