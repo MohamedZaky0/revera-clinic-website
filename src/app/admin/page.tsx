@@ -23609,6 +23609,24 @@ export default function AdminPage() {
               drawerAttachedList.push({ name, qty, unitPrice, total });
             }
           }
+
+          // RISK-057: DoctorAccountView writes "[Products Used During Session]: Name (Qty: N x
+          // UnitPrice EGP = Total EGP), ..." — neither pattern above matches it, so a product a
+          // doctor added during the session never showed up here ("No products added") even
+          // though amountPaid/amountLeft already reflected it correctly.
+          const doctorSessionMatches = notesStr.matchAll(
+            /(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
+          );
+          for (const match of doctorSessionMatches) {
+            const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
+            const qty = Number(match[2]);
+            const unitPrice = Number(match[3]);
+            const total = Number(match[4]);
+            if (!drawerExistingNames.has(name.toLowerCase())) {
+              drawerExistingNames.add(name.toLowerCase());
+              drawerAttachedList.push({ name, qty, unitPrice, total });
+            }
+          }
         }
 
         const productsCost = drawerAttachedList.reduce((sum, p) => sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unitPrice || p.price || 0))), 0);
@@ -27416,6 +27434,27 @@ export default function AdminPage() {
               if (!existingNames.has(name.toLowerCase())) {
                 existingNames.add(name.toLowerCase());
                 invoiceAttachedList.push({ name, qty: 1, unitPrice: total, total });
+              }
+            }
+
+            // RISK-057: DoctorAccountView.handleCompleteTreatment/handleSaveClinicalNote write
+            // "[Products Used During Session]: Name (Qty: N x UnitPrice EGP = Total EGP), ..." —
+            // a fourth note format distinct from the three parsed above (none of which match it).
+            // Because it was never parsed, a doctor-added product correctly reached amountPaid/
+            // amountLeft (RISK-038) but never appeared as a line item on the printed invoice —
+            // the PDF showed only the base service subtotal while "Amount Paid" silently included
+            // the product cost, with nothing on the document explaining the difference.
+            const doctorSessionProductMatches = notesStr.matchAll(
+              /(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
+            );
+            for (const match of doctorSessionProductMatches) {
+              const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
+              const qty = Number(match[2]);
+              const unitPrice = Number(match[3]);
+              const total = Number(match[4]);
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                invoiceAttachedList.push({ name, qty, unitPrice, total });
               }
             }
           }

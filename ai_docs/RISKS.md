@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-17 (RISK-056)
+> **Last Updated:** 2026-08-17 (RISK-057)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -2324,6 +2324,45 @@ shipped invisibly — the UI displayed a plausible-looking "0 EGP" that reads as
 charged yet" rather than "the entire service is about to be given away for free." It was only
 caught because a real doctor login completed a real session with a real product attached and the
 arithmetic didn't add up on screen before confirming.
+
+---
+
+## RISK-057: Doctor-Added Products Never Appeared As Invoice Line Items — Regex Format Mismatch (RESOLVED)
+
+**Severity:** Medium-High · **Type:** Regression / Billing display
+**Found:** 2026-08-17, live on `dev.reveraclinics.com`, immediately after settling the RISK-056 test
+invoice — the printed invoice for a Therapeutic Laser (110 EGP) + 700 EGP product session showed a
+single line item ("Therapeutic Laser — EGP 110"), a Subtotal of EGP 110, and "Amount Paid: EGP
+810" directly beneath it, with nothing on the document explaining the 700 EGP gap. The reception
+booking-details drawer's "Products & Session Consumables" panel showed "No products added" for the
+same booking, despite `amountPaid`/`amountLeft` already being correct (RISK-056).
+
+**What it is:** neither surface stores doctor-added products as structured rows — both
+reconstruct them by regex-parsing the reservation's free-text `notes` field (the same
+`notes`-as-source-of-truth pattern RISK-038 already flagged as a traceability gap). Both parsers
+recognize three note formats: `- Name (xQty) @ Price EGP`, `[Added Product]: Name (xQty) - Total
+EGP`, and `[Extra Device Pulses]: ...`. **None of them match what `DoctorAccountView.tsx`'s
+`handleCompleteTreatment`/`handleSaveClinicalNote` actually write**:
+`[Products Used During Session]: Name (Qty: N x UnitPrice EGP = Total EGP)`. Since the doctor
+portal is the only place a product gets added *during* a session (as opposed to reception adding
+one before/after), every session-added product silently failed to reconstruct on both the
+invoice PDF and the drawer's product panel — the money was always correct (RISK-056), only the
+itemized paper trail was invisible.
+
+**Fixed:** added a fourth regex,
+`/(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g`,
+matching `[Products Used During Session]: ...` in both places it's parsed:
+[src/app/admin/page.tsx](../src/app/admin/page.tsx) — the `viewingBooking` drawer's
+`drawerAttachedList` (~line 23601) and the `invoiceBooking` PDF's `invoiceAttachedList`
+(~line 27411). No data migration needed — this reconstructs from `notes` on every render, so it
+retroactively fixes every already-completed booking with this note shape, not just new ones.
+
+**Not fixed — flagged for follow-up:** this is the same underlying gap RISK-038 already named
+partial: reconciling four independent regex-based reconstructions of `notes` (here, the drawer, the
+invoice, and the checkout modal's own `extraAddonsCost` derivation) instead of writing doctor-added
+products as real rows the moment they're added is fragile — the next new note format written
+anywhere will silently reproduce this exact bug. Worth a real `reservation_products` (or similar)
+table before the next billing feature touches this path.
 
 ---
 
