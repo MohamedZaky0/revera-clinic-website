@@ -237,11 +237,13 @@ export default function DoctorOngoingSessionTab({
       if (res.ok) {
         alert("Prescription saved successfully!");
       } else {
-        alert("Prescription recorded for session.");
+        const errData = await res.json().catch(() => null);
+        const errMsg = (errData as any)?.error || (errData as any)?.message || "Failed to save prescription. Please try again.";
+        alert(errMsg);
       }
     } catch (err) {
       console.error(err);
-      alert("Prescription saved.");
+      alert("Failed to save prescription. Please check your connection and try again.");
     } finally {
       setSavingRxInline(false);
     }
