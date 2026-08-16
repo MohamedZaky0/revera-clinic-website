@@ -676,6 +676,43 @@ export function BookingModal({ variant = "modal", initialServiceId = null }: Boo
 
   function handleConfirm() {
     if (!serviceId || !selectedDate || !selectedTime || !name || !email || !phone) return;
+
+    // If a reservation was already created (e.g. user went back from payment step),
+    // PATCH it with updated details instead of creating a duplicate.
+    if (createdReservation) {
+      setIsCreatingReservation(true);
+      const finalNotes = isWhatsappSame
+        ? notes
+        : `${notes ? notes + "\n" : ""}[WhatsApp: ${whatsappNumber}]`;
+      const payload = {
+        requestedTime: selectedTime,
+        name, email, phone, notes: finalNotes,
+        sessionType,
+        branchId,
+        doctorName: selectedDoctor || null,
+      };
+      fetch(`/api/reservations?id=${createdReservation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(async r => {
+          const data = await r.json().catch(() => null);
+          if (!r.ok) throw new Error((data && data.error) || "Failed to update reservation");
+          return data;
+        })
+        .then(() => {
+          setIsCreatingReservation(false);
+          setStep(3);
+        })
+        .catch((err) => {
+          setIsCreatingReservation(false);
+          console.error("Failed to update reservation:", err);
+          alert(err.message || (isRTL ? "حدث خطأ أثناء تحديث الحجز، يرجى المحاولة مرة أخرى." : "Failed to update reservation. Please try again."));
+        });
+      return;
+    }
+
     setIsCreatingReservation(true);
     const finalNotes = isWhatsappSame 
       ? notes 
@@ -1662,7 +1699,25 @@ Attached is my payment transaction receipt photo.`;
 
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
+                      if (createdReservation) {
+                        try {
+                          const res = await fetch(`/api/reservations?id=${createdReservation.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: 'cancelled' })
+                          });
+                          if (!res.ok) {
+                            const errData = await res.json().catch(() => null);
+                            alert((errData && errData.error) || (isRTL ? "تعذّر إلغاء الحجز. يرجى المحاولة مرة أخرى." : "Failed to cancel reservation. Please try again."));
+                            return;
+                          }
+                        } catch (err) {
+                          console.error("Failed to cancel reservation:", err);
+                          alert(isRTL ? "تعذّر إلغاء الحجز. يرجى المحاولة مرة أخرى." : "Failed to cancel reservation. Please try again.");
+                          return;
+                        }
+                      }
                       setStep(2);
                       setCreatedReservation(null);
                     }}
