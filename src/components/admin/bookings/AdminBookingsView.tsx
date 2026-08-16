@@ -26,6 +26,7 @@ import {
   Loader2
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { getSessionStaleness } from "@/lib/services";
 
 interface ReservationItem {
   id: string | number;
@@ -237,10 +238,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         paySt = "Paid";
       }
 
+      const bookingDate = String(r.date || selectedDateStr).slice(0, 10);
+
+      // RISK-043: a session the doctor never completed stays `started` forever. Computed off the
+      // raw status, not the normalised `st`, so the check reads the state the DB actually holds.
+      const staleness = getSessionStaleness(r.status, r.startedAt ?? r.started_at, bookingDate);
+
       return {
         ...r,
         id: r.id || `res-${idx}`,
-        date: String(r.date || selectedDateStr).slice(0, 10),
+        date: bookingDate,
         time: formatDisplayTime(r.start_time || r.time || r.timeSlot || r.time_slot),
         customer_name: pName,
         customer_phone: phone,
@@ -249,7 +256,9 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         doctor_name: doc,
         room: rm,
         status: st,
-        paymentStatus: paySt
+        paymentStatus: paySt,
+        isStaleSession: staleness.isStale,
+        staleElapsedLabel: staleness.elapsedLabel
       };
     });
   }, [allReservations, dbReservations, dbProviders, localServices, providers, selectedDateStr]);
@@ -350,6 +359,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       postponedCount: postponed.length
     };
   }, [mergedAppointments, selectedDateStr]);
+
+  // RISK-043: every session still sitting in `started` past the threshold, newest first. Scoped to
+  // the whole loaded set rather than the selected day on purpose — the point of this list is to
+  // surface sessions from days nobody is looking at any more.
+  const staleSessions = useMemo(
+    () => mergedAppointments.filter(r => r.isStaleSession),
+    [mergedAppointments]
+  );
 
   // Pending approvals count
   const pendingApprovalsCount = useMemo(() => {
@@ -739,6 +756,46 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ── NEEDS ATTENTION: sessions left open (RISK-043) ── */}
+      {staleSessions.length > 0 && (
+        <div className="rounded-3xl border border-red-200 bg-red-50/60 p-5 shadow-xs space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100">
+              <AlertCircle size={17} className="text-red-600" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-red-900">
+                Needs Attention — {staleSessions.length} session{staleSessions.length !== 1 ? "s" : ""} left open
+              </h2>
+              <p className="text-xs text-red-700/80 mt-0.5">
+                These are still marked In Progress after more than 2 hours. Complete or cancel each one so the
+                slot, room and doctor are released.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {staleSessions.map((row) => (
+              <button
+                key={`stale-${row.id}`}
+                onClick={() => onViewBookingDetails && onViewBookingDetails(row)}
+                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-4 py-2.5 text-left transition hover:border-red-300 hover:bg-red-50/50"
+              >
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate text-xs font-bold text-[#111827]">{row.customer_name}</span>
+                  <span className="truncate text-[10px] font-medium text-[#6B7280]">
+                    {row.service_name} · {row.doctor_name} · {row.date}
+                  </span>
+                </div>
+                <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                  {row.staleElapsedLabel ? `Open ${row.staleElapsedLabel}` : "Left open"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── CONDITIONAL VIEW: PENDING APPROVALS or CALENDAR+SCHEDULE ── */}
       {viewMode === "pending" ? (
@@ -1155,10 +1212,25 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                             </td>
                             <td className="py-2.5 px-1 text-[#6B7280] font-medium text-xs truncate">{row.room}</td>
                             <td className="py-2.5 px-1">
-                              <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${stConfig.bg} ${stConfig.text} whitespace-nowrap`}>
-                                <span className={`h-1.5 w-1.5 rounded-full ${stConfig.dot}`}></span>
-                                {stConfig.label}
-                              </span>
+                              <div className="flex flex-col items-start gap-0.5">
+                                <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${stConfig.bg} ${stConfig.text} whitespace-nowrap`}>
+                                  <span className={`h-1.5 w-1.5 rounded-full ${stConfig.dot}`}></span>
+                                  {stConfig.label}
+                                </span>
+                                {row.isStaleSession && (
+                                  <span
+                                    title={
+                                      row.staleElapsedLabel
+                                        ? `This session has been open for ${row.staleElapsedLabel} — complete or cancel it.`
+                                        : "This session was left open from an earlier day — complete or cancel it."
+                                    }
+                                    className="inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 border border-red-200 whitespace-nowrap"
+                                  >
+                                    <AlertCircle size={9} />
+                                    {row.staleElapsedLabel ? `Open ${row.staleElapsedLabel}` : "Left open"}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="py-2.5 px-1">
                               <span className={`inline-flex items-center rounded-md border px-1 py-0.5 text-[9px] font-bold ${payStyle} whitespace-nowrap`}>

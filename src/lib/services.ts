@@ -58,6 +58,79 @@ export function getServiceDurationMinutes(
   return getDurationInMinutes(service.duration);
 }
 
+/**
+ * How long a session may sit in `started` before it is treated as forgotten rather than active.
+ *
+ * RISK-043: `reservations.started_at` was added so a staleness check could exist at all, but
+ * nothing consumed it — a doctor who forgot to press Complete held a slot, a room and an
+ * "Upcoming" count indefinitely (one was found still open from the 10th of the month).
+ *
+ * Fixed at 2 hours by clinic decision (2026-08-16) rather than derived from the service's
+ * `duration_minutes`: long enough that no genuine session trips it, short enough that a forgotten
+ * one is caught the same working day.
+ */
+export const STALE_SESSION_THRESHOLD_MS = 2 * 60 * 60 * 1000;
+
+export type SessionStaleness = {
+  isStale: boolean;
+  /** Milliseconds since the session was started, or null when `started_at` is absent. */
+  elapsedMs: number | null;
+  /** Short human label ("3h", "2d") for the badge, or null when nothing is known. */
+  elapsedLabel: string | null;
+};
+
+const NOT_STALE: SessionStaleness = { isStale: false, elapsedMs: null, elapsedLabel: null };
+
+function formatElapsedShort(ms: number): string {
+  const totalMinutes = Math.floor(ms / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  if (days >= 1) return `${days}d`;
+  const hours = Math.floor(totalMinutes / 60);
+  if (hours >= 1) return `${hours}h`;
+  return `${totalMinutes}m`;
+}
+
+/**
+ * Decides whether an in-progress session has been left open too long.
+ *
+ * Only ever reports on a session that is actually `started`/`in_progress` — a completed or
+ * cancelled booking is never stale no matter how old its `started_at` is.
+ *
+ * `startedAt` is null for any session started before the RISK-043 migration landed. Rather than
+ * guess an elapsed time, those fall back to the booking's own date: a session still open from an
+ * earlier day is stale with an unknown duration, one from today is left alone. `elapsedMs` stays
+ * null in that case so callers do not present a fabricated number.
+ */
+export function getSessionStaleness(
+  status: string | null | undefined,
+  startedAt: string | null | undefined,
+  bookingDate?: string | null,
+  now: Date = new Date()
+): SessionStaleness {
+  const st = (status || "").toLowerCase();
+  if (st !== "started" && st !== "in_progress") return NOT_STALE;
+
+  if (startedAt) {
+    const startedMs = new Date(startedAt).getTime();
+    if (!Number.isFinite(startedMs)) return NOT_STALE;
+    const elapsedMs = now.getTime() - startedMs;
+    if (elapsedMs < STALE_SESSION_THRESHOLD_MS) return NOT_STALE;
+    return { isStale: true, elapsedMs, elapsedLabel: formatElapsedShort(elapsedMs) };
+  }
+
+  // No timestamp: the only defensible signal left is that the booking's day has already passed.
+  if (bookingDate) {
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+      now.getDate()
+    ).padStart(2, "0")}`;
+    if (String(bookingDate).slice(0, 10) < todayStr) {
+      return { isStale: true, elapsedMs: null, elapsedLabel: null };
+    }
+  }
+
+  return NOT_STALE;
+}
+
 export const ALL_15MIN_SLOTS: string[] = (() => {
   const slots: string[] = [];
   for (let h = 9; h <= 21; h++) {
