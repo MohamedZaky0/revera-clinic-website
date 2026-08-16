@@ -618,12 +618,14 @@ export default function DoctorOngoingSessionTab({
                     </h3>
                   </div>
                   
-                  {/* Live Total Pulse Counter Badge */}
+                  {/* Live Total Pulse Counter Badge — only when device-linked services exist */}
+                  {(selectedDeviceId || additionalServices.some((s) => s.deviceId)) && (
                   <div className="flex items-center gap-2 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-1.5 text-xs font-black text-amber-900 shadow-sm">
                     <Zap size={14} className="text-amber-600 fill-amber-500 animate-pulse" />
                     <span>{t.totalPulsesCalculated}</span>
                     <span className="text-sm text-amber-900 font-extrabold">{totalSessionPulses} {t.pulsesLabel}</span>
                   </div>
+                  )}
                 </div>
 
                 {/* Primary Reserved Service Display */}
@@ -639,6 +641,7 @@ export default function DoctorOngoingSessionTab({
                       <label className="block text-[10px] font-bold text-[#5A6A51] mb-1">Selected Patient Service (Changeable)</label>
                       <select
                         value={
+                          activeSessionBooking.serviceId ||
                           activeSessionBooking.service_id ||
                           servicesList.find((s) => {
                             const sName = (s.en || s.name || s.title || s.name_en || s.ar || "").toLowerCase().trim();
@@ -659,9 +662,11 @@ export default function DoctorOngoingSessionTab({
                         ))}
                       </select>
                     </div>
+                    {selectedDeviceId && (
                     <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-lg shrink-0">
                       {extraPulsesCount || 100} {t.pulsesLabel}
                     </span>
+                    )}
                   </div>
                 </div>
 
@@ -770,11 +775,14 @@ export default function DoctorOngoingSessionTab({
                       className="col-span-2 rounded-xl border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-bold text-[#1F251A] outline-none"
                     >
                       <option value="">{t.selectProductPlaceholder}</option>
-                      {productsList.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.price || p.unit_price || p.selling_price || 0} EGP)
+                      {productsList.map((p) => {
+                        const isOutOfStock = Number(p.stock_quantity ?? p.stockQuantity ?? 0) <= 0 || p.status === "Out of Stock";
+                        return (
+                        <option key={p.id} value={p.id} disabled={isOutOfStock}>
+                          {p.name} ({p.price || p.unit_price || p.selling_price || 0} EGP){isOutOfStock ? " — Out of Stock" : ""}
                         </option>
-                      ))}
+                        );
+                      })}
                     </select>
 
                     <input
