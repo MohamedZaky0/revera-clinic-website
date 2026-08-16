@@ -1,6 +1,7 @@
 # Admin Panel: Componentization → Arabic i18n → Automated Testing
 
-> **Status:** plan only, nothing started.
+> **Status:** Phase 0 complete (2026-08-17 — 107 tests, `ai_docs/WINDSURF_BRIEFS.md` Brief 3).
+> Phase 1 not started; blocked on the open decisions at the bottom of this file.
 > **Written:** 2026-08-17, after a full-system audit (RISK-038…RISK-050).
 > **Owner decision required before Phase 0 starts.**
 
@@ -38,7 +39,7 @@ does not invent one.
 
 ---
 
-## Phase 0 — Safety net first (do this before touching `page.tsx`)
+## Phase 0 — Safety net first (do this before touching `page.tsx`) — ✅ DONE
 
 Refactoring 27k lines with no automated tests is the riskiest thing in this plan. Build the net
 before the trapeze.
