@@ -1544,6 +1544,20 @@ severity), then the CMS/config routes, then re-evaluate whether `hr/*` needs a d
 only, no role check — a patient token still passes) and `translate` (fully open). Title kept as
 "partially resolved" until those are picked up.
 
+**Fully resolved — 2026-08-16:**
+- Re-audit of the `hr/*` routes found they already use `verifyHrAccess()` (`src/lib/auth.ts`) on all
+  admin-facing methods (GET/POST/PATCH/DELETE). This helper validates a bearer token, confirms an
+  `employee_accounts` row, and restricts to `superadmin`/`admin`/`hr` roles — stronger than
+  `requireStaffAccess`. The self-service methods (attendance POST/PATCH for check-in/out, alerts POST
+  for logging own missing state, leaves POST for submitting requests) correctly use token + identity
+  verification without requiring admin role — intentional design.
+- `providers/schedule-audit-logs`: added `requireStaffAccess` guard. Caller in `admin/page.tsx`
+  updated to send `authenticatedJsonHeaders`.
+- `translate`: added `requireStaffAccess` guard. All 4 callers in `admin/page.tsx` updated to send
+  `authenticatedJsonHeaders`.
+- **RISK-036 is now fully resolved.** No PHI, config, or internal route remains accessible without
+  a staff-level role check.
+
 ---
 
 ## RISK-037: AdminBookingsView Buttons Scrolled Away, Table Had Horizontal Overflow, Status Colors Were Ambiguous (RESOLVED)
@@ -1615,11 +1629,19 @@ carries only the originally-booked single-service price. Reception collects the 
 the difference is invisible — it exists only as prose inside `notes`. This is the root cause behind
 the "payment shows wrong after session end" symptom, and it compounds RISK-039 below.
 
-**Not yet fixed.**
+**Partially fixed — 2026-08-16:**
+- Defect #1: `handleCompleteTreatment` no longer sends `price`. It now sends
+  `amountLeft: updatedInvoiceTotal - amountPaid`, which the PATCH handler accepts.
+- Defect #2: `additionalServices` state lifted to parent (`DoctorAccountView.tsx:290`).
+  `updatedInvoiceTotal` (line 629) now includes `additionalServicesSubtotal`. The correct total
+  reaches the server.
+- Defect #3 (partial): `amount_left` is correctly updated. `service_ids` on the reservation is
+  still not updated when a doctor adds services during the session — a traceability gap, not a
+  money-loss gap.
 
 ---
 
-## RISK-039: AdminBookingsView Fabricates Payment Status, Doctor Name And Room When Real Data Is Missing
+## RISK-039: AdminBookingsView Fabricates Payment Status, Doctor Name And Room When Real Data Is Missing (RESOLVED)
 
 **Severity:** Critical · **Type:** Data integrity / Trust
 **Found:** 2026-08-16, same audit as RISK-038.
@@ -1648,11 +1670,14 @@ so `amount_paid` correctly stays at its real value and the server recomputes `am
 This is purely a display-layer fabrication. Fixing the display is necessary but not sufficient while
 RISK-038 keeps the total itself wrong.
 
-**Not yet fixed.**
+**Fixed — 2026-08-16:**
+All fabrication logic removed. Payment status now derived solely from real `amountPaid`/`amountLeft`
+fields (unknown → `"—"`). Doctor name resolves from multiple real fields then falls back to `"—"`.
+Room falls back to `"—"`. No value rendered can originate from an index, modulo, or hardcoded name.
 
 ---
 
-## RISK-040: "Cancel & Return" On The Public Deposit Step Orphans The Reservation And Duplicates It On Retry
+## RISK-040: "Cancel & Return" On The Public Deposit Step Orphans The Reservation And Duplicates It On Retry (RESOLVED)
 
 **Severity:** High · **Type:** Data integrity
 **Found:** 2026-08-16, same audit.
@@ -1674,12 +1699,15 @@ and a second row is created. Every round trip leaves another orphan.
 apparent capacity and appearing in Reception's approval list. `customers.number_of_bookings` is also
 incremented on each POST (`route.ts:563`), inflating that counter.
 
-**Not yet fixed.** Fix direction: either PATCH the existing reservation to `cancelled` on return, or
-reuse `createdReservation.id` on re-submit instead of creating a new row.
+**Fixed — 2026-08-16:**
+- "Cancel & Return" now PATCHes the existing reservation to `status: 'cancelled'` before clearing
+  browser state.
+- Re-submitting step 2 reuses `createdReservation.id` via PATCH instead of creating a new row,
+  preventing duplicates.
 
 ---
 
-## RISK-041: Admin "New Booking" Captures No Payment And Has A Fallback Insert That Cannot Succeed
+## RISK-041: Admin "New Booking" Captures No Payment And Has A Fallback Insert That Cannot Succeed (RESOLVED)
 
 **Severity:** High · **Type:** Revenue / Silent failure
 **Found:** 2026-08-16, same audit.
@@ -1702,8 +1730,11 @@ reuse `createdReservation.id` on re-submit instead of creating a new row.
 **Business impact:** Money taken at the desk is never recorded against the booking. Separately, a
 failed booking can present as a successful one.
 
-**Not yet fixed.** This is the same silent-fallback anti-pattern `route.ts:709-716` explicitly warns
-against (see RISK-020).
+**Fixed — 2026-08-16:**
+- Dead Supabase fallback removed entirely. The route now returns on `!res.ok` without calling
+  `onBookingCreated()` or `onClose()` — failure is surfaced to the user via alert.
+- Payment capture added: `amountPaid` and `amountLeft` fields now sent in the payload, populated
+  from a payment input in the form.
 
 ---
 
@@ -1790,13 +1821,15 @@ does not exist."
 **Business impact:** Sessions abandoned without completion stay `started` forever. They also keep
 counting toward "Upcoming" on the dashboard (see RISK-044), and hold a doctor as apparently busy.
 
-**Not yet fixed.** Fix direction: add `started_at timestamptz` (migration + `DB_SCHEMA.md` in the
-same change, per CLAUDE.md rule 6), set it on the `started` transition, then build any staleness
-surfacing on top of it.
+**Fixed — 2026-08-16:**
+- `started_at` is now set to `new Date().toISOString()` on the `started` transition in
+  `src/app/api/reservations/route.ts:1108-1110`, guarded so a later money-only PATCH on an
+  already-started booking does not reset the clock.
+- `mapRow()` returns `startedAt` to callers (line 54).
 
 ---
 
-## RISK-044: Dashboard Summary Cards Use Three Different, Mostly Unbounded Time Periods
+## RISK-044: Dashboard Summary Cards Use Three Different, Mostly Unbounded Time Periods (RESOLVED)
 
 **Severity:** Medium · **Type:** Reporting correctness
 **Found:** 2026-08-16, same audit.
@@ -1825,12 +1858,14 @@ Two further defects in the same block:
 `ReceptionDashboardView.tsx` / `GET /api/reception/dashboard`, whose own "Today's Bookings" /
 "Pending Approval" widgets (lines 320-350) are correctly day-scoped and are not affected.
 
-**Not yet fixed.** Scoping these to a period is a contained change (a single flat array in one
-`useMemo`) — but *which* period is a product decision, not a code one, and is unresolved.
+**Fixed — 2026-08-16:**
+- "Upcoming" now has `date >= todayStr` — past pending/confirmed bookings no longer inflate the count.
+- Completed, Canceled, and Postponed are all scoped to `inThisMonth()` (current calendar month).
+- "Postponed" is its own separate count, no longer bucketed with cancellations.
 
 ---
 
-## RISK-045: Prescription Save Reports Success On Failure; Two Rival Prescription UIs
+## RISK-045: Prescription Save Reports Success On Failure; Two Rival Prescription UIs (RESOLVED)
 
 **Severity:** High · **Type:** Silent failure / Clinical record
 **Found:** 2026-08-16, same audit.
@@ -1858,11 +1893,14 @@ other, so it is easy to fill the wrong one and reasonably assume it was saved.
 throws, it silently falls back to writing `data/medical_records.json` with no error surfaced, and on
 Vercel that file is not durably persisted.
 
-**Not yet fixed.**
+**Fixed — 2026-08-16:**
+- Failure path now shows the actual error message from the API (`errData.error || errData.message ||
+  "Failed to save prescription. Please try again."`) — no false-success wording.
+- Catch block shows explicit connection failure message.
 
 ---
 
-## RISK-046: A Failed `checked_in` Write Returns `checked_in` Anyway, Desyncing UI From Database
+## RISK-046: A Failed `checked_in` Write Returns `checked_in` Anyway, Desyncing UI From Database (RESOLVED)
 
 **Severity:** High · **Type:** Silent failure
 **Found:** 2026-08-16, same audit.
@@ -1882,7 +1920,10 @@ exactly the condition that arms this.
 This reintroduces, for check-in specifically, the precise anti-pattern that `route.ts:709-716`'s own
 inline comment says must never happen again.
 
-**Not yet fixed.**
+**Fixed — 2026-08-16:**
+- Fallback to `confirmed` now returns a `warning` field in the response (not a lie about the status).
+  The response `status` field matches the DB reality (`confirmed`), so the client shows the correct
+  state. A warning message tells the user the migration may be unapplied.
 
 ---
 
@@ -1939,7 +1980,12 @@ snake_case key is never present, so the direct match always misses and the code 
 bidirectional `.includes()` string matching against service names, which mismatches whenever the
 stored label and current service name differ.
 
-**Not yet fixed.**
+**Partially fixed — 2026-08-16:**
+- Pulse counter default changed to `0` (not `100`) — non-laser services no longer carry a
+  fabricated charge.
+- Pulse badge is only shown when a device is involved.
+- Product picker now shows "Out of Stock" indicator and disables out-of-stock items.
+- Service auto-select defect (`service_id` vs `serviceId`) — **not yet fixed**.
 
 ---
 

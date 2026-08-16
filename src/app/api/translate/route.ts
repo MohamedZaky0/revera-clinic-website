@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
+import { requireStaffAccess } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   try {
     const body = await req.json();
     const text = body.text;

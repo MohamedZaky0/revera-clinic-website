@@ -5263,7 +5263,7 @@ export default function AdminPage() {
 
   function fetchAuditLogs() {
     setLoadingAuditLogs(true);
-    fetch("/api/providers/schedule-audit-logs")
+    fetch("/api/providers/schedule-audit-logs", { headers: authenticatedJsonHeaders })
       .then((res) => res.json())
       .then((data) => {
         setAuditLogsList(data || []);
@@ -6151,7 +6151,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/translate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({ text, from, to }),
       });
       const data = await res.json();
@@ -6421,7 +6421,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/translate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({ text, from, to }),
       });
       const data = await res.json();
@@ -6452,7 +6452,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/translate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({ text, from, to }),
       });
       const data = await res.json();
@@ -6487,7 +6487,7 @@ export default function AdminPage() {
     try {
       const res = await fetch("/api/translate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authenticatedJsonHeaders,
         body: JSON.stringify({ text, from, to }),
       });
       const data = await res.json();
