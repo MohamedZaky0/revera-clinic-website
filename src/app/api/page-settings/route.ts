@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireAdministratorAccess } from '@/lib/access';
 import fs from 'fs';
 import path from 'path';
 
@@ -125,6 +126,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const access = await requireAdministratorAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   let body: any;
   try {
     body = await req.json();

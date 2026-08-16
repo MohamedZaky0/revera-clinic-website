@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { requireStaffAccess } from '@/lib/access';
 import { normalizeServiceCommissions } from '@/lib/providerCommissions';
 import fs from 'fs';
 import path from 'path';
@@ -165,6 +166,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   let body: any;
   try {
     body = await req.json();
@@ -310,6 +316,11 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
@@ -479,6 +490,11 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const access = await requireStaffAccess(req);
+  if ('error' in access) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
