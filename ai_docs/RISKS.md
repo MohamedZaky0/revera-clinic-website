@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-16
+> **Last Updated:** 2026-08-17
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -1483,7 +1483,7 @@ outstanding — 10/10 checks pass. Separately confirmed a normal (non-package) c
 
 ---
 
-## RISK-036: Several PHI and Config-Mutating Routes Have No Server-Side Authorization At All
+## RISK-036: Several PHI and Config-Mutating Routes Have No Server-Side Authorization At All (PARTIALLY RESOLVED)
 
 **Severity:** High (medical-records/prescriptions) / Medium (config/CMS routes) · **Type:** Security
 **Found:** 2026-08-03, during an audit written while producing `ai_docs/SECURITY.md`
@@ -1522,6 +1522,27 @@ one to the routes RISK-018 didn't reach.
 severity), then the CMS/config routes, then re-evaluate whether `hr/*` needs a dedicated
 `requireAdministratorAccess` call or whether `PROTECTED_API_PREFIXES` should be split into
 "authenticated" vs. "staff-only" tiers so middleware can express the difference directly.
+
+**Fixed — 2026-08-16 (commits `5d69a16`, `84de55a`, `f192a3c` → `dev`), first two bullets only:**
+- `medical-records` and `prescriptions`: every method (GET/POST/DELETE) now requires
+  `requireStaffAccess` — deliberately not `requireAuthenticatedUser`, since a logged-in patient
+  satisfies that check and must not read another patient's chart.
+- `branches`, `providers`, `terms`, `page-settings`: writes (POST/PATCH/DELETE/PUT as applicable)
+  now require `requireAdministratorAccess` (branches/terms/page-settings) or `requireStaffAccess`
+  (providers) — GET stays open on all four, since the public site reads them unauthenticated
+  (`BookingModal.tsx`, `ContactPageContent.tsx`, `TermsModal.tsx`).
+- `categories`, `rooms`, `service-rooms`, `clinic-settings`, `customer-avatars`,
+  `provider-attendance`: writes guarded (`requireAdministratorAccess` for categories/
+  clinic-settings, `requireStaffAccess` for the rest). `categories` and `clinic-settings` GET also
+  guarded with `requireStaffAccess` — confirmed no public consumer calls either.
+- Every existing staff/admin caller of a newly-guarded write was located and confirmed to already
+  send an `Authorization` header (via `getAuthHeaders()` or the admin panel's
+  `authenticatedJsonHeaders`) before this landed — verified by reading each call site, not assumed.
+
+**Still open, not touched by this fix:** `hr/alerts`, `hr/attendance`, `hr/doctor-payroll`,
+`hr/leaves`, `hr/payroll`, `hr/performance`, `providers/schedule-audit-logs` (session-authenticated
+only, no role check — a patient token still passes) and `translate` (fully open). Title kept as
+"partially resolved" until those are picked up.
 
 ---
 
@@ -1686,7 +1707,7 @@ against (see RISK-020).
 
 ---
 
-## RISK-042: Wallet And Package Sales Bypass The Customer Balance Fields Entirely
+## RISK-042: Wallet And Package Sales Bypass The Customer Balance Fields Entirely (RESOLVED)
 
 **Severity:** High · **Type:** Accounting
 **Found:** 2026-08-16, same audit.
@@ -1721,7 +1742,33 @@ write paths above that bypass it, not the settlement logic itself.
 **Also relevant (intentional, but a third divergence source):** `src/app/admin/page.tsx:6996` lets
 staff overwrite `wallet_balance` as an absolute value from the manual edit form.
 
-**Not yet fixed.**
+**Fixed — 2026-08-16/17 (commits `ce4cd2f`, `9221c0f`, `8925cff` → `dev`):**
+- New `src/lib/wallet.ts` — `recordWalletMovement()` writes a `wallet_txns` row and updates
+  `customers.wallet_balance` together (ledger insert first; if it fails, the scalar is not touched
+  and the error surfaces, so the two can no longer silently disagree). `setAbsoluteWalletBalance()`
+  handles the one write site that sets an absolute value instead of a delta (the manual admin edit
+  noted above), converting it to a signed ledger row and skipping the insert entirely when the
+  delta is zero (the `amount > 0` CHECK constraint would otherwise reject it).
+- All four real write sites now go through this helper: POS wallet payments (`inventory/products/
+  sales/route.ts`, refuses the sale with 409 if the balance is short, instead of silently minting
+  credit), the cancel→refund and completion-settlement paths in `reservations/route.ts`, and the
+  manual admin edit in `customers/route.ts` (both the update and new-customer-with-opening-balance
+  cases).
+- `packages/sell/route.ts` now updates `customers.spent_amount` on every sale, accepts a real
+  `paymentMethod` on the request (validated against the `payments.method` CHECK list, defaulting to
+  `'cash'` for existing callers) instead of hardcoding `'cash'`, and applies the same wallet-balance
+  guard/deduction as POS when paid from wallet — with `invoice_id` correctly linked on the ledger row
+  since the invoice already exists at that point in this route (POS's deduction happens before its
+  invoice is created, so that one's ledger rows have no `invoice_id` — a minor traceability gap, not
+  a correctness one).
+- `GET /api/customers/reconcile` was not modified — it was already reading the right shape from
+  `wallet_txns`; the table was just always empty. It will now compute a correct ledger wallet
+  balance for any movement that happened after this fix landed.
+
+**Explicitly not attempted (unchanged from the original finding):** backfilling `wallet_txns` for
+historical wallet movements that predate this fix. There is no record of when or why those happened,
+so a `wallet_balance` that moved before 2026-08-16 will still show as ledger drift on `reconcile`
+until a deliberate opening-balance import is done under DEC-024 — a separate decision, not a bug.
 
 ---
 
