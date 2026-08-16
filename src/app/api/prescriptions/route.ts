@@ -146,7 +146,19 @@ export async function POST(req: Request) {
   };
 
   if (cleanBookingId) {
-    prescriptionData.booking_id = cleanBookingId;
+    try {
+      const { data: resMatch } = await supabaseServer
+        .from('reservations')
+        .select('id')
+        .eq('id', cleanBookingId)
+        .maybeSingle();
+
+      if (resMatch?.id) {
+        prescriptionData.booking_id = cleanBookingId;
+      }
+    } catch (_) {
+      // Ignore lookup error and proceed without setting booking_id
+    }
   }
 
   try {
@@ -161,7 +173,13 @@ export async function POST(req: Request) {
           .select()
           .single();
 
-        if (error && (error.message?.includes('booking_id') || error.code === 'PGRST204')) {
+        if (error && (
+          error.code === '23503' ||
+          error.code === 'PGRST204' ||
+          error.message?.includes('booking_id') ||
+          error.message?.includes('foreign key constraint') ||
+          error.message?.includes('prescriptions_booking_id_fkey')
+        )) {
           delete prescriptionData.booking_id;
           const retry = await supabaseServer
             .from('prescriptions')
@@ -189,7 +207,13 @@ export async function POST(req: Request) {
           .select()
           .single();
 
-        if (error && (error.message?.includes('booking_id') || error.code === 'PGRST204')) {
+        if (error && (
+          error.code === '23503' ||
+          error.code === 'PGRST204' ||
+          error.message?.includes('booking_id') ||
+          error.message?.includes('foreign key constraint') ||
+          error.message?.includes('prescriptions_booking_id_fkey')
+        )) {
           delete prescriptionData.booking_id;
           const retry = await supabaseServer
             .from('prescriptions')
