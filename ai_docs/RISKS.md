@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-17 (RISK-051)
+> **Last Updated:** 2026-08-17 (RISK-055)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -2131,6 +2131,149 @@ opening the real page and reading the real network tab did. This is the concrete
 `ai_docs/ADMIN_REFACTOR_AND_I18N_PLAN.md`'s Phase 0 auth tests (TASK-0.4) are necessary but not
 sufficient — they test that a route rejects the wrong caller, not that every existing legitimate
 caller still succeeds after the route changes. Worth a distinct regression test in Phase 1.
+
+---
+
+## RISK-052: AdminBookingsView's Approve Button Bypassed `openApprove()` Entirely (RESOLVED)
+
+**Severity:** High · **Type:** Regression / Business logic
+**Found:** 2026-08-16, live on `dev.reveraclinics.com`, immediately after RISK-051, during the same
+manual end-to-end browser session.
+
+**What it is:** the Pending Approvals table's own checkmark button
+(`AdminBookingsView` → `onApproveBooking`) called `setSelected(booking)` directly instead of
+`openApprove(booking)` — the exact function RISK-047 fixed to pre-fill the approve modal from the
+booking's real requested time/doctor and check availability. Bypassing it left the modal's
+`slot`/`doctorName` state as whatever a previous modal use had set, which is how a hardcoded
+`12:00` and `Dr. Sara El Gamel` reappeared through a second, untouched code path to the same
+modal — RISK-047's fix was real, this button just never called it.
+
+**Fixed:** `onApproveBooking` now calls `openApprove(booking)` (`f6ca090`,
+[src/app/admin/page.tsx](../src/app/admin/page.tsx)). Documented here retroactively — the fix
+shipped same-day but this file wasn't updated until the RISK-053…055 write-up below.
+
+---
+
+## RISK-053: New Cairo Branch's Working Hours Were Never Actually Configured
+
+**Severity:** Low (data/config gap, not a blocking bug) · **Type:** Data integrity
+**Found:** 2026-08-16, investigating a live report that 11:30 AM showed as "outside opening hours"
+when approving a real test booking (Therapeutic Laser, New Cairo, Tuesday 18 Aug, Dr. saifuldeen
+Naser).
+
+**What it is:** there are three independent places branch/service hours can come from, and for New
+Cairo none of them hold real data:
+
+1. `branches.service_hours` (New Cairo's row) — `null`, confirmed via `GET /api/branches`. Falls
+   back to a hardcoded 09:00–20:00-every-day default baked into `admin/page.tsx` (two separate
+   copies of the same default array, lines ~4540 and ~5146).
+2. `GET /api/availability`'s own fallback, `page_settings.value.footer.serviceHours` — the live
+   `page_settings` row has no `footer` key at all (`booking`/`deposit`/`inactivity`/`departments`
+   only, confirmed via `GET /api/page-settings`), so `data?.value?.footer?.serviceHours` evaluates
+   to `undefined || []`, i.e. an empty array, which the route then also treats as "no restriction,
+   use the 09:00–20:00 hardcoded default."
+3. The Settings → Service Hours admin UI writes to (1) — it has just never been saved for this
+   branch.
+
+**Why this didn't block 11:30 AM:** every one of these fallbacks is *permissive* (09:00–20:00,
+covers Tuesday), not restrictive, so a Tuesday 11:30 AM slot was never actually outside any of the
+three computed windows once the involved provider (`saifuldeen Naser`) had a real Tuesday
+in-person shift configured for New Cairo (09:00–20:00, confirmed via `GET /api/providers`). The
+approve modal's `getDayOperatingHoursApprove` also does not gate the "Confirm approve" button on
+its own "outside opening hours" warning — that button is only disabled by
+`approveUnavailableSlots.includes(slot) || !slot` (an actual scheduling conflict, not the hours
+warning). The specific block seen live most likely reflected the provider's schedule not yet being
+saved at that exact moment, or a slot briefly marked "taken" by the since-cancelled duplicate
+reservation (`008a9019…`) — both self-resolved, and the booking went on to be approved and started
+at the literal requested time (11:30 AM, `saifuldeen Naser`).
+
+**Not fixed — flagged for follow-up:** branch hours should be explicitly configured for every real
+branch (New Cairo, Sheikh Zayed) via Settings → Service Hours so the system stops running on
+implicit hardcoded defaults, and `fetchCachedServiceHours()` in
+[src/app/api/availability/route.ts](../src/app/api/availability/route.ts) silently returning `[]`
+for a page-settings shape that no longer exists (`footer.serviceHours`) is itself worth a decision:
+either restore that config path or delete the dead fallback.
+
+---
+
+## RISK-054: `AdminBookingsView`'s Display-Only Status Remap Leaked Into The Shared Booking-Details Modal (RESOLVED)
+
+**Severity:** Medium-High · **Type:** Regression / Business logic
+**Found:** 2026-08-16, live on `dev.reveraclinics.com`, continuing the same manual session — after
+approving and starting the RISK-053 test booking, opening it from Bookings → Today's Schedule
+showed no "Treatment In Session" indicator and, worse, still offered Postpone/Cancel/No Show for a
+booking that was actively in progress.
+
+**What it is:** `AdminBookingsView.tsx` builds its own table rows with a display-friendly status
+(`if (st === "approved") st = "confirmed"; if (st === "started") st = "in_progress";`, line ~227)
+and spreads the raw reservation underneath it, so the row object it hands back via
+`onViewBookingDetails` carries this *rewritten* status. `admin/page.tsx` passed that object
+straight into `setViewingBooking()`, and every Session Flow action in the shared details modal
+switches on the **raw** DB status strings (`'approved'`, `'started'`, `'checked_in'`,
+`'completed'`). Concretely, for an in-progress booking opened this way:
+
+- `viewingBooking.status === 'started'` never matched (it was `'in_progress'`), so the amber
+  "Treatment In Session" banner never rendered — the modal looked like a dead end with nothing left
+  to do.
+- The "Other Actions" block explicitly excludes `'started'` from showing Postpone/Cancel/No Show
+  (`!['completed','cancelled','rejected','no_show','started'].includes(...)`), but since the value
+  it saw was already rewritten to `'in_progress'`, that exclusion never fired — reception could
+  still see Cancel/No Show/Postpone for a session the assigned doctor was actively running.
+
+Confirmed live: opening the RISK-053 booking (raw status `started`) via Today's Schedule showed a
+badge reading `IN_PROGRESS` and an "Other Actions" panel with Postpone/Cancel/No Show still active.
+
+**Fixed:** `onViewBookingDetails` now looks up the untouched record from `allReservations` by id
+and passes that to `setViewingBooking` instead of the display-normalised row
+([src/app/admin/page.tsx](../src/app/admin/page.tsx), the `AdminBookingsView` render block under
+`activeNav === "Bookings"`). `AdminBookingsView`'s own table/badge rendering is unchanged — the fix
+only stops its display-only remap from leaking into a component with a different status contract.
+
+---
+
+## RISK-055: Stale Session Token In The Reservations Polling Effect Silently Wiped Pending Approvals & Booking History (RESOLVED)
+
+**Severity:** Critical · **Type:** Regression / Auth
+**Found:** 2026-08-16, live on `dev.reveraclinics.com`, same session — Pending Approvals showed "0
+bookings awaiting review" and a patient with 2 real bookings showed "No booking history records
+found" in their profile, despite both reservations existing and being readable via a direct,
+correctly-authenticated fetch.
+
+**What it is:** `admin/page.tsx` has a `useEffect` (`// Re-fetch bookings whenever branch selection
+changes and poll every 15 seconds for new requests`) with dependency array `[branch]` and an
+`eslint-disable-next-line react-hooks/exhaustive-deps` covering the omission of
+`fetchRequests`/`fetchAllReservations`. Those two functions close over `authenticatedJsonHeaders`,
+which is rebuilt every render from `session?.access_token` — but because the effect itself only
+re-runs when `branch` changes (which happens once, at mount), its `poll()` closure keeps calling
+whichever versions of `fetchRequests`/`fetchAllReservations` (and therefore whichever
+`session.access_token`) were live the one time this effect fired. If Supabase's session state
+updates afterward — a background token refresh, or simply resolving asynchronously after `branch`
+was already set — the frozen closure never sees it and keeps sending the old token on every 15-
+second poll, indefinitely.
+
+**Confirmed live**, three ways:
+1. `read_network_requests` showed a continuous stream of `GET /api/reservations?...branchId=...` →
+   `401 {"error":"Invalid or expired session."}`, including immediately after a full page reload.
+2. Manually re-issuing the exact same request from the page's own `fetch`, using the access token
+   read fresh from `localStorage` at that instant, returned `200` with the real data — proving the
+   token in browser storage (and therefore in a freshly-rendered `authenticatedJsonHeaders`) was
+   valid; only the frozen closure's copy was stale.
+3. `fetchRequests`'s and `fetchAllReservations`'s own `.catch` handlers call
+   `setRequests([])`/`setAllReservations([])` on any error — so each failed poll doesn't just skip
+   an update, it actively **erases** whatever had loaded successfully before, which is why Pending
+   Approvals and every patient's Booking History (both driven by `allReservations`) rendered empty
+   instead of merely stale.
+
+**Fixed:** added `session?.access_token` to the effect's dependency array
+([src/app/admin/page.tsx](../src/app/admin/page.tsx), ~line 5207) so the poll (and the closures it
+captures) is recreated whenever the token value actually changes, not just when `branch` does.
+
+**Why this matters beyond the fix itself:** this is the same failure shape as RISK-051 — a
+legitimate, already-authenticated caller silently losing access — but caused by client-side state
+going stale rather than a missing header. Neither `tsc`, `eslint`, nor a build would ever catch
+this; it only surfaced by reading the actual network tab against the actual running page during a
+long-lived manual session, which is exactly the scenario production admin shifts run in for hours
+at a time.
 
 ---
 

@@ -5203,8 +5203,18 @@ export default function AdminPage() {
       isMounted = false;
       clearTimeout(timerId);
     };
+  // RISK-053: this effect closes over fetchRequests/fetchAllReservations, which close over
+  // authenticatedJsonHeaders/session. Without session?.access_token in the deps, the poll loop
+  // keeps calling the closures captured whenever this effect last ran (i.e. whenever `branch`
+  // last changed) for its entire lifetime. If Supabase silently rotates the access token later
+  // (background refresh, or simply resolving async after `branch` was already set), the poll
+  // keeps sending the stale token forever, every 401 ("Invalid or expired session") lands in
+  // fetchRequests'/fetchAllReservations' .catch and overwrites requests/allReservations with []
+  // — wiping Pending Approvals and every patient's Booking History even though a fully valid
+  // session exists in state and localStorage. Re-creating the poll when the token value changes
+  // keeps it on the live token going forward.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branch]);
+  }, [branch, session?.access_token]);
 
   // Fetch ALL reservations (no branch filter) for the schedule view whenever the date or view changes
   useEffect(() => {
@@ -23306,7 +23316,17 @@ export default function AdminPage() {
                 }}
                 onFilterClick={() => setShowFilterModal(true)}
                 onViewBookingDetails={(booking: any) => {
-                  setViewingBooking(booking as any);
+                  // RISK-053: AdminBookingsView normalises status for its own table/badges
+                  // ('started' -> 'in_progress', 'approved' -> 'confirmed') and returns that
+                  // normalised object here. The shared details modal below switches its Session
+                  // Flow actions on the *raw* DB status strings, so passing the normalised object
+                  // straight through silently dropped the "Treatment In Session" banner and wrongly
+                  // re-exposed Postpone/Cancel/No Show for a booking that is actively in session
+                  // (the 'started' exclusion at the Other Actions block below never matched because
+                  // the value it saw was already rewritten to 'in_progress'). Resolve the untouched
+                  // record from allReservations by id instead.
+                  const raw = allReservations.find((r: any) => String(r.id) === String(booking?.id));
+                  setViewingBooking((raw || booking) as any);
                 }}
                 onPrint={() => window.print()}
                 onExportCSV={handleExportBookingsCSV}
