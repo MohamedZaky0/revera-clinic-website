@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { requireAdministratorAccess, requireAuthenticatedUser, requireStaffAccess } from '@/lib/access';
 import { isOwnIdentity } from '@/lib/customerIdentity';
+import { recordWalletMovement, setAbsoluteWalletBalance } from '@/lib/wallet';
 
 /**
  * This route has two legitimate caller populations: staff (reception/admin, full access)
@@ -182,6 +183,8 @@ export async function POST(req: Request) {
     updated_at: new Date().toISOString()
   };
 
+  const staffWalletValue = Number(wallet_balance || 0);
+
   if (caller.kind === 'patient') {
     // Financial fields are never patient-writable, regardless of what the request body
     // contains — a patient must not be able to set their own wallet_balance or erase
@@ -191,7 +194,7 @@ export async function POST(req: Request) {
     // Staff path — unchanged from before this endpoint required authentication.
     customerData.spent_amount = Number(spent_amount || 0);
     customerData.outstanding = Number(outstanding || 0);
-    customerData.wallet_balance = Number(wallet_balance || 0);
+    // wallet_balance is handled via the ledger helper below, not as a bare scalar write
   }
 
   try {
@@ -206,14 +209,20 @@ export async function POST(req: Request) {
 
       if (error) throw error;
       result = data;
+
+      // Write a wallet_txns ledger row when staff sets wallet_balance on an existing customer
+      if (caller.kind === 'staff') {
+        await setAbsoluteWalletBalance({ customerId: id, newBalance: staffWalletValue });
+      }
     } else {
+      const initialWallet = caller.kind === 'staff' ? staffWalletValue : 0;
       const { data, error } = await supabaseServer
         .from('customers')
         .insert({
           ...customerData,
           spent_amount: caller.kind === 'staff' ? Number(spent_amount || 0) : 0,
           outstanding: caller.kind === 'staff' ? Number(outstanding || 0) : 0,
-          wallet_balance: caller.kind === 'staff' ? Number(wallet_balance || 0) : 0,
+          wallet_balance: initialWallet,
           registration_date: new Date().toISOString(),
           created_at: new Date().toISOString()
         })
@@ -222,6 +231,17 @@ export async function POST(req: Request) {
 
       if (error) throw error;
       result = data;
+
+      // For a brand-new customer with non-zero wallet, write the opening ledger row
+      if (caller.kind === 'staff' && initialWallet > 0) {
+        await recordWalletMovement({
+          customerId: result.id,
+          direction: 'in',
+          amount: initialWallet,
+          reason: 'manual adjustment by staff',
+          newBalance: initialWallet,
+        });
+      }
     }
 
     return NextResponse.json(result, { status: id ? 200 : 201 });

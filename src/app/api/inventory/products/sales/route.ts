@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabaseServer';
 import { deductInventoryStock } from '@/app/api/inventory/products/route';
 import { requireStaffAccess } from '@/lib/access';
 import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/ledger';
+import { recordWalletMovement } from '@/lib/wallet';
 
 export const dynamic = 'force-dynamic';
 
@@ -155,7 +156,7 @@ async function addToCustomerSpend(customerId: string, amount: number) {
  * one on the row at write time, and clamps at 0 — a negative wallet_balance would read as debt
  * elsewhere in the admin UI, which is not what this field means.
  */
-async function deductFromWallet(customerId: string, amount: number) {
+async function deductFromWallet(customerId: string, amount: number, invoiceId?: string) {
   if (!customerId || !amount) return;
   try {
     const { data: customer, error: readErr } = await supabaseServer
@@ -170,14 +171,14 @@ async function deductFromWallet(customerId: string, amount: number) {
     }
 
     const newBalance = Math.max(0, Number(customer.wallet_balance || 0) - Number(amount));
-    const { error: writeErr } = await supabaseServer
-      .from('customers')
-      .update({ wallet_balance: newBalance, updated_at: new Date().toISOString() })
-      .eq('id', customerId);
-
-    if (writeErr) {
-      console.error('Failed to deduct customer wallet_balance:', customerId, writeErr.message);
-    }
+    await recordWalletMovement({
+      customerId,
+      direction: 'out',
+      amount: Number(amount),
+      reason: 'POS sale payment',
+      newBalance,
+      invoiceId: invoiceId ?? null,
+    });
   } catch (err) {
     console.error('Error deducting customer wallet_balance:', err);
   }

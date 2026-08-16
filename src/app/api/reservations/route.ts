@@ -8,6 +8,7 @@ import { computeCommission, consumptionCost, costPerPulse } from '@/lib/costing'
 import { deductInventoryStock } from '@/app/api/inventory/products/route';
 import { incrementDevicePulses } from '@/app/api/inventory/devices/route';
 import { normalizeEgyptMobile } from '@/lib/customerIdentity';
+import { recordWalletMovement } from '@/lib/wallet';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -1017,11 +1018,14 @@ export async function PATCH(req: Request) {
           if (action === 'cancel') {
             // Cancelled in advance: give the deposit back as wallet credit (matches the existing
             // checkout "change" pattern — store credit, not a claim this system can pay out cash).
-            const { error: custUpdateError } = await supabaseServer
-              .from('customers')
-              .update({ wallet_balance: Number(customer.wallet_balance || 0) + depositPaid })
-              .eq('id', target.customer_id);
-            if (custUpdateError) throw custUpdateError;
+            const newWalletBalance = Number(customer.wallet_balance || 0) + depositPaid;
+            await recordWalletMovement({
+              customerId: target.customer_id,
+              direction: 'in',
+              amount: depositPaid,
+              reason: 'deposit refund on cancellation',
+              newBalance: newWalletBalance,
+            });
           } else {
             // No-show: the clinic keeps the deposit as a cancellation fee — recognise it as
             // real spend now, since completion (which normally does this) will never happen.
@@ -1250,6 +1254,20 @@ export async function PATCH(req: Request) {
               );
             }
 
+            // Write a wallet_txns ledger row if the wallet actually moved
+            const walletDelta = settled.wallet - Number(customer.wallet_balance || 0);
+            if (walletDelta !== 0) {
+              await recordWalletMovement({
+                customerId: target.customer_id,
+                direction: walletDelta > 0 ? 'in' : 'out',
+                amount: Math.abs(walletDelta),
+                reason: walletDelta > 0 ? 'wallet deposit on settlement' : 'wallet withdrawal on settlement',
+                newBalance: settled.wallet,
+              });
+            }
+
+            // Update remaining scalars (spent, outstanding) — wallet_balance was
+            // already set by recordWalletMovement when the delta was non-zero.
             await supabaseServer
               .from('customers')
               .update({
