@@ -1831,8 +1831,8 @@ counting toward "Upcoming" on the dashboard (see RISK-044), and hold a doctor as
 **Fixed — 2026-08-16 (surfacing):** the timestamp above was the *input* for a staleness check, but
 nothing consumed it — a grep for `started_at` found it only inside `reservations/route.ts` itself, so
 the reported symptom (a doctor forgetting a session open) was still live. Now:
-- `getSessionStaleness()` + `STALE_SESSION_THRESHOLD_MS` added to `src/lib/services.ts`. Threshold is
-  a **fixed 2 hours** by clinic decision, deliberately *not* derived from the service's
+- `getSessionStaleness()` + `STALE_SESSION_THRESHOLD_MS` added to `src/lib/services.ts`. Threshold was
+  initially a fixed 2 hours by clinic decision, deliberately *not* derived from the service's
   `duration_minutes`: a single number staff can reason about beat per-service accuracy here.
 - It only ever reports on `started`/`in_progress` — a completed or cancelled booking is never stale
   regardless of how old its `started_at` is.
@@ -1844,10 +1844,27 @@ the reported symptom (a doctor forgetting a session open) was still live. Now:
   reservations — not just the selected day, since the whole point is to catch days nobody is looking
   at. Each entry opens the booking so staff can complete or cancel it.
 
+**Fixed — 2026-08-16 (configurable threshold + actual duration capture):** two follow-up requests
+from the clinic:
+- The 2-hour threshold is now **SuperAdmin-configurable** instead of hardcoded: a "Stale Session
+  Alert (Hours)" dropdown (1/2/3/4/6/8/12) in Booking Settings
+  (`src/app/admin/page.tsx:16067-16090`), persisted via the existing `page-settings`
+  save/load path as `booking.staleSessionHours`, and passed to `AdminBookingsView` as the
+  `staleSessionThresholdHours` prop. Falls back to the 2-hour default when unset or invalid
+  (`AdminBookingsView.tsx:177-180`).
+- A reservation now stores how long the session **actually took**, separate from the service's
+  planned `duration_minutes`. On the `started` → `completed` transition,
+  `src/app/api/reservations/route.ts:1103-1115` computes `completed_at - started_at` in minutes and
+  writes it to a new `reservations.actual_duration_minutes` column
+  (`supabase/migrations/20260817000000_add_actual_duration_to_reservations.sql`). Only computed when
+  `started_at` was actually recorded — no fabricated duration for sessions missing a start time.
+  `mapRow()` returns it as `actualDurationMinutes`.
+
 **Deliberately not done:** auto-closing stale sessions. Choosing the terminal state is a business
 decision, not a code one — `completed` would run `computeSettledBalances()` and move money on a
 session nobody confirmed, and `no_show` forfeits spend; a neutral `abandoned` state would need a
-CHECK-constraint migration. Both surfacing paths keep a human on the money decision.
+CHECK-constraint migration. Both surfacing paths keep a human on the money decision. `actual_duration_minutes`
+is captured but not yet surfaced anywhere in the UI — no display/report consumes it yet.
 
 ---
 

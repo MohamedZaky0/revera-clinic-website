@@ -100,11 +100,16 @@ function formatElapsedShort(ms: number): string {
  * guess an elapsed time, those fall back to the booking's own date: a session still open from an
  * earlier day is stale with an unknown duration, one from today is left alone. `elapsedMs` stays
  * null in that case so callers do not present a fabricated number.
+ *
+ * `thresholdMs` defaults to `STALE_SESSION_THRESHOLD_MS` (2 hours) but is a parameter, not a
+ * hardcoded read of the constant, so a SuperAdmin-configured value (Booking Settings →
+ * "Stale Session Alert") can be threaded through by the caller without editing this function.
  */
 export function getSessionStaleness(
   status: string | null | undefined,
   startedAt: string | null | undefined,
   bookingDate?: string | null,
+  thresholdMs: number = STALE_SESSION_THRESHOLD_MS,
   now: Date = new Date()
 ): SessionStaleness {
   const st = (status || "").toLowerCase();
@@ -114,7 +119,7 @@ export function getSessionStaleness(
     const startedMs = new Date(startedAt).getTime();
     if (!Number.isFinite(startedMs)) return NOT_STALE;
     const elapsedMs = now.getTime() - startedMs;
-    if (elapsedMs < STALE_SESSION_THRESHOLD_MS) return NOT_STALE;
+    if (elapsedMs < thresholdMs) return NOT_STALE;
     return { isStale: true, elapsedMs, elapsedLabel: formatElapsedShort(elapsedMs) };
   }
 

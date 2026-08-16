@@ -52,6 +52,7 @@ function mapRow(r: Record<string, any>) {
     providerId: r.provider_id ?? null,
     followUpDate: r.follow_up_date ?? null,
     startedAt: r.started_at ?? null,
+    actualDurationMinutes: r.actual_duration_minutes ?? null,
   };
 }
 
@@ -1100,7 +1101,17 @@ export async function PATCH(req: Request) {
       const updates: Record<string, any> = {};
       if (status) updates.status = status;
       if (status === 'completed' && target.status !== 'completed') {
-        updates.completed_at = new Date().toISOString();
+        const completedAt = new Date();
+        updates.completed_at = completedAt.toISOString();
+        // Store the real elapsed time for this session, distinct from the service's planned
+        // duration. Only computable when we actually recorded a start time (RISK-043).
+        if (target.started_at) {
+          const startedAt = new Date(target.started_at);
+          const elapsedMinutes = Math.round((completedAt.getTime() - startedAt.getTime()) / 60000);
+          if (Number.isFinite(elapsedMinutes) && elapsedMinutes >= 0) {
+            updates.actual_duration_minutes = elapsedMinutes;
+          }
+        }
       }
       // RISK-043: anchor the moment a session actually begins. Guarded on the transition so a
       // later money-only PATCH on an already-started booking does not reset the clock and make a

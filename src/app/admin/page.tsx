@@ -742,6 +742,9 @@ export default function AdminPage() {
   const [inactivityThreshold, setInactivityThreshold] = useState<number>(30);
   const [inactivityCountdown, setInactivityCountdown] = useState<number>(10);
   const [savingInactivitySettings, setSavingInactivitySettings] = useState(false);
+  // RISK-043: how long a session may sit `started`/`in_progress` before AdminBookingsView flags it
+  // as forgotten. Configurable so a clinic that runs longer sessions isn't stuck with false alarms.
+  const [bookingStaleSessionHours, setBookingStaleSessionHours] = useState<number>(2);
   // Rooms state
   const [rooms, setRooms] = useState<any[]>([]);
 
@@ -5829,6 +5832,7 @@ export default function AdminPage() {
             setBookingInstantApproval(data.booking.instantApproval ?? false);
             setBookingShowDoctorNotes(data.booking.showDoctorNotes ?? true);
             setBookingDepositPercentage(data.booking.depositPercentage ?? 20);
+            setBookingStaleSessionHours(data.booking.staleSessionHours ?? 2);
           }
           if (data.deposit) {
             setInstapayName(data.deposit.instapayName || "Revera Clinic");
@@ -6094,6 +6098,7 @@ export default function AdminPage() {
             instantApproval: bookingInstantApproval,
             showDoctorNotes: bookingShowDoctorNotes,
             depositPercentage: bookingDepositPercentage,
+            staleSessionHours: bookingStaleSessionHours,
             termsText: termsText
           }
         }),
@@ -16059,6 +16064,30 @@ export default function AdminPage() {
                       <span className="text-[11px] text-[#8A9A81] mt-1 block">Maximum concurrent appointments per time slot.</span>
                     </div>
 
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Stale Session Alert (Hours)</label>
+                        <button
+                          type="button"
+                          onClick={() => setActiveInfoFeature({
+                            title: "Stale Session Alert (Hours)",
+                            description: "If a doctor starts a session and forgets to mark it Completed, it stays 'In Progress' forever, keeping a room, slot and doctor tied up. This setting controls how many hours a session can stay In Progress before it is flagged in the Bookings screen's Needs Attention panel so staff can complete or cancel it."
+                          })}
+                          className="text-[#5A6A51]/60 hover:text-[#414E36] transition-colors p-0.5 rounded-full hover:bg-[#EDF1EC] flex"
+                          title="Click for info"
+                        >
+                          <Info size={13} />
+                        </button>
+                      </div>
+                      <select
+                        value={bookingStaleSessionHours}
+                        onChange={(e) => setBookingStaleSessionHours(Number(e.target.value))}
+                        className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition"
+                      >
+                        {[1, 2, 3, 4, 6, 8, 12].map(h => <option key={h} value={h}>{h} {h === 1 ? "Hour" : "Hours"}</option>)}
+                      </select>
+                      <span className="text-[11px] text-[#8A9A81] mt-1 block">How long a session can stay In Progress before it's flagged as forgotten.</span>
+                    </div>
 
                   </div>
 
@@ -23267,6 +23296,7 @@ export default function AdminPage() {
                 providers={providers}
                 localServices={localServices}
                 userName={loggedEmpAccount?.name?.split(" ")[0] || "Sara"}
+                staleSessionThresholdHours={bookingStaleSessionHours}
                 onNewBooking={() => setShowFullViewNewBooking(true)}
                 onPendingApprovalsClick={() => {
                   const el = document.getElementById("pending-approvals-section");

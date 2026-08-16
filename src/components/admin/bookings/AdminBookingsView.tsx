@@ -58,6 +58,8 @@ interface AdminBookingsViewProps {
   onExportCSV?: () => void;
   onApproveBooking?: (booking: any) => void;
   onRejectBooking?: (booking: any) => void;
+  /** SuperAdmin-configured "Stale Session Alert" from Booking Settings. Defaults to 2 hours. */
+  staleSessionThresholdHours?: number;
 }
 
 const formatDisplayTime = (timeStr?: string): string => {
@@ -95,7 +97,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   onPrint,
   onExportCSV,
   onApproveBooking,
-  onRejectBooking
+  onRejectBooking,
+  staleSessionThresholdHours
 }) => {
   // View Mode State: 'calendar' (Default main view) vs 'pending'
   const [viewMode, setViewMode] = useState<"pending" | "calendar">("calendar");
@@ -168,6 +171,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   };
 
   const selectedDateStr = useMemo(() => formatDateISO(selectedDate), [selectedDate]);
+
+  // RISK-043: SuperAdmin-configured threshold (Booking Settings → "Stale Session Alert"), falling
+  // back to the 2-hour default when the setting hasn't been set or is invalid.
+  const staleThresholdMs = useMemo(() => {
+    const hours = Number(staleSessionThresholdHours);
+    return Number.isFinite(hours) && hours > 0 ? hours * 60 * 60 * 1000 : undefined;
+  }, [staleSessionThresholdHours]);
 
   // Combine prop reservations with database reservations (strict real data)
   const mergedAppointments = useMemo(() => {
@@ -242,7 +252,9 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
       // RISK-043: a session the doctor never completed stays `started` forever. Computed off the
       // raw status, not the normalised `st`, so the check reads the state the DB actually holds.
-      const staleness = getSessionStaleness(r.status, r.startedAt ?? r.started_at, bookingDate);
+      // Threshold is SuperAdmin-configurable (Booking Settings → "Stale Session Alert"); falls
+      // back to the 2-hour default when unset.
+      const staleness = getSessionStaleness(r.status, r.startedAt ?? r.started_at, bookingDate, staleThresholdMs);
 
       return {
         ...r,
@@ -261,7 +273,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         staleElapsedLabel: staleness.elapsedLabel
       };
     });
-  }, [allReservations, dbReservations, dbProviders, localServices, providers, selectedDateStr]);
+  }, [allReservations, dbReservations, dbProviders, localServices, providers, selectedDateStr, staleThresholdMs]);
 
   // Chronological Booking Flow Order
   const FLOW_ORDER: Record<string, number> = {
@@ -769,8 +781,9 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 Needs Attention — {staleSessions.length} session{staleSessions.length !== 1 ? "s" : ""} left open
               </h2>
               <p className="text-xs text-red-700/80 mt-0.5">
-                These are still marked In Progress after more than 2 hours. Complete or cancel each one so the
-                slot, room and doctor are released.
+                These are still marked In Progress after more than {staleSessionThresholdHours || 2} hour
+                {(staleSessionThresholdHours || 2) !== 1 ? "s" : ""}. Complete or cancel each one so the slot,
+                room and doctor are released.
               </p>
             </div>
           </div>
