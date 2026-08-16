@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-17 (RISK-055)
+> **Last Updated:** 2026-08-17 (RISK-056)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -2274,6 +2274,56 @@ going stale rather than a missing header. Neither `tsc`, `eslint`, nor a build w
 this; it only surfaced by reading the actual network tab against the actual running page during a
 long-lived manual session, which is exactly the scenario production admin shifts run in for hours
 at a time.
+
+---
+
+## RISK-056: Doctor Portal's "Complete Treatment" Silently Dropped The Base Service Price From The Invoice (RESOLVED)
+
+**Severity:** High · **Type:** Regression / Billing
+**Found:** 2026-08-17, live on `dev.reveraclinics.com`, continuing the same manual session — after
+reassigning the RISK-053 test booking to a doctor with working login credentials and opening its
+Ongoing Session screen, the panel read "Primary Reserved Service: 0 EGP" and "Base Service: 0 EGP"
+for a Therapeutic Laser booking that costs 110 EGP, before any product/add-on had been logged.
+
+**What it is:** [src/components/admin/DoctorAccountView.tsx](../src/components/admin/DoctorAccountView.tsx)
+computed the invoice's base price as:
+
+```js
+const baseBookingPrice = Number(
+  activeSessionBooking?.price || activeSessionBooking?.total_price || activeSessionBooking?.amount || 0
+);
+```
+
+`activeSessionBooking` is populated either from `GET /api/reservations` (the `mapRow()` shape —
+`serviceId`/`serviceIds`/a nested `services: {price}` object, never a flat `.price`) or from a raw
+Supabase realtime row on the `reservations` table (snake_case DB columns, no price column at all —
+price is only ever derived via a join to `services`). Neither source has ever set `.price`,
+`.total_price`, or `.amount` directly on the booking. Those fields only exist locally after a
+doctor manually changes the service via the "Selected Patient Service (Changeable)" dropdown
+(`handleChangePrimaryService` sets `price`/`total_price` on the local object as a side effect,
+line ~645) — i.e. exactly the one interaction most sessions never need, because the correct
+service is already the one that was booked. For every other session, `baseBookingPrice` silently
+evaluated to `0`, and since `updatedInvoiceTotal = baseBookingPrice + additionalServicesSubtotal +
+productsSubtotal + extraPulsesSubtotal` feeds directly into `amountLeft` on the completing PATCH
+(`amountLeft: updatedInvoiceTotal - amountPaid`), **every treatment completed through the doctor
+portal without touching that dropdown would invoice for products/add-ons only, with the actual
+clinical service silently free.**
+
+Confirmed live: the RISK-053 test booking (Therapeutic Laser, 110 EGP) showed "Base Service: 0
+EGP"; after adding one 700 EGP product, "Final Invoice" read 700 EGP, not 810 EGP.
+
+**Fixed:** `baseBookingPrice` now falls back to `activeSessionBooking?.services?.price` (the
+mapRow-shaped nested object), then to looking the price up from `servicesList` by the booking's
+own `serviceId`/`service_id`/`serviceIds[0]`/`service_ids[0]` — the same `servicesList` source
+`handleChangePrimaryService` already trusts — before finally defaulting to `0`. The explicit
+`.price`/`.total_price`/`.amount` fields set by actually changing the service are still honoured
+first, so that interaction is unaffected.
+
+**Why this matters beyond the fix itself:** this is a real-money billing defect that would have
+shipped invisibly — the UI displayed a plausible-looking "0 EGP" that reads as "nothing extra
+charged yet" rather than "the entire service is about to be given away for free." It was only
+caught because a real doctor login completed a real session with a real product attached and the
+arithmetic didn't add up on screen before confirming.
 
 ---
 

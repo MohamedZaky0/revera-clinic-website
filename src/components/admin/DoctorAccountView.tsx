@@ -620,8 +620,27 @@ export default function DoctorAccountView({
   };
 
   // Subtotals
+  // RISK-056: activeSessionBooking is populated straight from GET /api/reservations (mapRow shape)
+  // or a raw Supabase realtime row — neither ever carries a `.price`/`.total_price`/`.amount`
+  // field. Those only appear locally after handleChangePrimaryService() sets them as a side
+  // effect of switching the service dropdown. Until a doctor actually touches that dropdown,
+  // this fell straight to `|| 0`, silently dropping the reserved service's real price from the
+  // completed invoice (e.g. a 110 EGP Therapeutic Laser session invoiced for 0 + whatever
+  // products/add-ons were logged). Fall back to looking the price up from the booking's own
+  // service id via servicesList, same source handleChangePrimaryService already uses.
+  const bookingServiceId =
+    activeSessionBooking?.serviceId ??
+    activeSessionBooking?.service_id ??
+    (Array.isArray(activeSessionBooking?.serviceIds) ? activeSessionBooking.serviceIds[0] : undefined) ??
+    (Array.isArray(activeSessionBooking?.service_ids) ? activeSessionBooking.service_ids[0] : undefined);
+  const bookingServiceFromList = servicesList.find((s) => String(s.id) === String(bookingServiceId));
   const baseBookingPrice = Number(
-    activeSessionBooking?.price || activeSessionBooking?.total_price || activeSessionBooking?.amount || 0
+    activeSessionBooking?.price ||
+    activeSessionBooking?.total_price ||
+    activeSessionBooking?.amount ||
+    activeSessionBooking?.services?.price ||
+    bookingServiceFromList?.price ||
+    0
   );
   const productsSubtotal = usedProducts.reduce((sum, item) => sum + item.total, 0);
   const extraPulsesSubtotal = extraPulsesCount * pricePerPulse;
