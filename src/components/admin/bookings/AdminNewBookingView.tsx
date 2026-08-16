@@ -6,7 +6,6 @@ import {
   Phone,
   User,
   Mail,
-  Calendar,
   Clock,
   Briefcase,
   CheckCircle2,
@@ -540,11 +539,11 @@ export default function AdminNewBookingView({
         </button>
       </div>
 
-      {/* ── MAIN 2-COLUMN GRID ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ── MAIN FORM & LAYOUT ── */}
+      <div className={activePackage ? "grid grid-cols-1 lg:grid-cols-3 gap-6" : "space-y-6"}>
 
-        {/* LEFT COLUMN: MAIN FORM (2/3 width) */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* MAIN FORM */}
+        <div className={activePackage ? "lg:col-span-2 space-y-6" : "space-y-6"}>
 
           {/* CARD 1: PATIENT INFORMATION */}
           <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#414E36]/10 shadow-xs space-y-6">
@@ -943,11 +942,9 @@ export default function AdminNewBookingView({
 
         </div>
 
-        {/* RIGHT COLUMN: PACKAGE & SUMMARY (1/3 width) */}
-        <div className="space-y-6">
-
-          {/* CARD A: ACTIVE PACKAGE (If patient has active package) */}
-          {activePackage && (
+        {/* RIGHT COLUMN: ACTIVE PACKAGE (1/3 width, if active package exists) */}
+        {activePackage && (
+          <div className="space-y-6">
             <div className="bg-white rounded-3xl p-6 border border-emerald-700/20 shadow-xs space-y-4">
               <div className="flex items-center gap-2 text-emerald-800">
                 <Package size={18} />
@@ -980,61 +977,8 @@ export default function AdminNewBookingView({
                 </button>
               </div>
             </div>
-          )}
-
-          {/* CARD B: APPOINTMENT SUMMARY */}
-          <div className="bg-white rounded-3xl p-6 border border-[#414E36]/10 shadow-xs space-y-4">
-            <div className="flex items-center gap-2 text-emerald-800 border-b border-[#414E36]/10 pb-3">
-              <Calendar size={18} />
-              <h3 className="font-extrabold text-sm">Appointment Summary</h3>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-bold">Patient</span>
-                <span className="font-extrabold text-[#1F251A]">{fullPatientName}</span>
-              </div>
-
-              <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-bold">Branch</span>
-                <span className="font-extrabold text-[#1F251A]">{selectedBranchName}</span>
-              </div>
-
-              <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-bold">Room</span>
-                <span className="font-extrabold text-[#1F251A]">{selectedRoomName}</span>
-              </div>
-
-              <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-bold">Service</span>
-                <span className="font-extrabold text-[#1F251A]">{selectedServiceName}</span>
-              </div>
-
-              <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-bold">Doctor</span>
-                <span className="font-extrabold text-[#1F251A]">{selectedDoctorName}</span>
-              </div>
-
-              <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-bold">Date</span>
-                <span className="font-extrabold text-[#1F251A]">{formattedDateStr}</span>
-              </div>
-
-              <div className="flex justify-between items-center pb-2 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-bold">Time</span>
-                <span className="font-extrabold text-[#1F251A]">{selectedTime} (30 min)</span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-[#5A6A51] font-bold">Session Type</span>
-                <span className="font-extrabold text-[#1F251A]">
-                  {sessionType === "in_person" ? "In Person / في العيادة" : "Online / أونلاين"}
-                </span>
-              </div>
-            </div>
           </div>
-
-        </div>
+        )}
 
       </div>
 

@@ -52,11 +52,24 @@ export async function GET(req: Request) {
       if (customerId && customerId !== 'all') {
         query = query.eq('customer_id', customerId);
       }
-      if (bookingId) {
+      if (bookingId && bookingId !== 'undefined' && bookingId !== 'null') {
         query = query.eq('booking_id', bookingId);
       }
 
-      const { data, error } = await query;
+      let { data, error } = await query;
+
+      if (error && (error.message?.includes('booking_id') || error.code === 'PGRST204')) {
+        let fallbackQuery = supabaseServer
+          .from('prescriptions')
+          .select('*')
+          .order('date', { ascending: false });
+        if (customerId && customerId !== 'all') {
+          fallbackQuery = fallbackQuery.eq('customer_id', customerId);
+        }
+        const fallbackRes = await fallbackQuery;
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      }
 
       if (error) {
         // If table doesn't exist, fall back to local JSON
@@ -109,7 +122,8 @@ export async function POST(req: Request) {
 
   const id = body.id;
   const customerId = body.customer_id || body.customerId;
-  const bookingId = body.booking_id || body.bookingId;
+  const rawBookingId = body.booking_id || body.bookingId;
+  const cleanBookingId = (rawBookingId && rawBookingId !== 'undefined' && rawBookingId !== 'null') ? rawBookingId : null;
   const patientName = body.patient_name || body.customer_name;
   const diagnosis = body.diagnosis;
   const medications = body.medications;
@@ -119,9 +133,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'patient_name or customer_name is required' }, { status: 400 });
   }
 
-  const prescriptionData = {
+  const prescriptionData: Record<string, any> = {
     customer_id: customerId || null,
-    booking_id: bookingId || null,
     patient_name: patientName,
     date: body.date || new Date().toISOString().slice(0, 10),
     diagnosis: diagnosis || null,
@@ -132,17 +145,51 @@ export async function POST(req: Request) {
     updated_at: new Date().toISOString()
   };
 
+  if (cleanBookingId) {
+    try {
+      const { data: resMatch } = await supabaseServer
+        .from('reservations')
+        .select('id')
+        .eq('id', cleanBookingId)
+        .maybeSingle();
+
+      if (resMatch?.id) {
+        prescriptionData.booking_id = cleanBookingId;
+      }
+    } catch (_) {
+      // Ignore lookup error and proceed without setting booking_id
+    }
+  }
+
   try {
     try {
       let result;
       if (id) {
         // Update
-        const { data, error } = await supabaseServer
+        let { data, error } = await supabaseServer
           .from('prescriptions')
           .update(prescriptionData)
           .eq('id', id)
           .select()
           .single();
+
+        if (error && (
+          error.code === '23503' ||
+          error.code === 'PGRST204' ||
+          error.message?.includes('booking_id') ||
+          error.message?.includes('foreign key constraint') ||
+          error.message?.includes('prescriptions_booking_id_fkey')
+        )) {
+          delete prescriptionData.booking_id;
+          const retry = await supabaseServer
+            .from('prescriptions')
+            .update(prescriptionData)
+            .eq('id', id)
+            .select()
+            .single();
+          data = retry.data;
+          error = retry.error;
+        }
 
         if (error) {
           if (error.code === 'PGRST205') throw error; // trigger local fallback
@@ -151,7 +198,7 @@ export async function POST(req: Request) {
         result = data;
       } else {
         // Insert
-        const { data, error } = await supabaseServer
+        let { data, error } = await supabaseServer
           .from('prescriptions')
           .insert({
             ...prescriptionData,
@@ -159,6 +206,26 @@ export async function POST(req: Request) {
           })
           .select()
           .single();
+
+        if (error && (
+          error.code === '23503' ||
+          error.code === 'PGRST204' ||
+          error.message?.includes('booking_id') ||
+          error.message?.includes('foreign key constraint') ||
+          error.message?.includes('prescriptions_booking_id_fkey')
+        )) {
+          delete prescriptionData.booking_id;
+          const retry = await supabaseServer
+            .from('prescriptions')
+            .insert({
+              ...prescriptionData,
+              created_at: new Date().toISOString()
+            })
+            .select()
+            .single();
+          data = retry.data;
+          error = retry.error;
+        }
 
         if (error) {
           if (error.code === 'PGRST205') throw error; // trigger local fallback
