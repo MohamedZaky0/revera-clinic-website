@@ -1,6 +1,6 @@
 # ai_docs — Revera Clinics Agent Knowledge Base
 
-> **Last Updated:** 2026-08-04
+> **Last Updated:** 2026-08-17
 > **Branch:** dev (these docs do not belong on main/production)
 > **Maintained by:** Project manager. Updated whenever architecture, decisions, or risks change.
 
@@ -62,6 +62,8 @@ Every file that exists in this folder is listed below — nothing is left unexpl
 | `PROPOSALS.md` | Proposed refactors awaiting approval — do not execute without review | A new refactor is proposed; an approved proposal is completed (mark it done) |
 | `FINANCE_TRACKER.md` | Execution tracker for `PROPOSALS.md` → PROPOSAL-002 (the Finance & Management Accounting module) — task-by-task status, what's done/blocked, exact requirements per task | Any Finance-module task's status changes; read `PROPOSALS.md` PROPOSAL-002 and `RISKS.md` RISK-010…RISK-020 first, per this file's own header |
 | `AGENTS.md` | Quick-start rules for AI agents specifically | Agent workflow changes; new rules for what agents must/must not do. **Known stale as of 2026-08-03** — written 2026-07-21, predates the auth/RLS hardening work and the fork-per-client framing now in `CLAUDE.md`; treat its security/single-tenant claims as superseded by `CLAUDE.md` and `SECURITY.md`, not as current fact |
+| `WINDSURF_BRIEFS.md` | **The single file for all Windsurf work briefs** — one active brief at the top, completed ones archived at the bottom. Do not create separate brief files. Standing rules it relies on live in `.windsurf/rules/*.md` and `.windsurf/MEMORIES.md` (repo root, loaded automatically by Windsurf), both written from defects actually found in this codebase | A new brief is written, or an active one completes (move it to the archive section) |
+| `ADMIN_REFACTOR_AND_I18N_PLAN.md` | Phased plan to make the admin panel bilingual: test net → componentize `admin/page.tsx` (27.7k lines, 606 `useState`, ~50 sections) → per-component Arabic → broader automated testing. Explains why translation cannot safely come first | A phase completes, or an open decision at the bottom of the file is answered |
 
 ### Manual test evidence (not narrative docs — click-through records)
 
