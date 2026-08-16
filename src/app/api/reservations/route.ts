@@ -780,18 +780,20 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   const url = new URL(req.url);
-  const id = url.searchParams.get('id');
-  if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+  const rawUrlId = url.searchParams.get('id');
 
   try {
     const body = await req.json();
     const { action, timeSlot, status, doctorName, notes, sessionType, amountPaid, amountLeft, serviceId, serviceIds, walletDeposit, walletWithdrawal, createdByEmployeeId, consumptionOverrides, redeemedServiceIds, date: newDate, followUpDate } = body;
 
+    const id = (rawUrlId && rawUrlId !== 'undefined' && rawUrlId !== 'null') ? rawUrlId : (body.id || body.booking_id || body.reservation_id);
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
     const { data: target, error: findError } = await supabaseServer
       .from('reservations')
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (findError || !target) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });

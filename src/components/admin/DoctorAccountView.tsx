@@ -854,12 +854,19 @@ export default function DoctorAccountView({
 
     const finalNotes = (clinicalNote || "") + sessionAddonsSummary;
 
+    const bookingTargetId = targetBooking?.id || targetBooking?.booking_id || targetBooking?.bookingId || targetBooking?._id || targetBooking?.reservation_id;
+    if (!bookingTargetId) {
+      alert("Booking ID is missing. Cannot complete treatment session.");
+      return;
+    }
+
     try {
       const headers = await getAuthHeaders();
-      const res = await fetch(`/api/reservations?id=${encodeURIComponent(targetBooking.id)}`, {
+      const res = await fetch(`/api/reservations?id=${encodeURIComponent(bookingTargetId)}`, {
         method: "PATCH",
         headers,
         body: JSON.stringify({
+          id: bookingTargetId,
           status: "completed",
           notes: finalNotes,
           amountLeft: updatedInvoiceTotal - Number(targetBooking.amountPaid ?? 0)

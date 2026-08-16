@@ -588,6 +588,7 @@ claim in `PROJECT.md`/`AGENTS.md`/`RISKS.md`, corrected 2026-07-21).
 |---|---|---|
 | `id` | UUID | Primary key |
 | `customer_id` | UUID | FK → customers.id, cascade delete |
+| `booking_id` | UUID | FK → reservations.id ON DELETE SET NULL, nullable. Added 2026-08-17 by `20260817010000_add_booking_id_to_prescriptions.sql`. Links digital prescription to a specific booking session. |
 | `patient_name` | text | NOT NULL — denormalized snapshot |
 | `date` | date | Default `CURRENT_DATE` |
 | `diagnosis` | text | nullable |
