@@ -7,8 +7,9 @@ import { buildInvoiceLine, buildInvoiceTotals, formatInvoiceNo } from '@/lib/led
 import { computeCommission, consumptionCost, costPerPulse } from '@/lib/costing';
 import { deductInventoryStock } from '@/app/api/inventory/products/route';
 import { incrementDevicePulses } from '@/app/api/inventory/devices/route';
-import { normalizeEgyptMobile } from '@/lib/customerIdentity';
+import { normalizeEgyptMobile, isOwnIdentity } from '@/lib/customerIdentity';
 import { recordWalletMovement } from '@/lib/wallet';
+import { classifyCaller } from '@/app/api/customers/route';
 
 /**
  * pg returns DATE columns as JavaScript Date objects set to UTC midnight.
@@ -420,6 +421,40 @@ export async function GET(req: Request) {
   const customerId = params.get('customerId');
   const createdByEmployeeId = params.get('createdByEmployeeId');
 
+  // This route has the same two caller populations as /api/customers: staff (unrestricted) and
+  // patients reading their own booking history (profile/page.tsx). Unlike /api/customers, there
+  // was never a caller check here at all — any unauthenticated request got every reservation in
+  // the database, full name/email/phone/notes included, and profile/page.tsx's own
+  // `?phone=<mine>` call proved it: the server trusted the query param, never the caller's actual
+  // session. Found during a full-system review, 2026-08-17.
+  const caller = await classifyCaller(req);
+  if (caller.kind === 'unauthenticated') {
+    return NextResponse.json({ error: caller.error }, { status: caller.status });
+  }
+  if (caller.kind === 'patient') {
+    if (!phone && !customerId) {
+      // The unfiltered/staff-scale queries below (createdByEmployeeId, branch+date sweeps with no
+      // patient filter) must never run for a patient caller.
+      return NextResponse.json({ error: 'Staff access is required.' }, { status: 403 });
+    }
+    if (phone) {
+      const ownMobile = normalizeEgyptMobile(caller.user.phone);
+      if (!ownMobile || normalizeEgyptMobile(phone) !== ownMobile) {
+        return NextResponse.json([]);
+      }
+    }
+    if (customerId) {
+      const { data: cust } = await supabaseServer
+        .from('customers')
+        .select('mobile, email, auth_user_id')
+        .eq('id', customerId)
+        .maybeSingle();
+      if (!isOwnIdentity(caller.user, cust)) {
+        return NextResponse.json([]);
+      }
+    }
+  }
+
   try {
     let q = supabaseServer
       .from('reservations')
@@ -762,16 +797,46 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const patientDepositFields = new Set(['status', 'amountPaid', 'amountLeft', 'notes']);
+    // Three narrow, unauthenticated-patient shapes, all scoped to a reservation still in
+    // 'pending_deposit' — before staff have touched it, the public BookingModal caller is not
+    // logged in as staff (or at all) and has no other way to report a deposit, cancel a booking
+    // they're abandoning at the payment step, or correct details before paying. Once a booking
+    // leaves 'pending_deposit' none of these match and requireStaffAccess takes over as before.
+    const noAction = !action;
+    const isPendingDeposit = target.status === 'pending_deposit';
+
+    const depositReportFields = new Set(['status', 'amountPaid', 'amountLeft', 'notes']);
     const isPatientDepositSelfReport =
-      !action &&
-      target.status === 'pending_deposit' &&
+      noAction &&
+      isPendingDeposit &&
       status === 'pending' &&
       typeof amountPaid === 'number' &&
       typeof amountLeft === 'number' &&
-      Object.keys(body).every((field) => patientDepositFields.has(field));
+      Object.keys(body).every((field) => depositReportFields.has(field));
 
-    if (!isPatientDepositSelfReport) {
+    // BookingModal's "Cancel & Return" — abandoning payment on a reservation it just created.
+    const isPatientSelfCancel =
+      noAction &&
+      isPendingDeposit &&
+      status === 'cancelled' &&
+      Object.keys(body).every((field) => field === 'status');
+
+    // BookingModal re-submitting step 2 after Back — updates the same reservation instead of
+    // creating a duplicate (RISK-040). No `status` field in this shape; a status change is never
+    // part of it.
+    const selfUpdateFields = new Set([
+      'serviceId', 'date', 'requestedTime', 'name', 'email', 'phone', 'notes',
+      'sessionType', 'branchId', 'doctorName',
+    ]);
+    const isPatientSelfUpdate =
+      noAction &&
+      isPendingDeposit &&
+      status === undefined &&
+      Object.keys(body).every((field) => selfUpdateFields.has(field));
+
+    const isPatientSelfService = isPatientDepositSelfReport || isPatientSelfCancel || isPatientSelfUpdate;
+
+    if (!isPatientSelfService) {
       const access = await requireStaffAccess(req);
       if ('error' in access) {
         return NextResponse.json({ error: access.error }, { status: access.status });

@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-17
+> **Last Updated:** 2026-08-17 (RISK-049, RISK-050)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -2033,6 +2033,75 @@ stored label and current service name differ.
 - Service auto-select: the `<select>` value now checks `activeSessionBooking.serviceId` (camelCase,
   as returned by `mapRow()`) first, then falls back to `service_id` and string matching — the
   direct ID match will hit on the first try for all reservations fetched via the API.
+
+---
+
+## RISK-049: `GET /api/reservations` Had No Caller Check At All — Any Patient's Full Booking History Was Readable By Anyone (RESOLVED)
+
+**Severity:** Critical · **Type:** Security / PII exposure
+**Found:** 2026-08-17, during a full-system review requested after asking directly "is this ready
+to run in a real clinic" — RISK-036's audit (2026-08-03) never examined this route at all, because
+its own POST is intentionally public (booking creation) and that appears to have been read as
+"the whole route is public" rather than being checked per method.
+
+**What it is:** `GET /api/reservations` ran with zero authentication — `curl` with no token and no
+filter returned **every reservation in the database**: name, email, phone, notes, appointment date/
+time, doctor, status. Worse, the one legitimate patient-facing caller
+(`src/app/profile/page.tsx:99`, the patient's own booking list) called
+`?phone=${sessionUser.mobile}` **with no Authorization header**, and the server trusted the query
+param verbatim — meaning `GET /api/reservations?phone=<any other patient's number>` returned that
+patient's full history to anyone who tried it, logged in or not.
+
+**Fixed — 2026-08-17:**
+- Reused the exact staff-vs-patient classification already established for `/api/customers`
+  (`classifyCaller()`, exported from `src/app/api/customers/route.ts` rather than duplicated).
+  Staff: unrestricted, as before. Unauthenticated: 401. Patient: must supply `phone` or
+  `customerId`, and the server verifies it actually resolves to *that* caller's own identity
+  (`isOwnIdentity()`, the same normalized-phone/email check `/api/customers` already uses) before
+  running the query — a mismatch returns `[]`, not another patient's data. A patient caller with
+  neither filter (the shape that used to return everything) gets 403.
+- `profile/page.tsx`'s booking-list fetch now sends the `Authorization` header it was missing
+  (the page already had an `authHeaders()` helper in scope for its adjacent `/api/customers` call —
+  reused, not reinvented).
+
+**Not attempted:** auditing whether any other route has this same "public method assumed to cover
+the whole file" gap. This was found by directly re-examining one specific route while answering a
+go-live-readiness question, not by a systematic re-sweep of all 69 routes. A full re-audit of GET
+methods specifically (POST/PATCH/DELETE were the focus of RISK-036 and RISK-018 before it) has not
+been done.
+
+---
+
+## RISK-050: The RISK-040 Public-Booking Fix Was Silently Rejected By A Pre-Existing Auth Gate (RESOLVED)
+
+**Severity:** High · **Type:** Regression / Business logic
+**Found:** 2026-08-17, same review as RISK-049.
+
+**What it is:** `PATCH /api/reservations` has required `requireStaffAccess` on every caller since
+2026-07-26 (`f29295e`, predates this entire audit), with one narrow unauthenticated carve-out:
+`isPatientDepositSelfReport`, which only matches a body shaped like `{status: 'pending', amountPaid,
+amountLeft, notes}` on a `pending_deposit` reservation — the patient reporting their own deposit
+payment.
+
+RISK-040's fix (2026-08-16, `b3b4b8d`) added two more unauthenticated `BookingModal.tsx` → PATCH
+calls that were reviewed and confirmed correct in isolation, but neither was checked against this
+gate: "Cancel & Return" sends `{status: 'cancelled'}`, and the reuse-on-retry call sends
+`{serviceId, date, requestedTime, name, email, phone, notes, sessionType, branchId, doctorName}` —
+**neither shape matches `isPatientDepositSelfReport`**, and neither call sends an Authorization
+header (the patient isn't logged in as staff). Both were silently rejected with 401. In practice:
+clicking "Cancel & Return" always failed, and re-submitting step 2 after Back always failed —
+RISK-040's actual reported bug (orphaned/duplicate reservations) was never fixed, because the fix's
+network calls never succeeded in the first place. This was missed in that day's review because the
+PATCH body shape was verified correct without also tracing it against `requireStaffAccess`.
+
+**Fixed — 2026-08-17:** extended the same carve-out pattern with two more narrowly-scoped,
+`pending_deposit`-only shapes: `isPatientSelfCancel` (`{status: 'cancelled'}` exactly) and
+`isPatientSelfUpdate` (the exact field set BookingModal's reuse call sends, no `status` field
+present). Both require `target.status === 'pending_deposit'` — once staff have touched a booking
+(approved, confirmed, started...) neither shape can match and `requireStaffAccess` takes over
+exactly as before. This accepts the same pre-existing risk shape the original deposit-report
+carve-out already accepted (an unauthenticated caller who knows a reservation's UUID can act on it
+while it's still unpaid) — not a new category of exposure, an extension of one already in production.
 
 ---
 

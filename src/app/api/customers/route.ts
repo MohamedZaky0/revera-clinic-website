@@ -11,12 +11,14 @@ import { recordWalletMovement, setAbsoluteWalletBalance } from '@/lib/wallet';
  * caller here is "authenticated but not staff", not "unauthenticated" — a blanket
  * requireStaffAccess check would 403 every patient. See RISK-018 / FINANCE_TRACKER 0.10.
  */
-type Caller =
+export type Caller =
   | { kind: 'staff' }
   | { kind: 'patient'; user: { id: string; email?: string | null; phone?: string | null } }
   | { kind: 'unauthenticated'; error: string; status: 401 | 403 | 500 };
 
-async function classifyCaller(req: Request): Promise<Caller> {
+/** Exported so other patient-and-staff-facing routes (e.g. /api/reservations GET) reuse this
+ *  exact classification instead of re-implementing the staff-then-patient fallback. */
+export async function classifyCaller(req: Request): Promise<Caller> {
   const staffResult = await requireStaffAccess(req);
   if (!('error' in staffResult)) return { kind: 'staff' };
   if (staffResult.status === 401) {

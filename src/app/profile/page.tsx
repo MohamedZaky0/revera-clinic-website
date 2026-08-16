@@ -96,7 +96,7 @@ export default function ProfilePage() {
 
       // 2. Fetch bookings list
       setLoadingBookings(true);
-      const bookingsRes = await fetch(`/api/reservations?phone=${sessionUser.mobile}`);
+      const bookingsRes = await fetch(`/api/reservations?phone=${sessionUser.mobile}`, { headers });
       if (bookingsRes.ok) {
         const list = await bookingsRes.json();
         setBookings(list || []);
