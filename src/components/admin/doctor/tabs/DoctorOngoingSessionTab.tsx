@@ -82,6 +82,7 @@ interface DoctorOngoingSessionTabProps {
   setActiveTab: (tab: DoctorTab) => void;
   reservations?: any[];
   setActiveSessionBooking?: (booking: any) => void;
+  onAdditionalServicesChange?: (services: AdditionalServiceItem[]) => void;
   t: any;
 }
 
@@ -133,6 +134,7 @@ export default function DoctorOngoingSessionTab({
   setActiveTab,
   reservations = [],
   setActiveSessionBooking,
+  onAdditionalServicesChange,
   t
 }: DoctorOngoingSessionTabProps) {
   // Additional Services added during ongoing treatment session
@@ -197,14 +199,18 @@ export default function DoctorOngoingSessionTab({
       pulses: Math.max(0, pulsesCountForService || 0)
     };
 
-    setAdditionalServices((prev) => [...prev, newItem]);
+    const updated = [...additionalServices, newItem];
+    setAdditionalServices(updated);
+    onAdditionalServicesChange?.(updated);
     setSelectedServiceIdToAdd("");
     setSelectedDeviceForService("");
     setPulsesCountForService(100);
   };
 
   const handleRemoveServiceFromSession = (id: string | number) => {
-    setAdditionalServices((prev) => prev.filter((item) => item.id !== id));
+    const updated = additionalServices.filter((item) => item.id !== id);
+    setAdditionalServices(updated);
+    onAdditionalServicesChange?.(updated);
   };
 
   // Inline prescription creation handler

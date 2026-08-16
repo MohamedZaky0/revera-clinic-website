@@ -7,7 +7,7 @@ import { doctorTranslations } from "./doctor/translations";
 import { parseBookingNotes, getAuthHeaders } from "./doctor/utils";
 import DoctorSidebar from "./doctor/DoctorSidebar";
 import DoctorScheduleTab from "./doctor/tabs/DoctorScheduleTab";
-import DoctorOngoingSessionTab from "./doctor/tabs/DoctorOngoingSessionTab";
+import DoctorOngoingSessionTab, { AdditionalServiceItem } from "./doctor/tabs/DoctorOngoingSessionTab";
 import DoctorPatientsTab from "./doctor/tabs/DoctorPatientsTab";
 import DoctorAnalyticsTab from "./doctor/tabs/DoctorAnalyticsTab";
 import DoctorSettingsTab from "./doctor/tabs/DoctorSettingsTab";
@@ -288,6 +288,7 @@ export default function DoctorAccountView({
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [selectedProductQty, setSelectedProductQty] = useState<number>(1);
   const [usedProducts, setUsedProducts] = useState<UsedProduct[]>([]);
+  const [additionalServices, setAdditionalServices] = useState<AdditionalServiceItem[]>([]);
 
   // Extra Device Pulses State
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
@@ -633,7 +634,8 @@ export default function DoctorAccountView({
   );
   const productsSubtotal = usedProducts.reduce((sum, item) => sum + item.total, 0);
   const extraPulsesSubtotal = extraPulsesCount * pricePerPulse;
-  const updatedInvoiceTotal = baseBookingPrice + productsSubtotal + extraPulsesSubtotal;
+  const additionalServicesSubtotal = additionalServices.reduce((sum, item) => sum + item.price, 0);
+  const updatedInvoiceTotal = baseBookingPrice + additionalServicesSubtotal + productsSubtotal + extraPulsesSubtotal;
 
   // Change Primary Service for Active Session or Drawer Booking
   const handleChangePrimaryService = async (targetBooking: any, newServiceId: string) => {
@@ -869,7 +871,7 @@ export default function DoctorAccountView({
         body: JSON.stringify({
           status: "completed",
           notes: finalNotes,
-          price: updatedInvoiceTotal
+          amountLeft: updatedInvoiceTotal - Number(targetBooking.amountPaid ?? 0)
         })
       });
 
@@ -877,6 +879,7 @@ export default function DoctorAccountView({
         alert("Session completed successfully! Product stock & device pulses deducted.");
         setActiveSessionBooking(null);
         setUsedProducts([]);
+        setAdditionalServices([]);
         setExtraPulsesCount(0);
         setSelectedDeviceId("");
         setClinicalNote("");
@@ -1034,6 +1037,7 @@ export default function DoctorAccountView({
             productsSubtotal={productsSubtotal}
             extraPulsesSubtotal={extraPulsesSubtotal}
             updatedInvoiceTotal={updatedInvoiceTotal}
+            onAdditionalServicesChange={setAdditionalServices}
             t={t}
           />
         )}
