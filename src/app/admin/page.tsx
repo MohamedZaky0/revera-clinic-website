@@ -24283,7 +24283,11 @@ export default function AdminPage() {
                               });
                               if (res.ok) {
                                 const updated = await res.json();
-                                setViewingBooking(prev => prev ? { ...prev, ...updated, status: 'checked_in' } : null);
+                                // RISK-046: trust the status the server actually stored rather than
+                                // forcing 'checked_in' locally — the two could disagree, and the UI
+                                // would silently revert on the next refetch.
+                                setViewingBooking(prev => prev ? { ...prev, ...updated } : null);
+                                if (updated?.warning) alert(updated.warning);
                                 fetchRequests();
                                 fetchAllReservations();
                               } else {

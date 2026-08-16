@@ -1162,8 +1162,15 @@ export async function PATCH(req: Request) {
         .select()
         .single();
 
+      // RISK-046: this used to fall back to writing 'confirmed' and then return
+      // `{ ...fbUpdated, status: 'checked_in' }` — telling the caller the check-in succeeded while
+      // the row actually held 'confirmed'. The UI trusted that response, so screen and database
+      // disagreed until the next refetch, when the status appeared to revert on its own. The
+      // fallback still writes 'confirmed' (better than leaving the booking untouched), but the
+      // response now reports what was really stored, and says so.
+      let checkedInDowngraded = false;
       if (updateError && status === 'checked_in') {
-        console.warn("Status 'checked_in' rejected by database constraint, falling back to confirmed status with checked_in flag:", updateError.message);
+        console.warn("Status 'checked_in' rejected by database constraint, falling back to confirmed:", updateError.message);
         const fallbackUpdates = { ...updates, status: 'confirmed' };
         const { data: fbUpdated, error: fbError } = await supabaseServer
           .from('reservations')
@@ -1172,12 +1179,23 @@ export async function PATCH(req: Request) {
           .select()
           .single();
         if (!fbError && fbUpdated) {
-          updated = { ...fbUpdated, status: 'checked_in' };
+          updated = fbUpdated;
           updateError = null;
+          checkedInDowngraded = true;
         }
       }
 
       if (updateError) throw updateError;
+
+      if (checkedInDowngraded) {
+        return NextResponse.json({
+          ...mapRow(updated),
+          warning:
+            "Check-in could not be recorded — this database does not accept the 'checked_in' status. " +
+            "The booking was saved as 'confirmed' instead. Apply migration " +
+            "20260810000000_add_checked_in_reservation_status.sql.",
+        });
+      }
 
       // Settle customer balances when the booking is being completed, or when money
       // fields change on one that is already completed (paying down an outstanding
