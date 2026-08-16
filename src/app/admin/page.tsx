@@ -23201,6 +23201,7 @@ export default function AdminPage() {
               <AdminNewBookingView
                 onClose={() => setShowFullViewNewBooking(false)}
                 onBookingCreated={() => {
+                  clearFetchCache();
                   fetchAllReservations();
                   setShowFullViewNewBooking(false);
                 }}
@@ -23249,6 +23250,7 @@ export default function AdminPage() {
             <AdminNewBookingView
               onClose={() => setActiveNav("Bookings")}
               onBookingCreated={() => {
+                clearFetchCache();
                 fetchAllReservations();
                 setActiveNav("Bookings");
               }}
