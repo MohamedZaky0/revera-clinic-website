@@ -1455,7 +1455,7 @@ export default function AdminPage() {
     bookings: [],
   });
   const [loadingApproveId, setLoadingApproveId] = useState<string | null>(null);
-  const [doctorName, setDoctorName] = useState<string>("Dr. Sara El Gamel");
+  const [doctorName, setDoctorName] = useState<string>("");
   const [slot, setSlot] = useState<string>("12:00");
   const [approveDate, setApproveDate] = useState<string>("");
   const [activeNav, setActiveNav] = useState("Dashboard");
@@ -7606,6 +7606,11 @@ export default function AdminPage() {
         } else if (outsideHours) {
           setApproveTimeWarning(`Requested time ${requestedSlot} is outside opening hours — pick another slot.`);
         }
+      }
+
+      // Pre-select the doctor the patient originally requested, if any.
+      if (r.doctorName) {
+        setDoctorName(r.doctorName);
       }
 
       setSelected(r);

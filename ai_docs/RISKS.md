@@ -1927,7 +1927,7 @@ inline comment says must never happen again.
 
 ---
 
-## RISK-047: Approve Request Pre-Fills A Hardcoded Doctor And Discards The Patient's Requested Time
+## RISK-047: Approve Request Pre-Fills A Hardcoded Doctor And Discards The Patient's Requested Time (RESOLVED)
 
 **Severity:** High · **Type:** Business logic
 **Found:** 2026-08-16, same audit.
@@ -1952,11 +1952,17 @@ availability.
 both silently contradict the request. There is no visual cue that these are defaults rather than the
 patient's actual booking, so an inattentive approval confirms the wrong slot with the wrong doctor.
 
-**Not yet fixed.**
+**Fixed — 2026-08-16:**
+- `openApprove` now reads `r.requestedTime || r.timeSlot` and pre-selects it; if the slot is taken
+  or outside hours, it stays selected but a warning is shown.
+- `openApprove` now reads `r.doctorName` and pre-fills the doctor field.
+- Default `doctorName` state changed from `"Dr. Sara El Gamel"` to `""`.
+- Existing `useEffect` validates the doctor against `availableDoctorsApprove` — if the requested
+  doctor is unavailable, falls back to the first available, not a hardcoded name.
 
 ---
 
-## RISK-048: Pulse Counter Shown For Non-Laser Services; No Out-Of-Stock Indicator On Products
+## RISK-048: Pulse Counter Shown For Non-Laser Services; No Out-Of-Stock Indicator On Products (RESOLVED)
 
 **Severity:** Medium · **Type:** UX / Inventory
 **Found:** 2026-08-16, same audit.
@@ -1980,12 +1986,14 @@ snake_case key is never present, so the direct match always misses and the code 
 bidirectional `.includes()` string matching against service names, which mismatches whenever the
 stored label and current service name differ.
 
-**Partially fixed — 2026-08-16:**
+**Fixed — 2026-08-16:**
 - Pulse counter default changed to `0` (not `100`) — non-laser services no longer carry a
   fabricated charge.
 - Pulse badge is only shown when a device is involved.
 - Product picker now shows "Out of Stock" indicator and disables out-of-stock items.
-- Service auto-select defect (`service_id` vs `serviceId`) — **not yet fixed**.
+- Service auto-select: the `<select>` value now checks `activeSessionBooking.serviceId` (camelCase,
+  as returned by `mapRow()`) first, then falls back to `service_id` and string matching — the
+  direct ID match will hit on the first try for all reservations fetched via the API.
 
 ---
 
