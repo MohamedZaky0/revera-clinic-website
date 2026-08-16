@@ -50,6 +50,7 @@ function mapRow(r: Record<string, any>) {
     doctorName: r.doctor_name ?? null,
     providerId: r.provider_id ?? null,
     followUpDate: r.follow_up_date ?? null,
+    startedAt: r.started_at ?? null,
   };
 }
 
@@ -1096,6 +1097,12 @@ export async function PATCH(req: Request) {
       if (status) updates.status = status;
       if (status === 'completed' && target.status !== 'completed') {
         updates.completed_at = new Date().toISOString();
+      }
+      // RISK-043: anchor the moment a session actually begins. Guarded on the transition so a
+      // later money-only PATCH on an already-started booking does not reset the clock and make a
+      // stale session look freshly opened — same guard shape as completed_at above.
+      if (status === 'started' && target.status !== 'started') {
+        updates.started_at = new Date().toISOString();
       }
       if (notes !== undefined) updates.notes = notes;
       if (doctorName !== undefined) {

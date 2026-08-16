@@ -148,6 +148,41 @@ async function addToCustomerSpend(customerId: string, amount: number) {
   }
 }
 
+/**
+ * RISK-042: deduct wallet credit actually spent on a sale.
+ *
+ * Re-reads the balance instead of trusting the pre-flight check so the amount subtracted is the
+ * one on the row at write time, and clamps at 0 — a negative wallet_balance would read as debt
+ * elsewhere in the admin UI, which is not what this field means.
+ */
+async function deductFromWallet(customerId: string, amount: number) {
+  if (!customerId || !amount) return;
+  try {
+    const { data: customer, error: readErr } = await supabaseServer
+      .from('customers')
+      .select('wallet_balance')
+      .eq('id', customerId)
+      .maybeSingle();
+
+    if (readErr || !customer) {
+      console.error('Could not read customer for wallet deduction:', customerId, readErr?.message);
+      return;
+    }
+
+    const newBalance = Math.max(0, Number(customer.wallet_balance || 0) - Number(amount));
+    const { error: writeErr } = await supabaseServer
+      .from('customers')
+      .update({ wallet_balance: newBalance, updated_at: new Date().toISOString() })
+      .eq('id', customerId);
+
+    if (writeErr) {
+      console.error('Failed to deduct customer wallet_balance:', customerId, writeErr.message);
+    }
+  } catch (err) {
+    console.error('Error deducting customer wallet_balance:', err);
+  }
+}
+
 async function getStoredSalesData(): Promise<{ sales: ProductSaleRecord[] }> {
   try {
     // 1. Prefer the native product_sales table, but only trust it when it has rows.
@@ -406,6 +441,30 @@ export async function POST(req: Request) {
       );
     }
 
+    // RISK-042: paying with wallet credit recorded the method in the payments ledger but never
+    // moved customers.wallet_balance, so the same credit could be spent again and again. Check
+    // the balance up front — refusing the sale is the only safe option, because letting it
+    // through would mint store credit the clinic never received.
+    const payingFromWallet = toPaymentMethod(payment_method) === 'wallet';
+    if (payingFromWallet) {
+      const { data: walletRow, error: walletReadErr } = await supabaseServer
+        .from('customers')
+        .select('wallet_balance')
+        .eq('id', customer_id)
+        .maybeSingle();
+      if (walletReadErr) throw walletReadErr;
+      const available = Number(walletRow?.wallet_balance || 0);
+      if (available < Number(total_amount || 0)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Insufficient wallet balance — EGP ${available} available, EGP ${Number(total_amount || 0)} required.`
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const newSale: ProductSaleRecord = {
       id: generateSaleId(),
       product_id,
@@ -434,6 +493,9 @@ export async function POST(req: Request) {
 
     await deductInventoryStock(product_id || product_name, Number(quantity));
     await addToCustomerSpend(customer_id, newSale.total_amount);
+    if (payingFromWallet) {
+      await deductFromWallet(customer_id, newSale.total_amount);
+    }
 
     if (!dbInsertErr && insertedDb) {
       try {

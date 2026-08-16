@@ -308,11 +308,35 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   }, [selectedDayAppointments, startIndex, rowsPerPage]);
 
   // Analytics counts calculation (Strict DB data)
+  //
+  // RISK-044: these counts used to run over every reservation ever created, with no date bound —
+  // "Completed" and "Canceled" were lifetime totals that only ever grew, and "Upcoming" counted
+  // bookings whose date had long passed. Each card now states a period it can actually be read
+  // against: Upcoming looks forward from today, Completed/Canceled/Postponed cover the current
+  // month. Postponed is also split out of Canceled — per RISK-029 it is a non-terminal state that
+  // moves no money and will still happen, so folding it into cancellations overstated lost work.
   const stats = useMemo(() => {
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+      new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+    ).padStart(2, "0")}`;
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+    const inThisMonth = (r: any) => {
+      const d = String(r.date || "");
+      return d >= monthStart && d <= monthEnd;
+    };
+
     const todays = mergedAppointments.filter(r => r.date === selectedDateStr);
-    const upcoming = mergedAppointments.filter(r => ["confirmed", "approved", "pending", "waiting", "checked_in"].includes(r.status || ""));
-    const completed = mergedAppointments.filter(r => r.status === "completed");
-    const canceled = mergedAppointments.filter(r => ["canceled", "cancelled", "postponed"].includes(r.status || ""));
+    const upcoming = mergedAppointments.filter(
+      r =>
+        ["confirmed", "approved", "pending", "waiting", "checked_in"].includes(r.status || "") &&
+        String(r.date || "") >= todayStr
+    );
+    const completed = mergedAppointments.filter(r => r.status === "completed" && inThisMonth(r));
+    const canceled = mergedAppointments.filter(r => ["canceled", "cancelled"].includes(r.status || "") && inThisMonth(r));
+    const postponed = mergedAppointments.filter(r => r.status === "postponed" && inThisMonth(r));
 
     const upcomingToday = todays.filter(r => ["confirmed", "approved", "pending", "waiting", "checked_in"].includes(r.status || ""));
     const nextTime = upcomingToday.length > 0 ? (upcomingToday[0].time || "09:30 AM") : "—";
@@ -322,7 +346,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       nextTime: nextTime,
       upcomingCount: upcoming.length,
       completedCount: completed.length,
-      canceledCount: canceled.length
+      canceledCount: canceled.length,
+      postponedCount: postponed.length
     };
   }, [mergedAppointments, selectedDateStr]);
 
@@ -542,8 +567,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         </div>
       </div>
 
-      {/* ── 4 ANALYTIC SUMMARY CARDS ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* ── 5 ANALYTIC SUMMARY CARDS ── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         
         {/* Card 1: Today's Appointments */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
@@ -573,7 +598,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#111827]">{stats.upcomingCount}</span>
-            <span className="text-xs font-semibold text-blue-600">Active</span>
+            <span className="text-xs font-semibold text-blue-600">Today onward</span>
           </div>
         </div>
 
@@ -589,7 +614,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#111827]">{stats.completedCount}</span>
-            <span className="text-xs font-semibold text-teal-600">Finished</span>
+            <span className="text-xs font-semibold text-teal-600">This month</span>
           </div>
         </div>
 
@@ -605,7 +630,24 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#111827]">{stats.canceledCount}</span>
-            <span className="text-xs font-semibold text-rose-600">Cancelled / Postponed</span>
+            <span className="text-xs font-semibold text-rose-600">This month</span>
+          </div>
+        </div>
+
+        {/* Card 5: Postponed — kept separate from Canceled: a postponed booking still happens
+            and moves no money (RISK-029), so counting it as a cancellation overstated lost work. */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+              Postponed
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+              <AlertCircle size={18} />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-[#111827]">{stats.postponedCount}</span>
+            <span className="text-xs font-semibold text-violet-600">This month</span>
           </div>
         </div>
       </div>
