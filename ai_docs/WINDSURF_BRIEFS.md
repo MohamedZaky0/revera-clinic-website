@@ -10,19 +10,128 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-None right now. Brief 5 (all 4 sub-PRs) is complete — see the archive below. `admin/page.tsx` is
-down to 26,763 lines (from 27,733 at the start of Phase 1). Two things outstanding before the next
-brief:
+## Brief 6 — Phase 2 setup + pattern-proving translation: MedicalReportModal (written 2026-08-17)
 
-1. **Migration `20260817020000_create_reservation_products.sql` (DEC-042) still needs to be applied
-   to the dev database** — written and wired into the app (`tsc`/`eslint`/`vitest` all clean) in a
-   parallel workstream while Brief 5 ran, but not yet live. Every `reservation_products` write path
-   500s until it's applied. Not this brief's scope to apply — flagging so it isn't missed.
-2. **Sub-PR 5 (Customer Profile Drawer)** is the one piece of Patients Brief 5 deliberately left
-   out — ~1,280 lines, 5 internal sub-tabs, 3 nested modals, and owns `viewingCustomerProfile`
-   (82 references across the whole file as of Brief 5's writing — needs enumerating before deciding
-   what can actually move). Needs its own investigation-then-brief cycle, not a repeat of the same
-   4-sub-PR template.
+**Read first:** `ai_docs/ADMIN_REFACTOR_AND_I18N_PLAN.md` Phase 2 (2.1–2.4), `DECISIONS.md` →
+**DEC-043** (admin-local language state, Western digits, per-component rollout). Migration
+`20260817020000_create_reservation_products.sql` (DEC-042) is now applied and live-verified —
+unrelated to this brief, mentioned only so it's not re-flagged as outstanding.
+
+**Why this is Phase 2's own "prove the pattern first" step:** same reasoning DEC-043 already
+applied to extraction order — set up the shared language mechanism once and prove it end-to-end on
+the smallest completed component (`MedicalReportModal.tsx`, ~152 lines) before rolling it out to
+the other 3 Patients components from Brief 5.
+
+**Correction to the plan's own assumption, found while scoping this brief:** the plan cites
+`DoctorAccountView`'s `lang` state as the pattern to mirror. Checked its actual implementation —
+`const [lang, setLang] = useState<"en"|"ar">("en")` (`DoctorAccountView.tsx:36`) has **no
+`localStorage` persistence at all** — it resets to `"en"` on every mount. DEC-043/the plan's own
+2.2 explicitly calls for persistence ("Persist to `localStorage` under `CLIENT.storagePrefix`"), so
+this brief adds that as a deliberate improvement over the Doctor Portal, not a straight copy of it.
+
+**Also found while scoping:** `admin/page.tsx` already has a **dead** `lang` state —
+`const [lang, setLang] = useState<"EN" | "AR">("EN")` at line 1499. Grepped every reference: it is
+never read and `setLang` is never called anywhere else in the file. Same shape of gap as
+`attachedProducts` (DEC-042) — a piece of scaffolding declared and abandoned. **Replace it**, don't
+add a second one — with lowercase `"en"`/`"ar"` values (matching Doctor Portal and the public
+`LanguageContext`'s convention, not this dead stub's uppercase one).
+
+### Part A — Shared setup (once, not per-component)
+
+1. **Language state** (`admin/page.tsx`): replace the dead `lang` state at line 1499 with:
+   ```ts
+   const [lang, setLang] = useState<"en" | "ar">(() => {
+     if (typeof window === "undefined") return "en";
+     const stored = localStorage.getItem(`${CLIENT.storagePrefix}_admin_lang`);
+     return stored === "ar" ? "ar" : "en";
+   });
+   useEffect(() => {
+     localStorage.setItem(`${CLIENT.storagePrefix}_admin_lang`, lang);
+   }, [lang]);
+   ```
+   `CLIENT.storagePrefix` is `"revera"` (`src/config/client.ts:25`) — **not yet imported in
+   `admin/page.tsx`** (checked: no `@/config/client` import exists there today), so add
+   `import { CLIENT } from "@/config/client";` alongside the other top-of-file imports.
+2. **Toggle UI**: add a language toggle near the sidebar header (`admin/page.tsx` ~line 26468,
+   the `REVERA CLINICS` header), visually matching `DoctorSidebar.tsx`'s existing toggle exactly
+   (`src/components/admin/doctor/DoctorSidebar.tsx:70–93` — same two-button pill, same active/
+   inactive classes) rather than inventing a new visual style for the same control.
+3. **New file** `src/components/admin/translations.ts`:
+   ```ts
+   export const adminTranslations = {
+     en: {
+       patients: {
+         medicalReportModal: { /* keys below */ },
+       },
+     },
+     ar: {
+       patients: {
+         medicalReportModal: { /* keys below */ },
+       },
+     },
+   };
+   ```
+   Namespaced per DEC-043/plan 2.1 (`patients.*`, more top-level namespaces added as more sections
+   get translated later — don't pre-create empty namespaces for unstarted sections).
+
+### Part B — Translate `MedicalReportModal.tsx` (the actual Phase 2 work for this brief)
+
+Every hardcoded string in the file, enumerated by reading it directly (not guessed) — 15 total:
+
+| Key | Current (EN) string |
+|---|---|
+| `title` | "Upload Medical Report & Document" |
+| `subtitle` | "Attach lab results, scan reports, or external clinical documents" |
+| `reportTitleLabel` | "Report Title" |
+| `reportTitlePlaceholder` | "e.g. Complete Blood Count & Hormonal Panel" |
+| `descriptionLabel` | "Description / Notes" |
+| `descriptionPlaceholder` | "Key clinical findings or doctor observations..." |
+| `fileUrlLabel` | "Document Link / File URL" |
+| `staffNameLabel` | "Recording Staff / Doctor Name" |
+| `staffNamePlaceholder` | "e.g. Dr. Sarah Al-Sayed" |
+| `cancelBtn` | "Cancel" |
+| `saveBtn` | "Save Medical Report" |
+| `savingBtn` | "Uploading..." |
+| `missingTitleAlert` | "Please enter a report title." |
+| `saveFailedAlert` | "Failed to save report." |
+| `saveErrorAlert` | "An error occurred while saving report." (fallback when `err.message` is empty) |
+
+Not translated, per DEC-043 2.4: the `https://...` URL placeholder (not user-facing copy, an input
+format hint) and anything that's actual patient/report data (none in this modal — it's all labels).
+
+Steps:
+1. Add `lang: "en" | "ar"` and `t: typeof adminTranslations["en"]["patients"]["medicalReportModal"]`
+   props to `MedicalReportModalProps`.
+2. Replace all 15 strings above with `t.<key>` lookups.
+3. Add `dir={lang === "ar" ? "rtl" : "ltr"}` to the modal's root `<div>` (currently
+   `className="fixed inset-0 z-[9999] ..."`, line 69).
+4. RTL audit (per plan 2.3): grepped the file for `ml-`/`mr-`/`text-left`/`text-right`/
+   `rounded-l-`/`rounded-r-`/`translate-x` — **none present**. Layout is `flex`-based throughout, so
+   `dir` alone should flip it correctly, but confirm visually in the browser rather than trusting
+   the grep alone — a truly empty result is exactly the kind of thing worth double-checking by eye.
+5. Update the render call at `admin/page.tsx:12205` to pass `lang={lang}`
+   `t={adminTranslations[lang].patients.medicalReportModal}`.
+
+### Exit criteria
+
+- Toggle switches the modal's language live, no page reload needed.
+- Toggle choice survives a hard page reload (localStorage persistence — the actual improvement over
+  Doctor Portal's version).
+- RTL layout confirmed by eye in the browser, not just by the (empty) grep.
+- `grep -n '>[A-Z]' src/components/admin/patients/MedicalReportModal.tsx` (per the plan's own
+  per-component exit criteria) turns up no leftover hardcoded English JSX text.
+- `npm run check` green (`tsc` + `eslint` + `vitest`, 107 tests still passing).
+- Browser-verify both languages end-to-end: open the modal, toggle to Arabic, fill and submit,
+  confirm `POST /api/medical-records` still succeeds (this PR must not touch that call).
+
+### What happens after this brief
+
+Once reviewed, repeat Part B's method (state/props/dir/audit, no new Part A setup needed — that's
+shared now) for the other 3 Brief 5 components: `MedicalFormModal.tsx`, `CustomerFormModal.tsx`,
+`PatientsDirectoryView.tsx` — each its own brief and commit, largest/most string-heavy last
+(`PatientsDirectoryView` and `CustomerFormModal` both look substantially bigger than this one from
+their line counts). Sub-PR 5 (Customer Profile Drawer investigation) remains separate, unblocked
+either way.
 
 ---
 ---

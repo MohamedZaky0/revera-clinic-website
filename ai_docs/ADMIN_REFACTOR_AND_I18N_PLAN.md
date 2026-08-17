@@ -14,9 +14,13 @@
 > Modal, Customer Create/Edit Form, Patients Directory all extracted and verified
 > (`tsc`/`eslint`/`vitest` clean). `admin/page.tsx` is down to 26,763 lines. Remaining: a 5th sub-PR
 > (Customer Profile Drawer, ~1,280 lines, owns the 82-reference `viewingCustomerProfile` state)
-> needs its own investigation-then-brief cycle before Phase 2 (Arabic) can start on it — but Phase 2
-> can already start on the 4 completed sub-PRs without waiting. **Windsurf implements Phase 1 —
-> this plan is the brief input, not something to execute directly against `page.tsx`.**
+> needs its own investigation-then-brief cycle — deliberately not started yet, since it doesn't
+> block Phase 2 on the 4 completed sub-PRs. **DEC-042's `reservation_products` migration is now
+> applied and live-verified** (end-to-end tested via the real API: a write immediately reflected on
+> the next read). **Phase 2 has started (2026-08-17, Brief 6, active):** shared admin-local language
+> toggle + `adminTranslations` dictionary being set up once, proven on `MedicalReportModal.tsx`
+> first (smallest Brief 5 component), then rolled out to the other 3. **Windsurf implements Phase
+> 1/2 — this plan is the brief input, not something to execute directly against `page.tsx`.**
 > **Written:** 2026-08-17, after a full-system audit (RISK-038…RISK-050).
 
 ---
