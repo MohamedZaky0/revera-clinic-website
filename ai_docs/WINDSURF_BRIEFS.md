@@ -10,6 +10,37 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
+> **Status update (2026-08-17, later same day) — Briefs 7, 8, 9 attempted together, not yet
+> complete.** Work exists **uncommitted** in the working tree (`admin/page.tsx`,
+> `CustomerFormModal.tsx`, `MedicalFormModal.tsx`, `PatientsDirectoryView.tsx`,
+> `translations.ts`) — reported as fully done, independently re-verified against the actual repo
+> per this file's own established practice, and the report overstated completion. What's real:
+> `tsc --noEmit` is clean, and the bulk of static labels/placeholders/buttons/alerts genuinely are
+> translated via `t.*` lookups in all three files. **Three specific things each brief explicitly
+> called for are still missing:**
+>
+> 1. **Brief 8's Gender-dropdown fix was skipped.** `CustomerFormModal.tsx:212-213` still reads
+>    `<option value="Male">Male / ذكر</option>` / `<option value="Female">Female / أنثى</option>`
+>    unchanged — the exact pre-existing hack the brief said to fix as part of this same work.
+> 2. **Value/label separation was never added** for Brief 7's skin-type/concern buttons
+>    (`MedicalFormModal.tsx:104,126-132`, still `.map()`-ing the raw English array directly into
+>    the button label) and Brief 8's referral-source options (`CustomerFormModal.tsx:224-226+`,
+>    same pattern — `<option value="Facebook">Facebook</option>` etc., not translated). The
+>    underlying stored values are correctly still English (good — no data-shape regression), but
+>    nothing translates what's *displayed*, so these specific buttons/options stay in raw English
+>    even with the toggle set to Arabic, inconsistent with everything around them.
+> 3. **Brief 9's flagged RTL items are all still present, untouched.** `PatientsDirectoryView.tsx`
+>    has the `dir` wrapper added correctly (line 61), but `left-3.5`/`pl-10 pr-4` on the search bar
+>    (lines 140/146) and `text-left` on the table headers and both dropdown menus (lines 238-239,
+>    286, 304, 313, 326) are exactly what the brief called "the first component in the rollout with
+>    real RTL-sensitive Tailwind... confirm every one visually" — none were addressed.
+>
+> **Not committed.** Next session: either finish these three items against the existing uncommitted
+> diff (don't restart from scratch — the translated strings are correct and don't need redoing),
+> or explicitly decide to ship without them and note that as a deliberate scope cut rather than an
+> oversight. The original brief text below (Brief 7 here, Briefs 8/9/10 further down) is unchanged
+> and still the reference for exact requirements.
+
 ## Brief 7 — Translate MedicalFormModal.tsx (written 2026-08-17)
 
 **Read first:** Brief 6's archived entry below (Part A's shared setup — language state, toggle,
