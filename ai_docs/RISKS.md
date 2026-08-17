@@ -1639,6 +1639,15 @@ the "payment shows wrong after session end" symptom, and it compounds RISK-039 b
   still not updated when a doctor adds services during the session — a traceability gap, not a
   money-loss gap.
 
+**Correction 2026-08-17 — Defect #3 is worse than "a traceability gap, not a money-loss gap."**
+RISK-057's investigation found `writeCheckoutInvoice()` (the only writer of the real `invoices`/
+`invoice_lines` ledger DEC-019 established) builds its lines solely from `serviceIds` — it never
+receives products/additional-services/pulses at all. That revenue reaches `amount_paid`/
+`amount_left` on the reservation row correctly, but **never becomes an `invoice_lines` row**, so
+Finance's P&L/margin/commission reporting (built on that ledger) under-reports it. See
+`DECISIONS.md` → **DEC-042** for the chosen fix (`reservation_products` staging table feeding
+`invoice_lines` directly) — not yet implemented.
+
 ---
 
 ## RISK-039: AdminBookingsView Fabricates Payment Status, Doctor Name And Room When Real Data Is Missing (RESOLVED)

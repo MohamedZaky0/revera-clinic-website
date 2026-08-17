@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-08-13
+> **Last Updated:** 2026-08-17 (DEC-042)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -1302,6 +1302,121 @@ flag.
   this decision only adds the destination column; building the actual import path is separate,
   unscoped work.
 
+
+---
+
+## DEC-042: Session-Added Products/Services/Pulses Get A Real `reservation_products` Staging Table, Feeding `invoice_lines` Directly — Not A New Parallel Ledger
+
+**Date:** 2026-08-17
+**Status:** Decided — active, **implementation pending** (this entry records the decision found
+correct during RISK-056/057 investigation; the schema/wiring below has not been built yet)
+
+**Context:**
+While live-testing a real booking through Approve → Start Session → Complete Treatment → Pay &
+Settle (RISK-053…057), a doctor-added product (700 EGP) turned out to be invisible on the printed
+invoice and the reception drawer's product panel, even though the reservation's own
+`amount_paid`/`amount_left` were correct. Chasing the root cause surfaced something worse than a
+display bug:
+
+1. **The intended structured design already exists in the frontend and was never finished.**
+   `admin/page.tsx`'s `handleAddProductToViewingBooking` (~line 1383) sends `attachedProducts` in
+   its `PATCH /api/reservations` body, and three separate read sites (`viewingBooking`'s Price
+   Details, its "Products & Session Consumables" panel, and the invoice PDF) all check
+   `Array.isArray(viewingBooking.attachedProducts)` **first**, before falling back to regex-parsing
+   `notes`. But `PATCH /api/reservations`'s field whitelist
+   (`src/app/api/reservations/route.ts:787`) never destructures `attachedProducts` — it is silently
+   dropped by Supabase's `.update()` on every call. The fallback (parsing free-text `notes`) has
+   been the *only* path that has ever actually worked, which is why it broke twice (RISK-038,
+   RISK-057) and will keep breaking: any new caller writing a differently-worded note silently
+   reproduces the same bug class.
+2. **The real financial ledger DEC-019 built (`invoices`/`invoice_lines`) never receives this
+   revenue at all — not a display gap, a reporting gap.** `writeCheckoutInvoice()`
+   (`src/app/api/reservations/route.ts:263`), the only function that ever inserts into `invoices`/
+   `invoice_lines`, builds its `lines` array solely from `serviceIds` — it has no parameter for
+   products, additional services, or device pulses. Every EGP a doctor adds during a session via
+   Products/Additional Services/Extra Pulses reaches `reservations.amount_paid`/`amount_left`
+   correctly (RISK-038's earlier partial fix) but **never becomes an `invoice_lines` row**. Since
+   Finance's P&L/margin/commission reporting is built on this ledger (DEC-019), every session with
+   a doctor-added extra is under-reported there today — this upgrades RISK-038's Defect #3 from "a
+   traceability gap, not a money-loss gap" to a real Finance under-reporting gap, not just a
+   receptionist-facing display inconsistency.
+
+**Alternatives Considered:**
+- **Keep patching the `notes`-regex reconstruction.** Rejected — this is the *second* time the
+  exact same bug (a new note-writer, an unmatched pattern) has shipped (RISK-038 → RISK-057, and
+  RISK-057 itself turned out to have three independent copies of the same broken logic). Patching a
+  fourth or fifth copy the next time a new "add X during a session" feature ships is not a fix, it
+  is the failure mode repeating.
+- **Finish wiring the existing `attachedProducts` field as a JSONB column on `reservations`.**
+  Cheaper than a new table (no join), and would fix the immediate display bug. Rejected as the
+  primary fix because it does nothing for the deeper gap: `writeCheckoutInvoice` would still need
+  to be taught to read it and turn it into `invoice_lines` at completion, and a JSON array on the
+  reservation row can't cleanly carry a real FK to `inventory_products` (for stock-deduction
+  traceability, matching how `consumption_entries`/`purchase_lines` already reference products by
+  FK, not by name string) or per-line metadata (`added_by_employee_id`, `added_at`, whether it came
+  from the doctor's session or reception's drawer) without becoming an ad hoc schema inside a
+  column.
+- **A standalone `reservation_products` table treated as its own permanent ledger, independent of
+  `invoices`/`invoice_lines`.** Rejected — this is what the user asked to sanity-check, and it is
+  the wrong shape specifically *because* DEC-019 already built and is actively extending
+  (`invoice_lines`, `payments`, `consumption_entries`, `purchase_lines`) the one ledger Finance
+  reports from. A second, parallel table holding the same kind of revenue-bearing rows would need
+  its own reconciliation against `invoice_lines` forever — exactly the "several independent
+  regex-based reconstructions of the same fact" anti-pattern this investigation just found and is
+  trying to close, just moved into two persisted tables instead of three parsers.
+
+**Chosen Option:**
+A `reservation_products` table, scoped as **pre-invoice staging that feeds `invoice_lines`, not a
+parallel ledger**:
+
+- Columns (indicative, to be finalized at implementation): `id`, `reservation_id` (FK →
+  `reservations.id`), `product_id` (FK → `inventory_products.id`, nullable for the "Additional
+  Service"/pulses case where there's no product row), `line_type` (`product` | `additional_service`
+  | `device_pulses`), `service_id` (FK → `services.id`, nullable, for `additional_service`), `qty`,
+  `unit_price`, `total`, `added_by_employee_id`, `added_by_role` (`doctor_session` |
+  `receptionist`), `created_at`.
+- `DoctorAccountView`'s "Add Product"/"Add Additional Service"/extra-pulses actions and the
+  reception drawer's "+ Add Product" action write a real row here **at the moment the item is
+  added** — no more building a `notes` sentence as the persistence mechanism. `notes` keeps carrying
+  the doctor's actual clinical note text, nothing else.
+- All three current display sites (drawer Price Details total, drawer "Products & Session
+  Consumables" panel, invoice PDF) switch from `notes`-regex reconstruction to a real `SELECT ...
+  WHERE reservation_id = ?` against this table. The regex parsers stay only as a **legacy-data
+  fallback** for bookings completed before this ships, whose only record is the old `notes` text.
+- `writeCheckoutInvoice()` is extended to also read `reservation_products` for the reservation being
+  completed and emit one `invoice_lines` row per entry (mirroring the existing `buildInvoiceLine`
+  call already used for services), so doctor/reception-added items finally reach the same
+  `invoices`/`invoice_lines`/`payments` ledger DEC-019 established — closing the Finance
+  under-reporting gap, not just the display one.
+- Once an invoice is issued for a reservation, its `reservation_products` rows become historical
+  input to that immutable invoice — same relationship `purchase_lines`/`consumption_entries` already
+  have to their own downstream tables elsewhere in this schema.
+
+**Reason:**
+- Directly continues DEC-019's stated principle — "every financial number [was] a mutable column on
+  a mutable row, with no append-only structure to reconstruct history from; reporting cannot patch
+  over that" — instead of adding a second thing needing the same treatment later.
+- A real FK to `inventory_products` (instead of a name string parsed out of prose) makes stock
+  deduction, cost/margin calculation (DEC-015), and commission attribution (DEC-018) actually
+  traceable per line, matching how every other line-item table in this schema
+  (`invoice_lines`, `purchase_lines`, `consumption_entries`) already works.
+- Normalizing "who added what, from where, when" as real columns (`added_by_employee_id`,
+  `added_by_role`) is something neither the dead JSONB field nor the notes-text approach could ever
+  give without becoming its own ad hoc parser.
+
+**Trade-offs:**
+- Real implementation scope not done as part of this decision: the migration, wiring three UI write
+  sites (doctor Products/Additional Services/Pulses, reception drawer's Add Product) to write real
+  rows instead of `notes` sentences, extending `writeCheckoutInvoice` to consume the table, and
+  switching the three display sites off `notes`-regex onto a real query (keeping the regex only as
+  legacy-data fallback).
+- Every already-completed booking's session add-ons exist only as `notes` text — this decision does
+  not include a backfill; the legacy-parser fallback is what keeps those historical bookings'
+  invoices/drawers readable, not a migration of old rows into the new table.
+- Widens `writeCheckoutInvoice`'s blast radius — it becomes the single place that must correctly
+  reconcile services *and* session add-ons into one invoice, which is more logic in one already
+  financially-sensitive function. Accepted: this is strictly better than the current state, where
+  that same revenue reaches no ledger row at all.
 
 ---
 
