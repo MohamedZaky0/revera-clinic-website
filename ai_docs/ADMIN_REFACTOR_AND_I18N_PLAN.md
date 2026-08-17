@@ -2,9 +2,16 @@
 
 > **Status:** Phase 0 complete (2026-08-17 — 107 tests, `ai_docs/WINDSURF_BRIEFS.md` Brief 3).
 > Open decisions resolved — see `DECISIONS.md` → **DEC-043**. Phase 1's pattern-proving PR
-> (Clinic Profile Settings, Brief 4) is complete and verified — extraction pattern proven. Next:
-> the Reception wave (Bookings, Patients, POS, New Booking), where Phase 2 (Arabic) actually
-> starts once the first one is extracted. **Windsurf implements Phase 1 — this plan is the brief
+> (Clinic Profile Settings, Brief 4) is complete and verified — extraction pattern proven.
+> **Reception-wave scope corrected (2026-08-17):** `New Booking` was already extracted
+> (`AdminNewBookingView.tsx`) and `Bookings` was already extracted (`AdminBookingsView.tsx`) before
+> DEC-043 was written — neither needs a brief. `activeNav === "Point of Sale"` turned out to be
+> dead mock UI (hardcoded `MOCK_PRODUCTS`, no persistence, "Complete Payment" is just an `alert()`)
+> — not the real POS (that's `product_sales`-backed "Sell Product", embedded inside Patients). It
+> is **not** part of Phase 1/2 scope; flagged as a separate open product question (build it for
+> real, or remove the dead nav item). **Patients is therefore the entire remaining Reception-wave
+> scope** — see Brief 5 (active) for its 4-sub-PR breakdown; a 5th (Customer Profile Drawer) needs
+> its own future investigation-then-brief. **Windsurf implements Phase 1 — this plan is the brief
 > input, not something to execute directly against `page.tsx`.**
 > **Written:** 2026-08-17, after a full-system audit (RISK-038…RISK-050).
 
@@ -119,8 +126,13 @@ pattern-proving PR, then skip directly to the Reception wave.** Waves 2–4 are 
    Notification / Queue / Inactivity / Service Hours / Pages Settings / Clinic Profile — small,
    form-heavy, low cross-dependency). Confirms the mechanical extract-and-test loop works before
    touching anything PII/entangled. No Arabic in this PR — just extraction + Phase 0 tests passing.
+   **Done — Brief 4, Clinic Profile Settings.**
 2. **Reception wave — Bookings, Patients, POS, New Booking** (the plan's original Wave 5+6
    content). This is where Arabic (Phase 2) actually starts, once each of these is extracted.
+   **Corrected 2026-08-17:** `Bookings` and `New Booking` were already extracted before this plan
+   was written; `Point of Sale` turned out to be dead mock UI, not real POS (see status note above)
+   — neither belongs in Phase 1/2 scope. **The wave is effectively just `Patients`** — see Brief 5
+   for its internal 4-sub-PR breakdown.
 
 Original full-scope wave table (reference only, not the current plan):
 
