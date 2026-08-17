@@ -1308,11 +1308,12 @@ flag.
 ## DEC-042: Session-Added Products/Services/Pulses Get A Real `reservation_products` Staging Table, Feeding `invoice_lines` Directly — Not A New Parallel Ledger
 
 **Date:** 2026-08-17
-**Status:** Decided — active, **implemented 2026-08-17, pending migration application.** Code is
-written and verified (`tsc`/`eslint`/`vitest` all clean) but the migration
-(`20260817020000_create_reservation_products.sql`) has not yet been applied to the live dev
-database — every write path below fails until it is. See "Implementation" below for exactly what
-landed and what's still open.
+**Status:** Decided — active, **implemented and live-verified 2026-08-17.** Migration
+(`20260817020000_create_reservation_products.sql`) applied to the dev database; code verified
+(`tsc`/`eslint`/`vitest` all clean) and end-to-end tested via the real API — a write immediately
+reflected on the next read, and a doctor-added product correctly appeared as its own `invoice_lines`
+row at completion. See "Implementation" below for exactly what landed and the remaining known gap
+(COGS/commission snapshot on these lines).
 
 **Context:**
 While live-testing a real booking through Approve → Start Session → Complete Treatment → Pay &

@@ -1113,10 +1113,13 @@ reconstructing the same fact from that text, none matching the doctor portal's a
 **Explicitly not a parallel ledger.** `writeCheckoutInvoice()` (`src/app/api/reservations/route.ts`)
 reads a reservation's `reservation_products` rows at completion time and emits one `invoice_lines`
 row per entry into the same `invoices`/`invoice_lines` ledger DEC-019 established — this table only
-holds what hasn't been invoiced yet. As of 2026-08-17 this is schema-only: the migration exists,
-application wiring (doctor portal + reception drawer write sites, `writeCheckoutInvoice` read side,
-the three display sites currently regex-parsing `notes`) is tracked as in-progress, not complete —
-check the corresponding write/read sites directly rather than assuming this table is populated.
+holds what hasn't been invoiced yet. **Live and verified as of 2026-08-17**: migration applied,
+both write sites (doctor portal session add-ons, reception drawer's "+ Add Product") and
+`writeCheckoutInvoice`'s read side wired, and end-to-end tested via the real API (a write
+immediately reflected on the next read; a doctor-added product correctly appeared as its own
+invoice line at completion). `cogs_snapshot`/`commission_snapshot` on the resulting `invoice_lines`
+rows remain `NULL` by design — these lines don't run through `applyCheckoutCosting`'s recipe
+lookup — a Finance-reporting gap, not a Reception/Doctor-facing one.
 
 ## Phase 3 — Overheads, Assets, Liabilities (PROPOSAL-002)
 
