@@ -1,6 +1,6 @@
 # RISKS.md — Revera Clinics Risk Register
 
-> **Last Updated:** 2026-08-17 (RISK-057)
+> **Last Updated:** 2026-08-17 (RISK-058)
 > **Previous content was for a different project — discarded entirely**
 > RISK-010 … RISK-020 were found by the 2026-07-25 finance discovery audit and are the
 > remediation scope of `PROPOSALS.md` → PROPOSAL-002 Phase 0.
@@ -2380,6 +2380,40 @@ reconciling several independent regex-based reconstructions of `notes` instead o
 doctor-added products as real rows the moment they're added is fragile. Worth a real
 `reservation_products` (or similar)
 table before the next billing feature touches this path.
+
+---
+
+## RISK-058: Clinic Profile Settings Save Correctly But Never Hydrate Back On Load
+
+**Severity:** Low-Medium · **Type:** Data integrity / UX
+**Found:** 2026-08-17, while researching the Phase 1 pattern-proving Windsurf brief
+(`ai_docs/WINDSURF_BRIEFS.md` Brief 4) — not part of live patient-journey testing, but flagged per
+this file's standing convention of logging any bug found along the way.
+
+**What it is:** Settings → Clinic Profile's 8 fields (`clinicName`, `clinicNameAr`,
+`clinicLocation`, `clinicLocationAr`, `clinicEmail`, `clinicPhone`, `clinicWhatsapp`,
+`savingClinicProfile` — `src/app/admin/page.tsx:4595-4602`) initialize from hardcoded literals
+(`"Revera Clinics"`, `"+201035595691"`, etc.) and are never populated from saved data. Confirmed by
+grep: every `setClinicX` call site is an `onChange` handler on the form itself — there is no
+`useEffect`/fetch anywhere that reads `/api/page-settings` and hydrates these 8 fields on mount,
+unlike sibling Settings sections.
+
+The save side works correctly — `handleSaveClinicProfile` (`:6018-6034`) POSTs to
+`/api/page-settings`, whose handler does a real merge-and-upsert into `page_settings.value.clinic`
+(`src/app/api/page-settings/route.ts:141-166`), confirmed by reading that route. The data is saved.
+It's just never read back.
+
+**Business impact:** Staff editing Clinic Profile always sees the hardcoded Revera-specific
+placeholder values, never what was actually last saved — including on the fork this repo is meant
+to support for other clinics (RISK-001), where a clinic that saves its real name/phone/location
+would see the literal string `"Revera Clinics"` again on next page load, with no visible indication
+whether their save took effect.
+
+**Not fixed** — deliberately left for a dedicated small PR rather than folded into Brief 4's
+mechanical extraction (which must not change behaviour) or fixed inline here (out of scope for the
+Windsurf-brief-writing task that surfaced it). The fix is a `useEffect` reading `GET
+/api/page-settings` and calling the 7 setters from `data.clinic`, matching whatever hydration
+pattern sibling sections (Deposit/Notification/Queue Settings) already use.
 
 ---
 
