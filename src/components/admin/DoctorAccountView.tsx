@@ -776,6 +776,81 @@ export default function DoctorAccountView({
     }
   };
 
+  // DEC-042: writes real reservation_products rows for everything accumulated in local session
+  // state (products, additional services, extra device pulses) so writeCheckoutInvoice
+  // (src/app/api/reservations/route.ts) can fold them into real invoice_lines when the completing
+  // PATCH below flips status to 'completed'. Must resolve before that PATCH fires -- it only reads
+  // reservation_products rows that already exist at the moment of the status transition. The
+  // notes-text summary built further down is kept alongside this, unchanged -- a human-readable
+  // audit trail and a safety net for the regex-based display fallback (RISK-057), not replaced.
+  // Failures here are logged, not thrown -- a doctor completing a session must not be blocked by
+  // this new write path failing; the pre-existing amountLeft/notes PATCH is still the number that
+  // matters to the patient's balance.
+  const persistSessionLineItems = async (targetBooking: any, pulsesToDeduct: number, deviceName: string) => {
+    const headers = await getAuthHeaders();
+    const reservationId = targetBooking?.id || targetBooking?.booking_id || targetBooking?.bookingId;
+    if (!reservationId) return;
+
+    const writes: Promise<any>[] = [];
+    for (const p of usedProducts) {
+      writes.push(
+        fetch("/api/reservation-products", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            reservationId,
+            lineType: "product",
+            productId: p.id,
+            description: p.name,
+            qty: p.qty,
+            unitPrice: p.unitPrice,
+            addedByRole: "doctor_session",
+          }),
+        })
+      );
+    }
+    for (const s of additionalServices) {
+      writes.push(
+        fetch("/api/reservation-products", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            reservationId,
+            lineType: "additional_service",
+            serviceId: s.id,
+            description: s.name,
+            qty: 1,
+            unitPrice: s.price,
+            addedByRole: "doctor_session",
+          }),
+        })
+      );
+    }
+    if (pulsesToDeduct > 0) {
+      writes.push(
+        fetch("/api/reservation-products", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            reservationId,
+            lineType: "device_pulses",
+            description: `${deviceName} — ${pulsesToDeduct} pulses`,
+            qty: pulsesToDeduct,
+            unitPrice: pricePerPulse,
+            addedByRole: "doctor_session",
+          }),
+        })
+      );
+    }
+
+    if (writes.length === 0) return;
+    const results = await Promise.allSettled(writes);
+    const failed = results.filter((r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok));
+    if (failed.length > 0) {
+      console.error(`persistSessionLineItems: ${failed.length}/${writes.length} reservation_products writes failed for reservation ${reservationId}`);
+    }
+  };
+
   // Complete Treatment Session
   const handleCompleteTreatment = async (targetBooking: any, overrideSessionPulses?: number) => {
     if (!targetBooking) return;
@@ -877,6 +952,13 @@ export default function DoctorAccountView({
     if (!bookingTargetId) {
       alert("Booking ID is missing. Cannot complete treatment session.");
       return;
+    }
+
+    try {
+      const deviceNameForPulses = devicesList.find((d) => String(d.id) === String(selectedDeviceId))?.name || "Device";
+      await persistSessionLineItems({ ...targetBooking, id: bookingTargetId }, pulsesToDeduct, deviceNameForPulses);
+    } catch (e) {
+      console.error("persistSessionLineItems threw (non-fatal, continuing to complete treatment):", e);
     }
 
     try {

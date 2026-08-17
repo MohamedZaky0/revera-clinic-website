@@ -21,7 +21,25 @@ function fmtDate(d: unknown): string {
   return String(d).slice(0, 10); // already a YYYY-MM-DD string
 }
 
-function mapRow(r: Record<string, any>) {
+/**
+ * Shapes a raw reservation_products row (DEC-042) into the {id, name, qty, unitPrice, total,
+ * addedBy} shape the three display sites in admin/page.tsx already check for first, before
+ * falling back to regex-parsing `notes` (RISK-038, RISK-057). Matching that pre-existing shape
+ * means the read side needs zero changes to those three call sites — they already prioritise
+ * `attachedProducts` when it's an array.
+ */
+function mapReservationProduct(p: Record<string, any>) {
+  return {
+    id: p.id,
+    name: p.description,
+    qty: Number(p.qty) || 1,
+    unitPrice: Number(p.unit_price) || 0,
+    total: Number(p.total) || 0,
+    addedBy: p.added_by_role === 'doctor_session' ? 'Doctor Session' : 'Receptionist',
+  };
+}
+
+function mapRow(r: Record<string, any>, attachedProducts?: Array<Record<string, any>>) {
   const serviceIds = Array.isArray(r.service_ids) ? r.service_ids : [];
   if (serviceIds.length === 0 && r.service_id) {
     serviceIds.push(r.service_id);
@@ -54,6 +72,7 @@ function mapRow(r: Record<string, any>) {
     followUpDate: r.follow_up_date ?? null,
     startedAt: r.started_at ?? null,
     actualDurationMinutes: r.actual_duration_minutes ?? null,
+    attachedProducts: attachedProducts ? attachedProducts.map(mapReservationProduct) : undefined,
   };
 }
 
@@ -322,7 +341,34 @@ async function writeCheckoutInvoice(params: {
     });
   });
 
-  const totals = buildInvoiceTotals(lines);
+  // DEC-042: fold in products/additional-services/device-pulses added to this reservation (doctor
+  // session or reception drawer) that haven't been invoiced yet. This is the fix for the gap
+  // RISK-038/RISK-057 traced back to writeCheckoutInvoice: it used to build lines from serviceIds
+  // alone, so this revenue reached reservations.amount_paid/amount_left but never a real
+  // invoice_lines row. cogs_snapshot/commission_snapshot deliberately left unset (NULL) — these
+  // don't run through applyCheckoutCosting's service_consumables/service_devices recipe lookup,
+  // matching invoice_lines' own "not yet costed" convention rather than pretending otherwise.
+  const { data: pendingReservationProducts, error: rpErr } = await supabaseServer
+    .from('reservation_products')
+    .select('id, line_type, service_id, description, qty, unit_price')
+    .eq('reservation_id', reservationId)
+    .is('invoiced_at', null);
+  if (rpErr) {
+    console.error('Failed to fetch pending reservation_products for invoice (non-fatal, service lines still write):', rpErr.message, '| reservation:', reservationId);
+  }
+  const addonLines = (pendingReservationProducts || []).map((p: any) =>
+    buildInvoiceLine({
+      lineType: 'product',
+      description: p.description,
+      qty: Number(p.qty) || 1,
+      unitPrice: Number(p.unit_price) || 0,
+      serviceId: p.line_type === 'additional_service' ? (p.service_id ?? undefined) : undefined,
+      providerId: providerId ?? undefined,
+    })
+  );
+
+  const allLines = [...lines, ...addonLines];
+  const totals = buildInvoiceTotals(allLines);
 
   // Atomic — public.next_invoice_no() wraps nextval(invoice_no_seq) server-side
   // (20260726010600_create_next_invoice_no_rpc.sql). PostgREST has no generic way to call the
@@ -349,9 +395,19 @@ async function writeCheckoutInvoice(params: {
   if (invoiceErr) throw invoiceErr;
 
   const { data: invoiceLines, error: linesErr } = await supabaseServer.from('invoice_lines').insert(
-    lines.map((line: ReturnType<typeof buildInvoiceLine>) => ({ ...line, invoice_id: invoice.id }))
+    allLines.map((line: ReturnType<typeof buildInvoiceLine>) => ({ ...line, invoice_id: invoice.id }))
   ).select('id, service_id, line_total');
   if (linesErr) throw linesErr;
+
+  if (pendingReservationProducts && pendingReservationProducts.length > 0) {
+    const { error: markInvoicedErr } = await supabaseServer
+      .from('reservation_products')
+      .update({ invoiced_at: new Date().toISOString() })
+      .in('id', pendingReservationProducts.map((p: any) => p.id));
+    if (markInvoicedErr) {
+      console.error('Failed to mark reservation_products as invoiced (non-fatal, invoice already written):', markInvoicedErr.message, '| reservation:', reservationId);
+    }
+  }
 
   try {
     await applyCheckoutCosting({
@@ -486,13 +542,36 @@ export async function GET(req: Request) {
       console.warn("Could not fetch services for reservations mapping:", servicesResult.error.message);
     }
 
+    // DEC-042: batch-fetch reservation_products for every reservation on this page in one query
+    // (not per-row) and group client-side, same pattern as servicesMap below — avoids an N+1
+    // query when this route returns many rows (e.g. the whole Bookings list).
+    const reservationIds = (resResult.data || []).map((r: any) => r.id);
+    const attachedProductsByReservation = new Map<string, Array<Record<string, any>>>();
+    if (reservationIds.length > 0) {
+      const { data: rpRows, error: rpError } = await supabaseServer
+        .from('reservation_products')
+        .select('*')
+        .in('reservation_id', reservationIds);
+      if (rpError) {
+        console.warn("Could not fetch reservation_products for reservations mapping:", rpError.message);
+      } else {
+        for (const p of rpRows || []) {
+          const list = attachedProductsByReservation.get(p.reservation_id) || [];
+          list.push(p);
+          attachedProductsByReservation.set(p.reservation_id, list);
+        }
+      }
+    }
+
     const servicesMap = new Map((servicesResult.data || []).map((s: any) => [s.id, s.price]));
     const mappedRows = (resResult.data || []).map((r: any) => ({
       ...r,
       services: r.service_id ? { price: servicesMap.get(r.service_id) || 0 } : null
     }));
 
-    return NextResponse.json(mappedRows.map(mapRow));
+    return NextResponse.json(
+      mappedRows.map((r: any) => mapRow(r, attachedProductsByReservation.get(r.id) || []))
+    );
   } catch (err) {
     console.error('GET /api/reservations error:', err);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });

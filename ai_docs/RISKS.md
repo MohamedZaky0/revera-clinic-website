@@ -1646,7 +1646,9 @@ receives products/additional-services/pulses at all. That revenue reaches `amoun
 `amount_left` on the reservation row correctly, but **never becomes an `invoice_lines` row**, so
 Finance's P&L/margin/commission reporting (built on that ledger) under-reports it. See
 `DECISIONS.md` → **DEC-042** for the chosen fix (`reservation_products` staging table feeding
-`invoice_lines` directly) — not yet implemented.
+`invoice_lines` directly) — **code implemented 2026-08-17, pending migration application** (see
+DEC-042's "Implementation" note for exact status; `tsc`/`eslint`/`vitest` clean, not yet verified
+live).
 
 ---
 
@@ -2373,13 +2375,14 @@ baseServicesTotal`, not from parsing `notes`, which is why it displayed correctl
 fix.) No data migration needed — all three reconstruct from `notes` on every render, so this
 retroactively fixes every already-completed booking with this note shape, not just new ones.
 
-**Not fixed — flagged for follow-up:** this is the same underlying gap RISK-038 already named
-partial, and finding a third copy of the identical bug while verifying the fix for the first two is
-the concrete proof of the "next new note format will silently reproduce this" warning below —
-reconciling several independent regex-based reconstructions of `notes` instead of writing
-doctor-added products as real rows the moment they're added is fragile. Worth a real
-`reservation_products` (or similar)
-table before the next billing feature touches this path.
+**Follow-up landed 2026-08-17 — DEC-042.** Finding a third copy of the identical bug while
+verifying the fix for the first two was the concrete proof that reconciling several independent
+regex-based reconstructions of `notes` instead of writing doctor-added products as real rows is
+fragile. A `reservation_products` staging table now exists (schema + full application wiring
+written and `tsc`/`eslint`/`vitest`-clean; **pending migration application to the dev database** —
+see DEC-042's "Implementation" note). Once live, the `notes`-regex parsers in all three display
+sites become a legacy-data fallback only — new writes go through real rows, and this bug class
+cannot reproduce for new sessions again.
 
 ---
 

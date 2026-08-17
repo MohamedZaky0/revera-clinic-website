@@ -1308,8 +1308,11 @@ flag.
 ## DEC-042: Session-Added Products/Services/Pulses Get A Real `reservation_products` Staging Table, Feeding `invoice_lines` Directly — Not A New Parallel Ledger
 
 **Date:** 2026-08-17
-**Status:** Decided — active, **implementation pending** (this entry records the decision found
-correct during RISK-056/057 investigation; the schema/wiring below has not been built yet)
+**Status:** Decided — active, **implemented 2026-08-17, pending migration application.** Code is
+written and verified (`tsc`/`eslint`/`vitest` all clean) but the migration
+(`20260817020000_create_reservation_products.sql`) has not yet been applied to the live dev
+database — every write path below fails until it is. See "Implementation" below for exactly what
+landed and what's still open.
 
 **Context:**
 While live-testing a real booking through Approve → Start Session → Complete Treatment → Pay &
@@ -1405,11 +1408,6 @@ parallel ledger**:
   give without becoming its own ad hoc parser.
 
 **Trade-offs:**
-- Real implementation scope not done as part of this decision: the migration, wiring three UI write
-  sites (doctor Products/Additional Services/Pulses, reception drawer's Add Product) to write real
-  rows instead of `notes` sentences, extending `writeCheckoutInvoice` to consume the table, and
-  switching the three display sites off `notes`-regex onto a real query (keeping the regex only as
-  legacy-data fallback).
 - Every already-completed booking's session add-ons exist only as `notes` text — this decision does
   not include a backfill; the legacy-parser fallback is what keeps those historical bookings'
   invoices/drawers readable, not a migration of old rows into the new table.
@@ -1417,6 +1415,46 @@ parallel ledger**:
   reconcile services *and* session add-ons into one invoice, which is more logic in one already
   financially-sensitive function. Accepted: this is strictly better than the current state, where
   that same revenue reaches no ledger row at all.
+- `cogs_snapshot`/`commission_snapshot` are left `NULL` on the `invoice_lines` rows generated from
+  `reservation_products` — they don't run through `applyCheckoutCosting`'s `service_consumables`/
+  `service_devices` recipe lookup (that lookup is keyed to the reservation's *primary* booked
+  services, not ad-hoc additions). Matches `invoice_lines`' own established "not yet costed"
+  convention (`DB_SCHEMA.md`) rather than fabricating a cost. Revenue is correct; COGS/margin
+  reporting on these specific lines is not, until this gap is closed separately.
+
+**Implementation (2026-08-17):**
+- Migration: `supabase/migrations/20260817020000_create_reservation_products.sql`. One column
+  beyond the original design above: `invoiced_at timestamptz`, nullable — marks a row as already
+  folded into an `invoice_lines` row, so `writeCheckoutInvoice` only ever processes each row once.
+- `GET /api/reservations` (`src/app/api/reservations/route.ts`) batch-fetches
+  `reservation_products` for every reservation on the page (one query, not N+1) and attaches it as
+  `attachedProducts` on each row — the exact field name and shape (`{id, name, qty, unitPrice,
+  total, addedBy}`) the three display sites already checked for first, before their `notes`-regex
+  fallback (RISK-057). **This means all three display sites needed zero code changes** — they
+  automatically read real data the moment a row exists.
+- New `POST /api/reservation-products` (`src/app/api/reservation-products/route.ts`): creates a row
+  with `added_by_employee_id` from the authenticated caller and `added_by_role` from the request
+  body (`'doctor_session'` | `'receptionist'` — the server can't infer which UI surface is calling).
+  If the target reservation is already `completed` with an issued invoice, appends directly to that
+  invoice's `invoice_lines` immediately (mirrors `appendPaymentToExistingInvoice`'s late-payment
+  pattern) rather than leaving the row stranded with no future completion event to pick it up.
+- `writeCheckoutInvoice()` now also reads `reservation_products WHERE invoiced_at IS NULL` for the
+  reservation being completed, builds one `invoice_lines` row per entry via the existing
+  `buildInvoiceLine()`, and marks those rows `invoiced_at` after a successful insert.
+- Doctor portal (`DoctorAccountView.tsx`): new `persistSessionLineItems()`, called from
+  `handleCompleteTreatment` right before the completing PATCH. Writes one row per accumulated
+  product/additional-service/pulse-usage entry. Non-fatal on failure — logged, doesn't block
+  completing the session, since the pre-existing `amountLeft`/`notes` PATCH remains the number that
+  actually matters to the patient's balance regardless of whether this new path succeeds.
+- Reception drawer (`admin/page.tsx`'s `handleAddProductToViewingBooking`): now also POSTs a real
+  row immediately (real-time, not batched) alongside the pre-existing `notes` append and
+  `amountLeft` recalculation — neither of which was removed.
+- The `notes`-text summaries (both sides) and the three display sites' `notes`-regex fallbacks are
+  **unchanged, kept as the legacy-data path** — exactly per the "no backfill" trade-off above.
+- Verified: `tsc --noEmit` 0 errors, `eslint` 0 errors (no new warnings), `vitest run` 107/107
+  passing. **Not yet verified live** — the migration has not been applied to the dev database in
+  this session (no Supabase project access from this environment); every write path 500s until it
+  is applied and the flow is exercised in the browser end-to-end.
 
 ---
 
