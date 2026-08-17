@@ -23977,6 +23977,31 @@ export default function AdminPage() {
                           });
                         }
                       }
+
+                      // RISK-057: DoctorAccountView actually writes "[Products Used During
+                      // Session]: Name (Qty: N x UnitPrice EGP = Total EGP), ..." — a third,
+                      // independent copy of this same regex-reconstruction (this panel) missed the
+                      // same fix already applied to drawerAttachedList/invoiceAttachedList above.
+                      const doctorSessionMatches = notesStr.matchAll(
+                        /(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
+                      );
+                      for (const match of doctorSessionMatches) {
+                        const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
+                        const qty = Number(match[2]);
+                        const unitPrice = Number(match[3]);
+                        const total = Number(match[4]);
+                        if (!existingNames.has(name.toLowerCase())) {
+                          existingNames.add(name.toLowerCase());
+                          list.push({
+                            id: name,
+                            name,
+                            qty,
+                            unitPrice,
+                            total,
+                            addedBy: 'Doctor Session'
+                          });
+                        }
+                      }
                     }
 
                     return (

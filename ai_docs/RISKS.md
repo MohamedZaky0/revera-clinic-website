@@ -2349,19 +2349,27 @@ one before/after), every session-added product silently failed to reconstruct on
 invoice PDF and the drawer's product panel — the money was always correct (RISK-056), only the
 itemized paper trail was invisible.
 
-**Fixed:** added a fourth regex,
+**Fixed:** added the same regex,
 `/(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g`,
-matching `[Products Used During Session]: ...` in both places it's parsed:
-[src/app/admin/page.tsx](../src/app/admin/page.tsx) — the `viewingBooking` drawer's
-`drawerAttachedList` (~line 23601) and the `invoiceBooking` PDF's `invoiceAttachedList`
-(~line 27411). No data migration needed — this reconstructs from `notes` on every render, so it
+matching `[Products Used During Session]: ...` to **three** independent copies of this same
+reconstruction logic in [src/app/admin/page.tsx](../src/app/admin/page.tsx) — not two. First pass
+fixed the `viewingBooking` drawer's Price Details total (`drawerAttachedList`, ~line 23601) and the
+`invoiceBooking` PDF's line items (`invoiceAttachedList`, ~line 27411); deploying and re-testing
+live then surfaced a **third**, entirely separate copy driving the drawer's own "Products & Session
+Consumables" panel (`list`, ~line 23934–23980, its own `existingNames`/`matchAll` calls) — same two
+old patterns, same missing fourth one, same "No products added" symptom, just for a different
+section of the same modal. That third copy is now fixed too. (The checkout modal's own
+`extraAddonsCost` figure was never affected — it derives from `amountLeft + amountPaid -
+baseServicesTotal`, not from parsing `notes`, which is why it displayed correctly even before this
+fix.) No data migration needed — all three reconstruct from `notes` on every render, so this
 retroactively fixes every already-completed booking with this note shape, not just new ones.
 
 **Not fixed — flagged for follow-up:** this is the same underlying gap RISK-038 already named
-partial: reconciling four independent regex-based reconstructions of `notes` (here, the drawer, the
-invoice, and the checkout modal's own `extraAddonsCost` derivation) instead of writing doctor-added
-products as real rows the moment they're added is fragile — the next new note format written
-anywhere will silently reproduce this exact bug. Worth a real `reservation_products` (or similar)
+partial, and finding a third copy of the identical bug while verifying the fix for the first two is
+the concrete proof of the "next new note format will silently reproduce this" warning below —
+reconciling several independent regex-based reconstructions of `notes` instead of writing
+doctor-added products as real rows the moment they're added is fragile. Worth a real
+`reservation_products` (or similar)
 table before the next billing feature touches this path.
 
 ---
