@@ -10,9 +10,13 @@
 > — not the real POS (that's `product_sales`-backed "Sell Product", embedded inside Patients). It
 > is **not** part of Phase 1/2 scope; flagged as a separate open product question (build it for
 > real, or remove the dead nav item). **Patients is therefore the entire remaining Reception-wave
-> scope** — see Brief 5 (active) for its 4-sub-PR breakdown; a 5th (Customer Profile Drawer) needs
-> its own future investigation-then-brief. **Windsurf implements Phase 1 — this plan is the brief
-> input, not something to execute directly against `page.tsx`.**
+> scope.** **Brief 5's 4 sub-PRs are complete (2026-08-17)** — Medical Report Modal, Medical Form
+> Modal, Customer Create/Edit Form, Patients Directory all extracted and verified
+> (`tsc`/`eslint`/`vitest` clean). `admin/page.tsx` is down to 26,763 lines. Remaining: a 5th sub-PR
+> (Customer Profile Drawer, ~1,280 lines, owns the 82-reference `viewingCustomerProfile` state)
+> needs its own investigation-then-brief cycle before Phase 2 (Arabic) can start on it — but Phase 2
+> can already start on the 4 completed sub-PRs without waiting. **Windsurf implements Phase 1 —
+> this plan is the brief input, not something to execute directly against `page.tsx`.**
 > **Written:** 2026-08-17, after a full-system audit (RISK-038…RISK-050).
 
 ---
