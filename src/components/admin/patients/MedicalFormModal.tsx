@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { X } from "lucide-react";
+import { adminTranslations } from "@/components/admin/translations";
 
 interface MedicalFormModalProps {
   setShowMedicalFormModal: (v: boolean) => void;
@@ -10,6 +11,8 @@ interface MedicalFormModalProps {
   authenticatedJsonHeaders: { "Content-Type": string; Authorization: string };
   medicalRecordForm: any;
   setMedicalRecordForm: React.Dispatch<React.SetStateAction<any>>;
+  lang: "en" | "ar";
+  t: typeof adminTranslations["en"]["patients"]["medicalFormModal"];
 }
 
 export default function MedicalFormModal({
@@ -19,6 +22,8 @@ export default function MedicalFormModal({
   authenticatedJsonHeaders,
   medicalRecordForm,
   setMedicalRecordForm,
+  lang,
+  t,
 }: MedicalFormModalProps) {
   const data = medicalRecordForm || {};
   const [savingMedicalForm, setSavingMedicalForm] = useState(false);
@@ -64,23 +69,23 @@ export default function MedicalFormModal({
         setMedicalRecordForm(saved.form || payload);
         setShowMedicalFormModal(false);
       } else {
-        alert("Failed to save medical intake form.");
+        alert(t.saveFailedAlert);
       }
     } catch (err: any) {
       console.error("Error saving medical form:", err);
-      alert(err.message || "An error occurred while saving.");
+      alert(err.message || t.saveErrorAlert);
     } finally {
       setSavingMedicalForm(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
       <div className="relative w-full max-w-2xl rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[#414E36]/15 space-y-6 my-8">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div>
-            <h3 className="text-xl font-bold text-[#1F251A]">Patient Medical & Aesthetic Intake Form</h3>
-            <p className="text-xs text-[#5A6A51] mt-0.5">Record clinical history, skin classification, medical background & allergies</p>
+            <h3 className="text-xl font-bold text-[#1F251A]">{t.title}</h3>
+            <p className="text-xs text-[#5A6A51] mt-0.5">{t.subtitle}</p>
           </div>
           <button
             type="button"
@@ -91,10 +96,10 @@ export default function MedicalFormModal({
           </button>
         </div>
 
-        <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-1">
+        <div className="space-y-5 max-h-[70vh] overflow-y-auto pe-1">
           {/* Skin Type */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-2">Skin Classification</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-2">{t.skinClassificationLabel}</label>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {["Normal", "Dry", "Oily", "Combination", "Sensitive"].map((type) => (
                 <button
@@ -107,7 +112,7 @@ export default function MedicalFormModal({
                       : "bg-white text-[#1F251A] border-[#414E36]/20 hover:border-[#414E36]"
                   }`}
                 >
-                  {type}
+                  {t.skinTypes[type as keyof typeof t.skinTypes]}
                 </button>
               ))}
             </div>
@@ -115,7 +120,7 @@ export default function MedicalFormModal({
 
           {/* Main Concerns */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-2">Primary Aesthetic Concerns</label>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#C4AE7C] mb-2">{t.primaryConcernsLabel}</label>
             <div className="flex flex-wrap gap-2 mb-3">
               {[
                 "Acne & Blemishes",
@@ -144,18 +149,18 @@ export default function MedicalFormModal({
                         : "bg-white text-gray-700 border-gray-200 hover:border-[#414E36]/30"
                     }`}
                   >
-                    {isSelected ? "✓ " : "+ "}{concern}
+                    {isSelected ? "✓ " : "+ "}{t.concerns[concern as keyof typeof t.concerns]}
                   </button>
                 );
               })}
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Additional Concern Details / Notes</label>
+              <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.additionalConcernLabel}</label>
               <input
                 type="text"
                 value={formOtherConcernsDetails}
                 onChange={(e) => setFormOtherConcernsDetails(e.target.value)}
-                placeholder="e.g. Melasma around cheeks, sensitive under-eye area..."
+                placeholder={t.additionalConcernPlaceholder}
                 className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
               />
             </div>
@@ -165,8 +170,8 @@ export default function MedicalFormModal({
           <div className="bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-xs font-bold text-[#1F251A]">Previous Aesthetic Treatments</label>
-                <p className="text-[11px] text-[#5A6A51]">Botox, Fillers, Lasers, Chemical Peels, Microneedling, etc.</p>
+                <label className="text-xs font-bold text-[#1F251A]">{t.previousTreatmentsLabel}</label>
+                <p className="text-[11px] text-[#5A6A51]">{t.previousTreatmentsDesc}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -176,7 +181,7 @@ export default function MedicalFormModal({
                     formHasPreviousTreatments ? "bg-[#414E36] text-white border-[#414E36]" : "bg-white text-gray-600 border-gray-200"
                   }`}
                 >
-                  Yes
+                  {t.yes}
                 </button>
                 <button
                   type="button"
@@ -185,7 +190,7 @@ export default function MedicalFormModal({
                     !formHasPreviousTreatments ? "bg-gray-200 text-gray-800 border-gray-300" : "bg-white text-gray-600 border-gray-200"
                   }`}
                 >
-                  No
+                  {t.no}
                 </button>
               </div>
             </div>
@@ -194,7 +199,7 @@ export default function MedicalFormModal({
                 rows={2}
                 value={formPreviousTreatmentsDetails}
                 onChange={(e) => setFormPreviousTreatmentsDetails(e.target.value)}
-                placeholder="List past procedures, approximate dates, and any adverse reactions..."
+                placeholder={t.previousTreatmentsPlaceholder}
                 className="w-full rounded-xl border border-[#414E36]/15 bg-white p-3 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
               />
             )}
@@ -204,8 +209,8 @@ export default function MedicalFormModal({
           <div className="bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-xs font-bold text-[#1F251A]">Existing Medical Conditions / Pregnancy</label>
-                <p className="text-[11px] text-[#5A6A51]">Diabetes, Hypertension, Autoimmune, Pregnancy, Nursing, etc.</p>
+                <label className="text-xs font-bold text-[#1F251A]">{t.medicalConditionsLabel}</label>
+                <p className="text-[11px] text-[#5A6A51]">{t.medicalConditionsDesc}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -215,7 +220,7 @@ export default function MedicalFormModal({
                     formHasMedicalConditions ? "bg-[#414E36] text-white border-[#414E36]" : "bg-white text-gray-600 border-gray-200"
                   }`}
                 >
-                  Yes
+                  {t.yes}
                 </button>
                 <button
                   type="button"
@@ -224,7 +229,7 @@ export default function MedicalFormModal({
                     !formHasMedicalConditions ? "bg-gray-200 text-gray-800 border-gray-300" : "bg-white text-gray-600 border-gray-200"
                   }`}
                 >
-                  No
+                  {t.no}
                 </button>
               </div>
             </div>
@@ -233,7 +238,7 @@ export default function MedicalFormModal({
                 rows={2}
                 value={formMedicalConditionsDetails}
                 onChange={(e) => setFormMedicalConditionsDetails(e.target.value)}
-                placeholder="Specify conditions..."
+                placeholder={t.medicalConditionsPlaceholder}
                 className="w-full rounded-xl border border-[#414E36]/15 bg-white p-3 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
               />
             )}
@@ -243,8 +248,8 @@ export default function MedicalFormModal({
           <div className="bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-xs font-bold text-[#1F251A]">Currently Taking Medications</label>
-                <p className="text-[11px] text-[#5A6A51]">Roaccutane/Isotretinoin, Blood thinners, Retinoids, Antibiotics, etc.</p>
+                <label className="text-xs font-bold text-[#1F251A]">{t.medicationsLabel}</label>
+                <p className="text-[11px] text-[#5A6A51]">{t.medicationsDesc}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -254,7 +259,7 @@ export default function MedicalFormModal({
                     formIsTakingMedication ? "bg-[#414E36] text-white border-[#414E36]" : "bg-white text-gray-600 border-gray-200"
                   }`}
                 >
-                  Yes
+                  {t.yes}
                 </button>
                 <button
                   type="button"
@@ -263,7 +268,7 @@ export default function MedicalFormModal({
                     !formIsTakingMedication ? "bg-gray-200 text-gray-800 border-gray-300" : "bg-white text-gray-600 border-gray-200"
                   }`}
                 >
-                  No
+                  {t.no}
                 </button>
               </div>
             </div>
@@ -272,7 +277,7 @@ export default function MedicalFormModal({
                 rows={2}
                 value={formMedicationDetails}
                 onChange={(e) => setFormMedicationDetails(e.target.value)}
-                placeholder="List active medications..."
+                placeholder={t.medicationsPlaceholder}
                 className="w-full rounded-xl border border-[#414E36]/15 bg-white p-3 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
               />
             )}
@@ -280,12 +285,12 @@ export default function MedicalFormModal({
 
           {/* Allergies */}
           <div>
-            <label className="block text-xs font-bold text-[#1F251A] mb-1">Known Allergies (Drugs / Skincare Ingredients / Latex)</label>
+            <label className="block text-xs font-bold text-[#1F251A] mb-1">{t.allergiesLabel}</label>
             <input
               type="text"
               value={formAllergies}
               onChange={(e) => setFormAllergies(e.target.value)}
-              placeholder="e.g. Penicillin, Aspirin, Fragrance, Hydroquinone, Latex..."
+              placeholder={t.allergiesPlaceholder}
               className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
             />
           </div>
@@ -297,7 +302,7 @@ export default function MedicalFormModal({
             onClick={() => setShowMedicalFormModal(false)}
             className="rounded-xl border border-[#414E36]/15 px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
           >
-            Cancel
+            {t.cancelBtn}
           </button>
           <button
             type="button"
@@ -305,7 +310,7 @@ export default function MedicalFormModal({
             disabled={savingMedicalForm}
             className="rounded-xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
           >
-            {savingMedicalForm ? "Saving..." : "Save Medical Intake Form"}
+            {savingMedicalForm ? t.savingBtn : t.saveBtn}
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Plus, MoreVertical, Download, Upload, Search, Filter, Pencil, User } from "lucide-react";
+import { adminTranslations } from "@/components/admin/translations";
 
 interface PatientsDirectoryViewProps {
   filteredCustomers: any[];
@@ -26,6 +27,8 @@ interface PatientsDirectoryViewProps {
   activeCustomerRowMenuId: string | null;
   setActiveCustomerRowMenuId: React.Dispatch<React.SetStateAction<string | null>>;
   customerMoreMenuRef: React.RefObject<HTMLDivElement | null>;
+  lang: "en" | "ar";
+  t: typeof adminTranslations["en"]["patients"]["patientsDirectoryView"];
 }
 
 export default function PatientsDirectoryView({
@@ -51,20 +54,22 @@ export default function PatientsDirectoryView({
   activeCustomerRowMenuId,
   setActiveCustomerRowMenuId,
   customerMoreMenuRef,
+  lang,
+  t,
 }: PatientsDirectoryViewProps) {
   return (
-    <>
+    <div dir={lang === "ar" ? "rtl" : "ltr"}>
       {/* Page header and controls panel (floating directly on background without white box) */}
       <div className="mb-6 flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-[#1F251A]">Patients Directory</h2>
-            <p className="text-xs text-[#5A6A51]">Manage demographic profiles and clinical histories</p>
+            <h2 className="text-xl font-bold text-[#1F251A]">{t.title}</h2>
+            <p className="text-xs text-[#5A6A51]">{t.subtitle}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="text-xs text-[#5A6A51] border border-[#414E36]/15 bg-white px-3.5 py-2 rounded-xl font-medium flex items-center gap-1 shadow-2xs">
-              Total Patients: <span className="font-bold text-[#1F251A]">{filteredCustomers.length}</span>
+              {t.totalPatientsLabel} <span className="font-bold text-[#1F251A]">{filteredCustomers.length}</span>
             </div>
 
             {hasPermission("customers.create") && (
@@ -72,7 +77,7 @@ export default function PatientsDirectoryView({
                 onClick={handleOpenAddCustomer}
                 className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] cursor-pointer shadow-2xs"
               >
-                <Plus size={14} /> Add Patient
+                <Plus size={14} /> {t.addPatientBtn}
               </button>
             )}
 
@@ -89,13 +94,13 @@ export default function PatientsDirectoryView({
                     ? "border-[#414E36] bg-[#414E36] text-white"
                     : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
                 }`}
-                title="More Actions"
+                title={t.moreActionsTitle}
               >
                 <MoreVertical size={16} />
               </button>
 
               {showCustomerMoreMenu && (
-                <div className="absolute right-0 top-11 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-2xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 dropdown-action-menu">
+                <div className="absolute end-0 top-11 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-2xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 dropdown-action-menu">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -103,10 +108,10 @@ export default function PatientsDirectoryView({
                       setShowCustomerMoreMenu(false);
                       setShowExportCustomersModal(true);
                     }}
-                    className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                    className="w-full text-start px-3.5 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
                   >
                     <Download size={15} className="text-[#5A6A51]" />
-                    <span>Export Patients</span>
+                    <span>{t.exportBtn}</span>
                   </button>
 
                   {hasPermission("customers.import") && (
@@ -117,10 +122,10 @@ export default function PatientsDirectoryView({
                         setShowCustomerMoreMenu(false);
                         setShowImportCustomersModal(true);
                       }}
-                      className="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                      className="w-full text-start px-3.5 py-2.5 rounded-xl hover:bg-[#FBFBF9] font-bold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
                     >
                       <Upload size={15} className="text-[#5A6A51]" />
-                      <span>Import Patients</span>
+                      <span>{t.importBtn}</span>
                     </button>
                   )}
                 </div>
@@ -132,18 +137,18 @@ export default function PatientsDirectoryView({
         {/* Unified Search and Icon-only Filter Bar */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 max-w-md">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] z-10 pointer-events-none" />
+            <Search size={16} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] z-10 pointer-events-none" />
             <input
               type="text"
               value={customerSearch}
               onChange={(e) => setCustomerSearch(e.target.value)}
-              placeholder="Search by name, phone, national ID..."
-              className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/15 shadow-2xs"
+              placeholder={t.searchPlaceholder}
+              className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2.5 ps-10 pe-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/15 shadow-2xs"
             />
           </div>
           <button
             onClick={() => setShowCustomerFilterPanel(prev => !prev)}
-            title="Filter"
+            title={t.filterTitle}
             className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
               showCustomerFilterPanel || customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All"
                 ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
@@ -152,7 +157,7 @@ export default function PatientsDirectoryView({
           >
             <Filter size={16} />
             {(customerFilterGender !== "All" || customerFilterStatus !== "All" || customerFilterReferral !== "All") && (
-              <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+              <span className="absolute -top-1 -end-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
             )}
           </button>
         </div>
@@ -163,48 +168,48 @@ export default function PatientsDirectoryView({
         <div className="mb-6 grid grid-cols-1 gap-4 rounded-3xl border border-[#414E36]/10 bg-[#F9F9F7] p-5 md:grid-cols-4 items-end shadow-sm animate-fadeIn">
           {/* Gender Filter */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Gender</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.genderFilterLabel}</label>
             <select
               value={customerFilterGender}
               onChange={(e) => setCustomerFilterGender(e.target.value)}
               className="w-full rounded-2xl border border-[#414E36]/10 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
             >
-              <option value="All">All Genders</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
+              <option value="All">{t.genderAll}</option>
+              <option value="Male">{t.genderMale}</option>
+              <option value="Female">{t.genderFemale}</option>
             </select>
           </div>
 
           {/* Status Filter */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Status</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.statusFilterLabel}</label>
             <select
               value={customerFilterStatus}
               onChange={(e) => setCustomerFilterStatus(e.target.value)}
               className="w-full rounded-2xl border border-[#414E36]/10 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
             >
-              <option value="All">All Statuses</option>
-              <option value="Active">Active Only</option>
-              <option value="Inactive">Inactive Only</option>
+              <option value="All">{t.statusAll}</option>
+              <option value="Active">{t.statusActive}</option>
+              <option value="Inactive">{t.statusInactive}</option>
             </select>
           </div>
 
           {/* Referral Source Filter */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Referral Source</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.referralFilterLabel}</label>
             <select
               value={customerFilterReferral}
               onChange={(e) => setCustomerFilterReferral(e.target.value)}
               className="w-full rounded-2xl border border-[#414E36]/10 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
             >
-              <option value="All">All Referrals</option>
-              <option value="Google">Google Search</option>
-              <option value="Facebook">Facebook</option>
-              <option value="Instagram">Instagram</option>
-              <option value="Friend">Friend / Family</option>
-              <option value="Doctor Referral">Doctor Referral</option>
-              <option value="Walk-in">Walk-in</option>
-              <option value="Other">Other</option>
+              <option value="All">{t.referralAll}</option>
+              <option value="Google">{t.referralFilterOptions["Google"]}</option>
+              <option value="Facebook">{t.referralFilterOptions["Facebook"]}</option>
+              <option value="Instagram">{t.referralFilterOptions["Instagram"]}</option>
+              <option value="Friend">{t.referralFilterOptions["Friend"]}</option>
+              <option value="Doctor Referral">{t.referralFilterOptions["Doctor Referral"]}</option>
+              <option value="Walk-in">{t.referralFilterOptions["Walk-in"]}</option>
+              <option value="Other">{t.referralFilterOptions["Other"]}</option>
             </select>
           </div>
 
@@ -219,7 +224,7 @@ export default function PatientsDirectoryView({
               }}
               className="h-[42px] w-full rounded-2xl border border-red-200 bg-red-50 text-xs font-bold text-red-600 hover:bg-red-100 transition"
             >
-              Clear Filters
+              {t.clearFiltersBtn}
             </button>
           </div>
         </div>
@@ -230,10 +235,10 @@ export default function PatientsDirectoryView({
         <table className="w-full min-w-[700px] text-sm">
           <thead>
             <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
-              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Customer</th>
-              <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Created At</th>
-              <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Bookings</th>
-              <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Active</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colCustomer}</th>
+              <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colCreatedAt}</th>
+              <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colBookings}</th>
+              <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colActive}</th>
               <th className="px-4 py-3 whitespace-nowrap"></th>
             </tr>
           </thead>
@@ -241,7 +246,7 @@ export default function PatientsDirectoryView({
             {filteredCustomers.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-5 py-8 text-center text-[#5A6A51]">
-                  No customers found.
+                  {t.noCustomers}
                 </td>
               </tr>
             )}
@@ -274,11 +279,11 @@ export default function PatientsDirectoryView({
                   <td className="px-5 py-4 text-center text-[#1F251A]">{c.bookings}</td>
                   <td className="px-5 py-4 text-center">
                     <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold border ${c.active !== false ? "bg-green-50 text-green-700 border-green-200/50" : "bg-red-50 text-red-700 border-red-200/50"}`}>
-                      {c.active !== false ? "Active" : "Inactive"}
+                      {c.active !== false ? t.activeBadge : t.inactiveBadge}
                     </span>
                   </td>
                   <td className="px-4 py-4 text-center">
-                    <div className="dropdown-action-menu relative inline-block text-left">
+                    <div className="dropdown-action-menu relative inline-block text-start">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -290,13 +295,13 @@ export default function PatientsDirectoryView({
                             ? "border-[#414E36] bg-[#414E36] text-white"
                             : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
                         }`}
-                        title="Actions"
+                        title={t.actionsTitle}
                       >
                         <MoreVertical size={13} />
                       </button>
 
                       {activeCustomerRowMenuId === uniqueKey && (
-                        <div className="absolute right-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left dropdown-action-menu">
+                        <div className="absolute end-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-start dropdown-action-menu">
                           {hasPermission("customers.edit") && (
                             <button
                               type="button"
@@ -305,10 +310,10 @@ export default function PatientsDirectoryView({
                                 setActiveCustomerRowMenuId(null);
                                 handleOpenEditCustomer(c);
                               }}
-                              className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                              className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
                             >
                               <Pencil size={13} className="text-[#5A6A51]" />
-                              <span>Edit Patient</span>
+                              <span>{t.editPatientBtn}</span>
                             </button>
                           )}
                           <button
@@ -318,10 +323,10 @@ export default function PatientsDirectoryView({
                               setActiveCustomerRowMenuId(null);
                               setViewingCustomerProfile(c);
                             }}
-                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                            className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
                           >
                             <User size={13} className="text-[#5A6A51]" />
-                            <span>View Profile</span>
+                            <span>{t.viewProfileBtn}</span>
                           </button>
                         </div>
                       )}
@@ -333,6 +338,6 @@ export default function PatientsDirectoryView({
           </tbody>
         </table>
       </div>
-    </>
+    </div>
   );
 }

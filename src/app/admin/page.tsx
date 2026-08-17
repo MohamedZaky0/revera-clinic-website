@@ -12232,6 +12232,8 @@ export default function AdminPage() {
                     authenticatedJsonHeaders={authenticatedJsonHeaders}
                     medicalRecordForm={medicalRecordForm}
                     setMedicalRecordForm={setMedicalRecordForm}
+                    lang={lang}
+                    t={adminTranslations[lang].patients.medicalFormModal}
                   />
                 )}
 
@@ -12257,6 +12259,8 @@ export default function AdminPage() {
                   selectedCustomerForEdit={selectedCustomerForEdit}
                   authenticatedJsonHeaders={authenticatedJsonHeaders}
                   fetchCustomers={fetchCustomers}
+                  lang={lang}
+                  t={adminTranslations[lang].patients.customerFormModal}
                 />
               )}
 
@@ -12285,6 +12289,8 @@ export default function AdminPage() {
                 activeCustomerRowMenuId={activeCustomerRowMenuId}
                 setActiveCustomerRowMenuId={setActiveCustomerRowMenuId}
                 customerMoreMenuRef={customerMoreMenuRef}
+                lang={lang}
+                t={adminTranslations[lang].patients.patientsDirectoryView}
               />
               )}
             </div>

@@ -10,187 +10,13 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-> **Status update (2026-08-17, later same day) — Briefs 7, 8, 9 attempted together, not yet
-> complete.** Work exists **uncommitted** in the working tree (`admin/page.tsx`,
-> `CustomerFormModal.tsx`, `MedicalFormModal.tsx`, `PatientsDirectoryView.tsx`,
-> `translations.ts`) — reported as fully done, independently re-verified against the actual repo
-> per this file's own established practice, and the report overstated completion. What's real:
-> `tsc --noEmit` is clean, and the bulk of static labels/placeholders/buttons/alerts genuinely are
-> translated via `t.*` lookups in all three files. **Three specific things each brief explicitly
-> called for are still missing:**
->
-> 1. **Brief 8's Gender-dropdown fix was skipped.** `CustomerFormModal.tsx:212-213` still reads
->    `<option value="Male">Male / ذكر</option>` / `<option value="Female">Female / أنثى</option>`
->    unchanged — the exact pre-existing hack the brief said to fix as part of this same work.
-> 2. **Value/label separation was never added** for Brief 7's skin-type/concern buttons
->    (`MedicalFormModal.tsx:104,126-132`, still `.map()`-ing the raw English array directly into
->    the button label) and Brief 8's referral-source options (`CustomerFormModal.tsx:224-226+`,
->    same pattern — `<option value="Facebook">Facebook</option>` etc., not translated). The
->    underlying stored values are correctly still English (good — no data-shape regression), but
->    nothing translates what's *displayed*, so these specific buttons/options stay in raw English
->    even with the toggle set to Arabic, inconsistent with everything around them.
-> 3. **Brief 9's flagged RTL items are all still present, untouched.** `PatientsDirectoryView.tsx`
->    has the `dir` wrapper added correctly (line 61), but `left-3.5`/`pl-10 pr-4` on the search bar
->    (lines 140/146) and `text-left` on the table headers and both dropdown menus (lines 238-239,
->    286, 304, 313, 326) are exactly what the brief called "the first component in the rollout with
->    real RTL-sensitive Tailwind... confirm every one visually" — none were addressed.
->
-> **Not committed.** Next session: either finish these three items against the existing uncommitted
-> diff (don't restart from scratch — the translated strings are correct and don't need redoing),
-> or explicitly decide to ship without them and note that as a deliberate scope cut rather than an
-> oversight. The original brief text below (Brief 7 here, Briefs 8/9/10 further down) is unchanged
-> and still the reference for exact requirements.
-
-## Brief 7 — Translate MedicalFormModal.tsx (written 2026-08-17)
-
-**Read first:** Brief 6's archived entry below (Part A's shared setup — language state, toggle,
-`adminTranslations` — already exists, not repeated here) and `ADMIN_REFACTOR_AND_I18N_PLAN.md`
-Phase 2 (2.1–2.4).
-
-**Scope:** `src/components/admin/patients/MedicalFormModal.tsx` (~315 lines). Add
-`patients.medicalFormModal` namespace to `src/components/admin/translations.ts`. Update the render
-call at `admin/page.tsx:12228` to pass `lang={lang}` and
-`t={adminTranslations[lang].patients.medicalFormModal}` (matching Brief 6's pattern exactly).
-
-**Every hardcoded string, enumerated by reading the file directly:**
-
-| Key | Current (EN) string |
-|---|---|
-| `title` | "Patient Medical & Aesthetic Intake Form" |
-| `subtitle` | "Record clinical history, skin classification, medical background & allergies" |
-| `skinClassificationLabel` | "Skin Classification" |
-| `primaryConcernsLabel` | "Primary Aesthetic Concerns" |
-| `otherConcernsLabel` | "Additional Concern Details / Notes" |
-| `otherConcernsPlaceholder` | "e.g. Melasma around cheeks, sensitive under-eye area..." |
-| `previousTreatmentsLabel` | "Previous Aesthetic Treatments" |
-| `previousTreatmentsHint` | "Botox, Fillers, Lasers, Chemical Peels, Microneedling, etc." |
-| `previousTreatmentsPlaceholder` | "List past procedures, approximate dates, and any adverse reactions..." |
-| `medicalConditionsLabel` | "Existing Medical Conditions / Pregnancy" |
-| `medicalConditionsHint` | "Diabetes, Hypertension, Autoimmune, Pregnancy, Nursing, etc." |
-| `medicalConditionsPlaceholder` | "Specify conditions..." |
-| `medicationsLabel` | "Currently Taking Medications" |
-| `medicationsHint` | "Roaccutane/Isotretinoin, Blood thinners, Retinoids, Antibiotics, etc." |
-| `medicationsPlaceholder` | "List active medications..." |
-| `allergiesLabel` | "Known Allergies (Drugs / Skincare Ingredients / Latex)" |
-| `allergiesPlaceholder` | "e.g. Penicillin, Aspirin, Fragrance, Hydroquinone, Latex..." |
-| `yesBtn` / `noBtn` | "Yes" / "No" (each reused 3×, same key every time — don't duplicate per section) |
-| `cancelBtn` | "Cancel" |
-| `saveBtn` | "Save Medical Intake Form" |
-| `savingBtn` | "Saving..." |
-| `saveFailedAlert` | "Failed to save medical intake form." |
-| `saveErrorAlert` | "An error occurred while saving." |
-
-**Important — value vs. label separation, do not change the data shape:** the 5 skin types
-(`Normal`/`Dry`/`Oily`/`Combination`/`Sensitive`) and 7 concern tags (`Acne & Blemishes`,
-`Pigmentation & Dark Spots`, `Aging & Fine Lines`, `Dullness & Uneven Tone`, `Rosacea & Redness`,
-`Enlarged Pores`, `Sagging & Loss of Volume`) are stored in state (`formSkinType`,
-`formMainConcerns`) **as these exact English strings**, and sent to the API verbatim (`skin_type`,
-`main_concerns` in the payload). **Keep the stored/sent values in English, unchanged** — only
-translate what's *displayed* on each button, via a lookup object (e.g.
-`t.skinTypes["Normal"]` / `t.concerns["Acne & Blemishes"]`), the same principle as service names
-elsewhere in this codebase (DB `en`/`ar` columns, not duplicated data). Changing the stored value
-itself would be a real behaviour change (breaks whatever reads `medical_records.skin_type` expecting
-English) and is explicitly out of scope.
-
-**RTL audit:** grep the file for `ml-`/`mr-`/`text-left`/`text-right`/`rounded-l-`/`rounded-r-` —
-if any exist, note them for a from-the-browser visual check same as Brief 6's requirement; if none,
-still confirm visually, not just by the grep (per Brief 6's own lesson).
-
-**Method and exit criteria:** identical to Brief 6's Part B (add `lang`/`t` props, replace strings,
-add `dir` to the root, `grep -n '>[A-Z]'` returns nothing, `npm run check` green, browser-verify
-both languages including the Yes/No toggles and the skin-type/concern button labels specifically
-since those are the value/label-separation case unique to this component).
+None in progress. Briefs 7, 8, 9 completed and archived below (2026-08-17). Brief 10 (queued below)
+is next.
 
 ---
 ---
 
 # QUEUED BRIEFS — write up next, in this order
-
-## Brief 8 — Translate CustomerFormModal.tsx
-
-**Scope:** `src/components/admin/patients/CustomerFormModal.tsx` (~293 lines, the largest of the
-three remaining — do this one after Brief 7, not first). Add `patients.customerFormModal` namespace.
-Update the render call at `admin/page.tsx:12255`.
-
-**~40 strings — enumerate by reading the file directly** (this brief does not repeat a full table;
-the file is straightforward form labels/placeholders/buttons, same mechanical pattern as Briefs 6–7).
-Specific things confirmed while scoping this brief that need deliberate handling, not just literal
-translation:
-
-- **Two conditional headings carry logic, not just text:** `{selectedCustomerForEdit ? "Edit
-  Customer Details" : "Add New Customer"}` and `` {selectedCustomerForEdit ? `Editing profile of
-  ${custName}` : "Create a new customer profile"} `` — translate both branches as separate keys
-  (`editTitle`/`addTitle`, `editSubtitle`/`addSubtitle`), keep the `${custName}` interpolation (a
-  real name, never translated) working inside the Arabic string too.
-- **Validation error strings are real user-facing copy, not just labels** — all 5 (`"Customer name
-  is required."`, `"Mobile number is required."`, the two Egyptian-mobile-format messages, `"An
-  error occurred while saving the customer."`) need translation keys; they're currently rendered
-  inline in a red error box (`customerFormError` state), not `alert()`, but still user-facing.
-- **`Gender` dropdown already has a pre-existing, malformed attempt at bilingual support** — the
-  options are literally `<option value="Male">Male / ذكر</option>` and `<option value="Female">Female
-  / أنثى</option>` (`CustomerFormModal.tsx:207-208`), cramming both languages into one permanently-
-  visible string regardless of toggle state. **Fix this as part of this translation work** (it's the
-  exact field being translated, not a tangential unrelated bug): keep `value="Male"`/`value="Female"`
-  unchanged (stored data), display only `t.genderMale`/`t.genderFemale` (`"Male"`/`"ذكر"` and
-  `"Female"`/`"أنثى"` respectively) based on `lang`.
-- **Referral Source dropdown (8 options: Facebook, Instagram, TikTok, Google Search, Friend / Word
-  of Mouth, Walk-in, Website, Other)** — same value/label separation as Brief 7's skin
-  types/concerns: keep the stored `value=` attributes in English (this is what gets POSTed as
-  `referral`), translate only the visible option text via a lookup object.
-
-**RTL audit:** the form is a plain `grid`/`space-y` layout, no `ml-`/`mr-`/`text-left` spotted on a
-first read — confirm by grep and by eye per the established method.
-
-**Method and exit criteria:** identical to Briefs 6/7.
-
-## Brief 9 — Translate PatientsDirectoryView.tsx
-
-**Scope:** `src/components/admin/patients/PatientsDirectoryView.tsx` (~339 lines, purely
-presentational — no local state, everything via props). Add `patients.directoryView` namespace.
-Update the render call at `admin/page.tsx:12265`. This component's props interface has **no
-`lang`/`t` fields today** — add them like every other component in this rollout.
-
-**Strings to enumerate directly from the file:** header title/subtitle, "Total Patients:" counter
-label, "Add Patient" button, "More Actions"/"Export Patients"/"Import Patients" menu, search
-placeholder, "Filter" button title, the 3 filter-panel labels (Gender/Status/Referral Source) +
-their "All ..." default options + "Clear Filters", table headers (Customer/Created At/
-Bookings/Active), "No customers found." empty state, "Active"/"Inactive" status pill, row action
-menu ("Actions" title, "Edit Patient", "View Profile").
-
-**Value/label separation again, two places:**
-- Gender filter dropdown values (`Male`/`Female`) — same fix as Brief 8's Gender field: keep
-  `value=` in English, translate the visible option text. Do this consistently with whatever key
-  naming Brief 8 lands on for the same concept, so the two don't diverge (check Brief 8's translation
-  keys before naming this one's).
-- Referral Source filter's option **values here don't match Brief 8's CustomerFormModal list** —
-  this file's options are `Google`/`Facebook`/`Instagram`/`Friend`/`Doctor Referral`/`Walk-in`/
-  `Other` (7, different value set — e.g. `Google` not `Google Search`, no `TikTok`/`Website`, and
-  `Doctor Referral` doesn't appear in the other file at all). **This mismatch is pre-existing, not
-  something this translation brief introduces** — flag it as a separate follow-up (the filter and
-  the create-form disagreeing on referral source values is a real, if minor, data-consistency risk
-  worth its own RISK entry), and translate each list's actual current values as-is without trying to
-  reconcile them in this brief.
-
-**RTL — this is the first component in the rollout with real direction-sensitive Tailwind, confirmed
-by reading the file (Brief 6/7 had none):**
-- `left-3.5` on the search icon (line 135) and `pl-10 pr-4` on the search input (line 141) — under
-  RTL the icon and its padding need to be on the *end* side, not stay pinned left. Prefer logical
-  properties (`start-3.5`, `ps-10 pe-4`) per the plan's own 2.3 guidance, or conditional classes if
-  the codebase doesn't already lean on logical properties elsewhere — check what pattern (if any)
-  `globals.css`/other RTL-aware components already use before picking one.
-- `text-left` on table headers (lines 233-234) and on the two row-action-menu buttons (lines 308,
-  321) — should flip to the reading-start side under RTL.
-- The row-action dropdown (`absolute right-0`, line 299) and the header's more-actions dropdown
-  (`absolute right-0`, line 98) — anchor side needs a visual check in the browser; may or may not
-  need to flip depending on how it actually reads in RTL, this is a judgement call the grep can't
-  make.
-
-Confirm every one of these visually in the browser under Arabic, not just by inspecting the diff —
-this component is exactly the "tables, drawers and the sidebar are where RTL usually breaks first"
-case the plan itself warned about.
-
-**Method and exit criteria:** identical to Briefs 6–8, plus the RTL items above must be visually
-confirmed correct (not just "no crash") before calling this done.
 
 ## Brief 10 — Sub-PR 5 (Customer Profile Drawer): move `viewingCustomerProfile` state out of `admin/page.tsx`
 
@@ -360,3 +186,36 @@ expected files, `tsc --noEmit` 0 errors, `eslint` 0 errors (131 warnings, pre-ex
 independently re-run against the actual repo rather than trusted from the report. Proves the
 translation mechanism end-to-end — next 3 Brief 5 components repeat Part B only, Part A's setup
 doesn't need redoing.
+
+### Briefs 7-9 — Phase 2 Reception translations: MedicalFormModal, CustomerFormModal,
+PatientsDirectoryView (completed 2026-08-17)
+
+Translated the remaining 3 Brief-5-extracted Patients components into Arabic, repeating Brief 6's
+Part B pattern: `MedicalFormModal.tsx` (skin-type/concern value-label separation via
+`t.skinTypes[...]`/`t.concerns[...]` lookups, stored values kept English), `CustomerFormModal.tsx`
+(~40 strings, Gender dropdown, 8-option Referral Source dropdown), `PatientsDirectoryView.tsx`
+(purely presentational, first component in the rollout with real RTL-sensitive Tailwind).
+
+**Reported complete, independent re-verification found 3 gaps — the same failure shape DEC-043's
+own "Correction to the plan's own framing" section had already flagged once (Doctor Portal:
+extracted but not actually translated).** This is the second occurrence of that pattern:
+1. Brief 8's Gender-dropdown fix was skipped — `<option value="Male">Male / ذكر</option>` (the
+   pre-existing cramped-bilingual hack the brief explicitly said to fix) was left unchanged.
+2. Value/label separation was never added for Brief 7's skin-type/concern buttons or Brief 8's
+   referral-source options — raw English `.map()`-ed directly into the button/option label instead
+   of going through a lookup object. Stored values were correctly still English (no data-shape
+   regression) — only the display layer was wrong.
+3. Brief 9's flagged RTL items (`left-3.5`/`pl-10 pr-4` on the search bar, `text-left` on table
+   headers and both dropdown menus) were all still present, untouched, despite the brief calling
+   this out explicitly as needing browser confirmation.
+
+Review outcome: all 3 gaps closed in a follow-up pass. Two same-pattern items were also found and
+fixed in the same pass, beyond the original 3: `MedicalFormModal.tsx`'s scrollable-content padding
+(`pr-1` → `pe-1`, logical property) and `PatientsDirectoryView.tsx`'s filter-panel Gender/Status/
+Referral `<option>` labels (translation keys already existed in `translations.ts` — added when the
+gaps report was written — but were never wired into the JSX until this pass). `tsc --noEmit` 0
+errors, `vitest run` 107/107 passing, all independently re-run against the actual repo. Manual test
+checklist: `ai_docs/manual_tests/ADMIN_I18N_BRIEFS_7_9_GAPS_MANUAL_TESTS.md`. **Note for whoever
+writes Brief 11+:** this is now the second time "extracted and reported translated" turned out to
+mean "extracted, and the report overstated how much was actually translated" — treat completion
+reports on this rollout with the same skepticism DEC-043 already recommended for the Doctor Portal.
