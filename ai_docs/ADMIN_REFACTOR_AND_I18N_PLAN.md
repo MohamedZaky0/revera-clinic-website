@@ -17,10 +17,13 @@
 > needs its own investigation-then-brief cycle — deliberately not started yet, since it doesn't
 > block Phase 2 on the 4 completed sub-PRs. **DEC-042's `reservation_products` migration is now
 > applied and live-verified** (end-to-end tested via the real API: a write immediately reflected on
-> the next read). **Phase 2 has started (2026-08-17, Brief 6, active):** shared admin-local language
-> toggle + `adminTranslations` dictionary being set up once, proven on `MedicalReportModal.tsx`
-> first (smallest Brief 5 component), then rolled out to the other 3. **Windsurf implements Phase
-> 1/2 — this plan is the brief input, not something to execute directly against `page.tsx`.**
+> the next read). **Phase 2's setup + pattern-proving translation is complete (Brief 6, 2026-08-17):**
+> admin-local `lang` state with `localStorage` persistence, sidebar toggle, and
+> `src/components/admin/translations.ts` all in place; `MedicalReportModal.tsx` fully translated and
+> verified. Remaining: repeat the same per-component translation for `MedicalFormModal.tsx`,
+> `CustomerFormModal.tsx`, `PatientsDirectoryView.tsx` (setup doesn't need redoing). **Windsurf
+> implements Phase 1/2 — this plan is the brief input, not something to execute directly against
+> `page.tsx`.**
 > **Written:** 2026-08-17, after a full-system audit (RISK-038…RISK-050).
 
 ---
