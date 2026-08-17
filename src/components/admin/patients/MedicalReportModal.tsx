@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { X } from "lucide-react";
+import { adminTranslations } from "@/components/admin/translations";
 
 interface MedicalReportModalProps {
   setShowMedicalReportModal: (v: boolean) => void;
@@ -9,6 +10,8 @@ interface MedicalReportModalProps {
   adminRole: string | null;
   authenticatedJsonHeaders: { "Content-Type": string; Authorization: string };
   setMedicalReports: React.Dispatch<React.SetStateAction<any[]>>;
+  lang: "en" | "ar";
+  t: typeof adminTranslations["en"]["patients"]["medicalReportModal"];
 }
 
 export default function MedicalReportModal({
@@ -17,6 +20,8 @@ export default function MedicalReportModal({
   adminRole,
   authenticatedJsonHeaders,
   setMedicalReports,
+  lang,
+  t,
 }: MedicalReportModalProps) {
   const [savingMedicalReport, setSavingMedicalReport] = useState(false);
   const [reportTitle, setReportTitle] = useState("");
@@ -26,7 +31,7 @@ export default function MedicalReportModal({
 
   async function handleSaveMedicalReport() {
     if (!viewingCustomerProfile?.id || !reportTitle.trim()) {
-      alert("Please enter a report title.");
+      alert(t.missingTitleAlert);
       return;
     }
     setSavingMedicalReport(true);
@@ -55,23 +60,23 @@ export default function MedicalReportModal({
         }
         setShowMedicalReportModal(false);
       } else {
-        alert("Failed to save report.");
+        alert(t.saveFailedAlert);
       }
     } catch (err: any) {
       console.error("Error saving report:", err);
-      alert(err.message || "An error occurred while saving report.");
+      alert(err.message || t.saveErrorAlert);
     } finally {
       setSavingMedicalReport(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
       <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 md:p-8 shadow-2xl border border-[#414E36]/15 space-y-5 my-8">
         <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">
           <div>
-            <h3 className="text-xl font-bold text-[#1F251A]">Upload Medical Report & Document</h3>
-            <p className="text-xs text-[#5A6A51] mt-0.5">Attach lab results, scan reports, or external clinical documents</p>
+            <h3 className="text-xl font-bold text-[#1F251A]">{t.title}</h3>
+            <p className="text-xs text-[#5A6A51] mt-0.5">{t.subtitle}</p>
           </div>
           <button
             type="button"
@@ -84,30 +89,30 @@ export default function MedicalReportModal({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Report Title <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.reportTitleLabel} <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={reportTitle}
               onChange={(e) => setReportTitle(e.target.value)}
-              placeholder="e.g. Complete Blood Count & Hormonal Panel"
+              placeholder={t.reportTitlePlaceholder}
               className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Description / Notes</label>
+            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.descriptionLabel}</label>
             <textarea
               rows={3}
               value={reportDescription}
               onChange={(e) => setReportDescription(e.target.value)}
-              placeholder="Key clinical findings or doctor observations..."
+              placeholder={t.descriptionPlaceholder}
               className="w-full rounded-xl border border-[#414E36]/15 bg-white p-3 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Document Link / File URL</label>
+            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.fileUrlLabel}</label>
             <input
               type="url"
               value={reportFileUrl}
@@ -118,12 +123,12 @@ export default function MedicalReportModal({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Recording Staff / Doctor Name</label>
+            <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.staffNameLabel}</label>
             <input
               type="text"
               value={reportDoctorName}
               onChange={(e) => setReportDoctorName(e.target.value)}
-              placeholder="e.g. Dr. Sarah Al-Sayed"
+              placeholder={t.staffNamePlaceholder}
               className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#C4AE7C]"
             />
           </div>
@@ -135,7 +140,7 @@ export default function MedicalReportModal({
             onClick={() => setShowMedicalReportModal(false)}
             className="rounded-xl border border-[#414E36]/15 px-5 py-2.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
           >
-            Cancel
+            {t.cancelBtn}
           </button>
           <button
             type="button"
@@ -143,7 +148,7 @@ export default function MedicalReportModal({
             disabled={savingMedicalReport || !reportTitle.trim()}
             className="rounded-xl bg-[#414E36] px-6 py-2.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
           >
-            {savingMedicalReport ? "Uploading..." : "Save Medical Report"}
+            {savingMedicalReport ? t.savingBtn : t.saveBtn}
           </button>
         </div>
       </div>

@@ -16,6 +16,8 @@ import { compressImage } from "@/lib/image";
 import { printInvoice } from "@/lib/printUtils";
 import { Branch } from "@/types";
 import { translations } from "@/lib/translations";
+import { CLIENT } from "@/config/client";
+import { adminTranslations } from "@/components/admin/translations";
 import UserProfileView from "@/components/admin/UserProfileView";
 import ClinicProfileSettingsView from "@/components/admin/settings/ClinicProfileSettingsView";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
@@ -1496,7 +1498,14 @@ export default function AdminPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [providerTab, setProviderTab] = useState<"Doctors" | "Attendance">("Doctors");
   const [branch, setBranch] = useState<string>(""); // branch id; empty = all branches
-  const [lang, setLang] = useState<"EN" | "AR">("EN");
+  const [lang, setLang] = useState<"en" | "ar">(() => {
+    if (typeof window === "undefined") return "en";
+    const stored = localStorage.getItem(`${CLIENT.storagePrefix}_admin_lang`);
+    return stored === "ar" ? "ar" : "en";
+  });
+  useEffect(() => {
+    localStorage.setItem(`${CLIENT.storagePrefix}_admin_lang`, lang);
+  }, [lang]);
   const [showQuickActionMenu, setShowQuickActionMenu] = useState(false);
   const [showNotificationMenu, setShowNotificationMenu] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([
@@ -7729,6 +7738,32 @@ export default function AdminPage() {
             </button>
           </div>
 
+          {/* Global Language Toggle Switcher */}
+          <div className="flex items-center rounded-xl bg-black/20 p-1 border border-white/10 shadow-inner w-full mb-6">
+            <button
+              type="button"
+              onClick={() => setLang("en")}
+              className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition text-center ${
+                lang === "en"
+                  ? "bg-[#FBFBF9] text-[#414E36] shadow-sm"
+                  : "text-[#FBFBF9]/70 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              English
+            </button>
+            <button
+              type="button"
+              onClick={() => setLang("ar")}
+              className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition text-center ${
+                lang === "ar"
+                  ? "bg-[#FBFBF9] text-[#414E36] shadow-sm"
+                  : "text-[#FBFBF9]/70 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              العربية
+            </button>
+          </div>
+
           <nav className="flex-1 space-y-1 overflow-y-auto pr-0.5">
             {permittedSidebarItems.map((item) => {
               if (item.label === "Settings") {
@@ -12208,6 +12243,8 @@ export default function AdminPage() {
                     adminRole={adminRole}
                     authenticatedJsonHeaders={authenticatedJsonHeaders}
                     setMedicalReports={setMedicalReports}
+                    lang={lang}
+                    t={adminTranslations[lang].patients.medicalReportModal}
                   />
                 )}
               </div>
