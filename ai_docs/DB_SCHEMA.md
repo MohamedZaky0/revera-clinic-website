@@ -1085,6 +1085,39 @@ Unique `(service_id, product_id)`. Product-role eligibility is validated in the 
 
 Unique `(service_id, device_id)`. Checkout adds `lamp_replacement_cost / max_pulses_limit × pulses_per_session` to the invoice line COGS snapshot.
 
+### `reservation_products`
+
+**Added 2026-08-17 by DEC-042** (`20260817020000_create_reservation_products.sql`). Pre-invoice
+staging for products/additional-services/device-pulses added to a reservation during a live doctor
+session or by reception, before that reservation is completed and invoiced. Replaces free-text
+`[Products Used During Session]: ...` sentences appended to `reservations.notes` — the mechanism
+RISK-038 and RISK-057 both trace back to (RISK-057 found three independent regex parsers all
+reconstructing the same fact from that text, none matching the doctor portal's actual format).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `reservation_id` | UUID | FK → reservations.id ON DELETE CASCADE |
+| `line_type` | text | CHECK IN (`'product'`, `'additional_service'`, `'device_pulses'`) |
+| `product_id` | text | FK → inventory_products.id ON DELETE SET NULL, nullable — set for `product` rows |
+| `service_id` | bigint | FK → services.id ON DELETE SET NULL, nullable — set for `additional_service` rows |
+| `description` | text | NOT NULL — human-readable line description; carries device/pulse detail for `device_pulses` rows (no `inventory_devices` FK on this table) |
+| `qty` | numeric | Default 1 |
+| `unit_price` | numeric | Default 0 |
+| `total` | numeric | Default 0 |
+| `added_by_employee_id` | UUID | FK → employee_accounts.id ON DELETE SET NULL, nullable |
+| `added_by_role` | text | CHECK IN (`'doctor_session'`, `'receptionist'`) |
+| `invoiced_at` | timestamptz | Nullable — set once `writeCheckoutInvoice()` has emitted an `invoice_lines` row for this entry, so completion is not double-counted on retry |
+| `created_at` | timestamptz | Default now() |
+
+**Explicitly not a parallel ledger.** `writeCheckoutInvoice()` (`src/app/api/reservations/route.ts`)
+reads a reservation's `reservation_products` rows at completion time and emits one `invoice_lines`
+row per entry into the same `invoices`/`invoice_lines` ledger DEC-019 established — this table only
+holds what hasn't been invoiced yet. As of 2026-08-17 this is schema-only: the migration exists,
+application wiring (doctor portal + reception drawer write sites, `writeCheckoutInvoice` read side,
+the three display sites currently regex-parsing `notes`) is tracked as in-progress, not complete —
+check the corresponding write/read sites directly rather than assuming this table is populated.
+
 ## Phase 3 — Overheads, Assets, Liabilities (PROPOSAL-002)
 
 **Added 2026-07-26 (tasks 3.1–3.7).** Schema-only — no library or endpoint reads/writes these
