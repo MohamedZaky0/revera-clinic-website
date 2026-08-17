@@ -10,11 +10,14 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-None right now. Phase 0 (test infrastructure) is complete — see the archive below. Phase 1
-(componentizing `src/app/admin/page.tsx`) is next, but its scope depends on open decisions in
-`ai_docs/ADMIN_REFACTOR_AND_I18N_PLAN.md` (Arabic scope: whole admin panel vs. Reception-first;
-language state model) that haven't been made yet. The next brief written here will be Phase 1,
-scoped to whatever is decided.
+None written yet. Phase 0 (test infrastructure) is complete — see the archive below. The open
+decisions blocking Phase 1 are now resolved (`ai_docs/DECISIONS.md` → **DEC-043**, 2026-08-17):
+Arabic scope is Reception-first (Bookings, Patients, POS, New Booking), language state is
+admin-local, money stays Western digits, and extraction order is one Wave 1 Settings section as a
+pattern-proving PR followed directly by the Reception wave — see the revised "Suggested order" in
+`ai_docs/ADMIN_REFACTOR_AND_I18N_PLAN.md`. The next brief to write here is that pattern-proving PR
+(pick one Wave 1 section: Booking / Deposit / Notification / Queue / Inactivity / Service Hours /
+Pages Settings / Clinic Profile).
 
 ---
 ---

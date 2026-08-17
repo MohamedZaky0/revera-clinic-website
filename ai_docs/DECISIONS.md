@@ -1,6 +1,6 @@
 # DECISIONS.md — Revera Clinics Decision Log
 
-> **Last Updated:** 2026-08-17 (DEC-042)
+> **Last Updated:** 2026-08-17 (DEC-043)
 > **Previous content was for a different project — discarded entirely**
 > **Rule:** Before changing any decision recorded here, read the full entry first.
 
@@ -1417,6 +1417,79 @@ parallel ledger**:
   reconcile services *and* session add-ons into one invoice, which is more logic in one already
   financially-sensitive function. Accepted: this is strictly better than the current state, where
   that same revenue reaches no ledger row at all.
+
+---
+
+## DEC-043: Admin Panel Arabic — Reception-First Scope, Admin-Local Language State, Western Digits, Prove-The-Pattern-Then-Reception Extraction Order
+
+**Date:** 2026-08-17
+**Status:** Decided — active. Resolves the 4 open decisions listed at the bottom of
+`ai_docs/ADMIN_REFACTOR_AND_I18N_PLAN.md`, unblocking that plan's Phase 1.
+
+**Context:**
+`ADMIN_REFACTOR_AND_I18N_PLAN.md` (written 2026-08-17 by Windsurf after the RISK-038…050 audit)
+established that Arabic cannot be added directly to `src/app/admin/page.tsx` (27,733 lines, ~860
+hardcoded strings, 606 `useState` calls) — it must be extracted into components first (Phase 1),
+then translated per-component (Phase 2), the same pattern already proven (partially — see the
+correction below) by the Doctor Portal. Phase 0 (Vitest + 107 tests, `npm run test` wired into
+`npm run check`) completed the same day. Phase 1 was blocked on 4 open questions the plan explicitly
+left for the owner. This entry answers them, reached in conversation on 2026-08-17.
+
+**Correction to the plan's own framing, found while answering these questions:** the plan cites
+`DoctorAccountView.tsx`'s `doctorTranslations[lang]` pattern as proof the extract-then-translate
+approach works. Verified live during the same day's RISK-053…057 testing and by direct grep: the
+dictionary is real and fully mirrored (206 keys `en`, 206 `ar`), but only **2 of 10** doctor
+components (`DoctorSidebar`, `DoctorScheduleTab`) actually consume it — the screens exercised live
+today (Ongoing Session, Complete Treatment, Products) render 100% hardcoded English despite the
+portal's own "English View / العرض بالعربية" toggle existing. The pattern is proven at the level of
+*"split the file, then translation becomes tractable"* — not yet at *"every split component is
+actually translated."* Phase 2 for the admin panel must budget for finishing each component's
+translation, not just extracting it.
+
+**Decisions:**
+
+1. **Arabic scope: Reception-first**, not the whole admin panel. Bookings, Patients, POS, New
+   Booking — matching the plan's own "much shorter path to real value" framing. The remaining ~45
+   sections stay English-only until a future decision extends scope.
+2. **Language state: admin-local**, mirroring `DoctorAccountView`'s own `lang` state — not the
+   shared public-site `LanguageContext`. Persisted to `localStorage` under `CLIENT.storagePrefix`.
+   Matches the plan's own recommendation, taken as-is: staff language preference is a different
+   concern from a public visitor's, and `LanguageContext` carries a known, still-unfixed SSR/CSR
+   hydration mismatch (from the `/book` work) this phase should not inherit.
+3. **Money stays in Western digits** in Arabic mode, matching the plan's own recommendation —
+   avoids accounting confusion between the two numeral systems on the same screen.
+4. **Extraction order: prove the pattern on one simple section first, then go straight to Reception
+   — not the plan's full Wave 1→6 sequence.** The plan's suggested wave order deliberately puts
+   Bookings/Patients/POS **last** (Wave 5 "largest PII surface, do after the pattern is proven",
+   Wave 6 "most entangled, do last") — reasonable when the goal is derisking the whole file, but in
+   direct tension with Reception-first Arabic: that scope means extracting exactly the sections the
+   plan calls riskiest, first. Resolved by keeping the plan's safety instinct (prove the mechanical
+   extraction process on something low-stakes before touching PII/entangled screens) while dropping
+   its unrelated sections: **one Wave 1 section (Settings group — small, form-heavy, few
+   cross-dependencies) as the pattern-proving PR, then directly into the Reception sections
+   (Bookings, Patients, POS, New Booking) needed for the chosen scope** — not Wave 1's full Settings
+   list, and not Waves 2–4 (Config/People/Catalog) at all, since they serve sections outside the
+   chosen Arabic scope.
+
+**Reason:**
+- Reception-first was the user's explicit call, matching the plan's own stated rationale for that
+  option.
+- Keeping one low-stakes proof section before Reception preserves the actual reason Wave ordering
+  existed — confidence that the mechanical extract-and-test loop works — without committing to
+  extracting ~15 sections (Waves 1–4 in full) that don't serve the chosen scope and would delay
+  Reception Arabic for no benefit under this narrower goal.
+- Surfacing the Doctor Portal's real (partial) translation coverage now, rather than letting Phase 2
+  planning assume it's a finished reference implementation, avoids under-scoping Phase 2's effort.
+
+**Trade-offs:**
+- Settings, Config, People, and Catalog sections (Waves 1 remainder, 2, 3, 4) stay both un-extracted
+  and English-only under this decision — revisiting Arabic scope later means resuming the plan's
+  original wave order for whatever wasn't covered by Reception-first.
+- The single pattern-proving section still needs picking and briefing before Phase 1 can start in
+  earnest — this decision authorizes the approach, not a specific section; that choice belongs to
+  whoever writes the next Windsurf brief.
+- No change to Phase 0's already-completed test suite; those 107 tests remain the safety net for
+  whichever sections Phase 1 now touches first.
 
 ---
 

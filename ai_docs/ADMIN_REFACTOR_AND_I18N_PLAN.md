@@ -1,9 +1,11 @@
 # Admin Panel: Componentization → Arabic i18n → Automated Testing
 
 > **Status:** Phase 0 complete (2026-08-17 — 107 tests, `ai_docs/WINDSURF_BRIEFS.md` Brief 3).
-> Phase 1 not started; blocked on the open decisions at the bottom of this file.
+> Open decisions below are now resolved — see `DECISIONS.md` → **DEC-043**. Phase 1 is unblocked;
+> not started yet. Next step is writing the Phase 1 Windsurf brief per the revised order in
+> "Suggested order" below. **Windsurf implements Phase 1 — this plan is the brief input, not
+> something to execute directly against `page.tsx`.**
 > **Written:** 2026-08-17, after a full-system audit (RISK-038…RISK-050).
-> **Owner decision required before Phase 0 starts.**
 
 ---
 
@@ -27,9 +29,16 @@ human can meaningfully review in one diff. That is precisely the condition under
 found in this audit slipped through — a correct-looking local change whose interaction with distant
 code nobody traced.
 
-The Doctor Portal is the proof the target pattern works: `DoctorAccountView.tsx` is ~1,090 lines,
-split into 12 tab/modal components, with `doctorTranslations[lang]` and `dir={lang === "ar" ? "rtl" : "ltr"}`.
-Arabic there was tractable **because the split happened first**.
+The Doctor Portal is the proof the *extraction* half of this works: `DoctorAccountView.tsx` is
+~1,090 lines, split into 12 tab/modal components, with `doctorTranslations[lang]` and
+`dir={lang === "ar" ? "rtl" : "ltr"}` available once split. **Correction (2026-08-17, DEC-043):**
+verified live and by grep that only 2 of those 10 components (`DoctorSidebar`,
+`DoctorScheduleTab`) actually consume `doctorTranslations` — the screens exercised in that day's
+RISK-053…057 testing (Ongoing Session, Complete Treatment, Products) render 100% hardcoded English
+despite the portal's own language toggle. Splitting the file is what made translation *tractable*;
+it did not mean every split component got translated. Phase 2 for the admin panel must budget
+translation work per component as real, separate effort — not assume it falls out of Phase 1 for
+free.
 
 44 admin sub-components already exist (`src/components/admin/**`) — Finance, bookings, doctor,
 inventory, marketing, packages, reception, services. This plan continues an established pattern; it
@@ -98,7 +107,21 @@ class that produced RISK-049 and would have caught it.
 5. No behaviour change. No renames. No styling changes. No "while I'm here" fixes.
 6. `npm run check` + `npm run test` green; browser-verify that one section.
 
-**Suggested order** — leaf-most and least entangled first, so early PRs build confidence:
+**Suggested order — revised by DEC-043 for Reception-first Arabic scope.** The original wave table
+below is kept for reference (it's still the right order if scope ever widens back to the whole
+admin panel), but Phase 1 work should follow this instead: **one Wave 1 section as a
+pattern-proving PR, then skip directly to the Reception wave.** Waves 2–4 are deferred indefinitely
+— they serve sections outside the chosen Arabic scope.
+
+**Revised order:**
+1. **Pattern-proving PR — one Wave 1 Settings section** (pick one: Booking / Deposit /
+   Notification / Queue / Inactivity / Service Hours / Pages Settings / Clinic Profile — small,
+   form-heavy, low cross-dependency). Confirms the mechanical extract-and-test loop works before
+   touching anything PII/entangled. No Arabic in this PR — just extraction + Phase 0 tests passing.
+2. **Reception wave — Bookings, Patients, POS, New Booking** (the plan's original Wave 5+6
+   content). This is where Arabic (Phase 2) actually starts, once each of these is extracted.
+
+Original full-scope wave table (reference only, not the current plan):
 
 | Wave | Sections | Rationale |
 |---|---|---|
@@ -188,11 +211,17 @@ refactor — the tests are. Don't let CI setup delay Phase 0.
 
 ---
 
-## Open decisions (needed before Phase 0)
+## Open decisions — RESOLVED 2026-08-17, see `DECISIONS.md` → DEC-043
 
-1. **Scope of Arabic** — the whole admin panel, or Reception-facing screens first? (Reception-first
-   is a much shorter path to real value: Bookings, Patients, POS, New Booking.)
-2. **Language state model** — admin-local vs. shared `LanguageContext` (recommendation above).
-3. **Money digit localisation** — Western digits in Arabic mode? (Recommendation: yes, keep Western.)
-4. **Appetite for Phase 1** — all ~50 sections, or only those needed for the chosen Arabic scope?
-   Decision 1 largely determines this.
+1. **Scope of Arabic** — ~~the whole admin panel, or Reception-facing screens first?~~
+   **Decided: Reception-first** (Bookings, Patients, POS, New Booking). The remaining ~45 sections
+   stay English-only until a future decision extends scope.
+2. **Language state model** — ~~admin-local vs. shared `LanguageContext`?~~ **Decided: admin-local**,
+   mirroring `DoctorAccountView`'s own `lang` state.
+3. **Money digit localisation** — ~~Western digits in Arabic mode?~~ **Decided: yes, Western digits.**
+4. **Appetite for Phase 1** — ~~all ~50 sections, or only those needed for the chosen scope?~~
+   **Decided: one Wave 1 section as a pattern-proving PR, then straight to the Reception wave** —
+   not the full Wave 1→6 sequence. See the revised "Suggested order" above.
+
+Next step: write the Phase 1 Windsurf brief for the pattern-proving PR (pick one Wave 1 Settings
+section), per DEC-043.
