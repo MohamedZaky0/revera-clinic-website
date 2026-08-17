@@ -1,10 +1,11 @@
 # Admin Panel: Componentization → Arabic i18n → Automated Testing
 
 > **Status:** Phase 0 complete (2026-08-17 — 107 tests, `ai_docs/WINDSURF_BRIEFS.md` Brief 3).
-> Open decisions below are now resolved — see `DECISIONS.md` → **DEC-043**. Phase 1 is unblocked;
-> not started yet. Next step is writing the Phase 1 Windsurf brief per the revised order in
-> "Suggested order" below. **Windsurf implements Phase 1 — this plan is the brief input, not
-> something to execute directly against `page.tsx`.**
+> Open decisions resolved — see `DECISIONS.md` → **DEC-043**. Phase 1's pattern-proving PR
+> (Clinic Profile Settings, Brief 4) is complete and verified — extraction pattern proven. Next:
+> the Reception wave (Bookings, Patients, POS, New Booking), where Phase 2 (Arabic) actually
+> starts once the first one is extracted. **Windsurf implements Phase 1 — this plan is the brief
+> input, not something to execute directly against `page.tsx`.**
 > **Written:** 2026-08-17, after a full-system audit (RISK-038…RISK-050).
 
 ---
