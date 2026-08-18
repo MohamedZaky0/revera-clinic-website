@@ -106,7 +106,7 @@ Every file that exists in this folder is listed below — nothing is left unexpl
 - Branch management CRUD
 - Website CMS — hero slides (EN/AR) editable via admin
 - Provider records (doctors) — basic CRUD
-- Employee attendance with GPS geofence check-in (500m radius, widened to 800m on Jul 8)
+- Employee attendance (GPS geofence check-in lock overlay disabled per user request)
 - Employee accounts and roles (`employee_accounts` + `roles` tables) with `/api/auth/me` permission lookup and expanded 12-category Role Management permissions matrix (Bookings, Customers, Doctors, Services, Employees, Inventory, HR, Marketing, Support, Reports, Settings, Finance)
 - Superadmin/admin bypass for daily GPS check-in
 - WhatsApp confirmation step for website bookings (English only)

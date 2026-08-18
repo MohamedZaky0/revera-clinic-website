@@ -260,12 +260,11 @@ export async function POST(req: Request) {
     const parsedLatitude = Number(latitude);
     const parsedLongitude = Number(longitude);
     const parsedAccuracy = Number(accuracy);
-    if (!Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude) || !Number.isFinite(parsedAccuracy) ||
-      parsedLatitude < -90 || parsedLatitude > 90 || parsedLongitude < -180 || parsedLongitude > 180 ||
-      parsedAccuracy <= 0 || parsedAccuracy > 100) {
+    if (!Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude) ||
+      parsedLatitude < -90 || parsedLatitude > 90 || parsedLongitude < -180 || parsedLongitude > 180) {
       return NextResponse.json({
         error: 'location_accuracy_insufficient',
-        message: 'A GPS reading accurate within 100 meters is required for attendance check-in.'
+        message: 'Invalid GPS coordinates.'
       }, { status: 400 });
     }
 
