@@ -425,6 +425,60 @@ const PERMISSION_STRUCTURE = [
     ]
   },
   {
+    category: "Employees & Staff",
+    prefix: "employees",
+    items: [
+      { key: "employees.view", label: "View Employee Directory" },
+      { key: "employees.create", label: "Add & Provision Employees" },
+      { key: "employees.edit", label: "Edit Employee Details & Roles" },
+      { key: "employees.delete", label: "Delete / Deactivate Employees" }
+    ]
+  },
+  {
+    category: "Inventory & Equipment",
+    prefix: "inventory",
+    items: [
+      { key: "inventory.view", label: "View Inventory & Stock Levels" },
+      { key: "inventory.manage_devices", label: "Manage Laser Devices & Pulses" },
+      { key: "inventory.manage_products", label: "Manage Products & Pricing" },
+      { key: "inventory.manage_suppliers", label: "Manage Suppliers & Orders" }
+    ]
+  },
+  {
+    category: "HR & Attendance",
+    prefix: "hr",
+    items: [
+      { key: "hr.view_attendance", label: "View Shift Logs & GPS Check-ins" },
+      { key: "hr.manage_attendance", label: "Approve / Override Attendance" },
+      { key: "hr.manage_payroll", label: "View & Process Staff Payroll" }
+    ]
+  },
+  {
+    category: "Marketing & Campaigns",
+    prefix: "marketing",
+    items: [
+      { key: "marketing.view_campaigns", label: "View Marketing Campaigns" },
+      { key: "marketing.manage_campaigns", label: "Create & Send Broadcasts" },
+      { key: "marketing.manage_discounts", label: "Manage Discounts & Offers" }
+    ]
+  },
+  {
+    category: "Customer Support",
+    prefix: "support",
+    items: [
+      { key: "support.view_tickets", label: "View Support Tickets" },
+      { key: "support.manage_tickets", label: "Respond & Resolve Tickets" }
+    ]
+  },
+  {
+    category: "Reports & Analytics",
+    prefix: "reports",
+    items: [
+      { key: "reports.view_analytics", label: "View Operational Analytics" },
+      { key: "reports.export_reports", label: "Export Business Data Reports" }
+    ]
+  },
+  {
     category: "Settings & System Control",
     prefix: "settings",
     items: [
@@ -15909,7 +15963,7 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-3">Permissions & Access Control</label>
-                        <div className="grid gap-4 md:grid-cols-2 max-h-[400px] overflow-y-auto rounded-3xl border border-[#414E36]/10 p-5 bg-[#FBFBF9]">
+                        <div className="grid gap-4 md:grid-cols-2 max-h-[550px] overflow-y-auto rounded-3xl border border-[#414E36]/10 p-5 bg-[#FBFBF9]">
                           {PERMISSION_STRUCTURE.map((group) => {
                             const allChecked = group.items.every(item => newRolePermissions.includes(item.key));
                             const someChecked = group.items.some(item => newRolePermissions.includes(item.key)) && !allChecked;
