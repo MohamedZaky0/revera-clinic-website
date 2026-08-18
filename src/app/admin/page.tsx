@@ -2789,7 +2789,10 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/roles', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify({ name: newRoleName, permissions: newRolePermissions })
       });
 
@@ -2812,7 +2815,10 @@ export default function AdminPage() {
     if (!(await showConfirm(`Are you sure you want to delete the role '${name}'? This will disconnect employee accounts assigned to this role.`))) return;
     try {
       const res = await fetch(`/api/roles?name=${encodeURIComponent(name)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
       });
       if (res.ok) {
         fetchRolesAndEmployees();
