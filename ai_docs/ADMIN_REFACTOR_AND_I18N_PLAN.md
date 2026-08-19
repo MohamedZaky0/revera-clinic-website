@@ -1,38 +1,37 @@
 # Admin Panel: Componentization → Arabic i18n → Automated Testing
 
 > **Status (updated 2026-08-19):** Phase 0 complete (107 tests, Brief 3). Open decisions resolved —
-> see `DECISIONS.md` → **DEC-043**. Reception scope per DEC-043 is **Bookings, Patients, POS, New
-> Booking**. Current state of each, verified against the actual repo, not assumed:
+> see `DECISIONS.md` → **DEC-043**, widened by its 2026-08-19 correction. Reception scope is now
+> **Bookings, Patients, POS, New Booking, Doctors (read-only), Services (read-only)** — Inventory
+> deliberately **not** added yet (see below). Current state, verified against the actual repo:
 >
 > | Screen | Extracted | Arabic translated |
 > |---|---|---|
 > | Bookings (`AdminBookingsView.tsx`, 1,308 lines) | ✅ (pre-existing) | ✅ Brief 13 (landed clean, no gaps) |
-> | New Booking (`AdminNewBookingView.tsx`, 1,123 lines) | ✅ (pre-existing) | ❌ **never briefed** — same |
+> | New Booking (`AdminNewBookingView.tsx`, 1,123 lines) | ✅ (pre-existing) | **Brief 14, in progress** |
 > | Patients — Directory, 3 modals | ✅ Brief 5 | ✅ Briefs 6-9 (gaps found + closed) |
 > | Patients — Profile Drawer (1,539 lines, 5 tabs + 3 modals) | ✅ Briefs 10 (state) + 11 (JSX) | ✅ Brief 12 (2 gaps found + closed) |
+> | Doctors (`page.tsx:7711-8372`, ~661 lines) | ❌ not started | ❌ not started |
+> | Services (`page.tsx:8375-9370`, ~995 lines) | ❌ not started | ❌ not started |
 > | POS | N/A — dead mock UI, unreachable through any nav path | **out of scope** — separate open product decision: build the real thing or delete the dead code |
 >
-> **Phase 1 (extraction) for Reception is now DONE** — Brief 11 landed 2026-08-19, so every
-> Reception screen in scope is extracted. **All that remains is Phase 2 (translation), 3 briefs:**
-> ~~Brief 12~~ (Profile Drawer) → ~~Brief 13~~ (Bookings) — both landed 2026-08-19 → **Brief 14**
-> (New Booking, ~38 strings + 7 placeholders, in progress). Written in `WINDSURF_BRIEFS.md`. Bookings/New Booking were extracted before DEC-043 existed, which
-> is why they skipped the Phase 1 brief list *and* why their Phase 2 translation was never scoped —
-> discovered 2026-08-19 while writing Brief 11, not previously documented. POS stays a standalone
-> product decision, not a translation task.
+> **Doctors and Services added to scope 2026-08-19** (DEC-043 correction) — Reception doesn't edit
+> either screen (both already gate their write actions behind `hasPermission`, e.g.
+> `providers.edit`, `services.create`/`.edit`/`.delete`), so extracting + translating them grants no
+> new capability, only makes the existing read-only view render correctly in Arabic. Neither has a
+> Windsurf brief written yet.
 >
-> **Two conventions the translation briefs must not break** (both already violated once, or at risk):
-> 1. **Value/label separation** — anything stored *and* displayed (booking status, payment method,
->    skin type, referral source) keeps its English value; only the label translates, via a lookup.
->    Briefs 7-8 got this wrong and shipped raw English labels; RISK-054 was a display-normalised
->    status leaking into shared state in `AdminBookingsView` specifically.
-> 2. **Dates stay on `en-GB`/`en-US`** — do not "helpfully" switch `toLocale*` calls to `ar-EG`.
->    DEC-043 decided Western digits; `PatientsDirectoryView.tsx` (already translated) is the
->    precedent and keeps English locales. `ar-EG` would produce Arabic month names *and* Arabic-Indic
->    digits in money/appointment contexts — a regression against an explicit decision.
+> **Inventory (`page.tsx:14724-15608`, ~885 lines) deliberately held out of scope.** Unlike
+> Doctors/Services, it has **zero** internal `hasPermission` checks — any role that can reach the
+> screen today has full create/edit/delete, so "Reception views but doesn't edit" is not actually
+> enforced yet. Extracting/translating a screen whose permission model may still change would need
+> redoing. Waiting on a decision about what Reception's real Inventory access should be before this
+> becomes a brief.
 >
-> DEC-042's `reservation_products` migration is applied and live-verified. Windsurf implements
-> Phase 1/2 — this plan is the brief input, not something to execute directly against `page.tsx`.
-> **Written:** 2026-08-17, after a full-system audit (RISK-038…RISK-050).
+> **Remaining Phase 2 work on the already-extracted screens:** ~~Brief 12~~ (Profile Drawer) →
+> ~~Brief 13~~ (Bookings) — both landed 2026-08-19 → **Brief 14** (New Booking, in progress). Then
+> Doctors and Services need their own Phase 1 (extraction) before Phase 2 can start, per this plan's
+> own extract-then-translate rule. POS stays a standalone product decision, not a translation task.
 
 ---
 
@@ -150,8 +149,14 @@ pattern-proving PR, then skip directly to the Reception wave.** Waves 2–4 are 
    content). This is where Arabic (Phase 2) actually starts, once each of these is extracted.
    **Corrected 2026-08-17:** `Bookings` and `New Booking` were already extracted before this plan
    was written; `Point of Sale` turned out to be dead mock UI, not real POS (see status note above)
-   — neither belongs in Phase 1/2 scope. **The wave is effectively just `Patients`** — see Brief 5
-   for its internal 4-sub-PR breakdown.
+   — neither belongs in Phase 1/2 scope. That left `Patients` as the only section needing its own
+   extraction — see Brief 5 for its internal 4-sub-PR breakdown.
+   **Widened 2026-08-19 (DEC-043 correction):** `Doctors` and `Services` added to Reception scope
+   — Reception already gets a read-only experience in both via existing `hasPermission` gates, so
+   extraction + translation is safe to do now. Both still need Wave-5-style extraction from
+   `page.tsx` before their own Phase 2 briefs can be written. `Inventory` explicitly **not** added —
+   it has no internal permission gating today, so what Reception should even see there is still an
+   open product decision, not an extraction question.
 
 Original full-scope wave table (reference only, not the current plan):
 

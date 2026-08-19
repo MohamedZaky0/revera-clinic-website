@@ -1530,6 +1530,32 @@ translation, not just extracting it.
 - No change to Phase 0's already-completed test suite; those 107 tests remain the safety net for
   whichever sections Phase 1 now touches first.
 
+**Correction 2026-08-19 — Reception scope widens to include Doctors and Services (read-only), per
+Mohamed: "لا ال Doctors و Services و ال Inventory من ضمن ال Scope لان الريسيبشن مش بيعدل بس بيشوف ال
+Info بتاعهم على الاقل" (Doctors, Services, and Inventory ARE in scope — Reception doesn't edit them,
+but at least views their info).** Checked against the actual repo before recording this:
+
+- **Doctors** (`page.tsx:7711-8372`, ~661 lines) and **Services** (`page.tsx:8375-9370`, ~995 lines)
+  are still fully inline, not extracted. Both already gate their write actions behind `hasPermission`
+  checks (`providers.edit`/`providers.delete` for Doctors; `services.create`/`.edit`/`.delete` for
+  Services) — so a Reception role without those specific permissions already gets a read-only
+  experience today, enforced at the code level, not just by convention. Extracting and translating
+  either section grants Reception no new capability; it only makes their existing read-only view
+  correctly render in Arabic. **Both added to Reception scope**, same extract-then-translate order
+  as the Patients/Bookings work.
+- **Inventory** (`page.tsx:14724-15608`, ~885 lines) is different in kind, not just size: it has
+  **zero** `hasPermission` checks anywhere in the block. Sidebar visibility is gated (only
+  `admin`/`HR` roles, or anyone whose granted permissions include an `inventory.*` prefix, see the
+  nav item at all — see `permittedSidebarItems` at `page.tsx:869`), but once inside, there is
+  currently no internal read/write boundary — any role that can reach the screen has full
+  create/edit/delete. If Reception is meant to be view-only here, that is not enforced today; it
+  would need real gating work first, which is a separate task from extraction/translation and out
+  of a mechanical Windsurf brief's scope. **Deliberately held pending** — Mohamed has not yet decided
+  what Reception's actual Inventory access should be, and extracting/translating a screen whose
+  permission model might still change would need redoing.
+- Not yet written: the actual Windsurf briefs for Doctors/Services extraction — this correction only
+  records the scope decision and the investigation behind it.
+
 ---
 
 ### DEC-025: Doctor Profile Details View in Admin Doctors Tab
