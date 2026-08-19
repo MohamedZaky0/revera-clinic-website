@@ -79,6 +79,7 @@ interface AdminNewBookingViewProps {
   rooms?: any[];
   lang?: "en" | "ar";
   t?: any;
+  activeBranchId?: string;
 }
 
 // Helper to extract service name cleanly. DB rows carry both `en` and `ar` columns —
@@ -119,6 +120,7 @@ export default function AdminNewBookingView({
   rooms = [],
   lang = "en",
   t,
+  activeBranchId
 }: AdminNewBookingViewProps) {
   const tr = t || adminTranslations[lang].bookings.adminNewBookingView;
   // Patient Search & Selection State
@@ -243,7 +245,9 @@ export default function AdminNewBookingView({
 
   // Set default selected branch, service & provider
   useEffect(() => {
-    if (!selectedBranchId && dbBranches.length > 0) {
+    if (activeBranchId) {
+      setSelectedBranchId(String(activeBranchId));
+    } else if (!selectedBranchId && dbBranches.length > 0) {
       setSelectedBranchId(String(dbBranches[0].id));
     }
     if (!selectedServiceId && dbServices.length > 0) {
@@ -252,7 +256,7 @@ export default function AdminNewBookingView({
     if (!selectedDoctorId && dbDoctors.length > 0) {
       setSelectedDoctorId(String(dbDoctors[0].id));
     }
-  }, [dbBranches, dbServices, dbDoctors]);
+  }, [activeBranchId, dbBranches, dbServices, dbDoctors]);
 
   // Filter rooms by selected branch
   const filteredRooms = useMemo(() => {
@@ -760,45 +764,14 @@ export default function AdminNewBookingView({
             </div>
 
             <div className="space-y-5 text-xs md:text-sm">
-              {/* Branch, Room, Service, Doctor, Date Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-                <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.branchLabel}</label>
-                  <select
-                    value={selectedBranchId}
-                    onChange={(e) => setSelectedBranchId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
-                  >
-                    {dbBranches.map(b => (
-                      <option key={b.id} value={b.id}>
-                        {b.name_en || b.name || b.name_ar || `${tr.branchFallback} #${b.id}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.roomLabel}</label>
-                  <select
-                    value={selectedRoomId}
-                    onChange={(e) => setSelectedRoomId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
-                  >
-                    <option value="">{tr.autoAssignRoomOption}</option>
-                    {filteredRooms.map(r => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
+              {/* Service, Doctor, Date Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block font-bold text-[#1F251A] mb-1.5">{tr.serviceLabel}</label>
                   <select
                     value={selectedServiceId}
                     onChange={(e) => setSelectedServiceId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
                   >
                     {dbServices.map(s => (
                       <option key={s.id} value={s.id}>
@@ -813,7 +786,7 @@ export default function AdminNewBookingView({
                   <select
                     value={selectedDoctorId}
                     onChange={(e) => setSelectedDoctorId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
                   >
                     {dbDoctors.map(d => (
                       <option key={d.id} value={d.id}>{d.name}</option>
@@ -828,7 +801,7 @@ export default function AdminNewBookingView({
                     required
                     value={bookingDate}
                     onChange={(e) => setBookingDate(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 cursor-pointer"
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700 cursor-pointer"
                   />
                 </div>
               </div>
@@ -1060,9 +1033,9 @@ export default function AdminNewBookingView({
               </div>
 
               <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">{tr.branchRoomLabel}</span>
+                <span className="text-[#5A6A51] font-semibold">{tr.branchLabel ? tr.branchLabel.replace(" *", "") : "Branch"}</span>
                 <span className="font-extrabold text-[#1F251A] text-end">
-                  {selectedBranchName} {selectedRoomName !== "—" ? `(${selectedRoomName})` : ""}
+                  {selectedBranchName}
                 </span>
               </div>
 

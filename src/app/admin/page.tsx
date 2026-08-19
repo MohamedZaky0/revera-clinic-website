@@ -17169,6 +17169,7 @@ export default function AdminPage() {
                 branches={branches}
                 lang={lang}
                 t={adminTranslations[lang].bookings.adminNewBookingView}
+                activeBranchId={branch}
               />
             ) : (
               <AdminBookingsView
@@ -17237,6 +17238,7 @@ export default function AdminPage() {
               branches={branches}
               lang={lang}
               t={adminTranslations[lang].bookings.adminNewBookingView}
+              activeBranchId={branch}
             />
           )}
         </>
