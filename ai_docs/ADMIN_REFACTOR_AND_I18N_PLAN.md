@@ -14,7 +14,7 @@
 > | Patients — Profile Drawer (1,539 lines, 5 tabs + 3 modals) | ✅ Briefs 10 (state) + 11 (JSX) | ✅ Brief 12 (2 gaps found + closed) |
 > | Doctors (`page.tsx:7711-8372`, ~661 lines) | ✅ Brief 15 (verified, no gaps) | **Brief 18, queued (Part 0 dedupes `AdminDoctorsView.tsx`/`ProviderFormModal.tsx`'s ~390-line identical shared form body into `ProviderFormFields.tsx` first, then Part 1 translates)** |
 > | Services (`page.tsx:8375-9370`, ~995 lines) | ✅ Brief 16 (verified — surfaced pre-existing RISK-064) | **Brief 19, queued** |
-> | Inventory (`page.tsx:14724-16063` + `page.tsx:23321-23506`, ~1,530 lines) | **Brief 17, active** | **Brief 20, queued (provisional — written against Brief 17's planned structure)** |
+> | Inventory (`page.tsx:14724-16063` + `page.tsx:23321-23506`, ~1,530 lines) | ✅ Brief 17 (verified, permission gating intact — one browser check pending a restricted test account) | **Brief 20, queued (re-verify against the now-real file structure before starting)** |
 > | POS | N/A — dead mock UI, unreachable through any nav path | **out of scope** — separate open product decision: build the real thing or delete the dead code |
 >
 > **Doctors and Services added to scope 2026-08-19** (DEC-043 correction) — Reception doesn't edit
@@ -32,12 +32,14 @@
 > extract-after-translate-decision order as everything else, but only after Part 1 is verified —
 > extracting a screen whose permission model was still being decided would have needed redoing.
 >
-> **Reception Phase 1 (extraction) is essentially done** — ~~Brief 15~~ (Doctors) and ~~Brief 16~~
-> (Services) both landed and verified 2026-08-19. Only Inventory's extraction remains, gated on
-> **Brief 17** (permission enforcement first, then extraction — both parts written, active). Phase 2
-> for Doctors (**Brief 18**) and Services (**Brief 19**) written and queued; Inventory's (**Brief
-> 20**) is written provisionally against Brief 17's planned file structure and needs re-verifying
-> once those files actually exist. POS stays a standalone product decision, not a translation task.
+> **Reception Phase 1 (extraction) is fully done** — ~~Brief 15~~ (Doctors), ~~Brief 16~~ (Services),
+> and ~~Brief 17~~ (Inventory, permissions + extraction) all landed and verified. **Brief 18** is now
+> active — restructured to deduplicate the ~390-line shared provider-form body
+> (`AdminDoctorsView.tsx`/`ProviderFormModal.tsx` were rendering byte-identical JSX twice) into
+> `ProviderFormFields.tsx` before translating. Services (**Brief 19**) written and queued;
+> Inventory's (**Brief 20**) is written provisionally against what was, at the time, Brief 17's
+> planned file structure — now that those files exist for real, re-verify the brief's line numbers
+> and scope before starting. POS stays a standalone product decision, not a translation task.
 >
 > **Process note worth flagging:** four briefs in a row (5, 13, 14, 15+16) have landed in commits
 > that swept in unrelated content or mislabeled which brief(s) they covered. Content was verified
