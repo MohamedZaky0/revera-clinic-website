@@ -120,8 +120,6 @@ import {
 } from "lucide-react";
 import RoomsManagerView from "@/components/RoomsManagerView";
 import SupplierManagementScreen from "@/components/admin/inventory/SupplierManagementScreen";
-import ServiceRecipeEditor from "@/components/admin/services/ServiceRecipeEditor";
-import ServiceDeviceEditor from "@/components/admin/services/ServiceDeviceEditor";
 import { PackageAdminPanel } from "@/components/admin/packages/PackageAdminPanel";
 import { PromotionsAdminPanel } from "@/components/admin/marketing/PromotionsAdminPanel";
 import { FinanceSection } from "@/components/admin/Finance/FinanceSection";
@@ -131,6 +129,11 @@ import ReceptionDashboardView from "@/components/admin/reception/ReceptionDashbo
 import { AdminBookingsView } from "@/components/admin/bookings/AdminBookingsView";
 import AdminNewBookingView from "@/components/admin/bookings/AdminNewBookingView";
 import { DoctorProfileDetailsView } from "@/components/admin/doctor/DoctorProfileDetailsView";
+import DoctorAuditLogsModal from "@/components/admin/doctor/DoctorAuditLogsModal";
+import { useProviderForm } from "@/components/admin/doctor/useProviderForm";
+import ProviderFormModal from "@/components/admin/doctor/ProviderFormModal";
+import AdminDoctorsView from "@/components/admin/doctor/AdminDoctorsView";
+import AdminServicesView from "@/components/admin/services/AdminServicesView";
 import TermsManagerView from "@/components/TermsManagerView";
 import { useAlertConfirm } from "@/contexts/AlertConfirmContext";
 import { cachedFetch, clearFetchCache } from "@/lib/fetchCache";
@@ -1552,7 +1555,6 @@ export default function AdminPage() {
   const [approveDate, setApproveDate] = useState<string>("");
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [providerTab, setProviderTab] = useState<"Doctors" | "Attendance">("Doctors");
   const [branch, setBranch] = useState<string>(""); // branch id; empty = all branches
   const [lang, setLang] = useState<"en" | "ar">(() => {
     if (typeof window === "undefined") return "en";
@@ -2195,17 +2197,7 @@ export default function AdminPage() {
         setCalendarView("Calendar");
       }
     }
-
-    if (activeNav === "Doctors") {
-      const hasView = hasPermission("providers.view");
-      const hasAttendance = hasPermission("providers.attendance");
-      if (hasAttendance && !hasView && providerTab === "Doctors") {
-        setProviderTab("Attendance");
-      } else if (hasView && !hasAttendance && providerTab === "Attendance") {
-        setProviderTab("Doctors");
-      }
-    }
-  }, [activeNav, adminRole, adminPermissions, hasPermission, calendarView, providerTab]);
+  }, [activeNav, adminRole, adminPermissions, hasPermission, calendarView]);
 
   // Close page-level dropdowns when any other dropdown is toggled
   useEffect(() => {
@@ -4100,7 +4092,6 @@ export default function AdminPage() {
       image: DEFAULT_HERO_SLIDES[index]?.image,
     })),
   );
-  const [providers, setProviders] = useState<any[]>(PROVIDERS);
 
   const isDoctorAvailableAdmin = useCallback((
     doctor: any,
@@ -4210,6 +4201,119 @@ export default function AdminPage() {
     return !hasOverlap;
   }, [localServices, allReservations]);
 
+  // ── Branches state (moved before provider hook so hook can use branches) ──
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [branchModal, setBranchModal] = useState<{ open: boolean; mode: "add" | "edit"; branch: Partial<Branch> }>({
+    open: false, mode: "add", branch: {}
+  });
+  const [savingBranch, setSavingBranch] = useState(false);
+  const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
+  const [selectedBranchForHoursId, setSelectedBranchForHoursId] = useState<string>("");
+  const [savingBranchHours, setSavingBranchHours] = useState(false);
+
+  // ── Provider form hook (extracted from inline state — see Brief 15 Sub-PR 2) ──
+  const providerForm = useProviderForm({
+    branches,
+    session,
+    authenticatedJsonHeaders,
+    showConfirm,
+    fetchRolesAndEmployees,
+    getDoctorFirstReservationDate,
+    allReservations,
+    activeNav,
+    adminRole,
+    hasPermission,
+  });
+  const {
+    providers,
+    setProviders,
+    fetchProviders,
+    editingDoctorInline,
+    setEditingDoctorInline,
+    viewingDoctorDetails,
+    setViewingDoctorDetails,
+    showProviderModal,
+    setShowProviderModal,
+    providerModalMode,
+    setProviderModalMode,
+    providerEditingId,
+    setProviderEditingId,
+    savingProvider,
+    providerFormName,
+    setProviderFormName,
+    providerFormRating,
+    setProviderFormRating,
+    providerFormMore,
+    setProviderFormMore,
+    providerFormFixedSalary,
+    setProviderFormFixedSalary,
+    providerFormCommissionType,
+    setProviderFormCommissionType,
+    providerFormCommissionValue,
+    setProviderFormCommissionValue,
+    providerFormCommissionBase,
+    setProviderFormCommissionBase,
+    providerFormCommissionFixedComponent,
+    setProviderFormCommissionFixedComponent,
+    providerFormServiceCommissions,
+    setProviderFormServiceCommissions,
+    providerFormSelectedServices,
+    setProviderFormSelectedServices,
+    providerFormImage,
+    setProviderFormImage,
+    providerFormPhone,
+    setProviderFormPhone,
+    providerFormGender,
+    setProviderFormGender,
+    providerFormAge,
+    setProviderFormAge,
+    providerFormSpecialty,
+    setProviderFormSpecialty,
+    providerFormNationalId,
+    setProviderFormNationalId,
+    providerFormBranchId,
+    setProviderFormBranchId,
+    providerFormBranchIds,
+    setProviderFormBranchIds,
+    providerFormBranchSchedules,
+    setProviderFormBranchSchedules,
+    providerFormSelectedScheduleBranchId,
+    setProviderFormSelectedScheduleBranchId,
+    providerFormStartDate,
+    setProviderFormStartDate,
+    providerFormWorkingDaysHours,
+    setProviderFormWorkingDaysHours,
+    providerFormOnlineWorkingDaysHours,
+    setProviderFormOnlineWorkingDaysHours,
+    providerFormScheduleTab,
+    setProviderFormScheduleTab,
+    handleScheduleBranchChange,
+    openAddProviderModal,
+    openEditProviderModal,
+    handleSaveProvider,
+    handleDeleteProvider,
+    providerTab,
+    setProviderTab,
+    attendanceDate,
+    setAttendanceDate,
+    attendanceRecords,
+    loadingProviderAttendance,
+    savingAttendanceId,
+    fetchAttendance,
+    handleToggleAttendance,
+    showProviderFilterPanel,
+    setShowProviderFilterPanel,
+    providerFilterBranchId,
+    setProviderFilterBranchId,
+    providerFilterSpecialty,
+    setProviderFilterSpecialty,
+    providerFilterGender,
+    setProviderFilterGender,
+    providerSearchQuery,
+    setProviderSearchQuery,
+  } = providerForm;
+
   const availableDoctorsNewPatient = useMemo(() => {
     return providers.filter(p => isDoctorAvailableAdmin(p, newPatientBranch, newPatientDate, newPatientTimeSlot, newPatientService, newPatientSessionType));
   }, [providers, newPatientBranch, newPatientDate, newPatientTimeSlot, newPatientService, newPatientSessionType, isDoctorAvailableAdmin]);
@@ -4241,87 +4345,17 @@ export default function AdminPage() {
 
 
   // Custom provider inline & modal states
-  const [editingDoctorInline, setEditingDoctorInline] = useState<any | null>(null);
-  const [viewingDoctorDetails, setViewingDoctorDetails] = useState<any | null>(null);
   const [expandedDoctorServices, setExpandedDoctorServices] = useState<Record<string, boolean>>({});
   const toggleExpandedDoctorServices = (docKey: string) => {
     setExpandedDoctorServices(prev => ({ ...prev, [docKey]: !prev[docKey] }));
   };
   const [departmentsList, setDepartmentsList] = useState<string[]>(["Receptionist", "Doctors"]);
   const [newDeptInput, setNewDeptInput] = useState("");
-  const [showProviderModal, setShowProviderModal] = useState(false);
-  const [providerModalMode, setProviderModalMode] = useState<"add" | "edit">("add");
-  const [providerEditingId, setProviderEditingId] = useState<string | null>(null);
-  const [providerFormName, setProviderFormName] = useState("");
-  const [providerFormRating, setProviderFormRating] = useState(5);
-  const [providerFormMore, setProviderFormMore] = useState(0);
-  const [providerFormFixedSalary, setProviderFormFixedSalary] = useState("0");
-  const [providerFormCommissionType, setProviderFormCommissionType] = useState("none");
-  const [providerFormCommissionValue, setProviderFormCommissionValue] = useState("0");
-  const [providerFormCommissionBase, setProviderFormCommissionBase] = useState<"gross" | "net_of_materials">("gross");
-  const [providerFormCommissionFixedComponent, setProviderFormCommissionFixedComponent] = useState("0");
-  const [providerFormServiceCommissions, setProviderFormServiceCommissions] = useState<ServiceCommissionEntry[]>([]);
-  const [providerFormSelectedServices, setProviderFormSelectedServices] = useState<string[]>([]);
-  const [providerFormImage, setProviderFormImage] = useState("");
-  const [providerFormPhone, setProviderFormPhone] = useState("");
-  const [providerFormGender, setProviderFormGender] = useState<"Male" | "Female" | "">("");
-  const [providerFormAge, setProviderFormAge] = useState<string>("");
-  const [providerFormSpecialty, setProviderFormSpecialty] = useState("");
-  const [providerFormNationalId, setProviderFormNationalId] = useState("");
-  const [providerFormBranchId, setProviderFormBranchId] = useState("");
-  const [providerFormBranchIds, setProviderFormBranchIds] = useState<string[]>([]);
-  const [providerFormBranchSchedules, setProviderFormBranchSchedules] = useState<Record<string, { in_person: any; online: any }>>({});
-  const [providerFormSelectedScheduleBranchId, setProviderFormSelectedScheduleBranchId] = useState<string>("");
-  const [providerFormStartDate, setProviderFormStartDate] = useState("");
-  const [providerFormWorkingDaysHours, setProviderFormWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; shifts?: { start: string; end: string }[] }>>({
-    Sunday: { isOpen: false, start: "10:00", end: "20:00" },
-    Monday: { isOpen: false, start: "10:00", end: "20:00" },
-    Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
-    Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
-    Thursday: { isOpen: false, start: "10:00", end: "20:00" },
-    Friday: { isOpen: false, start: "10:00", end: "20:00" },
-    Saturday: { isOpen: false, start: "10:00", end: "20:00" }
-  });
-  const [providerFormOnlineWorkingDaysHours, setProviderFormOnlineWorkingDaysHours] = useState<Record<string, { isOpen: boolean; start: string; end: string; shifts?: { start: string; end: string }[] }>>({
-    Sunday: { isOpen: false, start: "10:00", end: "20:00" },
-    Monday: { isOpen: false, start: "10:00", end: "20:00" },
-    Tuesday: { isOpen: false, start: "10:00", end: "20:00" },
-    Wednesday: { isOpen: false, start: "10:00", end: "20:00" },
-    Thursday: { isOpen: false, start: "10:00", end: "20:00" },
-    Friday: { isOpen: false, start: "10:00", end: "20:00" },
-    Saturday: { isOpen: false, start: "10:00", end: "20:00" }
-  });
-  const [providerFormScheduleTab, setProviderFormScheduleTab] = useState<"in_person" | "online">("in_person");
   const [showAuditLogsModal, setShowAuditLogsModal] = useState(false);
-  const [auditLogsList, setAuditLogsList] = useState<any[]>([]);
-  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
-  const [savingProvider, setSavingProvider] = useState(false);
-  const [attendanceDate, setAttendanceDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
-  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
-  const [loadingProviderAttendance, setLoadingProviderAttendance] = useState(false);
-  const [savingAttendanceId, setSavingAttendanceId] = useState<string | null>(null);
-
-  const [showProviderFilterPanel, setShowProviderFilterPanel] = useState(false);
-  const [providerFilterBranchId, setProviderFilterBranchId] = useState("All");
-  const [providerFilterSpecialty, setProviderFilterSpecialty] = useState("All");
-  const [providerFilterGender, setProviderFilterGender] = useState("All");
-  const [providerSearchQuery, setProviderSearchQuery] = useState("");
 
   const [loadingPageSettings, setLoadingPageSettings] = useState(false);
   const [savingPageSettings, setSavingPageSettings] = useState(false);
-  // ── Branches state ──
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [loadingBranches, setLoadingBranches] = useState(false);
-  const [branchModal, setBranchModal] = useState<{ open: boolean; mode: "add" | "edit"; branch: Partial<Branch> }>({
-    open: false, mode: "add", branch: {}
-  });
-  const [savingBranch, setSavingBranch] = useState(false);
-  const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
-  const [selectedBranchForHoursId, setSelectedBranchForHoursId] = useState<string>("");
-  const [savingBranchHours, setSavingBranchHours] = useState(false);
+
   const [serviceHours, setServiceHours] = useState<Array<{ day: string; dayAr: string; isOpen: boolean; openTime: string; closeTime: string }>>([
     { day: "Sunday", dayAr: "الأحد", isOpen: true, openTime: "09:00", closeTime: "20:00" },
     { day: "Monday", dayAr: "الإثنين", isOpen: true, openTime: "09:00", closeTime: "20:00" },
@@ -5038,462 +5072,6 @@ export default function AdminPage() {
       .catch(() => setManualUnavailableSlots([]));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAddBookingModal, newPatientService, newPatientDate, newPatientBranch]);
-
-  function fetchProviders() {
-    clearFetchCache("/api/providers");
-    fetch("/api/providers")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setProviders(data);
-        }
-      })
-      .catch((err) => console.error("fetchProviders error:", err));
-  }
-
-  function fetchAuditLogs() {
-    setLoadingAuditLogs(true);
-    fetch("/api/providers/schedule-audit-logs", { headers: authenticatedJsonHeaders })
-      .then((res) => res.json())
-      .then((data) => {
-        setAuditLogsList(data || []);
-      })
-      .catch((err) => console.error("fetchAuditLogs error:", err))
-      .finally(() => setLoadingAuditLogs(false));
-  }
-
-  async function fetchAttendance(dateStr: string) {
-    setLoadingProviderAttendance(true);
-    try {
-      const res = await fetch(`/api/provider-attendance?date=${dateStr}`, { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setAttendanceRecords(data);
-      } else {
-        console.error("Failed to fetch attendance");
-      }
-    } catch (err) {
-      console.error("fetchAttendance error:", err);
-    } finally {
-      setLoadingProviderAttendance(false);
-    }
-  }
-
-  async function handleToggleAttendance(providerId: string, status: "Present" | "Absent" | "On Leave") {
-    setSavingAttendanceId(providerId);
-    try {
-      const existing = attendanceRecords.find(r => r.provider_id === providerId);
-      const payload = {
-        providerId,
-        date: attendanceDate,
-        status,
-        checkIn: status === "Present" ? "09:00" : null,
-        checkOut: status === "Present" ? "17:00" : null,
-        notes: existing?.notes || ""
-      };
-
-      const res = await fetch("/api/provider-attendance", {
-        method: "POST",
-        headers: authenticatedJsonHeaders,
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        fetchAttendance(attendanceDate);
-      } else {
-        alert("Failed to save attendance record.");
-      }
-    } catch (err) {
-      console.error("handleToggleAttendance error:", err);
-      alert("Error saving attendance.");
-    } finally {
-      setSavingAttendanceId(null);
-    }
-  }
-
-  useEffect(() => {
-    if (providerTab === "Attendance") {
-      fetchAttendance(attendanceDate);
-    }
-  }, [providerTab, attendanceDate, fetchAttendance]);
-
-  const handleScheduleBranchChange = (nextBranchId: string) => {
-    const prevBranchId = providerFormSelectedScheduleBranchId;
-    if (!prevBranchId) {
-      setProviderFormSelectedScheduleBranchId(nextBranchId);
-      return;
-    }
-    
-    // Save current schedule configuration to the prev branch ID
-    const updatedSchedules = {
-      ...providerFormBranchSchedules,
-      [prevBranchId]: {
-        in_person: providerFormWorkingDaysHours,
-        online: providerFormOnlineWorkingDaysHours
-      }
-    };
-    setProviderFormBranchSchedules(updatedSchedules);
-    setProviderFormSelectedScheduleBranchId(nextBranchId);
-
-    // Load next branch schedule
-    const nextSched = updatedSchedules[nextBranchId] || {};
-    let inClinicSched = {
-      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
-      Monday: { isOpen: false, start: "09:00", end: "20:00" },
-      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
-      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
-      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
-      Friday: { isOpen: false, start: "09:00", end: "20:00" },
-      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
-    };
-    let onlineSched = { ...inClinicSched };
-
-    if (nextSched.in_person) inClinicSched = { ...inClinicSched, ...nextSched.in_person };
-    if (nextSched.online) onlineSched = { ...onlineSched, ...nextSched.online };
-
-    setProviderFormWorkingDaysHours(inClinicSched);
-    setProviderFormOnlineWorkingDaysHours(onlineSched);
-  };
-
-  function openAddProviderModal() {
-    setProviderModalMode("add");
-    setProviderEditingId(null);
-    setProviderFormName("");
-    setProviderFormRating(5);
-    setProviderFormMore(0);
-    setProviderFormFixedSalary("0");
-    setProviderFormCommissionType("none");
-    setProviderFormCommissionValue("0");
-    setProviderFormCommissionBase("gross");
-    setProviderFormCommissionFixedComponent("0");
-    setProviderFormServiceCommissions([]);
-    setProviderFormSelectedServices([]);
-    setProviderFormImage("");
-    setProviderFormPhone("");
-    setProviderFormGender("");
-    setProviderFormAge("");
-    setProviderFormSpecialty("");
-    setProviderFormNationalId("");
-    
-    // Multi-branch initial state
-    const defaultBranchIds = branches.length > 0 ? [branches[0].id] : [];
-    setProviderFormBranchIds(defaultBranchIds);
-    setProviderFormBranchSchedules({});
-    
-    const activeBranchId = defaultBranchIds.length > 0 ? defaultBranchIds[0] : "";
-    setProviderFormSelectedScheduleBranchId(activeBranchId);
-    setProviderFormBranchId(activeBranchId); // Backwards compatibility for legacy branchId state
-    
-    setProviderFormStartDate("");
-    setProviderFormWorkingDaysHours({
-      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
-      Monday: { isOpen: false, start: "09:00", end: "20:00" },
-      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
-      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
-      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
-      Friday: { isOpen: false, start: "09:00", end: "20:00" },
-      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
-    });
-    setProviderFormOnlineWorkingDaysHours({
-      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
-      Monday: { isOpen: false, start: "09:00", end: "20:00" },
-      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
-      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
-      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
-      Friday: { isOpen: false, start: "09:00", end: "20:00" },
-      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
-    });
-    setProviderFormScheduleTab("in_person");
-    setShowProviderModal(true);
-  }
-
-  function openEditProviderModal(provider: any) {
-    setProviderModalMode("edit");
-    setProviderEditingId(provider.id);
-    setProviderFormName(provider.name);
-    setProviderFormRating(provider.rating || 5);
-    setProviderFormMore(provider.more || 0);
-    setProviderFormSelectedServices(provider.services || []);
-    setProviderFormImage(provider.image || "");
-    setProviderFormPhone(provider.phone || "");
-    setProviderFormGender(provider.gender || "");
-    setProviderFormAge(provider.age ? String(provider.age) : "");
-    setProviderFormSpecialty(provider.specialty || "");
-    setProviderFormNationalId(provider.nationalId || "");
-    setProviderFormStartDate(provider.startDate || "");
-    setProviderFormFixedSalary(String(provider.fixedSalary || 0));
-    setProviderFormCommissionType(provider.commissionType || "none");
-    setProviderFormCommissionValue(String(provider.commissionValue || 0));
-    setProviderFormCommissionBase(provider.commissionBase || "gross");
-    setProviderFormCommissionFixedComponent(String(provider.commissionFixedComponent || 0));
-    setProviderFormServiceCommissions(Array.isArray(provider.serviceCommissions) ? provider.serviceCommissions : []);
-
-    const rawSched = provider.workingDaysHours || {};
-    
-    // Parse branch IDs
-    let initialBranchIds: string[] = [];
-    if (rawSched && typeof rawSched === 'object' && Array.isArray(rawSched.branch_ids)) {
-      initialBranchIds = rawSched.branch_ids;
-    } else if (provider.branchId) {
-      initialBranchIds = [provider.branchId];
-    } else if (branches.length > 0) {
-      initialBranchIds = [branches[0].id];
-    }
-    setProviderFormBranchIds(initialBranchIds);
-
-    // Parse branch schedules
-    let initialBranchSchedules: Record<string, any> = {};
-    if (rawSched && typeof rawSched === 'object' && rawSched.branch_schedules) {
-      initialBranchSchedules = rawSched.branch_schedules;
-    } else if (provider.branchId) {
-      initialBranchSchedules = {
-        [provider.branchId]: {
-          in_person: rawSched.in_person || rawSched,
-          online: rawSched.online || rawSched
-        }
-      };
-    }
-    setProviderFormBranchSchedules(initialBranchSchedules);
-
-    // Set selected schedule branch
-    const activeBranchId = initialBranchIds.length > 0 ? initialBranchIds[0] : (branches.length > 0 ? branches[0].id : "");
-    setProviderFormSelectedScheduleBranchId(activeBranchId);
-    setProviderFormBranchId(activeBranchId); // Backwards compatibility
-
-    // Load active branch schedule
-    let inClinicSched = {
-      Sunday: { isOpen: false, start: "09:00", end: "20:00" },
-      Monday: { isOpen: false, start: "09:00", end: "20:00" },
-      Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
-      Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
-      Thursday: { isOpen: false, start: "09:00", end: "20:00" },
-      Friday: { isOpen: false, start: "09:00", end: "20:00" },
-      Saturday: { isOpen: false, start: "09:00", end: "20:00" }
-    };
-    let onlineSched = { ...inClinicSched };
-
-    const activeBranchSched = initialBranchSchedules[activeBranchId] || {};
-    if (activeBranchSched.in_person) {
-      inClinicSched = { ...inClinicSched, ...activeBranchSched.in_person };
-    }
-    if (activeBranchSched.online) {
-      onlineSched = { ...onlineSched, ...activeBranchSched.online };
-    }
-
-    setProviderFormWorkingDaysHours(inClinicSched);
-    setProviderFormOnlineWorkingDaysHours(onlineSched);
-    setProviderFormScheduleTab("in_person");
-    setEditingDoctorInline(provider);
-    setShowProviderModal(false);
-  }
-
-  function handleSaveProvider() {
-    if (!providerFormName.trim()) {
-      alert("Provider Name is required.");
-      return;
-    }
-
-    if (providerFormBranchIds.length === 0) {
-      alert("Please select at least one branch for the provider.");
-      return;
-    }
-
-    // Capture the current working schedule to the active branch configuration
-    const finalSchedules = {
-      ...providerFormBranchSchedules,
-      ...(providerFormSelectedScheduleBranchId ? {
-        [providerFormSelectedScheduleBranchId]: {
-          in_person: providerFormWorkingDaysHours,
-          online: providerFormOnlineWorkingDaysHours
-        }
-      } : {})
-    };
-
-    // Auto-populate default closed schedules for any assigned branches that haven't been configured yet
-    providerFormBranchIds.forEach((bId) => {
-      if (!finalSchedules[bId]) {
-        finalSchedules[bId] = {
-          in_person: {
-            Sunday: { isOpen: false, start: "09:00", end: "20:00" },
-            Monday: { isOpen: false, start: "09:00", end: "20:00" },
-            Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
-            Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
-            Thursday: { isOpen: false, start: "09:00", end: "20:00" },
-            Friday: { isOpen: false, start: "09:00", end: "20:00" },
-            Saturday: { isOpen: false, start: "09:00", end: "20:00" }
-          },
-          online: {
-            Sunday: { isOpen: false, start: "09:00", end: "20:00" },
-            Monday: { isOpen: false, start: "09:00", end: "20:00" },
-            Tuesday: { isOpen: false, start: "09:00", end: "20:00" },
-            Wednesday: { isOpen: false, start: "09:00", end: "20:00" },
-            Thursday: { isOpen: false, start: "09:00", end: "20:00" },
-            Friday: { isOpen: false, start: "09:00", end: "20:00" },
-            Saturday: { isOpen: false, start: "09:00", end: "20:00" }
-          }
-        };
-      }
-    });
-
-    // Comprehensive Cross-Branch & Multi-Shift Overlap Validation
-    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    
-    const extractShiftsForDay = (dayConfig: any) => {
-      if (!dayConfig || !dayConfig.isOpen) return [];
-      const shifts: Array<{ startMins: number; endMins: number; startStr: string; endStr: string }> = [];
-      const timeToMins = (tStr: string) => {
-        if (!tStr) return 0;
-        const [h, m] = tStr.split(":").map(Number);
-        return (h || 0) * 60 + (m || 0);
-      };
-
-      if (Array.isArray(dayConfig.shifts) && dayConfig.shifts.length > 0) {
-        dayConfig.shifts.forEach((s: any) => {
-          if (s.start && s.end) {
-            shifts.push({
-              startMins: timeToMins(s.start),
-              endMins: timeToMins(s.end),
-              startStr: s.start,
-              endStr: s.end,
-            });
-          }
-        });
-      } else if (dayConfig.start && dayConfig.end) {
-        shifts.push({
-          startMins: timeToMins(dayConfig.start),
-          endMins: timeToMins(dayConfig.end),
-          startStr: dayConfig.start,
-          endStr: dayConfig.end,
-        });
-      }
-      return shifts;
-    };
-
-    for (const day of weekdays) {
-      const dayShifts: Array<{
-        branchId: string;
-        branchName: string;
-        type: 'In-Clinic' | 'Online';
-        startMins: number;
-        endMins: number;
-        startStr: string;
-        endStr: string;
-      }> = [];
-
-      for (const bId of providerFormBranchIds) {
-        const sched = finalSchedules[bId];
-        if (!sched) continue;
-        const branchName = branches.find((b) => b.id === bId)?.name_en || bId;
-
-        // In-Clinic shifts
-        const inClinicShifts = extractShiftsForDay(sched.in_person?.[day]);
-        inClinicShifts.forEach((s) => {
-          dayShifts.push({ branchId: bId, branchName, type: 'In-Clinic', ...s });
-        });
-
-        // Online shifts
-        const onlineShifts = extractShiftsForDay(sched.online?.[day]);
-        onlineShifts.forEach((s) => {
-          dayShifts.push({ branchId: bId, branchName, type: 'Online', ...s });
-        });
-      }
-
-      // Check all pairs of shifts for overlap on this day
-      for (let i = 0; i < dayShifts.length; i++) {
-        for (let j = i + 1; j < dayShifts.length; j++) {
-          const s1 = dayShifts[i];
-          const s2 = dayShifts[j];
-
-          if (s1.startMins < s2.endMins && s2.startMins < s1.endMins) {
-            alert(`Schedule overlap detected on ${day}!\nDoctor cannot be scheduled at "${s1.branchName}" (${s1.type}: ${s1.startStr} - ${s1.endStr}) and "${s2.branchName}" (${s2.type}: ${s2.startStr} - ${s2.endStr}) at the same time.`);
-            return;
-          }
-        }
-      }
-    }
-
-    setSavingProvider(true);
-
-    const payload = {
-      name: providerFormName.trim(),
-      services: providerFormSelectedServices,
-      rating: Number(providerFormRating),
-      more: Math.max(0, providerFormSelectedServices.length - 2),
-      image: providerFormImage || null,
-      phone: providerFormPhone || null,
-      gender: providerFormGender || null,
-      age: providerFormAge ? Number(providerFormAge) : null,
-      specialty: providerFormSpecialty || null,
-      nationalId: providerFormNationalId || null,
-      workingDaysHours: {
-        branch_ids: providerFormBranchIds,
-        branch_schedules: finalSchedules
-      },
-      branchId: providerFormBranchIds[0] || null, // Keep legacy branchId column in sync with first branch
-      startDate: getDoctorFirstReservationDate(providerFormName, allReservations) || providerFormStartDate || null,
-      fixedSalary: Number(providerFormFixedSalary || 0),
-      commissionType: providerFormCommissionType,
-      commissionValue: Number(providerFormCommissionValue || 0),
-      commissionBase: providerFormCommissionBase,
-      commissionFixedComponent: Number(providerFormCommissionFixedComponent || 0),
-      serviceCommissions: providerFormServiceCommissions
-    };
-
-    const isEdit = providerModalMode === "edit";
-    const url = isEdit ? `/api/providers?id=${providerEditingId}` : "/api/providers";
-    const method = isEdit ? "PATCH" : "POST";
-
-    fetch(url, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(session?.access_token ? { "Authorization": `Bearer ${session.access_token}` } : {})
-      },
-      body: JSON.stringify(payload)
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && data.name) {
-          fetchProviders();
-          fetchRolesAndEmployees();
-          setShowProviderModal(false);
-          setEditingDoctorInline(null);
-          alert(isEdit ? "Provider updated successfully!" : "Provider added successfully!");
-        } else {
-          alert(data.error || "Failed to save provider.");
-        }
-      })
-      .catch((err) => {
-        console.error("handleSaveProvider error:", err);
-        alert("Error saving provider.");
-      })
-      .finally(() => {
-        setSavingProvider(false);
-      });
-  }
-
-  async function handleDeleteProvider(id: string) {
-    if (!id) return;
-    if (await showConfirm("Are you sure you want to delete this provider?")) {
-      fetch(`/api/providers?id=${id}`, {
-        method: "DELETE",
-        headers: authenticatedJsonHeaders,
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data && data.success) {
-            fetchProviders();
-            alert("Provider deleted successfully!");
-          } else {
-            alert("Failed to delete provider.");
-          }
-        })
-        .catch((err) => {
-          console.error("handleDeleteProvider error:", err);
-          alert("Error deleting provider.");
-        });
-    }
-  }
 
   function fetchPageSettings() {
     setLoadingPageSettings(true);
@@ -7709,1664 +7287,123 @@ export default function AdminPage() {
 
           {/* ── PROVIDERS VIEW ── */}
           {activeNav === "Doctors" && (
-            <section className="space-y-6">
-              {viewingDoctorDetails ? (
-                <DoctorProfileDetailsView
-                  doctor={viewingDoctorDetails}
-                  onBack={() => setViewingDoctorDetails(null)}
-                  reservations={allReservations}
-                  branches={branches}
-                  localServices={localServices}
-                />
-              ) : editingDoctorInline ? (
-                <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] space-y-6">
-                  <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
-                    <div>
-                      <button
-                        onClick={() => setEditingDoctorInline(null)}
-                        className="mb-2 inline-flex items-center gap-2 rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#414E36] shadow-sm transition hover:bg-[#F2EFE9]"
-                      >
-                        <ArrowLeft size={14} /> Back to Doctors
-                      </button>
-                      <h1 className="text-3xl font-bold text-[#1F251A]">Edit Doctor: {providerFormName || editingDoctorInline.name}</h1>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    {/* Row 1: Name & Specialty */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Name</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Dr. Jane Doe"
-                          value={providerFormName}
-                          onChange={(e) => setProviderFormName(e.target.value)}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Specialty</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Dermatologist"
-                          value={providerFormSpecialty}
-                          onChange={(e) => setProviderFormSpecialty(e.target.value)}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Row 2: Phone & National ID */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 01012345678"
-                          value={providerFormPhone}
-                          onChange={(e) => setProviderFormPhone(e.target.value)}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">National ID</label>
-                        <input
-                          type="text"
-                          placeholder="14-digit National ID"
-                          value={providerFormNationalId}
-                          onChange={(e) => setProviderFormNationalId(e.target.value)}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Row 3: Gender & Auto-calculated Age/DOB */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Gender</label>
-                        <select
-                          value={providerFormGender}
-                          onChange={(e) => setProviderFormGender(e.target.value as "Male" | "Female" | "")}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        >
-                          <option value="">Select Gender</option>
-                          <option value="Male">Male</option>
-                          <option value="Female">Female</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Age &amp; Date of Birth</label>
-                        {(() => {
-                          const check = parseEgyptianNationalId(providerFormNationalId);
-                          if (check.isValid) {
-                            return (
-                              <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/70 px-4 py-2 text-xs text-[#1F251A] font-semibold flex items-center justify-between min-h-[42px]">
-                                <span>{check.age} yrs • DOB: {check.dobFormatted}</span>
-                                <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">✓ National ID</span>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div className="w-full rounded-2xl border border-[#414E36]/15 bg-gray-50 px-4 py-2.5 text-xs text-[#5A6A51] italic min-h-[42px] flex items-center">
-                              Auto-calculated from National ID
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Row 4: Branches & Start Date */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branches (Select one or more)</label>
-                        <div className="flex flex-wrap gap-2 p-2 rounded-2xl border border-[#414E36]/15 bg-white min-h-[42px] items-center">
-                          {branches.map((b) => {
-                            const isSelected = providerFormBranchIds.includes(b.id);
-                            return (
-                              <button
-                                key={b.id}
-                                type="button"
-                                onClick={() => {
-                                  if (isSelected) {
-                                    if (providerFormBranchIds.length <= 1) {
-                                      alert("A doctor must be assigned to at least one branch.");
-                                      return;
-                                    }
-                                    const nextIds = providerFormBranchIds.filter((id) => id !== b.id);
-                                    setProviderFormBranchIds(nextIds);
-                                    if (providerFormSelectedScheduleBranchId === b.id) {
-                                      handleScheduleBranchChange(nextIds[0]);
-                                    }
-                                  } else {
-                                    const nextIds = [...providerFormBranchIds, b.id];
-                                    setProviderFormBranchIds(nextIds);
-                                    if (!providerFormSelectedScheduleBranchId) {
-                                      setProviderFormSelectedScheduleBranchId(b.id);
-                                    }
-                                  }
-                                }}
-                                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
-                                  isSelected
-                                    ? "bg-[#414E36] text-white border-[#414E36]"
-                                    : "bg-[#414E36]/5 text-[#414E36] border-transparent hover:bg-[#414E36]/10"
-                                }`}
-                              >
-                                {b.name_en} {isSelected ? "✓" : "+"}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
-                        <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 flex items-center justify-between min-h-[42px]">
-                          {(() => {
-                            const autoDate = getDoctorFirstReservationDate(providerFormName, allReservations);
-                            const displayDate = autoDate || providerFormStartDate;
-                            if (displayDate) {
-                              return (
-                                <div className="flex items-center justify-between w-full">
-                                  <span className="text-sm font-semibold text-[#1F251A]">{displayDate}</span>
-                                  <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full border border-[#414E36]/15 flex items-center gap-1">
-                                    ⚡ Auto from 1st Booking
-                                  </span>
-                                </div>
-                              );
-                            }
-                            return (
-                              <span className="text-xs italic text-[#5A6A51]/70">
-                                Will auto-set on doctor's 1st reservation
-                              </span>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Row 5: Rating & Image */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="md:col-span-1">
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Rating (1-5)</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="5"
-                          step="0.1"
-                          placeholder="e.g. 5"
-                          value={providerFormRating}
-                          onChange={(e) => setProviderFormRating(Number(e.target.value))}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Image URL or Base64</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. /images/doctors/dr-doe.jpg"
-                          value={providerFormImage}
-                          onChange={(e) => setProviderFormImage(e.target.value)}
-                          className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Services & Commission */}
-                    <div className="max-w-xs">
-                      <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Fixed Salary (EGP)</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 5000"
-                        value={providerFormFixedSalary}
-                        onChange={(e) => setProviderFormFixedSalary(e.target.value)}
-                        className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                      />
-                    </div>
-                    <DoctorServiceCommissionEditor
-                      allServices={allServicesList}
-                      services={providerFormSelectedServices}
-                      commissions={providerFormServiceCommissions}
-                      defaultType={providerFormCommissionType as DefaultCommissionType}
-                      defaultValue={providerFormCommissionValue}
-                      defaultBase={providerFormCommissionBase}
-                      defaultFixedComponent={providerFormCommissionFixedComponent}
-                      onServicesChange={setProviderFormSelectedServices}
-                      onCommissionsChange={setProviderFormServiceCommissions}
-                      onDefaultTypeChange={setProviderFormCommissionType}
-                      onDefaultValueChange={setProviderFormCommissionValue}
-                      onDefaultBaseChange={setProviderFormCommissionBase}
-                      onDefaultFixedComponentChange={setProviderFormCommissionFixedComponent}
-                    />
-
-                    {/* Weekly Working Schedule */}
-                    <div>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-                        <div>
-                          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Weekly Working Days & Hours (Shifts)</label>
-                          {providerFormBranchIds.length > 1 && (
-                            <div className="mt-1.5 flex items-center gap-2">
-                              <span className="text-xs text-[#5A6A51]">Configure branch schedule:</span>
-                              <select
-                                value={providerFormSelectedScheduleBranchId}
-                                onChange={(e) => handleScheduleBranchChange(e.target.value)}
-                                className="rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-xs text-[#1F251A] font-semibold outline-none focus:border-[#C4AE7C] shadow-sm cursor-pointer"
-                              >
-                                {providerFormBranchIds.map((bId) => {
-                                  const br = branches.find((b) => b.id === bId);
-                                  return (
-                                    <option key={bId} value={bId}>
-                                      {br ? br.name_en : bId}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex rounded-lg border border-[#414E36]/15 p-0.5 bg-gray-50 text-[10px] font-bold self-start sm:self-auto shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setProviderFormScheduleTab("in_person")}
-                            className={`px-3 py-1 rounded transition-colors ${
-                              providerFormScheduleTab === "in_person"
-                                ? "bg-[#414E36] text-white"
-                                : "text-[#5A6A51] hover:text-[#414E36]"
-                            }`}
-                          >
-                            In-Clinic
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setProviderFormScheduleTab("online")}
-                            className={`px-3 py-1 rounded transition-colors ${
-                              providerFormScheduleTab === "online"
-                                ? "bg-[#414E36] text-white"
-                                : "text-[#5A6A51] hover:text-[#414E36]"
-                            }`}
-                          >
-                            Online
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
-                        {(() => {
-                          const activeSched = providerFormScheduleTab === "in_person" ? providerFormWorkingDaysHours : providerFormOnlineWorkingDaysHours;
-                          const setActiveSched = providerFormScheduleTab === "in_person" ? setProviderFormWorkingDaysHours : setProviderFormOnlineWorkingDaysHours;
-
-                          return Object.keys(activeSched).map((day) => {
-                            const sched = activeSched[day];
-                            return (
-                              <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
-                                <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={sched.isOpen}
-                                    onChange={(e) => {
-                                      setActiveSched({
-                                        ...activeSched,
-                                        [day]: { ...sched, isOpen: e.target.checked }
-                                      });
-                                    }}
-                                    className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
-                                  />
-                                  <span className="text-xs font-bold text-[#414E36] w-24">{day}</span>
-                                </label>
-
-                                {sched.isOpen ? (
-                                  <div className="flex flex-col gap-2 w-full sm:w-auto">
-                                    {/* Shifts list */}
-                                    {((sched.shifts && sched.shifts.length > 0) ? sched.shifts : [{ start: sched.start || "09:00", end: sched.end || "17:00" }]).map((shft: any, shiftIdx: number) => (
-                                      <div key={shiftIdx} className="flex items-center gap-2">
-                                        <input
-                                          type="time"
-                                          value={shft.start}
-                                          onChange={(e) => {
-                                            const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
-                                            currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], start: e.target.value };
-                                            setActiveSched({
-                                              ...activeSched,
-                                              [day]: {
-                                                ...sched,
-                                                start: currentShifts[0].start,
-                                                end: currentShifts[0].end,
-                                                shifts: currentShifts
-                                              }
-                                            });
-                                          }}
-                                          className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
-                                        />
-                                        <span className="text-xs text-[#5A6A51]">to</span>
-                                        <input
-                                          type="time"
-                                          value={shft.end}
-                                          onChange={(e) => {
-                                            const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
-                                            currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], end: e.target.value };
-                                            setActiveSched({
-                                              ...activeSched,
-                                              [day]: {
-                                                ...sched,
-                                                start: currentShifts[0].start,
-                                                end: currentShifts[0].end,
-                                                shifts: currentShifts
-                                              }
-                                            });
-                                          }}
-                                          className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
-                                        />
-                                        {shiftIdx > 0 && (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
-                                              const filteredShifts = currentShifts.filter((_: any, i: number) => i !== shiftIdx);
-                                              setActiveSched({
-                                                ...activeSched,
-                                                [day]: {
-                                                  ...sched,
-                                                  start: filteredShifts[0].start,
-                                                  end: filteredShifts[0].end,
-                                                  shifts: filteredShifts
-                                                }
-                                              });
-                                            }}
-                                            className="text-red-500 hover:text-red-700 transition cursor-pointer"
-                                          >
-                                            <Trash2 size={14} />
-                                          </button>
-                                        )}
-                                      </div>
-                                    ))}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
-                                        const newShifts = [...currentShifts, { start: "09:00", end: "17:00" }];
-                                        setActiveSched({
-                                          ...activeSched,
-                                          [day]: {
-                                            ...sched,
-                                            shifts: newShifts
-                                          }
-                                        });
-                                      }}
-                                      className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] transition flex items-center gap-1 mt-1 cursor-pointer"
-                                    >
-                                      <Plus size={12} /> Add Shift
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span className="text-xs text-gray-400 italic">Off / Closed</span>
-                                )}
-                              </div>
-                            );
-                          });
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-3 pt-4 border-t border-[#E6E9EB]">
-                      <button
-                        onClick={handleSaveProvider}
-                        disabled={savingProvider}
-                        className="rounded-2xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-50"
-                      >
-                        {savingProvider ? "Saving..." : "Save Changes"}
-                      </button>
-                      <button
-                        onClick={() => setEditingDoctorInline(null)}
-                        className="rounded-2xl border border-[#E6E9EB] bg-white px-6 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-bold text-[#1F251A]">Doctors</h2>
-                      <p className="text-xs text-[#5A6A51]">Manage doctor schedules, services, and ratings</p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={() => {
-                          fetchAuditLogs();
-                          setShowAuditLogsModal(true);
-                        }}
-                        className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
-                      >
-                        <ClipboardList size={14} /> Audit Logs
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Search Bar Row above Table */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative flex-1 max-w-md">
-                      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] z-10 pointer-events-none" />
-                      <input
-                        type="text"
-                        value={providerSearchQuery}
-                        onChange={(e) => setProviderSearchQuery(e.target.value)}
-                        placeholder="Search doctor by name, specialty..."
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:bg-white focus:ring-2 focus:ring-[#C4AE7C]/15"
-                      />
-                    </div>
-                    <button
-                      onClick={() => setShowProviderFilterPanel(prev => !prev)}
-                      title="Filter"
-                      className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer ${
-                        showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All"
-                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
-                          : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
-                      }`}
-                    >
-                      <Filter size={16} />
-                      {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All") && (
-                        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
-                      )}
-                    </button>
-                  </div>
-
-                {/* Dynamic Filters Drawer */}
-                {showProviderFilterPanel && (
-                  <div className="mb-6 grid grid-cols-1 gap-4 rounded-3xl border border-[#414E36]/10 bg-[#F9F9F7] p-5 md:grid-cols-3 items-end shadow-sm animate-fadeIn">
-                    {/* Branch Dropdown */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Branch</label>
-                      <select
-                        value={providerFilterBranchId}
-                        onChange={(e) => setProviderFilterBranchId(e.target.value)}
-                        className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
-                      >
-                        <option value="All">All Branches</option>
-                        {branches.map((b) => (
-                          <option key={b.id} value={b.id}>{b.name_en}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Specialty Dropdown */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Specialty</label>
-                      <select
-                        value={providerFilterSpecialty}
-                        onChange={(e) => setProviderFilterSpecialty(e.target.value)}
-                        className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
-                      >
-                        <option value="All">All Specialties</option>
-                        {uniqueSpecialties.map((spec) => (
-                          <option key={spec} value={spec}>{spec}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Gender and Clear Options */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Gender</label>
-                        <select
-                          value={providerFilterGender}
-                          onChange={(e) => setProviderFilterGender(e.target.value)}
-                          className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
-                        >
-                          <option value="All">All</option>
-                          <option value="Male">Male</option>
-                          <option value="Female">Female</option>
-                        </select>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setProviderFilterBranchId("All");
-                          setProviderFilterSpecialty("All");
-                          setProviderFilterGender("All");
-                          setProviderSearchQuery("");
-                        }}
-                        className="h-[42px] w-full rounded-2xl border border-red-200 bg-red-50/50 text-xs font-bold text-red-600 hover:bg-red-100/70 transition"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                  <div className="overflow-x-auto rounded-2xl border border-[#414E36]/10 bg-white shadow-sm scrollbar-none">
-                    <table className="w-full min-w-[700px] text-sm">
-                      <thead>
-                        <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
-                          <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Doctor Name</th>
-                          <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Bookings</th>
-                          <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Services</th>
-                          <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Rating</th>
-                          <th className="px-4 py-3 whitespace-nowrap"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#414E36]/8">
-                        {filteredProviders.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="px-5 py-8 text-center text-[#5A6A51]">
-                              No doctors/providers matching filters.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredProviders.map((provider) => {
-                            const docKey = provider.id || provider.name;
-                            const isExpanded = !!expandedDoctorServices[docKey];
-                            const displayServices = isExpanded ? provider.services : provider.services.slice(0, 2);
-                            const hasMore = provider.services.length > 2;
-
-                            return (
-                              <tr
-                                key={docKey}
-                                onClick={() => setViewingDoctorDetails(provider)}
-                                className="transition hover:bg-[#F9F9F7] cursor-pointer"
-                              >
-                                <td className="px-5 py-4 font-semibold text-[#1F251A]">
-                                  <div className="flex items-center gap-3">
-                                    <div className="h-8 w-8 rounded-full bg-[#EDF1EC] text-[#414E36] border border-[#414E36]/10 flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden">
-                                      {provider.avatar_url || provider.image ? (
-                                        <img src={provider.avatar_url || provider.image} alt={provider.name} className="h-full w-full object-cover" />
-                                      ) : (
-                                        <span>{(provider.name || "D").charAt(0).toUpperCase()}</span>
-                                      )}
-                                    </div>
-                                    <span>{provider.name}</span>
-                                  </div>
-                                </td>
-                                <td className="px-5 py-4 text-center font-medium text-[#1F251A]">{provider.bookings}</td>
-                                <td className="px-5 py-4 text-[#5A6A51]">
-                                  <div className="flex flex-wrap items-center gap-1.5 max-w-md">
-                                    {displayServices.map((service: string) => (
-                                      <span key={service} className="inline-block rounded-full border border-[#414E36]/15 bg-[#EDF1EC]/60 px-2.5 py-0.5 text-[11px] font-medium text-[#414E36]">
-                                        {service}
-                                      </span>
-                                    ))}
-                                    {hasMore && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleExpandedDoctorServices(docKey);
-                                        }}
-                                        className="inline-flex items-center gap-1 rounded-full bg-[#C4AE7C]/20 hover:bg-[#C4AE7C]/35 border border-[#C4AE7C]/40 px-2.5 py-0.5 text-[11px] font-bold text-[#414E36] transition active:scale-95 cursor-pointer shadow-2xs"
-                                        title={isExpanded ? "Click to show fewer services" : "Click to view all assigned services"}
-                                      >
-                                        {isExpanded ? "Show Less" : `+${provider.services.length - 2} More`}
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-5 py-4 text-center">
-                                  <span className="inline-flex items-center justify-center gap-1.5 text-[#1F251A] font-semibold text-xs">
-                                    <Star size={13} className="text-[#C4AE7C] fill-[#C4AE7C]" />
-                                    {provider.rating}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-4 text-center">
-                                  <div className="dropdown-action-menu relative inline-block text-left">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveDoctorRowMenuId(prev => prev === docKey ? null : docKey);
-                                      }}
-                                      className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
-                                        activeDoctorRowMenuId === docKey
-                                          ? "border-[#414E36] bg-[#414E36] text-white"
-                                          : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                      }`}
-                                      title="Actions"
-                                    >
-                                      <MoreVertical size={13} />
-                                    </button>
-
-                                    {activeDoctorRowMenuId === docKey && (
-                                      <div className="absolute right-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left dropdown-action-menu">
-                                        {hasPermission("providers.edit") && (
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setActiveDoctorRowMenuId(null);
-                                              openEditProviderModal(provider);
-                                            }}
-                                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
-                                          >
-                                            <Pencil size={13} className="text-[#5A6A51]" />
-                                            <span>Edit Doctor</span>
-                                          </button>
-                                        )}
-                                        {provider.id && hasPermission("providers.delete") && (
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setActiveDoctorRowMenuId(null);
-                                              handleDeleteProvider(provider.id);
-                                            }}
-                                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
-                                          >
-                                            <Trash2 size={13} className="text-red-600" />
-                                            <span>Delete Doctor</span>
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </section>
+            <AdminDoctorsView
+              providerForm={providerForm}
+              branches={branches}
+              allReservations={allReservations}
+              localServices={localServices}
+              allServicesList={allServicesList}
+              getDoctorFirstReservationDate={getDoctorFirstReservationDate}
+              parseEgyptianNationalId={parseEgyptianNationalId}
+              uniqueSpecialties={uniqueSpecialties}
+              filteredProviders={filteredProviders}
+              expandedDoctorServices={expandedDoctorServices}
+              toggleExpandedDoctorServices={toggleExpandedDoctorServices}
+              activeDoctorRowMenuId={activeDoctorRowMenuId}
+              setActiveDoctorRowMenuId={setActiveDoctorRowMenuId}
+              showAuditLogsModal={showAuditLogsModal}
+              setShowAuditLogsModal={setShowAuditLogsModal}
+              hasPermission={hasPermission}
+            />
           )}
 
           {/* ── SERVICES VIEW ── */}
           {activeNav === "Services" && (
-            <div>
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-                <h2 className="text-2xl font-semibold text-[#1F251A]">Services</h2>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/30 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#414E36]/5">
-                    <Upload size={14} /> Import
-                  </button>
-                  <button
-                    onClick={() => setShowAddCategoryModal(true)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-4 py-2 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer"
-                  >
-                    <Plus size={14} /> Add Category
-                  </button>
-                </div>
-              </div>
-
-              {/* Controls Bar: Search, Sort, Filter, and Expand/Collapse */}
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-3 flex-1">
-                  <div className="relative max-w-xs flex-1 min-w-[220px] flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
-                      <input
-                        value={serviceSearch}
-                        onChange={(e) => { setServiceSearch(e.target.value); }}
-                        placeholder="Search services…"
-                        className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 shadow-2xs"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowServiceFilterPanel(prev => !prev)}
-                      title="Filter"
-                      className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
-                        showServiceFilterPanel || serviceFilterStatus !== "All"
-                          ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
-                          : "border-[#414E36]/15 bg-white text-[#414E36] hover:bg-[#FBFBF9]"
-                      }`}
-                    >
-                      <Filter size={15} />
-                      {serviceFilterStatus !== "All" && (
-                        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <ArrowUpDown size={14} className="text-[#5A6A51]" />
-                    <select
-                      value={serviceSortBy}
-                      onChange={(e) => setServiceSortBy(e.target.value as any)}
-                      className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#414E36] outline-none transition focus:border-[#C4AE7C] shadow-2xs cursor-pointer"
-                    >
-                      <option value="custom">Sort: Default / Drag Order</option>
-                      <option value="name_asc">Sort: Name (A to Z)</option>
-                      <option value="name_desc">Sort: Name (Z to A)</option>
-                      <option value="price_asc">Sort: Price (Low to High)</option>
-                      <option value="price_desc">Sort: Price (High to Low)</option>
-                      <option value="newest">Sort: Newest First</option>
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const allExpanded = localCategories.every(c => expandedCategories[c.key] ?? true);
-                    const newStates = Object.fromEntries(localCategories.map(c => [c.key, !allExpanded]));
-                    setExpandedCategories(newStates);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#F9F9F7] transition shadow-2xs"
-                >
-                  {localCategories.every(c => expandedCategories[c.key] ?? true) ? "Collapse All" : "Expand All"}
-                </button>
-              </div>
-
-              {/* Dynamic Services Filter Panel */}
-              {showServiceFilterPanel && (
-                <div className="mb-5 grid grid-cols-1 gap-4 rounded-2xl border border-[#414E36]/10 bg-[#F9F9F7] p-4 md:grid-cols-3 items-end shadow-sm animate-fadeIn">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Status Filter</label>
-                    <select
-                      value={serviceFilterStatus}
-                      onChange={(e) => setServiceFilterStatus(e.target.value as any)}
-                      className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                    >
-                      <option value="All">All Statuses</option>
-                      <option value="Active">Active Only</option>
-                      <option value="Inactive">Inactive Only</option>
-                    </select>
-                  </div>
-                  <div className="md:col-span-2 flex justify-end">
-                    <button
-                      onClick={() => {
-                        setServiceFilterStatus("All");
-                        setServiceSearch("");
-                      }}
-                      className="px-4 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600 hover:bg-red-100 transition cursor-pointer"
-                    >
-                      Clear Filters
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Category Accordions */}
-              <div className="flex flex-col gap-4">
-                {localCategories.map((cat) => {
-                  const catServicesRaw = (groupedServices[cat.key] ?? []).filter((svc) => {
-                    const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
-                    if (!toggles.visible) return false;
-                    if (serviceFilterStatus === "Active" && !toggles.active) return false;
-                    if (serviceFilterStatus === "Inactive" && toggles.active) return false;
-                    return true;
-                  });
-                  const catServices = [...catServicesRaw].sort((a, b) => {
-                    if (serviceSortBy === "name_asc") return (a.en || "").localeCompare(b.en || "");
-                    if (serviceSortBy === "name_desc") return (b.en || "").localeCompare(a.en || "");
-                    if (serviceSortBy === "price_asc") return (a.price ?? 0) - (b.price ?? 0);
-                    if (serviceSortBy === "price_desc") return (b.price ?? 0) - (a.price ?? 0);
-                    if (serviceSortBy === "newest") {
-                      const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                      const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                      return tB - tA;
-                    }
-                    return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
-                  });
-                  const isExpanded = expandedCategories[cat.key] ?? true;
-                  const hasMatch = catServices.length > 0;
-                  if (serviceSearch.trim() && !hasMatch) return null;
-
-                  return (
-                    <div
-                      key={cat.key}
-                      draggable={!!catDraggable[cat.key]}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("text/plain", cat.key);
-                        setDraggedCatKey(cat.key);
-                      }}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setDragOverCatKey(cat.key);
-                      }}
-                      onDragEnd={() => {
-                        setDraggedCatKey(null);
-                        setDragOverCatKey(null);
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        if (draggedCatKey !== null && draggedCatKey !== cat.key) {
-                          handleReorderCategories(draggedCatKey, cat.key);
-                        }
-                        setDraggedCatKey(null);
-                        setDragOverCatKey(null);
-                      }}
-                      className={`overflow-hidden rounded-2xl border border-[#414E36]/10 bg-white shadow-sm transition-all ${
-                        draggedCatKey === cat.key ? "opacity-30 bg-[#F2EFE9]" : ""
-                      } ${
-                        dragOverCatKey === cat.key ? "border-t-2 border-t-[#C4AE7C]" : ""
-                      }`}
-                    >
-                      {/* Category header row */}
-                      <div
-                        onClick={() => toggleCategoryExpand(cat.key)}
-                        className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 transition hover:bg-[#F9F9F7]"
-                      >
-                        <div className="flex items-center gap-3">
-                          {/* Category Drag Handle */}
-                          <div
-                            onMouseEnter={() => setCatDraggable(prev => ({ ...prev, [cat.key]: true }))}
-                            onMouseLeave={() => setCatDraggable(prev => ({ ...prev, [cat.key]: false }))}
-                            onClick={(e) => e.stopPropagation()}
-                            className="cursor-grab active:cursor-grabbing inline-flex h-7 w-7 items-center justify-center rounded border border-[#414E36]/10 bg-white text-[#5A6A51]/60 hover:bg-[#F2EFE9] hover:text-[#414E36] transition"
-                            title="Drag to reorder category"
-                          >
-                            <GripVertical size={14} />
-                          </div>
-                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EDF1EC]">
-                            <Layers size={16} className="text-[#414E36]" />
-                          </div>
-                          <div className="text-left">
-                            <p className="font-semibold text-[#1F251A]">{cat.en}</p>
-                          </div>
-                          <span className="ml-1 inline-flex items-center rounded-full bg-[#414E36]/8 px-2.5 py-0.5 text-xs font-semibold text-[#414E36]">
-                            {catServices.length} service{catServices.length !== 1 ? "s" : ""}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteCategoryTarget(cat);
-                            }}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                          >
-                            Remove
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAddServiceTargetCategory(cat.key);
-                              setServiceCategory(cat.key);
-                              setServiceNameEn("");
-                              setServiceNameAr("");
-                              setServiceDuration("1:00 Hours");
-                              setServiceDurationMinutes(60);
-                              setServiceUnitType("both");
-                              setServiceDescEn("");
-                              setServiceDescAr("");
-                              setServiceSortOrder(0);
-                              setServiceIsShared(false);
-                              setServiceEnableReminder(true);
-                              setServiceImageUrl("");
-                              setServicePrice(0);
-                              setServiceBranchPricing([{ name: "Zayed", price: 0, visible: true, status: true, isDefault: true }]);
-                              setEditingService(null);
-                              setShowAddServiceModal(true);
-                            }}
-                            className={`${hasPermission("services.create") ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-xl bg-[#414E36] px-3.5 py-1.5 text-xs font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer`}
-                          >
-                            <Plus size={12} /> Add Service
-                          </button>
-                          <span className="text-[#5A6A51] transition-transform duration-200" style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
-                            <ChevronDown size={18} />
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Services sub-table */}
-                      {isExpanded && (
-                        <div className="border-t border-[#414E36]/8">
-                          {catServices.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#EDF1EC]">
-                                <Layers size={20} className="text-[#5A6A51]" />
-                              </div>
-                              <p className="text-sm font-medium text-[#1F251A]">No services yet</p>
-                              <p className="text-xs text-[#5A6A51]">Click &ldquo;Add Service&rdquo; to add one to this category.</p>
-                            </div>
-                          ) : (
-                            <div className="overflow-x-auto">
-                              <table className="w-full min-w-[860px] text-sm">
-                                <thead>
-                                  <tr className="bg-[#F9F9F7]">
-                                    <th className="w-10 px-3 py-2.5"></th>
-                                    <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">ID</th>
-                                    <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Name</th>
-                                    <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Created At</th>
-                                    <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Branch Price</th>
-                                    <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Branches</th>
-                                    <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Sort Order</th>
-                                    <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Status</th>
-                                    <th className="px-3 py-2.5"></th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[#414E36]/6">
-                                  {catServices.map((svc) => {
-                                    const toggles = serviceToggles[svc.id] ?? { visible: true, active: true };
-                                    const isInactive = !toggles.active;
-                                    const rowFaded = isInactive;
-                                    return (
-                                      <tr
-                                        key={svc.id}
-                                        draggable={!!rowDraggable[svc.id]}
-                                        onDragStart={(e) => {
-                                          e.dataTransfer.setData("text/plain", svc.id.toString());
-                                          setDraggedServiceId(svc.id);
-                                        }}
-                                        onDragOver={(e) => {
-                                          e.preventDefault();
-                                          setDragOverServiceId(svc.id);
-                                        }}
-                                        onDragEnd={() => {
-                                          setDraggedServiceId(null);
-                                          setDragOverServiceId(null);
-                                        }}
-                                        onDrop={(e) => {
-                                          e.preventDefault();
-                                          if (draggedServiceId !== null && draggedServiceId !== svc.id) {
-                                            handleReorderServices(draggedServiceId, svc.id);
-                                          }
-                                          setDraggedServiceId(null);
-                                          setDragOverServiceId(null);
-                                        }}
-                                        className={`transition ${
-                                          draggedServiceId === svc.id ? "opacity-30 bg-[#F2EFE9]" : ""
-                                        } ${
-                                          dragOverServiceId === svc.id ? "border-t-2 border-t-[#C4AE7C]" : ""
-                                        } ${
-                                          rowFaded ? "opacity-50 bg-[#F9F9F7]" : "hover:bg-[#F9F9F7]"
-                                        }`}
-                                      >
-                                        {/* Drag Handle */}
-                                        <td className="px-3 py-3 text-center">
-                                          <div
-                                            onMouseEnter={() => setRowDraggable(prev => ({ ...prev, [svc.id]: true }))}
-                                            onMouseLeave={() => setRowDraggable(prev => ({ ...prev, [svc.id]: false }))}
-                                            className="cursor-grab active:cursor-grabbing inline-flex h-7 w-7 items-center justify-center rounded border border-[#414E36]/10 bg-white text-[#5A6A51]/60 hover:bg-[#F2EFE9] hover:text-[#414E36] transition"
-                                            title="Drag to reorder"
-                                          >
-                                            <GripVertical size={14} />
-                                          </div>
-                                        </td>
-                                        <td className="px-5 py-3 font-mono text-xs text-[#5A6A51]">{svc.id}</td>
-                                        <td className="px-5 py-3">
-                                          <div className="flex items-center gap-2">
-                                            <p className={`font-semibold ${ rowFaded ? "line-through text-[#5A6A51]" : "text-[#1F251A]" }`}>{svc.en}</p>
-                                            {isInactive && (
-                                              <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-500">Inactive</span>
-                                            )}
-                                          </div>
-                                        </td>
-                                        <td className="px-5 py-3 text-[#5A6A51]">
-                                          {svc.createdAt ? (
-                                            <>
-                                              <span className="block text-sm font-medium text-[#1F251A]">
-                                                {svc.createdAt.split(" ").slice(0, 2).join(" ")}
-                                              </span>
-                                              <span className="text-xs">
-                                                {svc.createdAt.split(" ").slice(2).join(" ")}
-                                              </span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <span className="block text-sm font-medium text-[#1F251A]">30 Apr</span>
-                                              <span className="text-xs">2:01 pm</span>
-                                            </>
-                                          )}
-                                        </td>
-                                        <td className="px-5 py-3">
-                                          <span className="font-medium text-[#C4AE7C]">EGP {svc.price ?? 0}</span>
-                                        </td>
-                                        <td className="px-5 py-3 text-xs text-[#5A6A51] max-w-[200px] truncate">
-                                          {Array.isArray(svc.branchPricing) && svc.branchPricing.length > 0 ? (
-                                            svc.branchPricing.map((bp) => (
-                                              <div key={bp.name} className="flex items-center gap-1.5 mb-0.5 text-[11px]">
-                                                <span className="font-medium text-[#1F251A]">{bp.name}:</span>
-                                                <span className="text-[#C4AE7C]">EGP {bp.price}</span>
-                                                {bp.isDefault && <span className="text-[8px] bg-[#414E36]/10 text-[#414E36] px-1 rounded font-bold">Def</span>}
-                                              </div>
-                                            ))
-                                          ) : (
-                                            <div className="flex items-center gap-1.5 text-[11px]">
-                                              <span className="font-medium text-[#1F251A]">Zayed:</span>
-                                              <span className="text-[#C4AE7C]">EGP {svc.price ?? 0}</span>
-                                              <span className="text-[8px] bg-[#414E36]/10 text-[#414E36] px-1 rounded font-bold">Def</span>
-                                            </div>
-                                          )}
-                                        </td>
-                                        <td className="px-5 py-3 text-center">
-                                          <span className="font-medium text-[#1F251A]">{svc.sortOrder ?? 0}</span>
-                                        </td>
-                                        {/* Status Badge */}
-                                        <td className="px-5 py-3 text-center">
-                                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                                            toggles.active
-                                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                                              : "bg-gray-100 text-gray-500 border border-gray-200"
-                                          }`}>
-                                            {toggles.active ? "Active" : "Inactive"}
-                                          </span>
-                                        </td>
-                                        {/* 3 Dots Actions Menu */}
-                                        <td className="px-3 py-3 text-center">
-                                          <div className="relative inline-block text-left">
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setActiveServiceRowMenuId(prev => prev === svc.id ? null : svc.id);
-                                              }}
-                                              className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition cursor-pointer dropdown-action-menu ${
-                                                activeServiceRowMenuId === svc.id
-                                                  ? "border-[#414E36] bg-[#414E36] text-white"
-                                                  : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
-                                              }`}
-                                              title="Actions"
-                                            >
-                                              <MoreVertical size={13} />
-                                            </button>
-
-                                            {activeServiceRowMenuId === svc.id && (
-                                              <div className="absolute right-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left dropdown-action-menu">
-                                                {hasPermission("services.edit") && (
-                                                  <>
-                                                    <button
-                                                      type="button"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setActiveServiceRowMenuId(null);
-                                                        handleEditService(svc);
-                                                      }}
-                                                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
-                                                    >
-                                                      <Pencil size={13} className="text-[#5A6A51]" />
-                                                      <span>Edit Service</span>
-                                                    </button>
-
-                                                    <button
-                                                      type="button"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        toggleService(svc.id, "active");
-                                                      }}
-                                                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center justify-between transition cursor-pointer"
-                                                    >
-                                                      <div className="flex items-center gap-2">
-                                                        <span className={`h-2 w-2 rounded-full ${toggles.active ? "bg-emerald-500" : "bg-gray-300"}`} />
-                                                        <span>{toggles.active ? "Deactivate" : "Activate"}</span>
-                                                      </div>
-                                                      <span className="text-[10px] font-bold text-[#5A6A51] bg-[#F2EFE9] px-1.5 py-0.5 rounded">
-                                                        {toggles.active ? "Active" : "Off"}
-                                                      </span>
-                                                    </button>
-                                                  </>
-                                                )}
-
-                                                {hasPermission("services.delete") && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setActiveServiceRowMenuId(null);
-                                                      setDeleteServiceTarget(svc);
-                                                    }}
-                                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
-                                                  >
-                                                    <Trash2 size={13} className="text-red-600" />
-                                                    <span>Delete Service</span>
-                                                  </button>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Summary bar */}
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#414E36]/8 bg-white px-4 py-3 text-sm text-[#5A6A51] shadow-sm">
-                <span>{filteredServices.length} total services across {localCategories.length} categories</span>
-                <button
-                  onClick={() => setExpandedCategories(prev => Object.fromEntries(Object.keys(prev).map(k => [k, true])))}
-                  className="text-xs font-medium text-[#414E36] underline-offset-2 hover:underline"
-                >
-                  Expand All
-                </button>
-              </div>
-
-              {/* ── DELETE CATEGORY CONFIRMATION MODAL ── */}
-              {deleteCategoryTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-                  <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[#414E36]/10 animate-fadeIn">
-                    <div className="mb-4 flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                          <line x1="12" y1="9" x2="12" y2="13" />
-                          <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
-                      </div>
-                      <h3 className="text-lg font-bold text-[#1F251A]">Delete Category?</h3>
-                    </div>
-                    
-                    <p className="text-sm text-[#5A6A51] leading-relaxed mb-6">
-                      Are you sure you want to delete the category <span className="font-semibold text-[#1F251A]">&ldquo;{deleteCategoryTarget.en}&rdquo;</span>? All services inside this category will also be deleted. This action cannot be undone.
-                    </p>
-
-                    <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/8 pt-4">
-                      <button
-                        onClick={() => setDeleteCategoryTarget(null)}
-                        className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => {
-                          removeCategory(deleteCategoryTarget.key);
-                          setDeleteCategoryTarget(null);
-                        }}
-                        className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-                      >
-                        Yes, Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* ── DELETE SERVICE CONFIRMATION MODAL ── */}
-              {deleteServiceTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-                  <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-[#414E36]/10 animate-fadeIn">
-                    <div className="mb-4 flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600">
-                        <Trash2 size={20} />
-                      </div>
-                      <h3 className="text-lg font-bold text-[#1F251A]">Delete Service?</h3>
-                    </div>
-                    
-                    <p className="text-sm text-[#5A6A51] leading-relaxed mb-6">
-                      Are you sure you want to delete the service <span className="font-semibold text-[#1F251A]">&ldquo;{deleteServiceTarget.en}&rdquo;</span>? This action cannot be undone.
-                    </p>
-
-                    <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/8 pt-4">
-                      <button
-                        onClick={() => {
-                          setDeleteServiceTarget(null);
-                          setShowAddServiceModal(true);
-                        }}
-                        className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={async () => {
-                          setDeleteServiceTarget(null);
-                          const ok = await deleteServiceFromApi(deleteServiceTarget.id);
-                          if (ok) {
-                            await loadServicesFromApi();
-                          }
-                        }}
-                        className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
-                      >
-                        Yes, Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-
-              {/* ── ADD CATEGORY MODAL ── */}
-              {showAddCategoryModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-                  <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-                    <div className="mb-5 flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-[#1F251A]">Add New Category</h3>
-                        <p className="text-sm text-[#5A6A51]">Create a new service category for the clinic.</p>
-                      </div>
-                      <button
-                        onClick={() => setShowAddCategoryModal(false)}
-                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] hover:bg-[#F9F9F7]"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div className="flex flex-col gap-4">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Category Name (English)</label>
-                        <input
-                          value={newCategoryNameEn}
-                          onChange={(e) => setNewCategoryNameEn(e.target.value)}
-                          placeholder="e.g. Dermatology & Aesthetic"
-                          className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-6 flex items-center justify-end gap-3">
-                      <button
-                        onClick={() => setShowAddCategoryModal(false)}
-                        className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (!newCategoryNameEn.trim()) return;
-                          const key = newCategoryNameEn.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-                          const updated = [...localCategories, { key, en: newCategoryNameEn.trim(), ar: "" }];
-                          setLocalCategories(updated);
-                          saveDynamicCategories(updated);
-                          setExpandedCategories(prev => ({ ...prev, [key]: true }));
-                          setNewCategoryNameEn("");
-                          setShowAddCategoryModal(false);
-                        }}
-                        className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                      >
-                        Create Category
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── REDESIGNED ADD/EDIT SERVICE MODAL ── */}
-              {showAddServiceModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm overflow-y-auto">
-                  <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl my-8 border border-[#414E36]/10 animate-fadeIn flex flex-col max-h-[90vh]">
-                    
-                    {/* Modal Header */}
-                    <div className="flex items-center justify-between border-b border-[#414E36]/10 px-6 py-4">
-                      <h3 className="text-lg font-bold text-[#1F251A]">
-                        {editingService ? "Edit Service" : "Add Service"}
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddServiceModal(false)}
-                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#414E36]/15 text-[#5A6A51] transition hover:bg-[#FBFBF9] hover:text-[#1F251A]"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    
-                    {/* Modal Content - Scrollable */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                      
-                      {/* Service Image Section */}
-                      <div className="flex flex-col items-center justify-center">
-                        <span className="text-sm font-semibold text-[#5A6A51] mb-2">Service Image</span>
-                        <label className="relative flex h-28 w-28 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#414E36]/20 bg-[#FBFBF9] transition hover:bg-[#F2EFE9] overflow-hidden group">
-                          {serviceImageUrl ? (
-                            <>
-                              <img src={serviceImageUrl} alt="Service preview" className="h-full w-full object-cover" />
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span className="text-[10px] text-white font-medium text-center px-1">Change Image</span>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center text-[#5A6A51]/60">
-                              <svg className="mb-1 h-8 w-8 text-[#5A6A51]/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                            </div>
-                          )}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                try {
-                                  const compressed = await compressImage(file, 1000, 1000, 0.75);
-                                  setServiceImageUrl(compressed);
-                                } catch (err) {
-                                  console.error("Failed to compress service image, using original:", err);
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    setServiceImageUrl(reader.result as string);
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }
-                            }}
-                          />
-                        </label>
-                        <span className="text-[11px] text-[#5A6A51]/75 mt-2">Click to upload or change the image</span>
-                      </div>
-
-                      {/* 2-Column fields */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        
-                        {/* Service Category */}
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                            Service Category <span className="text-red-500">*</span>
-                          </label>
-                          <select
-                            value={serviceCategory}
-                            onChange={(e) => setServiceCategory(e.target.value)}
-                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
-                          >
-                            <option value="" disabled>Select Category</option>
-                            {localCategories.map(cat => (
-                              <option key={cat.key} value={cat.key}>{cat.en}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Duration */}
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                            Duration <span className="text-red-500">*</span>
-                          </label>
-                          <select
-                            value={serviceDuration}
-                            onChange={(e) => {
-                              const text = e.target.value;
-                              setServiceDuration(text);
-                              setServiceDurationMinutes(getDurationInMinutes(text));
-                            }}
-                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
-                          >
-                            <option value="0:15 Hours">0:15 Hours</option>
-                            <option value="0:30 Hours">0:30 Hours</option>
-                            <option value="0:45 Hours">0:45 Hours</option>
-                            <option value="1:00 Hours">1:00 Hours</option>
-                            <option value="1:30 Hours">1:30 Hours</option>
-                            <option value="2:00 Hours">2:00 Hours</option>
-                            <option value="2:30 Hours">2:30 Hours</option>
-                            <option value="3:00 Hours">3:00 Hours</option>
-                          </select>
-                        </div>
-
-                        {/* Duration (minutes) */}
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                            Duration (minutes) <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={1440}
-                            value={serviceDurationMinutes}
-                            onChange={(e) => {
-                              const minutes = Number(e.target.value) || 0;
-                              setServiceDurationMinutes(minutes);
-                              const matches = ["0:15 Hours", "0:30 Hours", "0:45 Hours", "1:00 Hours", "1:30 Hours", "2:00 Hours", "2:30 Hours", "3:00 Hours"].find(
-                                (opt) => getDurationInMinutes(opt) === minutes
-                              );
-                              if (matches) setServiceDuration(matches);
-                            }}
-                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
-                          />
-                        </div>
-
-                        {/* Session Type */}
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                            Session Type <span className="text-red-500">*</span>
-                          </label>
-                          <select
-                            value={serviceUnitType}
-                            onChange={(e) => setServiceUnitType(e.target.value)}
-                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
-                          >
-                            <option value="in_clinic">In-Clinic Only</option>
-                            <option value="online">Online Only</option>
-                            <option value="both">Both (In-Clinic & Online)</option>
-                          </select>
-                        </div>
-
-                        {/* Service Name EN */}
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                            Service Name (EN) <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={serviceNameEn}
-                            onChange={(e) => setServiceNameEn(e.target.value)}
-                            placeholder="Physio: Full Transformation (15)"
-                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
-                          />
-                        </div>
-
-                        {/* Service Name AR */}
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                            Service Name (AR) <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={serviceNameAr}
-                            onChange={(e) => setServiceNameAr(e.target.value)}
-                            placeholder="علاج طبيعي: باقة التحول (15 جلسة)"
-                            dir="rtl"
-                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
-                          />
-                        </div>
-
-                        {/* English Description */}
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">English Description</label>
-                          <textarea
-                            value={serviceDescEn}
-                            onChange={(e) => setServiceDescEn(e.target.value)}
-                            rows={3}
-                            placeholder="Enter English description..."
-                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium resize-none"
-                          />
-                        </div>
-
-                        {/* Arabic Description */}
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">Arabic Description</label>
-                          <textarea
-                            value={serviceDescAr}
-                            onChange={(e) => setServiceDescAr(e.target.value)}
-                            rows={3}
-                            placeholder="أدخل الوصف باللغة العربية..."
-                            dir="rtl"
-                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium resize-none"
-                          />
-                        </div>
-
-                        {/* Sort Order */}
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">Sort Order</label>
-                          <input
-                            type="number"
-                            value={serviceSortOrder}
-                            onChange={(e) => setServiceSortOrder(Number(e.target.value) || 0)}
-                            className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
-                          />
-                        </div>
-
-                        {/* Price */}
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                            Price (EGP) <span className="text-red-500">*</span>
-                          </label>
-                          <div className="relative flex rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] overflow-hidden text-sm">
-                            <span className="bg-[#F2EFE9] border-r border-[#414E36]/15 px-3.5 py-2.5 text-[#5A6A51] font-semibold">EGP</span>
-                            <input
-                              type="number"
-                              value={servicePrice}
-                              onChange={(e) => setServicePrice(Number(e.target.value) || 0)}
-                              placeholder="0"
-                              className="w-full px-4 py-2.5 outline-none bg-transparent text-[#1F251A] font-medium"
-                            />
-                          </div>
-                        </div>
-
-                      </div>
-
-                      {/* Toggles */}
-                      <div className="space-y-4 pt-2">
-                        {/* Is Shared Toggle */}
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-semibold text-[#1F251A]">Is Shared</span>
-                            <span className="text-xs text-[#5A6A51] mt-0.5">Service that can be booked by multiple clients at the same time</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setServiceIsShared(!serviceIsShared)}
-                            className="relative h-6 w-11 flex-shrink-0 rounded-full focus:outline-none transition-colors duration-300"
-                            style={{ backgroundColor: serviceIsShared ? "#414E36" : "#E2E8F0" }}
-                          >
-                            <span
-                              className="absolute top-[4px] h-4 w-4 rounded-full bg-white shadow-md transition-all duration-300"
-                              style={{ left: serviceIsShared ? "24px" : "4px" }}
-                            />
-                          </button>
-                        </div>
-
-                        {/* Enable Booking Reminder Toggle */}
-                        <div className="flex items-start justify-between gap-4">
-                          <span className="text-sm font-semibold text-[#1F251A]">Enable Booking Reminder</span>
-                          <button
-                            type="button"
-                            onClick={() => setServiceEnableReminder(!serviceEnableReminder)}
-                            className="relative h-6 w-11 flex-shrink-0 rounded-full focus:outline-none transition-colors duration-300"
-                            style={{ backgroundColor: serviceEnableReminder ? "#414E36" : "#E2E8F0" }}
-                          >
-                            <span
-                              className="absolute top-[4px] h-4 w-4 rounded-full bg-white shadow-md transition-all duration-300"
-                              style={{ left: serviceEnableReminder ? "24px" : "4px" }}
-                            />
-                          </button>
-                        </div>
-                      </div>
-
-                      {editingService && (
-                        <>
-                          <ServiceRecipeEditor serviceId={editingService.id} authHeaders={authenticatedJsonHeaders} />
-                          <ServiceDeviceEditor serviceId={editingService.id} authHeaders={authenticatedJsonHeaders} />
-                        </>
-                      )}
-
-                    </div>
-
-                    {/* Modal Footer */}
-                    <div className="border-t border-[#414E36]/10 px-6 py-4 flex items-center justify-between gap-3 bg-[#FBFBF9] rounded-b-2xl">
-                      <div>
-                        {editingService && hasPermission("services.delete") && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDeleteServiceTarget(editingService);
-                              setShowAddServiceModal(false);
-                            }}
-                            className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 cursor-pointer"
-                          >
-                            <Trash2 size={14} />
-                            <span>Delete Service</span>
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setShowAddServiceModal(false)}
-                          className="rounded-lg border border-[#414E36]/15 px-5 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
-                        >
-                          Cancel
-                        </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!serviceNameEn.trim()) return;
-                          if (serviceDurationMinutes <= 0 || serviceDurationMinutes > 1440) {
-                            alert("Duration must be between 1 and 1440 minutes.");
-                            return;
-                          }
-
-                          const previousIds = new Set(localServices.map(s => s.id));
-
-                          let updatedServices: ServiceItem[];
-                          if (editingService) {
-                            // Edit mode
-                            updatedServices = localServices.map(s => {
-                              if (s.id === editingService.id) {
-                                return {
-                                  ...s,
-                                  en: serviceNameEn.trim(),
-                                  ar: serviceNameAr.trim(),
-                                  cat: serviceCategory,
-                                  unit: serviceUnitType.toLowerCase(),
-                                  price: servicePrice,
-                                  duration: serviceDuration,
-                                  duration_minutes: serviceDurationMinutes,
-                                  descriptionEn: serviceDescEn.trim(),
-                                  descriptionAr: serviceDescAr.trim(),
-                                  sortOrder: serviceSortOrder,
-                                  isShared: serviceIsShared,
-                                  enableReminder: serviceEnableReminder,
-                                  img: serviceImageUrl,
-                                  branchPricing: serviceBranchPricing.map(bp => ({ ...bp, price: servicePrice })),
-                                };
-                              }
-                              return s;
-                            });
-                          } else {
-                            // Add mode — let the database assign the id
-                            const newService: ServiceItem = {
-                              id: 0, // placeholder, removed by the API mapper
-                              en: serviceNameEn.trim(),
-                              ar: serviceNameAr.trim(),
-                              cat: serviceCategory,
-                              unit: serviceUnitType.toLowerCase(),
-                              price: servicePrice,
-                              duration: serviceDuration,
-                              duration_minutes: serviceDurationMinutes,
-                              descriptionEn: serviceDescEn.trim(),
-                              descriptionAr: serviceDescAr.trim(),
-                              sortOrder: serviceSortOrder,
-                              isShared: serviceIsShared,
-                              enableReminder: serviceEnableReminder,
-                              img: serviceImageUrl,
-                              branchPricing: serviceBranchPricing.map(bp => ({ ...bp, price: servicePrice })),
-                              createdAt: new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + " " + new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true }),
-                            };
-                            updatedServices = [...localServices, newService];
-                            setExpandedCategories(prev => ({ ...prev, [serviceCategory]: true }));
-                          }
-
-                          const synced = await syncServicesToApi(updatedServices);
-                          if (synced) {
-                            setLocalServices(synced);
-
-                            const savedService = editingService
-                              ? synced.find(s => s.id === editingService.id)
-                              : synced.find(s => !previousIds.has(s.id));
-
-                            const defaultBranch = serviceBranchPricing.find(b => b.isDefault);
-                            if (savedService && defaultBranch) {
-                              setServiceToggle(savedService.id, "active", defaultBranch.status);
-                              setServiceToggle(savedService.id, "visible", defaultBranch.visible);
-                              setServiceToggles(prev => ({
-                                ...prev,
-                                [savedService.id]: { visible: defaultBranch.visible, active: defaultBranch.status }
-                              }));
-                            }
-                          }
-
-                          setShowAddServiceModal(false);
-                        }}
-                        className="rounded-lg bg-[#414E36] px-6 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-
-                  </div>
-                </div>
-              )}
-            </div>
+            <AdminServicesView
+              localServices={localServices}
+              setLocalServices={setLocalServices}
+              localCategories={localCategories}
+              setLocalCategories={setLocalCategories}
+              expandedCategories={expandedCategories}
+              setExpandedCategories={setExpandedCategories}
+              showAddCategoryModal={showAddCategoryModal}
+              setShowAddCategoryModal={setShowAddCategoryModal}
+              showAddServiceModal={showAddServiceModal}
+              setShowAddServiceModal={setShowAddServiceModal}
+              addServiceTargetCategory={addServiceTargetCategory}
+              setAddServiceTargetCategory={setAddServiceTargetCategory}
+              newCategoryNameEn={newCategoryNameEn}
+              setNewCategoryNameEn={setNewCategoryNameEn}
+              newCategoryNameAr={newCategoryNameAr}
+              setNewCategoryNameAr={setNewCategoryNameAr}
+              newServiceNameEn={newServiceNameEn}
+              setNewServiceNameEn={setNewServiceNameEn}
+              newServiceNameAr={newServiceNameAr}
+              setNewServiceNameAr={setNewServiceNameAr}
+              newServicePrice={newServicePrice}
+              setNewServicePrice={setNewServicePrice}
+              deleteCategoryTarget={deleteCategoryTarget}
+              setDeleteCategoryTarget={setDeleteCategoryTarget}
+              editingService={editingService}
+              setEditingService={setEditingService}
+              deleteServiceTarget={deleteServiceTarget}
+              setDeleteServiceTarget={setDeleteServiceTarget}
+              serviceNameEn={serviceNameEn}
+              setServiceNameEn={setServiceNameEn}
+              serviceNameAr={serviceNameAr}
+              setServiceNameAr={setServiceNameAr}
+              serviceCategory={serviceCategory}
+              setServiceCategory={setServiceCategory}
+              serviceDuration={serviceDuration}
+              setServiceDuration={setServiceDuration}
+              serviceDurationMinutes={serviceDurationMinutes}
+              setServiceDurationMinutes={setServiceDurationMinutes}
+              serviceUnitType={serviceUnitType}
+              setServiceUnitType={setServiceUnitType}
+              serviceDescEn={serviceDescEn}
+              setServiceDescEn={setServiceDescEn}
+              serviceDescAr={serviceDescAr}
+              setServiceDescAr={setServiceDescAr}
+              serviceSortOrder={serviceSortOrder}
+              setServiceSortOrder={setServiceSortOrder}
+              serviceIsShared={serviceIsShared}
+              setServiceIsShared={setServiceIsShared}
+              serviceEnableReminder={serviceEnableReminder}
+              setServiceEnableReminder={setServiceEnableReminder}
+              serviceImageUrl={serviceImageUrl}
+              setServiceImageUrl={setServiceImageUrl}
+              servicePrice={servicePrice}
+              setServicePrice={setServicePrice}
+              serviceBranchPricing={serviceBranchPricing}
+              setServiceBranchPricing={setServiceBranchPricing}
+              draggedServiceId={draggedServiceId}
+              setDraggedServiceId={setDraggedServiceId}
+              dragOverServiceId={dragOverServiceId}
+              setDragOverServiceId={setDragOverServiceId}
+              rowDraggable={rowDraggable}
+              setRowDraggable={setRowDraggable}
+              draggedCatKey={draggedCatKey}
+              setDraggedCatKey={setDraggedCatKey}
+              dragOverCatKey={dragOverCatKey}
+              setDragOverCatKey={setDragOverCatKey}
+              catDraggable={catDraggable}
+              setCatDraggable={setCatDraggable}
+              serviceSearch={serviceSearch}
+              setServiceSearch={setServiceSearch}
+              serviceSortBy={serviceSortBy}
+              setServiceSortBy={setServiceSortBy}
+              showServiceFilterPanel={showServiceFilterPanel}
+              setShowServiceFilterPanel={setShowServiceFilterPanel}
+              serviceFilterStatus={serviceFilterStatus}
+              setServiceFilterStatus={setServiceFilterStatus}
+              serviceToggles={serviceToggles}
+              setServiceToggles={setServiceToggles}
+              activeServiceRowMenuId={activeServiceRowMenuId}
+              setActiveServiceRowMenuId={setActiveServiceRowMenuId}
+              filteredServices={filteredServices}
+              groupedServices={groupedServices}
+              handleEditService={handleEditService}
+              handleReorderServices={handleReorderServices}
+              handleReorderCategories={handleReorderCategories}
+              toggleCategoryExpand={toggleCategoryExpand}
+              removeCategory={removeCategory}
+              toggleService={toggleService}
+              syncServicesToApi={syncServicesToApi}
+              loadServicesFromApi={loadServicesFromApi}
+              deleteServiceFromApi={deleteServiceFromApi}
+              authenticatedJsonHeaders={authenticatedJsonHeaders}
+              hasPermission={hasPermission}
+            />
           )}
 
           {/* ── PROMOTIONS VIEW ── */}
@@ -22894,428 +20931,14 @@ export default function AdminPage() {
       )}
 
       {/* Add/Edit Provider Modal */}
-      {showProviderModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
-          <div className="w-full max-w-xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[90vh] flex flex-col">
-            
-            {/* Header */}
-            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4 shrink-0">
-              <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">
-                  {providerModalMode === "edit" ? "Edit Doctor / Provider" : "Add Doctor / Provider"}
-                </p>
-                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">
-                  {providerModalMode === "edit" ? "Modify Provider Details" : "Create New Provider"}
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowProviderModal(false)}
-                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Scrollable Form Content */}
-            <div className="flex-1 overflow-y-auto space-y-5 pr-1">
-              
-              {/* Row 1: Name & Specialty */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Dr. Jane Doe"
-                    value={providerFormName}
-                    onChange={(e) => setProviderFormName(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Specialty</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Dermatologist"
-                    value={providerFormSpecialty}
-                    onChange={(e) => setProviderFormSpecialty(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Phone & National ID */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 01012345678"
-                    value={providerFormPhone}
-                    onChange={(e) => setProviderFormPhone(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">National ID</label>
-                  <input
-                    type="text"
-                    placeholder="14-digit National ID"
-                    value={providerFormNationalId}
-                    onChange={(e) => setProviderFormNationalId(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  />
-                </div>
-              </div>
-
-              {/* Row 3: Gender & Auto-calculated Age/DOB */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Gender</label>
-                  <select
-                    value={providerFormGender}
-                    onChange={(e) => setProviderFormGender(e.target.value as "Male" | "Female" | "")}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Age &amp; Date of Birth</label>
-                  {(() => {
-                    const check = parseEgyptianNationalId(providerFormNationalId);
-                    if (check.isValid) {
-                      return (
-                        <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/70 px-4 py-2 text-xs text-[#1F251A] font-semibold flex items-center justify-between min-h-[42px]">
-                          <span>{check.age} yrs • DOB: {check.dobFormatted}</span>
-                          <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">✓ National ID</span>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="w-full rounded-2xl border border-[#414E36]/15 bg-gray-50 px-4 py-2.5 text-xs text-[#5A6A51] italic min-h-[42px] flex items-center">
-                        Auto-calculated from National ID
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Row 4: Branch & Start Date */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branches (Select one or more)</label>
-                  <div className="flex flex-wrap gap-2 p-2 rounded-2xl border border-[#414E36]/15 bg-white min-h-[42px] items-center">
-                    {branches.map((b) => {
-                      const isSelected = providerFormBranchIds.includes(b.id);
-                      return (
-                        <button
-                          key={b.id}
-                          type="button"
-                          onClick={() => {
-                            if (isSelected) {
-                              if (providerFormBranchIds.length <= 1) {
-                                alert("A doctor must be assigned to at least one branch.");
-                                return;
-                              }
-                              const nextIds = providerFormBranchIds.filter((id) => id !== b.id);
-                              setProviderFormBranchIds(nextIds);
-                              if (providerFormSelectedScheduleBranchId === b.id) {
-                                handleScheduleBranchChange(nextIds[0]);
-                              }
-                            } else {
-                              const nextIds = [...providerFormBranchIds, b.id];
-                              setProviderFormBranchIds(nextIds);
-                              if (!providerFormSelectedScheduleBranchId) {
-                                setProviderFormSelectedScheduleBranchId(b.id);
-                              }
-                            }
-                          }}
-                          className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
-                            isSelected
-                              ? "bg-[#414E36] text-white border-[#414E36]"
-                              : "bg-[#414E36]/5 text-[#414E36] border-transparent hover:bg-[#414E36]/10"
-                          }`}
-                        >
-                          {b.name_en} {isSelected ? "✓" : "+"}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
-                  <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 flex items-center justify-between min-h-[42px]">
-                    {(() => {
-                      const autoDate = getDoctorFirstReservationDate(providerFormName, allReservations);
-                      const displayDate = autoDate || providerFormStartDate;
-                      if (displayDate) {
-                        return (
-                          <div className="flex items-center justify-between w-full">
-                            <span className="text-sm font-semibold text-[#1F251A]">{displayDate}</span>
-                            <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full border border-[#414E36]/15 flex items-center gap-1">
-                              ⚡ Auto from 1st Booking
-                            </span>
-                          </div>
-                        );
-                      }
-                      return (
-                        <span className="text-xs italic text-[#5A6A51]/70">
-                          Will auto-set on doctor's 1st reservation
-                        </span>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 5: Rating & Provider Image URL/Base64 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-1">
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Rating (1-5)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    step="0.1"
-                    placeholder="e.g. 5"
-                    value={providerFormRating}
-                    onChange={(e) => setProviderFormRating(Number(e.target.value))}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Image URL or Base64</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. /images/doctors/dr-doe.jpg"
-                    value={providerFormImage}
-                    onChange={(e) => setProviderFormImage(e.target.value)}
-                    className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                  />
-                </div>
-              </div>
-
-              {/* Services & Commission */}
-              <div className="max-w-xs">
-                <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">
-                  Fixed Salary (EGP)
-                </label>
-                <input
-                  type="number"
-                  placeholder="e.g. 5000"
-                  value={providerFormFixedSalary}
-                  onChange={(e) => setProviderFormFixedSalary(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
-                />
-              </div>
-              <DoctorServiceCommissionEditor
-                allServices={allServicesList}
-                services={providerFormSelectedServices}
-                commissions={providerFormServiceCommissions}
-                defaultType={providerFormCommissionType as DefaultCommissionType}
-                defaultValue={providerFormCommissionValue}
-                defaultBase={providerFormCommissionBase}
-                defaultFixedComponent={providerFormCommissionFixedComponent}
-                onServicesChange={setProviderFormSelectedServices}
-                onCommissionsChange={setProviderFormServiceCommissions}
-                onDefaultTypeChange={setProviderFormCommissionType}
-                onDefaultValueChange={setProviderFormCommissionValue}
-                onDefaultBaseChange={setProviderFormCommissionBase}
-                onDefaultFixedComponentChange={setProviderFormCommissionFixedComponent}
-              />
-
-              {/* Weekly Working Schedule */}
-              <div>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Weekly Working Days & Hours</label>
-                    {providerFormBranchIds.length > 1 && (
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <span className="text-xs text-[#5A6A51]">Configure branch schedule:</span>
-                        <select
-                          value={providerFormSelectedScheduleBranchId}
-                          onChange={(e) => handleScheduleBranchChange(e.target.value)}
-                          className="rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-xs text-[#1F251A] font-semibold outline-none focus:border-[#C4AE7C] shadow-sm cursor-pointer"
-                        >
-                          {providerFormBranchIds.map((bId) => {
-                            const br = branches.find((b) => b.id === bId);
-                            return (
-                              <option key={bId} value={bId}>
-                                {br ? br.name_en : bId}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex rounded-lg border border-[#414E36]/15 p-0.5 bg-gray-50 text-[10px] font-bold self-start sm:self-auto shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setProviderFormScheduleTab("in_person")}
-                      className={`px-3 py-1 rounded transition-colors ${
-                        providerFormScheduleTab === "in_person"
-                          ? "bg-[#414E36] text-white"
-                          : "text-[#5A6A51] hover:text-[#414E36]"
-                      }`}
-                    >
-                      In-Clinic
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setProviderFormScheduleTab("online")}
-                      className={`px-3 py-1 rounded transition-colors ${
-                        providerFormScheduleTab === "online"
-                          ? "bg-[#414E36] text-white"
-                          : "text-[#5A6A51] hover:text-[#414E36]"
-                      }`}
-                    >
-                      Online
-                    </button>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 space-y-3">
-                  {(() => {
-                    const activeSched = providerFormScheduleTab === "in_person" ? providerFormWorkingDaysHours : providerFormOnlineWorkingDaysHours;
-                    const setActiveSched = providerFormScheduleTab === "in_person" ? setProviderFormWorkingDaysHours : setProviderFormOnlineWorkingDaysHours;
-
-                    return Object.keys(activeSched).map((day) => {
-                      const sched = activeSched[day];
-                      return (
-                        <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#414E36]/5 pb-2.5 last:border-0 last:pb-0">
-                          <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={sched.isOpen}
-                              onChange={(e) => {
-                                setActiveSched({
-                                  ...activeSched,
-                                  [day]: { ...sched, isOpen: e.target.checked }
-                                });
-                              }}
-                              className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
-                            />
-                            <span className="text-xs font-bold text-[#414E36] w-24">{day}</span>
-                          </label>
-
-                          {sched.isOpen ? (
-                            <div className="flex flex-col gap-2 w-full sm:w-auto">
-                              {/* Shifts list */}
-                              {((sched.shifts && sched.shifts.length > 0) ? sched.shifts : [{ start: sched.start || "09:00", end: sched.end || "17:00" }]).map((shft, shiftIdx) => (
-                                <div key={shiftIdx} className="flex items-center gap-2">
-                                  <input
-                                    type="time"
-                                    value={shft.start}
-                                    onChange={(e) => {
-                                      const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
-                                      currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], start: e.target.value };
-                                      setActiveSched({
-                                        ...activeSched,
-                                        [day]: {
-                                          ...sched,
-                                          start: currentShifts[0].start,
-                                          end: currentShifts[0].end,
-                                          shifts: currentShifts
-                                        }
-                                      });
-                                    }}
-                                    className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
-                                  />
-                                  <span className="text-xs text-[#5A6A51]">to</span>
-                                  <input
-                                    type="time"
-                                    value={shft.end}
-                                    onChange={(e) => {
-                                      const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
-                                      currentShifts[shiftIdx] = { ...currentShifts[shiftIdx], end: e.target.value };
-                                      setActiveSched({
-                                        ...activeSched,
-                                        [day]: {
-                                          ...sched,
-                                          start: currentShifts[0].start,
-                                          end: currentShifts[0].end,
-                                          shifts: currentShifts
-                                        }
-                                      });
-                                    }}
-                                    className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
-                                  />
-                                  {shiftIdx > 0 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
-                                        const filteredShifts = currentShifts.filter((_, i) => i !== shiftIdx);
-                                        setActiveSched({
-                                          ...activeSched,
-                                          [day]: {
-                                            ...sched,
-                                            start: filteredShifts[0].start,
-                                            end: filteredShifts[0].end,
-                                            shifts: filteredShifts
-                                          }
-                                        });
-                                      }}
-                                      className="text-red-500 hover:text-red-700 transition"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const currentShifts = (sched.shifts && sched.shifts.length > 0) ? [...sched.shifts] : [{ start: sched.start || "09:00", end: sched.end || "17:00" }];
-                                  const newShifts = [...currentShifts, { start: "09:00", end: "17:00" }];
-                                  setActiveSched({
-                                    ...activeSched,
-                                    [day]: {
-                                      ...sched,
-                                      shifts: newShifts
-                                    }
-                                  });
-                                }}
-                                className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] transition flex items-center gap-1 mt-1"
-                              >
-                                <Plus size={12} /> Add Shift
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400 italic">Off / Closed</span>
-                          )}
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-
-            </div>
-
-            {/* Footer Actions */}
-            <div className="border-t border-[#414E36]/10 pt-4 mt-4 flex gap-3 shrink-0">
-              <button
-                onClick={handleSaveProvider}
-                disabled={savingProvider}
-                className="flex-1 rounded-3xl bg-[#414E36] py-3 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] disabled:opacity-50 text-center"
-              >
-                {savingProvider ? "Saving..." : providerModalMode === "edit" ? "Save Changes" : "Add Provider"}
-              </button>
-              <button
-                onClick={() => setShowProviderModal(false)}
-                className="flex-1 rounded-3xl border border-[#414E36]/20 bg-[#fff] py-3 text-sm font-bold text-[#414E36] hover:bg-[#f7f6f2] text-center"
-              >
-                Cancel
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
+      <ProviderFormModal
+        providerForm={providerForm}
+        branches={branches}
+        allServicesList={allServicesList}
+        getDoctorFirstReservationDate={getDoctorFirstReservationDate}
+        allReservations={allReservations}
+        parseEgyptianNationalId={parseEgyptianNationalId}
+      />
 
       {/* Device Audit Logs Modal */}
       {showDeviceAuditLogsModal && (
@@ -23507,120 +21130,10 @@ export default function AdminPage() {
 
       {/* Doctor Schedule Audit Logs Modal */}
       {showAuditLogsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
-          <div className="w-full max-w-4xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4 shrink-0">
-              <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-[#5A6A51]/80 font-bold">Audit History</p>
-                <h3 className="mt-2 text-2xl font-semibold text-[#1F251A]">Doctor Schedule Audit Logs</h3>
-              </div>
-              <button
-                onClick={() => setShowAuditLogsModal(false)}
-                className="rounded-full bg-[#F2EFE9] p-2.5 text-[#414E36] transition hover:bg-[#e4e0d6]"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-              {loadingAuditLogs ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-3">
-                  <span className="h-8 w-8 animate-spin rounded-full border-4 border-[#414E36] border-t-transparent" />
-                  <p className="text-xs text-[#5A6A51] font-semibold">Loading Audit Records...</p>
-                </div>
-              ) : auditLogsList.length === 0 ? (
-                <div className="text-center py-20 text-[#5A6A51] italic text-sm">
-                  No schedule change audit logs found.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {auditLogsList.map((log) => {
-                    const formatSchedPreview = (sched: any) => {
-                      if (!sched) return <span className="text-gray-400 italic">None</span>;
-                      if (sched.in_person || sched.online) {
-                        return (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px] font-mono leading-relaxed mt-2">
-                            {sched.in_person && (
-                              <div className="rounded-xl bg-white border border-[#414E36]/10 p-3">
-                                <p className="font-bold text-[#414E36] border-b pb-1 mb-1 text-[10px] uppercase">In-Clinic Schedule</p>
-                                {Object.entries(sched.in_person).map(([d, config]: any) => (
-                                  config.isOpen && <div key={d}>{d}: {config.start} - {config.end}</div>
-                                ))}
-                              </div>
-                            )}
-                            {sched.online && (
-                              <div className="rounded-xl bg-white border border-[#414E36]/10 p-3">
-                                <p className="font-bold text-[#414E36] border-b pb-1 mb-1 text-[10px] uppercase">Online Schedule</p>
-                                {Object.entries(sched.online).map(([d, config]: any) => (
-                                  config.isOpen && <div key={d}>{d}: {config.start} - {config.end}</div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-                      return (
-                        <div className="rounded-xl bg-white border border-[#414E36]/10 p-3 text-[11px] font-mono leading-relaxed mt-1">
-                          {Object.entries(sched).map(([d, config]: any) => (
-                            config.isOpen && <div key={d}>{d}: {config.start} - {config.end}</div>
-                          ))}
-                        </div>
-                      );
-                    };
-
-                    return (
-                      <div key={log.id} className="rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/40 p-4 space-y-2">
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-[#414E36]/10 pb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-[#1F251A] text-sm">{log.provider_name}</span>
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                              log.action === "create_schedule" 
-                                ? "bg-green-100 text-green-700 border border-green-200" 
-                                : "bg-blue-100 text-blue-700 border border-blue-200"
-                            }`}>
-                              {log.action === "create_schedule" ? "Created" : "Updated"}
-                            </span>
-                          </div>
-                          <div className="text-gray-500 text-[11px]">
-                            {new Date(log.created_at).toLocaleString()}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                          <div>
-                            <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">Previous Schedule</p>
-                            <div className="mt-1">{formatSchedPreview(log.previous_schedule)}</div>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">New Schedule</p>
-                            <div className="mt-1">{formatSchedPreview(log.new_schedule)}</div>
-                          </div>
-                        </div>
-
-                        <div className="flex justify-between items-center text-[10px] text-[#5A6A51] border-t border-[#414E36]/5 pt-2">
-                          <span>Changed By: <strong className="text-[#414E36]">{log.changed_by}</strong></span>
-                          <span className="opacity-60 font-mono">ID: {log.id.slice(0, 8)}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div className="border-t border-[#414E36]/10 pt-4 mt-4 shrink-0 flex justify-end">
-              <button
-                onClick={() => setShowAuditLogsModal(false)}
-                className="rounded-3xl border border-[#414E36]/20 bg-[#fff] px-8 py-3 text-sm font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
-              >
-                Close Audit Logs
-              </button>
-            </div>
-          </div>
-        </div>
+        <DoctorAuditLogsModal
+          onClose={() => setShowAuditLogsModal(false)}
+          authenticatedJsonHeaders={authenticatedJsonHeaders}
+        />
       )}
 
       {/* ── EXPORT CUSTOMERS MODAL ── */}
