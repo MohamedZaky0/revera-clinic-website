@@ -9,16 +9,27 @@
 > | Bookings (`AdminBookingsView.tsx`, 1,308 lines) | ✅ (pre-existing) | ❌ **never briefed** — 0 `lang`/`dir`/`adminTranslations` references |
 > | New Booking (`AdminNewBookingView.tsx`, 1,123 lines) | ✅ (pre-existing) | ❌ **never briefed** — same |
 > | Patients — Directory, 3 modals | ✅ Brief 5 | ✅ Briefs 6-9 (gaps found + closed) |
-> | Patients — Profile Drawer (~1,308 lines, 5 tabs + 3 modals) | state only, Brief 10; JSX itself = **Brief 11, active now** | not started (Brief 12+, after 11) |
+> | Patients — Profile Drawer (1,539 lines, 5 tabs + 3 modals) | ✅ Briefs 10 (state) + 11 (JSX) | **Brief 12, active now** |
 > | POS | N/A — dead mock UI, unreachable through any nav path | **out of scope** — separate open product decision: build the real thing or delete the dead code |
 >
-> **So "Reception is fully in scope" is not close yet** — Bookings and New Booking were extracted
-> before DEC-043 existed (hence skipped the Phase 1 brief list) but that also means Phase 2
-> translation for them was never scoped either; this was only discovered 2026-08-19 while writing
-> Brief 11, not previously documented. Remaining work, in the order that makes sense: **Brief 11**
-> (Profile Drawer JSX extraction, active) → **Brief 12** (Profile Drawer translation) → **Brief 13**
-> (Bookings translation — no extraction needed, straight to Phase 2) → **Brief 14** (New Booking
-> translation, same). POS stays a standalone product decision, not a translation task.
+> **Phase 1 (extraction) for Reception is now DONE** — Brief 11 landed 2026-08-19, so every
+> Reception screen in scope is extracted. **All that remains is Phase 2 (translation), 3 briefs:**
+> **Brief 12** (Profile Drawer, ~99 strings + 18 RTL classes — active now) → **Brief 13** (Bookings,
+> ~34 strings) → **Brief 14** (New Booking, ~38 strings + 7 placeholders). All three are written and
+> queued in `WINDSURF_BRIEFS.md`. Bookings/New Booking were extracted before DEC-043 existed, which
+> is why they skipped the Phase 1 brief list *and* why their Phase 2 translation was never scoped —
+> discovered 2026-08-19 while writing Brief 11, not previously documented. POS stays a standalone
+> product decision, not a translation task.
+>
+> **Two conventions the translation briefs must not break** (both already violated once, or at risk):
+> 1. **Value/label separation** — anything stored *and* displayed (booking status, payment method,
+>    skin type, referral source) keeps its English value; only the label translates, via a lookup.
+>    Briefs 7-8 got this wrong and shipped raw English labels; RISK-054 was a display-normalised
+>    status leaking into shared state in `AdminBookingsView` specifically.
+> 2. **Dates stay on `en-GB`/`en-US`** — do not "helpfully" switch `toLocale*` calls to `ar-EG`.
+>    DEC-043 decided Western digits; `PatientsDirectoryView.tsx` (already translated) is the
+>    precedent and keeps English locales. `ar-EG` would produce Arabic month names *and* Arabic-Indic
+>    digits in money/appointment contexts — a regression against an explicit decision.
 >
 > DEC-042's `reservation_products` migration is applied and live-verified. Windsurf implements
 > Phase 1/2 — this plan is the brief input, not something to execute directly against `page.tsx`.
