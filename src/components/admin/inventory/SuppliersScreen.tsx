@@ -15,11 +15,12 @@ type Supplier = {
 
 type Props = {
   authHeaders: Record<string, string>;
+  canManage?: boolean;
 };
 
 const EMPTY_FORM = { name: "", contact: "", payment_terms: "", active: true };
 
-export default function SuppliersScreen({ authHeaders }: Props) {
+export default function SuppliersScreen({ authHeaders, canManage = true }: Props) {
   const { showConfirm } = useAlertConfirm();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,7 +141,7 @@ export default function SuppliersScreen({ authHeaders }: Props) {
           <button
             type="button"
             onClick={openAddModal}
-            className="inline-flex items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]"
+            className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]`}
           >
             <Plus size={14} /> Add Supplier
           </button>
@@ -201,7 +202,7 @@ export default function SuppliersScreen({ authHeaders }: Props) {
                       <button
                         type="button"
                         onClick={() => openEditModal(s)}
-                        className="rounded-xl border border-[#E6E9EB] p-2 text-[#5A6A51] transition hover:bg-[#EBF0E6] hover:text-[#414E36]"
+                        className={`${canManage ? "inline-flex" : "hidden"} rounded-xl border border-[#E6E9EB] p-2 text-[#5A6A51] transition hover:bg-[#EBF0E6] hover:text-[#414E36]`}
                         title="Edit Supplier"
                       >
                         <Pencil size={15} />
@@ -209,7 +210,7 @@ export default function SuppliersScreen({ authHeaders }: Props) {
                       <button
                         type="button"
                         onClick={() => handleDelete(s)}
-                        className="rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
+                        className={`${canManage ? "inline-flex" : "hidden"} rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700`}
                         title="Delete Supplier"
                       >
                         <Trash2 size={15} />

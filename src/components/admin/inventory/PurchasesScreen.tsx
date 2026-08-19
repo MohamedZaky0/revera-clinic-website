@@ -36,13 +36,14 @@ type Purchase = {
 
 type Props = {
   authHeaders: Record<string, string>;
+  canManage?: boolean;
 };
 
 type FormLine = { productId: string; qty: string; unitCost: string };
 
 const EMPTY_LINE: FormLine = { productId: "", qty: "", unitCost: "" };
 
-export default function PurchasesScreen({ authHeaders }: Props) {
+export default function PurchasesScreen({ authHeaders, canManage = true }: Props) {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -196,7 +197,7 @@ export default function PurchasesScreen({ authHeaders }: Props) {
           <button
             type="button"
             onClick={openModal}
-            className="inline-flex items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]"
+            className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]`}
           >
             <Plus size={14} /> Record Purchase
           </button>

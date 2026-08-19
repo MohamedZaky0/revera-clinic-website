@@ -12775,7 +12775,7 @@ export default function AdminPage() {
                           fetchDeviceAuditLogs();
                           setShowDeviceAuditLogsModal(true);
                         }}
-                        className="inline-flex items-center gap-2 rounded-3xl border border-[#414E36]/30 bg-white px-4 py-2.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EBF0E6] shadow-sm"
+                        className={`${hasPermission("inventory.manage_devices") ? "inline-flex" : "hidden"} items-center gap-2 rounded-3xl border border-[#414E36]/30 bg-white px-4 py-2.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EBF0E6] shadow-sm`}
                       >
                         <ClipboardList size={15} /> Audit Logs
                       </button>
@@ -12795,7 +12795,7 @@ export default function AdminPage() {
                           setDeviceNotes("");
                           setShowAddDeviceModal(true);
                         }}
-                        className="inline-flex items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-2.5 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
+                        className={`${hasPermission("inventory.manage_devices") ? "inline-flex" : "hidden"} items-center gap-2 rounded-3xl bg-[#414E36] px-5 py-2.5 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm`}
                       >
                         <Plus size={15} /> Add Device
                       </button>
@@ -13042,7 +13042,7 @@ export default function AdminPage() {
                                       setDeviceNotes("");
                                       setShowAddDeviceModal(true);
                                     }}
-                                    className="inline-flex items-center gap-2 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] shadow-sm cursor-pointer"
+                                    className={`${hasPermission("inventory.manage_devices") ? "inline-flex" : "hidden"} items-center gap-2 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] shadow-sm cursor-pointer`}
                                   >
                                     <Plus size={14} /> Add Device
                                   </button>
@@ -13179,37 +13179,41 @@ export default function AdminPage() {
 
                                          {activeDeviceRowMenuId === dev.id && (
                                            <div className="absolute right-0 top-9 z-50 w-48 rounded-2xl bg-white p-1.5 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left">
-                                             <button
-                                               type="button"
-                                               onClick={(e) => {
-                                                 e.stopPropagation();
-                                                 setActiveDeviceRowMenuId(null);
-                                                 setSelectedDeviceForPulses(dev);
-                                                 setNewPulseCountInput(String(dev.current_pulse_count || 0));
-                                                 setShowUpdatePulsesModal(true);
-                                               }}
-                                               className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
-                                             >
-                                               <Gauge size={14} className="text-[#414E36]" />
-                                               <span>Update Pulses</span>
-                                             </button>
+                                             {hasPermission("inventory.manage_devices") && (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveDeviceRowMenuId(null);
+                                                setSelectedDeviceForPulses(dev);
+                                                setNewPulseCountInput(String(dev.current_pulse_count || 0));
+                                                setShowUpdatePulsesModal(true);
+                                              }}
+                                              className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                            >
+                                              <Gauge size={14} className="text-[#414E36]" />
+                                              <span>Update Pulses</span>
+                                            </button>
+                                            )}
 
-                                             <button
-                                               type="button"
-                                               onClick={(e) => {
-                                                 e.stopPropagation();
-                                                 setActiveDeviceRowMenuId(null);
-                                                 setSelectedDeviceForReset(dev);
-                                                 setResetReason("Routine Maintenance");
-                                                 setResetPerformedBy("");
-                                                 setResetNotes("");
-                                                 setShowResetPulsesModal(true);
-                                               }}
-                                               className="w-full text-left px-3 py-2 rounded-xl hover:bg-amber-50 font-semibold text-amber-800 flex items-center gap-2.5 transition cursor-pointer"
-                                             >
-                                               <RotateCcw size={14} className="text-amber-600" />
-                                               <span>Reset Counter</span>
-                                             </button>
+                                             {hasPermission("inventory.manage_devices") && (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveDeviceRowMenuId(null);
+                                                setSelectedDeviceForReset(dev);
+                                                setResetReason("Routine Maintenance");
+                                                setResetPerformedBy("");
+                                                setResetNotes("");
+                                                setShowResetPulsesModal(true);
+                                              }}
+                                              className="w-full text-left px-3 py-2 rounded-xl hover:bg-amber-50 font-semibold text-amber-800 flex items-center gap-2.5 transition cursor-pointer"
+                                            >
+                                              <RotateCcw size={14} className="text-amber-600" />
+                                              <span>Reset Counter</span>
+                                            </button>
+                                            )}
 
                                              <button
                                                type="button"
@@ -13227,29 +13231,31 @@ export default function AdminPage() {
 
                                              <div className="my-1 border-t border-gray-100" />
 
-                                             <button
-                                               type="button"
-                                               onClick={(e) => {
-                                                 e.stopPropagation();
-                                                 setActiveDeviceRowMenuId(null);
-                                                 setEditingDevice(dev);
-                                                 setDeviceName(dev.name || "");
-                                                 setDeviceModel(dev.model || "");
-                                                 setDeviceSerial(dev.serial_number || "");
-                                                 setDeviceCategory(dev.category || "Laser Hair Removal");
-                                                 setDeviceBranchId(dev.branch_id || "");
-                                                 setDeviceInitialPulses(String(dev.initial_pulse_count || 0));
-                                                 setDeviceWarningThreshold1(String(dev.warning_threshold_1 || 80000));
-                                                 setDeviceMaintenanceThreshold2(String(dev.maintenance_threshold_2 || 100000));
-                                                 setDeviceLampReplacementCost(String(dev.lamp_replacement_cost ?? 0));
-                                                 setDeviceNotes(dev.notes || "");
-                                                 setShowAddDeviceModal(true);
-                                               }}
-                                               className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
-                                             >
-                                               <Pencil size={14} className="text-[#5A6A51]" />
-                                               <span>Edit Device</span>
-                                             </button>
+                                             {hasPermission("inventory.manage_devices") && (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveDeviceRowMenuId(null);
+                                                setEditingDevice(dev);
+                                                setDeviceName(dev.name || "");
+                                                setDeviceModel(dev.model || "");
+                                                setDeviceSerial(dev.serial_number || "");
+                                                setDeviceCategory(dev.category || "Laser Hair Removal");
+                                                setDeviceBranchId(dev.branch_id || "");
+                                                setDeviceInitialPulses(String(dev.initial_pulse_count || 0));
+                                                setDeviceWarningThreshold1(String(dev.warning_threshold_1 || 80000));
+                                                setDeviceMaintenanceThreshold2(String(dev.maintenance_threshold_2 || 100000));
+                                                setDeviceLampReplacementCost(String(dev.lamp_replacement_cost ?? 0));
+                                                setDeviceNotes(dev.notes || "");
+                                                setShowAddDeviceModal(true);
+                                              }}
+                                              className="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2.5 transition cursor-pointer"
+                                            >
+                                              <Pencil size={14} className="text-[#5A6A51]" />
+                                              <span>Edit Device</span>
+                                            </button>
+                                            )}
                                            </div>
                                          )}
                                        </div>
@@ -13397,7 +13403,7 @@ export default function AdminPage() {
                                 resetProductForm();
                                 setShowAddProductModal(true);
                               }}
-                              className="inline-flex items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]"
+                              className={`${hasPermission("inventory.manage_products") ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]`}
                             >
                               <Plus size={14} /> Add Item
                             </button>
@@ -13432,7 +13438,7 @@ export default function AdminPage() {
                                           resetProductForm();
                                           setShowAddProductModal(true);
                                         }}
-                                        className="mt-2 inline-flex items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] cursor-pointer"
+                                        className={`mt-2 ${hasPermission("inventory.manage_products") ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] cursor-pointer`}
                                       >
                                         <Plus size={14} /> Add Item
                                       </button>
@@ -13505,7 +13511,7 @@ export default function AdminPage() {
                                             type="button"
                                             onClick={() => handleOpenSellProductModal(prod)}
                                             disabled={prod.stock_quantity <= 0 || prod.role === 'consumable'}
-                                            className="inline-flex items-center gap-1 rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 disabled:cursor-not-allowed"
+                                            className={`${hasPermission("inventory.manage_products") ? "inline-flex" : "hidden"} items-center gap-1 rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 disabled:cursor-not-allowed`}
                                             title={prod.role === 'consumable' ? 'Consumable Only (Used in services only, not for retail sale)' : prod.stock_quantity <= 0 ? 'Out of Stock' : 'Sell Product'}
                                           >
                                             <Tag size={13} /> {prod.role === 'consumable' ? 'Consumable Only' : 'Sell Product'}
@@ -13513,18 +13519,18 @@ export default function AdminPage() {
                                           <button
                                             type="button"
                                             onClick={() => openEditProductModal(prod)}
-                                            className="rounded-xl border border-[#E6E9EB] p-2 text-[#5A6A51] transition hover:bg-[#EBF0E6] hover:text-[#414E36]"
+                                            className={`${hasPermission("inventory.manage_products") ? "inline-flex" : "hidden"} rounded-xl border border-[#E6E9EB] p-2 text-[#5A6A51] transition hover:bg-[#EBF0E6] hover:text-[#414E36]`}
                                             title="Edit Product"
                                           >
                                             <Pencil size={15} />
                                           </button>
-                                          {adminRole === "superadmin" ? (
+                                          {hasPermission("inventory.manage_products") && adminRole === "superadmin" ? (
                                             <>
                                               <button
                                                 type="button"
                                                 data-testid={`soft-delete-product-${prod.id}`}
                                                 onClick={() => requestDeleteProduct(prod.id, prod.name, "soft")}
-                                                className="rounded-xl border border-amber-200 p-2 text-amber-600 transition hover:bg-amber-50 hover:text-amber-700"
+                                                className="inline-flex rounded-xl border border-amber-200 p-2 text-amber-600 transition hover:bg-amber-50 hover:text-amber-700"
                                                 title="Soft Delete (hide, reversible)"
                                               >
                                                 <Archive size={15} />
@@ -13533,23 +13539,23 @@ export default function AdminPage() {
                                                 type="button"
                                                 data-testid={`hard-delete-product-${prod.id}`}
                                                 onClick={() => requestDeleteProduct(prod.id, prod.name, "hard")}
-                                                className="rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
+                                                className="inline-flex rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
                                                 title="Permanently Delete (superadmin only)"
                                               >
                                                 <Trash2 size={15} />
                                               </button>
                                             </>
-                                          ) : (
+                                          ) : hasPermission("inventory.manage_products") ? (
                                             <button
                                               type="button"
                                               data-testid={`soft-delete-product-${prod.id}`}
                                               onClick={() => requestDeleteProduct(prod.id, prod.name, "soft")}
-                                              className="rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
+                                              className="inline-flex rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
                                               title="Delete Product"
                                             >
                                               <Trash2 size={15} />
                                             </button>
-                                          )}
+                                          ) : null}
                                         </div>
                                       </td>
                                     </tr>
@@ -13638,7 +13644,7 @@ export default function AdminPage() {
               {/* TAB 3: SUPPLIERS & PURCHASES */}
               {inventorySubTab === "suppliers" && (
                 <div className="rounded-[40px] bg-[#FBFBF9] p-6 shadow-[0_30px_80px_rgba(47,61,41,0.07)] border border-[#E6E9EB]">
-                  <SupplierManagementScreen authHeaders={authenticatedJsonHeaders} />
+                  <SupplierManagementScreen authHeaders={authenticatedJsonHeaders} canManage={hasPermission("inventory.manage_suppliers")} />
                 </div>
               )}
             </div>

@@ -7,9 +7,10 @@ import PurchasesScreen from "./PurchasesScreen";
 
 type Props = {
   authHeaders: Record<string, string>;
+  canManage?: boolean;
 };
 
-export default function SupplierManagementScreen({ authHeaders }: Props) {
+export default function SupplierManagementScreen({ authHeaders, canManage = true }: Props) {
   const [tab, setTab] = useState<"suppliers" | "purchases">("suppliers");
 
   return (
@@ -40,9 +41,9 @@ export default function SupplierManagementScreen({ authHeaders }: Props) {
       </div>
 
       {tab === "suppliers" ? (
-        <SuppliersScreen authHeaders={authHeaders} />
+        <SuppliersScreen authHeaders={authHeaders} canManage={canManage} />
       ) : (
-        <PurchasesScreen authHeaders={authHeaders} />
+        <PurchasesScreen authHeaders={authHeaders} canManage={canManage} />
       )}
     </div>
   );
