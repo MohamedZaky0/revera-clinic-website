@@ -1,29 +1,27 @@
 # Admin Panel: Componentization → Arabic i18n → Automated Testing
 
-> **Status:** Phase 0 complete (2026-08-17 — 107 tests, `ai_docs/WINDSURF_BRIEFS.md` Brief 3).
-> Open decisions resolved — see `DECISIONS.md` → **DEC-043**. Phase 1's pattern-proving PR
-> (Clinic Profile Settings, Brief 4) is complete and verified — extraction pattern proven.
-> **Reception-wave scope corrected (2026-08-17):** `New Booking` was already extracted
-> (`AdminNewBookingView.tsx`) and `Bookings` was already extracted (`AdminBookingsView.tsx`) before
-> DEC-043 was written — neither needs a brief. `activeNav === "Point of Sale"` turned out to be
-> dead mock UI (hardcoded `MOCK_PRODUCTS`, no persistence, "Complete Payment" is just an `alert()`)
-> — not the real POS (that's `product_sales`-backed "Sell Product", embedded inside Patients). It
-> is **not** part of Phase 1/2 scope; flagged as a separate open product question (build it for
-> real, or remove the dead nav item). **Patients is therefore the entire remaining Reception-wave
-> scope.** **Brief 5's 4 sub-PRs are complete (2026-08-17)** — Medical Report Modal, Medical Form
-> Modal, Customer Create/Edit Form, Patients Directory all extracted and verified
-> (`tsc`/`eslint`/`vitest` clean). `admin/page.tsx` is down to 26,763 lines. Remaining: a 5th sub-PR
-> (Customer Profile Drawer, ~1,280 lines, owns the 82-reference `viewingCustomerProfile` state)
-> needs its own investigation-then-brief cycle — deliberately not started yet, since it doesn't
-> block Phase 2 on the 4 completed sub-PRs. **DEC-042's `reservation_products` migration is now
-> applied and live-verified** (end-to-end tested via the real API: a write immediately reflected on
-> the next read). **Phase 2's setup + pattern-proving translation is complete (Brief 6, 2026-08-17):**
-> admin-local `lang` state with `localStorage` persistence, sidebar toggle, and
-> `src/components/admin/translations.ts` all in place; `MedicalReportModal.tsx` fully translated and
-> verified. Remaining: repeat the same per-component translation for `MedicalFormModal.tsx`,
-> `CustomerFormModal.tsx`, `PatientsDirectoryView.tsx` (setup doesn't need redoing). **Windsurf
-> implements Phase 1/2 — this plan is the brief input, not something to execute directly against
-> `page.tsx`.**
+> **Status (updated 2026-08-19):** Phase 0 complete (107 tests, Brief 3). Open decisions resolved —
+> see `DECISIONS.md` → **DEC-043**. Reception scope per DEC-043 is **Bookings, Patients, POS, New
+> Booking**. Current state of each, verified against the actual repo, not assumed:
+>
+> | Screen | Extracted | Arabic translated |
+> |---|---|---|
+> | Bookings (`AdminBookingsView.tsx`, 1,308 lines) | ✅ (pre-existing) | ❌ **never briefed** — 0 `lang`/`dir`/`adminTranslations` references |
+> | New Booking (`AdminNewBookingView.tsx`, 1,123 lines) | ✅ (pre-existing) | ❌ **never briefed** — same |
+> | Patients — Directory, 3 modals | ✅ Brief 5 | ✅ Briefs 6-9 (gaps found + closed) |
+> | Patients — Profile Drawer (~1,308 lines, 5 tabs + 3 modals) | state only, Brief 10; JSX itself = **Brief 11, active now** | not started (Brief 12+, after 11) |
+> | POS | N/A — dead mock UI, unreachable through any nav path | **out of scope** — separate open product decision: build the real thing or delete the dead code |
+>
+> **So "Reception is fully in scope" is not close yet** — Bookings and New Booking were extracted
+> before DEC-043 existed (hence skipped the Phase 1 brief list) but that also means Phase 2
+> translation for them was never scoped either; this was only discovered 2026-08-19 while writing
+> Brief 11, not previously documented. Remaining work, in the order that makes sense: **Brief 11**
+> (Profile Drawer JSX extraction, active) → **Brief 12** (Profile Drawer translation) → **Brief 13**
+> (Bookings translation — no extraction needed, straight to Phase 2) → **Brief 14** (New Booking
+> translation, same). POS stays a standalone product decision, not a translation task.
+>
+> DEC-042's `reservation_products` migration is applied and live-verified. Windsurf implements
+> Phase 1/2 — this plan is the brief input, not something to execute directly against `page.tsx`.
 > **Written:** 2026-08-17, after a full-system audit (RISK-038…RISK-050).
 
 ---
