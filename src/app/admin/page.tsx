@@ -7015,6 +7015,8 @@ export default function AdminPage() {
               deleteServiceFromApi={deleteServiceFromApi}
               authenticatedJsonHeaders={authenticatedJsonHeaders}
               hasPermission={hasPermission}
+              lang={lang}
+              t={adminTranslations[lang].services}
             />
           )}
 

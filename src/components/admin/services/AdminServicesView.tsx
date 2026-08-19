@@ -22,6 +22,7 @@ import {
 import { compressImage } from "@/lib/image";
 import ServiceRecipeEditor from "@/components/admin/services/ServiceRecipeEditor";
 import ServiceDeviceEditor from "@/components/admin/services/ServiceDeviceEditor";
+import { adminTranslations } from "@/components/admin/translations";
 
 interface AdminServicesViewProps {
   // State
@@ -121,6 +122,8 @@ interface AdminServicesViewProps {
   deleteServiceFromApi: (id: number) => Promise<boolean>;
   authenticatedJsonHeaders: { "Content-Type": string; Authorization: string };
   hasPermission: (perm: string) => boolean;
+  lang: "en" | "ar";
+  t: typeof adminTranslations["en"]["services"];
 }
 
 export default function AdminServicesView(props: AdminServicesViewProps) {
@@ -170,21 +173,22 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
     toggleCategoryExpand, removeCategory, toggleService,
     syncServicesToApi, loadServicesFromApi, deleteServiceFromApi,
     authenticatedJsonHeaders, hasPermission,
+    lang, t,
   } = props;
 
   return (
-    <div>
+    <div dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-2xl font-semibold text-[#1F251A]">Services</h2>
+        <h2 className="text-2xl font-semibold text-[#1F251A]">{t.heading}</h2>
         <div className="flex flex-wrap items-center gap-2">
           <button className="inline-flex items-center gap-2 rounded-lg border border-[#414E36]/30 bg-white px-4 py-2 text-sm font-medium text-[#414E36] shadow-sm transition hover:bg-[#414E36]/5">
-            <Upload size={14} /> Import
+            <Upload size={14} /> {t.importBtn}
           </button>
           <button
             onClick={() => setShowAddCategoryModal(true)}
             className="inline-flex items-center gap-2 rounded-xl bg-[#414E36] px-4 py-2 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer"
           >
-            <Plus size={14} /> Add Category
+            <Plus size={14} /> {t.addCategoryBtn}
           </button>
         </div>
       </div>
@@ -194,18 +198,18 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
         <div className="flex flex-wrap items-center gap-3 flex-1">
           <div className="relative max-w-xs flex-1 min-w-[220px] flex items-center gap-2">
             <div className="relative flex-1">
-              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+              <Search size={14} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
               <input
                 value={serviceSearch}
                 onChange={(e) => { setServiceSearch(e.target.value); }}
-                placeholder="Search services…"
-                className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2 pl-9 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 shadow-2xs"
+                placeholder={t.searchPlaceholder}
+                className="w-full rounded-xl border border-[#414E36]/15 bg-white py-2 ps-9 pe-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 shadow-2xs"
               />
             </div>
             <button
               type="button"
               onClick={() => setShowServiceFilterPanel(prev => !prev)}
-              title="Filter"
+              title={t.filterTitle}
               className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
                 showServiceFilterPanel || serviceFilterStatus !== "All"
                   ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
@@ -214,7 +218,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
             >
               <Filter size={15} />
               {serviceFilterStatus !== "All" && (
-                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                <span className="absolute -top-1 -end-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
               )}
             </button>
           </div>
@@ -226,12 +230,12 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
               onChange={(e) => setServiceSortBy(e.target.value as any)}
               className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#414E36] outline-none transition focus:border-[#C4AE7C] shadow-2xs cursor-pointer"
             >
-              <option value="custom">Sort: Default / Drag Order</option>
-              <option value="name_asc">Sort: Name (A to Z)</option>
-              <option value="name_desc">Sort: Name (Z to A)</option>
-              <option value="price_asc">Sort: Price (Low to High)</option>
-              <option value="price_desc">Sort: Price (High to Low)</option>
-              <option value="newest">Sort: Newest First</option>
+              <option value="custom">{t.sortDefault}</option>
+              <option value="name_asc">{t.sortNameAsc}</option>
+              <option value="name_desc">{t.sortNameDesc}</option>
+              <option value="price_asc">{t.sortPriceAsc}</option>
+              <option value="price_desc">{t.sortPriceDesc}</option>
+              <option value="newest">{t.sortNewest}</option>
             </select>
           </div>
         </div>
@@ -245,7 +249,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
           }}
           className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#F9F9F7] transition shadow-2xs"
         >
-          {localCategories.every(c => expandedCategories[c.key] ?? true) ? "Collapse All" : "Expand All"}
+          {localCategories.every(c => expandedCategories[c.key] ?? true) ? t.collapseAll : t.expandAll}
         </button>
       </div>
 
@@ -253,15 +257,15 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
       {showServiceFilterPanel && (
         <div className="mb-5 grid grid-cols-1 gap-4 rounded-2xl border border-[#414E36]/10 bg-[#F9F9F7] p-4 md:grid-cols-3 items-end shadow-sm animate-fadeIn">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Status Filter</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.statusFilterLabel}</label>
             <select
               value={serviceFilterStatus}
               onChange={(e) => setServiceFilterStatus(e.target.value as any)}
               className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C]"
             >
-              <option value="All">All Statuses</option>
-              <option value="Active">Active Only</option>
-              <option value="Inactive">Inactive Only</option>
+              <option value="All">{t.allStatuses}</option>
+              <option value="Active">{t.activeOnly}</option>
+              <option value="Inactive">{t.inactiveOnly}</option>
             </select>
           </div>
           <div className="md:col-span-2 flex justify-end">
@@ -272,7 +276,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
               }}
               className="px-4 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600 hover:bg-red-100 transition cursor-pointer"
             >
-              Clear Filters
+              {t.clearFilters}
             </button>
           </div>
         </div>
@@ -346,18 +350,18 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     onMouseLeave={() => setCatDraggable(prev => ({ ...prev, [cat.key]: false }))}
                     onClick={(e) => e.stopPropagation()}
                     className="cursor-grab active:cursor-grabbing inline-flex h-7 w-7 items-center justify-center rounded border border-[#414E36]/10 bg-white text-[#5A6A51]/60 hover:bg-[#F2EFE9] hover:text-[#414E36] transition"
-                    title="Drag to reorder category"
+                    title={t.dragReorderCategory}
                   >
                     <GripVertical size={14} />
                   </div>
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EDF1EC]">
                     <Layers size={16} className="text-[#414E36]" />
                   </div>
-                  <div className="text-left">
+                  <div className="text-start">
                     <p className="font-semibold text-[#1F251A]">{cat.en}</p>
                   </div>
-                  <span className="ml-1 inline-flex items-center rounded-full bg-[#414E36]/8 px-2.5 py-0.5 text-xs font-semibold text-[#414E36]">
-                    {catServices.length} service{catServices.length !== 1 ? "s" : ""}
+                  <span className="ms-1 inline-flex items-center rounded-full bg-[#414E36]/8 px-2.5 py-0.5 text-xs font-semibold text-[#414E36]">
+                    {catServices.length} {catServices.length !== 1 ? t.serviceCountSuffixPlural : t.serviceCountSuffix}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -368,7 +372,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     }}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
                   >
-                    Remove
+                    {t.removeBtn}
                   </button>
                   <button
                     onClick={(e) => {
@@ -393,7 +397,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     }}
                     className={`${hasPermission("services.create") ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-xl bg-[#414E36] px-3.5 py-1.5 text-xs font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] cursor-pointer`}
                   >
-                    <Plus size={12} /> Add Service
+                    <Plus size={12} /> {t.addServiceBtn}
                   </button>
                   <span className="text-[#5A6A51] transition-transform duration-200" style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}>
                     <ChevronDown size={18} />
@@ -409,8 +413,8 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#EDF1EC]">
                         <Layers size={20} className="text-[#5A6A51]" />
                       </div>
-                      <p className="text-sm font-medium text-[#1F251A]">No services yet</p>
-                      <p className="text-xs text-[#5A6A51]">Click &ldquo;Add Service&rdquo; to add one to this category.</p>
+                      <p className="text-sm font-medium text-[#1F251A]">{t.noServicesYet}</p>
+                      <p className="text-xs text-[#5A6A51]">{t.noServicesHint}</p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
@@ -418,13 +422,13 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                         <thead>
                           <tr className="bg-[#F9F9F7]">
                             <th className="w-10 px-3 py-2.5"></th>
-                            <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">ID</th>
-                            <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Name</th>
-                            <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Created At</th>
-                            <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Branch Price</th>
-                            <th className="px-5 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Branches</th>
-                            <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Sort Order</th>
-                            <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">Status</th>
+                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colId}</th>
+                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colName}</th>
+                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colCreatedAt}</th>
+                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colBranchPrice}</th>
+                            <th className="px-5 py-2.5 text-start text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colBranches}</th>
+                            <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colSortOrder}</th>
+                            <th className="px-5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-widest text-[#5A6A51]">{t.colStatus}</th>
                             <th className="px-3 py-2.5"></th>
                           </tr>
                         </thead>
@@ -471,7 +475,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                     onMouseEnter={() => setRowDraggable(prev => ({ ...prev, [svc.id]: true }))}
                                     onMouseLeave={() => setRowDraggable(prev => ({ ...prev, [svc.id]: false }))}
                                     className="cursor-grab active:cursor-grabbing inline-flex h-7 w-7 items-center justify-center rounded border border-[#414E36]/10 bg-white text-[#5A6A51]/60 hover:bg-[#F2EFE9] hover:text-[#414E36] transition"
-                                    title="Drag to reorder"
+                                    title={t.dragReorder}
                                   >
                                     <GripVertical size={14} />
                                   </div>
@@ -481,7 +485,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                   <div className="flex items-center gap-2">
                                     <p className={`font-semibold ${ rowFaded ? "line-through text-[#5A6A51]" : "text-[#1F251A]" }`}>{svc.en}</p>
                                     {isInactive && (
-                                      <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-500">Inactive</span>
+                                      <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-500">{t.statusInactive}</span>
                                     )}
                                   </div>
                                 </td>
@@ -532,12 +536,12 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
                                       : "bg-gray-100 text-gray-500 border border-gray-200"
                                   }`}>
-                                    {toggles.active ? "Active" : "Inactive"}
+                                    {toggles.active ? t.statusActive : t.statusInactive}
                                   </span>
                                 </td>
                                 {/* 3 Dots Actions Menu */}
                                 <td className="px-3 py-3 text-center">
-                                  <div className="relative inline-block text-left">
+                                  <div className="relative inline-block text-start">
                                     <button
                                       type="button"
                                       onClick={(e) => {
@@ -549,13 +553,13 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                           ? "border-[#414E36] bg-[#414E36] text-white"
                                           : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
                                       }`}
-                                      title="Actions"
+                                      title={t.actionsTitle}
                                     >
                                       <MoreVertical size={13} />
                                     </button>
 
                                     {activeServiceRowMenuId === svc.id && (
-                                      <div className="absolute right-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left dropdown-action-menu">
+                                      <div className="absolute end-0 top-8 z-50 w-44 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-start dropdown-action-menu">
                                         {hasPermission("services.edit") && (
                                           <>
                                             <button
@@ -565,10 +569,10 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                                 setActiveServiceRowMenuId(null);
                                                 handleEditService(svc);
                                               }}
-                                              className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                              className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
                                             >
                                               <Pencil size={13} className="text-[#5A6A51]" />
-                                              <span>Edit Service</span>
+                                              <span>{t.editService}</span>
                                             </button>
 
                                             <button
@@ -577,14 +581,14 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                                 e.stopPropagation();
                                                 toggleService(svc.id, "active");
                                               }}
-                                              className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center justify-between transition cursor-pointer"
+                                              className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center justify-between transition cursor-pointer"
                                             >
                                               <div className="flex items-center gap-2">
                                                 <span className={`h-2 w-2 rounded-full ${toggles.active ? "bg-emerald-500" : "bg-gray-300"}`} />
-                                                <span>{toggles.active ? "Deactivate" : "Activate"}</span>
+                                                <span>{toggles.active ? t.deactivate : t.activate}</span>
                                               </div>
                                               <span className="text-[10px] font-bold text-[#5A6A51] bg-[#F2EFE9] px-1.5 py-0.5 rounded">
-                                                {toggles.active ? "Active" : "Off"}
+                                                {toggles.active ? t.statusActive : t.statusOff}
                                               </span>
                                             </button>
                                           </>
@@ -598,10 +602,10 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                                               setActiveServiceRowMenuId(null);
                                               setDeleteServiceTarget(svc);
                                             }}
-                                            className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
+                                            className="w-full text-start px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
                                           >
                                             <Trash2 size={13} className="text-red-600" />
-                                            <span>Delete Service</span>
+                                            <span>{t.deleteService}</span>
                                           </button>
                                         )}
                                       </div>
@@ -624,12 +628,12 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
       {/* Summary bar */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#414E36]/8 bg-white px-4 py-3 text-sm text-[#5A6A51] shadow-sm">
-        <span>{filteredServices.length} total services across {localCategories.length} categories</span>
+        <span>{t.summaryTotal(filteredServices.length, localCategories.length)}</span>
         <button
           onClick={() => setExpandedCategories(prev => Object.fromEntries(Object.keys(prev).map(k => [k, true])))}
           className="text-xs font-medium text-[#414E36] underline-offset-2 hover:underline"
         >
-          Expand All
+          {t.expandAll}
         </button>
       </div>
 
@@ -645,11 +649,11 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                   <line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-[#1F251A]">Delete Category?</h3>
+              <h3 className="text-lg font-bold text-[#1F251A]">{t.deleteCategoryTitle}</h3>
             </div>
             
             <p className="text-sm text-[#5A6A51] leading-relaxed mb-6">
-              Are you sure you want to delete the category <span className="font-semibold text-[#1F251A]">&ldquo;{deleteCategoryTarget.en}&rdquo;</span>? All services inside this category will also be deleted. This action cannot be undone.
+              {t.deleteCategoryConfirm(deleteCategoryTarget.en)}
             </p>
 
             <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/8 pt-4">
@@ -657,7 +661,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 onClick={() => setDeleteCategoryTarget(null)}
                 className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
               >
-                Cancel
+                {t.cancelBtn}
               </button>
               <button
                 onClick={() => {
@@ -666,7 +670,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 }}
                 className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
               >
-                Yes, Delete
+                {t.yesDeleteBtn}
               </button>
             </div>
           </div>
@@ -681,11 +685,11 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600">
                 <Trash2 size={20} />
               </div>
-              <h3 className="text-lg font-bold text-[#1F251A]">Delete Service?</h3>
+              <h3 className="text-lg font-bold text-[#1F251A]">{t.deleteServiceTitle}</h3>
             </div>
             
             <p className="text-sm text-[#5A6A51] leading-relaxed mb-6">
-              Are you sure you want to delete the service <span className="font-semibold text-[#1F251A]">&ldquo;{deleteServiceTarget.en}&rdquo;</span>? This action cannot be undone.
+              {t.deleteServiceConfirm(deleteServiceTarget.en)}
             </p>
 
             <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/8 pt-4">
@@ -696,7 +700,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 }}
                 className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
               >
-                Cancel
+                {t.cancelBtn}
               </button>
               <button
                 onClick={async () => {
@@ -708,7 +712,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 }}
                 className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
               >
-                Yes, Delete
+                {t.yesDeleteBtn}
               </button>
             </div>
           </div>
@@ -722,8 +726,8 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-lg font-semibold text-[#1F251A]">Add New Category</h3>
-                <p className="text-sm text-[#5A6A51]">Create a new service category for the clinic.</p>
+                <h3 className="text-lg font-semibold text-[#1F251A]">{t.addNewCategoryTitle}</h3>
+                <p className="text-sm text-[#5A6A51]">{t.addNewCategorySubtitle}</p>
               </div>
               <button
                 onClick={() => setShowAddCategoryModal(false)}
@@ -734,11 +738,11 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
             </div>
             <div className="flex flex-col gap-4">
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">Category Name (English)</label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#5A6A51]">{t.categoryNameEnLabel}</label>
                 <input
                   value={newCategoryNameEn}
                   onChange={(e) => setNewCategoryNameEn(e.target.value)}
-                  placeholder="e.g. Dermatology & Aesthetic"
+                  placeholder={t.categoryNameEnPlaceholder}
                   className="w-full rounded-lg border border-[#414E36]/15 bg-[#F9F9F7] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20"
                 />
               </div>
@@ -748,7 +752,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 onClick={() => setShowAddCategoryModal(false)}
                 className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#F9F9F7]"
               >
-                Cancel
+                {t.cancelBtn}
               </button>
               <button
                 onClick={() => {
@@ -763,7 +767,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 }}
                 className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
               >
-                Create Category
+                {t.createCategoryBtn}
               </button>
             </div>
           </div>
@@ -778,7 +782,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-[#414E36]/10 px-6 py-4">
               <h3 className="text-lg font-bold text-[#1F251A]">
-                {editingService ? "Edit Service" : "Add Service"}
+                {editingService ? t.editServiceTitle : t.addServiceTitle}
               </h3>
               <button
                 type="button"
@@ -794,13 +798,13 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
               
               {/* Service Image Section */}
               <div className="flex flex-col items-center justify-center">
-                <span className="text-sm font-semibold text-[#5A6A51] mb-2">Service Image</span>
+                <span className="text-sm font-semibold text-[#5A6A51] mb-2">{t.serviceImageLabel}</span>
                 <label className="relative flex h-28 w-28 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#414E36]/20 bg-[#FBFBF9] transition hover:bg-[#F2EFE9] overflow-hidden group">
                   {serviceImageUrl ? (
                     <>
                       <img src={serviceImageUrl} alt="Service preview" className="h-full w-full object-cover" />
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="text-[10px] text-white font-medium text-center px-1">Change Image</span>
+                        <span className="text-[10px] text-white font-medium text-center px-1">{t.changeImage}</span>
                       </div>
                     </>
                   ) : (
@@ -832,7 +836,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     }}
                   />
                 </label>
-                <span className="text-[11px] text-[#5A6A51]/75 mt-2">Click to upload or change the image</span>
+                <span className="text-[11px] text-[#5A6A51]/75 mt-2">{t.clickToUpload}</span>
               </div>
 
               {/* 2-Column fields */}
@@ -841,14 +845,14 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 {/* Service Category */}
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                    Service Category <span className="text-red-500">*</span>
+                    {t.serviceCategoryLabel} <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={serviceCategory}
                     onChange={(e) => setServiceCategory(e.target.value)}
                     className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                   >
-                    <option value="" disabled>Select Category</option>
+                    <option value="" disabled>{t.selectCategory}</option>
                     {localCategories.map(cat => (
                       <option key={cat.key} value={cat.key}>{cat.en}</option>
                     ))}
@@ -858,7 +862,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 {/* Duration */}
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                    Duration <span className="text-red-500">*</span>
+                    {t.durationLabel} <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={serviceDuration}
@@ -883,7 +887,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 {/* Duration (minutes) */}
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                    Duration (minutes) <span className="text-red-500">*</span>
+                    {t.durationMinutesLabel} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -905,29 +909,29 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 {/* Session Type */}
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                    Session Type <span className="text-red-500">*</span>
+                    {t.sessionTypeLabel} <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={serviceUnitType}
                     onChange={(e) => setServiceUnitType(e.target.value)}
                     className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                   >
-                    <option value="in_clinic">In-Clinic Only</option>
-                    <option value="online">Online Only</option>
-                    <option value="both">Both (In-Clinic & Online)</option>
+                    <option value="in_clinic">{t.sessionInClinic}</option>
+                    <option value="online">{t.sessionOnline}</option>
+                    <option value="both">{t.sessionBoth}</option>
                   </select>
                 </div>
 
                 {/* Service Name EN */}
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                    Service Name (EN) <span className="text-red-500">*</span>
+                    {t.serviceNameEnLabel} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={serviceNameEn}
                     onChange={(e) => setServiceNameEn(e.target.value)}
-                    placeholder="Physio: Full Transformation (15)"
+                    placeholder={t.serviceNameEnPlaceholder}
                     className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                   />
                 </div>
@@ -935,13 +939,13 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 {/* Service Name AR */}
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                    Service Name (AR) <span className="text-red-500">*</span>
+                    {t.serviceNameArLabel} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={serviceNameAr}
                     onChange={(e) => setServiceNameAr(e.target.value)}
-                    placeholder="علاج طبيعي: باقة التحول (15 جلسة)"
+                    placeholder={t.serviceNameArPlaceholder}
                     dir="rtl"
                     className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium"
                   />
@@ -949,24 +953,24 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
                 {/* English Description */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">English Description</label>
+                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">{t.englishDescLabel}</label>
                   <textarea
                     value={serviceDescEn}
                     onChange={(e) => setServiceDescEn(e.target.value)}
                     rows={3}
-                    placeholder="Enter English description..."
+                    placeholder={t.englishDescPlaceholder}
                     className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium resize-none"
                   />
                 </div>
 
                 {/* Arabic Description */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">Arabic Description</label>
+                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">{t.arabicDescLabel}</label>
                   <textarea
                     value={serviceDescAr}
                     onChange={(e) => setServiceDescAr(e.target.value)}
                     rows={3}
-                    placeholder="أدخل الوصف باللغة العربية..."
+                    placeholder={t.arabicDescPlaceholder}
                     dir="rtl"
                     className="w-full rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C] focus:ring-2 focus:ring-[#C4AE7C]/20 text-[#1F251A] font-medium resize-none"
                   />
@@ -974,7 +978,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
                 {/* Sort Order */}
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">Sort Order</label>
+                  <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">{t.sortOrderLabel}</label>
                   <input
                     type="number"
                     value={serviceSortOrder}
@@ -986,10 +990,10 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 {/* Price */}
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold text-[#5A6A51]">
-                    Price (EGP) <span className="text-red-500">*</span>
+                    {t.priceLabel} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative flex rounded-lg border border-[#414E36]/15 bg-[#FBFBF9] overflow-hidden text-sm">
-                    <span className="bg-[#F2EFE9] border-r border-[#414E36]/15 px-3.5 py-2.5 text-[#5A6A51] font-semibold">EGP</span>
+                    <span className="bg-[#F2EFE9] border-e border-[#414E36]/15 px-3.5 py-2.5 text-[#5A6A51] font-semibold">EGP</span>
                     <input
                       type="number"
                       value={servicePrice}
@@ -1007,8 +1011,8 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 {/* Is Shared Toggle */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-[#1F251A]">Is Shared</span>
-                    <span className="text-xs text-[#5A6A51] mt-0.5">Service that can be booked by multiple clients at the same time</span>
+                    <span className="text-sm font-semibold text-[#1F251A]">{t.isSharedLabel}</span>
+                    <span className="text-xs text-[#5A6A51] mt-0.5">{t.isSharedDesc}</span>
                   </div>
                   <button
                     type="button"
@@ -1025,7 +1029,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
 
                 {/* Enable Booking Reminder Toggle */}
                 <div className="flex items-start justify-between gap-4">
-                  <span className="text-sm font-semibold text-[#1F251A]">Enable Booking Reminder</span>
+                  <span className="text-sm font-semibold text-[#1F251A]">{t.enableReminderLabel}</span>
                   <button
                     type="button"
                     onClick={() => setServiceEnableReminder(!serviceEnableReminder)}
@@ -1062,7 +1066,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                     className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 cursor-pointer"
                   >
                     <Trash2 size={14} />
-                    <span>Delete Service</span>
+                    <span>{t.deleteService}</span>
                   </button>
                 )}
               </div>
@@ -1073,14 +1077,14 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                   onClick={() => setShowAddServiceModal(false)}
                   className="rounded-lg border border-[#414E36]/15 px-5 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
                 >
-                  Cancel
+                  {t.cancelBtn}
                 </button>
               <button
                 type="button"
                 onClick={async () => {
                   if (!serviceNameEn.trim()) return;
                   if (serviceDurationMinutes <= 0 || serviceDurationMinutes > 1440) {
-                    alert("Duration must be between 1 and 1440 minutes.");
+                    alert(t.durationAlert);
                     return;
                   }
 
@@ -1158,7 +1162,7 @@ export default function AdminServicesView(props: AdminServicesViewProps) {
                 }}
                 className="rounded-lg bg-[#414E36] px-6 py-2 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26]"
               >
-                Save
+                {t.saveBtn}
               </button>
             </div>
           </div>
