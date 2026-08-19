@@ -1221,7 +1221,7 @@ export default function CustomerProfileDrawer({
                           </p>
                         </div>
                         <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-bold text-gray-500 capitalize">
-                          {String(pkg.status).replace("_", " ")}
+                          {(t.packageStatusLabels as Record<string, string>)[String(pkg.status)] || String(pkg.status).replace("_", " ")}
                         </span>
                       </div>
                     ))}
