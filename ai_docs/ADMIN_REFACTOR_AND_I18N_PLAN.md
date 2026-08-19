@@ -9,12 +9,12 @@
 > | Screen | Extracted | Arabic translated |
 > |---|---|---|
 > | Bookings (`AdminBookingsView.tsx`, 1,308 lines) | ✅ (pre-existing) | ✅ Brief 13 (landed clean, no gaps) |
-> | New Booking (`AdminNewBookingView.tsx`, 1,123 lines) | ✅ (pre-existing) | **Brief 14, in progress** |
+> | New Booking (`AdminNewBookingView.tsx`, 1,123 lines) | ✅ (pre-existing) | ✅ Brief 14 (landed clean, no gaps) |
 > | Patients — Directory, 3 modals | ✅ Brief 5 | ✅ Briefs 6-9 (gaps found + closed) |
 > | Patients — Profile Drawer (1,539 lines, 5 tabs + 3 modals) | ✅ Briefs 10 (state) + 11 (JSX) | ✅ Brief 12 (2 gaps found + closed) |
-> | Doctors (`page.tsx:7711-8372`, ~661 lines) | ❌ not started (Brief 15 queued) | ❌ not started |
-> | Services (`page.tsx:8375-9370`, ~995 lines) | ❌ not started (Brief 16 queued) | ❌ not started |
-> | Inventory (`page.tsx:14724-16063` + `page.tsx:23321-23506`, ~1,530 lines) | ❌ not started (Brief 17 queued) | ❌ not started |
+> | Doctors (`page.tsx:7711-8372`, ~661 lines) | ✅ Brief 15 (verified, no gaps) | not yet briefed |
+> | Services (`page.tsx:8375-9370`, ~995 lines) | ✅ Brief 16 (verified — surfaced pre-existing RISK-064) | not yet briefed |
+> | Inventory (`page.tsx:14724-16063` + `page.tsx:23321-23506`, ~1,530 lines) | **Brief 17, next** | not yet briefed |
 > | POS | N/A — dead mock UI, unreachable through any nav path | **out of scope** — separate open product decision: build the real thing or delete the dead code |
 >
 > **Doctors and Services added to scope 2026-08-19** (DEC-043 correction) — Reception doesn't edit
@@ -32,11 +32,16 @@
 > extract-after-translate-decision order as everything else, but only after Part 1 is verified —
 > extracting a screen whose permission model was still being decided would have needed redoing.
 >
-> **Remaining Phase 2 work on the already-extracted screens:** ~~Brief 12~~ (Profile Drawer) →
-> ~~Brief 13~~ (Bookings) — both landed 2026-08-19 → **Brief 14** (New Booking, in progress). Then
-> Doctors, Services, and Inventory each need their own Phase 1 (extraction — Briefs 15/16/17, all
-> written and queued) before Phase 2 can start on them. POS stays a standalone product decision, not
-> a translation task.
+> **Reception Phase 1 (extraction) is essentially done** — ~~Brief 15~~ (Doctors) and ~~Brief 16~~
+> (Services) both landed and verified 2026-08-19. Only Inventory's extraction remains, gated on
+> **Brief 17** (permission enforcement first, then extraction — both parts written, next up).
+> Doctors and Services now need Phase 2 (translation) briefs written — not yet done. POS stays a
+> standalone product decision, not a translation task.
+>
+> **Process note worth flagging:** four briefs in a row (5, 13, 14, 15+16) have landed in commits
+> that swept in unrelated content or mislabeled which brief(s) they covered. Content was verified
+> correct independently every time, but this is now a pattern, not a one-off — worth raising with
+> whoever is driving the Windsurf side about commit hygiene going forward.
 
 ---
 

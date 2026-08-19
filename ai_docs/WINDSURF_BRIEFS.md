@@ -10,145 +10,7 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 14 — Phase 2: translate `AdminNewBookingView.tsx` to Arabic
-
-**Brief 13 landed 2026-08-19 — see its archive entry below** (`bookings` top-level namespace now
-exists, extend it here, don't duplicate). Same situation and same reasoning as Brief 13 — already
-extracted, never translated, zero Arabic wiring today. **Phase 2 only, no extraction.**
-
-**Target:** `src/components/admin/bookings/AdminNewBookingView.tsx` (1,123 lines).
-
-**Measured scope (grepped 2026-08-19, re-confirm):** ~38 hardcoded strings, **7 `placeholder`
-attributes** (unlike Brief 13 — this is a form-heavy screen, so placeholders and any validation /
-`alert()` copy matter here), RTL-sensitive Tailwind = `text-right` ×8, `right-0` ×1, `pr-3` ×1,
-`left-0` ×1.
-
-**Wiring:** add `lang`/`t` props and a `bookings.adminNewBookingView` namespace. If Brief 13 landed
-first it will already have created the `bookings` top-level namespace — extend it, don't duplicate
-it. Pass props from `admin/page.tsx` at its render sites (~21740 and ~21804 — again, more than one).
-
-**Value/label separation:** session type (in-clinic / online), payment method, and any service or
-branch identifier must keep English/DB values. Service names come from the DB and already have
-`en`/`ar` columns — use those, do not copy service names into `translations.ts`.
-
-**Dates:** 3 `toLocale*` calls — leave hardcoded.
-
-**Method / exit criteria:** identical to Briefs 12-13. Browser-verify by actually creating a booking
-in Arabic end-to-end and confirming the created record's stored fields are English.
-
----
----
-
-# QUEUED BRIEFS — do these next, in this order
-
-## Brief 15 — Phase 1: extract `Doctors` from `admin/page.tsx`
-
-**Why this exists:** DEC-043's 2026-08-19 correction added Doctors to Reception scope (Reception
-already gets a read-only view today via existing `providers.edit`/`.delete` permission gates — see
-the correction note for the investigation). This brief does extraction only, no translation, same
-extract-then-translate split as every other section. **Read this whole brief before starting —
-unlike every prior Phase 1 brief, this section is not one contiguous block.**
-
-**The ecosystem is scattered across 3 separate regions of `page.tsx` (verified by direct read,
-2026-08-19 — re-confirm line numbers, other work has been landing on this file):**
-
-1. **Main `activeNav === "Doctors"` block**, lines 7711–8372 (~661 lines). Three-way conditional:
-   `viewingDoctorDetails` → already-extracted `<DoctorProfileDetailsView />` (just a call, no
-   change needed) · `editingDoctorInline` → a full-page inline edit form (~406 lines) · else → the
-   doctors list/directory (~246 lines, includes an "Audit Logs" button and per-row Edit/Delete
-   actions gated by `hasPermission("providers.edit"/".delete")`).
-2. **Add/Edit Provider modal**, lines 22897–23318 (~421 lines) — over 14,000 lines away from the
-   block above. Opened only via `openAddProviderModal()` (line 5158) for **adding** a new doctor.
-3. **Audit Logs modal**, lines 23509–23624 (~115 lines) — also far away. Opened only from the
-   list's "Audit Logs" button. Fully self-contained: own state (`showAuditLogsModal`, line 4295)
-   and fetcher (`fetchAuditLogs()`, line 5054), not shared with anything else in this ecosystem.
-
-**Critical finding — regions 1 and 2 share one set of ~31 state variables, don't split them
-naively.** The inline edit form (region 1) and the Add/Edit modal (region 2) both read/write the
-identical `providerForm*` state block (lines 4255–4294: name, rating, commission fields, working
-hours, branch schedules, etc. — confirmed by grep, both regions reference the same 20 field names).
-This is **not** two unsynced editors (not a RISK-045 situation) — it's one shared form whose
-presentation differs by context: `openAddProviderModal()` shows the modal for new doctors;
-`openEditProviderModal(provider)` (misleadingly named — it actually sets `editingDoctorInline` and
-**closes** the modal, line 5210) routes existing-doctor edits to the inline full-page view instead.
-Both funnel into the same `handleSaveProvider()` (lines 5290–5473) and `handleDeleteProvider()`
-(lines 5475–5496). Renaming `openEditProviderModal` to something accurate is optional, not required
-by this brief — use judgement, don't let it expand scope.
-
-**Also found while investigating — dead/orphaned code, move it, don't complete it or drop it:**
-`providerTab` (`"Doctors" | "Attendance"`, line 1555), `attendanceDate`/`attendanceRecords`
-(lines 4299–4303), and `fetchAttendance()` (line 5065) have full data-fetching plumbing — including
-a permission-normalisation effect (lines 2199–2208) and a fetch-trigger effect (lines 5115–5118) —
-for what looks like a planned "Attendance" sub-tab on the Doctors screen. **Confirmed by exhaustive
-grep: zero JSX anywhere renders `providerTab`, `attendanceRecords`, or an Attendance tab.** It is
-declared and fetched but never displayed — the same shape of gap as DEC-042's `attachedProducts`
-and the dead `lang` state Brief 6 found. Move this state/logic verbatim wherever it ends up (do not
-silently delete it, do not invent UI to "finish" it) and flag it in your completion report so a
-human can decide later whether to build the missing tab or delete the plumbing.
-
-**Scope — 4 ordered sub-PRs, same reasoning as Brief 5/10/11 (shared state can't be split from its
-two consumer UIs without lifting it to a hook first), each its own commit:**
-1. **Audit Logs modal** → `src/components/admin/doctor/DoctorAuditLogsModal.tsx` (or similar).
-   Fully independent of the `providerForm*` state — safe to do first, proves the pattern for this
-   section the same way Brief 5's Sub-PR 1 did for Patients.
-2. **`useProviderForm` hook** (or similar name) → move all `providerForm*` state (lines 4255–4294),
-   `providers`/`editingDoctorInline`/`viewingDoctorDetails`/`showProviderModal`/`providerModalMode`/
-   `providerEditingId` (lines 4103, 4244–4254), the provider filter/search state (lines 4307–4311),
-   the dead Attendance plumbing (moves here too, still unused), and the 4 handlers
-   (`openAddProviderModal`, `openEditProviderModal`, `handleSaveProvider`, `handleDeleteProvider` —
-   NOT `fetchAuditLogs`, that stays with Sub-PR 1) into `src/components/admin/doctor/useProviderForm.ts`.
-   `page.tsx` calls this once and passes the result to both consumers as props — same
-   no-double-hook-call rule as Brief 10.
-3. **Add/Edit Provider modal JSX** → `src/components/admin/doctor/ProviderFormModal.tsx`, consuming
-   the hook's output as props.
-4. **Main Doctors list + inline edit view JSX** → `src/components/admin/doctor/AdminDoctorsView.tsx`,
-   same props pattern. `DoctorServiceCommissionEditor` (already extracted, also used elsewhere —
-   Services and doctor payroll) is imported as-is, no changes needed to it.
-
-**Method:** no behaviour change, no renames (beyond the optional one noted above), no translation.
-`npm run check` green after every sub-PR. Browser-verify each sub-PR before moving to the next:
-list loads, Add Doctor (modal) and Edit Doctor (inline) both save correctly to the same record
-shape, Delete Doctor works, Audit Logs opens and loads entries.
-
-**Exit criteria:** `admin/page.tsx` no longer declares any of the state/JSX above directly; all 4
-new files render/behave identically to today; `npm run check` green on the final sub-PR.
-
-## Brief 16 — Phase 1: extract `Services` from `admin/page.tsx`
-
-**Why this exists:** same DEC-043 correction as Brief 15. Reception already gets a read-only view
-today via existing `services.create`/`.edit`/`.delete` permission gates.
-
-**Target:** `src/app/admin/page.tsx`, `activeNav === "Services"` block, lines 8375–9370
-(~995 lines). **Unlike Doctors, this section is a single contiguous block** — verified by grep that
-every piece of state it touches (`editingService` line 1721, `showAddCategoryModal` line 1705,
-`newCategoryNameEn`/`newCategoryNameAr` line 1708–1709, `deleteServiceTarget` line 1722) is declared
-once and referenced **only** inside this block, nowhere else in the file. No hidden cross-section
-sharing to investigate, no scattered modals elsewhere — this is a Brief-4-shaped extraction, not a
-Brief-5-shaped one.
-
-**Internal structure, all self-contained within the one block:** the services list/catalog view,
-an inline Add/Edit Service form (`editingService`), an Add Category modal (`showAddCategoryModal`,
-~line 8920), and a delete-confirmation modal (`deleteServiceTarget`, ~line 8877). Two
-already-extracted components are consumed here as-is (no changes needed):
-`ServiceRecipeEditor`/`ServiceDeviceEditor` (rendered when `editingService` is set) and
-`DoctorServiceCommissionEditor` (also used by Doctors and doctor payroll elsewhere — shared, don't
-duplicate it).
-
-**Shared/page-level state this block needs as props, not moved:** `localServices`/
-`setLocalServices` and `syncServicesToApi` — these are genuinely page-level (already passed into
-`PromotionsAdminPanel` the same way), not Services-specific state to extract.
-
-**Scope:** move the whole block into `src/components/admin/services/AdminServicesView.tsx`
-(single component, single PR — no sub-PR breakdown needed given the self-containment above). Move
-`editingService`, `showAddCategoryModal`, `newCategoryNameEn`, `newCategoryNameAr`,
-`deleteServiceTarget`, and their handlers together with it.
-
-**Method:** no behaviour change, no renames, no translation. `npm run check` green.
-
-**Exit criteria:** `admin/page.tsx` no longer declares the state above or the JSX directly; renders
-`<AdminServicesView ... />` instead; behaves identically; browser-verify: list loads, add/edit/
-delete a service, add a category, recipe/device/commission editors still open correctly from within
-the edit form.
+Briefs 14, 15, and 16 completed and archived below (2026-08-19).
 
 ## Brief 17 — Wire Inventory permission enforcement, then extract from `admin/page.tsx`
 
@@ -499,6 +361,12 @@ modals render fully Arabic, booking status shows `مكتمل` while the record k
 dates/money stay Western (`18 Aug 2026`, `2360 EGP`), and English mode reverts cleanly. `tsc` 0
 errors, `eslint` 0 errors, `vitest` 597 passed / 6 expected fail (baseline unchanged).
 
+**Process note:** Windsurf began Brief 13 in the same working tree while this verification was
+running, so its in-progress `bookings.adminBookingsView` keys were already sitting uncommitted in
+`translations.ts` — the same file this fix touches. Rather than repeat Brief 5's commit
+commingling, only this change's own hunks were staged (built against `HEAD` and staged via
+`update-index`), leaving Brief 13's work untouched in the working tree for its own commit.
+
 ### Brief 13 — Phase 2: translate `AdminBookingsView.tsx` to Arabic (completed 2026-08-19)
 
 Added `lang`/`t` props (this component had none before), a `bookings.adminBookingsView` namespace —
@@ -532,9 +400,76 @@ objects entirely, caught by `tsc` before it was staged) and staged that exact bl
 plumbing, leaving Brief 14's in-progress `adminNewBookingView` additions untouched in the working
 tree.
 
+### Brief 14 — Phase 2: translate `AdminNewBookingView.tsx` to Arabic (completed 2026-08-19)
 
-**Process note:** Windsurf began Brief 13 in the same working tree while this verification was
-running, so its in-progress `bookings.adminBookingsView` keys were already sitting uncommitted in
-`translations.ts` — the same file this fix touches. Rather than repeat Brief 5's commit
-commingling, only this change's own hunks were staged (built against `HEAD` and staged via
-`update-index`), leaving Brief 13's work untouched in the working tree for its own commit.
+Added `lang`/`t` props, extended the `bookings` namespace with `adminNewBookingView`, wired both
+of `page.tsx`'s render sites (this component genuinely does render twice, unlike Bookings). Also
+fixed a pre-existing bilingual-hack pattern in the Session Type radio cards (same shape as the
+Gender-dropdown issue Briefs 7-8 found) — now clean single labels per language instead of
+"In Person / في العيادة"-style concatenation.
+
+Review outcome: `grep '>[A-Z][a-z]'` and RTL-sensitive-class sweeps both 0; 6 of 7 placeholders
+translated via `tr.*`, the 7th (`placeholder="0"` on the Amount Paid Now field) correctly left as a
+literal digit, not copy, per DEC-043. All 3 `toLocale*` calls confirmed untouched by diffing the
+commit. Session type (`in_person`/`online`) and every DB id in the booking payload confirmed still
+canonical English. No service names duplicated into `translations.ts` — pulled from the DB's own
+`en`/`ar` columns as the brief required. en/ar key parity 410/410 across the whole file. `tsc`/
+`eslint` clean (0 errors), `vitest` 597/603 unchanged. Browser-verified live in both languages:
+opened New Booking from the Bookings-tab entry point, full form (patient info, appointment details,
+session type, notes, amount) renders fully Arabic with Arabic service names pulled correctly from
+the DB, English reverts cleanly. The report's manual test checklist was thorough and accurate,
+matching the actual wiring exactly (correctly notes 2 render sites, not 1).
+
+**Process note, same pattern as Briefs 13/14 before it:** landed in another oversized commit
+(~2,900 lines) sweeping in the same unrelated test-coverage workstream. This one was **already
+pushed to `origin/dev`** by the time it was found — could not be safely un-commingled without a
+force-push to shared history, which was not done. Content verified correct independently of the
+commit hygiene issue. This is now the **third** time in a row a brief's commit has swept in
+unrelated content; worth raising as a process question rather than continuing to silently absorb it
+each time.
+
+### Brief 15 — Phase 1: extract `Doctors` from `admin/page.tsx` (completed 2026-08-19)
+
+Split into the 4 ordered sub-PRs exactly as scoped: `DoctorAuditLogsModal.tsx` (independent, moved
+first), `useProviderForm.ts` (the ~31 shared `providerForm*` fields plus the dead Attendance
+plumbing — confirmed moved **verbatim**, not dropped or "finished"), `ProviderFormModal.tsx`, and
+`AdminDoctorsView.tsx`. `useProviderForm()` is called exactly once in `page.tsx` and passed as a
+single prop to both consumers — no double-hook-call trap. `DoctorServiceCommissionEditor` still
+imported from its one canonical location by all three call sites (page.tsx's remaining Services
+block, `AdminDoctorsView`, `ProviderFormModal`) — not duplicated.
+
+Review outcome: `tsc`/`eslint` clean (0 errors) across all 4 new files plus `page.tsx`, `vitest`
+597/603 unchanged. Browser-verified live: doctors list renders with real data; Audit Logs modal
+opens with real schedule-change history (`saifuldeen Naser`, `UPDATED` badges, timestamps); the
+inline Edit Doctor view opens with correct per-doctor hydration confirmed via direct DOM inspection
+(name and phone fields pre-filled from the actual record, not the placeholder — an empty Specialty
+field on one doctor was a red herring, that doctor's own record genuinely has no specialty set, not
+a hydration bug — confirmed by comparing against the record's own Profile Details view).
+
+### Brief 16 — Phase 1: extract `Services` from `admin/page.tsx` (completed 2026-08-19)
+
+Single-component extraction into `AdminServicesView.tsx` as scoped — no hook needed, confirmed
+self-contained. `localServices`/`setLocalServices`/`syncServicesToApi` passed as props, not moved
+(shared with `PromotionsAdminPanel`, per the brief's own flag). `ServiceRecipeEditor`/
+`ServiceDeviceEditor`/`DoctorServiceCommissionEditor` all still wired correctly.
+
+Review outcome: `tsc`/`eslint` clean (0 errors), `vitest` 597/603 unchanged. Browser-verified live:
+services list renders with real branch pricing; "Add Service" modal opens with the full bilingual
+form (Service Name EN/AR, English/Arabic Description, category, duration, price) working correctly.
+
+**Found, not caused, by this extraction — logged as RISK-064:** the "Add New Category" modal has
+only one input (English name); `newCategoryNameAr` exists in state/props but was never wired to any
+JSX, so every category created there gets a permanently blank Arabic name. Confirmed pre-existing
+by diffing the pre-extraction commit — this dead-state pattern already existed in `page.tsx` before
+Brief 16 touched it, moved verbatim. Not fixed here (a real feature gap, not a mechanical-extraction
+fix); see `ai_docs/RISKS.md` RISK-064 for the exact fix needed.
+
+**Process note:** Briefs 15 and 16 arrived in a single commit mislabeled only as "BRIEF 16",
+touching both features' code in the same `page.tsx` diff (16,149 lines changed). Unlike prior
+commingling incidents, this one is not cleanly separable after the fact — both extractions
+genuinely modified the same file in the same pass, and manually splitting a diff this size would
+risk introducing an error that a clean file-level un-commingling wouldn't. Not pushed at the time
+this was found, so the option existed, but a risky manual split was judged worse than an accurately
+relabeled single commit; verified independently either way. **This is the fourth commingled/
+mislabeled commit in a row** (Briefs 5, 13, 14, and now 15+16) — flagged to Mohamed as a pattern
+worth addressing at the process level, not something to keep silently absorbing per-brief.

@@ -2522,6 +2522,37 @@ the bug is unfixed. Once the guard is corrected, those four assertions will star
 
 ---
 
+## RISK-064: "Add New Category" (Services) Has No Arabic Name Field — Every Category Created There Gets A Permanently Blank `ar`
+
+**Severity:** Low · **Type:** Data integrity / i18n
+**Found:** 2026-08-19, verifying Windsurf's Brief 16 (Services extraction) — not caused by the
+extraction, confirmed pre-existing by diffing against the pre-extraction commit
+(`6abff84:src/app/admin/page.tsx`), where `newCategoryNameAr` was already declared and already
+never referenced anywhere but its own `useState`. The extraction moved this exact, already-broken
+behaviour verbatim into `src/components/admin/services/AdminServicesView.tsx`.
+
+**What it is:** the "Add New Category" modal (`AdminServicesView.tsx`, ~line 725) renders exactly
+one input, "Category Name (English)", bound to `newCategoryNameEn`. Its save handler (~line 754)
+hardcodes the Arabic field: `{ key, en: newCategoryNameEn.trim(), ar: "" }`. The `newCategoryNameAr`
+state (and its setter) exist in the component's own props/type — visible in an eslint
+`no-unused-vars` sweep — but there is no corresponding JSX input anywhere for it. Confirmed live in
+the browser: the modal genuinely shows only one text field.
+
+**Business impact:** every service category created through this form (not seeded via migration or
+direct DB edit) has a permanently blank Arabic name unless someone later finds and manually edits
+it elsewhere. Anywhere the public site or admin panel displays a category's Arabic label would show
+blank for these categories — silent, not an error, easy to miss until a patient-facing Arabic page
+is checked.
+
+**Not fixed** — out of scope for Brief 16, which was extraction-only with an explicit
+no-behaviour-change requirement; building the missing field is a real (if small) feature addition,
+not a mechanical move. Fix is a second input in the same modal ("Category Name (Arabic)") bound to
+`newCategoryNameAr`, and changing the save handler's `ar: ""` to `ar: newCategoryNameAr.trim()` —
+the state and prop plumbing to do this already exist, only the JSX and the one save-handler field
+are missing.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:
