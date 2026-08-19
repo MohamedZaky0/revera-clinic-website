@@ -10,51 +10,11 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 13 — Phase 2: translate `AdminBookingsView.tsx` to Arabic
-
-**Why this exists:** DEC-043 scoped Arabic to Reception = Bookings, Patients, POS, New Booking.
-`AdminBookingsView.tsx` was already extracted *before* DEC-043 was written, so it never appeared in
-Phase 1's brief list — and as a result its Phase 2 translation was never scoped either. It has
-**zero** Arabic wiring today (no `lang`, no `dir`, no `adminTranslations` — confirmed by grep
-2026-08-19) despite being one of the most-used Reception screens in the product. This was only
-discovered while writing Brief 11. **No extraction needed — this is Phase 2 only.**
-
-**Target:** `src/components/admin/bookings/AdminBookingsView.tsx` (1,308 lines).
-
-**Measured scope (grepped 2026-08-19, re-confirm):** ~34 hardcoded strings, 0 `placeholder`
-attributes, RTL-sensitive Tailwind = `text-left` ×6, `right-0` ×2. Same caveat as Brief 12: the
-grep count is a floor — enumerate by reading.
-
-**Wiring — this one needs it added, unlike Brief 12.** The component currently takes no `lang` prop
-at all. Add `lang` and `t` props, add a `bookings.adminBookingsView` namespace to
-`translations.ts` (note: `bookings` will be a **new top-level namespace** — the file currently only
-has `patients`), and pass both down from `admin/page.tsx` at its render sites (~line 21753, plus a
-second render site around ~21804 — check both, `page.tsx` renders this component more than once).
-
-**Value/label separation — highest risk in this file.** It is full of reservation `status` strings
-(`confirmed`, `checked_in`, `in_progress`, `completed`, `cancelled`, `approved`, `rejected`) used in
-comparisons, in `supabase.update({ status: ... })` calls (~lines 559, 573), and in
-`getStatusBadgeClass()`. **Translate the displayed label only, via a lookup; never the compared or
-written value.** RISK-054 already bit this exact component once — a display-normalised status leaked
-into shared state — so be especially careful that nothing translated flows back into logic.
-
-**Dates:** 2 `toLocale*` calls — leave hardcoded, same reasoning as Brief 12.
-
-**Method / exit criteria:** identical to Brief 12 (per-component `dir`, logical properties, both
-languages browser-verified, stored values confirmed unchanged, manual test checklist written).
-Browser-verify the actual Reception flow in Arabic, not just that the page renders: approve a
-booking, check one in, confirm the status badges still read correctly and the underlying record
-still stores English.
-
----
----
-
-# QUEUED BRIEFS — do these next, in this order
-
 ## Brief 14 — Phase 2: translate `AdminNewBookingView.tsx` to Arabic
 
-Same situation and same reasoning as Brief 13 — already extracted, never translated, zero Arabic
-wiring today. **Phase 2 only, no extraction.**
+**Brief 13 landed 2026-08-19 — see its archive entry below** (`bookings` top-level namespace now
+exists, extend it here, don't duplicate). Same situation and same reasoning as Brief 13 — already
+extracted, never translated, zero Arabic wiring today. **Phase 2 only, no extraction.**
 
 **Target:** `src/components/admin/bookings/AdminNewBookingView.tsx` (1,123 lines).
 
@@ -95,6 +55,7 @@ Review outcome: five defects found in the delivered work and fixed separately �
 coerced to 0 (reintroducing the "Paid" bug in narrower form), a React stale-closure read after the
 setter that populates it, one numbered sub-point silently skipped, cache invalidation applied to 2
 of ~20 call sites, and a PATCH payload missing fields the user can still change.
+
 
 ### Brief 2 — Wallet ledger & API authorization (completed 2026-08-16/17)
 RISK-042: `wallet_txns` was never written by anything; POS wallet payments never deducted the
@@ -314,6 +275,40 @@ Browser-verified independently in both languages: all 5 tabs and the Add Product
 modals render fully Arabic, booking status shows `مكتمل` while the record keeps `completed`,
 dates/money stay Western (`18 Aug 2026`, `2360 EGP`), and English mode reverts cleanly. `tsc` 0
 errors, `eslint` 0 errors, `vitest` 597 passed / 6 expected fail (baseline unchanged).
+
+### Brief 13 — Phase 2: translate `AdminBookingsView.tsx` to Arabic (completed 2026-08-19)
+
+Added `lang`/`t` props (this component had none before), a `bookings.adminBookingsView` namespace —
+the first top-level namespace beyond `patients` — and wired it through `admin/page.tsx`'s single
+render site (there is only one; the brief's own note about "a second render site around ~21804"
+was a mistake made while writing the brief, mixing this component up with `AdminNewBookingView`,
+which genuinely does render twice — corrected here, not a gap in the delivered work).
+
+Review outcome: this was the highest value/label-separation risk in the rollout so far — the exact
+component RISK-054 broke once already — and it held up. `getStatusConfig()`/`getPaymentStyle()`
+switch on the raw canonical status/payment value and return only the translated label; every
+comparison and both `supabase.update({ status: ... })` call sites are untouched English literals,
+confirmed by grep rather than assumed. All 15 `toLocale*` calls left on `en-GB`/`en-US`. Sweep for
+remaining hardcoded strings/RTL classes: 0/0. en/ar key parity: 345/345 against the commit as
+authored. `tsc`/`eslint` clean, `vitest` 597 passed unchanged. Browser-verified live in both
+languages via a full page-text dump — every card, table header, legend label (all 8 statuses), and
+the one live row's badges (`مؤكد`/`مدفوع جزئياً`) translated correctly while `Wednesday, 19 August
+2026` and `09:00 AM` stayed English; English mode reverts cleanly. The report's own manual test
+checklist was accurate and well-scoped — given a dated independent-evidence table rather than
+rewritten.
+
+**Process note, not a content defect:** the work arrived committed as part of a single ~2,550-line
+commit that also swept in an entirely separate, already-in-progress test-coverage workstream
+(Finance/doctor component tests, `fetchFake` helpers, `vitest.config.ts`, package dependency
+changes, `.claude/launch.json`) — the same commingling pattern as Brief 5, at larger scale. Not yet
+pushed at the time this was found, so safely un-commingled locally: soft-reset, then staged only
+this brief's 4 actual files. `translations.ts` needed extra care since Brief 14 was being written
+concurrently in the same file — extracted just the `adminBookingsView` block via brace-depth-aware
+parsing (a naive string-anchor insertion attempt first landed the block outside the `en`/`ar`
+objects entirely, caught by `tsc` before it was staged) and staged that exact blob through git
+plumbing, leaving Brief 14's in-progress `adminNewBookingView` additions untouched in the working
+tree.
+
 
 **Process note:** Windsurf began Brief 13 in the same working tree while this verification was
 running, so its in-progress `bookings.adminBookingsView` keys were already sitting uncommitted in

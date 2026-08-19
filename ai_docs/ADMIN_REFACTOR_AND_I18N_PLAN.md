@@ -6,7 +6,7 @@
 >
 > | Screen | Extracted | Arabic translated |
 > |---|---|---|
-> | Bookings (`AdminBookingsView.tsx`, 1,308 lines) | ✅ (pre-existing) | **Brief 13, in progress** |
+> | Bookings (`AdminBookingsView.tsx`, 1,308 lines) | ✅ (pre-existing) | ✅ Brief 13 (landed clean, no gaps) |
 > | New Booking (`AdminNewBookingView.tsx`, 1,123 lines) | ✅ (pre-existing) | ❌ **never briefed** — same |
 > | Patients — Directory, 3 modals | ✅ Brief 5 | ✅ Briefs 6-9 (gaps found + closed) |
 > | Patients — Profile Drawer (1,539 lines, 5 tabs + 3 modals) | ✅ Briefs 10 (state) + 11 (JSX) | ✅ Brief 12 (2 gaps found + closed) |
@@ -14,9 +14,8 @@
 >
 > **Phase 1 (extraction) for Reception is now DONE** — Brief 11 landed 2026-08-19, so every
 > Reception screen in scope is extracted. **All that remains is Phase 2 (translation), 3 briefs:**
-> ~~Brief 12~~ (Profile Drawer — landed 2026-08-19) → **Brief 13** (Bookings, ~34 strings — in
-> progress) → **Brief 14** (New Booking, ~38 strings + 7 placeholders). All three are written in
-> `WINDSURF_BRIEFS.md`. Bookings/New Booking were extracted before DEC-043 existed, which
+> ~~Brief 12~~ (Profile Drawer) → ~~Brief 13~~ (Bookings) — both landed 2026-08-19 → **Brief 14**
+> (New Booking, ~38 strings + 7 placeholders, in progress). Written in `WINDSURF_BRIEFS.md`. Bookings/New Booking were extracted before DEC-043 existed, which
 > is why they skipped the Phase 1 brief list *and* why their Phase 2 translation was never scoped —
 > discovered 2026-08-19 while writing Brief 11, not previously documented. POS stays a standalone
 > product decision, not a translation task.
