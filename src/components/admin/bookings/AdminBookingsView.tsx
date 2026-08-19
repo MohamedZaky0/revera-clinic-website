@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getSessionStaleness } from "@/lib/services";
+import { adminTranslations } from "@/components/admin/translations";
 
 interface ReservationItem {
   id: string | number;
@@ -60,6 +61,8 @@ interface AdminBookingsViewProps {
   onRejectBooking?: (booking: any) => void;
   /** SuperAdmin-configured "Stale Session Alert" from Booking Settings. Defaults to 2 hours. */
   staleSessionThresholdHours?: number;
+  lang?: "en" | "ar";
+  t?: any;
 }
 
 const formatDisplayTime = (timeStr?: string): string => {
@@ -98,8 +101,11 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   onExportCSV,
   onApproveBooking,
   onRejectBooking,
-  staleSessionThresholdHours
+  staleSessionThresholdHours,
+  lang = "en",
+  t,
 }) => {
+  const tr = t || adminTranslations[lang].bookings.adminBookingsView;
   // View Mode State: 'calendar' (Default main view) vs 'pending'
   const [viewMode, setViewMode] = useState<"pending" | "calendar">("calendar");
   // Mini calendar state - Default to REAL CURRENT DATE
@@ -462,27 +468,27 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       case "pending":
       case "waiting":
       case "pending_deposit":
-        return { label: "Pending", bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500", border: "border-l-orange-500" };
+        return { label: tr.statusLabels.pending, bg: "bg-orange-50", text: "text-orange-700", dot: "bg-orange-500", border: "border-l-orange-500" };
       case "checked_in":
-        return { label: "Checked In", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", border: "border-l-blue-500" };
+        return { label: tr.statusLabels.checkedIn, bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", border: "border-l-blue-500" };
       case "in_progress":
       case "started":
-        return { label: "In Progress", bg: "bg-purple-50", text: "text-purple-700", dot: "bg-purple-500", border: "border-l-purple-500" };
+        return { label: tr.statusLabels.inProgress, bg: "bg-purple-50", text: "text-purple-700", dot: "bg-purple-500", border: "border-l-purple-500" };
       case "completed":
-        return { label: "Completed", bg: "bg-teal-50", text: "text-teal-700", dot: "bg-teal-500", border: "border-l-teal-500" };
+        return { label: tr.statusLabels.completed, bg: "bg-teal-50", text: "text-teal-700", dot: "bg-teal-500", border: "border-l-teal-500" };
       case "postponed":
       case "rescheduled":
-        return { label: "Postponed", bg: "bg-indigo-50", text: "text-indigo-700", dot: "bg-indigo-500", border: "border-l-indigo-500" };
+        return { label: tr.statusLabels.postponed, bg: "bg-indigo-50", text: "text-indigo-700", dot: "bg-indigo-500", border: "border-l-indigo-500" };
       case "canceled":
       case "cancelled":
       case "rejected":
-        return { label: "Canceled", bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500", border: "border-l-rose-500" };
+        return { label: tr.statusLabels.canceled, bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500", border: "border-l-rose-500" };
       case "no_show":
-        return { label: "No Show", bg: "bg-gray-100", text: "text-gray-700", dot: "bg-gray-500", border: "border-l-gray-500" };
+        return { label: tr.statusLabels.noShow, bg: "bg-gray-100", text: "text-gray-700", dot: "bg-gray-500", border: "border-l-gray-500" };
       case "confirmed":
       case "approved":
       default:
-        return { label: "Confirmed", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", border: "border-l-emerald-500" };
+        return { label: tr.statusLabels.confirmed, bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", border: "border-l-emerald-500" };
     }
   };
 
@@ -490,6 +496,11 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     if (payStatus === "Paid") return "bg-emerald-100 text-emerald-800 border-emerald-200";
     if (payStatus === "Deposit Paid") return "bg-amber-100 text-amber-800 border-amber-200";
     return "bg-gray-100 text-gray-700 border-gray-200";
+  };
+
+  const paymentStatusLabel = (payStatus?: string): string => {
+    if (!payStatus) return "";
+    return tr.paymentStatusLabels[payStatus] ?? payStatus;
   };
 
   const handlePrevMonth = () => {
@@ -582,16 +593,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   };
 
   return (
-    <div className="w-full space-y-6 animate-fadeIn pb-12 text-[#1F251A] relative">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="w-full space-y-6 animate-fadeIn pb-12 text-[#1F251A] relative">
       
       {/* ── TOP HEADER BAR ── */}
       <div className="relative z-10 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2 sm:text-2xl">
-            Good morning, {userName} <span className="inline-block animate-bounce">👋</span>
+            {tr.greeting} {userName} <span className="inline-block animate-bounce">👋</span>
           </h1>
           <p className="text-xs text-[#6B7280]">
-            Here's what's happening at Revera Clinics today.
+            {tr.subtitle}
           </p>
         </div>
       </div>
@@ -603,7 +614,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              Today's Appointments
+              {tr.cardTodayAppointments}
             </span>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-[#1E3A2B]">
               <CalendarIcon size={18} />
@@ -611,7 +622,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#111827]">{stats.todayCount}</span>
-            <span className="text-xs font-medium text-[#6B7280]">Next: {stats.nextTime}</span>
+            <span className="text-xs font-medium text-[#6B7280]">{tr.nextPrefix} {stats.nextTime}</span>
           </div>
         </div>
 
@@ -619,7 +630,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              Upcoming
+              {tr.cardUpcoming}
             </span>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
               <Clock size={18} />
@@ -627,7 +638,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#111827]">{stats.upcomingCount}</span>
-            <span className="text-xs font-semibold text-blue-600">Today onward</span>
+            <span className="text-xs font-semibold text-blue-600">{tr.todayOnward}</span>
           </div>
         </div>
 
@@ -635,7 +646,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              Completed
+              {tr.cardCompleted}
             </span>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
               <CheckCircle2 size={18} />
@@ -643,7 +654,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#111827]">{stats.completedCount}</span>
-            <span className="text-xs font-semibold text-teal-600">This month</span>
+            <span className="text-xs font-semibold text-teal-600">{tr.thisMonth}</span>
           </div>
         </div>
 
@@ -651,7 +662,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              Canceled
+              {tr.cardCanceled}
             </span>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
               <XCircle size={18} />
@@ -659,7 +670,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#111827]">{stats.canceledCount}</span>
-            <span className="text-xs font-semibold text-rose-600">This month</span>
+            <span className="text-xs font-semibold text-rose-600">{tr.thisMonth}</span>
           </div>
         </div>
 
@@ -668,7 +679,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              Postponed
+              {tr.cardPostponed}
             </span>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
               <AlertCircle size={18} />
@@ -676,7 +687,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#111827]">{stats.postponedCount}</span>
-            <span className="text-xs font-semibold text-violet-600">This month</span>
+            <span className="text-xs font-semibold text-violet-600">{tr.thisMonth}</span>
           </div>
         </div>
       </div>
@@ -695,7 +706,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             }`}
           >
             <Clock size={15} />
-            <span>Pending</span>
+            <span>{tr.pendingToggle}</span>
             {pendingApprovalsCount > 0 && (
               <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold bg-[#EF4444] text-white">
                 {pendingApprovalsCount}
@@ -713,7 +724,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             }`}
           >
             <CalendarIcon size={15} />
-            <span>Calendar View</span>
+            <span>{tr.calendarViewToggle}</span>
           </button>
         </div>
 
@@ -725,7 +736,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             className="inline-flex items-center gap-2 rounded-xl bg-[#1E3A2B] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#162C20] active:scale-95 cursor-pointer"
           >
             <Plus size={16} />
-            <span>New Booking</span>
+            <span>{tr.newBookingBtn}</span>
           </button>
 
           <div className="relative" ref={moreMenuRef}>
@@ -741,19 +752,19 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 });
               }}
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] shadow-sm transition hover:bg-gray-50 active:scale-95 cursor-pointer"
-              title="More options"
+              title={tr.moreOptionsTitle}
             >
               <MoreVertical size={18} className="text-[#6B7280]" />
             </button>
 
             {isMoreMenuOpen && (
-              <div className="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+              <div className="absolute end-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
                 <button
                   onClick={() => { onPrint?.(); setIsMoreMenuOpen(false); }}
                   className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer"
                 >
                   <Printer size={15} className="text-[#6B7280]" />
-                  Print Schedule
+                  {tr.printScheduleBtn}
                 </button>
                 <div className="mx-4 border-t border-gray-100" />
                 <button
@@ -761,7 +772,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   className="flex w-full items-center gap-3 px-4 py-3 text-sm font-semibold text-[#374151] hover:bg-gray-50 transition cursor-pointer"
                 >
                   <Download size={15} className="text-[#6B7280]" />
-                  Export CSV
+                  {tr.exportCsvBtn}
                 </button>
               </div>
             )}
@@ -778,12 +789,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             </div>
             <div className="min-w-0">
               <h2 className="text-sm font-bold text-red-900">
-                Needs Attention — {staleSessions.length} session{staleSessions.length !== 1 ? "s" : ""} left open
+                {tr.needsAttentionPrefix} — {staleSessions.length} {staleSessions.length !== 1 ? tr.sessionsPlural : tr.sessionSingular} {tr.leftOpenSuffix}
               </h2>
               <p className="text-xs text-red-700/80 mt-0.5">
-                These are still marked In Progress after more than {staleSessionThresholdHours || 2} hour
-                {(staleSessionThresholdHours || 2) !== 1 ? "s" : ""}. Complete or cancel each one so the slot,
-                room and doctor are released.
+                {tr.attentionBodyPrefix} {staleSessionThresholdHours || 2} {(staleSessionThresholdHours || 2) !== 1 ? tr.hoursPlural : tr.hourSingular}. {tr.attentionBodySuffix}
               </p>
             </div>
           </div>
@@ -793,7 +802,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               <button
                 key={`stale-${row.id}`}
                 onClick={() => onViewBookingDetails && onViewBookingDetails(row)}
-                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-4 py-2.5 text-left transition hover:border-red-300 hover:bg-red-50/50"
+                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-red-200 bg-white px-4 py-2.5 text-start transition hover:border-red-300 hover:bg-red-50/50"
               >
                 <div className="flex min-w-0 flex-col">
                   <span className="truncate text-xs font-bold text-[#111827]">{row.customer_name}</span>
@@ -802,7 +811,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   </span>
                 </div>
                 <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
-                  {row.staleElapsedLabel ? `Open ${row.staleElapsedLabel}` : "Left open"}
+                  {row.staleElapsedLabel ? `${tr.openPrefix} ${row.staleElapsedLabel}` : tr.leftOpenBadge}
                 </span>
               </button>
             ))}
@@ -816,30 +825,30 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         {/* Section Header */}
         <div className="flex items-center justify-between pb-2 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-bold text-[#111827]">Pending Approvals</h2>
-            <p className="text-xs text-[#6B7280] mt-0.5">{pendingApprovalsList.length} booking{pendingApprovalsList.length !== 1 ? 's' : ''} awaiting review</p>
+            <h2 className="text-base font-bold text-[#111827]">{tr.pendingApprovalsHeading}</h2>
+            <p className="text-xs text-[#6B7280] mt-0.5">{pendingApprovalsList.length} {pendingApprovalsList.length !== 1 ? tr.bookingsPlural : tr.bookingSingular} {tr.awaitingReviewSuffix}</p>
           </div>
         </div>
         {/* Table Container */}
         <div className="overflow-x-auto scrollbar-none">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-start text-xs border-collapse">
             <thead>
               <tr className="border-b border-gray-100 text-[11px] font-bold text-[#6B7280]">
-                <th className="py-3 px-3 whitespace-nowrap">Patient ˅</th>
-                <th className="py-3 px-3 whitespace-nowrap">Service</th>
-                <th className="py-3 px-3 whitespace-nowrap">Doctor</th>
-                <th className="py-3 px-3 whitespace-nowrap">Date &amp; Time</th>
-                <th className="py-3 px-3 whitespace-nowrap">Branch</th>
-                <th className="py-3 px-3 whitespace-nowrap">Status</th>
-                <th className="py-3 px-3 whitespace-nowrap">Requested At</th>
-                <th className="py-3 px-3 whitespace-nowrap text-left">Actions</th>
+                <th className="py-3 px-3 whitespace-nowrap">{tr.colPatient} ˅</th>
+                <th className="py-3 px-3 whitespace-nowrap">{tr.colService}</th>
+                <th className="py-3 px-3 whitespace-nowrap">{tr.colDoctor}</th>
+                <th className="py-3 px-3 whitespace-nowrap">{tr.colDateTime}</th>
+                <th className="py-3 px-3 whitespace-nowrap">{tr.colBranch}</th>
+                <th className="py-3 px-3 whitespace-nowrap">{tr.colStatus}</th>
+                <th className="py-3 px-3 whitespace-nowrap">{tr.colRequestedAt}</th>
+                <th className="py-3 px-3 whitespace-nowrap text-start">{tr.colActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {paginatedPendingList.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-sm text-[#6B7280]">
-                    No pending approval requests.
+                    {tr.noPendingRequests}
                   </td>
                 </tr>
               ) : (
@@ -854,7 +863,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     <div>
                       <span className="font-extrabold text-[#111827] text-xs block">{item.patientName}</span>
                       <span className="text-[11px] font-mono text-gray-500 font-medium block">{item.phone}</span>
-                      {item.patientAge && <span className="text-[11px] text-gray-400 font-medium">{item.patientAge} years</span>}
+                      {item.patientAge && <span className="text-[11px] text-gray-400 font-medium">{item.patientAge} {tr.yearsSuffix}</span>}
                     </div>
                   </td>
 
@@ -886,7 +895,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   {/* 8. Status */}
                   <td className="py-3.5 px-3 whitespace-nowrap">
                     <span className="inline-flex items-center rounded-xl bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700 border border-orange-200">
-                      Pending
+                      {tr.statusLabels.pending}
                     </span>
                   </td>
 
@@ -897,7 +906,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   </td>
 
                   {/* 10. Actions */}
-                  <td className="py-3.5 px-3 whitespace-nowrap text-left">
+                  <td className="py-3.5 px-3 whitespace-nowrap text-start">
                     <div className="flex items-center justify-start gap-2">
                       <button
                         type="button"
@@ -906,7 +915,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           handleApproveItem(item);
                         }}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-600 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition active:scale-95 shadow-xs"
-                        title="Approve"
+                        title={tr.approveTitle}
                       >
                         <Check size={16} strokeWidth={2.5} />
                       </button>
@@ -917,7 +926,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           handleRejectItem(item);
                         }}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition active:scale-95 shadow-xs"
-                        title="Reject"
+                        title={tr.rejectTitle}
                       >
                         <X size={16} strokeWidth={2.5} />
                       </button>
@@ -929,13 +938,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                             setActiveMenuId((prev) => (prev === item.id ? null : item.id));
                           }}
                           className="p-1.5 rounded-lg hover:bg-gray-100 text-[#6B7280] transition dropdown-action-menu cursor-pointer"
-                          title="More actions"
+                          title={tr.moreActionsTitle}
                         >
                           <MoreVertical size={16} />
                         </button>
 
                         {activeMenuId === item.id && (
-                          <div className="absolute right-0 top-8 z-50 w-44 rounded-xl border border-gray-100 bg-white p-1 shadow-xl text-xs animate-in fade-in duration-150 dropdown-action-menu text-left">
+                          <div className="absolute end-0 top-8 z-50 w-44 rounded-xl border border-gray-100 bg-white p-1 shadow-xl text-xs animate-in fade-in duration-150 dropdown-action-menu text-start">
                             <button
                               type="button"
                               onClick={(e) => {
@@ -946,7 +955,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                               className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition cursor-pointer"
                             >
                               <Eye size={14} className="text-gray-500" />
-                              <span>View Details</span>
+                              <span>{tr.viewDetailsBtn}</span>
                             </button>
                             <button
                               type="button"
@@ -958,7 +967,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                               className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-emerald-50 font-semibold text-emerald-700 transition cursor-pointer"
                             >
                               <Check size={14} className="text-emerald-600" />
-                              <span>Approve Booking</span>
+                              <span>{tr.approveBookingBtn}</span>
                             </button>
                             <button
                               type="button"
@@ -970,7 +979,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                               className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-rose-50 font-semibold text-rose-600 transition cursor-pointer"
                             >
                               <X size={14} className="text-rose-500" />
-                              <span>Reject Booking</span>
+                              <span>{tr.rejectBookingBtn}</span>
                             </button>
                           </div>
                         )}
@@ -987,7 +996,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         {/* Bottom Pagination Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between border-t border-gray-100 pt-4 gap-3 text-xs font-semibold text-gray-500">
           <div>
-            Showing {pendingApprovalsList.length > 0 ? startIndexPending + 1 : 0} to {Math.min(startIndexPending + pendingRowsPerPage, pendingApprovalsList.length)} of {pendingApprovalsList.length} pending approvals
+            {tr.showingPrefix} {pendingApprovalsList.length > 0 ? startIndexPending + 1 : 0} {tr.toWord} {Math.min(startIndexPending + pendingRowsPerPage, pendingApprovalsList.length)} {tr.ofWord} {pendingApprovalsList.length} {tr.pendingApprovalsSuffix}
           </div>
           
           <div className="flex items-center gap-4">
@@ -1014,7 +1023,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
             {/* Rows per page */}
             <div className="flex items-center gap-1.5">
-              <span>Rows per page:</span>
+              <span>{tr.rowsPerPageLabel}</span>
               <select
                 value={pendingRowsPerPage}
                 onChange={(e) => {
@@ -1058,13 +1067,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   }}
                   className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-[#374151] hover:bg-gray-50 transition"
                 >
-                  Today
+                  {tr.todayBtn}
                 </button>
               </div>
 
               {/* Weekday Labels */}
               <div className="grid grid-cols-7 text-center text-xs font-semibold text-[#6B7280] mb-2">
-                {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => <span key={d}>{d}</span>)}
+                {[tr.weekdays.sun, tr.weekdays.mon, tr.weekdays.tue, tr.weekdays.wed, tr.weekdays.thu, tr.weekdays.fri, tr.weekdays.sat].map((d, wIdx) => <span key={wIdx}>{d}</span>)}
               </div>
 
               {/* Day Grid */}
@@ -1112,14 +1121,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               <div className="mt-6 border-t border-gray-100 pt-4">
                 <div className="grid grid-cols-2 gap-y-2.5 gap-x-2 text-xs font-medium text-[#4B5563]">
                   {[
-                    { color: "#F97316", label: "Pending" },
-                    { color: "#22C55E", label: "Confirmed" },
-                    { color: "#3B82F6", label: "Checked In" },
-                    { color: "#A855F7", label: "In Progress" },
-                    { color: "#0D9488", label: "Completed" },
-                    { color: "#6366F1", label: "Postponed" },
-                    { color: "#EF4444", label: "Canceled" },
-                    { color: "#6B7280", label: "No Show" },
+                    { color: "#F97316", label: tr.statusLabels.pending },
+                    { color: "#22C55E", label: tr.statusLabels.confirmed },
+                    { color: "#3B82F6", label: tr.statusLabels.checkedIn },
+                    { color: "#A855F7", label: tr.statusLabels.inProgress },
+                    { color: "#0D9488", label: tr.statusLabels.completed },
+                    { color: "#6366F1", label: tr.statusLabels.postponed },
+                    { color: "#EF4444", label: tr.statusLabels.canceled },
+                    { color: "#6B7280", label: tr.statusLabels.noShow },
                   ].map(({ color, label }) => (
                     <div key={label} className="flex items-center gap-2">
                       <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}></span>
@@ -1137,7 +1146,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               {/* Header */}
               <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-[#111827]">Today's Schedule</h2>
+                  <h2 className="text-xl font-bold text-[#111827]">{tr.todaysScheduleHeading}</h2>
                   <p className="text-xs font-medium text-[#6B7280]">{formattedHeaderDate}</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1145,12 +1154,12 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     onClick={() => setStatusFilter("All")}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#374151] hover:bg-gray-50 active:scale-95"
                   >
-                    <span>All Appointments</span>
+                    <span>{tr.allAppointmentsBtn}</span>
                     <ArrowRight size={14} />
                   </button>
                   <button
                     onClick={onFilterClick}
-                    title="Filter"
+                    title={tr.filterTitle}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] hover:bg-gray-50 active:scale-95 cursor-pointer"
                   >
                     <Filter size={15} />
@@ -1160,16 +1169,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
               {/* Table */}
               <div className="w-full overflow-hidden">
-                <table className="w-full text-left border-collapse text-xs table-fixed">
+                <table className="w-full text-start border-collapse text-xs table-fixed">
                   <thead>
                     <tr className="border-b border-gray-100 text-[10px] uppercase font-bold tracking-tight text-[#9CA3AF]">
-                      <th className="py-2.5 px-1 font-bold w-[11%]">Time</th>
-                      <th className="py-2.5 px-1 font-bold w-[19%]">Patient</th>
-                      <th className="py-2.5 px-1 font-bold w-[19%]">Service</th>
-                      <th className="py-2.5 px-1 font-bold w-[16%]">Doctor</th>
-                      <th className="py-2.5 px-1 font-bold w-[9%]">Room</th>
-                      <th className="py-2.5 px-1 font-bold w-[13%]">Status</th>
-                      <th className="py-2.5 px-1 font-bold w-[13%]">Payment</th>
+                      <th className="py-2.5 px-1 font-bold w-[11%]">{tr.colTime}</th>
+                      <th className="py-2.5 px-1 font-bold w-[19%]">{tr.colPatient}</th>
+                      <th className="py-2.5 px-1 font-bold w-[19%]">{tr.colService}</th>
+                      <th className="py-2.5 px-1 font-bold w-[16%]">{tr.colDoctor}</th>
+                      <th className="py-2.5 px-1 font-bold w-[9%]">{tr.colRoom}</th>
+                      <th className="py-2.5 px-1 font-bold w-[13%]">{tr.colStatus}</th>
+                      <th className="py-2.5 px-1 font-bold w-[13%]">{tr.colPayment}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -1177,21 +1186,21 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                       <tr>
                         <td colSpan={7} className="py-12 text-center text-xs text-[#5A6A51]">
                           <Loader2 size={20} className="animate-spin mx-auto mb-2 text-[#1E3A2B]" />
-                          Loading appointments...
+                          {tr.loadingAppointments}
                         </td>
                       </tr>
                     ) : paginatedAppointments.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="py-12 text-center text-sm text-[#6B7280]">
                           <div className="max-w-sm mx-auto space-y-3">
-                            <p className="font-semibold text-[#111827]">No appointments for {formattedHeaderDate}.</p>
+                            <p className="font-semibold text-[#111827]">{tr.noAppointmentsPrefix} {formattedHeaderDate}.</p>
                             <button
                               type="button"
                               onClick={onNewBooking}
                               className="inline-flex items-center gap-2 rounded-xl bg-[#1E3A2B] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#162C20]"
                             >
                               <Plus size={14} />
-                              <span>Create New Booking</span>
+                              <span>{tr.createNewBookingBtn}</span>
                             </button>
                           </div>
                         </td>
@@ -1234,20 +1243,20 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                                   <span
                                     title={
                                       row.staleElapsedLabel
-                                        ? `This session has been open for ${row.staleElapsedLabel} — complete or cancel it.`
-                                        : "This session was left open from an earlier day — complete or cancel it."
+                                        ? `${tr.staleTooltipPrefix} ${row.staleElapsedLabel} ${tr.staleTooltipSuffix}`
+                                        : tr.staleTooltipNoElapsed
                                     }
                                     className="inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700 border border-red-200 whitespace-nowrap"
                                   >
                                     <AlertCircle size={9} />
-                                    {row.staleElapsedLabel ? `Open ${row.staleElapsedLabel}` : "Left open"}
+                                    {row.staleElapsedLabel ? `${tr.openPrefix} ${row.staleElapsedLabel}` : tr.leftOpenBadge}
                                   </span>
                                 )}
                               </div>
                             </td>
                             <td className="py-2.5 px-1">
                               <span className={`inline-flex items-center rounded-md border px-1 py-0.5 text-[9px] font-bold ${payStyle} whitespace-nowrap`}>
-                                {row.paymentStatus}
+                                {paymentStatusLabel(row.paymentStatus)}
                               </span>
                             </td>
                           </tr>
@@ -1261,13 +1270,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               {/* Pagination */}
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-[#6B7280] border-t border-gray-100 pt-3">
                 <div>
-                  Showing <span className="font-semibold text-[#111827]">{totalAppointments > 0 ? startIndex + 1 : 0}</span> to{" "}
+                  {tr.showingPrefix} <span className="font-semibold text-[#111827]">{totalAppointments > 0 ? startIndex + 1 : 0}</span> {tr.toWord}{" "}
                   <span className="font-semibold text-[#111827]">{Math.min(startIndex + rowsPerPage, totalAppointments)}</span>{" "}
-                  of <span className="font-semibold text-[#111827]">{totalAppointments}</span> appointments
+                  {tr.ofWord} <span className="font-semibold text-[#111827]">{totalAppointments}</span> {tr.appointmentsSuffix}
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <span>Rows per page:</span>
+                    <span>{tr.rowsPerPageLabel}</span>
                     <select
                       value={rowsPerPage}
                       onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
@@ -1286,7 +1295,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     >
                       <ChevronLeft size={14} />
                     </button>
-                    <span className="px-2 font-semibold text-[#111827]">Page {safePage} of {totalPages}</span>
+                    <span className="px-2 font-semibold text-[#111827]">{tr.pageLabel} {safePage} {tr.ofWord} {totalPages}</span>
                     <button
                       disabled={safePage >= totalPages}
                       onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}

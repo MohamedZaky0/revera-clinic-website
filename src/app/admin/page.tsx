@@ -20552,6 +20552,8 @@ export default function AdminPage() {
                 localServices={localServices}
                 userName={loggedEmpAccount?.name?.split(" ")[0] || "Sara"}
                 staleSessionThresholdHours={bookingStaleSessionHours}
+                lang={lang}
+                t={adminTranslations[lang].bookings.adminBookingsView}
                 onNewBooking={() => setShowFullViewNewBooking(true)}
                 onPendingApprovalsClick={() => {
                   const el = document.getElementById("pending-approvals-section");
