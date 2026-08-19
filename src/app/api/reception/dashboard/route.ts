@@ -1,7 +1,29 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabaseClient";
+import { supabaseServer } from "@/lib/supabaseServer";
+import { requireStaffAccess } from "@/lib/access";
+
+const ALLOWED_ROLES = ["receptionist", "hr", "admin", "superadmin"];
+
+/**
+ * Reception/HR self-service data: staff must be authenticated, and restricted to the roles that
+ * actually work this screen (a doctor token, for instance, must not be able to clock reception
+ * staff in/out or read their targets). See RISK-059.
+ */
+async function requireReceptionAccess(req: Request) {
+  const result = await requireStaffAccess(req);
+  if ("error" in result) return result;
+  if (!ALLOWED_ROLES.includes(result.access.role)) {
+    return { error: "Forbidden: Reception or HR access required.", status: 403 as const };
+  }
+  return result;
+}
 
 export async function GET(req: Request) {
+  const auth = await requireReceptionAccess(req);
+  if ("error" in auth) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const employeeIdParam = searchParams.get("employeeId");
@@ -10,7 +32,7 @@ export async function GET(req: Request) {
     const todayStr = new Date().toISOString().split("T")[0];
 
     // 1. Resolve Receptionist Employee Account from DB
-    let employeeQuery = supabase.from("employee_accounts").select("*");
+    let employeeQuery = supabaseServer.from("employee_accounts").select("*");
     if (employeeIdParam) {
       employeeQuery = employeeQuery.eq("id", employeeIdParam);
     } else if (emailParam) {
@@ -33,7 +55,7 @@ export async function GET(req: Request) {
     // 2. Fetch Real Shift & Attendance Data from DB
     let attendanceRecord: any = null;
     if (empId) {
-      const { data: att } = await supabase
+      const { data: att } = await supabaseServer
         .from("hr_attendance")
         .select("*")
         .eq("employee_id", empId)
@@ -77,7 +99,7 @@ export async function GET(req: Request) {
     const startOfMonthStr = startOfMonth.toISOString().split("T")[0];
 
     let monthlyAchieved = 0;
-    let monthResQuery = supabase
+    let monthResQuery = supabaseServer
       .from("reservations")
       .select("amount_paid, status")
       .gte("date", startOfMonthStr);
@@ -103,7 +125,7 @@ export async function GET(req: Request) {
     const remainingTarget = Math.max(0, targetAmount - monthlyAchieved);
 
     // 4. Fetch Real Services for title resolution
-    const { data: servicesData } = await supabase
+    const { data: servicesData } = await supabaseServer
       .from("services")
       .select("id, en, name, ar, title");
 
@@ -116,7 +138,7 @@ export async function GET(req: Request) {
     }
 
     // 5. Fetch Real Today's Bookings from DB
-    const { data: reservationsToday } = await supabase
+    const { data: reservationsToday } = await supabaseServer
       .from("reservations")
       .select("*")
       .eq("date", todayStr)
@@ -190,9 +212,14 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireReceptionAccess(req);
+  if ("error" in auth) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+  }
+
   try {
     const body = await req.json();
-    const { action, employeeId, email } = body;
+    const { action, employeeId } = body;
 
     if (!action || (action !== "start_shift" && action !== "end_shift")) {
       return NextResponse.json(
@@ -201,14 +228,14 @@ export async function POST(req: Request) {
       );
     }
 
-    // Resolve employee account
-    let empId = employeeId;
-    if (!empId) {
-      let query = supabase.from("employee_accounts").select("id");
-      if (email) query = query.ilike("email", email);
-      else query = query.ilike("department", "Reception");
-      const { data } = await query.limit(1);
-      if (Array.isArray(data) && data.length > 0) empId = data[0].id;
+    // Resolve the employee from the authenticated session, never by guessing a Reception-dept
+    // row — with more than one receptionist on shift that guess can silently record the wrong
+    // person's attendance (RISK-059). A receptionist can only clock themselves in/out; HR/admin/
+    // superadmin may pass an explicit target `employeeId` to act on another employee's behalf.
+    const role = auth.access.role;
+    let empId: string | null = auth.access.employee.id;
+    if (role !== "receptionist" && employeeId) {
+      empId = employeeId;
     }
 
     if (!empId) {
@@ -222,7 +249,28 @@ export async function POST(req: Request) {
     const nowIso = new Date().toISOString();
 
     if (action === "start_shift") {
-      const { data, error } = await supabase
+      const { data: existing, error: fetchError } = await supabaseServer
+        .from("hr_attendance")
+        .select("*")
+        .eq("employee_id", empId)
+        .eq("date", todayStr)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      // Idempotency (RISK-059/F-3): re-firing start_shift after today's shift already ended must
+      // not wipe check_out_time and reopen it. A start while already in progress is a no-op.
+      if (existing?.check_out_time) {
+        return NextResponse.json(
+          { success: false, error: "Today's shift has already ended and cannot be restarted." },
+          { status: 409 }
+        );
+      }
+      if (existing?.check_in_time) {
+        return NextResponse.json({ success: true, action: "start_shift", attendance: existing });
+      }
+
+      const { data, error } = await supabaseServer
         .from("hr_attendance")
         .upsert(
           {
@@ -240,7 +288,26 @@ export async function POST(req: Request) {
       if (error) throw error;
       return NextResponse.json({ success: true, action: "start_shift", attendance: data });
     } else {
-      const { data, error } = await supabase
+      const { data: existing, error: fetchError } = await supabaseServer
+        .from("hr_attendance")
+        .select("*")
+        .eq("employee_id", empId)
+        .eq("date", todayStr)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      if (!existing?.check_in_time) {
+        return NextResponse.json(
+          { success: false, error: "No open shift found for today. Start a shift before ending it." },
+          { status: 404 }
+        );
+      }
+      if (existing.check_out_time) {
+        return NextResponse.json({ success: true, action: "end_shift", attendance: existing });
+      }
+
+      const { data, error } = await supabaseServer
         .from("hr_attendance")
         .update({ check_out_time: nowIso })
         .eq("employee_id", empId)

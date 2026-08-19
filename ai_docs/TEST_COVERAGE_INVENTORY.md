@@ -8,9 +8,10 @@ not by reading feature docs.
 ~31,500 lines of components (of which `src/app/admin/page.tsx` alone is 26,807 lines with 401
 `onClick` handlers).
 
-**Covered today:** 7 of 26 lib modules; **6 of 153 handlers** have a real route-level test
-(`/api/hr/doctor-payroll` GET/POST/PATCH, `/api/reservations` PATCH fully + GET/POST auth-shape),
-plus auth-shape-only assertions on 4 more routes. No component tests, no E2E.
+**Covered today:** 7 of 26 lib modules; **8 of 153 handlers** have a real route-level test
+(`/api/hr/doctor-payroll` GET/POST/PATCH, `/api/reservations` PATCH fully + GET/POST auth-shape,
+`/api/reception/dashboard` GET/POST), plus auth-shape-only assertions on 4 more routes. No component
+tests, no E2E.
 
 ## How to read this
 
@@ -58,23 +59,34 @@ Four things surfaced while tracing the flows. They are not test gaps — they ar
 missing tests would have caught. Per the rule above, each gets a test asserting the **correct**
 behaviour, marked `it.fails` until the defect is fixed.
 
-### F-1 — `/api/reception/dashboard` POST has no authentication at all (P0, security)
+### F-1 — `/api/reception/dashboard` POST has no authentication at all (P0, security) — FIXED
 
 `src/app/api/reception/dashboard/route.ts:192` exposes `start_shift` / `end_shift` and never checks
 an `Authorization` header — it is the only mutating endpoint in the system with zero auth. Anyone who
 can reach the URL can clock any employee in or out. This is the endpoint behind the reception
 shift buttons.
 
-### F-2 — Same endpoint clocks in the *wrong person* when `employeeId` is omitted (P0)
+**Fixed 2026-08-19 — see RISK-059.** Both GET and POST now require `requireStaffAccess`, restricted
+to `receptionist`/`hr`/`admin`/`superadmin`.
+
+### F-2 — Same endpoint clocks in the *wrong person* when `employeeId` is omitted (P0) — FIXED
 
 At `:207-211`, if no `employeeId` is supplied it falls back to `ilike("department", "Reception")`
 with `.limit(1)` — the first Reception employee in arbitrary DB order. Two receptionists on shift
 means one silently records the other's attendance, which then feeds `hr_payroll`.
 
-### F-3 — `start_shift` wipes an existing `check_out_time` (P0, idempotency)
+**Fixed 2026-08-19 — see RISK-059.** POST resolves the employee from the authenticated session
+instead; a receptionist can only act on their own record, HR/admin/superadmin may target another
+via an explicit `employeeId`.
+
+### F-3 — `start_shift` wipes an existing `check_out_time` (P0, idempotency) — FIXED
 
 At `:224-238`, `start_shift` upserts `check_out_time: null` on conflict of `(employee_id, date)`.
 Re-firing it after a shift already ended erases the end time, leaving an open shift for that day.
+
+**Fixed 2026-08-19 — see RISK-059.** `start_shift` now checks today's existing row first: rejects
+with 409 if the shift already ended, no-ops if already in progress, only upserts a fresh row when
+none exists.
 
 ### F-4 — The entire checkout money calculation lives inside a JSX closure (P0, untestable)
 
@@ -190,14 +202,17 @@ first, then these become straightforward.
 | **Start shift** | `POST /api/reception/dashboard` | `hr_attendance` |
 | **End shift** | `POST /api/reception/dashboard` | `hr_attendance` |
 
+**Covered** — `tests/routes/reception-dashboard.test.ts` (14 tests). F-1/F-2/F-3 fixed 2026-08-19,
+see RISK-059. Manual click-through: `ai_docs/manual_tests/RISK_059_MANUAL_TESTS.md`.
+
 **Scenarios to test:**
-- **No token → 401.** *(Currently fails — see F-1.)*
-- Non-reception/non-HR token → 403. *(Currently fails.)*
+- **No token → 401.** ✅ Fixed — see F-1/RISK-059.
+- Non-reception/non-HR token → 403. ✅ Fixed.
 - `start_shift` writes `check_in_time` and status `Present` for today.
 - `end_shift` writes `check_out_time` for today's row only.
-- **`start_shift` on an already-ended shift does not erase `check_out_time`.** *(Currently fails — F-3.)*
+- **`start_shift` on an already-ended shift does not erase `check_out_time`.** ✅ Fixed — see F-3.
 - **With two Reception employees and no `employeeId`, the request does not silently pick the wrong
-  one.** *(Currently fails — F-2.)*
+  one.** ✅ Fixed — see F-2.
 - `end_shift` with no open shift returns a clear error rather than a 500.
 - An invalid `action` returns 400 without touching `hr_attendance`.
 
@@ -298,10 +313,10 @@ one reads (traced from source):
 | Mark doctor paid | `PATCH /api/hr/doctor-payroll` | `doctor_payroll` | **Covered** |
 | Run staff payroll | `POST /api/hr/payroll` | `hr_payroll` | None |
 | Mark staff paid | `PATCH /api/hr/payroll` | `hr_payroll` | None |
-| Attendance | `GET/POST/PATCH /api/hr/attendance` | `hr_attendance` | None |
-| Leaves | `GET/POST/PATCH /api/hr/leaves` | `hr_leave_requests` | None |
-| Performance | `/api/hr/performance` | `hr_performance` | None |
-| Alerts | `/api/hr/alerts` | `hr_alerts` | None |
+| Attendance | `GET/POST/PATCH /api/hr/attendance` | `hr_attendance` | Auth only (RISK-063 open — see module 10) |
+| Leaves | `GET/POST/PATCH /api/hr/leaves` | `hr_leave_requests` | Auth only (RISK-063 open) |
+| Performance | `/api/hr/performance` | `hr_performance` | Auth only |
+| Alerts | `/api/hr/alerts` | `hr_alerts` | Auth only (RISK-063 open) |
 
 **Scenarios to test (staff payroll):**
 - `achieved_revenue` holds **revenue**, not a count, when `target_type_snapshot='reservations'`
@@ -385,23 +400,35 @@ one reads (traced from source):
 
 ## 10. Auth & Access Control — P2
 
-`src/lib/auth.ts` and `src/lib/access.ts` gate everything, and are tested only through 5 routes.
+`src/lib/auth.ts` and `src/lib/access.ts` gate everything.
+
+**Covered** — `tests/routes/auth-sweep.test.ts`: a single table-driven registry over 149 of the
+153 handlers, asserting two dimensions per guarded route — no token → 401, and an authenticated
+non-staff (patient) session → 403 — plus a "confirmed-public reads stay public" check for the
+handful that are intentionally unguarded. 286 assertions from one registry, not 153 hand-written
+tests, and it fails loudly the moment a new route is added without updating the registry (a sanity
+test pins the exact row count).
 
 **A note on `CLAUDE.md` rule 3:** it states `/api/*` routes are not auth-validated server-side. This
-sweep found that to be **out of date** — 68 of 71 route files call a guard. The genuine exceptions
-are `/api/reception/dashboard` (F-1, a real hole), plus `/api/auth/*`, `/api/availability`, and
-`/api/health/supabase` (which are intentionally public or self-guarding). Rule 3 should be rewritten
-once F-1 is fixed.
+sweep found that to be **out of date** — every route file now calls a guard except the confirmed
+intentionally-public ones (`/api/auth/employee-email`, `/api/branches` GET, `/api/services` GET,
+`/api/terms` GET, `/api/providers` GET, `/api/page-settings` GET, `/api/packages` GET,
+`/api/availability`, `/api/health/supabase`, `/api/customer-avatars` GET — each either explicitly
+commented "public" or plainly needed by the unauthenticated marketing site). `/api/reception/
+dashboard`'s hole (F-1/F-2/F-3) was fixed 2026-08-19, see RISK-059. Rule 3 in `CLAUDE.md` should be
+rewritten to reflect this.
 
-**Scenarios to test — as a table-driven test across all 153 handlers:**
-- No token → 401 for every non-public handler.
-- Patient token on a staff route → 403.
-- Wrong-role staff token (reception on an HR route) → 403.
-- Valid role → 200.
-- Rejections return no data body, only an error.
+**New finding from building the sweep — RISK-063 (open):** `POST /api/hr/alerts`,
+`POST`/`PATCH /api/hr/attendance`, and `POST /api/hr/leaves` each inline a check for *a valid
+Supabase session* but never verify that session belongs to actual staff (no `employee_accounts`
+lookup) — unlike every GET in those same three files, which correctly use `verifyHrAccess`. An
+authenticated patient can currently submit HR attendance/leave/alert rows. Asserted as `it.fails`
+in the sweep; see RISK-063 for the fix (swap the inline check for `verifyHrAccess`).
 
-A single parameterised test over a list of `[route, method, requiredRole]` covers this module far
-more cheaply than 153 hand-written tests, and fails loudly when someone adds a route without a guard.
+**Open product question, not guessed at in the sweep:** `provider-attendance` GET, `rooms` GET, and
+`service-rooms` GET have no auth guard and no comment establishing intent — unlike the confirmed-
+public list above, these return staff scheduling/room data, not marketing content. Whether they
+should be public is a product call; flagged here rather than asserted either way.
 
 ---
 
@@ -427,8 +454,8 @@ more cheaply than 153 hand-written tests, and fails loudly when someone adds a r
    `tests/routes/reservations-patch.test.ts`).
 2. **Extract the checkout math** out of `admin/page.tsx` into `src/lib/` (F-4), then unit-test it.
    The server side of checkout is now covered; the client-side money math is still not.
-3. **Fix and test `/api/reception/dashboard`** (F-1, F-2, F-3) — smallest file, three real bugs, and
-   it is the shift flow.
+3. ~~**Fix and test `/api/reception/dashboard`** (F-1, F-2, F-3) — smallest file, three real bugs,
+   and it is the shift flow.~~ **Done 2026-08-19 — see RISK-059.**
 4. **Table-driven auth test** across all 153 handlers (module 10) — cheap, wide, and catches every
    future unguarded route.
 5. **Packages endpoints** (module 4) — deferred revenue is the easiest thing to get quietly wrong.

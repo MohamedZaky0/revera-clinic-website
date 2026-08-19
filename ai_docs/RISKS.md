@@ -2420,6 +2420,108 @@ pattern sibling sections (Deposit/Notification/Queue Settings) already use.
 
 ---
 
+## RISK-059: `/api/reception/dashboard` Had No Auth, Could Clock In The Wrong Receptionist, And Could Silently Reopen An Ended Shift (RESOLVED)
+
+**Severity:** High (P0) · **Type:** Security / Data integrity
+**Found:** 2026-08-19, during the test-coverage sweep (`ai_docs/TEST_COVERAGE_INVENTORY.md`,
+findings F-1/F-2/F-3). RISK-036's audit (2026-08-16) had already swept every route file for missing
+auth guards and marked itself fully resolved — it missed this file because `route.ts:192` never
+imported any of the `access.ts`/`auth.ts` helpers at all, not even a broken one, so the grep-based
+sweep that closed RISK-036 had nothing to flag it against.
+
+**What it was — three compounding defects in the same handler:**
+- **F-1 (no auth):** `POST /api/reception/dashboard` (`start_shift`/`end_shift`) never checked an
+  `Authorization` header. It was the only mutating endpoint in the system with zero auth — anyone
+  who could reach the URL could clock any employee in or out.
+- **F-2 (wrong-employee fallback):** when `employeeId` was omitted, the route fell back to
+  `ilike("department", "Reception").limit(1)` — the first Reception employee in arbitrary DB order.
+  With two receptionists on shift, one could silently record the other's attendance, which then
+  feeds `hr_payroll`.
+- **F-3 (idempotency):** `start_shift` upserted `check_out_time: null` unconditionally on conflict
+  of `(employee_id, date)`. Re-firing it after a shift had already ended erased the recorded end
+  time and reopened the shift for that day.
+
+The route also queried through `@/lib/supabaseClient` (the anon-key client) instead of
+`@/lib/supabaseServer` (service role) — the pattern every sibling route uses — which is also why it
+couldn't be unit-tested with the shared `supabaseServer` fake until fixed.
+
+**Fix — `src/app/api/reception/dashboard/route.ts`:**
+- Added `requireReceptionAccess()` (wraps `requireStaffAccess` from `@/lib/access`), restricted to
+  `receptionist`/`hr`/`admin`/`superadmin` roles, applied to **both** GET and POST. GET was in scope
+  for the same guard even though F-1 only named POST: it returns patient names, today's booking
+  list, and the receptionist's monthly financial target/achieved figures, unauthenticated — the same
+  class of exposure this codebase already guards on `/api/reservations` and `/api/customers`.
+- POST now resolves the target employee from the authenticated session
+  (`access.employee.id`), never by guessing. A `receptionist` caller can only act on their own
+  employee record — an `employeeId` in the request body is ignored for that role. `hr`/`admin`/
+  `superadmin` may still pass an explicit `employeeId` to act on another employee's behalf (e.g.
+  correcting a missed clock-out), matching the manager-override shape `hr/attendance` already uses.
+- `start_shift` now reads today's existing `hr_attendance` row first: if `check_out_time` is already
+  set, it rejects with 409 instead of upserting over it; if the shift is merely already in progress,
+  re-firing is a no-op that returns the existing row unchanged (true idempotency, not just the one
+  tested case). `end_shift` with no open shift now returns 404 with a clear message instead of
+  falling through to `.single()` on zero rows and surfacing as a generic 500.
+- Switched every query in the file from `@/lib/supabaseClient` to `@/lib/supabaseServer`.
+
+**Frontend:** `ReceptionDashboardView.tsx` made its GET/POST calls with no `Authorization` header at
+all (unlike every other admin screen, which attaches `session.access_token`). Added an `accessToken`
+prop (matching the convention already used by `PnlScreen`/other Finance screens) and wired both
+fetches to send `Authorization: Bearer <token>` when present; `admin/page.tsx` now passes
+`accessToken={session?.access_token}` into `<ReceptionDashboardView />`. Without this the guard fix
+would have silently locked reception staff out of clocking in/out.
+
+**Verification:** `tests/routes/reception-dashboard.test.ts` — 14 route-level tests against the
+shared `supabaseServer` fake, covering all three defects plus the sibling scenarios listed in
+`TEST_COVERAGE_INVENTORY.md` §2 (invalid action rejected before any write, `end_shift` with no open
+shift, a date-scoped `end_shift` update). `npx tsc --noEmit` and `npx eslint` clean on all touched
+files (pre-existing warnings elsewhere in `admin/page.tsx` untouched). Manual checklist:
+`ai_docs/manual_tests/RISK_059_MANUAL_TESTS.md`.
+
+**Not covered by this fix:** `GET`'s own employee-resolution fallback (`route.ts:41`, same
+department-guess shape as F-2) is unchanged — it's a read, not a mutation, and no scenario in
+`TEST_COVERAGE_INVENTORY.md` §2 called for it. Worth revisiting if HR ever needs to distinguish
+"which specific receptionist's dashboard" via GET without an explicit `employeeId`.
+
+---
+
+## RISK-063: Four HR Write Endpoints Check For *A* Session, Never That It Belongs To Staff
+
+**Severity:** Medium-High · **Type:** Security / Access control
+**Found:** 2026-08-19, building a table-driven auth sweep (`tests/routes/auth-sweep.test.ts`) across
+all 153 route handlers (ai_docs/TEST_COVERAGE_INVENTORY.md module 10).
+
+**What it is:** `POST /api/hr/alerts`, `POST /api/hr/attendance`, `PATCH /api/hr/attendance`, and
+`POST /api/hr/leaves` each inline their own auth check instead of calling `verifyHrAccess` (which
+every sibling GET on the same file correctly uses):
+
+```ts
+const { data: { user }, error: authError } = await supabaseServer.auth.getUser(token);
+if (authError || !user) return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+```
+
+This confirms the bearer token is a *valid Supabase session* — it never checks that session has a
+matching `employee_accounts` row. The comments above two of these ("Allow any employee session to
+log their missing state", "any logged in employee can submit a leave request") describe the
+intended scope, but the code doesn't enforce it: a **patient** with a valid logged-in session can
+currently submit HR attendance clock-ins, leave requests, or missing-employee alerts under any
+`employee_id` they choose to pass — there is no check that the caller's own identity has any
+connection to that id.
+
+**Consequence:** a patient account can inject fabricated attendance/leave/alert rows that
+downstream HR screens and `hr_payroll` treat as real, misattributed to whichever `employee_id` the
+request names.
+
+**Fix required:** replace the inline check in all four handlers with `verifyHrAccess(req)` (or
+`requireStaffAccess` + an explicit role allowlist, matching the `requireReceptionAccess` pattern
+RISK-059 just established), the same guard already used by every GET in these same three files.
+
+**Verification:** `tests/routes/auth-sweep.test.ts` asserts the correct behavior (403 for an
+authenticated non-staff caller) for all four as `it.fails` — currently failing-as-expected because
+the bug is unfixed. Once the guard is corrected, those four assertions will start passing and
+`it.fails` will flip to a hard failure — the signal to remove the marker.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:

@@ -29,6 +29,7 @@ interface ReceptionDashboardViewProps {
   receptionistRole?: string;
   employeeId?: string;
   email?: string;
+  accessToken?: string;
   onNavigateTab?: (tabName: string) => void;
   onLogout?: () => void;
 }
@@ -38,6 +39,7 @@ export default function ReceptionDashboardView({
   receptionistRole = "Receptionist",
   employeeId,
   email,
+  accessToken,
   onNavigateTab,
   onLogout
 }: ReceptionDashboardViewProps) {
@@ -55,7 +57,10 @@ export default function ReceptionDashboardView({
       if (employeeId) params.set("employeeId", employeeId);
       if (email) params.set("email", email);
 
-      const res = await fetch(`/api/reception/dashboard?${params.toString()}`, { cache: "no-store" });
+      const res = await fetch(`/api/reception/dashboard?${params.toString()}`, {
+        cache: "no-store",
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+      });
       const data = await res.json();
       if (data.success) {
         setDashboardData(data);
@@ -71,8 +76,9 @@ export default function ReceptionDashboardView({
   };
 
   useEffect(() => {
+    if (!accessToken) return;
     fetchDashboardData();
-  }, [employeeId, email]);
+  }, [employeeId, email, accessToken]);
 
   // Live timer for elapsed shift time ticker when shift is active
   useEffect(() => {
@@ -93,7 +99,10 @@ export default function ReceptionDashboardView({
 
       const res = await fetch("/api/reception/dashboard", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+        },
         body: JSON.stringify({
           action: targetAction,
           employeeId,
