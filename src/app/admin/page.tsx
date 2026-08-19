@@ -426,6 +426,60 @@ const PERMISSION_STRUCTURE = [
     ]
   },
   {
+    category: "Employees & Staff",
+    prefix: "employees",
+    items: [
+      { key: "employees.view", label: "View Employee Directory" },
+      { key: "employees.create", label: "Add & Provision Employees" },
+      { key: "employees.edit", label: "Edit Employee Details & Roles" },
+      { key: "employees.delete", label: "Delete / Deactivate Employees" }
+    ]
+  },
+  {
+    category: "Inventory & Equipment",
+    prefix: "inventory",
+    items: [
+      { key: "inventory.view", label: "View Inventory & Stock Levels" },
+      { key: "inventory.manage_devices", label: "Manage Laser Devices & Pulses" },
+      { key: "inventory.manage_products", label: "Manage Products & Pricing" },
+      { key: "inventory.manage_suppliers", label: "Manage Suppliers & Orders" }
+    ]
+  },
+  {
+    category: "HR & Attendance",
+    prefix: "hr",
+    items: [
+      { key: "hr.view_attendance", label: "View Shift Logs & GPS Check-ins" },
+      { key: "hr.manage_attendance", label: "Approve / Override Attendance" },
+      { key: "hr.manage_payroll", label: "View & Process Staff Payroll" }
+    ]
+  },
+  {
+    category: "Marketing & Campaigns",
+    prefix: "marketing",
+    items: [
+      { key: "marketing.view_campaigns", label: "View Marketing Campaigns" },
+      { key: "marketing.manage_campaigns", label: "Create & Send Broadcasts" },
+      { key: "marketing.manage_discounts", label: "Manage Discounts & Offers" }
+    ]
+  },
+  {
+    category: "Customer Support",
+    prefix: "support",
+    items: [
+      { key: "support.view_tickets", label: "View Support Tickets" },
+      { key: "support.manage_tickets", label: "Respond & Resolve Tickets" }
+    ]
+  },
+  {
+    category: "Reports & Analytics",
+    prefix: "reports",
+    items: [
+      { key: "reports.view_analytics", label: "View Operational Analytics" },
+      { key: "reports.export_reports", label: "Export Business Data Reports" }
+    ]
+  },
+  {
     category: "Settings & System Control",
     prefix: "settings",
     items: [
@@ -2411,82 +2465,10 @@ export default function AdminPage() {
     }
   }
 
-  // Geolocation Check-In on login resolution
+  // Geolocation Check-In on login resolution (Disabled for now per user request)
   useEffect(() => {
-    console.log("Attendance Location Check-In triggered for user:", {
-      email: adminEmail,
-      role: adminRole,
-      dbId: adminDbId
-    });
-
-    if (!adminEmail || !session?.access_token || !adminRole || !adminDbId) {
-      console.log("Skipping check-in: missing auth data.");
-      return;
-    }
-    
-    // Bypass location enforcement for superadmins and admins
-    const loggedEmp = employeesList.find(e => e.id === adminDbId || e.email?.toLowerCase() === adminEmail.toLowerCase());
-    if (adminRole === 'superadmin' || adminRole === 'admin') {
-      console.log("Skipping location check: admin / superadmin bypass.");
-      return;
-    }
-
-    if (typeof window !== "undefined" && (!navigator || !navigator.geolocation)) {
-      console.warn("Geolocation not supported by browser/context.");
-      setLocationWarningMsg("Geolocation is not supported by your browser or connection context (requires HTTPS / localhost). Access is restricted until location verification can be performed.");
-      setLocationWarningOpen(true);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        console.log("GPS coordinates received:", latitude, longitude);
-        try {
-          const res = await fetch('/api/hr/attendance', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`
-            },
-            body: JSON.stringify({ employeeId: adminDbId, latitude, longitude, accuracy })
-          });
-
-          if (res.ok) {
-            console.log("Attendance daily check-in logged successfully.");
-          } else {
-            const errData = await res.json().catch(() => ({}));
-            console.warn("Check-in API rejected request:", errData);
-            if (errData.error === 'not_in_location') {
-              setLocationWarningMsg(
-                errData.message || `Your current location does not match the required check-in area for your assigned branch.\n\nYou are currently ${errData.distance || 'unknown'} meters away from the branch. Access is restricted while outside the 800-meter radius.`
-              );
-              setLocationWarningOpen(true);
-            } else if (errData.error === 'no_branch') {
-              setLocationWarningMsg("Your account has no branch assigned. Please contact the administrator.");
-              setLocationWarningOpen(true);
-            } else if (errData.error === 'no_location_configured') {
-              setLocationWarningMsg(errData.message || "No GPS coordinates configured for your assigned branch. Please contact your administrator to configure branch coordinates.");
-              setLocationWarningOpen(true);
-            } else {
-              setLocationWarningMsg(
-                errData.message || errData.error || "An unexpected error occurred during attendance verification."
-              );
-              setLocationWarningOpen(true);
-            }
-          }
-        } catch (err) {
-          console.error("Daily checkin API error:", err);
-        }
-      },
-      (geoErr) => {
-        console.warn("Geolocation permission denied or failed:", geoErr);
-        setLocationWarningMsg("Location access was denied or failed. Attendance check-in requires GPS access to verify your work location. Please enable location in your browser settings and refresh the page.");
-        setLocationWarningOpen(true);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }, [adminEmail, session, adminRole, adminDbId, employeesList]);
+    // GPS Attendance Location Check-In Enforcement Disabled
+  }, []);
 
   // Inactivity Presence Monitor for standard staff
   useEffect(() => {
@@ -2633,7 +2615,10 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/roles', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify({ name: newRoleName, permissions: newRolePermissions })
       });
 
@@ -2656,7 +2641,10 @@ export default function AdminPage() {
     if (!(await showConfirm(`Are you sure you want to delete the role '${name}'? This will disconnect employee accounts assigned to this role.`))) return;
     try {
       const res = await fetch(`/api/roles?name=${encodeURIComponent(name)}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
       });
       if (res.ok) {
         fetchRolesAndEmployees();
@@ -15385,7 +15373,7 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-3">Permissions & Access Control</label>
-                        <div className="grid gap-4 md:grid-cols-2 max-h-[400px] overflow-y-auto rounded-3xl border border-[#414E36]/10 p-5 bg-[#FBFBF9]">
+                        <div className="grid gap-4 md:grid-cols-2 max-h-[550px] overflow-y-auto rounded-3xl border border-[#414E36]/10 p-5 bg-[#FBFBF9]">
                           {PERMISSION_STRUCTURE.map((group) => {
                             const allChecked = group.items.every(item => newRolePermissions.includes(item.key));
                             const someChecked = group.items.some(item => newRolePermissions.includes(item.key)) && !allChecked;
