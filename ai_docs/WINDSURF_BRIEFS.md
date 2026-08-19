@@ -126,16 +126,71 @@ sub-PR.
 
 # QUEUED BRIEFS — do these next, in this order
 
-## Brief 18 — Phase 2: translate the Doctors ecosystem to Arabic
+## Brief 18 — Deduplicate the shared provider-form body, then translate the Doctors ecosystem
 
-**Target — 3 files, all from Brief 15's extraction, translate together in one brief since they
-share state and the same value/label risks:** `src/components/admin/doctor/AdminDoctorsView.tsx`
-(786 lines), `src/components/admin/doctor/ProviderFormModal.tsx` (508 lines),
-`src/components/admin/doctor/DoctorAuditLogsModal.tsx` (146 lines). None currently take a `lang`
-prop or have a `dir` attribute — same "wiring needed, unlike Brief 12" situation as Brief 13.
+**Why Part 0 exists:** verifying this brief's original scope found that `AdminDoctorsView.tsx`
+(inline edit view) and `ProviderFormModal.tsx` (Add modal) don't just share the Gender/Session-Type
+fields — **all 21 `providerForm*` fields they use are identical, confirmed by diffing the field
+lists**, and the JSX rendering each field is **byte-for-byte identical** between the two files
+(confirmed directly — the Gender `<select>` block, for one example, is character-for-character the
+same in both, differing only in indentation). This is Brief 15's own finding (both surfaces read
+the same `useProviderForm()` hook) taken one step further: it's not just the *state* that's shared,
+the *entire form body* was copy-pasted between the two presentations. Translating it in place would
+mean doing the same work twice and — per the last conversation with Mohamed — that duplication
+should be eliminated as a component first, matching this whole effort's own DEC-027 philosophy,
+rather than patched twice.
 
-**Measured scope (grepped 2026-08-19, re-confirm):**
-| File | Hardcoded strings | Placeholders | RTL classes |
+### Part 0 — Extract the shared form body into one component (do this first, no translation yet)
+
+**Boundaries (verified by direct read, 2026-08-19 — re-confirm before starting):**
+- `AdminDoctorsView.tsx` lines 150–522: the `<div className="space-y-6">` block from "Row 1: Name &
+  Specialty" through the end of the working-schedule renderer, immediately before the "Action
+  Buttons" comment at line 524.
+- `ProviderFormModal.tsx` lines 109–484: the `<div className="flex-1 overflow-y-auto space-y-5
+  pr-1">` block, same starting point ("Row 1: Name & Specialty") through the same ending point,
+  immediately before the "Footer Actions" comment at line 487.
+
+**What does NOT move — stays in each file as its own wrapper:** the page-level chrome in
+`AdminDoctorsView.tsx` ("Back to Doctors" button, `<h1>Edit Doctor: {name}</h1>` heading, "Save
+Changes" button) and the modal-level chrome in `ProviderFormModal.tsx` (modal header/close button,
+"Cancel"/"Save Changes"/"Add Provider" footer — the button label itself depends on
+`providerModalMode`, which correctly lives outside the shared body). Also stays in
+`AdminDoctorsView.tsx`: the doctors list/table and its own filter panel — the filter panel's Gender
+dropdown (`providerFilterGender`, ~line 632) is a **different control for a different purpose**
+(filtering the list, not editing a doctor) and is **not** part of this consolidation, even though it
+has the same `<option value="Male">`/`<option value="Female">` shape.
+
+**Scope:** extract the two identical blocks into `src/components/admin/doctor/ProviderFormFields.tsx`,
+taking `providerForm` (the whole `useProviderForm()` return value, already threaded through both
+call sites per Brief 15) as its prop, same pattern as everywhere else. `AdminDoctorsView.tsx` and
+`ProviderFormModal.tsx` each render `<ProviderFormFields providerForm={providerForm} .../>` inside
+their own remaining chrome. `DoctorServiceCommissionEditor` (used inside the shared body) moves with
+it, imported from its existing canonical location — no change to that component.
+
+**Method:** no behaviour change, no renames beyond the new file, no translation yet — pure
+mechanical move, same rules as Briefs 5/10/11/15/16. `npm run check` green. Browser-verify both
+surfaces still work identically: edit an existing doctor via the inline view, add a new doctor via
+the modal, confirm every field (name, specialty, phone, national ID, gender, branches, start date,
+rating, image, commission/services editor, working schedule for both in-person and online) still
+reads and saves correctly from both entry points.
+
+**Exit criteria for Part 0:** neither `AdminDoctorsView.tsx` nor `ProviderFormModal.tsx` contains
+the duplicated field JSX anymore; both render `<ProviderFormFields />`; `npm run check` green;
+both entry points browser-verified working identically to before. Commit this before starting Part 1.
+
+### Part 1 — Translate (after Part 0 lands and is verified)
+
+**Target — now 4 files instead of 3, but the duplication is gone:**
+`src/components/admin/doctor/ProviderFormFields.tsx` (the new shared body — translate once here,
+not twice), `src/components/admin/doctor/AdminDoctorsView.tsx` (now just the list + filter panel +
+page chrome), `src/components/admin/doctor/ProviderFormModal.tsx` (now just the modal chrome),
+`src/components/admin/doctor/DoctorAuditLogsModal.tsx` (146 lines, unchanged by Part 0). None
+currently take a `lang` prop or have a `dir` attribute.
+
+**Re-measure string/placeholder/RTL-class counts once Part 0 lands** — the original counts below
+were taken pre-consolidation and will have shifted (most of `AdminDoctorsView.tsx`'s and
+`ProviderFormModal.tsx`'s counts move into `ProviderFormFields.tsx`):
+| File (pre-Part-0 baseline, 2026-08-19) | Hardcoded strings | Placeholders | RTL classes |
 |---|---|---|---|
 | `AdminDoctorsView.tsx` | ~34 | 8 | `text-left`×6, `left-3.5`, `pl-10`, `pr-4`, `right-0`, `right-1` |
 | `ProviderFormModal.tsx` | ~16 | 7 | `pr-1`×1 |
@@ -143,22 +198,18 @@ prop or have a `dir` attribute — same "wiring needed, unlike Brief 12" situati
 
 As always, the grep count is a floor — enumerate by reading each file.
 
-**Value/label separation — the highest-risk part of this brief, 3 separate sites for the same
-issue.** `AdminDoctorsView.tsx` and `ProviderFormModal.tsx` **both** contain an inline Gender
-dropdown (`<option value="Male">Male</option>` / `<option value="Female">Female</option>` —
-confirmed at `AdminDoctorsView.tsx:210-211` and `:632-633`, `ProviderFormModal.tsx:169-170`) —
-this is because both components render the same shared provider form in two different
-presentations (Brief 15's finding: inline edit vs. Add modal), so the same field appears twice.
-`AdminDoctorsView.tsx:632-633` is a **filter-panel** Gender dropdown (`providerFilterGender`,
-separate purpose from the edit-form ones at 210/169 but the identical bug shape). Translate all 3
-via the same `t.genderMale`/`t.genderFemale` lookup pattern already established for
-`CustomerFormModal.tsx` (Briefs 7-8) — **keep `value="Male"`/`value="Female"` unchanged**, they
-feed `providerFormGender`/`providerFilterGender` which must stay canonical.
+**Value/label separation — now 2 sites instead of 3, both genuinely necessary:**
+`ProviderFormFields.tsx`'s Gender `<select>` (the single shared copy — was duplicated at
+`AdminDoctorsView.tsx:210-211` and `ProviderFormModal.tsx:169-170` before Part 0, now translate it
+once) and `AdminDoctorsView.tsx`'s **filter-panel** Gender dropdown (~line 632, `providerFilterGender`
+— genuinely separate, filters the list rather than editing a record, not touched by Part 0).
+Translate both via the same `t.genderMale`/`t.genderFemale` lookup already established for
+`CustomerFormModal.tsx` (Briefs 7-8) — **keep `value="Male"`/`value="Female"` unchanged**, they feed
+`providerFormGender`/`providerFilterGender` which must stay canonical.
 
-Also gate the Session Type toggle (`providerFormScheduleTab`, `"in_person" | "online"` —
-`AdminDoctorsView.tsx:385-411`, `ProviderFormModal.tsx:346-372`, both reading/writing the same
-shared state) the same way Brief 14 fixed New Booking's Session Type cards — translate the label,
-never the stored `"in_person"`/`"online"` value.
+Also translate the Session Type toggle inside `ProviderFormFields.tsx` (`providerFormScheduleTab`,
+`"in_person" | "online"` — now only one copy, was duplicated before Part 0) the same way Brief 14
+fixed New Booking's Session Type cards — translate the label, never the stored value.
 
 **A real bug to fix as part of this brief, not just a translation nicety:**
 `DoctorAuditLogsModal.tsx:108` calls `new Date(log.created_at).toLocaleString()` with **no locale
@@ -171,23 +222,24 @@ setting from this admin panel's own `lang` toggle). **Pin it explicitly to `en-G
 matching the surrounding convention** — this is a fix, not something to leave alone the way the
 already-pinned calls elsewhere must be left alone.
 
-**Dates that ARE already pinned — leave these alone:** none of the other 3 files have any other
-`toLocale*` calls (confirmed by grep) — this whole brief has exactly one date-formatting call
-total, and it's the broken one above.
+**Dates that ARE already pinned — leave these alone:** no other `toLocale*` calls exist across
+these 4 files (confirmed by grep pre-Part-0) — exactly one date-formatting call total, and it's the
+broken one above.
 
-**Method:** `dir={lang === "ar" ? "rtl" : "ltr"}` on each of the 3 components' own root — per
-component, same as everywhere else. Note: `AdminServicesView.tsx` (a sibling file, not in this
-brief) has 2 hardcoded `dir="rtl"` attributes on its Arabic-name/description *text inputs* — if you
-see the equivalent pattern anywhere in these 3 Doctor files (an Arabic-content input field, not a
-UI-language toggle), that is a content-direction hint for typing Arabic text and is unrelated to
-this brief's `lang`/`dir` wiring — do not remove or confuse it with the translation toggle.
+**Method:** `dir={lang === "ar" ? "rtl" : "ltr"}` on each component's own root — per component, same
+as everywhere else, including on the new `ProviderFormFields.tsx`. Note: `AdminServicesView.tsx` (a
+sibling file, not in this brief) has 2 hardcoded `dir="rtl"` attributes on its Arabic-name/
+description *text inputs* — if you see the equivalent pattern anywhere in these 4 Doctor files (an
+Arabic-content input field, not a UI-language toggle), that is a content-direction hint for typing
+Arabic text and is unrelated to this brief's `lang`/`dir` wiring — do not remove or confuse it with
+the translation toggle.
 
 **Exit criteria:** same as every prior Phase 2 brief — `grep '>[A-Z][a-z]'` and
-`grep 'placeholder='` return only intentional non-copy matches across all 3 files; all RTL classes
+`grep 'placeholder='` return only intentional non-copy matches across all 4 files; all RTL classes
 converted to logical properties; the `toLocaleString()` bug fixed; Gender/Session-Type value/label
-separation correct in all 3 sites; browser-verified in both languages (open Doctors, edit a doctor
-via the inline view, open Add Doctor via the modal, open Audit Logs — all 3 in Arabic); manual test
-checklist written per CLAUDE.md.
+separation correct in both remaining sites; browser-verified in both languages (open Doctors, edit
+a doctor via the inline view, open Add Doctor via the modal, open Audit Logs — all in Arabic);
+manual test checklist written per CLAUDE.md.
 
 ## Brief 19 — Phase 2: translate `AdminServicesView.tsx` to Arabic
 

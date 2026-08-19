@@ -12,7 +12,7 @@
 > | New Booking (`AdminNewBookingView.tsx`, 1,123 lines) | ✅ (pre-existing) | ✅ Brief 14 (landed clean, no gaps) |
 > | Patients — Directory, 3 modals | ✅ Brief 5 | ✅ Briefs 6-9 (gaps found + closed) |
 > | Patients — Profile Drawer (1,539 lines, 5 tabs + 3 modals) | ✅ Briefs 10 (state) + 11 (JSX) | ✅ Brief 12 (2 gaps found + closed) |
-> | Doctors (`page.tsx:7711-8372`, ~661 lines) | ✅ Brief 15 (verified, no gaps) | **Brief 18, queued** |
+> | Doctors (`page.tsx:7711-8372`, ~661 lines) | ✅ Brief 15 (verified, no gaps) | **Brief 18, queued (Part 0 dedupes `AdminDoctorsView.tsx`/`ProviderFormModal.tsx`'s ~390-line identical shared form body into `ProviderFormFields.tsx` first, then Part 1 translates)** |
 > | Services (`page.tsx:8375-9370`, ~995 lines) | ✅ Brief 16 (verified — surfaced pre-existing RISK-064) | **Brief 19, queued** |
 > | Inventory (`page.tsx:14724-16063` + `page.tsx:23321-23506`, ~1,530 lines) | **Brief 17, active** | **Brief 20, queued (provisional — written against Brief 17's planned structure)** |
 > | POS | N/A — dead mock UI, unreachable through any nav path | **out of scope** — separate open product decision: build the real thing or delete the dead code |
