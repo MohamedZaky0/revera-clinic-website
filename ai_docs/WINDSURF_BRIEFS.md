@@ -10,121 +10,6 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 18 — Deduplicate the shared provider-form body, then translate the Doctors ecosystem
-
-**Why Part 0 exists:** verifying this brief's original scope found that `AdminDoctorsView.tsx`
-(inline edit view) and `ProviderFormModal.tsx` (Add modal) don't just share the Gender/Session-Type
-fields — **all 21 `providerForm*` fields they use are identical, confirmed by diffing the field
-lists**, and the JSX rendering each field is **byte-for-byte identical** between the two files
-(confirmed directly — the Gender `<select>` block, for one example, is character-for-character the
-same in both, differing only in indentation). This is Brief 15's own finding (both surfaces read
-the same `useProviderForm()` hook) taken one step further: it's not just the *state* that's shared,
-the *entire form body* was copy-pasted between the two presentations. Translating it in place would
-mean doing the same work twice and — per the last conversation with Mohamed — that duplication
-should be eliminated as a component first, matching this whole effort's own DEC-027 philosophy,
-rather than patched twice.
-
-### Part 0 — Extract the shared form body into one component (do this first, no translation yet)
-
-**Boundaries (verified by direct read, 2026-08-19 — re-confirm before starting):**
-- `AdminDoctorsView.tsx` lines 150–522: the `<div className="space-y-6">` block from "Row 1: Name &
-  Specialty" through the end of the working-schedule renderer, immediately before the "Action
-  Buttons" comment at line 524.
-- `ProviderFormModal.tsx` lines 109–484: the `<div className="flex-1 overflow-y-auto space-y-5
-  pr-1">` block, same starting point ("Row 1: Name & Specialty") through the same ending point,
-  immediately before the "Footer Actions" comment at line 487.
-
-**What does NOT move — stays in each file as its own wrapper:** the page-level chrome in
-`AdminDoctorsView.tsx` ("Back to Doctors" button, `<h1>Edit Doctor: {name}</h1>` heading, "Save
-Changes" button) and the modal-level chrome in `ProviderFormModal.tsx` (modal header/close button,
-"Cancel"/"Save Changes"/"Add Provider" footer — the button label itself depends on
-`providerModalMode`, which correctly lives outside the shared body). Also stays in
-`AdminDoctorsView.tsx`: the doctors list/table and its own filter panel — the filter panel's Gender
-dropdown (`providerFilterGender`, ~line 632) is a **different control for a different purpose**
-(filtering the list, not editing a doctor) and is **not** part of this consolidation, even though it
-has the same `<option value="Male">`/`<option value="Female">` shape.
-
-**Scope:** extract the two identical blocks into `src/components/admin/doctor/ProviderFormFields.tsx`,
-taking `providerForm` (the whole `useProviderForm()` return value, already threaded through both
-call sites per Brief 15) as its prop, same pattern as everywhere else. `AdminDoctorsView.tsx` and
-`ProviderFormModal.tsx` each render `<ProviderFormFields providerForm={providerForm} .../>` inside
-their own remaining chrome. `DoctorServiceCommissionEditor` (used inside the shared body) moves with
-it, imported from its existing canonical location — no change to that component.
-
-**Method:** no behaviour change, no renames beyond the new file, no translation yet — pure
-mechanical move, same rules as Briefs 5/10/11/15/16. `npm run check` green. Browser-verify both
-surfaces still work identically: edit an existing doctor via the inline view, add a new doctor via
-the modal, confirm every field (name, specialty, phone, national ID, gender, branches, start date,
-rating, image, commission/services editor, working schedule for both in-person and online) still
-reads and saves correctly from both entry points.
-
-**Exit criteria for Part 0:** neither `AdminDoctorsView.tsx` nor `ProviderFormModal.tsx` contains
-the duplicated field JSX anymore; both render `<ProviderFormFields />`; `npm run check` green;
-both entry points browser-verified working identically to before. Commit this before starting Part 1.
-
-### Part 1 — Translate (after Part 0 lands and is verified)
-
-**Target — now 4 files instead of 3, but the duplication is gone:**
-`src/components/admin/doctor/ProviderFormFields.tsx` (the new shared body — translate once here,
-not twice), `src/components/admin/doctor/AdminDoctorsView.tsx` (now just the list + filter panel +
-page chrome), `src/components/admin/doctor/ProviderFormModal.tsx` (now just the modal chrome),
-`src/components/admin/doctor/DoctorAuditLogsModal.tsx` (146 lines, unchanged by Part 0). None
-currently take a `lang` prop or have a `dir` attribute.
-
-**Re-measure string/placeholder/RTL-class counts once Part 0 lands** — the original counts below
-were taken pre-consolidation and will have shifted (most of `AdminDoctorsView.tsx`'s and
-`ProviderFormModal.tsx`'s counts move into `ProviderFormFields.tsx`):
-| File (pre-Part-0 baseline, 2026-08-19) | Hardcoded strings | Placeholders | RTL classes |
-|---|---|---|---|
-| `AdminDoctorsView.tsx` | ~34 | 8 | `text-left`×6, `left-3.5`, `pl-10`, `pr-4`, `right-0`, `right-1` |
-| `ProviderFormModal.tsx` | ~16 | 7 | `pr-1`×1 |
-| `DoctorAuditLogsModal.tsx` | ~9 | 0 | `pr-1`×1 |
-
-As always, the grep count is a floor — enumerate by reading each file.
-
-**Value/label separation — now 2 sites instead of 3, both genuinely necessary:**
-`ProviderFormFields.tsx`'s Gender `<select>` (the single shared copy — was duplicated at
-`AdminDoctorsView.tsx:210-211` and `ProviderFormModal.tsx:169-170` before Part 0, now translate it
-once) and `AdminDoctorsView.tsx`'s **filter-panel** Gender dropdown (~line 632, `providerFilterGender`
-— genuinely separate, filters the list rather than editing a record, not touched by Part 0).
-Translate both via the same `t.genderMale`/`t.genderFemale` lookup already established for
-`CustomerFormModal.tsx` (Briefs 7-8) — **keep `value="Male"`/`value="Female"` unchanged**, they feed
-`providerFormGender`/`providerFilterGender` which must stay canonical.
-
-Also translate the Session Type toggle inside `ProviderFormFields.tsx` (`providerFormScheduleTab`,
-`"in_person" | "online"` — now only one copy, was duplicated before Part 0) the same way Brief 14
-fixed New Booking's Session Type cards — translate the label, never the stored value.
-
-**A real bug to fix as part of this brief, not just a translation nicety:**
-`DoctorAuditLogsModal.tsx:108` calls `new Date(log.created_at).toLocaleString()` with **no locale
-argument at all** — unlike every other date-formatting call in this codebase (all pinned to
-`en-GB`/`en-US`), this one silently follows whatever locale the admin's own browser/OS happens to
-be set to. That's already a latent inconsistency across different staff machines, and it means
-adding Arabic language support elsewhere in the file makes this one spot *more* likely to drift
-into Arabic-formatted digits/months by accident (the browser locale is a separate, unrelated
-setting from this admin panel's own `lang` toggle). **Pin it explicitly to `en-GB` or `en-US`
-matching the surrounding convention** — this is a fix, not something to leave alone the way the
-already-pinned calls elsewhere must be left alone.
-
-**Dates that ARE already pinned — leave these alone:** no other `toLocale*` calls exist across
-these 4 files (confirmed by grep pre-Part-0) — exactly one date-formatting call total, and it's the
-broken one above.
-
-**Method:** `dir={lang === "ar" ? "rtl" : "ltr"}` on each component's own root — per component, same
-as everywhere else, including on the new `ProviderFormFields.tsx`. Note: `AdminServicesView.tsx` (a
-sibling file, not in this brief) has 2 hardcoded `dir="rtl"` attributes on its Arabic-name/
-description *text inputs* — if you see the equivalent pattern anywhere in these 4 Doctor files (an
-Arabic-content input field, not a UI-language toggle), that is a content-direction hint for typing
-Arabic text and is unrelated to this brief's `lang`/`dir` wiring — do not remove or confuse it with
-the translation toggle.
-
-**Exit criteria:** same as every prior Phase 2 brief — `grep '>[A-Z][a-z]'` and
-`grep 'placeholder='` return only intentional non-copy matches across all 4 files; all RTL classes
-converted to logical properties; the `toLocaleString()` bug fixed; Gender/Session-Type value/label
-separation correct in both remaining sites; browser-verified in both languages (open Doctors, edit
-a doctor via the inline view, open Add Doctor via the modal, open Audit Logs — all in Arabic);
-manual test checklist written per CLAUDE.md.
-
 ## Brief 19 — Phase 2: translate `AdminServicesView.tsx` to Arabic
 
 **Target:** `src/components/admin/services/AdminServicesView.tsx` (1,171 lines — the largest single
@@ -157,45 +42,62 @@ DEC-043.
 value/label separation confirmed on all 3 status renderings, both languages browser-verified (list
 view, Add/Edit Service form, Add Category modal, filter panel), manual test checklist written.
 
+---
+---
+
+# QUEUED BRIEFS — do these next, in this order
+
 ## Brief 20 — Phase 2: translate the Inventory ecosystem to Arabic
 
-**Do not start this until Brief 17 Part 2 has landed.** This brief is written against Brief 17's
-*planned* component structure so it's ready the moment extraction finishes — the file paths below
-don't exist yet as of 2026-08-19. Re-verify every path and line-count claim once Brief 17 is done;
-treat everything here as provisional scope, not measured fact, until then.
+**Brief 17 landed and was independently verified 2026-08-20** — this brief is now rewritten against
+the real files, not the prediction that used to sit here.
 
-**Expected targets, per Brief 17 Part 2's scope:** `src/components/admin/inventory/
-AdminInventoryView.tsx` (top-level wrapper), `InventoryDevicesTab.tsx`, `InventoryProductsTab.tsx`,
-`DeviceAuditLogsModal.tsx`, plus the already-existing `SupplierManagementScreen.tsx` (and its
-children `SuppliersScreen.tsx`/`PurchasesScreen.tsx`) — **these 3 supplier files predate this whole
-i18n rollout and need the same `lang`/`dir` wiring added, they are not exempt just because they
-were already extracted**.
+**Targets — 6 files:** `src/components/admin/inventory/{AdminInventoryView,InventoryDevicesTab,
+InventoryProductsTab,DeviceAuditLogsModal}.tsx` (all new, from Brief 17), plus
+`SupplierManagementScreen.tsx`/`SuppliersScreen.tsx`/`PurchasesScreen.tsx` (pre-existing, not
+exempt — they need the same `lang`/`dir` wiring as everything else). None currently take a `lang`
+prop. Re-measure hardcoded-string/placeholder/RTL-class counts before starting — none were taken
+for this brief yet.
 
-**Known from Brief 17's own investigation, carries over here:** the devices and products domains
-don't share state (confirmed in Brief 17), so unlike Brief 18 there's likely no cross-file
-duplicate-field risk to chase — but re-confirm once the files exist, don't assume Brief 17's
-pre-extraction analysis of `page.tsx` still holds true post-extraction.
+**Permission-gating interaction — verified, not predicted, this time.** `page.tsx` computes 3
+booleans once (`hasPermission("inventory.manage_devices")` etc.) and passes them down as a single
+generically-named `canManage` prop into each tab (`InventoryDevicesTab`/`InventoryProductsTab`
+receive `canManage={canManageDevices}`/`canManage={canManageProducts}`;
+`SupplierManagementScreen` receives `canManage={canManageSuppliers}` and forwards it to its 2
+children unchanged). Every write button in these files already reads `canManage`, not
+`hasPermission(...)` directly — **do not touch the `canManage` conditionals** when adding `t.*`
+lookups to the same buttons; label and permission gate must stay independent. Browser-verify in
+Arabic with the full-access account at minimum (a genuinely restricted-account browser check is
+still outstanding from Brief 17 itself, tracked in
+`ai_docs/manual_tests/BRIEF_17_INVENTORY_PERMISSIONS_AND_EXTRACTION_MANUAL_TESTS.md` — pick that up
+too if a restricted test account becomes available).
 
-**Value/label separation candidates to check once the files exist (not yet confirmed against real
-code — this is a prediction, verify it):** device/product status fields (active/inactive, low-stock
-indicators), any payment or supplier-status enums in the Suppliers/Purchases screens. Apply the
-same rule as every prior brief: translate the label, never a value compared in logic or written
-back via POST/PATCH.
+**Value/label separation — confirmed real sites, not predictions:**
+- Device status, 3 canonical values used in both comparisons and a filter dropdown:
+  `"Optimal"`/`"Warning"`/`"Maintenance Due"` (`InventoryDevicesTab.tsx` — stat-card counts ~line
+  218/236/254, filter `<option>`s ~line 317-318, badge rendering ~line 422+). Translate the
+  displayed label only; `dev.status === "..."` comparisons and the `value=` attributes must stay
+  English.
+- Product status, 4 canonical values, same shape: `"Active"`/`"Inactive"`/`"Out of Stock"`/
+  `"Discontinued"` (`InventoryProductsTab.tsx` — the `prodStatus` form state at line 88, filter
+  `<option>`s ~line 489-492, badge rendering ~line 593+). Same rule — label only, never the stored
+  value or the `<option value="...">`.
+- Devices and products still don't share state with each other (re-confirmed against the real
+  files, matching what Brief 17's pre-extraction analysis predicted) — no cross-file duplicate-field
+  risk to chase here, unlike Brief 18's Doctors situation.
 
-**Permission-gating interaction:** Brief 17 Part 1 will have added `hasPermission("inventory.view"
-/".manage_devices"/".manage_products"/".manage_suppliers")` checks with conditional rendering
-(`hasPermission(...) ? "inline-flex" : "hidden"`, matching the Services convention). When adding
-`t.*` lookups to those same buttons, **do not accidentally remove or restructure the permission
-conditional** — the translated label and the permission gate apply to the same element
-independently; changing one must not regress the other. Browser-verify with both a full-access and
-a view-only permission grant in Arabic, not just in English.
+**Dates:** check for `toLocale*` calls across all 6 files and confirm each is pinned to
+`en-GB`/`en-US` per DEC-043 — or fix it the way Brief 18 fixed `DoctorAuditLogsModal.tsx`'s
+unpinned `toLocaleString()` if the same gap exists here (worth checking specifically, since that
+exact bug already turned up once in this rollout).
 
-**Dates:** none measured yet — check for `toLocale*` calls once the files exist and confirm they're
-pinned to `en-GB`/`en-US` per DEC-043 (or fix them the way Brief 18 fixes
-`DoctorAuditLogsModal.tsx`'s unpinned one, if the same gap exists here).
+**Also found during Brief 17, not this brief's job to fix but worth knowing:**
+`InventoryProductsTab.tsx` has a dead `handleSearchPatientByPhone` function with zero call sites,
+pre-existing from before Brief 17. Don't accidentally give it real UI while translating nearby code
+— if it stays dead, it stays dead; reviving it is a feature decision, not a translation task.
 
 **Method / exit criteria:** identical shape to every prior Phase 2 brief. Manual test checklist
-written per CLAUDE.md, including a pass with a view-only Reception-style permission grant.
+written per CLAUDE.md.
 
 ---
 ---
@@ -582,3 +484,29 @@ the same as watching it render for a real restricted session — flagged in
 confirmed via `git log -S` that this was already dead code in `page.tsx` before Brief 17 touched it,
 moved verbatim. Same shape as Brief 15's dead Attendance-tab plumbing; not a new RISK entry, just
 noted for whoever eventually does dead-code cleanup in this area.
+
+### Brief 18 — Deduplicate the shared provider-form body, then translate the Doctors ecosystem (completed 2026-08-20)
+
+Landed as 2 clean commits: Part 0 (extract `ProviderFormFields.tsx`), Part 1 (translate all 4
+files). Part 0 delivered exactly what it set out to — the ~390-line form body duplicated
+byte-for-byte between `AdminDoctorsView.tsx` and `ProviderFormModal.tsx` (confirmed identical by
+diffing the Gender `<select>` block character-for-character before starting) now lives once, and
+the Gender value/label-separation site count dropped from 3 to 2 as a direct consequence, exactly
+as the brief predicted.
+
+Review outcome: `tsc`/`eslint` clean (0 errors), `vitest` 597/603 unchanged, en/ar key parity exact
+(477/477) against the commit as authored. The `toLocaleString()` bug (unpinned, silently following
+the browser's own locale) is fixed, pinned to `en-GB`. Browser-verified live in both languages:
+Doctors list, Edit Doctor inline view (Gender, Session Type, all fields), RTL mirroring on the full
+form, clean revert to English.
+
+**Two gaps found and closed, neither structural:** (1) the row-actions dropdown wrapper in
+`AdminDoctorsView.tsx` still used `text-left` while its own inner menu correctly used `text-start`
+— almost certainly visually inert (icon-only button) but fixed to match the brief's own bar.
+(2) The working-schedule day labels (`{day}`, rendered straight from `Object.keys(activeSched)`)
+had no translation lookup at all — "Sunday" through "Saturday" stayed English even in Arabic mode.
+Not something the brief anticipated when written, and not catchable by `grep '>[A-Z][a-z]'` (an
+interpolated expression, not literal JSX text) — found only by reading the actual Arabic render.
+Fixed with a `dayNames` lookup added to `providerFormFields`, with the underlying `day` key
+(correctly still the canonical English weekday name used to index the schedule object) left
+untouched. Manual test checklist: `ai_docs/manual_tests/BRIEF_18_DOCTORS_DEDUP_AND_I18N_MANUAL_TESTS.md`.
