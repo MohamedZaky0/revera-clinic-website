@@ -39,6 +39,120 @@ in Arabic end-to-end and confirming the created record's stored fields are Engli
 ---
 ---
 
+# QUEUED BRIEFS — do these next, in this order
+
+## Brief 15 — Phase 1: extract `Doctors` from `admin/page.tsx`
+
+**Why this exists:** DEC-043's 2026-08-19 correction added Doctors to Reception scope (Reception
+already gets a read-only view today via existing `providers.edit`/`.delete` permission gates — see
+the correction note for the investigation). This brief does extraction only, no translation, same
+extract-then-translate split as every other section. **Read this whole brief before starting —
+unlike every prior Phase 1 brief, this section is not one contiguous block.**
+
+**The ecosystem is scattered across 3 separate regions of `page.tsx` (verified by direct read,
+2026-08-19 — re-confirm line numbers, other work has been landing on this file):**
+
+1. **Main `activeNav === "Doctors"` block**, lines 7711–8372 (~661 lines). Three-way conditional:
+   `viewingDoctorDetails` → already-extracted `<DoctorProfileDetailsView />` (just a call, no
+   change needed) · `editingDoctorInline` → a full-page inline edit form (~406 lines) · else → the
+   doctors list/directory (~246 lines, includes an "Audit Logs" button and per-row Edit/Delete
+   actions gated by `hasPermission("providers.edit"/".delete")`).
+2. **Add/Edit Provider modal**, lines 22897–23318 (~421 lines) — over 14,000 lines away from the
+   block above. Opened only via `openAddProviderModal()` (line 5158) for **adding** a new doctor.
+3. **Audit Logs modal**, lines 23509–23624 (~115 lines) — also far away. Opened only from the
+   list's "Audit Logs" button. Fully self-contained: own state (`showAuditLogsModal`, line 4295)
+   and fetcher (`fetchAuditLogs()`, line 5054), not shared with anything else in this ecosystem.
+
+**Critical finding — regions 1 and 2 share one set of ~31 state variables, don't split them
+naively.** The inline edit form (region 1) and the Add/Edit modal (region 2) both read/write the
+identical `providerForm*` state block (lines 4255–4294: name, rating, commission fields, working
+hours, branch schedules, etc. — confirmed by grep, both regions reference the same 20 field names).
+This is **not** two unsynced editors (not a RISK-045 situation) — it's one shared form whose
+presentation differs by context: `openAddProviderModal()` shows the modal for new doctors;
+`openEditProviderModal(provider)` (misleadingly named — it actually sets `editingDoctorInline` and
+**closes** the modal, line 5210) routes existing-doctor edits to the inline full-page view instead.
+Both funnel into the same `handleSaveProvider()` (lines 5290–5473) and `handleDeleteProvider()`
+(lines 5475–5496). Renaming `openEditProviderModal` to something accurate is optional, not required
+by this brief — use judgement, don't let it expand scope.
+
+**Also found while investigating — dead/orphaned code, move it, don't complete it or drop it:**
+`providerTab` (`"Doctors" | "Attendance"`, line 1555), `attendanceDate`/`attendanceRecords`
+(lines 4299–4303), and `fetchAttendance()` (line 5065) have full data-fetching plumbing — including
+a permission-normalisation effect (lines 2199–2208) and a fetch-trigger effect (lines 5115–5118) —
+for what looks like a planned "Attendance" sub-tab on the Doctors screen. **Confirmed by exhaustive
+grep: zero JSX anywhere renders `providerTab`, `attendanceRecords`, or an Attendance tab.** It is
+declared and fetched but never displayed — the same shape of gap as DEC-042's `attachedProducts`
+and the dead `lang` state Brief 6 found. Move this state/logic verbatim wherever it ends up (do not
+silently delete it, do not invent UI to "finish" it) and flag it in your completion report so a
+human can decide later whether to build the missing tab or delete the plumbing.
+
+**Scope — 4 ordered sub-PRs, same reasoning as Brief 5/10/11 (shared state can't be split from its
+two consumer UIs without lifting it to a hook first), each its own commit:**
+1. **Audit Logs modal** → `src/components/admin/doctor/DoctorAuditLogsModal.tsx` (or similar).
+   Fully independent of the `providerForm*` state — safe to do first, proves the pattern for this
+   section the same way Brief 5's Sub-PR 1 did for Patients.
+2. **`useProviderForm` hook** (or similar name) → move all `providerForm*` state (lines 4255–4294),
+   `providers`/`editingDoctorInline`/`viewingDoctorDetails`/`showProviderModal`/`providerModalMode`/
+   `providerEditingId` (lines 4103, 4244–4254), the provider filter/search state (lines 4307–4311),
+   the dead Attendance plumbing (moves here too, still unused), and the 4 handlers
+   (`openAddProviderModal`, `openEditProviderModal`, `handleSaveProvider`, `handleDeleteProvider` —
+   NOT `fetchAuditLogs`, that stays with Sub-PR 1) into `src/components/admin/doctor/useProviderForm.ts`.
+   `page.tsx` calls this once and passes the result to both consumers as props — same
+   no-double-hook-call rule as Brief 10.
+3. **Add/Edit Provider modal JSX** → `src/components/admin/doctor/ProviderFormModal.tsx`, consuming
+   the hook's output as props.
+4. **Main Doctors list + inline edit view JSX** → `src/components/admin/doctor/AdminDoctorsView.tsx`,
+   same props pattern. `DoctorServiceCommissionEditor` (already extracted, also used elsewhere —
+   Services and doctor payroll) is imported as-is, no changes needed to it.
+
+**Method:** no behaviour change, no renames (beyond the optional one noted above), no translation.
+`npm run check` green after every sub-PR. Browser-verify each sub-PR before moving to the next:
+list loads, Add Doctor (modal) and Edit Doctor (inline) both save correctly to the same record
+shape, Delete Doctor works, Audit Logs opens and loads entries.
+
+**Exit criteria:** `admin/page.tsx` no longer declares any of the state/JSX above directly; all 4
+new files render/behave identically to today; `npm run check` green on the final sub-PR.
+
+## Brief 16 — Phase 1: extract `Services` from `admin/page.tsx`
+
+**Why this exists:** same DEC-043 correction as Brief 15. Reception already gets a read-only view
+today via existing `services.create`/`.edit`/`.delete` permission gates.
+
+**Target:** `src/app/admin/page.tsx`, `activeNav === "Services"` block, lines 8375–9370
+(~995 lines). **Unlike Doctors, this section is a single contiguous block** — verified by grep that
+every piece of state it touches (`editingService` line 1721, `showAddCategoryModal` line 1705,
+`newCategoryNameEn`/`newCategoryNameAr` line 1708–1709, `deleteServiceTarget` line 1722) is declared
+once and referenced **only** inside this block, nowhere else in the file. No hidden cross-section
+sharing to investigate, no scattered modals elsewhere — this is a Brief-4-shaped extraction, not a
+Brief-5-shaped one.
+
+**Internal structure, all self-contained within the one block:** the services list/catalog view,
+an inline Add/Edit Service form (`editingService`), an Add Category modal (`showAddCategoryModal`,
+~line 8920), and a delete-confirmation modal (`deleteServiceTarget`, ~line 8877). Two
+already-extracted components are consumed here as-is (no changes needed):
+`ServiceRecipeEditor`/`ServiceDeviceEditor` (rendered when `editingService` is set) and
+`DoctorServiceCommissionEditor` (also used by Doctors and doctor payroll elsewhere — shared, don't
+duplicate it).
+
+**Shared/page-level state this block needs as props, not moved:** `localServices`/
+`setLocalServices` and `syncServicesToApi` — these are genuinely page-level (already passed into
+`PromotionsAdminPanel` the same way), not Services-specific state to extract.
+
+**Scope:** move the whole block into `src/components/admin/services/AdminServicesView.tsx`
+(single component, single PR — no sub-PR breakdown needed given the self-containment above). Move
+`editingService`, `showAddCategoryModal`, `newCategoryNameEn`, `newCategoryNameAr`,
+`deleteServiceTarget`, and their handlers together with it.
+
+**Method:** no behaviour change, no renames, no translation. `npm run check` green.
+
+**Exit criteria:** `admin/page.tsx` no longer declares the state above or the JSX directly; renders
+`<AdminServicesView ... />` instead; behaves identically; browser-verify: list loads, add/edit/
+delete a service, add a category, recipe/device/commission editors still open correctly from within
+the edit form.
+
+---
+---
+
 # ARCHIVE — completed briefs
 
 Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
