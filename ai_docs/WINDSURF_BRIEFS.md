@@ -124,6 +124,146 @@ sub-PR.
 ---
 ---
 
+# QUEUED BRIEFS — do these next, in this order
+
+## Brief 18 — Phase 2: translate the Doctors ecosystem to Arabic
+
+**Target — 3 files, all from Brief 15's extraction, translate together in one brief since they
+share state and the same value/label risks:** `src/components/admin/doctor/AdminDoctorsView.tsx`
+(786 lines), `src/components/admin/doctor/ProviderFormModal.tsx` (508 lines),
+`src/components/admin/doctor/DoctorAuditLogsModal.tsx` (146 lines). None currently take a `lang`
+prop or have a `dir` attribute — same "wiring needed, unlike Brief 12" situation as Brief 13.
+
+**Measured scope (grepped 2026-08-19, re-confirm):**
+| File | Hardcoded strings | Placeholders | RTL classes |
+|---|---|---|---|
+| `AdminDoctorsView.tsx` | ~34 | 8 | `text-left`×6, `left-3.5`, `pl-10`, `pr-4`, `right-0`, `right-1` |
+| `ProviderFormModal.tsx` | ~16 | 7 | `pr-1`×1 |
+| `DoctorAuditLogsModal.tsx` | ~9 | 0 | `pr-1`×1 |
+
+As always, the grep count is a floor — enumerate by reading each file.
+
+**Value/label separation — the highest-risk part of this brief, 3 separate sites for the same
+issue.** `AdminDoctorsView.tsx` and `ProviderFormModal.tsx` **both** contain an inline Gender
+dropdown (`<option value="Male">Male</option>` / `<option value="Female">Female</option>` —
+confirmed at `AdminDoctorsView.tsx:210-211` and `:632-633`, `ProviderFormModal.tsx:169-170`) —
+this is because both components render the same shared provider form in two different
+presentations (Brief 15's finding: inline edit vs. Add modal), so the same field appears twice.
+`AdminDoctorsView.tsx:632-633` is a **filter-panel** Gender dropdown (`providerFilterGender`,
+separate purpose from the edit-form ones at 210/169 but the identical bug shape). Translate all 3
+via the same `t.genderMale`/`t.genderFemale` lookup pattern already established for
+`CustomerFormModal.tsx` (Briefs 7-8) — **keep `value="Male"`/`value="Female"` unchanged**, they
+feed `providerFormGender`/`providerFilterGender` which must stay canonical.
+
+Also gate the Session Type toggle (`providerFormScheduleTab`, `"in_person" | "online"` —
+`AdminDoctorsView.tsx:385-411`, `ProviderFormModal.tsx:346-372`, both reading/writing the same
+shared state) the same way Brief 14 fixed New Booking's Session Type cards — translate the label,
+never the stored `"in_person"`/`"online"` value.
+
+**A real bug to fix as part of this brief, not just a translation nicety:**
+`DoctorAuditLogsModal.tsx:108` calls `new Date(log.created_at).toLocaleString()` with **no locale
+argument at all** — unlike every other date-formatting call in this codebase (all pinned to
+`en-GB`/`en-US`), this one silently follows whatever locale the admin's own browser/OS happens to
+be set to. That's already a latent inconsistency across different staff machines, and it means
+adding Arabic language support elsewhere in the file makes this one spot *more* likely to drift
+into Arabic-formatted digits/months by accident (the browser locale is a separate, unrelated
+setting from this admin panel's own `lang` toggle). **Pin it explicitly to `en-GB` or `en-US`
+matching the surrounding convention** — this is a fix, not something to leave alone the way the
+already-pinned calls elsewhere must be left alone.
+
+**Dates that ARE already pinned — leave these alone:** none of the other 3 files have any other
+`toLocale*` calls (confirmed by grep) — this whole brief has exactly one date-formatting call
+total, and it's the broken one above.
+
+**Method:** `dir={lang === "ar" ? "rtl" : "ltr"}` on each of the 3 components' own root — per
+component, same as everywhere else. Note: `AdminServicesView.tsx` (a sibling file, not in this
+brief) has 2 hardcoded `dir="rtl"` attributes on its Arabic-name/description *text inputs* — if you
+see the equivalent pattern anywhere in these 3 Doctor files (an Arabic-content input field, not a
+UI-language toggle), that is a content-direction hint for typing Arabic text and is unrelated to
+this brief's `lang`/`dir` wiring — do not remove or confuse it with the translation toggle.
+
+**Exit criteria:** same as every prior Phase 2 brief — `grep '>[A-Z][a-z]'` and
+`grep 'placeholder='` return only intentional non-copy matches across all 3 files; all RTL classes
+converted to logical properties; the `toLocaleString()` bug fixed; Gender/Session-Type value/label
+separation correct in all 3 sites; browser-verified in both languages (open Doctors, edit a doctor
+via the inline view, open Add Doctor via the modal, open Audit Logs — all 3 in Arabic); manual test
+checklist written per CLAUDE.md.
+
+## Brief 19 — Phase 2: translate `AdminServicesView.tsx` to Arabic
+
+**Target:** `src/components/admin/services/AdminServicesView.tsx` (1,171 lines — the largest single
+translation target after `CustomerProfileDrawer.tsx`). No `lang` prop or `dir` attribute today.
+
+**Measured scope (grepped 2026-08-19, re-confirm):** ~44 hardcoded strings, 7 placeholders,
+RTL classes = `text-left`×11, `left-3.5`, `ml-1`, `pl-9`, `pr-4`, `right-0`, `right-1`.
+
+**Already present, not part of this brief's scope:** 2 hardcoded `dir="rtl"` attributes at lines
+945 and 970, on the Arabic Service Name / Arabic Description text inputs. These make sense as-is —
+an input for typing Arabic content should stay RTL regardless of the admin's own UI language — do
+not touch them, do not confuse them with the `lang`/`dir` wiring this brief needs to add to the
+component's own root.
+
+**Value/label separation:** service active/inactive status appears in 3 different renderings that
+must all translate consistently while `toggles.active` stays a boolean (no stored-string risk here,
+simpler than Gender/status-string cases) — a status badge (`{toggles.active ? "Active" :
+"Inactive"}`, ~line 535), a dropdown filter (`<option value="Active">Active Only</option>` /
+`<option value="Inactive">Inactive Only</option>`, ~lines 263-264 — **keep the `value=` attributes
+English**, `serviceFilterStatus` compares against them directly), and a menu action label pair
+(`{toggles.active ? "Deactivate" : "Activate"}` + a second small badge `{toggles.active ? "Active" :
+"Off"}`, ~lines 584-587 — note this one says **"Off"**, not "Inactive", a different string for the
+same boolean state; translate both without conflating them into one key).
+
+**Dates:** exactly 1 `toLocale*` call (line 1132, building a new service's `createdAt` string) —
+already correctly pinned to `en-GB` for both the date and time parts. Leave it exactly as-is, per
+DEC-043.
+
+**Method / exit criteria:** identical to Brief 18 — per-component `dir`, logical RTL properties,
+value/label separation confirmed on all 3 status renderings, both languages browser-verified (list
+view, Add/Edit Service form, Add Category modal, filter panel), manual test checklist written.
+
+## Brief 20 — Phase 2: translate the Inventory ecosystem to Arabic
+
+**Do not start this until Brief 17 Part 2 has landed.** This brief is written against Brief 17's
+*planned* component structure so it's ready the moment extraction finishes — the file paths below
+don't exist yet as of 2026-08-19. Re-verify every path and line-count claim once Brief 17 is done;
+treat everything here as provisional scope, not measured fact, until then.
+
+**Expected targets, per Brief 17 Part 2's scope:** `src/components/admin/inventory/
+AdminInventoryView.tsx` (top-level wrapper), `InventoryDevicesTab.tsx`, `InventoryProductsTab.tsx`,
+`DeviceAuditLogsModal.tsx`, plus the already-existing `SupplierManagementScreen.tsx` (and its
+children `SuppliersScreen.tsx`/`PurchasesScreen.tsx`) — **these 3 supplier files predate this whole
+i18n rollout and need the same `lang`/`dir` wiring added, they are not exempt just because they
+were already extracted**.
+
+**Known from Brief 17's own investigation, carries over here:** the devices and products domains
+don't share state (confirmed in Brief 17), so unlike Brief 18 there's likely no cross-file
+duplicate-field risk to chase — but re-confirm once the files exist, don't assume Brief 17's
+pre-extraction analysis of `page.tsx` still holds true post-extraction.
+
+**Value/label separation candidates to check once the files exist (not yet confirmed against real
+code — this is a prediction, verify it):** device/product status fields (active/inactive, low-stock
+indicators), any payment or supplier-status enums in the Suppliers/Purchases screens. Apply the
+same rule as every prior brief: translate the label, never a value compared in logic or written
+back via POST/PATCH.
+
+**Permission-gating interaction:** Brief 17 Part 1 will have added `hasPermission("inventory.view"
+/".manage_devices"/".manage_products"/".manage_suppliers")` checks with conditional rendering
+(`hasPermission(...) ? "inline-flex" : "hidden"`, matching the Services convention). When adding
+`t.*` lookups to those same buttons, **do not accidentally remove or restructure the permission
+conditional** — the translated label and the permission gate apply to the same element
+independently; changing one must not regress the other. Browser-verify with both a full-access and
+a view-only permission grant in Arabic, not just in English.
+
+**Dates:** none measured yet — check for `toLocale*` calls once the files exist and confirm they're
+pinned to `en-GB`/`en-US` per DEC-043 (or fix them the way Brief 18 fixes
+`DoctorAuditLogsModal.tsx`'s unpinned one, if the same gap exists here).
+
+**Method / exit criteria:** identical shape to every prior Phase 2 brief. Manual test checklist
+written per CLAUDE.md, including a pass with a view-only Reception-style permission grant.
+
+---
+---
+
 # ARCHIVE — completed briefs
 
 Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`

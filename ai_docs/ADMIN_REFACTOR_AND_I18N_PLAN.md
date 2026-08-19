@@ -12,9 +12,9 @@
 > | New Booking (`AdminNewBookingView.tsx`, 1,123 lines) | ✅ (pre-existing) | ✅ Brief 14 (landed clean, no gaps) |
 > | Patients — Directory, 3 modals | ✅ Brief 5 | ✅ Briefs 6-9 (gaps found + closed) |
 > | Patients — Profile Drawer (1,539 lines, 5 tabs + 3 modals) | ✅ Briefs 10 (state) + 11 (JSX) | ✅ Brief 12 (2 gaps found + closed) |
-> | Doctors (`page.tsx:7711-8372`, ~661 lines) | ✅ Brief 15 (verified, no gaps) | not yet briefed |
-> | Services (`page.tsx:8375-9370`, ~995 lines) | ✅ Brief 16 (verified — surfaced pre-existing RISK-064) | not yet briefed |
-> | Inventory (`page.tsx:14724-16063` + `page.tsx:23321-23506`, ~1,530 lines) | **Brief 17, next** | not yet briefed |
+> | Doctors (`page.tsx:7711-8372`, ~661 lines) | ✅ Brief 15 (verified, no gaps) | **Brief 18, queued** |
+> | Services (`page.tsx:8375-9370`, ~995 lines) | ✅ Brief 16 (verified — surfaced pre-existing RISK-064) | **Brief 19, queued** |
+> | Inventory (`page.tsx:14724-16063` + `page.tsx:23321-23506`, ~1,530 lines) | **Brief 17, active** | **Brief 20, queued (provisional — written against Brief 17's planned structure)** |
 > | POS | N/A — dead mock UI, unreachable through any nav path | **out of scope** — separate open product decision: build the real thing or delete the dead code |
 >
 > **Doctors and Services added to scope 2026-08-19** (DEC-043 correction) — Reception doesn't edit
@@ -34,9 +34,10 @@
 >
 > **Reception Phase 1 (extraction) is essentially done** — ~~Brief 15~~ (Doctors) and ~~Brief 16~~
 > (Services) both landed and verified 2026-08-19. Only Inventory's extraction remains, gated on
-> **Brief 17** (permission enforcement first, then extraction — both parts written, next up).
-> Doctors and Services now need Phase 2 (translation) briefs written — not yet done. POS stays a
-> standalone product decision, not a translation task.
+> **Brief 17** (permission enforcement first, then extraction — both parts written, active). Phase 2
+> for Doctors (**Brief 18**) and Services (**Brief 19**) written and queued; Inventory's (**Brief
+> 20**) is written provisionally against Brief 17's planned file structure and needs re-verifying
+> once those files actually exist. POS stays a standalone product decision, not a translation task.
 >
 > **Process note worth flagging:** four briefs in a row (5, 13, 14, 15+16) have landed in commits
 > that swept in unrelated content or mislabeled which brief(s) they covered. Content was verified
