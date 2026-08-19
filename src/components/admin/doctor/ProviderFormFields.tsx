@@ -360,7 +360,7 @@ export default function ProviderFormFields({
                       }}
                       className="h-4 w-4 rounded border-[#414E36]/15 text-[#414E36] focus:ring-[#C4AE7C] cursor-pointer"
                     />
-                    <span className="text-xs font-bold text-[#414E36] w-24">{day}</span>
+                    <span className="text-xs font-bold text-[#414E36] w-24">{(t.dayNames as Record<string, string>)[day] || day}</span>
                   </label>
 
                   {sched.isOpen ? (

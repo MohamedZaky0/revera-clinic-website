@@ -558,6 +558,15 @@ export const adminTranslations = {
         cancelBtn: "Cancel",
       },
       providerFormFields: {
+        dayNames: {
+          Sunday: "Sunday",
+          Monday: "Monday",
+          Tuesday: "Tuesday",
+          Wednesday: "Wednesday",
+          Thursday: "Thursday",
+          Friday: "Friday",
+          Saturday: "Saturday",
+        },
         nameLabel: "Doctor's Name",
         namePlaceholder: "e.g. Dr. Jane Doe",
         specialtyLabel: "Specialty",
@@ -1170,6 +1179,15 @@ export const adminTranslations = {
         cancelBtn: "إلغاء",
       },
       providerFormFields: {
+        dayNames: {
+          Sunday: "الأحد",
+          Monday: "الإثنين",
+          Tuesday: "الثلاثاء",
+          Wednesday: "الأربعاء",
+          Thursday: "الخميس",
+          Friday: "الجمعة",
+          Saturday: "السبت",
+        },
         nameLabel: "اسم الطبيب",
         namePlaceholder: "مثال: د. جين دو",
         specialtyLabel: "التخصص",

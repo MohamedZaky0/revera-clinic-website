@@ -323,7 +323,7 @@ export default function AdminDoctorsView({
                           </span>
                         </td>
                         <td className="px-4 py-4 text-center">
-                          <div className="dropdown-action-menu relative inline-block text-left">
+                          <div className="dropdown-action-menu relative inline-block text-start">
                             <button
                               type="button"
                               onClick={(e) => {
