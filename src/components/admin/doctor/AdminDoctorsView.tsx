@@ -14,6 +14,7 @@ import { Branch } from "@/types";
 import { DoctorProfileDetailsView } from "@/components/admin/doctor/DoctorProfileDetailsView";
 import { UseProviderFormReturn } from "@/components/admin/doctor/useProviderForm";
 import ProviderFormFields from "@/components/admin/doctor/ProviderFormFields";
+import { adminTranslations } from "@/components/admin/translations";
 
 interface AdminDoctorsViewProps {
   providerForm: UseProviderFormReturn;
@@ -40,6 +41,9 @@ interface AdminDoctorsViewProps {
   showAuditLogsModal: boolean;
   setShowAuditLogsModal: (show: boolean) => void;
   hasPermission: (perm: string) => boolean;
+  lang: "en" | "ar";
+  t: typeof adminTranslations["en"]["doctors"]["adminDoctorsView"];
+  tFormFields: typeof adminTranslations["en"]["doctors"]["providerFormFields"];
 }
 
 export default function AdminDoctorsView({
@@ -58,6 +62,9 @@ export default function AdminDoctorsView({
   setActiveDoctorRowMenuId,
   setShowAuditLogsModal,
   hasPermission,
+  lang,
+  t,
+  tFormFields,
 }: AdminDoctorsViewProps) {
   const {
     viewingDoctorDetails,
@@ -82,7 +89,7 @@ export default function AdminDoctorsView({
   } = providerForm;
 
   return (
-    <section className="space-y-6">
+    <section dir={lang === "ar" ? "rtl" : "ltr"} className="space-y-6">
       {viewingDoctorDetails ? (
         <DoctorProfileDetailsView
           doctor={viewingDoctorDetails}
@@ -99,9 +106,9 @@ export default function AdminDoctorsView({
                 onClick={() => setEditingDoctorInline(null)}
                 className="mb-2 inline-flex items-center gap-2 rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#414E36] shadow-sm transition hover:bg-[#F2EFE9]"
               >
-                <ArrowLeft size={14} /> Back to Doctors
+                <ArrowLeft size={14} /> {t.backToDoctors}
               </button>
-              <h1 className="text-3xl font-bold text-[#1F251A]">Edit Doctor: {providerFormName || editingDoctorInline.name}</h1>
+              <h1 className="text-3xl font-bold text-[#1F251A]">{t.editDoctorTitle} {providerFormName || editingDoctorInline.name}</h1>
             </div>
           </div>
 
@@ -113,6 +120,8 @@ export default function AdminDoctorsView({
               getDoctorFirstReservationDate={getDoctorFirstReservationDate}
               allReservations={allReservations}
               parseEgyptianNationalId={parseEgyptianNationalId}
+              lang={lang}
+              t={tFormFields}
             />
 
             {/* Action Buttons */}
@@ -122,13 +131,13 @@ export default function AdminDoctorsView({
                 disabled={savingProvider}
                 className="rounded-2xl bg-[#414E36] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-50"
               >
-                {savingProvider ? "Saving..." : "Save Changes"}
+                {savingProvider ? t.savingBtn : t.saveChangesBtn}
               </button>
               <button
                 onClick={() => setEditingDoctorInline(null)}
                 className="rounded-2xl border border-[#E6E9EB] bg-white px-6 py-3 text-sm font-semibold text-[#414E36] transition hover:bg-[#F2EFE9]"
               >
-                Cancel
+                {t.cancelBtn}
               </button>
             </div>
           </div>
@@ -137,8 +146,8 @@ export default function AdminDoctorsView({
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-bold text-[#1F251A]">Doctors</h2>
-              <p className="text-xs text-[#5A6A51]">Manage doctor schedules, services, and ratings</p>
+              <h2 className="text-xl font-bold text-[#1F251A]">{t.doctorsHeading}</h2>
+              <p className="text-xs text-[#5A6A51]">{t.doctorsSubtitle}</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -146,7 +155,7 @@ export default function AdminDoctorsView({
                 onClick={() => setShowAuditLogsModal(true)}
                 className="inline-flex items-center gap-2 rounded-xl border border-[#414E36]/15 bg-white px-4 py-2 text-sm font-semibold text-[#414E36] transition hover:bg-[#FBFBF9]"
               >
-                <ClipboardList size={14} /> Audit Logs
+                <ClipboardList size={14} /> {t.auditLogsBtn}
               </button>
             </div>
           </div>
@@ -154,18 +163,18 @@ export default function AdminDoctorsView({
           {/* Search Bar Row above Table */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 max-w-md">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] z-10 pointer-events-none" />
+              <Search size={16} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51] z-10 pointer-events-none" />
               <input
                 type="text"
                 value={providerSearchQuery}
                 onChange={(e) => setProviderSearchQuery(e.target.value)}
-                placeholder="Search doctor by name, specialty..."
-                className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:bg-white focus:ring-2 focus:ring-[#C4AE7C]/15"
+                placeholder={t.searchPlaceholder}
+                className="w-full rounded-xl border border-[#414E36]/15 bg-[#F9F9F7] py-2.5 ps-10 pe-4 text-sm outline-none transition focus:border-[#C4AE7C] focus:bg-white focus:ring-2 focus:ring-[#C4AE7C]/15"
               />
             </div>
             <button
               onClick={() => setShowProviderFilterPanel(prev => !prev)}
-              title="Filter"
+              title={t.filterTitle}
               className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer ${
                 showProviderFilterPanel || providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All"
                   ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
@@ -174,7 +183,7 @@ export default function AdminDoctorsView({
             >
               <Filter size={16} />
               {(providerFilterBranchId !== "All" || providerFilterSpecialty !== "All" || providerFilterGender !== "All") && (
-                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                <span className="absolute -top-1 -end-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
               )}
             </button>
           </div>
@@ -184,13 +193,13 @@ export default function AdminDoctorsView({
             <div className="mb-6 grid grid-cols-1 gap-4 rounded-3xl border border-[#414E36]/10 bg-[#F9F9F7] p-5 md:grid-cols-3 items-end shadow-sm animate-fadeIn">
               {/* Branch Dropdown */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Branch</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.branchFilterLabel}</label>
                 <select
                   value={providerFilterBranchId}
                   onChange={(e) => setProviderFilterBranchId(e.target.value)}
                   className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
                 >
-                  <option value="All">All Branches</option>
+                  <option value="All">{t.allBranches}</option>
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>{b.name_en}</option>
                   ))}
@@ -199,13 +208,13 @@ export default function AdminDoctorsView({
 
               {/* Specialty Dropdown */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Specialty</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.specialtyFilterLabel}</label>
                 <select
                   value={providerFilterSpecialty}
                   onChange={(e) => setProviderFilterSpecialty(e.target.value)}
                   className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
                 >
-                  <option value="All">All Specialties</option>
+                  <option value="All">{t.allSpecialties}</option>
                   {uniqueSpecialties.map((spec) => (
                     <option key={spec} value={spec}>{spec}</option>
                   ))}
@@ -215,15 +224,15 @@ export default function AdminDoctorsView({
               {/* Gender and Clear Options */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">Gender</label>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">{t.genderFilterLabel}</label>
                   <select
                     value={providerFilterGender}
                     onChange={(e) => setProviderFilterGender(e.target.value)}
                     className="w-full rounded-2xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-[#C4AE7C]"
                   >
-                    <option value="All">All</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
+                    <option value="All">{t.allGenders}</option>
+                    <option value="Male">{t.genderMale}</option>
+                    <option value="Female">{t.genderFemale}</option>
                   </select>
                 </div>
                 <button
@@ -235,7 +244,7 @@ export default function AdminDoctorsView({
                   }}
                   className="h-[42px] w-full rounded-2xl border border-red-200 bg-red-50/50 text-xs font-bold text-red-600 hover:bg-red-100/70 transition"
                 >
-                  Clear
+                  {t.clearBtn}
                 </button>
               </div>
             </div>
@@ -245,10 +254,10 @@ export default function AdminDoctorsView({
             <table className="w-full min-w-[700px] text-sm">
               <thead>
                 <tr className="border-b border-[#414E36]/10 bg-[#F9F9F7]">
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Doctor Name</th>
-                  <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Bookings</th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Services</th>
-                  <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">Rating</th>
+                  <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colDoctorName}</th>
+                  <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colBookings}</th>
+                  <th className="px-5 py-3 text-start text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colServices}</th>
+                  <th className="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-widest text-[#5A6A51] whitespace-nowrap">{t.colRating}</th>
                   <th className="px-4 py-3 whitespace-nowrap"></th>
                 </tr>
               </thead>
@@ -256,7 +265,7 @@ export default function AdminDoctorsView({
                 {filteredProviders.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-5 py-8 text-center text-[#5A6A51]">
-                      No doctors/providers matching filters.
+                      {t.noProvidersFound}
                     </td>
                   </tr>
                 ) : (
@@ -300,9 +309,9 @@ export default function AdminDoctorsView({
                                   toggleExpandedDoctorServices(docKey);
                                 }}
                                 className="inline-flex items-center gap-1 rounded-full bg-[#C4AE7C]/20 hover:bg-[#C4AE7C]/35 border border-[#C4AE7C]/40 px-2.5 py-0.5 text-[11px] font-bold text-[#414E36] transition active:scale-95 cursor-pointer shadow-2xs"
-                                title={isExpanded ? "Click to show fewer services" : "Click to view all assigned services"}
+                                title={isExpanded ? t.showFewerTitle : t.showAllTitle}
                               >
-                                {isExpanded ? "Show Less" : `+${provider.services.length - 2} More`}
+                                {isExpanded ? t.showLess : `${t.morePrefix}${provider.services.length - 2}${t.moreSuffix}`}
                               </button>
                             )}
                           </div>
@@ -326,13 +335,13 @@ export default function AdminDoctorsView({
                                   ? "border-[#414E36] bg-[#414E36] text-white"
                                   : "border-[#414E36]/15 bg-white text-[#5A6A51] hover:border-[#C4AE7C] hover:text-[#414E36]"
                               }`}
-                              title="Actions"
+                              title={t.actionsTitle}
                             >
                               <MoreVertical size={13} />
                             </button>
 
                             {activeDoctorRowMenuId === docKey && (
-                              <div className="absolute right-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-left dropdown-action-menu">
+                              <div className="absolute end-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-start dropdown-action-menu">
                                 {hasPermission("providers.edit") && (
                                   <button
                                     type="button"
@@ -341,10 +350,10 @@ export default function AdminDoctorsView({
                                       setActiveDoctorRowMenuId(null);
                                       openEditProviderModal(provider);
                                     }}
-                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
+                                    className="w-full text-start px-3 py-2 rounded-lg hover:bg-[#FBFBF9] font-semibold text-[#1F251A] flex items-center gap-2 transition cursor-pointer"
                                   >
                                     <Pencil size={13} className="text-[#5A6A51]" />
-                                    <span>Edit Doctor</span>
+                                    <span>{t.editDoctorBtn}</span>
                                   </button>
                                 )}
                                 {provider.id && hasPermission("providers.delete") && (
@@ -355,10 +364,10 @@ export default function AdminDoctorsView({
                                       setActiveDoctorRowMenuId(null);
                                       handleDeleteProvider(provider.id);
                                     }}
-                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
+                                    className="w-full text-start px-3 py-2 rounded-lg hover:bg-red-50 font-semibold text-red-600 flex items-center gap-2 transition cursor-pointer"
                                   >
                                     <Trash2 size={13} className="text-red-600" />
-                                    <span>Delete Doctor</span>
+                                    <span>{t.deleteDoctorBtn}</span>
                                   </button>
                                 )}
                               </div>

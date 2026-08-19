@@ -6913,6 +6913,9 @@ export default function AdminPage() {
               showAuditLogsModal={showAuditLogsModal}
               setShowAuditLogsModal={setShowAuditLogsModal}
               hasPermission={hasPermission}
+              lang={lang}
+              t={adminTranslations[lang].doctors.adminDoctorsView}
+              tFormFields={adminTranslations[lang].doctors.providerFormFields}
             />
           )}
 
@@ -18693,6 +18696,9 @@ export default function AdminPage() {
         getDoctorFirstReservationDate={getDoctorFirstReservationDate}
         allReservations={allReservations}
         parseEgyptianNationalId={parseEgyptianNationalId}
+        lang={lang}
+        t={adminTranslations[lang].doctors.providerFormModal}
+        tFormFields={adminTranslations[lang].doctors.providerFormFields}
       />
 
       {/* Doctor Schedule Audit Logs Modal */}
@@ -18700,6 +18706,8 @@ export default function AdminPage() {
         <DoctorAuditLogsModal
           onClose={() => setShowAuditLogsModal(false)}
           authenticatedJsonHeaders={authenticatedJsonHeaders}
+          lang={lang}
+          t={adminTranslations[lang].doctors.doctorAuditLogsModal}
         />
       )}
 

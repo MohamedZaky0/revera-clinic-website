@@ -7,6 +7,7 @@ import {
   DefaultCommissionType,
 } from "@/components/admin/services/DoctorServiceCommissionEditor";
 import { UseProviderFormReturn } from "@/components/admin/doctor/useProviderForm";
+import { adminTranslations } from "@/components/admin/translations";
 
 interface ProviderFormFieldsProps {
   providerForm: UseProviderFormReturn;
@@ -23,6 +24,8 @@ interface ProviderFormFieldsProps {
     gender: string | null;
     governorate: string | null;
   };
+  lang: "en" | "ar";
+  t: typeof adminTranslations["en"]["doctors"]["providerFormFields"];
 }
 
 export default function ProviderFormFields({
@@ -32,6 +35,8 @@ export default function ProviderFormFields({
   getDoctorFirstReservationDate,
   allReservations,
   parseEgyptianNationalId,
+  lang,
+  t,
 }: ProviderFormFieldsProps) {
   const {
     providerFormName,
@@ -77,24 +82,24 @@ export default function ProviderFormFields({
   } = providerForm;
 
   return (
-    <>
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="space-y-5">
       {/* Row 1: Name & Specialty */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Name</label>
+          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.nameLabel}</label>
           <input
             type="text"
-            placeholder="e.g. Dr. Jane Doe"
+            placeholder={t.namePlaceholder}
             value={providerFormName}
             onChange={(e) => setProviderFormName(e.target.value)}
             className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
           />
         </div>
         <div>
-          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Specialty</label>
+          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.specialtyLabel}</label>
           <input
             type="text"
-            placeholder="e.g. Dermatologist"
+            placeholder={t.specialtyPlaceholder}
             value={providerFormSpecialty}
             onChange={(e) => setProviderFormSpecialty(e.target.value)}
             className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
@@ -105,20 +110,20 @@ export default function ProviderFormFields({
       {/* Row 2: Phone & National ID */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Phone Number</label>
+          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.phoneLabel}</label>
           <input
             type="text"
-            placeholder="e.g. 01012345678"
+            placeholder={t.phonePlaceholder}
             value={providerFormPhone}
             onChange={(e) => setProviderFormPhone(e.target.value)}
             className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
           />
         </div>
         <div>
-          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">National ID</label>
+          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.nationalIdLabel}</label>
           <input
             type="text"
-            placeholder="14-digit National ID"
+            placeholder={t.nationalIdPlaceholder}
             value={providerFormNationalId}
             onChange={(e) => setProviderFormNationalId(e.target.value)}
             className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
@@ -129,32 +134,32 @@ export default function ProviderFormFields({
       {/* Row 3: Gender & Auto-calculated Age/DOB */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Gender</label>
+          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.genderLabel}</label>
           <select
             value={providerFormGender}
             onChange={(e) => setProviderFormGender(e.target.value as "Male" | "Female" | "")}
             className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
           >
-            <option value="">Select Gender</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
+            <option value="">{t.genderSelectPlaceholder}</option>
+            <option value="Male">{t.genderMale}</option>
+            <option value="Female">{t.genderFemale}</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Age &amp; Date of Birth</label>
+          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.ageDobLabel}</label>
           {(() => {
             const check = parseEgyptianNationalId(providerFormNationalId);
             if (check.isValid) {
               return (
                 <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#EDF1EC]/70 px-4 py-2 text-xs text-[#1F251A] font-semibold flex items-center justify-between min-h-[42px]">
-                  <span>{check.age} yrs • DOB: {check.dobFormatted}</span>
-                  <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">✓ National ID</span>
+                  <span>{check.age} {t.ageYearsSuffix} • {t.dobPrefix} {check.dobFormatted}</span>
+                  <span className="text-[10px] text-[#414E36] font-bold bg-white px-2 py-0.5 rounded-full border border-[#414E36]/10">{t.nationalIdValidBadge}</span>
                 </div>
               );
             }
             return (
               <div className="w-full rounded-2xl border border-[#414E36]/15 bg-gray-50 px-4 py-2.5 text-xs text-[#5A6A51] italic min-h-[42px] flex items-center">
-                Auto-calculated from National ID
+                {t.autoCalculatedNote}
               </div>
             );
           })()}
@@ -164,7 +169,7 @@ export default function ProviderFormFields({
       {/* Row 4: Branches & Start Date */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Branches (Select one or more)</label>
+          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.branchesLabel}</label>
           <div className="flex flex-wrap gap-2 p-2 rounded-2xl border border-[#414E36]/15 bg-white min-h-[42px] items-center">
             {branches.map((b) => {
               const isSelected = providerFormBranchIds.includes(b.id);
@@ -175,7 +180,7 @@ export default function ProviderFormFields({
                   onClick={() => {
                     if (isSelected) {
                       if (providerFormBranchIds.length <= 1) {
-                        alert("A doctor must be assigned to at least one branch.");
+                        alert(t.atLeastOneBranchAlert);
                         return;
                       }
                       const nextIds = providerFormBranchIds.filter((id) => id !== b.id);
@@ -204,7 +209,7 @@ export default function ProviderFormFields({
           </div>
         </div>
         <div>
-          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Start Date</label>
+          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.startDateLabel}</label>
           <div className="w-full rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] px-4 py-2.5 flex items-center justify-between min-h-[42px]">
             {(() => {
               const autoDate = getDoctorFirstReservationDate(providerFormName, allReservations);
@@ -214,14 +219,14 @@ export default function ProviderFormFields({
                   <div className="flex items-center justify-between w-full">
                     <span className="text-sm font-semibold text-[#1F251A]">{displayDate}</span>
                     <span className="text-[10px] font-bold text-[#414E36] bg-[#EDF1EC] px-2.5 py-0.5 rounded-full border border-[#414E36]/15 flex items-center gap-1">
-                      ⚡ Auto from 1st Booking
+                      {t.autoFromFirstBooking}
                     </span>
                   </div>
                 );
               }
               return (
                 <span className="text-xs italic text-[#5A6A51]/70">
-                  Will auto-set on doctor's 1st reservation
+                  {t.willAutoSetNote}
                 </span>
               );
             })()}
@@ -232,23 +237,23 @@ export default function ProviderFormFields({
       {/* Row 5: Rating & Image */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-1">
-          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Rating (1-5)</label>
+          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.ratingLabel}</label>
           <input
             type="number"
             min="1"
             max="5"
             step="0.1"
-            placeholder="e.g. 5"
+            placeholder={t.ratingPlaceholder}
             value={providerFormRating}
             onChange={(e) => setProviderFormRating(Number(e.target.value))}
             className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
           />
         </div>
         <div className="md:col-span-2">
-          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Doctor's Image URL or Base64</label>
+          <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.imageLabel}</label>
           <input
             type="text"
-            placeholder="e.g. /images/doctors/dr-doe.jpg"
+            placeholder={t.imagePlaceholder}
             value={providerFormImage}
             onChange={(e) => setProviderFormImage(e.target.value)}
             className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
@@ -258,10 +263,10 @@ export default function ProviderFormFields({
 
       {/* Services & Commission */}
       <div className="max-w-xs">
-        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">Fixed Salary (EGP)</label>
+        <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold mb-1.5">{t.fixedSalaryLabel}</label>
         <input
           type="number"
-          placeholder="e.g. 5000"
+          placeholder={t.fixedSalaryPlaceholder}
           value={providerFormFixedSalary}
           onChange={(e) => setProviderFormFixedSalary(e.target.value)}
           className="w-full rounded-2xl border border-[#414E36]/15 bg-white px-4 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
@@ -287,10 +292,10 @@ export default function ProviderFormFields({
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <div>
-            <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">Weekly Working Days &amp; Hours (Shifts)</label>
+            <label className="block text-xs uppercase tracking-wider text-[#5A6A51] font-bold">{t.weeklyScheduleLabel}</label>
             {providerFormBranchIds.length > 1 && (
               <div className="mt-1.5 flex items-center gap-2">
-                <span className="text-xs text-[#5A6A51]">Configure branch schedule:</span>
+                <span className="text-xs text-[#5A6A51]">{t.configureBranchSchedule}</span>
                 <select
                   value={providerFormSelectedScheduleBranchId}
                   onChange={(e) => handleScheduleBranchChange(e.target.value)}
@@ -318,7 +323,7 @@ export default function ProviderFormFields({
                   : "text-[#5A6A51] hover:text-[#414E36]"
               }`}
             >
-              In-Clinic
+              {t.inClinicTab}
             </button>
             <button
               type="button"
@@ -329,7 +334,7 @@ export default function ProviderFormFields({
                   : "text-[#5A6A51] hover:text-[#414E36]"
               }`}
             >
-              Online
+              {t.onlineTab}
             </button>
           </div>
         </div>
@@ -381,7 +386,7 @@ export default function ProviderFormFields({
                             }}
                             className="rounded-lg border border-[#414E36]/15 px-2 py-1 text-xs outline-none focus:border-[#C4AE7C]"
                           />
-                          <span className="text-xs text-[#5A6A51]">to</span>
+                          <span className="text-xs text-[#5A6A51]">{t.toLabel}</span>
                           <input
                             type="time"
                             value={shft.end}
@@ -438,11 +443,11 @@ export default function ProviderFormFields({
                         }}
                         className="text-xs font-semibold text-[#414E36] hover:text-[#2e3a26] transition flex items-center gap-1 mt-1 cursor-pointer"
                       >
-                        <Plus size={12} /> Add Shift
+                        <Plus size={12} /> {t.addShiftBtn}
                       </button>
                     </div>
                   ) : (
-                    <span className="text-xs text-gray-400 italic">Off / Closed</span>
+                    <span className="text-xs text-gray-400 italic">{t.offClosed}</span>
                   )}
                 </div>
               );
@@ -450,6 +455,6 @@ export default function ProviderFormFields({
           })()}
         </div>
       </div>
-    </>
+    </div>
   );
 }
