@@ -10,8 +10,9 @@ not by reading feature docs.
 
 **Covered today:** 7 of 26 lib modules; **8 of 153 handlers** have a real route-level test
 (`/api/hr/doctor-payroll` GET/POST/PATCH, `/api/reservations` PATCH fully + GET/POST auth-shape,
-`/api/reception/dashboard` GET/POST), plus auth-shape-only assertions on 4 more routes. No component
-tests, no E2E.
+`/api/reception/dashboard` GET/POST), plus auth-shape-only assertions on 4 more routes. Component
+tests: 7 of the P0 money components (module 12) have real render/interaction tests as of this sweep.
+No E2E.
 
 ## How to read this
 
@@ -445,6 +446,56 @@ should be public is a product call; flagged here rather than asserted either way
 - Service price change does **not** retroactively alter already-issued invoices — the snapshot holds.
 - Required-field validation returns 400, not 500.
 - Public reads stay public (partly covered already).
+
+---
+
+## 12. Components (`src/components/**`, excluding `src/app/admin/page.tsx`)
+
+Component-level tests (vitest + jsdom + React Testing Library, `tests/components/**/*.test.tsx`)
+render each component, interact via `@testing-library/user-event`, and assert on rendered output
+plus the exact `fetch()` calls fired (`tests/helpers/fetchFake.ts`, mirroring
+`tests/helpers/supabaseFake.ts`'s "actually apply the request, throw loudly on anything
+unimplemented" philosophy). `src/app/admin/page.tsx` is excluded — it is being split into these
+same components by a separate, parallel effort; testing it directly would be testing code about to
+move.
+
+**Finding from this sweep — RISK-019 doc drift:** RISK-019 states *"no client component reads or
+writes a Supabase table any more"* since commit `8108b82`. That is no longer true. Three of the
+seven P0 components below (`AdminBookingsView`, `UserProfileView`, `DoctorAccountView`) read and
+**write** `reservations`/`providers`/`branches`/`doctor_payroll`/`employee_accounts` directly from
+the browser via `@/lib/supabaseClient` (the anon-key client) — salary, commission, and target-revenue
+figures, and the booking approve/reject buttons, never touch an API route at all. RISK-019's
+"residual risk" paragraph already flags permissive RLS policies on `employee_accounts`/`hr_*`/
+`doctor_payroll` as functionally open with the anon key; this sweep confirms live, current-code call
+sites hitting exactly that gap, not just policy config. RISK-019 needs a correction pass, and the
+approve/reject write path bypassing `PATCH /api/reservations` (module 1's documented status-transition
+guards — e.g. rejecting an already-completed booking) is worth a follow-up look.
+
+**New finding — unlogged timezone bug in `UserProfileView.tsx`:** `getDateRange()` builds
+`monthStr` from `new Date(year, month, 1).toISOString().split("T")[0]`. `new Date(...)` is local
+midnight; `.toISOString()` converts to UTC. In any timezone ahead of UTC — including Africa/Cairo,
+this clinic's own timezone — local midnight on the 1st is still the previous day in UTC, so
+`monthStr` silently resolves to **last month**. `doctor_payroll` is looked up with
+`.eq("month", monthStr)`, so a doctor's current-month payroll (fixed salary, commission, deductions)
+is looked up under the wrong month for the whole clinic's timezone. Reproduced directly in this
+sandbox (Europe/Berlin, UTC+2) via `tests/components/UserProfileView.test.tsx`, marked `it.fails`
+pending a RISK id. The same `getDateRange`-shaped pattern (`new Date(y, m, 1).toISOString()`) is
+worth grepping for elsewhere in the codebase — this file is very unlikely to be the only place it
+was written.
+
+| Component | Priority | Coverage | Notes |
+|---|---|---|---|
+| `admin/bookings/AdminBookingsView.tsx` | P0 | **Covered** (10 tests) | Payment-status derivation matrix (RISK-039 regression guard), doctor-name resolution, approve/reject — direct Supabase writes, not `PATCH /api/reservations`. |
+| `admin/DoctorAccountView.tsx` | P0 | **Covered** (4 tests) | `handleCompleteTreatment`'s checkout PATCH (`amountLeft` calc, status transition), rejected/cancelled booking filtering, patient dedup. |
+| `admin/UserProfileView.tsx` | P0 | **Covered** (10 tests, 1 `it.fails`) | Doctor/staff net-salary math, target-progress %, password-change validation. Direct Supabase reads only (no `fetch()` at all in this file). |
+| `admin/doctor/DoctorProfileDetailsView.tsx` | P0 | **Covered** (12 tests) | Doctor→reservation matching, search/status/date filters, pagination, CSV export payload. No fetch/Supabase — pure prop-driven display+filter logic. |
+| `admin/doctor/tabs/DoctorOngoingSessionTab.tsx` | P0 | **Covered** (11 tests) | Additional-service subtotal/pulses math, `/api/service-devices` default-pulses lookup, inline prescription POST. |
+| `admin/Finance/AssetsScreen.tsx` | P0 | **Covered** (11 tests) | Total cost/book-value/depreciation math, add/edit/delete validation (salvage ≤ cost), post-depreciation flow. |
+| `admin/Finance/NewVsReturningScreen.tsx` | P0 | **Covered** (9 tests) | New-patient revenue share %, walk-in note visibility, branch filter refetch. |
+
+**Remaining `src/components/**` surface** (P1 finance/reporting screens, then P2/P3 CRUD and
+presentational components) is not yet swept file-by-file the way the API modules above are — that
+sweep is future work, to be done as component test batches land.
 
 ---
 

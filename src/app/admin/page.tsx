@@ -20543,6 +20543,8 @@ export default function AdminPage() {
                 providers={providers}
                 customers={dbCustomers}
                 branches={branches}
+                lang={lang}
+                t={adminTranslations[lang].bookings.adminNewBookingView}
               />
             ) : (
               <AdminBookingsView
@@ -20609,6 +20611,8 @@ export default function AdminPage() {
               providers={providers}
               customers={dbCustomers}
               branches={branches}
+              lang={lang}
+              t={adminTranslations[lang].bookings.adminNewBookingView}
             />
           )}
         </>

@@ -21,6 +21,7 @@ import {
   DoorOpen
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { adminTranslations } from "@/components/admin/translations";
 
 interface ServiceItem {
   id: string | number;
@@ -76,11 +77,15 @@ interface AdminNewBookingViewProps {
   customers?: any[];
   branches?: any[];
   rooms?: any[];
+  lang?: "en" | "ar";
+  t?: any;
 }
 
-// Helper to extract service name cleanly
-function getServiceName(s: any): string {
+// Helper to extract service name cleanly. DB rows carry both `en` and `ar` columns —
+// prefer the matching-language column when present, falling back to English/any other field.
+function getServiceName(s: any, lang: "en" | "ar" = "en"): string {
   if (!s) return "Medical Service";
+  if (lang === "ar" && s.ar) return s.ar;
   return s.en || s.name || s.title || s.name_en || s.title_en || s.ar || `Service #${s.id}`;
 }
 
@@ -111,8 +116,11 @@ export default function AdminNewBookingView({
   providers = [],
   customers = [],
   branches = [],
-  rooms = []
+  rooms = [],
+  lang = "en",
+  t,
 }: AdminNewBookingViewProps) {
+  const tr = t || adminTranslations[lang].bookings.adminNewBookingView;
   // Patient Search & Selection State
   const [patientSearchQuery, setPatientSearchQuery] = useState("");
   const [customerList, setCustomerList] = useState<CustomerItem[]>(customers);
@@ -421,7 +429,7 @@ export default function AdminNewBookingView({
   const selectedBranchObj = dbBranches.find(b => String(b.id) === String(selectedBranchId)) || dbBranches[0];
   const selectedRoomObj = dbRooms.find(r => String(r.id) === String(selectedRoomId));
 
-  const selectedServiceName = getServiceName(selectedServiceObj);
+  const selectedServiceName = getServiceName(selectedServiceObj, lang);
   const selectedDoctorName = selectedDoctorObj?.name || "Doctor";
   const selectedBranchName = selectedBranchObj?.name_en || selectedBranchObj?.name || selectedBranchObj?.name_ar || "Clinic Branch";
   const selectedRoomName = selectedRoomObj?.name || "Room 1 (Auto)";
@@ -442,19 +450,19 @@ export default function AdminNewBookingView({
 
   const handleOpenSummaryModal = () => {
     if (!phone || !firstName) {
-      alert("Please enter patient phone number and first name.");
+      alert(tr.phoneFirstNameAlert);
       return;
     }
     if (!selectedServiceId) {
-      alert("Please select a service.");
+      alert(tr.selectServiceAlert);
       return;
     }
     if (!selectedDoctorId) {
-      alert("Please select a doctor.");
+      alert(tr.selectDoctorAlert);
       return;
     }
     if (!selectedTime) {
-      alert("Please select an available time slot.");
+      alert(tr.selectTimeAlert);
       return;
     }
     setShowConfirmModal(true);
@@ -463,7 +471,7 @@ export default function AdminNewBookingView({
   // Submission Handler connecting to POST /api/reservations + Direct Supabase fallback
   const handleCreateBooking = async (action: "normal" | "print" | "whatsapp" = "normal") => {
     if (!phone || !firstName) {
-      alert("Please enter patient phone number and first name.");
+      alert(tr.phoneFirstNameAlert);
       return;
     }
 
@@ -496,7 +504,7 @@ export default function AdminNewBookingView({
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        const errMsg = (errData as any)?.error || (errData as any)?.message || "Failed to create booking. Please try again.";
+        const errMsg = (errData as any)?.error || (errData as any)?.message || tr.bookingFailedAlert;
         alert(errMsg);
         return;
       }
@@ -514,26 +522,26 @@ export default function AdminNewBookingView({
       onClose();
     } catch (err) {
       console.error("Booking creation error:", err);
-      alert("Booking creation failed. Please check connection.");
+      alert(tr.bookingCreationFailedAlert);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 pb-12 animate-fadeIn text-[#1F251A]">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="w-full max-w-6xl mx-auto space-y-6 pb-12 animate-fadeIn text-[#1F251A]">
       
       {/* ── TOP PAGE HEADER ── */}
       <div className="bg-white rounded-3xl p-6 border border-[#414E36]/10 shadow-xs flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-[#1F251A]">New Booking</h1>
-          <p className="text-xs md:text-sm font-semibold text-[#5A6A51] mt-0.5">Create a new appointment for a patient</p>
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-[#1F251A]">{tr.title}</h1>
+          <p className="text-xs md:text-sm font-semibold text-[#5A6A51] mt-0.5">{tr.subtitle}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="h-10 w-10 rounded-2xl border border-[#414E36]/15 bg-[#FBFBF9] hover:bg-[#414E36] hover:text-white transition flex items-center justify-center text-[#1F251A]"
-          title="Close New Booking View"
+          title={tr.closeTitle}
         >
           <X size={20} />
         </button>
@@ -553,19 +561,19 @@ export default function AdminNewBookingView({
                   1
                 </span>
                 <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-emerald-800">
-                  Patient Information
+                  {tr.patientInfoHeading}
                 </h2>
               </div>
 
               {/* Patient Status Indicator */}
               {patientFound === true && (
                 <span className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 text-xs font-bold text-emerald-700">
-                  <CheckCircle2 size={15} className="text-emerald-600" /> Patient found
+                  <CheckCircle2 size={15} className="text-emerald-600" /> {tr.patientFoundBadge}
                 </span>
               )}
               {patientFound === false && (
                 <span className="inline-flex items-center gap-1.5 rounded-2xl bg-blue-50 border border-blue-200 px-3.5 py-1.5 text-xs font-bold text-blue-700">
-                  + New Patient
+                  {tr.newPatientBadge}
                 </span>
               )}
             </div>
@@ -574,20 +582,20 @@ export default function AdminNewBookingView({
               {/* Phone Input with Country Code & Integrated Patients Dropdown */}
               <div className="relative" ref={phoneDropdownRef}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block font-bold text-[#1F251A]">Phone Number *</label>
+                  <label className="block font-bold text-[#1F251A]">{tr.phoneLabel}</label>
                   <button
                     type="button"
                     onClick={() => setShowCustomerDropdown(prev => !prev)}
                     className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
                   >
                     <Users size={13} />
-                    <span>{showCustomerDropdown ? "Hide Patients List" : "Browse All Patients"}</span>
+                    <span>{showCustomerDropdown ? tr.hidePatientsListBtn : tr.browsePatientsBtn}</span>
                     <ChevronDown size={13} />
                   </button>
                 </div>
 
                 <div className="flex items-center rounded-2xl border border-[#414E36]/20 bg-white overflow-hidden shadow-xs focus-within:border-emerald-700">
-                  <div className="flex items-center gap-1.5 px-3 py-2.5 bg-[#FBFBF9] border-r border-[#414E36]/10 font-bold text-[#1F251A]">
+                  <div className="flex items-center gap-1.5 px-3 py-2.5 bg-[#FBFBF9] border-e border-[#414E36]/10 font-bold text-[#1F251A]">
                     <span className="text-base">🇪🇬</span>
                     <select
                       value={countryCode}
@@ -609,7 +617,7 @@ export default function AdminNewBookingView({
                       setPhone(e.target.value);
                       setShowCustomerDropdown(true);
                     }}
-                    placeholder="01234567890 (type to search existing patient)"
+                    placeholder={tr.phonePlaceholder}
                     className="w-full px-3.5 py-2.5 font-mono text-[#1F251A] outline-none font-bold placeholder:text-gray-400 placeholder:font-sans"
                   />
                   {phone ? (
@@ -621,7 +629,7 @@ export default function AdminNewBookingView({
                         setPatientFound(null);
                         setShowCustomerDropdown(true);
                       }}
-                      className="pr-3 text-[#5A6A51] hover:text-[#1F251A]"
+                      className="pe-3 text-[#5A6A51] hover:text-[#1F251A]"
                     >
                       <X size={14} />
                     </button>
@@ -630,20 +638,20 @@ export default function AdminNewBookingView({
 
                 {/* Scrollable Floating Customer List Dropdown */}
                 {showCustomerDropdown && (
-                  <div className="absolute left-0 right-0 top-full mt-1 z-[100] max-h-64 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/20 shadow-2xl p-2 space-y-1">
+                  <div className="absolute start-0 end-0 top-full mt-1 z-[100] max-h-64 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/20 shadow-2xl p-2 space-y-1">
                     <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-xl flex justify-between items-center mb-1">
-                      <span>Database Patients ({customerList.length})</span>
-                      <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] font-bold text-xs">Close ✕</button>
+                      <span>{tr.databasePatientsPrefix} ({customerList.length})</span>
+                      <button type="button" onClick={() => setShowCustomerDropdown(false)} className="text-[#1F251A] font-bold text-xs">{tr.closeBtn}</button>
                     </div>
                     
                     {customerList.length === 0 ? (
                       <div className="p-4 text-center text-xs text-[#5A6A51] font-semibold">
-                        No matching patients found. Type details below to create a new patient.
+                        {tr.noMatchingPatients}
                       </div>
                     ) : (
                       customerList.map((c) => {
-                        const cName = c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || "Patient Account";
-                        const cPhone = c.mobile || c.phone || "No Phone";
+                        const cName = c.name || c.full_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || tr.patientAccountFallback;
+                        const cPhone = c.mobile || c.phone || tr.noPhoneLabel;
                         const isSelected = foundCustomer?.id === c.id;
 
                         return (
@@ -664,7 +672,7 @@ export default function AdminNewBookingView({
                               isSelected ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800"
                             }`}>
                               {isSelected ? <Check size={12} /> : null}
-                              {isSelected ? "Selected" : "Select"}
+                              {isSelected ? tr.selectedBadge : tr.selectBadge}
                             </span>
                           </div>
                         );
@@ -677,24 +685,24 @@ export default function AdminNewBookingView({
               {/* First Name & Last Name Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">First Name *</label>
+                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.firstNameLabel}</label>
                   <input
                     type="text"
                     required
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="Mohamed"
+                    placeholder={tr.firstNamePlaceholder}
                     className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">Last Name *</label>
+                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.lastNameLabel}</label>
                   <input
                     type="text"
                     required
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Ahmed"
+                    placeholder={tr.lastNamePlaceholder}
                     className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none focus:border-emerald-700"
                   />
                 </div>
@@ -703,24 +711,24 @@ export default function AdminNewBookingView({
               {/* Email & WhatsApp Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">Email</label>
+                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.emailLabel}</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="mohamed.ahmed@email.com"
+                    placeholder={tr.emailPlaceholder}
                     className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-semibold text-[#1F251A] outline-none focus:border-emerald-700"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">WhatsApp Number</label>
+                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.whatsappLabel}</label>
                   <div className="space-y-2">
                     <input
                       type="tel"
                       disabled={sameAsPhone}
                       value={sameAsPhone ? phone : whatsapp}
                       onChange={(e) => setWhatsapp(e.target.value)}
-                      placeholder="Same as phone"
+                      placeholder={tr.whatsappPlaceholder}
                       className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-mono text-[#1F251A] outline-none disabled:bg-[#FBFBF9]"
                     />
                     <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[#5A6A51]">
@@ -730,7 +738,7 @@ export default function AdminNewBookingView({
                         onChange={(e) => setSameAsPhone(e.target.checked)}
                         className="h-4 w-4 rounded border-gray-300 text-emerald-700 focus:ring-emerald-600 cursor-pointer"
                       />
-                      <span>Same as phone number</span>
+                      <span>{tr.sameAsPhoneLabel}</span>
                     </label>
                   </div>
                 </div>
@@ -746,7 +754,7 @@ export default function AdminNewBookingView({
                   2
                 </span>
                 <h2 className="text-xs md:text-sm font-black uppercase tracking-wider text-emerald-800">
-                  Appointment Details
+                  {tr.appointmentDetailsHeading}
                 </h2>
               </div>
             </div>
@@ -755,7 +763,7 @@ export default function AdminNewBookingView({
               {/* Branch, Room, Service, Doctor, Date Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">Branch *</label>
+                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.branchLabel}</label>
                   <select
                     value={selectedBranchId}
                     onChange={(e) => setSelectedBranchId(e.target.value)}
@@ -763,20 +771,20 @@ export default function AdminNewBookingView({
                   >
                     {dbBranches.map(b => (
                       <option key={b.id} value={b.id}>
-                        {b.name_en || b.name || b.name_ar || `Branch #${b.id}`}
+                        {b.name_en || b.name || b.name_ar || `${tr.branchFallback} #${b.id}`}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">Room (Optional)</label>
+                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.roomLabel}</label>
                   <select
                     value={selectedRoomId}
                     onChange={(e) => setSelectedRoomId(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
                   >
-                    <option value="">Auto-Assign Room</option>
+                    <option value="">{tr.autoAssignRoomOption}</option>
                     {filteredRooms.map(r => (
                       <option key={r.id} value={r.id}>
                         {r.name}
@@ -786,7 +794,7 @@ export default function AdminNewBookingView({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">Service *</label>
+                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.serviceLabel}</label>
                   <select
                     value={selectedServiceId}
                     onChange={(e) => setSelectedServiceId(e.target.value)}
@@ -794,14 +802,14 @@ export default function AdminNewBookingView({
                   >
                     {dbServices.map(s => (
                       <option key={s.id} value={s.id}>
-                        {getServiceName(s)}
+                        {getServiceName(s, lang)}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">Doctor *</label>
+                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.doctorLabel}</label>
                   <select
                     value={selectedDoctorId}
                     onChange={(e) => setSelectedDoctorId(e.target.value)}
@@ -814,7 +822,7 @@ export default function AdminNewBookingView({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-[#1F251A] mb-1.5">Date *</label>
+                  <label className="block font-bold text-[#1F251A] mb-1.5">{tr.dateLabel}</label>
                   <input
                     type="date"
                     required
@@ -828,10 +836,10 @@ export default function AdminNewBookingView({
               {/* REAL DYNAMIC TIME SLOTS */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="font-bold text-[#1F251A]">Available Time *</label>
+                  <label className="font-bold text-[#1F251A]">{tr.availableTimeLabel}</label>
                   {loadingSlots && (
                     <span className="flex items-center gap-1 text-[11px] text-[#5A6A51]">
-                      <Loader2 size={12} className="animate-spin text-emerald-700" /> Fetching slots...
+                      <Loader2 size={12} className="animate-spin text-emerald-700" /> {tr.fetchingSlotsLabel}
                     </span>
                   )}
                 </div>
@@ -855,9 +863,9 @@ export default function AdminNewBookingView({
                             ? "bg-[#1E3A2B] text-white shadow-md scale-105"
                             : "bg-[#FBFBF9] text-[#1F251A] border border-[#414E36]/15 hover:border-[#1E3A2B]"
                         }`}
-                        title={isBooked ? "Slot already booked" : `Select ${tSlot}`}
+                        title={isBooked ? tr.slotBookedTitle : `${tr.selectSlotTitlePrefix} ${tSlot}`}
                       >
-                        {tSlot} {isBooked ? "(Booked)" : ""}
+                        {tSlot} {isBooked ? tr.bookedSuffix : ""}
                       </button>
                     );
                   })}
@@ -866,7 +874,7 @@ export default function AdminNewBookingView({
 
               {/* Session Type (In Person vs Online) */}
               <div>
-                <label className="block font-bold text-[#1F251A] mb-2">Session Type *</label>
+                <label className="block font-bold text-[#1F251A] mb-2">{tr.sessionTypeLabel}</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label
                     onClick={() => setSessionType("in_person")}
@@ -883,7 +891,7 @@ export default function AdminNewBookingView({
                       onChange={() => setSessionType("in_person")}
                       className="text-emerald-700 focus:ring-emerald-600 cursor-pointer"
                     />
-                    <span className="font-extrabold text-[#1F251A]">In Person / في العيادة</span>
+                    <span className="font-extrabold text-[#1F251A]">{tr.inPersonLabel}</span>
                   </label>
 
                   <label
@@ -901,7 +909,7 @@ export default function AdminNewBookingView({
                       onChange={() => setSessionType("online")}
                       className="text-emerald-700 focus:ring-emerald-600 cursor-pointer"
                     />
-                    <span className="font-extrabold text-[#1F251A]">Online / أونلاين</span>
+                    <span className="font-extrabold text-[#1F251A]">{tr.onlineLabel}</span>
                   </label>
                 </div>
               </div>
@@ -909,7 +917,7 @@ export default function AdminNewBookingView({
               {/* Notes (Optional) */}
               <div>
                 <div className="flex justify-between items-center mb-1.5">
-                  <label className="font-bold text-[#1F251A]">Notes (Optional)</label>
+                  <label className="font-bold text-[#1F251A]">{tr.notesLabel}</label>
                   <span className="text-[11px] text-[#5A6A51] font-mono">{notes.length} / 200</span>
                 </div>
                 <textarea
@@ -917,7 +925,7 @@ export default function AdminNewBookingView({
                   rows={3}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add any notes about this appointment..."
+                  placeholder={tr.notesPlaceholder}
                   className="w-full rounded-2xl border border-[#414E36]/20 bg-white p-3.5 text-xs text-[#1F251A] outline-none focus:border-emerald-700"
                 />
               </div>
@@ -925,8 +933,8 @@ export default function AdminNewBookingView({
               {/* Amount Paid Now */}
               <div>
                 <div className="flex justify-between items-center mb-1.5">
-                  <label className="font-bold text-[#1F251A]">Amount Paid Now</label>
-                  <span className="text-[11px] text-[#5A6A51] font-mono">EGP</span>
+                  <label className="font-bold text-[#1F251A]">{tr.amountPaidLabel}</label>
+                  <span className="text-[11px] text-[#5A6A51] font-mono">{tr.egpLabel}</span>
                 </div>
                 <input
                   type="number"
@@ -948,18 +956,18 @@ export default function AdminNewBookingView({
             <div className="bg-white rounded-3xl p-6 border border-emerald-700/20 shadow-xs space-y-4">
               <div className="flex items-center gap-2 text-emerald-800">
                 <Package size={18} />
-                <h3 className="font-extrabold text-sm">Active Package</h3>
+                <h3 className="font-extrabold text-sm">{tr.activePackageHeading}</h3>
               </div>
 
               <div className="bg-[#FBFBF9] p-4 rounded-2xl border border-[#414E36]/10 space-y-3">
                 <h4 className="font-extrabold text-xs text-[#1F251A]">{activePackage.name}</h4>
                 <div className="flex justify-between items-center text-[11px]">
                   <div>
-                    <span className="text-[#5A6A51] block font-bold">Remaining</span>
-                    <span className="font-black text-emerald-700 text-xs">{activePackage.remaining} Sessions</span>
+                    <span className="text-[#5A6A51] block font-bold">{tr.remainingLabel}</span>
+                    <span className="font-black text-emerald-700 text-xs">{activePackage.remaining} {tr.sessionsSuffix}</span>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[#5A6A51] block font-bold">Expires On</span>
+                  <div className="text-end">
+                    <span className="text-[#5A6A51] block font-bold">{tr.expiresOnLabel}</span>
                     <span className="font-bold text-[#1F251A]">{activePackage.expiresOn}</span>
                   </div>
                 </div>
@@ -973,7 +981,7 @@ export default function AdminNewBookingView({
                       : "bg-white text-emerald-800 border-emerald-700/30 hover:bg-emerald-50"
                   }`}
                 >
-                  {usePackageMode ? "Package Applied (0 EGP)" : "Use Package"}
+                  {usePackageMode ? tr.packageAppliedLabel : tr.usePackageBtn}
                 </button>
               </div>
             </div>
@@ -989,7 +997,7 @@ export default function AdminNewBookingView({
           onClick={onClose}
           className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-[#414E36]/20 bg-white font-bold text-xs text-[#1F251A] hover:bg-[#FBFBF9] transition"
         >
-          Cancel
+          {tr.cancelBtn}
         </button>
 
         {/* Single Full Create Booking Button */}
@@ -1000,7 +1008,7 @@ export default function AdminNewBookingView({
           className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[#1E3A2B] text-white font-extrabold text-xs hover:bg-[#162C20] transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs cursor-pointer"
         >
           {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
-          <span>Create Booking</span>
+          <span>{tr.createBookingBtn}</span>
         </button>
       </div>
 
@@ -1015,8 +1023,8 @@ export default function AdminNewBookingView({
                   <CheckCircle2 size={20} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-base text-[#1F251A]">Confirm Booking Summary</h3>
-                  <p className="text-[11px] text-[#5A6A51] font-medium">Review appointment details before final submission</p>
+                  <h3 className="font-extrabold text-base text-[#1F251A]">{tr.confirmModalTitle}</h3>
+                  <p className="text-[11px] text-[#5A6A51] font-medium">{tr.confirmModalSubtitle}</p>
                 </div>
               </div>
               <button
@@ -1032,61 +1040,61 @@ export default function AdminNewBookingView({
             {/* Content Details Grid */}
             <div className="bg-[#FBFBF9] rounded-2xl p-4 border border-[#414E36]/10 space-y-3 text-xs">
               <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">Patient Name</span>
-                <span className="font-extrabold text-[#1F251A] text-right">{fullPatientName}</span>
+                <span className="text-[#5A6A51] font-semibold">{tr.patientNameLabel}</span>
+                <span className="font-extrabold text-[#1F251A] text-end">{fullPatientName}</span>
               </div>
 
               <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">Phone Number</span>
-                <span className="font-mono font-bold text-[#1F251A] text-right">{phone}</span>
+                <span className="text-[#5A6A51] font-semibold">{tr.phoneNumberLabel}</span>
+                <span className="font-mono font-bold text-[#1F251A] text-end">{phone}</span>
               </div>
 
               <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">Service</span>
-                <span className="font-extrabold text-[#1F251A] text-right">{selectedServiceName}</span>
+                <span className="text-[#5A6A51] font-semibold">{tr.serviceLabel.replace(" *", "")}</span>
+                <span className="font-extrabold text-[#1F251A] text-end">{selectedServiceName}</span>
               </div>
 
               <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">Doctor</span>
-                <span className="font-extrabold text-[#1F251A] text-right">{selectedDoctorName}</span>
+                <span className="text-[#5A6A51] font-semibold">{tr.doctorLabel.replace(" *", "")}</span>
+                <span className="font-extrabold text-[#1F251A] text-end">{selectedDoctorName}</span>
               </div>
 
               <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">Branch / Room</span>
-                <span className="font-extrabold text-[#1F251A] text-right">
+                <span className="text-[#5A6A51] font-semibold">{tr.branchRoomLabel}</span>
+                <span className="font-extrabold text-[#1F251A] text-end">
                   {selectedBranchName} {selectedRoomName !== "—" ? `(${selectedRoomName})` : ""}
                 </span>
               </div>
 
               <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">Date &amp; Time</span>
-                <span className="font-extrabold text-emerald-800 text-right">
-                  {formattedDateStr} at {selectedTime}
+                <span className="text-[#5A6A51] font-semibold">{tr.dateTimeLabel}</span>
+                <span className="font-extrabold text-emerald-800 text-end">
+                  {formattedDateStr} {tr.atWord} {selectedTime}
                 </span>
               </div>
 
               <div className="flex justify-between items-center pb-2.5 border-b border-[#414E36]/10">
-                <span className="text-[#5A6A51] font-semibold">Session Type</span>
-                <span className="font-bold text-[#1F251A] text-right">
-                  {sessionType === "in_person" ? "In Person / في العيادة" : "Online / أونلاين"}
+                <span className="text-[#5A6A51] font-semibold">{tr.sessionTypeLabel.replace(" *", "")}</span>
+                <span className="font-bold text-[#1F251A] text-end">
+                  {sessionType === "in_person" ? tr.inPersonLabel : tr.onlineLabel}
                 </span>
               </div>
 
               {usePackageMode ? (
                 <div className="flex justify-between items-center pt-0.5 text-emerald-800 font-extrabold">
-                  <span>Price / Payment</span>
-                  <span>0 EGP (Active Package)</span>
+                  <span>{tr.pricePaymentLabel}</span>
+                  <span>{tr.activePackagePriceLabel}</span>
                 </div>
               ) : (
                 <div className="flex justify-between items-center pt-0.5 font-extrabold text-[#1F251A]">
-                  <span className="text-[#5A6A51] font-semibold">Service Price</span>
-                  <span className="text-emerald-800">{selectedServiceObj?.price || 500} EGP</span>
+                  <span className="text-[#5A6A51] font-semibold">{tr.servicePriceLabel}</span>
+                  <span className="text-emerald-800">{selectedServiceObj?.price || 500} {tr.egpLabel}</span>
                 </div>
               )}
 
               {notes && (
                 <div className="pt-2 border-t border-[#414E36]/10">
-                  <span className="text-[#5A6A51] font-semibold block mb-1">Notes</span>
+                  <span className="text-[#5A6A51] font-semibold block mb-1">{tr.notesLabel.replace(" (Optional)", "")}</span>
                   <p className="text-[11px] text-[#1F251A] bg-white p-2.5 rounded-xl border border-[#414E36]/10">{notes}</p>
                 </div>
               )}
@@ -1100,7 +1108,7 @@ export default function AdminNewBookingView({
                 onClick={() => setShowConfirmModal(false)}
                 className="px-5 py-3 rounded-2xl border border-[#414E36]/20 bg-white font-bold text-xs text-[#1F251A] hover:bg-[#FBFBF9] transition cursor-pointer"
               >
-                Back to Edit
+                {tr.backToEditBtn}
               </button>
               <button
                 type="button"
@@ -1112,7 +1120,7 @@ export default function AdminNewBookingView({
                 className="px-6 py-3 rounded-2xl bg-[#1E3A2B] text-white font-extrabold text-xs hover:bg-[#162C20] transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md cursor-pointer"
               >
                 {submitting ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                <span>{submitting ? "Creating..." : "Confirm & Create Booking"}</span>
+                <span>{submitting ? tr.creatingBtn : tr.confirmCreateBookingBtn}</span>
               </button>
             </div>
           </div>
