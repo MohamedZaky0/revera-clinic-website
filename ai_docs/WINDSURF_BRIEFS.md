@@ -10,14 +10,6 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-None in progress. Briefs 7, 8, 9 completed and archived below (2026-08-17). Brief 10 (queued below)
-is next.
-
----
----
-
-# QUEUED BRIEFS — write up next, in this order
-
 ## Brief 10 — Sub-PR 5 (Customer Profile Drawer): move `viewingCustomerProfile` state out of `admin/page.tsx`
 
 **Read first:** Brief 5's archived entry (why this was deferred) and the correction below — the risk

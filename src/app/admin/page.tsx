@@ -24,6 +24,7 @@ import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import CustomerFormModal from "@/components/admin/patients/CustomerFormModal";
 import PatientsDirectoryView from "@/components/admin/patients/PatientsDirectoryView";
+import { useCustomerProfile } from "@/components/admin/patients/useCustomerProfile";
 import {
   AlarmClock,
   ArrowLeft,
@@ -1578,19 +1579,7 @@ export default function AdminPage() {
   const [savingPostpone, setSavingPostpone] = useState(false);
 
   // Customer Profile details drawer state
-  const [viewingCustomerProfile, setViewingCustomerProfile] = useState<Customer | null>(null);
   const [customerAvatars, setCustomerAvatars] = useState<Record<string, string>>({});
-
-  // Medical Record Center & Intake Form states
-  const [medicalRecordForm, setMedicalRecordForm] = useState<any | null>(null);
-  const [medicalReports, setMedicalReports] = useState<any[]>([]);
-  const [loadingMedicalRecords, setLoadingMedicalRecords] = useState(false);
-  
-  // Medical Intake Form Modal state
-  const [showMedicalFormModal, setShowMedicalFormModal] = useState(false);
-
-  // Medical Report Modal state
-  const [showMedicalReportModal, setShowMedicalReportModal] = useState(false);
 
   const fetchCustomerAvatars = useCallback(async () => {
     try {
@@ -1639,57 +1628,12 @@ export default function AdminPage() {
     }
   };
 
-  const [customerProfileTab, setCustomerProfileTab] = useState<"info" | "history" | "prescription" | "products" | "packages">("info");
-  const [customerRecordsSubTab, setCustomerRecordsSubTab] = useState<"intake" | "prescriptions" | "reports">("intake");
-  const [customerPrescriptions, setCustomerPrescriptions] = useState<any[]>([]);
-  const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
-  const [prescriptionEditMode, setPrescriptionEditMode] = useState(false);
-  const [editingPrescription, setEditingPrescription] = useState<any | null>(null);
-
-  // Patient Product Balances state
-  const [customerProductsSubTab, setCustomerProductsSubTab] = useState<"current" | "history">("current");
-  const [customerProductBalances, setCustomerProductBalances] = useState<any[]>([]);
-  const [loadingCustomerProducts, setLoadingCustomerProducts] = useState(false);
-  const [logUsageModalBalance, setLogUsageModalBalance] = useState<any | null>(null);
-  const [logUsageQty, setLogUsageQty] = useState<number>(1);
-  const [logUsageNotes, setLogUsageNotes] = useState<string>("");
-  const [savingUsageLog, setSavingUsageLog] = useState(false);
-  const [showAddPatientProductModal, setShowAddPatientProductModal] = useState(false);
-  const [selectedAddProductId, setSelectedAddProductId] = useState<string>("");
-  const [selectedAddProductName, setSelectedAddProductName] = useState<string>("");
-  const [selectedAddProductQty, setSelectedAddProductQty] = useState<number>(1);
-  const [selectedAddProductUnitPrice, setSelectedAddProductUnitPrice] = useState<number>(0);
-  const [addingProductToPatient, setAddingProductToPatient] = useState(false);
-
-  // Patient Packages state
-  const [customerPackagesSubTab, setCustomerPackagesSubTab] = useState<"current" | "history">("current");
-  const [customerProfilePackages, setCustomerProfilePackages] = useState<any[]>([]);
-  const [loadingCustomerPackages, setLoadingCustomerPackages] = useState(false);
-  const [showSellPackageModal, setShowSellPackageModal] = useState(false);
-  const [availablePackageOffers, setAvailablePackageOffers] = useState<any[]>([]);
-  const [selectedSellPackageId, setSelectedSellPackageId] = useState<string>("");
-  const [sellPackagePaymentMethod, setSellPackagePaymentMethod] = useState<string>("cash");
-  const [sellingPackage, setSellingPackage] = useState(false);
-
   // Package/promotion awareness at booking + checkout time
   const [bookingCustomerPackages, setBookingCustomerPackages] = useState<any[]>([]);
   const [checkoutCustomerPackages, setCheckoutCustomerPackages] = useState<any[]>([]);
   const [redeemedPackageItems, setRedeemedPackageItems] = useState<Record<number, string>>({});
   const [matchedCustomerId, setMatchedCustomerId] = useState<string | null>(null);
   const [manualBookingCustomerPackages, setManualBookingCustomerPackages] = useState<any[]>([]);
-  // Which of this customer's past reservations were paid for by redeeming a package session —
-  // so Booking History can show *why* a visit shows 0 EGP paid, and which package/purchase date.
-  const [customerPackageRedemptions, setCustomerPackageRedemptions] = useState<any[]>([]);
-
-  // Prescription Form states
-  const [rxDiagnosis, setRxDiagnosis] = useState("");
-  const [rxMedications, setRxMedications] = useState<{ name: string; dosage: string; instructions: string }[]>([]);
-  const [rxMedInput, setRxMedInput] = useState("");
-  const [rxMedDropdown, setRxMedDropdown] = useState("");
-  const [rxGeneralNotes, setRxGeneralNotes] = useState("");
-  const [rxDocNotes, setRxDocNotes] = useState("");
-  const [rxFollowUpDate, setRxFollowUpDate] = useState("");
-  const [savingPrescription, setSavingPrescription] = useState(false);
 
   const [couponSearch, setCouponSearch] = useState("");
   const [couponDate, setCouponDate] = useState("");
@@ -1860,52 +1804,6 @@ export default function AdminPage() {
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
   const [calendarView, setCalendarView] = useState<"Calendar" | "List" | "Schedule">("Calendar");
-  // Fetch prescriptions and medical records when viewing customer profile changes
-  useEffect(() => {
-    if (!viewingCustomerProfile?.id) {
-      setCustomerPrescriptions([]);
-      setMedicalRecordForm(null);
-      setMedicalReports([]);
-      setCustomerProfileTab("info");
-      setPrescriptionEditMode(false);
-      setEditingPrescription(null);
-      return;
-    }
-
-    const fetchRx = async () => {
-      setLoadingPrescriptions(true);
-      try {
-        const res = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`, { headers: authenticatedJsonHeaders });
-        if (res.ok) {
-          const data = await res.json();
-          setCustomerPrescriptions(data);
-        }
-      } catch (err) {
-        console.error("Error fetching prescriptions:", err);
-      } finally {
-        setLoadingPrescriptions(false);
-      }
-    };
-
-    const fetchMedicalRecords = async () => {
-      setLoadingMedicalRecords(true);
-      try {
-        const res = await fetch(`/api/medical-records?customerId=${viewingCustomerProfile.id}`, { headers: authenticatedJsonHeaders });
-        if (res.ok) {
-          const data = await res.json();
-          setMedicalRecordForm(data.form || null);
-          setMedicalReports(data.reports || []);
-        }
-      } catch (err) {
-        console.error("Error fetching medical records:", err);
-      } finally {
-        setLoadingMedicalRecords(false);
-      }
-    };
-
-    fetchRx();
-    fetchMedicalRecords();
-  }, [viewingCustomerProfile?.id]);
 
   useEffect(() => {
     if (adminRole === 'superadmin') return;
@@ -3690,12 +3588,6 @@ export default function AdminPage() {
     }
   }, [session]);
 
-  useEffect(() => {
-    if (activeNav === "Inventory" || activeNav === "Products" || activeNav === "Point of Sale" || activeNav === "Patients" || viewingCustomerProfile) {
-      fetchInventoryProducts();
-    }
-  }, [activeNav, viewingCustomerProfile, fetchInventoryProducts]);
-
   // Also load once session is ready regardless of tab — the notification bell's low-stock
   // alerts need inventoryProducts populated even if the admin never visits the Inventory tab.
   useEffect(() => {
@@ -3931,36 +3823,6 @@ export default function AdminPage() {
     }
   }, [session]);
 
-  useEffect(() => {
-    if (activeNav === "Inventory" || activeNav === "Products" || viewingCustomerProfile?.id) {
-      fetchProductSalesHistory();
-    }
-  }, [activeNav, viewingCustomerProfile?.id, fetchProductSalesHistory]);
-
-  const fetchCustomerProductBalances = useCallback(async (customerId: string) => {
-    try {
-      setLoadingCustomerProducts(true);
-      if (!session?.access_token) return;
-      const res = await fetch(`/api/customers/products?customer_id=${encodeURIComponent(customerId)}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCustomerProductBalances(data.balances || []);
-      }
-    } catch (err) {
-      console.error("Error fetching customer product balances:", err);
-    } finally {
-      setLoadingCustomerProducts(false);
-    }
-  }, [session]);
-
-  useEffect(() => {
-    if (viewingCustomerProfile?.id) {
-      fetchCustomerProductBalances(viewingCustomerProfile.id);
-    }
-  }, [viewingCustomerProfile?.id, fetchCustomerProductBalances]);
-
   // Shared fetch for a customer's purchased packages (customer_packages + items), reused across
   // the profile's Packages tab, the booking detail drawer, checkout, and manual booking creation —
   // each keeps its own state so switching which booking/profile is in view never shows stale data.
@@ -3979,40 +3841,112 @@ export default function AdminPage() {
     }
   }, [session]);
 
-  const fetchCustomerProfilePackages = useCallback(async (customerId: string) => {
-    setLoadingCustomerPackages(true);
-    await fetchCustomerPackagesInto(customerId, setCustomerProfilePackages);
-    setLoadingCustomerPackages(false);
-  }, [fetchCustomerPackagesInto]);
+  const {
+    viewingCustomerProfile,
+    setViewingCustomerProfile,
+    medicalRecordForm,
+    setMedicalRecordForm,
+    medicalReports,
+    setMedicalReports,
+    loadingMedicalRecords,
+    showMedicalFormModal,
+    setShowMedicalFormModal,
+    showMedicalReportModal,
+    setShowMedicalReportModal,
+    customerProfileTab,
+    setCustomerProfileTab,
+    customerRecordsSubTab,
+    setCustomerRecordsSubTab,
+    customerPrescriptions,
+    loadingPrescriptions,
+    prescriptionEditMode,
+    setPrescriptionEditMode,
+    editingPrescription,
+    customerProductsSubTab,
+    setCustomerProductsSubTab,
+    customerProductBalances,
+    loadingCustomerProducts,
+    logUsageModalBalance,
+    setLogUsageModalBalance,
+    logUsageQty,
+    setLogUsageQty,
+    logUsageNotes,
+    setLogUsageNotes,
+    savingUsageLog,
+    showAddPatientProductModal,
+    setShowAddPatientProductModal,
+    selectedAddProductId,
+    setSelectedAddProductId,
+    selectedAddProductName,
+    setSelectedAddProductName,
+    selectedAddProductQty,
+    setSelectedAddProductQty,
+    selectedAddProductUnitPrice,
+    setSelectedAddProductUnitPrice,
+    addingProductToPatient,
+    customerPackagesSubTab,
+    setCustomerPackagesSubTab,
+    customerProfilePackages,
+    loadingCustomerPackages,
+    showSellPackageModal,
+    setShowSellPackageModal,
+    availablePackageOffers,
+    selectedSellPackageId,
+    setSelectedSellPackageId,
+    sellPackagePaymentMethod,
+    setSellPackagePaymentMethod,
+    sellingPackage,
+    customerPackageRedemptions,
+    rxDiagnosis,
+    setRxDiagnosis,
+    rxMedications,
+    setRxMedications,
+    rxMedInput,
+    setRxMedInput,
+    rxMedDropdown,
+    setRxMedDropdown,
+    rxGeneralNotes,
+    setRxGeneralNotes,
+    rxDocNotes,
+    setRxDocNotes,
+    rxFollowUpDate,
+    setRxFollowUpDate,
+    savingPrescription,
+    fetchCustomerProductBalances,
+    fetchAvailablePackageOffers,
+    handleSellPackageToCustomer,
+    handleSaveUsageLog,
+    handleAddProductToPatient,
+    handleStartCreatePrescription,
+    handleStartEditPrescription,
+    handleAddMedication,
+    handleRemoveMedication,
+    handleSavePrescription,
+    handleDeletePrescription,
+    handleOpenMedicalFormModal,
+    handleOpenMedicalReportModal,
+    handleDeleteMedicalReport,
+    handlePrintPrescription,
+  } = useCustomerProfile({
+    session,
+    authenticatedJsonHeaders,
+    fetchInventoryProducts,
+    fetchProductSalesHistory,
+    fetchCustomerPackagesInto,
+    showConfirm,
+  });
 
   useEffect(() => {
-    if (viewingCustomerProfile?.id) {
-      fetchCustomerProfilePackages(viewingCustomerProfile.id);
+    if (activeNav === "Inventory" || activeNav === "Products" || activeNav === "Point of Sale" || activeNav === "Patients" || viewingCustomerProfile) {
+      fetchInventoryProducts();
     }
-  }, [viewingCustomerProfile?.id, fetchCustomerProfilePackages]);
-
-  const fetchCustomerPackageRedemptions = useCallback(async (customerId: string) => {
-    try {
-      if (!session?.access_token) return;
-      const res = await fetch(`/api/customers/package-redemptions?customer_id=${encodeURIComponent(customerId)}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCustomerPackageRedemptions(data.redemptions || []);
-      }
-    } catch (err) {
-      console.error("Error fetching customer package redemptions:", err);
-    }
-  }, [session]);
+  }, [activeNav, viewingCustomerProfile, fetchInventoryProducts]);
 
   useEffect(() => {
-    if (viewingCustomerProfile?.id) {
-      fetchCustomerPackageRedemptions(viewingCustomerProfile.id);
-    } else {
-      setCustomerPackageRedemptions([]);
+    if (activeNav === "Inventory" || activeNav === "Products" || viewingCustomerProfile?.id) {
+      fetchProductSalesHistory();
     }
-  }, [viewingCustomerProfile?.id, fetchCustomerPackageRedemptions]);
+  }, [activeNav, viewingCustomerProfile?.id, fetchProductSalesHistory]);
 
   useEffect(() => {
     if (viewingBooking?.customerId) {
@@ -4038,140 +3972,6 @@ export default function AdminPage() {
       setManualBookingCustomerPackages([]);
     }
   }, [matchedCustomerId, fetchCustomerPackagesInto]);
-
-  const fetchAvailablePackageOffers = useCallback(async () => {
-    try {
-      const res = await fetch("/api/packages");
-      if (res.ok) {
-        const data = await res.json();
-        setAvailablePackageOffers(Array.isArray(data) ? data.filter((p: any) => p.active) : []);
-      }
-    } catch (err) {
-      console.error("Error fetching package offers:", err);
-    }
-  }, []);
-
-  const handleSellPackageToCustomer = async () => {
-    if (!viewingCustomerProfile?.id || !selectedSellPackageId) return;
-    const customerId = viewingCustomerProfile.id;
-    setSellingPackage(true);
-    try {
-      const res = await fetch("/api/packages/sell", {
-        method: "POST",
-        headers: authenticatedJsonHeaders,
-        body: JSON.stringify({
-          customerId,
-          packageId: selectedSellPackageId,
-          branchId: null,
-          paymentMethod: sellPackagePaymentMethod,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        await fetchCustomerProfilePackages(customerId);
-        setShowSellPackageModal(false);
-        setSelectedSellPackageId("");
-        setSellPackagePaymentMethod("cash");
-        alert(`Package sold successfully!${data.invoice?.invoice_no ? ` Invoice ${data.invoice.invoice_no}` : ""}`);
-      } else {
-        alert(data.error || "Failed to sell package.");
-      }
-    } catch (err) {
-      console.error("Error selling package:", err);
-      alert("Error selling package.");
-    } finally {
-      setSellingPackage(false);
-    }
-  };
-
-  const handleSaveUsageLog = async () => {
-    if (!logUsageModalBalance || !logUsageQty || logUsageQty <= 0) return;
-    try {
-      setSavingUsageLog(true);
-      const res = await fetch("/api/customers/products", {
-        method: "PATCH",
-        headers: authenticatedJsonHeaders,
-        body: JSON.stringify({
-          balance_id: logUsageModalBalance.id,
-          quantity_used: Number(logUsageQty),
-          used_by: session?.user?.email || "Staff",
-          notes: logUsageNotes
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && viewingCustomerProfile?.id) {
-          await fetchCustomerProductBalances(viewingCustomerProfile.id);
-          setLogUsageModalBalance(null);
-          setLogUsageQty(1);
-          setLogUsageNotes("");
-        }
-      }
-    } catch (err) {
-      console.error("Error logging product usage:", err);
-    } finally {
-      setSavingUsageLog(false);
-    }
-  };
-
-  const handleAddProductToPatient = async () => {
-    if (!viewingCustomerProfile || !selectedAddProductName || !selectedAddProductQty || selectedAddProductQty <= 0) return;
-    try {
-      setAddingProductToPatient(true);
-      const totalAmt = Number(selectedAddProductUnitPrice || 0) * Number(selectedAddProductQty || 1);
-      const res = await fetch("/api/customers/products", {
-        method: "POST",
-        headers: authenticatedJsonHeaders,
-        body: JSON.stringify({
-          customer_id: viewingCustomerProfile.id,
-          customer_name: viewingCustomerProfile.name || '',
-          customer_mobile: viewingCustomerProfile.mobile || viewingCustomerProfile.phone || '',
-          product_id: selectedAddProductId || `prod-${Date.now()}`,
-          product_name: selectedAddProductName,
-          quantity: Number(selectedAddProductQty),
-          unit_price: Number(selectedAddProductUnitPrice || 0),
-          total_amount: Number(totalAmt || 0)
-        })
-      });
-
-      if (res.ok) {
-        // Also record in product sales history
-        await fetch("/api/inventory/products/sales", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
-          },
-          body: JSON.stringify({
-            product_id: selectedAddProductId || `prod-${Date.now()}`,
-            product_name: selectedAddProductName,
-            customer_id: viewingCustomerProfile.id,
-            customer_name: viewingCustomerProfile.name || '',
-            customer_mobile: viewingCustomerProfile.mobile || viewingCustomerProfile.phone || '',
-            quantity: Number(selectedAddProductQty),
-            unit_price: Number(selectedAddProductUnitPrice || 0),
-            total_amount: Number(totalAmt || 0),
-            sold_by: session?.user?.email || "Admin/Receptionist"
-          })
-        });
-
-        if (viewingCustomerProfile.id) {
-          await fetchCustomerProductBalances(viewingCustomerProfile.id);
-        }
-        await fetchProductSalesHistory();
-        await fetchInventoryProducts();
-        setShowAddPatientProductModal(false);
-        setSelectedAddProductId("");
-        setSelectedAddProductName("");
-        setSelectedAddProductQty(1);
-        setSelectedAddProductUnitPrice(0);
-      }
-    } catch (err) {
-      console.error("Error adding product to patient:", err);
-    } finally {
-      setAddingProductToPatient(false);
-    }
-  };
 
   const handleOpenSellProductModal = (prod: any) => {
     if (prod?.role === "consumable") {
@@ -6879,330 +6679,6 @@ export default function AdminPage() {
     setImportProgress(0);
     setImportLog([]);
   };
-
-  function handleStartCreatePrescription() {
-    setEditingPrescription(null);
-    setRxDiagnosis("");
-    setRxMedications([]);
-    setRxMedInput("");
-    setRxMedDropdown("");
-    setRxGeneralNotes("");
-    setRxDocNotes("");
-    setRxFollowUpDate("");
-    setPrescriptionEditMode(true);
-  }
-
-  function handleStartEditPrescription(rx: any) {
-    setEditingPrescription(rx);
-    setRxDiagnosis(rx.diagnosis || "");
-    setRxMedications(rx.medications || []);
-    setRxMedInput("");
-    setRxMedDropdown("");
-    setRxGeneralNotes(rx.general_notes || "");
-    setRxDocNotes(rx.doctor_notes || "");
-    setRxFollowUpDate(rx.follow_up_date || "");
-    setPrescriptionEditMode(true);
-  }
-
-  function handleAddMedication() {
-    if (!rxMedInput.trim()) return;
-    setRxMedications(prev => [
-      ...prev,
-      {
-        name: rxMedInput.trim(),
-        dosage: "",
-        instructions: ""
-      }
-    ]);
-    setRxMedInput("");
-    setRxMedDropdown("");
-  }
-
-  function handleRemoveMedication(index: number) {
-    setRxMedications(prev => prev.filter((_, idx) => idx !== index));
-  }
-
-  async function handleSavePrescription() {
-    if (!viewingCustomerProfile?.id) return;
-    setSavingPrescription(true);
-
-    const payload = {
-      id: editingPrescription?.id || undefined,
-      customer_id: viewingCustomerProfile.id,
-      patient_name: viewingCustomerProfile.name,
-      date: new Date().toISOString().slice(0, 10),
-      diagnosis: rxDiagnosis.trim() || null,
-      medications: rxMedications,
-      general_notes: rxGeneralNotes.trim() || null,
-      doctor_notes: rxDocNotes.trim() || null,
-      follow_up_date: rxFollowUpDate || null
-    };
-
-    try {
-      const res = await fetch("/api/prescriptions", {
-        method: "POST",
-        headers: authenticatedJsonHeaders,
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to save prescription");
-      }
-
-      // Re-fetch prescriptions
-      const rxRes = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`, { headers: authenticatedJsonHeaders });
-      if (rxRes.ok) {
-        const rxData = await rxRes.json();
-        setCustomerPrescriptions(rxData);
-      }
-
-      setPrescriptionEditMode(false);
-      setEditingPrescription(null);
-    } catch (err: any) {
-      console.error("handleSavePrescription error:", err);
-      alert(err.message || "An error occurred while saving the prescription.");
-    } finally {
-      setSavingPrescription(false);
-    }
-  }
-
-  async function handleDeletePrescription(id: string) {
-    if (!(await showConfirm("Are you sure you want to delete this prescription?"))) return;
-    try {
-      const res = await fetch(`/api/prescriptions?id=${id}`, {
-        method: "DELETE",
-        headers: authenticatedJsonHeaders,
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to delete prescription");
-      }
-
-      // Re-fetch prescriptions
-      if (viewingCustomerProfile?.id) {
-        const rxRes = await fetch(`/api/prescriptions?customerId=${viewingCustomerProfile.id}`, { headers: authenticatedJsonHeaders });
-        if (rxRes.ok) {
-          const rxData = await rxRes.json();
-          setCustomerPrescriptions(rxData);
-        }
-      }
-    } catch (err: any) {
-      console.error("handleDeletePrescription error:", err);
-      alert(err.message || "An error occurred while deleting the prescription.");
-    }
-  }
-
-  function handleOpenMedicalFormModal() {
-    setShowMedicalFormModal(true);
-  }
-
-  function handleOpenMedicalReportModal() {
-    setShowMedicalReportModal(true);
-  }
-
-  async function handleDeleteMedicalReport(reportId: string) {
-    if (!confirm("Are you sure you want to delete this report?")) return;
-    try {
-      setMedicalReports((prev) => prev.filter((r) => r.id !== reportId));
-      await fetch(`/api/medical-records?reportId=${encodeURIComponent(reportId)}`, {
-        method: "DELETE",
-        headers: authenticatedJsonHeaders,
-      });
-    } catch (err) {
-      console.error("Error deleting medical report:", err);
-    }
-  }
-
-  function handlePrintPrescription(rx: any) {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      alert("Please allow popups to print prescriptions.");
-      return;
-    }
-
-    const rxDate = new Date(rx.date).toLocaleDateString("en-US", {
-      year: "numeric", month: "long", day: "numeric"
-    });
-
-    const followUpDateStr = rx.follow_up_date
-      ? new Date(rx.follow_up_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-      : "";
-
-    const medsHtml = rx.medications && rx.medications.length > 0
-      ? `<ol style="margin-left: 20px; font-size: 16px; line-height: 1.8;">
-          ${rx.medications.map((m: any) => `
-            <li style="margin-bottom: 12px;">
-              <strong>${m.name}</strong>
-              ${m.instructions ? `<br/><span style="color: #555; font-size: 14px; font-style: italic;">${m.instructions}</span>` : ""}
-            </li>
-          `).join("")}
-         </ol>`
-      : `<p style="color: #666; font-style: italic;">No medications prescribed.</p>`;
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Prescription - ${rx.patient_name}</title>
-        <style>
-          body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            color: #1F251A;
-            margin: 0;
-            padding: 40px;
-            background-color: #fff;
-          }
-          .letterhead {
-            text-align: center;
-            border-bottom: 2px solid #414E36;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
-          }
-          .logo {
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            color: #414E36;
-            margin: 0;
-            text-transform: uppercase;
-          }
-          .tagline {
-            font-size: 12px;
-            color: #8A9A81;
-            margin: 5px 0 0 0;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-          }
-          .meta-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 40px;
-            font-size: 14px;
-            border-bottom: 1px solid #E6E9EB;
-            padding-bottom: 20px;
-          }
-          .meta-label {
-            font-weight: bold;
-            color: #5A6A51;
-            text-transform: uppercase;
-            font-size: 11px;
-            letter-spacing: 0.1em;
-            margin-bottom: 5px;
-          }
-          .meta-value {
-            font-size: 16px;
-            font-weight: 600;
-            color: #1F251A;
-          }
-          .section-title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #414E36;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            border-bottom: 1px solid #F2EFE9;
-            padding-bottom: 8px;
-            margin-top: 30px;
-            margin-bottom: 15px;
-          }
-          .content-block {
-            font-size: 15px;
-            line-height: 1.6;
-            color: #333;
-            margin-bottom: 20px;
-          }
-          .footer {
-            margin-top: 80px;
-            border-top: 1px solid #E6E9EB;
-            padding-top: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-          }
-          .signature-area {
-            text-align: center;
-            width: 200px;
-          }
-          .signature-line {
-            border-bottom: 1px solid #1F251A;
-            margin-bottom: 5px;
-            height: 40px;
-          }
-          .signature-label {
-            font-size: 12px;
-            color: #5A6A51;
-            font-weight: 500;
-          }
-          .clinic-info {
-            font-size: 11px;
-            color: #8A9A81;
-            line-height: 1.5;
-          }
-          @media print {
-            body { padding: 0; }
-            @page { margin: 20mm; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="letterhead">
-          <h1 class="logo">Revera Clinic</h1>
-          <p class="tagline">Aesthetic & Medical Center</p>
-        </div>
-
-        <div class="meta-grid">
-          <div>
-            <div class="meta-label">Patient Name</div>
-            <div class="meta-value">\${rx.patient_name}</div>
-          </div>
-          <div style="text-align: right;">
-            <div class="meta-label">Date</div>
-            <div class="meta-value">\${rxDate}</div>
-          </div>
-        </div>
-
-        \${rx.diagnosis ? \`
-          <div class="section-title">Diagnosis</div>
-          <div class="content-block" style="white-space: pre-wrap;">\${rx.diagnosis}</div>
-        \` : ''}
-
-        <div class="section-title" style="margin-top: 40px;">Rx (Prescribed Medications)</div>
-        <div class="content-block">\${medsHtml}</div>
-
-        \${rx.general_notes ? \`
-          <div class="section-title">General Notes</div>
-          <div class="content-block" style="white-space: pre-wrap;">\${rx.general_notes}</div>
-        \` : ''}
-
-        \${followUpDateStr ? \`
-          <div class="section-title">Next Follow-Up Date</div>
-          <div class="content-block" style="font-weight: 600; color: #414E36;">\${followUpDateStr}</div>
-        \` : ''}
-
-        <div class="footer">
-          <div class="clinic-info">
-            <strong>Revera Clinic Cairo</strong><br/>
-            El-Ghad St, Pyramids, Giza<br/>
-            Tel: +20 100 000 0000 | info@revera.com
-          </div>
-          <div class="signature-area">
-            <div class="signature-line"></div>
-            <div class="signature-label">Doctor's Signature / Stamp</div>
-          </div>
-        </div>
-
-        <script>
-          window.onload = function() {
-            window.print();
-          }
-        </script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-  }
 
   function handleDeleteCustomer(id: string) {
     setDeletingCustomer(true);
@@ -22264,6 +21740,7 @@ export default function AdminPage() {
               receptionistRole={loggedEmpAccount?.role_name || adminRole || "Receptionist"}
               employeeId={loggedEmpAccount?.id || adminDbId}
               email={adminEmail}
+              accessToken={session?.access_token}
               onNavigateTab={(tabName) => setActiveNav(tabName)}
               onLogout={handleLogout}
             />
