@@ -10,59 +10,9 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 10 — Sub-PR 5 (Customer Profile Drawer): move `viewingCustomerProfile` state out of `admin/page.tsx`
-
-**Read first:** Brief 5's archived entry (why this was deferred) and the correction below — the risk
-Brief 5 flagged turned out to be smaller than assumed.
-
-**Investigation done while queuing this brief (2026-08-17) — corrects Brief 5's own assumption:**
-Brief 5 counted 82 references to `viewingCustomerProfile` file-wide and flagged it as "almost
-certainly read/set from places outside the Patients block too... needs enumerating." Enumerated now:
-
-- Current count: 80 references (down slightly — some consolidated into the 4 already-extracted
-  components' props). 42 fall inside the current `activeNav === "Patients"` JSX block
-  (`admin/page.tsx:10942–12293`); 38 fall outside it.
-- **Every single one of those 38 "outside" references is `viewingCustomerProfile`'s own supporting
-  logic** — `useEffect`s and handler functions (fetching prescriptions, medical records, product
-  balances, package redemptions; selling a package; adding a product to a patient) that are
-  *declared* earlier in the file (functions/hooks conventionally sit above the JSX that uses them)
-  but are logically part of the Profile Drawer's own behaviour, not some other section's.
-- **Confirmed by two separate greps that this state is not actually cross-section shared:**
-  `grep -n "setViewingCustomerProfile("` across all of `src/` finds it called **only** inside
-  `admin/page.tsx` and the already-extracted `src/components/admin/patients/*.tsx` files — never
-  from Bookings or anywhere else. `grep -rln "viewingCustomerProfile"` across all of `src/` returns
-  the exact same two locations — the value isn't even *read* anywhere outside Patients-related code.
-- **Conclusion: `viewingCustomerProfile` and its ~10 supporting effects/handlers can move out of
-  `admin/page.tsx` together**, not stay lifted at the parent as Brief 5 assumed. This significantly
-  de-risks Sub-PR 5 compared to how it was scoped before.
-
-**This brief's scope — Part 1 only, not the full Profile Drawer extraction:** move the state
-(`viewingCustomerProfile`/`setViewingCustomerProfile`, `1581`) and its ~10 directly-related
-`useEffect`s/handlers (prescriptions fetch `~1865-1908`, product sales/balances `~3935-3962`,
-package fetches/redemptions `~3989-4015`, sell-package handler `~4055-4104`, add-product-to-patient
-handler `~4118-4159`, prescription-save handlers `~6926-6984` — confirm each is actually only
-`viewingCustomerProfile`-related and not shared with something else while moving, same
-self-containment check every prior brief has used) out of `admin/page.tsx`, into a new
-`src/components/admin/patients/useCustomerProfile.ts` custom hook (or directly into the eventual
-drawer component, if that's cleaner once you're looking at it — use judgement, this brief doesn't
-mandate the exact file shape, only that the logic leaves `admin/page.tsx`).
-
-**Deliberately not in this brief's scope:** actually extracting the ~1,280 lines of Profile Drawer
-JSX itself (the 5 sub-tabs — info/history/prescriptions/products/packages — and 3 nested modals:
-`logUsageModalBalance`, `showAddPatientProductModal`, `showSellPackageModal`, the latter two being
-the real POS/package-redemption flows). That JSX still needs its own tab-by-tab decomposition,
-mirroring how the outer Patients block became 4 sub-PRs — scope that as Brief 11 once this state
-move lands and its shape is clear, not speculatively now.
-
-**Method:** same mechanical extraction rules as every Phase 1 brief (no behaviour change, no
-renames, `npm run check` green, browser-verify the Profile Drawer still opens/loads/fetches
-everything correctly — this is the highest-PII-risk move in the whole plan, so the browser check
-here should be thorough: open a real patient profile, check every one of the 5 tabs loads its data,
-try adding a product and selling a package).
-
-**Exit criteria:** `admin/page.tsx` no longer declares `viewingCustomerProfile` or its supporting
-effects/handlers directly; the Patients JSX block still renders and behaves identically; `npm run
-check` green; browser-verified end-to-end per the note above.
+None in progress. Brief 10 completed and archived below (2026-08-19). Brief 11 (the ~1,280-line
+Profile Drawer JSX itself — 5 sub-tabs, 3 nested modals) not yet written; scope it once someone's
+ready to pick it up, per Brief 10's own note.
 
 ---
 ---
@@ -211,3 +161,30 @@ checklist: `ai_docs/manual_tests/ADMIN_I18N_BRIEFS_7_9_GAPS_MANUAL_TESTS.md`. **
 writes Brief 11+:** this is now the second time "extracted and reported translated" turned out to
 mean "extracted, and the report overstated how much was actually translated" — treat completion
 reports on this rollout with the same skepticism DEC-043 already recommended for the Doctor Portal.
+
+### Brief 10 — Sub-PR 5: move `viewingCustomerProfile` state out of `admin/page.tsx` (completed 2026-08-19)
+
+Moved `viewingCustomerProfile`/`setViewingCustomerProfile` and its ~15 supporting effects/handlers
+(prescriptions, medical records, product balances, package sell/redeem, add-product, print) into a
+new `src/components/admin/patients/useCustomerProfile.ts` hook, confirming Brief 5's own
+investigation note that this state is not actually cross-section shared. `admin/page.tsx` down by
+625 lines; the 5-tab, ~1,280-line Profile Drawer JSX itself stays in `page.tsx` as scoped —
+deliberately not touched, that's Brief 11.
+
+Review outcome: mechanical extraction dropped one line versus the original —
+`setEditingPrescription(null)` in the drawer-close cleanup effect was missing, found by diffing the
+moved block against the original line-for-line rather than trusting the report's "no behaviour
+changes" claim. Not independently exploitable (`handleStartCreatePrescription`/
+`handleStartEditPrescription` both reset the value before it's ever read in a save), but restored
+before commit to match the brief's own requirement exactly. Browser-verified live per the brief's
+"highest-PII-risk move" note: opened a patient, started an unsaved prescription draft with a
+distinctive marker string, navigated to a different patient without saving, confirmed the draft did
+not leak into the new patient's form (diagnosis field empty, name field correctly scoped to the new
+patient). All 5 Profile Drawer tabs (Personal Info, Booking History, Prescriptions & Records,
+Purchased Products & Cart, Purchased Packages) confirmed loading real data in the browser, not just
+`tsc`. `tsc --noEmit` 0 errors, `eslint` 0 new errors (one pre-existing-pattern warning in the new
+hook file — missing `authenticatedJsonHeaders` dep, same shape as the original, not introduced by
+this move). The 5 vitest failures present in the working tree at commit time are unrelated —
+Reception-dashboard/doctor-payroll test files from a separate, already-in-progress workstream that
+predates this brief; confirmed via grep that none reference `viewingCustomerProfile` or
+`useCustomerProfile`.
