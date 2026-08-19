@@ -1556,6 +1556,30 @@ but at least views their info).** Checked against the actual repo before recordi
 - Not yet written: the actual Windsurf briefs for Doctors/Services extraction — this correction only
   records the scope decision and the investigation behind it.
 
+**Correction 2026-08-19 (second) — Inventory added to scope too, with a precondition, per Mohamed:
+"اعتبرها لل admin و نزود ال Permissions بنفس الطريقة اللي موجوده في ال Settings, Role Management"
+(treat it as admin's by default, and add the Permissions the same way Settings/Role Management
+already does).** Investigated before writing the brief: the 4 permission keys this needs
+(`inventory.view`, `.manage_devices`, `.manage_products`, `.manage_suppliers`) **already exist** in
+`PERMISSION_STRUCTURE` (`page.tsx:439-447`) — assignable to any role today via Role Management. The
+gap is not the permission system, it's that nothing in the ~1,700-line Inventory screen (main
+block, its two adjacent modals, a far-away Device Audit Logs modal, and the already-extracted
+`SupplierManagementScreen.tsx`) ever calls `hasPermission` on them — confirmed by grep, zero
+references outside the declaration. Any role reaching the nav item today has full unguarded
+create/edit/delete.
+
+**Decision, confirmed with Mohamed before writing Brief 17:** wire the existing 4 keys into real
+`hasPermission` checks on every write action (mirroring exactly how Services already gates
+`services.create`/`.edit`/`.delete`), as its own commit landing *before* any structural extraction.
+Nav-level access stays unchanged (`admin`/`HR` roles see Inventory automatically, per
+`permittedSidebarItems` at `page.tsx:869` — not touched by this brief). Reception will be granted
+`inventory.view` separately, once the enforcement exists, giving them the same read-only experience
+Doctors/Services already provide. Extraction (Brief 17 Part 2) follows only after Part 1 lands and
+is verified — doing it in the other order would have meant extracting a screen whose permission
+model was still an open question, needing a redo.
+
+Brief 17 written and queued (`WINDSURF_BRIEFS.md`), covering both parts.
+
 ---
 
 ### DEC-025: Doctor Profile Details View in Admin Doctors Tab

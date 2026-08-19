@@ -1,9 +1,10 @@
 # Admin Panel: Componentization → Arabic i18n → Automated Testing
 
 > **Status (updated 2026-08-19):** Phase 0 complete (107 tests, Brief 3). Open decisions resolved —
-> see `DECISIONS.md` → **DEC-043**, widened by its 2026-08-19 correction. Reception scope is now
-> **Bookings, Patients, POS, New Booking, Doctors (read-only), Services (read-only)** — Inventory
-> deliberately **not** added yet (see below). Current state, verified against the actual repo:
+> see `DECISIONS.md` → **DEC-043**, widened by two 2026-08-19 corrections. Reception scope is now
+> **Bookings, Patients, POS, New Booking, Doctors (read-only), Services (read-only), Inventory
+> (read-only, pending its own permission-enforcement fix)**. Current state, verified against the
+> actual repo:
 >
 > | Screen | Extracted | Arabic translated |
 > |---|---|---|
@@ -11,27 +12,31 @@
 > | New Booking (`AdminNewBookingView.tsx`, 1,123 lines) | ✅ (pre-existing) | **Brief 14, in progress** |
 > | Patients — Directory, 3 modals | ✅ Brief 5 | ✅ Briefs 6-9 (gaps found + closed) |
 > | Patients — Profile Drawer (1,539 lines, 5 tabs + 3 modals) | ✅ Briefs 10 (state) + 11 (JSX) | ✅ Brief 12 (2 gaps found + closed) |
-> | Doctors (`page.tsx:7711-8372`, ~661 lines) | ❌ not started | ❌ not started |
-> | Services (`page.tsx:8375-9370`, ~995 lines) | ❌ not started | ❌ not started |
+> | Doctors (`page.tsx:7711-8372`, ~661 lines) | ❌ not started (Brief 15 queued) | ❌ not started |
+> | Services (`page.tsx:8375-9370`, ~995 lines) | ❌ not started (Brief 16 queued) | ❌ not started |
+> | Inventory (`page.tsx:14724-16063` + `page.tsx:23321-23506`, ~1,530 lines) | ❌ not started (Brief 17 queued) | ❌ not started |
 > | POS | N/A — dead mock UI, unreachable through any nav path | **out of scope** — separate open product decision: build the real thing or delete the dead code |
 >
 > **Doctors and Services added to scope 2026-08-19** (DEC-043 correction) — Reception doesn't edit
 > either screen (both already gate their write actions behind `hasPermission`, e.g.
 > `providers.edit`, `services.create`/`.edit`/`.delete`), so extracting + translating them grants no
-> new capability, only makes the existing read-only view render correctly in Arabic. Neither has a
-> Windsurf brief written yet.
+> new capability, only makes the existing read-only view render correctly in Arabic.
 >
-> **Inventory (`page.tsx:14724-15608`, ~885 lines) deliberately held out of scope.** Unlike
-> Doctors/Services, it has **zero** internal `hasPermission` checks — any role that can reach the
-> screen today has full create/edit/delete, so "Reception views but doesn't edit" is not actually
-> enforced yet. Extracting/translating a screen whose permission model may still change would need
-> redoing. Waiting on a decision about what Reception's real Inventory access should be before this
-> becomes a brief.
+> **Inventory added 2026-08-19 (second correction), but with a precondition.** Its 4 permission
+> keys (`inventory.view`/`.manage_devices`/`.manage_products`/`.manage_suppliers`) already exist in
+> Role Management's `PERMISSION_STRUCTURE` — they were simply never wired to a `hasPermission`
+> check anywhere in the ~1,700-line screen, unlike Doctors/Services. Mohamed's decision: wire that
+> enforcement first (Brief 17 Part 1 — its own commit, lands before any file move), keep today's
+> nav-level default (`admin`/`HR` see it automatically), and Reception gets `inventory.view` granted
+> separately once the enforcement exists. Extraction (Brief 17 Part 2) follows the same
+> extract-after-translate-decision order as everything else, but only after Part 1 is verified —
+> extracting a screen whose permission model was still being decided would have needed redoing.
 >
 > **Remaining Phase 2 work on the already-extracted screens:** ~~Brief 12~~ (Profile Drawer) →
 > ~~Brief 13~~ (Bookings) — both landed 2026-08-19 → **Brief 14** (New Booking, in progress). Then
-> Doctors and Services need their own Phase 1 (extraction) before Phase 2 can start, per this plan's
-> own extract-then-translate rule. POS stays a standalone product decision, not a translation task.
+> Doctors, Services, and Inventory each need their own Phase 1 (extraction — Briefs 15/16/17, all
+> written and queued) before Phase 2 can start on them. POS stays a standalone product decision, not
+> a translation task.
 
 ---
 

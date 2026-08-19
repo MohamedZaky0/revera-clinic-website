@@ -150,6 +150,115 @@ duplicate it).
 delete a service, add a category, recipe/device/commission editors still open correctly from within
 the edit form.
 
+## Brief 17 — Wire Inventory permission enforcement, then extract from `admin/page.tsx`
+
+**Why this exists, and why it's two things in one brief:** DEC-043's correction held Inventory out
+of Reception scope specifically because it had no internal permission enforcement — unlike
+Doctors/Services, which already gate their write actions. Mohamed's decision (2026-08-19): keep
+today's nav-level default (`admin`/`HR` roles see Inventory automatically — unchanged,
+`page.tsx:869`'s `permittedSidebarItems`), wire real `hasPermission` checks onto every write action
+so a role without them gets read-only, and Reception will be granted `inventory.view` separately
+later once this exists. **Do the permission wiring first, as its own commit, before any structural
+extraction** — it's the actual product requirement, valuable on its own, and safer to land and
+verify independently of a 1,700-line file move.
+
+### Part 1 — Permission enforcement (do this first)
+
+**The permission keys already exist — this is wiring, not adding new permissions.** Read
+`PERMISSION_STRUCTURE` at `page.tsx:439-447` (the "Inventory & Equipment" category, already
+assignable to any role via Role Management today): `inventory.view`, `inventory.manage_devices`,
+`inventory.manage_products`, `inventory.manage_suppliers`. **Confirmed by grep: not one of these 4
+keys is referenced anywhere outside that declaration** — the whole Inventory screen (main block,
+both its inline modals, the far-away Device Audit Logs modal, and the already-extracted
+`SupplierManagementScreen.tsx`/`SuppliersScreen.tsx`/`PurchasesScreen.tsx`) has **zero**
+`hasPermission` calls today. Any role that can reach the nav item has full unguarded
+create/edit/delete. The one exception: product hard-delete is already gated by
+`adminRole === "superadmin"` (line ~15484) — that's a role check, not a permission check; leave it
+exactly as-is, it's an intentional extra safety net on top of, not instead of, the permission gate
+below.
+
+**Wire these, mirroring exactly how Services already gates `services.create`/`.edit`/`.delete`:**
+- Gate the devices sub-tab's write surface behind `hasPermission("inventory.manage_devices")`:
+  the "Add Device" button (both trigger points, relative lines ~183 and ~385 inside the devices
+  sub-tab), the edit-device entry point, and the "Audit Logs" button that opens the Device Audit
+  Logs modal.
+- Gate the products sub-tab's write surface behind `hasPermission("inventory.manage_products")`:
+  "Add Product" (both trigger points, ~relative 130 and 165), "Edit Product", and the soft-delete
+  button (~line 15509, `title="Delete Product"`) — hard-delete stays superadmin-only as noted above.
+- Gate `SupplierManagementScreen.tsx` behind `hasPermission("inventory.manage_suppliers")` — pass
+  it down as a prop (e.g. `canManage`) since the component is already separate from `page.tsx`;
+  it currently has zero permission awareness, same gap as everything else here.
+- Gate the **read baseline**: whatever renders when none of the manage_* permissions are present
+  should still work under `inventory.view` alone — a role with only `inventory.view` sees the
+  devices/products/suppliers lists with all write buttons hidden, not blocked entirely. Follow the
+  same conditional-render pattern Services uses for its "Add Service" button
+  (`hasPermission("services.create") ? "inline-flex" : "hidden"`) rather than removing markup.
+
+**Method:** no other behaviour change. `npm run check` green. Browser-verify with two accounts (or
+by temporarily editing `adminPermissions` in a test session): one with only `inventory.view` sees
+read-only across all 3 sub-tabs; one with the full set behaves exactly as today.
+
+**Exit criteria for Part 1:** every write action enumerated above is behind the correct
+`hasPermission` check; a view-only grant renders the full read experience with no write controls;
+`npm run check` green. Commit this before starting Part 2.
+
+### Part 2 — Extraction (after Part 1 lands and is verified)
+
+**Structure (verified by direct read, 2026-08-19 — re-confirm line numbers, other work has been
+landing on this file):** unlike Doctors, most of this is genuinely one contiguous region — the two
+inline modals sit directly after the main block, not thousands of lines away. Only the Device Audit
+Logs modal is a true outlier.
+
+1. **Main block**, `activeNav === "Inventory"`, lines 14724–15608 (~885 lines): header + 3 sub-tabs
+   switched on `inventorySubTab` (`"devices" | "products" | "suppliers"`, line 3310) — devices
+   (~415 lines) and products (~367 lines) are each fully inline; suppliers (~4 lines) already just
+   renders `<SupplierManagementScreen />`, no extraction needed there.
+2. **Add/Edit Device modal**, lines 15611–15852 (~242 lines) — immediately adjacent to the main
+   block (3-line gap). Save handler is inline (`onSubmit={async (e) => {...}}` at line ~15633, not
+   a named function).
+3. **Add/Edit Product modal**, lines 15855–16063 (~209 lines) — immediately adjacent to #2.
+   Save handler: `handleSaveProduct` (line 3701). Delete: `requestDeleteProduct` (line 3751).
+4. **Device Audit Logs modal**, lines 23321–23506 (~185 lines) — the one genuinely far-away piece,
+   same pattern as Doctors' Audit Logs modal. Own state (`showDeviceAuditLogsModal`,
+   `deviceAuditLogs`, `deviceAuditSearchQuery`, `deviceAuditFilterDevice`, `deviceAuditFilterType`,
+   lines 3352–3357) and fetcher (`fetchDeviceAuditLogs`, line 3359) — fully independent of the
+   device/product form state, confirmed by grep.
+
+**Devices and products do NOT share state with each other** (unlike Doctors, where the inline edit
+view and the modal shared one `providerForm*` block) — every device field is `deviceX`, every
+product field is `productX`, confirmed by grep with no cross-references. This means, unlike Brief
+15, **no shared hook is required between them** — they can become two independent components.
+
+**Critical shared-state finding — do not let either new component own this:**
+`inventoryProducts`/`setInventoryProducts`/`inventoryProductsLoading` (lines 3535–3536) is **not**
+Inventory-admin-specific — it's the same master product list `useCustomerProfile.ts` fetches via
+`fetchInventoryProducts` for the Patients Profile Drawer's product-balance tab (Brief 10/11). Moving
+it into a new Inventory component would break that consumer. Pass it down as a prop from `page.tsx`
+exactly as it already is, the same way Brief 16 flagged `localServices` for Services.
+
+**Scope — ordered sub-PRs, each its own commit:**
+1. **Device Audit Logs modal** → `src/components/admin/inventory/DeviceAuditLogsModal.tsx` (or
+   similar) — fully independent, safe first move, same role as every prior section's "start with
+   the standalone modal" sub-PR.
+2. **Devices sub-tab (list + its adjacent Add/Edit modal)** →
+   `src/components/admin/inventory/InventoryDevicesTab.tsx`. Self-contained state, no hook needed.
+3. **Products sub-tab (list + its adjacent Add/Edit modal)** →
+   `src/components/admin/inventory/InventoryProductsTab.tsx`. Receives `inventoryProducts`/
+   `setInventoryProducts`/`fetchInventoryProducts` as props per the finding above; owns its own
+   `productX`/`showAddProductModal`/`editingProduct` state locally.
+4. **Top-level wrapper** → `src/components/admin/inventory/AdminInventoryView.tsx`, switching on
+   `inventorySubTab` to render `InventoryDevicesTab` / `InventoryProductsTab` /
+   `SupplierManagementScreen` (unchanged, already extracted).
+
+**Method:** no behaviour change beyond what Part 1 already landed, no renames, no translation.
+`npm run check` green after every sub-PR. Browser-verify each: devices list + add/edit device +
+device audit logs; products list + add/edit product + soft/hard delete; suppliers tab unchanged;
+permission gating from Part 1 still holds after the file move (re-check with a view-only grant).
+
+**Exit criteria:** `admin/page.tsx` no longer declares any of the state/JSX above directly; all 4
+new files render/behave identically, permission gating intact; `npm run check` green on the final
+sub-PR.
+
 ---
 ---
 
