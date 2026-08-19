@@ -10,68 +10,10 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 11 — Sub-PR 5 Part 2: extract Customer Profile Drawer JSX out of `admin/page.tsx`
-
-**Read first:** Brief 10's archived entry — it moved all of this drawer's state/handlers into
-`src/components/admin/patients/useCustomerProfile.ts` and deliberately left the JSX itself in
-`page.tsx`. This brief moves that JSX. **Extraction only — no Arabic translation in this brief**,
-same extract-then-translate split as every other Patients component (Brief 5 → Briefs 6-9).
-
-**Current boundaries in `admin/page.tsx` (verified by direct read, 2026-08-19 — re-confirm exact
-line numbers before starting, other work has been landing on this file):**
-
-- Whole drawer block: `{viewingCustomerProfile && (` at **line 10410** to its matching `)}` at
-  **line 11717** (~1,308 lines total).
-- 5 sub-tabs inside it, switched on `customerProfileTab`:
-  - Personal Info — `customerProfileTab === "info"`, ~10552–10639 (~88 lines)
-  - Booking History — `"history"`, ~10640–10729 (~90 lines)
-  - Prescriptions & Records — `"prescription"`, ~10730–11107 (~378 lines; includes the medical
-    intake display, the "Write Prescription" form, and the reports list — largest tab by far)
-  - Purchased Products & Cart — `"products"`, ~11108–11286 (~179 lines)
-  - Purchased Packages — `"packages"`, ~11287–11412 (~126 lines)
-- 3 inline modals nested inside the drawer, **not yet extracted anywhere** (unlike
-  MedicalFormModal/MedicalReportModal, which already are — see below):
-  - Log Usage modal (`logUsageModalBalance`), ~11413–11483 (~71 lines)
-  - Add Product to Patient modal (`showAddPatientProductModal`), ~11484–11593 (~110 lines)
-  - Sell Package modal (`showSellPackageModal`), ~11594–11699 (~106 lines)
-- 2 render calls to **already-extracted** components sit inside this same block
-  (`MedicalFormModal`, `MedicalReportModal`, ~11680–11716) — these just move along with the rest of
-  the JSX as-is, do not touch `MedicalFormModal.tsx`/`MedicalReportModal.tsx` themselves.
-
-**Scope:** move the whole block (lines 10410–11717, both the 5 tabs and the 3 not-yet-extracted
-modals — keep them together, don't split into 8 separate files unless it's clearly cleaner once
-you're looking at it) into a new `src/components/admin/patients/CustomerProfileDrawer.tsx`.
-
-**Props — critical, read carefully:** Brief 10 already moved this drawer's state/handlers into
-`useCustomerProfile()`, called once in `page.tsx` (not inside the new component — `page.tsx` still
-needs `viewingCustomerProfile`/`fetchInventoryProducts`/`fetchProductSalesHistory` for its own two
-`activeNav`-dependent effects, per Brief 10's note). **Do not call `useCustomerProfile()` a second
-time inside the new drawer component** — that would create two independent state instances and
-break the drawer silently (stale/duplicate state, hard to catch by inspection). Instead, `page.tsx`
-destructures the hook once and passes everything the drawer needs down as props, the same pattern
-Brief 5's 4 sub-PRs already use for `MedicalFormModal`/`CustomerFormModal`/etc.
-
-Also identify and thread through whatever this JSX block references that Brief 10 did *not* move
-(e.g. `hasPermission`, `adminRole`, icon imports, any other page-level state/fetchers touched only
-inside this block) — same self-containment check every prior brief has used, don't assume the hook
-covers everything.
-
-**Method:** same mechanical extraction rules as every Phase 1 brief — no behaviour change, no
-renames, no styling changes, no translation. `npm run check` green. Browser-verify thoroughly (same
-"highest-PII-risk move" standard as Brief 10): open a real patient, confirm all 5 tabs still load
-their data, open all 3 modals (log usage, add product, sell package) and confirm each still submits
-correctly, confirm the drawer still closes back to the Patients table.
-
-**Exit criteria:** `admin/page.tsx` no longer contains the `{viewingCustomerProfile && (...)}` JSX
-block directly — it renders `<CustomerProfileDrawer ... />` (or equivalent) instead; drawer behaves
-identically in the browser; `npm run check` green.
-
-**Not in scope — flag for whoever picks up next:** Arabic translation of this drawer (Brief 12,
-after this lands) is not the only remaining Reception-scope translation gap. `AdminBookingsView.tsx`
-and `AdminNewBookingView.tsx` — both explicitly in DEC-043's Reception scope — are already extracted
-but have **zero** Arabic wiring (no `lang`/`dir`/`adminTranslations`, confirmed by grep, 2026-08-19)
-despite being reachable, actively-used Reception screens. Neither has ever been briefed. See the
-status note in `ADMIN_REFACTOR_AND_I18N_PLAN.md` for the full remaining-scope picture.
+None in progress. Brief 11 completed and archived below (2026-08-19). Next up, in order: Brief 12
+(Profile Drawer translation), then Brief 13 (Bookings translation), then Brief 14 (New Booking
+translation) — see `ADMIN_REFACTOR_AND_I18N_PLAN.md`'s status header for the full remaining
+Reception-scope picture.
 
 ---
 ---
@@ -247,3 +189,32 @@ this move). The 5 vitest failures present in the working tree at commit time are
 Reception-dashboard/doctor-payroll test files from a separate, already-in-progress workstream that
 predates this brief; confirmed via grep that none reference `viewingCustomerProfile` or
 `useCustomerProfile`.
+
+### Brief 11 — Sub-PR 5 Part 2: extract Customer Profile Drawer JSX out of `admin/page.tsx` (completed 2026-08-19)
+
+Moved the ~1,300-line drawer block (5 tabs, 3 inline modals: log usage, add product, sell package)
+out of `admin/page.tsx` into `src/components/admin/patients/CustomerProfileDrawer.tsx`, receiving
+Brief 10's hook output as props rather than re-calling `useCustomerProfile()` — `page.tsx` keeps its
+one call for the two `activeNav`-dependent effects Brief 10 left there. No translation in this
+brief, per the extract-then-translate split; that's Brief 12.
+
+Review outcome: structurally correct — `tsc --noEmit` 0 errors, all 5 tabs and all 3 nested modals
+independently browser-verified loading real patient data and opening correctly (log usage modal
+verified by code read only, since it needs a patient with an existing product balance to trigger and
+none was on hand; the other 4 tabs + 2 modals were exercised live). **Report explicitly admitted
+browser verification was skipped** ("Playwright MCP server crashed mid-session, from killing all
+node processes") and asked for manual verification instead of doing it — done independently rather
+than accepted as-is. Side note: killing "all node processes" also killed an unrelated project's dev
+server that happened to be running on the same port; not this repo's process to kill, worth knowing
+for next time.
+
+Found one real ESLint **error** (not a warning) in the new file — `react-hooks/purity` flagging a
+`Date.now()` call during render in the Purchase History date column. Traced via `git log -S` to a
+commit predating this whole Windsurf-briefs effort — pre-existing, not introduced by this
+extraction. The reason it surfaced now: `page.tsx` at 25k+ lines was too large for the React
+Compiler's purity checker to analyze (confirmed — 0 errors on the pre-extraction file despite the
+identical line existing in it), so it silently never fired there; the newly-isolated, reasonably-
+sized component is analyzable and caught it. Fixed to match the codebase's existing "never
+fabricate, show em-dash" convention (RISK-039) instead of reading the render-time clock as a
+fallback — browser-verified the empty-state path still renders correctly. `vitest run`: 597 passed,
+6 expected fail, 0 unexpected (matches the report's number, independently re-run).
