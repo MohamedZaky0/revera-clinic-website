@@ -226,15 +226,18 @@ export default function CustomerProfileDrawer({
 }: CustomerProfileDrawerProps) {
   if (!viewingCustomerProfile) return null;
 
+  const t = adminTranslations[lang].patients.customerProfileDrawer;
+  const mf = adminTranslations[lang].patients.medicalFormModal;
+
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="space-y-6 animate-fadeIn">
       {/* Back button */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => setViewingCustomerProfile(null)}
           className="flex items-center gap-1.5 text-xs font-bold text-[#5A6A51] hover:text-[#414E36] outline-none transition uppercase tracking-wider"
         >
-          <ArrowLeft size={14} /> Back to Patients
+          <ArrowLeft size={14} /> {t.backBtn}
         </button>
         {hasPermission("customers.edit") && (
           <button
@@ -244,7 +247,7 @@ export default function CustomerProfileDrawer({
             }}
             className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-[#EDF1EC]/40 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EDF1EC]"
           >
-            <Pencil size={12} /> Edit Profile
+            <Pencil size={12} /> {t.editProfileBtn}
           </button>
         )}
       </div>
@@ -265,8 +268,8 @@ export default function CustomerProfileDrawer({
               )}
             </div>
             <label
-              className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
-              title="Upload/Change Profile Picture"
+              className="absolute -bottom-1 -end-1 p-1.5 rounded-full bg-[#414E36] text-white cursor-pointer shadow-md hover:bg-[#2e3a26] transition flex items-center justify-center"
+              title={t.uploadPhotoTitle}
             >
               <Camera size={12} />
               <input
@@ -285,8 +288,8 @@ export default function CustomerProfileDrawer({
               <button
                 type="button"
                 onClick={() => viewingCustomerProfile.id && handleAvatarRemove(viewingCustomerProfile.id)}
-                className="absolute -top-1 -right-1 p-1 rounded-full bg-red-600 text-white shadow-xs hover:bg-red-700 transition"
-                title="Remove Photo"
+                className="absolute -top-1 -end-1 p-1 rounded-full bg-red-600 text-white shadow-xs hover:bg-red-700 transition"
+                title={t.removePhotoTitle}
               >
                 <X size={10} />
               </button>
@@ -299,7 +302,7 @@ export default function CustomerProfileDrawer({
                 viewingCustomerProfile.active !== false ? "bg-[#EDF1EC] text-[#414E36]" : "bg-red-50 text-red-600"
               }`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${viewingCustomerProfile.active !== false ? "bg-[#414E36]" : "bg-red-500"}`} />
-                {viewingCustomerProfile.active !== false ? "Active Patient" : "Inactive"}
+                {viewingCustomerProfile.active !== false ? t.activePatientBadge : t.inactiveBadge}
               </span>
             </div>
           </div>
@@ -316,7 +319,7 @@ export default function CustomerProfileDrawer({
               : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
           }`}
         >
-          Personal Info
+          {t.tabInfo}
         </button>
         <button
           onClick={() => setCustomerProfileTab("history")}
@@ -326,7 +329,7 @@ export default function CustomerProfileDrawer({
               : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
           }`}
         >
-          Booking History
+          {t.tabHistory}
         </button>
         <button
           onClick={() => setCustomerProfileTab("prescription")}
@@ -336,7 +339,7 @@ export default function CustomerProfileDrawer({
               : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
           }`}
         >
-          Prescriptions & Records
+          {t.tabPrescription}
         </button>
         <button
           onClick={() => setCustomerProfileTab("products")}
@@ -347,7 +350,7 @@ export default function CustomerProfileDrawer({
           }`}
         >
           <ShoppingBag size={15} />
-          Purchased Products & Cart
+          {t.tabProducts}
         </button>
         <button
           onClick={() => {
@@ -361,7 +364,7 @@ export default function CustomerProfileDrawer({
           }`}
         >
           <Package size={15} />
-          Purchased Packages
+          {t.tabPackages}
         </button>
       </div>
 
@@ -372,31 +375,31 @@ export default function CustomerProfileDrawer({
           <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
             <div className="grid grid-cols-2 gap-y-4 gap-x-6 text-sm">
               <div>
-                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Phone Number</span>
+                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.phoneLabel}</span>
                 <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.mobile || viewingCustomerProfile.phone || "—"}</span>
               </div>
               <div>
-                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Email Address</span>
+                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.emailLabel}</span>
                 <span className="font-semibold text-[#1F251A] break-all">{viewingCustomerProfile.email || "—"}</span>
               </div>
               <div>
-                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Age</span>
+                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.ageLabel}</span>
                 <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.age || "—"}</span>
               </div>
               <div>
-                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Gender</span>
+                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.genderLabel}</span>
                 <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.gender || "—"}</span>
               </div>
               <div>
-                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">National ID</span>
+                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.nationalIdLabel}</span>
                 <span className="font-semibold text-[#1F251A] font-mono">{viewingCustomerProfile.national_id || "—"}</span>
               </div>
               <div>
-                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Referral Source</span>
+                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.referralLabel}</span>
                 <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.referral || "—"}</span>
               </div>
               <div>
-                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Occupation</span>
+                <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.occupationLabel}</span>
                 <span className="font-semibold text-[#1F251A]">{viewingCustomerProfile.occupation || "—"}</span>
               </div>
 
@@ -423,19 +426,19 @@ export default function CustomerProfileDrawer({
                 return (
                   <>
                     <div>
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">City</span>
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.cityLabel}</span>
                       <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
                         {cCity || "—"}
                       </span>
                     </div>
                     <div>
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Street</span>
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.streetLabel}</span>
                       <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
                         {cStreet || "—"}
                       </span>
                     </div>
                     <div className="col-span-2 sm:col-span-1">
-                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Building</span>
+                      <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.buildingLabel}</span>
                       <span className="font-semibold text-[#1F251A] block bg-[#F9F9F7] px-3 py-2 rounded-lg border border-[#414E36]/5">
                         {cBuilding || "—"}
                       </span>
@@ -445,7 +448,7 @@ export default function CustomerProfileDrawer({
               })()}
               {viewingCustomerProfile.note && (
                 <div className="col-span-2">
-                  <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Notes & Observations</span>
+                  <span className="block text-xs font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.notesLabel}</span>
                   <p className="text-xs text-[#5A6A51] bg-amber-50/40 border border-amber-200/50 rounded-xl p-3 leading-relaxed">
                     {viewingCustomerProfile.note}
                   </p>
@@ -460,7 +463,7 @@ export default function CustomerProfileDrawer({
           <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
             <div className="flex items-center justify-end pb-1">
               <span className="text-xs font-semibold bg-[#EDF1EC] text-[#414E36] px-2.5 py-1 rounded-md">
-                Total: {
+                {t.totalLabel} {
                   allReservations.filter(
                     (r) =>
                       r.phone === (viewingCustomerProfile.mobile || viewingCustomerProfile.phone) ||
@@ -473,12 +476,12 @@ export default function CustomerProfileDrawer({
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] font-bold text-[#5A6A51] uppercase tracking-wider text-[10px]">
-                    <th className="px-4 py-3 text-left">Date / Slot</th>
-                    <th className="px-4 py-3 text-left">Service</th>
-                    <th className="px-4 py-3 text-left">Provider</th>
-                    <th className="px-4 py-3 text-right">Paid</th>
-                    <th className="px-4 py-3 text-right">Left</th>
-                    <th className="px-4 py-3 text-center">Status</th>
+                    <th className="px-4 py-3 text-start">{t.colDateSlot}</th>
+                    <th className="px-4 py-3 text-start">{t.colService}</th>
+                    <th className="px-4 py-3 text-start">{t.colProvider}</th>
+                    <th className="px-4 py-3 text-end">{t.colPaid}</th>
+                    <th className="px-4 py-3 text-end">{t.colLeft}</th>
+                    <th className="px-4 py-3 text-center">{t.colStatus}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
@@ -492,7 +495,7 @@ export default function CustomerProfileDrawer({
                       return (
                         <tr>
                           <td colSpan={6} className="px-4 py-6 text-center text-gray-400 italic">
-                            No booking history records found for this patient.
+                            {t.noHistory}
                           </td>
                         </tr>
                       );
@@ -520,19 +523,19 @@ export default function CustomerProfileDrawer({
                           </td>
                           <td className="px-4 py-3 font-semibold text-[#1F251A]">{serv}</td>
                           <td className="px-4 py-3">{res.doctorName || "—"}</td>
-                          <td className="px-4 py-3 text-right font-medium text-green-700">
+                          <td className="px-4 py-3 text-end font-medium text-green-700">
                             {spent} EGP
                             {redemptions.map((r: any, idx: number) => (
                               <span key={idx} className="block text-[9px] font-semibold text-[#C4AE7C] mt-0.5 whitespace-nowrap">
-                                via {r.packageName}
-                                {r.packagePurchasedAt && ` (bought ${new Date(r.packagePurchasedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})`}
+                                {t.viaLabel} {r.packageName}
+                                {r.packagePurchasedAt && ` (${t.boughtLabel} ${new Date(r.packagePurchasedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})`}
                               </span>
                             ))}
                           </td>
-                          <td className="px-4 py-3 text-right font-medium text-red-600">{left} EGP</td>
+                          <td className="px-4 py-3 text-end font-medium text-red-600">{left} EGP</td>
                           <td className="px-4 py-3 text-center">
                             <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${statusClass}`}>
-                              {res.status}
+                              {(t.statusLabels as Record<string, string>)[res.status] || res.status}
                             </span>
                           </td>
                         </tr>
@@ -560,7 +563,7 @@ export default function CustomerProfileDrawer({
                       : "text-[#5A6A51] hover:text-[#414E36]"
                   }`}
                 >
-                  📋 Medical Intake & History
+                  📋 {t.subtabIntake}
                 </button>
                 <button
                   type="button"
@@ -571,7 +574,7 @@ export default function CustomerProfileDrawer({
                       : "text-[#5A6A51] hover:text-[#414E36]"
                   }`}
                 >
-                  💊 Clinical Prescriptions ({customerPrescriptions.length})
+                  💊 {t.subtabPrescriptions} ({customerPrescriptions.length})
                 </button>
                 <button
                   type="button"
@@ -582,7 +585,7 @@ export default function CustomerProfileDrawer({
                       : "text-[#5A6A51] hover:text-[#414E36]"
                   }`}
                 >
-                  📄 Reports & Documents ({medicalReports.length})
+                  📄 {t.subtabReports} ({medicalReports.length})
                 </button>
               </div>
 
@@ -592,7 +595,7 @@ export default function CustomerProfileDrawer({
                   onClick={handleOpenMedicalFormModal}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm shrink-0"
                 >
-                  <Pencil size={13} /> {medicalRecordForm ? "Edit Intake Form" : "+ Fill Medical Intake Form"}
+                  <Pencil size={13} /> {medicalRecordForm ? t.editIntakeBtn : t.fillIntakeBtn}
                 </button>
               )}
 
@@ -602,7 +605,7 @@ export default function CustomerProfileDrawer({
                   onClick={handleStartCreatePrescription}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm shrink-0"
                 >
-                  <Plus size={14} /> Write Prescription
+                  <Plus size={14} /> {t.writePrescriptionBtn}
                 </button>
               )}
 
@@ -612,7 +615,7 @@ export default function CustomerProfileDrawer({
                   onClick={handleOpenMedicalReportModal}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm shrink-0"
                 >
-                  <Plus size={14} /> Upload Report
+                  <Plus size={14} /> {t.uploadReportBtn}
                 </button>
               )}
             </div>
@@ -624,15 +627,15 @@ export default function CustomerProfileDrawer({
                   <div className="bg-white rounded-2xl border border-[#414E36]/10 p-6 space-y-6">
                     <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
                       <div>
-                        <h4 className="text-sm font-bold text-[#1F251A]">Patient Medical & Aesthetic Intake Form</h4>
-                        <p className="text-xs text-[#5A6A51]">Clinical background, skin analysis, medical conditions & allergies</p>
+                        <h4 className="text-sm font-bold text-[#1F251A]">{t.intakeFormTitle}</h4>
+                        <p className="text-xs text-[#5A6A51]">{t.intakeFormSubtitle}</p>
                       </div>
                       <button
                         type="button"
                         onClick={handleOpenMedicalFormModal}
                         className="inline-flex items-center gap-1.5 rounded-lg border border-[#414E36]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
                       >
-                        <Pencil size={12} /> Edit Form
+                        <Pencil size={12} /> {t.editFormBtn}
                       </button>
                     </div>
 
@@ -640,43 +643,43 @@ export default function CustomerProfileDrawer({
                       {/* SECTION 1: Skin & Beauty Profile */}
                       <div className="bg-[#FBFBF9] p-5 rounded-xl border border-[#414E36]/10 space-y-4">
                         <h5 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] border-b border-[#414E36]/10 pb-2">
-                          Skin & Beauty Profile
+                          {t.skinBeautyProfileHeading}
                         </h5>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <span className="text-[11px] font-semibold text-[#5A6A51] block mb-1">Skin Type</span>
+                            <span className="text-[11px] font-semibold text-[#5A6A51] block mb-1">{t.skinTypeLabel}</span>
                             <span className="inline-block bg-[#414E36]/10 text-[#414E36] font-bold text-xs px-3 py-1 rounded-lg">
-                              {medicalRecordForm.skin_type || "Normal"}
+                              {mf.skinTypes[medicalRecordForm.skin_type as keyof typeof mf.skinTypes] || medicalRecordForm.skin_type || mf.skinTypes["Normal"]}
                             </span>
                           </div>
 
                           <div>
-                            <span className="text-[11px] font-semibold text-[#5A6A51] block mb-1">Main Concerns</span>
+                            <span className="text-[11px] font-semibold text-[#5A6A51] block mb-1">{t.mainConcernsLabel}</span>
                             <div className="flex flex-wrap gap-1.5">
                               {medicalRecordForm.main_concerns && medicalRecordForm.main_concerns.length > 0 ? (
                                 medicalRecordForm.main_concerns.map((c: string, idx: number) => (
                                   <span key={idx} className="bg-white border border-[#414E36]/20 text-[#1F251A] text-xs font-medium px-2.5 py-1 rounded-lg">
-                                    {c}
+                                    {mf.concerns[c as keyof typeof mf.concerns] || c}
                                   </span>
                                 ))
                               ) : (
-                                <span className="text-xs text-gray-400 italic">None specified</span>
+                                <span className="text-xs text-gray-400 italic">{t.noneSpecified}</span>
                               )}
                             </div>
                             {medicalRecordForm.other_concerns_details && (
                               <p className="text-xs text-[#1F251A] mt-1.5 italic">
-                                Details: {medicalRecordForm.other_concerns_details}
+                                {t.detailsPrefix} {medicalRecordForm.other_concerns_details}
                               </p>
                             )}
                           </div>
 
                           <div className="md:col-span-2 pt-2 border-t border-[#414E36]/5">
-                            <span className="text-[11px] font-semibold text-[#5A6A51] block">Previous Aesthetic Treatments</span>
+                            <span className="text-[11px] font-semibold text-[#5A6A51] block">{t.previousTreatmentsLabel}</span>
                             <p className="text-xs font-medium text-[#1F251A] mt-0.5">
                               {medicalRecordForm.has_previous_treatments || medicalRecordForm.previous_treatments ? (
-                                <span className="text-emerald-800 font-semibold">Yes — {medicalRecordForm.previous_treatments_details || medicalRecordForm.previous_treatments || "Specified"}</span>
+                                <span className="text-emerald-800 font-semibold">{t.yesLabel} — {medicalRecordForm.previous_treatments_details || medicalRecordForm.previous_treatments || t.specifiedFallback}</span>
                               ) : (
-                                <span className="text-gray-500">No</span>
+                                <span className="text-gray-500">{t.noLabel}</span>
                               )}
                             </p>
                           </div>
@@ -686,35 +689,35 @@ export default function CustomerProfileDrawer({
                       {/* SECTION 2: Medical Information */}
                       <div className="bg-[#FBFBF9] p-5 rounded-xl border border-[#414E36]/10 space-y-4">
                         <h5 className="text-xs font-bold uppercase tracking-wider text-[#C4AE7C] border-b border-[#414E36]/10 pb-2">
-                          Medical Information
+                          {t.medicalInfoHeading}
                         </h5>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <span className="text-[11px] font-semibold text-[#5A6A51] block">Medical Conditions</span>
+                            <span className="text-[11px] font-semibold text-[#5A6A51] block">{t.medicalConditionsLabel}</span>
                             <p className="text-xs font-medium text-[#1F251A] mt-0.5">
                               {medicalRecordForm.has_medical_conditions || medicalRecordForm.medical_conditions ? (
-                                <span className="text-amber-900 font-semibold">Yes — {medicalRecordForm.medical_conditions_details || medicalRecordForm.medical_conditions || "Specified"}</span>
+                                <span className="text-amber-900 font-semibold">{t.yesLabel} — {medicalRecordForm.medical_conditions_details || medicalRecordForm.medical_conditions || t.specifiedFallback}</span>
                               ) : (
-                                <span className="text-gray-500">No</span>
+                                <span className="text-gray-500">{t.noLabel}</span>
                               )}
                             </p>
                           </div>
 
                           <div>
-                            <span className="text-[11px] font-semibold text-[#5A6A51] block">Current Medication</span>
+                            <span className="text-[11px] font-semibold text-[#5A6A51] block">{t.currentMedicationLabel}</span>
                             <p className="text-xs font-medium text-[#1F251A] mt-0.5">
                               {medicalRecordForm.is_taking_medication || medicalRecordForm.medications ? (
-                                <span className="text-amber-900 font-semibold">Yes — {medicalRecordForm.medication_details || medicalRecordForm.medications || "Specified"}</span>
+                                <span className="text-amber-900 font-semibold">{t.yesLabel} — {medicalRecordForm.medication_details || medicalRecordForm.medications || t.specifiedFallback}</span>
                               ) : (
-                                <span className="text-gray-500">No</span>
+                                <span className="text-gray-500">{t.noLabel}</span>
                               )}
                             </p>
                           </div>
 
                           <div className="md:col-span-2 pt-2 border-t border-[#414E36]/5">
-                            <span className="text-[11px] font-semibold text-[#5A6A51] block">Allergies (Skincare / Ingredients / Drugs)</span>
+                            <span className="text-[11px] font-semibold text-[#5A6A51] block">{t.allergiesLabel}</span>
                             <p className="text-xs font-medium text-amber-900 mt-0.5">
-                              {medicalRecordForm.allergies || "No known allergies reported"}
+                              {medicalRecordForm.allergies || t.noAllergiesReported}
                             </p>
                           </div>
                         </div>
@@ -725,15 +728,15 @@ export default function CustomerProfileDrawer({
                   <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-3">
                     <FileText size={36} className="mx-auto text-[#8A9A81]" />
                     <div>
-                      <p className="text-sm font-semibold text-[#1F251A]">No Medical Intake Form recorded yet</p>
-                      <p className="text-xs text-[#5A6A51]">Fill out the patient's medical history, skin type, concerns, and allergies.</p>
+                      <p className="text-sm font-semibold text-[#1F251A]">{t.noIntakeTitle}</p>
+                      <p className="text-xs text-[#5A6A51]">{t.noIntakeSubtitle}</p>
                     </div>
                     <button
                       type="button"
                       onClick={handleOpenMedicalFormModal}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
                     >
-                      + Fill Medical Intake Form
+                      {t.fillIntakeBtn}
                     </button>
                   </div>
                 )}
@@ -746,36 +749,36 @@ export default function CustomerProfileDrawer({
                 {prescriptionEditMode ? (
                   <div className="bg-white rounded-2xl border border-[#414E36]/10 p-5 space-y-4">
                     <h5 className="text-sm font-bold text-[#1F251A] border-b border-[#414E36]/5 pb-2">
-                      {editingPrescription ? "Edit Prescription" : "New Visit Prescription"}
+                      {editingPrescription ? t.editPrescriptionTitle : t.newPrescriptionTitle}
                     </h5>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Patient Name (Auto-filled)</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.patientNameAutoLabel}</label>
                         <input type="text" readOnly value={viewingCustomerProfile.name} className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Date (Auto-filled)</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.dateAutoLabel}</label>
                         <input type="text" readOnly value={new Date().toISOString().slice(0, 10)} className="w-full rounded-xl border border-[#414E36]/15 bg-gray-50 px-3.5 py-2 text-sm text-gray-500 outline-none" />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Diagnosis / Assessment</label>
-                      <textarea placeholder="Describe the medical assessment..." value={rxDiagnosis} onChange={(e) => setRxDiagnosis(e.target.value)} rows={3} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.diagnosisLabel}</label>
+                      <textarea placeholder={t.diagnosisPlaceholder} value={rxDiagnosis} onChange={(e) => setRxDiagnosis(e.target.value)} rows={3} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
                     </div>
                     <div className="border border-[#414E36]/10 rounded-xl p-4 bg-[#FBFBF9] space-y-3">
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#414E36]">Prescribed Medications</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#414E36]">{t.prescribedMedicationsLabel}</label>
                       <div className="flex gap-2">
                         <div className="flex-1 space-y-2">
                           <div className="flex gap-2">
                             <select value={rxMedDropdown} onChange={(e) => { const val = e.target.value; setRxMedDropdown(val); if (val && val !== "Custom") { setRxMedInput(val); } }} className="rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition">
-                              <option value="">-- Choose from Catalog --</option>
+                              <option value="">{t.chooseCatalogOption}</option>
                               {MOCK_MEDICINES.map((med) => (<option key={med.id} value={med.name}>{med.name}</option>))}
-                              <option value="Custom">Custom Medication...</option>
+                              <option value="Custom">{t.customMedicationOption}</option>
                             </select>
-                            <input type="text" placeholder="Enter medication name..." value={rxMedInput} onChange={(e) => setRxMedInput(e.target.value)} className="flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+                            <input type="text" placeholder={t.medNamePlaceholder} value={rxMedInput} onChange={(e) => setRxMedInput(e.target.value)} className="flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
                           </div>
                         </div>
-                        <button type="button" onClick={handleAddMedication} className="rounded-xl bg-[#414E36] px-4 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shrink-0">Add</button>
+                        <button type="button" onClick={handleAddMedication} className="rounded-xl bg-[#414E36] px-4 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shrink-0">{t.addBtn}</button>
                       </div>
                       {rxMedications.length > 0 ? (
                         <div className="space-y-2 pt-2 border-t border-[#414E36]/5">
@@ -783,44 +786,44 @@ export default function CustomerProfileDrawer({
                             <div key={idx} className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-[#414E36]/10 text-sm">
                               <div className="flex-1">
                                 <span className="font-semibold text-[#1F251A]">{med.name}</span>
-                                <input type="text" placeholder="Dosage instructions..." value={med.instructions} onChange={(e) => { const newMeds = [...rxMedications]; newMeds[idx].instructions = e.target.value; setRxMedications(newMeds); }} className="w-full mt-1 bg-transparent text-xs text-[#5A6A51] border-b border-transparent hover:border-[#414E36]/15 focus:border-[#C4AE7C] outline-none py-0.5" />
+                                <input type="text" placeholder={t.dosagePlaceholder} value={med.instructions} onChange={(e) => { const newMeds = [...rxMedications]; newMeds[idx].instructions = e.target.value; setRxMedications(newMeds); }} className="w-full mt-1 bg-transparent text-xs text-[#5A6A51] border-b border-transparent hover:border-[#414E36]/15 focus:border-[#C4AE7C] outline-none py-0.5" />
                               </div>
-                              <button type="button" onClick={() => handleRemoveMedication(idx)} className="text-red-500 hover:text-red-700 transition p-1 ml-2"><Trash2 size={14} /></button>
+                              <button type="button" onClick={() => handleRemoveMedication(idx)} className="text-red-500 hover:text-red-700 transition p-1 ms-2"><Trash2 size={14} /></button>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-[#8A9A81] italic text-center py-2">No medications added yet.</p>
+                        <p className="text-xs text-[#8A9A81] italic text-center py-2">{t.noMedsYet}</p>
                       )}
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">General Notes (Optional)</label>
-                      <textarea placeholder="Additional advice..." value={rxGeneralNotes} onChange={(e) => setRxGeneralNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.generalNotesLabel}</label>
+                      <textarea placeholder={t.generalNotesPlaceholder} value={rxGeneralNotes} onChange={(e) => setRxGeneralNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-800">📝 Doctor-Only Notes (Optional)</label>
-                        <span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1.5 py-0.5 rounded">Hidden from print</span>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-800">📝 {t.doctorNotesLabel}</label>
+                        <span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1.5 py-0.5 rounded">{t.hiddenFromPrintBadge}</span>
                       </div>
-                      <textarea placeholder="Confidential clinical remarks..." value={rxDocNotes} onChange={(e) => setRxDocNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-amber-300/40 bg-amber-50/20 px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-amber-400 transition" />
+                      <textarea placeholder={t.doctorNotesPlaceholder} value={rxDocNotes} onChange={(e) => setRxDocNotes(e.target.value)} rows={2} className="w-full rounded-xl border border-amber-300/40 bg-amber-50/20 px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-amber-400 transition" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">Next Follow-Up Date (Optional)</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5">{t.followUpDateLabel}</label>
                       <input type="date" value={rxFollowUpDate} onChange={(e) => setRxFollowUpDate(e.target.value)} className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C] transition" />
                     </div>
                     <div className="flex items-center justify-end gap-3 border-t border-[#414E36]/10 pt-4">
-                      <button type="button" onClick={() => setPrescriptionEditMode(false)} className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]">Cancel</button>
-                      <button type="button" onClick={handleSavePrescription} disabled={savingPrescription} className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60">{savingPrescription ? "Saving..." : "Save Record"}</button>
+                      <button type="button" onClick={() => setPrescriptionEditMode(false)} className="rounded-lg border border-[#414E36]/15 px-4 py-2 text-sm font-medium text-[#414E36] transition hover:bg-[#EDF1EC]">{t.cancelBtn}</button>
+                      <button type="button" onClick={handleSavePrescription} disabled={savingPrescription} className="rounded-lg bg-[#414E36] px-5 py-2 text-sm font-semibold text-[#FBFBF9] shadow-sm transition hover:bg-[#2e3a26] disabled:opacity-60">{savingPrescription ? t.savingBtn : t.saveRecordBtn}</button>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {loadingPrescriptions ? (
-                      <div className="text-center py-12 text-[#5A6A51] text-sm">Loading medical records...</div>
+                      <div className="text-center py-12 text-[#5A6A51] text-sm">{t.loadingRecords}</div>
                     ) : customerPrescriptions.length === 0 ? (
                       <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-2">
-                        <p className="text-sm font-semibold text-[#1F251A]">No clinical prescriptions recorded yet</p>
-                        <p className="text-xs text-[#5A6A51]">Create a prescription or register clinic visit details for this patient.</p>
+                        <p className="text-sm font-semibold text-[#1F251A]">{t.noPrescriptionsTitle}</p>
+                        <p className="text-xs text-[#5A6A51]">{t.noPrescriptionsSubtitle}</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -832,24 +835,24 @@ export default function CustomerProfileDrawer({
                               <div className="flex items-center justify-between border-b border-[#414E36]/5 pb-3">
                                 <div>
                                   <span className="font-bold text-[#1F251A] text-sm">{rxDate}</span>
-                                  <span className="text-xs text-[#8A9A81] block">Recorded by Revera Clinic Team</span>
+                                  <span className="text-xs text-[#8A9A81] block">{t.recordedByTeam}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <button type="button" onClick={() => handlePrintPrescription(rx)} className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"><Printer size={13} /> Print</button>
+                                  <button type="button" onClick={() => handlePrintPrescription(rx)} className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"><Printer size={13} /> {t.printBtn}</button>
                                   {isDocUser && (
                                     <>
-                                      <button type="button" onClick={() => handleStartEditPrescription(rx)} className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"><Pencil size={12} /> Edit</button>
+                                      <button type="button" onClick={() => handleStartEditPrescription(rx)} className="inline-flex items-center gap-1 rounded-lg border border-[#414E36]/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"><Pencil size={12} /> {t.editBtn}</button>
                                       <button type="button" onClick={() => handleDeletePrescription(rx.id)} className="inline-flex items-center justify-center h-8 w-8 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition"><Trash2 size={13} /></button>
                                     </>
                                   )}
                                 </div>
                               </div>
                               <div className="space-y-3 text-sm">
-                                {rx.diagnosis && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">Diagnosis</span><p className="text-[#1F251A] font-medium leading-relaxed">{rx.diagnosis}</p></div>)}
-                                {rx.medications && rx.medications.length > 0 && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Medications Prescribed</span><ul className="space-y-2 bg-[#FBFBF9] rounded-xl border border-[#414E36]/5 p-3">{rx.medications.map((m: any, idx: number) => (<li key={idx} className="flex flex-col"><span className="font-semibold text-[#1F251A]">{m.name}</span>{m.instructions && (<span className="text-xs text-[#5A6A51] italic">{m.instructions}</span>)}</li>))}</ul></div>)}
-                                {rx.general_notes && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">General Notes</span><p className="text-xs text-[#5A6A51] bg-[#FBFBF9] rounded-xl p-3 border border-[#414E36]/5 leading-relaxed">{rx.general_notes}</p></div>)}
-                                {rx.doctor_notes && isDocUser && (<div className="border border-amber-300/40 bg-amber-50/20 rounded-xl p-3.5 space-y-1"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-amber-800">🔒 Doctor-Only Notes</span><span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1 py-0.5 rounded">Hidden from print</span></div><p className="text-xs text-amber-900 leading-relaxed">{rx.doctor_notes}</p></div>)}
-                                {rx.follow_up_date && (<div className="flex items-center gap-1.5 text-xs text-[#414E36] font-semibold bg-[#EDF1EC]/60 px-3 py-2 rounded-xl w-fit"><Calendar size={13} />Next Follow-Up: {new Date(rx.follow_up_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>)}
+                                {rx.diagnosis && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.diagnosisFieldLabel}</span><p className="text-[#1F251A] font-medium leading-relaxed">{rx.diagnosis}</p></div>)}
+                                {rx.medications && rx.medications.length > 0 && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.medicationsPrescribedLabel}</span><ul className="space-y-2 bg-[#FBFBF9] rounded-xl border border-[#414E36]/5 p-3">{rx.medications.map((m: any, idx: number) => (<li key={idx} className="flex flex-col"><span className="font-semibold text-[#1F251A]">{m.name}</span>{m.instructions && (<span className="text-xs text-[#5A6A51] italic">{m.instructions}</span>)}</li>))}</ul></div>)}
+                                {rx.general_notes && (<div><span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-0.5">{t.generalNotesFieldLabel}</span><p className="text-xs text-[#5A6A51] bg-[#FBFBF9] rounded-xl p-3 border border-[#414E36]/5 leading-relaxed">{rx.general_notes}</p></div>)}
+                                {rx.doctor_notes && isDocUser && (<div className="border border-amber-300/40 bg-amber-50/20 rounded-xl p-3.5 space-y-1"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-amber-800">🔒 {t.doctorNotesFieldLabel}</span><span className="text-[9px] font-semibold text-amber-700 uppercase bg-amber-50 px-1 py-0.5 rounded">{t.hiddenFromPrintBadge}</span></div><p className="text-xs text-amber-900 leading-relaxed">{rx.doctor_notes}</p></div>)}
+                                {rx.follow_up_date && (<div className="flex items-center gap-1.5 text-xs text-[#414E36] font-semibold bg-[#EDF1EC]/60 px-3 py-2 rounded-xl w-fit"><Calendar size={13} />{t.nextFollowUpPrefix} {new Date(rx.follow_up_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>)}
                               </div>
                             </div>
                           );
@@ -868,15 +871,15 @@ export default function CustomerProfileDrawer({
                   <div className="text-center py-12 bg-white rounded-2xl border border-[#414E36]/10 space-y-3">
                     <FileText size={36} className="mx-auto text-[#8A9A81]" />
                     <div>
-                      <p className="text-sm font-semibold text-[#1F251A]">No medical reports uploaded yet</p>
-                      <p className="text-xs text-[#5A6A51]">Upload lab results, scan reports, or external clinical documents for this patient.</p>
+                      <p className="text-sm font-semibold text-[#1F251A]">{t.noReportsTitle}</p>
+                      <p className="text-xs text-[#5A6A51]">{t.noReportsSubtitle}</p>
                     </div>
                     <button
                       type="button"
                       onClick={handleOpenMedicalReportModal}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-4 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm"
                     >
-                      <Plus size={14} /> Upload Report
+                      <Plus size={14} /> {t.uploadReportBtn}
                     </button>
                   </div>
                 ) : (
@@ -887,7 +890,7 @@ export default function CustomerProfileDrawer({
                           <div className="space-y-1">
                             <h5 className="font-bold text-[#1F251A] text-sm">{report.report_title}</h5>
                             <span className="text-[10px] font-semibold text-[#5A6A51] uppercase bg-[#EDF1EC] px-2 py-0.5 rounded-md">
-                              {report.report_type || "General Document"}
+                              {report.report_type || t.generalDocumentLabel}
                             </span>
                           </div>
                           <button
@@ -910,7 +913,7 @@ export default function CustomerProfileDrawer({
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 text-[#414E36] font-semibold hover:underline"
                             >
-                              View File ↗
+                              {t.viewFileLink}
                             </a>
                           )}
                         </div>
@@ -934,14 +937,14 @@ export default function CustomerProfileDrawer({
                     onClick={() => setCustomerProductsSubTab("current")}
                     className={`px-3 py-1 rounded-lg transition ${customerProductsSubTab === "current" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
                   >
-                    Active Balances
+                    {t.activeBalancesTab}
                   </button>
                   <button
                     type="button"
                     onClick={() => setCustomerProductsSubTab("history")}
                     className={`px-3 py-1 rounded-lg transition ${customerProductsSubTab === "history" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
                   >
-                    Purchase History
+                    {t.purchaseHistoryTab}
                   </button>
                 </div>
               </div>
@@ -957,7 +960,7 @@ export default function CustomerProfileDrawer({
                   }}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm w-fit"
                 >
-                  <Plus size={14} /> Add Product to Cart / Patient
+                  <Plus size={14} /> {t.addProductBtn}
                 </button>
               )}
             </div>
@@ -965,15 +968,15 @@ export default function CustomerProfileDrawer({
             {customerProductsSubTab === "current" && (
               <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm">
                 {loadingCustomerProducts ? (
-                  <div className="p-8 text-center text-sm text-[#5A6A51]">Loading patient product balances...</div>
+                  <div className="p-8 text-center text-sm text-[#5A6A51]">{t.loadingProductBalances}</div>
                 ) : customerProductBalances.length === 0 ? (
                   <div className="p-12 text-center space-y-3">
                     <div className="mx-auto w-12 h-12 rounded-full bg-[#EDF1EC] flex items-center justify-center text-[#414E36]">
                       <ShoppingBag size={24} />
                     </div>
-                    <p className="text-sm font-semibold text-[#1F251A]">No product balances or active packages</p>
+                    <p className="text-sm font-semibold text-[#1F251A]">{t.noProductBalancesTitle}</p>
                     <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
-                      Add products or home-care packages to this patient's cart so staff can track remaining sessions and usage.
+                      {t.noProductBalancesSubtitle}
                     </p>
                     <button
                       type="button"
@@ -986,20 +989,20 @@ export default function CustomerProfileDrawer({
                       }}
                       className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
                     >
-                      <Plus size={14} /> Sell / Assign Product
+                      <Plus size={14} /> {t.sellAssignProductBtn}
                     </button>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full text-start text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-[#414E36]/10 bg-[#FBFBF9] text-[#5A6A51] font-bold uppercase tracking-wider">
-                          <th className="py-3 px-4">Product Name</th>
-                          <th className="py-3 px-4 text-center">Purchased Qty</th>
-                          <th className="py-3 px-4 text-center">Used Qty</th>
-                          <th className="py-3 px-4 text-center">Remaining Balance</th>
-                          <th className="py-3 px-4 text-center">Status</th>
-                          <th className="py-3 px-4 text-right">Actions</th>
+                          <th className="py-3 px-4">{t.colProductName}</th>
+                          <th className="py-3 px-4 text-center">{t.colPurchasedQty}</th>
+                          <th className="py-3 px-4 text-center">{t.colUsedQty}</th>
+                          <th className="py-3 px-4 text-center">{t.colRemainingBalance}</th>
+                          <th className="py-3 px-4 text-center">{t.colStatus}</th>
+                          <th className="py-3 px-4 text-end">{t.colActions}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#414E36]/5">
@@ -1024,7 +1027,7 @@ export default function CustomerProfileDrawer({
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
                                   remaining > 0 ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-500"
                                 }`}>
-                                  {remaining} left
+                                  {remaining} {t.leftSuffix}
                                 </span>
                               </td>
                               <td className="py-3.5 px-4 text-center">
@@ -1032,10 +1035,10 @@ export default function CustomerProfileDrawer({
                                   !isDepleted ? "bg-emerald-100/80 text-emerald-800" : "bg-amber-100 text-amber-800"
                                 }`}>
                                   <span className={`h-1.5 w-1.5 rounded-full ${!isDepleted ? "bg-emerald-600" : "bg-amber-600"}`} />
-                                  {!isDepleted ? "Active Balance" : "Fully Consumed"}
+                                  {!isDepleted ? t.activeBalanceBadge : t.fullyConsumedBadge}
                                 </span>
                               </td>
-                              <td className="py-3.5 px-4 text-right">
+                              <td className="py-3.5 px-4 text-end">
                                 {!isDepleted ? (
                                   <button
                                     type="button"
@@ -1046,10 +1049,10 @@ export default function CustomerProfileDrawer({
                                     }}
                                     className="inline-flex items-center gap-1 rounded-lg bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition shadow-xs"
                                   >
-                                    Deduct / Log Usage
+                                    {t.deductLogUsageBtn}
                                   </button>
                                 ) : (
-                                  <span className="text-[11px] text-gray-400 italic">No remaining sessions</span>
+                                  <span className="text-[11px] text-gray-400 italic">{t.noRemainingSessions}</span>
                                 )}
                               </td>
                             </tr>
@@ -1064,19 +1067,19 @@ export default function CustomerProfileDrawer({
 
             {customerProductsSubTab === "history" && (
               <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm p-6 space-y-4">
-                <h5 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Recent Product Sales & Allocations</h5>
+                <h5 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">{t.recentSalesHeading}</h5>
                 {productSalesHistory.filter((s: any) => s.customer_id === viewingCustomerProfile.id).length === 0 ? (
-                  <p className="text-xs text-[#8A9A81] italic text-center py-6">No historical product transactions for this patient.</p>
+                  <p className="text-xs text-[#8A9A81] italic text-center py-6">{t.noSalesHistory}</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full text-start text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-[#414E36]/10 text-[#5A6A51] font-bold uppercase bg-[#FBFBF9]">
-                          <th className="py-2.5 px-3">Date</th>
-                          <th className="py-2.5 px-3">Product</th>
-                          <th className="py-2.5 px-3 text-center">Qty</th>
-                          <th className="py-2.5 px-3 text-right">Unit Price</th>
-                          <th className="py-2.5 px-3 text-right">Total</th>
+                          <th className="py-2.5 px-3">{t.colDate}</th>
+                          <th className="py-2.5 px-3">{t.colProduct}</th>
+                          <th className="py-2.5 px-3 text-center">{t.colQty}</th>
+                          <th className="py-2.5 px-3 text-end">{t.colUnitPrice}</th>
+                          <th className="py-2.5 px-3 text-end">{t.colTotal}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#414E36]/5">
@@ -1091,8 +1094,8 @@ export default function CustomerProfileDrawer({
                               </td>
                               <td className="py-2.5 px-3 font-semibold text-[#1F251A]">{sale.product_name}</td>
                               <td className="py-2.5 px-3 text-center font-semibold">{sale.quantity}</td>
-                              <td className="py-2.5 px-3 text-right">EGP {Number(sale.unit_price || 0).toLocaleString()}</td>
-                              <td className="py-2.5 px-3 text-right font-bold text-[#414E36]">EGP {Number(sale.total_amount || 0).toLocaleString()}</td>
+                              <td className="py-2.5 px-3 text-end">EGP {Number(sale.unit_price || 0).toLocaleString()}</td>
+                              <td className="py-2.5 px-3 text-end font-bold text-[#414E36]">EGP {Number(sale.total_amount || 0).toLocaleString()}</td>
                             </tr>
                           ))}
                       </tbody>
@@ -1115,14 +1118,14 @@ export default function CustomerProfileDrawer({
                     onClick={() => setCustomerPackagesSubTab("current")}
                     className={`px-3 py-1 rounded-lg transition ${customerPackagesSubTab === "current" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
                   >
-                    Active Packages
+                    {t.activePackagesTab}
                   </button>
                   <button
                     type="button"
                     onClick={() => setCustomerPackagesSubTab("history")}
                     className={`px-3 py-1 rounded-lg transition ${customerPackagesSubTab === "history" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
                   >
-                    History
+                    {t.historyTab}
                   </button>
                 </div>
               </div>
@@ -1135,7 +1138,7 @@ export default function CustomerProfileDrawer({
                   }}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] shadow-sm w-fit"
                 >
-                  <Plus size={14} /> Sell Package to Patient
+                  <Plus size={14} /> {t.sellPackageBtn}
                 </button>
               )}
             </div>
@@ -1143,15 +1146,15 @@ export default function CustomerProfileDrawer({
             {customerPackagesSubTab === "current" && (
               <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm">
                 {loadingCustomerPackages ? (
-                  <div className="p-8 text-center text-sm text-[#5A6A51]">Loading purchased packages...</div>
+                  <div className="p-8 text-center text-sm text-[#5A6A51]">{t.loadingPackages}</div>
                 ) : customerProfilePackages.filter((p: any) => p.status === "active").length === 0 ? (
                   <div className="p-12 text-center space-y-3">
                     <div className="mx-auto w-12 h-12 rounded-full bg-[#EDF1EC] flex items-center justify-center text-[#414E36]">
                       <Package size={24} />
                     </div>
-                    <p className="text-sm font-semibold text-[#1F251A]">No active packages</p>
+                    <p className="text-sm font-semibold text-[#1F251A]">{t.noActivePackagesTitle}</p>
                     <p className="text-xs text-[#5A6A51] max-w-sm mx-auto">
-                      Sell this patient a package to track their pre-paid sessions here.
+                      {t.noActivePackagesSubtitle}
                     </p>
                     <button
                       type="button"
@@ -1161,7 +1164,7 @@ export default function CustomerProfileDrawer({
                       }}
                       className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#414E36] px-3.5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
                     >
-                      <Plus size={14} /> Sell Package
+                      <Plus size={14} /> {t.sellPackageShortBtn}
                     </button>
                   </div>
                 ) : (
@@ -1176,20 +1179,20 @@ export default function CustomerProfileDrawer({
                               isExpired ? "bg-amber-100 text-amber-800" : "bg-emerald-100/80 text-emerald-800"
                             }`}>
                               <span className={`h-1.5 w-1.5 rounded-full ${isExpired ? "bg-amber-600" : "bg-emerald-600"}`} />
-                              {isExpired ? "Expired" : "Active"}
+                              {isExpired ? t.expiredBadge : t.packageActiveBadge}
                             </span>
                           </div>
                           <p className="text-[11px] text-[#5A6A51]">
-                            Purchased {new Date(pkg.purchasedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
-                            {pkg.expiresAt && ` · Expires ${new Date(pkg.expiresAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`}
-                            {` · EGP ${Number(pkg.pricePaid).toLocaleString()} paid`}
+                            {t.purchasedPrefix} {new Date(pkg.purchasedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                            {pkg.expiresAt && ` · ${t.expiresPrefix} ${new Date(pkg.expiresAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`}
+                            {` · EGP ${Number(pkg.pricePaid).toLocaleString()} ${t.paidSuffix}`}
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {(pkg.items || []).map((it: any) => (
                               <span key={it.id} className="inline-flex items-center gap-1.5 rounded-full bg-[#F9F9F7] border border-[#414E36]/10 px-2.5 py-1 text-[11px] font-semibold text-[#414E36]">
                                 {it.serviceName || `Service #${it.serviceId}`}
                                 <span className={`font-bold ${it.qtyRemaining > 0 ? "text-emerald-700" : "text-gray-400"}`}>
-                                  {it.qtyUsed}/{it.qtyTotal} used
+                                  {it.qtyUsed}/{it.qtyTotal} {t.usedSuffix}
                                 </span>
                               </span>
                             ))}
@@ -1204,9 +1207,9 @@ export default function CustomerProfileDrawer({
 
             {customerPackagesSubTab === "history" && (
               <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm p-6 space-y-4">
-                <h5 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">Expired & Fully Used Packages</h5>
+                <h5 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">{t.expiredPackagesHeading}</h5>
                 {customerProfilePackages.filter((p: any) => p.status !== "active").length === 0 ? (
-                  <p className="text-xs text-[#8A9A81] italic text-center py-6">No past package history for this patient.</p>
+                  <p className="text-xs text-[#8A9A81] italic text-center py-6">{t.noPackageHistory}</p>
                 ) : (
                   <div className="space-y-3">
                     {customerProfilePackages.filter((p: any) => p.status !== "active").map((pkg: any) => (
@@ -1214,7 +1217,7 @@ export default function CustomerProfileDrawer({
                         <div>
                           <p className="font-semibold text-[#1F251A] text-sm">{pkg.packageName}</p>
                           <p className="text-[11px] text-[#5A6A51]">
-                            Purchased {new Date(pkg.purchasedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                            {t.purchasedPrefix} {new Date(pkg.purchasedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                           </p>
                         </div>
                         <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-bold text-gray-500 capitalize">
@@ -1236,7 +1239,7 @@ export default function CustomerProfileDrawer({
           <div className="fixed inset-0 bg-black/40" onClick={() => setLogUsageModalBalance(null)} />
           <div className="relative z-10 w-full max-w-md bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
-              <h4 className="text-base font-bold text-[#1F251A]">Deduct / Log Product Usage</h4>
+              <h4 className="text-base font-bold text-[#1F251A]">{t.logUsageModalTitle}</h4>
               <button
                 type="button"
                 onClick={() => setLogUsageModalBalance(null)}
@@ -1247,10 +1250,10 @@ export default function CustomerProfileDrawer({
             </div>
 
             <div className="bg-[#EDF1EC]/60 p-3.5 rounded-xl space-y-1 text-xs">
-              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">Product / Item</span>
+              <span className="block text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider">{t.productItemLabel}</span>
               <p className="font-bold text-[#1F251A] text-sm">{logUsageModalBalance.product_name}</p>
               <p className="text-[#5A6A51]">
-                Current Remaining Balance: <strong className="text-[#414E36]">
+                {t.currentRemainingLabel} <strong className="text-[#414E36]">
                   {logUsageModalBalance.remaining_quantity ?? logUsageModalBalance.remaining_balance ?? ((logUsageModalBalance.purchased_quantity || logUsageModalBalance.total_purchased || logUsageModalBalance.quantity || 0) - (logUsageModalBalance.used_quantity || logUsageModalBalance.total_used || logUsageModalBalance.quantity_used || 0))}
                 </strong>
               </p>
@@ -1258,7 +1261,7 @@ export default function CustomerProfileDrawer({
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Quantity Used / Deducted</label>
+                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.qtyUsedLabel}</label>
                 <input
                   type="number"
                   min="1"
@@ -1269,9 +1272,9 @@ export default function CustomerProfileDrawer({
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Usage Notes / Session Details</label>
+                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.usageNotesLabel}</label>
                 <textarea
-                  placeholder="e.g. Session #2 administered at New Cairo branch..."
+                  placeholder={t.usageNotesPlaceholder}
                   value={logUsageNotes}
                   onChange={(e) => setLogUsageNotes(e.target.value)}
                   rows={3}
@@ -1286,7 +1289,7 @@ export default function CustomerProfileDrawer({
                 onClick={() => setLogUsageModalBalance(null)}
                 className="rounded-xl border border-[#414E36]/15 px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
               >
-                Cancel
+                {t.cancelBtn}
               </button>
               <button
                 type="button"
@@ -1294,7 +1297,7 @@ export default function CustomerProfileDrawer({
                 disabled={savingUsageLog}
                 className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
               >
-                {savingUsageLog ? "Deducting..." : "Confirm Usage"}
+                {savingUsageLog ? t.deductingBtn : t.confirmUsageBtn}
               </button>
             </div>
           </div>
@@ -1308,8 +1311,8 @@ export default function CustomerProfileDrawer({
           <div className="relative z-10 w-full max-w-lg bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
               <div>
-                <h4 className="text-base font-bold text-[#1F251A]">Add Product / Package to Patient</h4>
-                <p className="text-xs text-[#5A6A51]">Assign product balance to {viewingCustomerProfile.name}</p>
+                <h4 className="text-base font-bold text-[#1F251A]">{t.addProductModalTitle}</h4>
+                <p className="text-xs text-[#5A6A51]">{t.assignProductBalanceTo} {viewingCustomerProfile.name}</p>
               </div>
               <button
                 type="button"
@@ -1322,7 +1325,7 @@ export default function CustomerProfileDrawer({
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Select Product from Inventory</label>
+                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.selectProductLabel}</label>
                 <select
                   value={selectedAddProductId}
                   onChange={(e) => {
@@ -1336,22 +1339,22 @@ export default function CustomerProfileDrawer({
                   }}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                 >
-                  <option value="">-- Choose Product / Item --</option>
+                  <option value="">{t.chooseProductOption}</option>
                   {inventoryProducts.filter((p) => p.role !== "consumable").map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({p.category || 'Product'}) - EGP {p.selling_price || p.price || 0}
+                      {p.name} ({p.category || t.productFallbackCategory}) - EGP {p.selling_price || p.price || 0}
                     </option>
                   ))}
-                  <option value="custom">Custom Item / Package...</option>
+                  <option value="custom">{t.customItemOption}</option>
                 </select>
               </div>
 
               {(!selectedAddProductId || selectedAddProductId === "custom") && (
                 <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Custom Product / Package Name</label>
+                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.customProductNameLabel}</label>
                   <input
                     type="text"
-                    placeholder="e.g. Skin Care Home Set (3 Sessions)"
+                    placeholder={t.customProductNamePlaceholder}
                     value={selectedAddProductName}
                     onChange={(e) => setSelectedAddProductName(e.target.value)}
                     className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
@@ -1361,7 +1364,7 @@ export default function CustomerProfileDrawer({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Quantity</label>
+                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.quantityLabel}</label>
                   <input
                     type="number"
                     min="1"
@@ -1371,7 +1374,7 @@ export default function CustomerProfileDrawer({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Unit Price (EGP)</label>
+                  <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.unitPriceLabel}</label>
                   <input
                     type="number"
                     min="0"
@@ -1383,7 +1386,7 @@ export default function CustomerProfileDrawer({
               </div>
 
               <div className="bg-[#EDF1EC]/60 p-3.5 rounded-xl flex items-center justify-between text-xs font-semibold text-[#1F251A]">
-                <span>Total Amount:</span>
+                <span>{t.totalAmountLabel}</span>
                 <span className="text-base font-bold text-[#414E36]">
                   EGP {(selectedAddProductQty * selectedAddProductUnitPrice).toLocaleString()}
                 </span>
@@ -1396,7 +1399,7 @@ export default function CustomerProfileDrawer({
                 onClick={() => setShowAddPatientProductModal(false)}
                 className="rounded-xl border border-[#414E36]/15 px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
               >
-                Cancel
+                {t.cancelBtn}
               </button>
               <button
                 type="button"
@@ -1404,7 +1407,7 @@ export default function CustomerProfileDrawer({
                 disabled={addingProductToPatient || !selectedAddProductName}
                 className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
               >
-                {addingProductToPatient ? "Adding..." : "Add to Patient Cart"}
+                {addingProductToPatient ? t.addingBtn : t.addToPatientCartBtn}
               </button>
             </div>
           </div>
@@ -1418,8 +1421,8 @@ export default function CustomerProfileDrawer({
           <div className="relative z-10 w-full max-w-lg bg-white rounded-2xl border border-[#414E36]/15 p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
               <div>
-                <h4 className="text-base font-bold text-[#1F251A]">Sell Package to Patient</h4>
-                <p className="text-xs text-[#5A6A51]">Assign a package to {viewingCustomerProfile.name}</p>
+                <h4 className="text-base font-bold text-[#1F251A]">{t.sellPackageBtn}</h4>
+                <p className="text-xs text-[#5A6A51]">{t.assignPackageTo} {viewingCustomerProfile.name}</p>
               </div>
               <button
                 type="button"
@@ -1432,33 +1435,33 @@ export default function CustomerProfileDrawer({
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Select Package</label>
+                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.selectPackageLabel}</label>
                 <select
                   value={selectedSellPackageId}
                   onChange={(e) => setSelectedSellPackageId(e.target.value)}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                 >
-                  <option value="">-- Choose Package --</option>
+                  <option value="">{t.choosePackageOption}</option>
                   {availablePackageOffers.map((pkg: any) => (
                     <option key={pkg.id} value={pkg.id}>
-                      {pkg.name} - EGP {Number(pkg.price).toLocaleString()} ({pkg.items?.length || 0} services)
+                      {pkg.name} - EGP {Number(pkg.price).toLocaleString()} ({pkg.items?.length || 0} {t.servicesCountSuffix})
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">Payment Method</label>
+                <label className="block text-xs font-semibold text-[#5A6A51] mb-1">{t.paymentMethodLabel}</label>
                 <select
                   value={sellPackagePaymentMethod}
                   onChange={(e) => setSellPackagePaymentMethod(e.target.value)}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm text-[#1F251A] outline-none focus:border-[#C4AE7C]"
                 >
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="wallet">Wallet</option>
-                  <option value="instapay">InstaPay</option>
-                  <option value="transfer">Transfer</option>
+                  <option value="cash">{t.paymentMethods.cash}</option>
+                  <option value="card">{t.paymentMethods.card}</option>
+                  <option value="wallet">{t.paymentMethods.wallet}</option>
+                  <option value="instapay">{t.paymentMethods.instapay}</option>
+                  <option value="transfer">{t.paymentMethods.transfer}</option>
                 </select>
               </div>
 
@@ -1468,12 +1471,12 @@ export default function CustomerProfileDrawer({
                 return (
                   <div className="bg-[#EDF1EC]/60 p-3.5 rounded-xl space-y-2 text-xs text-[#1F251A]">
                     <div className="flex items-center justify-between font-semibold">
-                      <span>Price:</span>
+                      <span>{t.priceLabel}</span>
                       <span className="text-base font-bold text-[#414E36]">EGP {Number(pkg.price).toLocaleString()}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Validity:</span>
-                      <span className="font-semibold">{pkg.validityDays} days</span>
+                      <span>{t.validityLabel}</span>
+                      <span className="font-semibold">{pkg.validityDays} {t.daysSuffix}</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       {(pkg.items || []).map((it: any) => (
@@ -1493,7 +1496,7 @@ export default function CustomerProfileDrawer({
                 onClick={() => setShowSellPackageModal(false)}
                 className="rounded-xl border border-[#414E36]/15 px-4 py-2 text-xs font-semibold text-[#414E36] hover:bg-[#EDF1EC] transition"
               >
-                Cancel
+                {t.cancelBtn}
               </button>
               <button
                 type="button"
@@ -1501,7 +1504,7 @@ export default function CustomerProfileDrawer({
                 disabled={sellingPackage || !selectedSellPackageId}
                 className="rounded-xl bg-[#414E36] px-5 py-2 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-50"
               >
-                {sellingPackage ? "Selling..." : "Sell Package"}
+                {sellingPackage ? t.sellingBtn : t.sellPackageShortBtn}
               </button>
             </div>
           </div>
