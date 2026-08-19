@@ -10,43 +10,6 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 19 — Phase 2: translate `AdminServicesView.tsx` to Arabic
-
-**Target:** `src/components/admin/services/AdminServicesView.tsx` (1,171 lines — the largest single
-translation target after `CustomerProfileDrawer.tsx`). No `lang` prop or `dir` attribute today.
-
-**Measured scope (grepped 2026-08-19, re-confirm):** ~44 hardcoded strings, 7 placeholders,
-RTL classes = `text-left`×11, `left-3.5`, `ml-1`, `pl-9`, `pr-4`, `right-0`, `right-1`.
-
-**Already present, not part of this brief's scope:** 2 hardcoded `dir="rtl"` attributes at lines
-945 and 970, on the Arabic Service Name / Arabic Description text inputs. These make sense as-is —
-an input for typing Arabic content should stay RTL regardless of the admin's own UI language — do
-not touch them, do not confuse them with the `lang`/`dir` wiring this brief needs to add to the
-component's own root.
-
-**Value/label separation:** service active/inactive status appears in 3 different renderings that
-must all translate consistently while `toggles.active` stays a boolean (no stored-string risk here,
-simpler than Gender/status-string cases) — a status badge (`{toggles.active ? "Active" :
-"Inactive"}`, ~line 535), a dropdown filter (`<option value="Active">Active Only</option>` /
-`<option value="Inactive">Inactive Only</option>`, ~lines 263-264 — **keep the `value=` attributes
-English**, `serviceFilterStatus` compares against them directly), and a menu action label pair
-(`{toggles.active ? "Deactivate" : "Activate"}` + a second small badge `{toggles.active ? "Active" :
-"Off"}`, ~lines 584-587 — note this one says **"Off"**, not "Inactive", a different string for the
-same boolean state; translate both without conflating them into one key).
-
-**Dates:** exactly 1 `toLocale*` call (line 1132, building a new service's `createdAt` string) —
-already correctly pinned to `en-GB` for both the date and time parts. Leave it exactly as-is, per
-DEC-043.
-
-**Method / exit criteria:** identical to Brief 18 — per-component `dir`, logical RTL properties,
-value/label separation confirmed on all 3 status renderings, both languages browser-verified (list
-view, Add/Edit Service form, Add Category modal, filter panel), manual test checklist written.
-
----
----
-
-# QUEUED BRIEFS — do these next, in this order
-
 ## Brief 20 — Phase 2: translate the Inventory ecosystem to Arabic
 
 **Brief 17 landed and was independently verified 2026-08-20** — this brief is now rewritten against
@@ -510,3 +473,22 @@ interpolated expression, not literal JSX text) — found only by reading the act
 Fixed with a `dayNames` lookup added to `providerFormFields`, with the underlying `day` key
 (correctly still the canonical English weekday name used to index the schedule object) left
 untouched. Manual test checklist: `ai_docs/manual_tests/BRIEF_18_DOCTORS_DEDUP_AND_I18N_MANUAL_TESTS.md`.
+
+### Brief 19 — Phase 2: translate `AdminServicesView.tsx` to Arabic (completed 2026-08-20)
+
+Landed as 1 clean commit. Content and translation quality reviewed directly by Mohamed in the
+browser rather than independently re-walked string-by-string — his own read of live Arabic UI text
+is faster and more reliable than a code-side check for that specific judgment. Mechanical checks run
+on top: `tsc`/`eslint` clean (0 errors, only pre-existing unused-var warnings), `vitest` 597/603
+unchanged, en/ar key parity exact (567/567) across the whole `translations.ts`. Status value/label
+separation confirmed correct — `<option value="Active">{t.activeOnly}</option>` keeps the stored
+value canonical. The 2 pre-existing hardcoded `dir="rtl"` attributes on the Arabic Service Name/
+Description text inputs (content-direction hints, not the language toggle) are unaffected, as
+expected.
+
+**Found, not caused, by this brief:** a `"Def"` badge abbreviation (default branch-price indicator,
+2 occurrences) and a hardcoded `"Zayed:"` fallback label (used only when `svc.branchPricing` isn't
+an array) both remain untranslated. Confirmed via diff against the pre-Brief-19 commit that both
+already existed before this brief touched the file — not a regression. Low impact, not blocking;
+worth a follow-up pass whenever this table is next touched. Manual test checklist:
+`ai_docs/manual_tests/BRIEF_19_SERVICES_I18N_MANUAL_TESTS.md`.

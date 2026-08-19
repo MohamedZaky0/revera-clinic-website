@@ -13,7 +13,7 @@
 > | Patients — Directory, 3 modals | ✅ Brief 5 | ✅ Briefs 6-9 (gaps found + closed) |
 > | Patients — Profile Drawer (1,539 lines, 5 tabs + 3 modals) | ✅ Briefs 10 (state) + 11 (JSX) | ✅ Brief 12 (2 gaps found + closed) |
 > | Doctors (`page.tsx:7711-8372`, ~661 lines) | ✅ Brief 15 (verified, no gaps) | ✅ Brief 18 (dedup + translate, 2 gaps found + closed) |
-> | Services (`page.tsx:8375-9370`, ~995 lines) | ✅ Brief 16 (verified — surfaced pre-existing RISK-064) | **Brief 19, active (in progress live)** |
+> | Services (`page.tsx:8375-9370`, ~995 lines) | ✅ Brief 16 (verified — surfaced pre-existing RISK-064) | ✅ Brief 19 (content verified by Mohamed directly; 2 small pre-existing gaps noted, not blocking) |
 > | Inventory (`page.tsx:14724-16063` + `page.tsx:23321-23506`, ~1,530 lines) | ✅ Brief 17 (verified, permission gating intact — one browser check pending a restricted test account) | **Brief 20, queued (re-verify against the now-real file structure before starting)** |
 > | POS | N/A — dead mock UI, unreachable through any nav path | **out of scope** — separate open product decision: build the real thing or delete the dead code |
 >
@@ -32,13 +32,12 @@
 > extract-after-translate-decision order as everything else, but only after Part 1 is verified —
 > extracting a screen whose permission model was still being decided would have needed redoing.
 >
-> **Reception Phase 1 (extraction) is fully done, and Doctors' Phase 2 has now landed too** —
-> ~~Brief 15~~ (Doctors extraction), ~~Brief 16~~ (Services extraction), ~~Brief 17~~ (Inventory,
-> permissions + extraction), and ~~Brief 18~~ (Doctors dedup + translation) all landed and
-> independently verified. **Brief 19** (Services translation) is active and already visibly
-> progressing live. **Brief 20** (Inventory translation) is queued behind it, rewritten 2026-08-20
-> against Brief 17's real, now-existing files with grounded value/label-separation sites (device
-> status: Optimal/Warning/Maintenance Due; product status: Active/Inactive/Out of
+> **Reception Phase 1 (extraction) and Phase 2 (translation) are both fully done for Doctors,
+> Services, and Bookings/New Booking** — ~~Brief 15~~ through ~~Brief 19~~ all landed and verified
+> (Brief 19's content verified directly by Mohamed in the browser). **Brief 20** (Inventory
+> translation) is the last piece, now active — rewritten 2026-08-20 against Brief 17's real,
+> now-existing files with grounded value/label-separation sites (device status: Optimal/Warning/
+> Maintenance Due; product status: Active/Inactive/Out of
 > Stock/Discontinued) rather than the predictions it originally carried. POS stays a standalone
 > product decision, not a translation task.
 >
