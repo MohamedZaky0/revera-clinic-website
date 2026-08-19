@@ -10,70 +10,6 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-## Brief 12 — Phase 2: translate `CustomerProfileDrawer.tsx` to Arabic
-
-**Read first:** the Briefs 7-9 archive entry below — those were reported complete while 3 specific
-items were still missing, and this is the same kind of work. Read what the gaps were before
-starting, so this one doesn't repeat them.
-
-**Target:** `src/components/admin/patients/CustomerProfileDrawer.tsx` (1,539 lines — the largest
-single translation target in this rollout so far). Extracted in Brief 11, deliberately untranslated
-at the time per the extract-then-translate split.
-
-**Measured scope (grepped 2026-08-19, re-confirm before starting):**
-- **~99 hardcoded UI strings** (`grep -c '>[A-Z][a-z]'`) and **7 `placeholder="..."` attributes**.
-  These counts are a floor, not a total — they miss `title=`/`aria-label=`, strings in ternaries,
-  and `alert()`/`confirm()` message text. **Enumerate by reading the file, not by trusting the
-  grep** — that's exactly how Brief 6 got its count right and Briefs 7-9 got theirs wrong.
-- Spread across the 5 tab regions (line numbers relative to current file): Personal Info ~371–459,
-  Booking History ~459–549, Prescriptions & Records ~549–927 (largest), Purchased Products ~927–1108,
-  Purchased Packages ~1108–1233 — plus the 3 inline modals after those (~1233–1519).
-- **RTL-sensitive Tailwind: 18 occurrences** — `text-right` ×10, `text-left` ×5, `right-1` ×2,
-  `ml-2` ×1. Convert to logical properties (`text-end`/`text-start`/`end-1`/`ms-2`), same as
-  `PatientsDirectoryView.tsx` already does.
-
-**Wiring — mostly already done, don't rebuild it:** the component already receives `lang` and
-`adminTranslations` as props (lines ~122–123, ~223–224) and already forwards
-`t={adminTranslations[lang].patients.medicalFormModal}` / `.medicalReportModal` to its two child
-modals. Add a `patients.customerProfileDrawer` namespace to
-`src/components/admin/translations.ts` (both `en` and `ar` blocks — the file is currently 326 lines,
-structured `{ en: { patients: {...} }, ar: { patients: {...} } }`) and consume it in this component.
-Note the prop is currently typed `adminTranslations: any` — tightening that type is optional and
-explicitly **not required** by this brief; don't let it expand scope.
-
-**Value/label separation — the exact thing Briefs 7-8 got wrong.** Any string that is both *stored*
-and *displayed* must keep its stored value in canonical English and translate only the label via a
-lookup object. In this file that means at minimum: booking `status` values (`confirmed`,
-`completed`, `cancelled`, `checked_in`, `in_progress`, `postponed`, `pending`), payment methods
-(`cash`/`card`/`wallet`/`instapay`/`transfer`), and anything else rendered straight out of a DB row.
-**Do not translate the value passed to `getStatusBadgeClass()` or written back in any PATCH/POST.**
-
-**Dates and numbers — do NOT "fix" these.** This file has 15 `toLocale*` calls, hardcoded to
-`en-GB`/`en-US`. **Leave every one of them exactly as-is.** DEC-043 decided Western digits, and
-`PatientsDirectoryView.tsx` (already translated, the precedent) leaves its dates on `en-GB`/`en-US`
-too. Switching these to `ar-EG` would produce Arabic month names *and* Arabic-Indic digits in money
-and appointment contexts — that is a regression against an explicit decision, not an improvement.
-
-**Also not in scope:** patient-entered data, clinical notes, prescription medication names
-(`MOCK_MEDICINES`), and service names from the DB (those already have `en`/`ar` columns). Per
-plan §2.4.
-
-**Method:** `dir={lang === "ar" ? "rtl" : "ltr"}` on the component root (per-component only — never
-on `admin/page.tsx`'s root or the sidebar; the sidebar deliberately does not flip). No behaviour
-change, no renames, no restructuring. `npm run check` green.
-
-**Exit criteria:** every visible string comes from `t.*`; `grep '>[A-Z][a-z]'` and
-`grep 'placeholder="'` on the file return only intentional non-copy matches; all 18 RTL-sensitive
-classes converted to logical properties; **browser-verified in both `en` and `ar`** — open a real
-patient, walk all 5 tabs and all 3 modals in Arabic, confirm layout mirrors correctly and no raw
-English remains; then confirm stored values are unchanged (save something, check the record still
-holds English). Write the manual test checklist to `ai_docs/manual_tests/` per CLAUDE.md.
-
----
----
-
-# QUEUED BRIEFS — do these next, in this order
-
 ## Brief 13 — Phase 2: translate `AdminBookingsView.tsx` to Arabic
 
 **Why this exists:** DEC-043 scoped Arabic to Reception = Bookings, Patients, POS, New Booking.
@@ -109,6 +45,11 @@ languages browser-verified, stored values confirmed unchanged, manual test check
 Browser-verify the actual Reception flow in Arabic, not just that the page renders: approve a
 booking, check one in, confirm the status badges still read correctly and the underlying record
 still stores English.
+
+---
+---
+
+# QUEUED BRIEFS — do these next, in this order
 
 ## Brief 14 — Phase 2: translate `AdminNewBookingView.tsx` to Arabic
 
@@ -338,3 +279,44 @@ sized component is analyzable and caught it. Fixed to match the codebase's exist
 fabricate, show em-dash" convention (RISK-039) instead of reading the render-time clock as a
 fallback — browser-verified the empty-state path still renders correctly. `vitest run`: 597 passed,
 6 expected fail, 0 unexpected (matches the report's number, independently re-run).
+
+
+### Brief 12 — Phase 2: translate `CustomerProfileDrawer.tsx` to Arabic (completed 2026-08-19)
+
+Translated the 1,539-line Profile Drawer (5 tabs + 3 inline modals) via a new
+`patients.customerProfileDrawer` namespace in `translations.ts`. All 18 RTL-sensitive Tailwind
+classes converted to logical properties exactly as scoped (`text-right`×10 → `text-end`,
+`text-left`×5 → `text-start`, `right-1`×2 → `end-1`, `ml-2` → `ms-2`); all 7 placeholders
+translated; `dir` applied on the component root only. Reused the existing
+`medicalFormModal` skinTypes/concerns lookups rather than duplicating them.
+
+Review outcome: the translation itself held up under checks that caught real gaps in Briefs 7-9 —
+`grep '>[A-Z][a-z]'` returns 0, en/ar key parity is exact (345 keys each, verified by script, no
+one-sided keys rendering `undefined`), every `toLocale*` call left on `en-GB`/`en-US` per DEC-043
+(confirmed by diffing the commit: only surrounding copy changed, never a locale argument), and
+value/label separation is correct throughout — payment methods keep `value="cash"` with Arabic
+labels, reservation status goes through a lookup with the raw value still passed to
+`getStatusBadgeClass()`, and stored skin-type/status values are unchanged.
+
+**Two gaps found and closed.** (1) The package-history status badge still rendered
+`String(pkg.status).replace("_"," ")` — the raw DB value — so an expired/used-up package showed
+English text on an otherwise fully Arabic screen. The brief's own `>[A-Z][a-z]` scope grep could
+not see it because it is an interpolated expression, not literal JSX text; this is precisely the
+"the grep count is a floor, not a total — enumerate by reading" caveat the brief wrote in advance.
+Fixed with the same lookup-plus-fallback shape already used for reservation status, so an
+unrecognised status degrades to the old rendering instead of blank. Not exercisable in the browser
+(needs a patient holding a non-`active` package; none available) — flagged as Pending in the
+checklist rather than claimed as verified. (2) The manual test checklist required by the brief's
+exit criteria and by CLAUDE.md was not written; written now as
+`ai_docs/manual_tests/BRIEF_12_PROFILE_DRAWER_I18N_MANUAL_TESTS.md`.
+
+Browser-verified independently in both languages: all 5 tabs and the Add Product / Sell Package
+modals render fully Arabic, booking status shows `مكتمل` while the record keeps `completed`,
+dates/money stay Western (`18 Aug 2026`, `2360 EGP`), and English mode reverts cleanly. `tsc` 0
+errors, `eslint` 0 errors, `vitest` 597 passed / 6 expected fail (baseline unchanged).
+
+**Process note:** Windsurf began Brief 13 in the same working tree while this verification was
+running, so its in-progress `bookings.adminBookingsView` keys were already sitting uncommitted in
+`translations.ts` — the same file this fix touches. Rather than repeat Brief 5's commit
+commingling, only this change's own hunks were staged (built against `HEAD` and staged via
+`update-index`), leaving Brief 13's work untouched in the working tree for its own commit.
