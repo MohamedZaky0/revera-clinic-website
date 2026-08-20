@@ -17488,80 +17488,106 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     )}
                   </div>
 
-                  {/* Notes */}
-                  <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5">
-                    {isEditingNotes ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-bold text-[#1F251A]">Edit Notes</p>
-                        </div>
-                        <textarea
-                          value={notesDraft}
-                          onChange={(e) => setNotesDraft(e.target.value)}
-                          placeholder="Enter notes about this booking..."
-                          className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition min-h-[100px]"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => setIsEditingNotes(false)}
-                            className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={async () => {
-                              await saveNotes(notesDraft);
-                              setViewingBooking(prev => prev ? { ...prev, notes: notesDraft } : null);
-                              setIsEditingNotes(false);
-                            }}
-                            className="rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
-                          >
-                            Save Note
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between mb-4">
-                          <p className="text-sm font-bold text-[#1F251A]">Notes</p>
-                          {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
-                            <button
-                              onClick={() => {
-                                setNotesDraft(viewingBooking.notes || "");
-                                setIsEditingNotes(true);
-                              }}
-                              className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
-                            >
-                              {viewingBooking.notes ? "Edit Note" : "+ Add Note"}
-                            </button>
-                          )}
-                        </div>
-                        {viewingBooking.notes ? (
-                          <div className="rounded-xl bg-[#F7F7F3] p-4 text-sm text-[#414E36]">
-                            {viewingBooking.notes}
+                  {/* Doctor Clinical Notes */}
+                  {(() => {
+                    const cleanDoctorNotes = (() => {
+                      if (!viewingBooking?.notes) return "";
+                      let text = String(viewingBooking.notes);
+                      text = text.replace(/\[Products Used During Session\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Additional Services(?: Used)?(?: During Session)?\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Device Pulses Deducted\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Extra Device Pulses\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Invoice Total Updated\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Total Invoice\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Added Product\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/\[Added Service\]:[\s\S]*?(?=\[|$)/gi, "");
+                      text = text.replace(/-\s+[\s\S]*?\(x\d+\)\s+@\s+\d+[\s\S]*?EGP/gi, "");
+                      return text.trim();
+                    })();
+
+                    return (
+                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
+                        {isEditingNotes ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-bold text-[#1F251A]">Edit Doctor Clinical Notes</p>
+                            </div>
+                            <textarea
+                              value={notesDraft}
+                              onChange={(e) => setNotesDraft(e.target.value)}
+                              placeholder="Enter clinical notes or session observations..."
+                              className="w-full rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 text-sm text-[#1F251A] outline-none focus:border-[#414E36] transition min-h-[100px]"
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => setIsEditingNotes(false)}
+                                className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  const raw = String(viewingBooking.notes || "");
+                                  const matches = raw.match(/(\[(?:Products Used|Additional Services|Device Pulses|Extra Device|Invoice Total|Total Invoice|Added Product|Added Service)[^\]]*\]:[^\n\[]*)/gi);
+                                  const systemTags = matches ? "\n" + matches.join("\n") : "";
+                                  const finalNotes = notesDraft.trim() + systemTags;
+                                  await saveNotes(finalNotes);
+                                  setViewingBooking(prev => prev ? { ...prev, notes: finalNotes } : null);
+                                  setIsEditingNotes(false);
+                                }}
+                                className="rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                              >
+                                Save Note
+                              </button>
+                            </div>
                           </div>
                         ) : (
-                          <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
-                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                            </svg>
-                            <p className="text-xs font-semibold">no notes yet</p>
-                            {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
-                              <button
-                                onClick={() => {
-                                  setNotesDraft("");
-                                  setIsEditingNotes(true);
-                                }}
-                                className="mt-2 text-xs font-bold text-[#414E36] hover:underline"
-                              >
-                                Add your first note about this customer
-                              </button>
+                          <>
+                            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Doctor Clinical Notes</p>
+                                <p className="text-sm font-bold text-[#1F251A] mt-0.5">Session Clinical Observations</p>
+                              </div>
+                              {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
+                                <button
+                                  onClick={() => {
+                                    setNotesDraft(cleanDoctorNotes);
+                                    setIsEditingNotes(true);
+                                  }}
+                                  className="rounded-2xl bg-[#414E36] px-3 py-1 text-xs font-semibold text-[#FBFBF9] hover:bg-[#2e3a26] transition"
+                                >
+                                  {cleanDoctorNotes ? "Edit Note" : "+ Add Note"}
+                                </button>
+                              )}
+                            </div>
+                            {cleanDoctorNotes ? (
+                              <div className="rounded-xl bg-[#F7F7F3] border border-[#414E36]/10 p-4 text-sm text-[#1F251A] whitespace-pre-line leading-relaxed">
+                                {cleanDoctorNotes}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2 opacity-60">
+                                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                </svg>
+                                <p className="text-xs font-semibold text-[#1F251A]">No clinical notes recorded for this session yet</p>
+                                {hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
+                                  <button
+                                    onClick={() => {
+                                      setNotesDraft("");
+                                      setIsEditingNotes(true);
+                                    }}
+                                    className="mt-2 text-xs font-bold text-[#414E36] hover:underline"
+                                  >
+                                    + Add doctor note
+                                  </button>
+                                )}
+                              </div>
                             )}
-                          </div>
+                          </>
                         )}
-                      </>
-                    )}
-                  </div>
+                      </div>
+                    );
+                  })()}
 
                 </div>
 
