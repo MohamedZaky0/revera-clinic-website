@@ -16952,33 +16952,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           }
         }
 
-        const recordedTotalPrice = Number((viewingBooking as any).total_price || (viewingBooking as any).totalPrice || (viewingBooking as any).final_price || (viewingBooking as any).finalPrice || 0);
-        if (recordedTotalPrice > targetInvoiceTotal) {
-          targetInvoiceTotal = recordedTotalPrice;
-        }
-
         const rawPaid = Number(viewingBooking.amountPaid || (viewingBooking as any).amount_paid || 0);
-        const rawLeft = (viewingBooking as any).amountLeft !== undefined && (viewingBooking as any).amountLeft !== null && (viewingBooking as any).amountLeft !== ""
-          ? Number((viewingBooking as any).amountLeft)
-          : ((viewingBooking as any).amount_left !== undefined && (viewingBooking as any).amount_left !== null && (viewingBooking as any).amount_left !== ""
-              ? Number((viewingBooking as any).amount_left)
-              : null);
-
-        if (rawLeft !== null && (rawPaid + rawLeft) > targetInvoiceTotal) {
-          targetInvoiceTotal = rawPaid + rawLeft;
-        }
-
-        if (additionalServicesList.length === 0 && targetInvoiceTotal > baseAndAttachedTotal) {
-          const diff = targetInvoiceTotal - baseAndAttachedTotal;
-          additionalServicesList.push({
-            name: "Additional Clinical Services",
-            qty: 1,
-            unitPrice: diff,
-            total: diff,
-            lineType: "additional_service"
-          });
-        }
-
         const additionalServicesCost = additionalServicesList.reduce((sum, s) => sum + s.total, 0);
         const productsCost = productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
         const totalPrice = servicesCost + additionalServicesCost + productsCost;
@@ -19958,32 +19932,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             }
           }
 
-          const recordedCheckoutTotal = Number((checkoutBooking as any).total_price || (checkoutBooking as any).totalPrice || (checkoutBooking as any).final_price || (checkoutBooking as any).finalPrice || 0);
-          if (recordedCheckoutTotal > targetCheckoutTotal) {
-            targetCheckoutTotal = recordedCheckoutTotal;
-          }
-
-          const rawCheckoutLeft = (checkoutBooking as any).amountLeft !== undefined && (checkoutBooking as any).amountLeft !== null && (checkoutBooking as any).amountLeft !== ""
-            ? Number((checkoutBooking as any).amountLeft)
-            : ((checkoutBooking as any).amount_left !== undefined && (checkoutBooking as any).amount_left !== null && (checkoutBooking as any).amount_left !== ""
-                ? Number((checkoutBooking as any).amount_left)
-                : null);
-
-          if (rawCheckoutLeft !== null && (depositAlreadyPaid + rawCheckoutLeft) > targetCheckoutTotal) {
-            targetCheckoutTotal = depositAlreadyPaid + rawCheckoutLeft;
-          }
-
-          if (checkoutAdditionalServicesList.length === 0 && targetCheckoutTotal > baseAndAttachedTotal) {
-            const diff = targetCheckoutTotal - baseAndAttachedTotal;
-            checkoutAdditionalServicesList.push({
-              name: "Additional Clinical Services",
-              qty: 1,
-              unitPrice: diff,
-              total: diff,
-              lineType: "additional_service"
-            });
-          }
-
           const checkoutAdditionalServicesCost = checkoutAdditionalServicesList.reduce((sum, s) => sum + s.total, 0);
           const checkoutProductsCost = checkoutProductsConsumablesList.reduce((sum, p) => sum + p.total, 0);
           const totalCost = baseServicesTotal + checkoutAdditionalServicesCost + checkoutProductsCost;
@@ -20606,33 +20554,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             }
           }
 
-          const recordedTotalPrice = Number((invoiceBooking as any).total_price || (invoiceBooking as any).totalPrice || (invoiceBooking as any).final_price || (invoiceBooking as any).finalPrice || 0);
-          if (recordedTotalPrice > targetInvoiceTotal) {
-            targetInvoiceTotal = recordedTotalPrice;
-          }
-
           const rawPaid = Number(invoiceBooking.amountPaid || (invoiceBooking as any).amount_paid || 0);
           const rawLeft = (invoiceBooking as any).amountLeft !== undefined && (invoiceBooking as any).amountLeft !== null && (invoiceBooking as any).amountLeft !== ""
             ? Number((invoiceBooking as any).amountLeft)
             : ((invoiceBooking as any).amount_left !== undefined && (invoiceBooking as any).amount_left !== null && (invoiceBooking as any).amount_left !== ""
                 ? Number((invoiceBooking as any).amount_left)
                 : null);
-
-          if (rawLeft !== null && (rawPaid + rawLeft) > targetInvoiceTotal) {
-            targetInvoiceTotal = rawPaid + rawLeft;
-          }
-
-          if (invoiceAdditionalServicesList.length === 0 && targetInvoiceTotal > currentAttachedTotal) {
-            const diff = targetInvoiceTotal - currentAttachedTotal;
-            invoiceAdditionalServicesList.push({
-              name: "Additional Clinical Services (Additional Service)",
-              nameAr: "خدمات سريرية إضافية (خدمة إضافية)",
-              qty: 1,
-              unitPrice: diff,
-              price: diff,
-              total: diff
-            });
-          }
 
           const allInvoiceItems = [...baseServicesList, ...invoiceAdditionalServicesList, ...invoiceProductsList].filter((item: any) => {
             const nameLower = String(item.name || '').toLowerCase();
