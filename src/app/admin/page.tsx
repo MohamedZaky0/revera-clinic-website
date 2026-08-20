@@ -16787,26 +16787,63 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         }
 
         // 2. Parse from notes (safety net & historical support)
+        // 2. Parse from notes (safety net & historical support)
         if (viewingBooking.notes) {
           const notesStr = String(viewingBooking.notes);
 
-          // a) Additional Services in notes
-          const additionalServiceMatches = notesStr.matchAll(
-            /(?:\[Additional Services(?: Used)?(?: During Session)?\]:\s*|,\s*)(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
-          );
-          for (const match of additionalServiceMatches) {
-            const name = match[1].replace(/^\[Additional Services(?: Used)?(?: During Session)?\]:\s*/, "").trim();
-            const qty = Number(match[2]) || 1;
-            const unitPrice = Number(match[3]) || 0;
-            const total = Number(match[4]) || (qty * unitPrice);
-            if (!existingNames.has(name.toLowerCase())) {
-              existingNames.add(name.toLowerCase());
-              additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+          // a) Check for [Additional Services Used] or [Additional Services]
+          const addSvcBlockMatch = notesStr.match(/\[Additional Services(?: Used)?(?: During Session)?\]:\s*([^\n\[]+)/i);
+          if (addSvcBlockMatch) {
+            const rawBlock = addSvcBlockMatch[1];
+            // Split by comma outside parentheses
+            const items = rawBlock.split(/,(?![^(]*\))/);
+            for (const item of items) {
+              const trimmed = item.trim();
+              if (!trimmed) continue;
+              // Format 1: Name (Qty: 1 x 200 EGP = 200 EGP)
+              const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+              if (m1) {
+                const name = m1[1].trim();
+                const qty = Number(m1[2]) || 1;
+                const unitPrice = Number(m1[3]) || 0;
+                const total = Number(m1[4]) || (qty * unitPrice);
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                }
+                continue;
+              }
+              // Format 2: Name (Qty: 1 x 200 EGP)
+              const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+              if (m2) {
+                const name = m2[1].trim();
+                const qty = Number(m2[2]) || 1;
+                const unitPrice = Number(m2[3]) || 0;
+                const total = qty * unitPrice;
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                }
+                continue;
+              }
+              // Format 3: Name - 200 EGP or Name (200 EGP)
+              const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+)\s*(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+              if (m3) {
+                const name = m3[1].trim();
+                const qty = m3[2] ? Number(m3[2]) : 1;
+                const total = Number(m3[3]) || 0;
+                const unitPrice = qty > 0 ? total / qty : total;
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                }
+                continue;
+              }
             }
           }
 
           // b) Added Service format: [Added Service]: Name - 350 EGP
-          const addedServiceMatches = notesStr.matchAll(/\[Added Service\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+          const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service)\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/gi);
           for (const match of addedServiceMatches) {
             const name = match[1].trim();
             const qty = match[2] ? Number(match[2]) : 1;
@@ -16819,22 +16856,30 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           }
 
           // c) Products Used in notes
-          const doctorSessionMatches = notesStr.matchAll(
-            /(?:\[Products Used During Session\]:\s*|,\s*)(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
-          );
-          for (const match of doctorSessionMatches) {
-            const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
-            const qty = Number(match[2]) || 1;
-            const unitPrice = Number(match[3]) || 0;
-            const total = Number(match[4]) || (qty * unitPrice);
-            if (!existingNames.has(name.toLowerCase())) {
-              existingNames.add(name.toLowerCase());
-              productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+          const prodBlockMatch = notesStr.match(/\[Products Used During Session\]:\s*([^\n\[]+)/i);
+          if (prodBlockMatch) {
+            const rawProdBlock = prodBlockMatch[1];
+            const items = rawProdBlock.split(/,(?![^(]*\))/);
+            for (const item of items) {
+              const trimmed = item.trim();
+              if (!trimmed) continue;
+              const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+              if (m1) {
+                const name = m1[1].trim();
+                const qty = Number(m1[2]) || 1;
+                const unitPrice = Number(m1[3]) || 0;
+                const total = Number(m1[4]) || (qty * unitPrice);
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+                }
+                continue;
+              }
             }
           }
 
           // d) Receptionist Added Product: [Added Product]: Name (x2) - 1400 EGP
-          const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+          const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/gi);
           for (const match of receptionistMatches) {
             const name = match[1].trim();
             const qty = match[2] ? Number(match[2]) : 1;
@@ -16847,7 +16892,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           }
 
           // f) Generic format: - Name (x2) @ 700 EGP
-          const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
+          const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/gi);
           for (const match of doctorMatches) {
             const name = match[1].trim();
             const qty = Number(match[2]);
@@ -16891,7 +16936,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           targetInvoiceTotal = rawPaid + rawLeft;
         }
 
-        if (targetInvoiceTotal > baseAndAttachedTotal) {
+        if (additionalServicesList.length === 0 && targetInvoiceTotal > baseAndAttachedTotal) {
           const diff = targetInvoiceTotal - baseAndAttachedTotal;
           additionalServicesList.push({
             name: "Additional Clinical Services",
@@ -17094,17 +17139,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           )}
                         </div>
                       ))}
-
-                      {/* Additional Added Services */}
-                      {additionalServicesList.map((as, asIdx) => (
-                        <div key={`add-${asIdx}`} className="flex items-center gap-2 bg-[#FAF5EB] border border-[#C4AE7C]/40 rounded-xl px-3 py-1.5 text-sm font-semibold text-[#414E36] shadow-sm">
-                          <span>{as.name}</span>
-                          <span className="text-xs font-bold text-[#C4AE7C]">({as.total || (as.qty * as.unitPrice)} EGP)</span>
-                          <span className="rounded-full bg-[#C4AE7C]/20 px-2 py-0.5 text-[10px] font-bold text-[#414E36]">
-                            Additional Service
-                          </span>
-                        </div>
-                      ))}
                     </div>
 
                     {isEditingService && (
@@ -17303,10 +17337,57 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     });
 
                     return (
-                      <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS & SESSION CONSUMABLES</p>
+                      <>
+                        {/* Additional Clinical Services & Extra Adjustments Card */}
+                        {additionalServicesList.length > 0 && (
+                          <div className="rounded-2xl border border-[#C4AE7C]/30 bg-white p-5 space-y-3 shadow-xs">
+                            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#C4AE7C]">
+                                  ADDITIONAL SERVICES & EXTRA ADJUSTMENTS
+                                </p>
+                                <p className="text-sm font-bold text-[#1F251A] mt-0.5">
+                                  {additionalServicesList.length} Additional Service{additionalServicesList.length > 1 ? "s" : ""} Added in Session
+                                </p>
+                              </div>
+                              <span className="rounded-full bg-[#FAF5EB] px-3 py-1 text-xs font-bold text-[#C4AE7C] border border-[#C4AE7C]/40">
+                                Total: {additionalServicesCost} EGP
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                              {additionalServicesList.map((as, asIdx) => (
+                                <div
+                                  key={`add-card-${asIdx}`}
+                                  className="flex flex-col justify-between p-3.5 rounded-2xl bg-[#FAF5EB]/60 border border-[#C4AE7C]/30 hover:border-[#C4AE7C] transition shadow-2xs space-y-2"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <span className="font-bold text-sm text-[#1F251A] leading-snug">
+                                      {as.name}
+                                    </span>
+                                    <span className="rounded-full bg-[#C4AE7C]/20 px-2 py-0.5 text-[10px] font-bold text-[#414E36] shrink-0">
+                                      Additional Service
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center justify-between pt-2 border-t border-[#C4AE7C]/20 text-xs">
+                                    <span className="text-[#5A6A51] font-medium">
+                                      Qty: {as.qty} {as.qty > 1 ? `x ${as.unitPrice} EGP` : ""}
+                                    </span>
+                                    <span className="text-sm font-extrabold text-[#414E36]">
+                                      {as.total || (as.qty * as.unitPrice)} EGP
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS & SESSION CONSUMABLES</p>
                             <p className="text-sm font-bold text-[#1F251A] mt-0.5">
                               {filteredProductsList.length > 0
                                 ? `${filteredProductsList.length} Product(s) Attached`
@@ -17352,6 +17433,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           <p className="text-xs text-[#5A6A51]">No retail or procedure products linked to this booking yet.</p>
                         )}
                       </div>
+                    </>
                     );
                   })()}
 
