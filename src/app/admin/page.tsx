@@ -20448,25 +20448,33 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const allInvoiceItems = [...baseServicesList, ...invoiceAdditionalServicesList, ...invoiceProductsList].filter((item: any) => {
             const nameLower = String(item.name || '').toLowerCase();
             const isPulse = nameLower.includes('pulse') || nameLower.includes('device —') || nameLower.includes('device -');
-            if (isPulse && (item.total === 0 || item.unitPrice === 0 || item.price === 0)) {
+            if (isPulse && (Number(item.total) === 0 || Number(item.unitPrice) === 0 || Number(item.price) === 0)) {
               return false;
             }
             return true;
           });
-          const totalCost = allInvoiceItems.reduce((sum: number, item: any) => sum + item.total, 0);
+          const totalCost = allInvoiceItems.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0);
 
           // 2. Fetch customer and branch details
-          const walletUsed = Math.max(0, totalCost - (invoiceBooking.amountPaid ?? 0) - (invoiceBooking.amountLeft ?? 0));
+          const finalPaid = rawPaid;
+          const finalLeft = rawLeft ?? 0;
+          const walletUsed = Math.max(0, totalCost - finalPaid - finalLeft);
           const branch = branches.find(b => b.id === invoiceBooking.branchId);
           const branchName = branch ? (isRTL ? branch.name_ar : branch.name_en) : "Revera Zayed Clinic";
-          const invoiceNo = `REV-INV-${invoiceBooking.id.slice(0, 8).toUpperCase()}`;
+          const invoiceNo = `REV-INV-${String(invoiceBooking.id || '').slice(0, 8).toUpperCase()}`;
 
           return (
-            <div className="fixed inset-0 z-[9999] flex justify-center items-start overflow-y-auto p-4 sm:p-6 md:p-8 bg-black/60 backdrop-blur-sm">
-              <div className="w-full max-w-2xl rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-[#414E36]/10 my-4 sm:my-6 animate-in fade-in zoom-in-95 duration-150">
+            <div 
+              className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-fadeIn"
+              onClick={() => setInvoiceBooking(null)}
+            >
+              <div 
+                className="relative w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl bg-white p-5 sm:p-6 shadow-2xl border border-[#414E36]/10 animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
                 
                 {/* Header Actions */}
-                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 mb-4">
+                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 mb-3 shrink-0">
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#C4AE7C]">Invoice Preview</span>
                     <h3 className="text-base font-bold text-[#1F251A] mt-0.5 font-sans">Booking Invoice Details</h3>
@@ -20479,10 +20487,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   </button>
                 </div>
 
-                {/* Printable Invoice Container */}
-                <div className="border border-gray-100 rounded-2xl p-5 sm:p-6 bg-[#FBFBF9]/40">
+                {/* Printable Invoice Container (Scrollable) */}
+                <div className="overflow-y-auto pr-1.5 flex-1 border border-gray-100 rounded-2xl p-4 sm:p-5 bg-[#FBFBF9]/40 space-y-4">
                   {/* Top Header */}
-                  <div className="flex justify-between items-start gap-4 pb-4 border-b border-[#414E36]/20">
+                  <div className="flex justify-between items-start gap-4 pb-3.5 border-b border-[#414E36]/20">
                     <div>
                       <h1 className="text-lg sm:text-xl font-bold tracking-wider text-[#414E36]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
                       <p className="text-xs text-[#5A6A51] mt-0.5 font-semibold">Sheikh Zayed / New Cairo</p>
@@ -20492,19 +20500,19 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     <div className="text-right">
                       <h2 className="text-xl sm:text-2xl font-bold tracking-wide text-[#C4AE7C]" style={{ fontFamily: "Marcellus, serif" }}>INVOICE</h2>
                       <p className="text-xs text-[#1F251A] mt-1 font-bold">No: {invoiceNo}</p>
-                      <p className="text-[11px] text-[#5A6A51] mt-0.5">Date: {invoiceBooking.date}</p>
+                      <p className="text-[11px] text-[#5A6A51] mt-0.5">Date: {invoiceBooking.date || new Date().toISOString().slice(0, 10)}</p>
                     </div>
                   </div>
 
                   {/* Customer / Billing Info */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-4 text-xs leading-relaxed">
-                    <div className="bg-white rounded-xl border border-gray-100 p-3.5 shadow-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs leading-relaxed">
+                    <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Billed To</p>
-                      <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name}</p>
-                      <p className="text-[#5A6A51] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone}</p>
+                      <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name || "Patient"}</p>
+                      <p className="text-[#5A6A51] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone || "—"}</p>
                       <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
                     </div>
-                    <div className="bg-white rounded-xl border border-gray-100 p-3.5 shadow-sm">
+                    <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Booking Details</p>
                       <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
                       <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
@@ -20513,23 +20521,23 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   </div>
 
                   {/* Table of Services & Add-ons */}
-                  <div className="overflow-x-auto my-4 border border-gray-100 rounded-xl bg-white shadow-sm">
+                  <div className="overflow-x-auto border border-gray-100 rounded-xl bg-white shadow-sm">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-100">
-                          <th className="p-2.5 sm:p-3 text-left">Service / Item Rendered</th>
-                          <th className="p-2.5 sm:p-3 text-center w-14">Qty</th>
-                          <th className="p-2.5 sm:p-3 text-right w-24">Unit Price</th>
-                          <th className="p-2.5 sm:p-3 text-right w-24">Total</th>
+                          <th className="p-2.5 text-left">Service / Item Rendered</th>
+                          <th className="p-2.5 text-center w-14">Qty</th>
+                          <th className="p-2.5 text-right w-24">Unit Price</th>
+                          <th className="p-2.5 text-right w-24">Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {allInvoiceItems.map((item: any, idx: number) => (
                           <tr key={idx} className="hover:bg-gray-50/50">
-                            <td className="p-2.5 sm:p-3 font-semibold text-[#1F251A]">{item.name}</td>
-                            <td className="p-2.5 sm:p-3 text-center text-gray-500">{item.qty}</td>
-                            <td className="p-2.5 sm:p-3 text-right text-gray-600">EGP {item.unitPrice.toLocaleString()}</td>
-                            <td className="p-2.5 sm:p-3 text-right font-bold text-[#1F251A]">EGP {item.total.toLocaleString()}</td>
+                            <td className="p-2.5 font-semibold text-[#1F251A]">{item.name}</td>
+                            <td className="p-2.5 text-center text-gray-500">{item.qty || 1}</td>
+                            <td className="p-2.5 text-right text-gray-600">EGP {(Number(item.unitPrice || item.price) || 0).toLocaleString()}</td>
+                            <td className="p-2.5 text-right font-bold text-[#1F251A]">EGP {(Number(item.total) || 0).toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -20537,39 +20545,39 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   </div>
 
                   {/* Pricing Summary */}
-                  <div className="flex justify-end text-xs my-4">
-                    <div className="w-60 space-y-2">
+                  <div className="flex justify-end text-xs">
+                    <div className="w-60 space-y-1.5">
                       <div className="flex justify-between text-gray-500">
                         <span>Subtotal:</span>
                         <span className="font-semibold text-[#1F251A]">EGP {totalCost.toLocaleString()}</span>
                       </div>
                       {walletUsed > 0 && (
-                        <div className="flex justify-between text-green-700">
+                        <div className="flex justify-between text-green-700 font-medium">
                           <span>Paid from Wallet:</span>
                           <span className="font-bold">- EGP {walletUsed.toLocaleString()}</span>
                         </div>
                       )}
                       <div className="flex justify-between border-t border-[#414E36] pt-1.5 text-sm font-bold text-[#414E36]">
                         <span>Amount Paid:</span>
-                        <span>EGP {invoiceBooking.amountPaid.toLocaleString()}</span>
+                        <span>EGP {finalPaid.toLocaleString()}</span>
                       </div>
-                      {invoiceBooking.amountLeft > 0 && (
+                      {finalLeft > 0 && (
                         <div className="flex justify-between font-bold text-red-600">
                           <span>Outstanding Due:</span>
-                          <span>EGP {invoiceBooking.amountLeft.toLocaleString()}</span>
+                          <span>EGP {finalLeft.toLocaleString()}</span>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* Thank you */}
-                  <div className="text-center text-[10px] text-gray-400 mt-4 pt-3 border-t border-dashed border-gray-200">
+                  <div className="text-center text-[10px] text-gray-400 pt-2 border-t border-dashed border-gray-200">
                     <p>Thank you for choosing Revera Clinics!</p>
                   </div>
                 </div>
 
                 {/* Bottom Buttons */}
-                <div className="flex items-center justify-end gap-3 mt-4 border-t border-gray-100 pt-3">
+                <div className="flex items-center justify-end gap-3 mt-3 border-t border-gray-100 pt-3 shrink-0">
                   <button
                     onClick={() => setInvoiceBooking(null)}
                     className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
