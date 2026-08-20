@@ -17024,40 +17024,31 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 {/* Left Column */}
                 <div className="space-y-6">
                   
-                  {/* Service & Date & Session Type */}
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">SERVICE</p>
-                      <p className="mt-1 text-base font-semibold text-[#1F251A]">{serviceNames}</p>
-                    </div>
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">BOOKING DATE</p>
-                      <p className="mt-1 text-base font-semibold text-[#1F251A]">
-                        {viewingBooking.date} {viewingBooking.timeSlot ? ` @ ${viewingBooking.timeSlot}` : viewingBooking.requestedTime ? ` @ ${viewingBooking.requestedTime}` : ""}
+                  {/* Compact Booking Info Header: Service, Date & Session Type */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-xl border border-[#414E36]/10 bg-white p-3.5 shadow-2xs">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#5A6A51]">SERVICE</p>
+                      <p className="mt-1 text-xs sm:text-sm font-bold text-[#1F251A] leading-snug line-clamp-2" title={serviceNames}>
+                        {serviceNames}
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-[#414E36]/10 bg-white p-4 flex flex-col justify-between">
-                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51] mb-1">SESSION TYPE</p>
-                       <select
-                         value={viewingBooking.sessionType || "in_person"}
-                         disabled={!hasPermission("bookings.edit") || viewingBooking.status === 'completed'}
-                         onChange={async (e) => {
-                           const newType = e.target.value;
-                           await fetch(`/api/reservations?id=${viewingBooking.id}`, {
-                             method: "PATCH",
-                             headers: authenticatedJsonHeaders,
-                             body: JSON.stringify({ sessionType: newType })
-                           });
-                           setViewingBooking(prev => prev ? { ...prev, sessionType: newType } : null);
-                           fetchAllReservations();
-                         }}
-                         className="w-full rounded-xl border border-[#414E36]/15 bg-white px-2 py-1 text-sm font-semibold text-[#1F251A] outline-none transition focus:border-[#C4AE7C] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                       >
-                         <option value="in_person">In Person / في العيادة</option>
-                         <option value="online">Online / أونلاين</option>
-                       </select>
-                     </div>
-                     
+
+                    <div className="rounded-xl border border-[#414E36]/10 bg-white p-3.5 shadow-2xs">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#5A6A51]">BOOKING DATE</p>
+                      <p className="mt-1 text-xs sm:text-sm font-bold text-[#1F251A] leading-snug">
+                        {viewingBooking.date} {viewingBooking.timeSlot ? `@ ${viewingBooking.timeSlot}` : viewingBooking.requestedTime ? `@ ${viewingBooking.requestedTime}` : ""}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-[#414E36]/10 bg-white p-3.5 shadow-2xs flex flex-col justify-between">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#5A6A51]">SESSION TYPE</p>
+                      <div className="mt-1">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#EDF1EC] px-2.5 py-1 text-xs font-bold text-[#414E36]">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#414E36]"></span>
+                          {viewingBooking.sessionType === 'online' ? "Online Consultation / أونلاين" : "In Person / في العيادة"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Price Details */}
