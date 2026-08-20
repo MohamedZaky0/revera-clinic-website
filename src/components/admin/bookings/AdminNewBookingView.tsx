@@ -140,6 +140,57 @@ function isSlotInPast(tSlot: string, bookingDateStr: string): boolean {
   return false;
 }
 
+function isDoctorAvailableForService(doctor: any, service: any): boolean {
+  if (!doctor || !service) return true;
+
+  const serviceIdStr = String(service.id);
+  const serviceNameEn = (service.en || service.name || service.title || service.name_en || service.title_en || "").toLowerCase().trim();
+  const serviceNameAr = (service.ar || "").toLowerCase().trim();
+  const serviceCategory = (service.category || service.cat || "").toLowerCase().trim();
+
+  // 1. Check provider.service_ids / provider.serviceIds / provider.services_ids
+  const serviceIds = doctor.service_ids || doctor.serviceIds || doctor.services_ids;
+  if (Array.isArray(serviceIds) && serviceIds.length > 0) {
+    if (serviceIds.some((id: any) => String(id) === serviceIdStr)) {
+      return true;
+    }
+  }
+
+  // 2. Check provider.services array (can contain service names, titles, or IDs)
+  const providerServices = doctor.services || doctor.services_provided;
+  if (Array.isArray(providerServices) && providerServices.length > 0) {
+    const matches = providerServices.some((s: any) => {
+      if (s === null || s === undefined) return false;
+      const sStr = String(s).toLowerCase().trim();
+      if (!sStr) return false;
+
+      if (sStr === serviceIdStr) return true;
+      if (serviceNameEn && (sStr.includes(serviceNameEn) || serviceNameEn.includes(sStr))) return true;
+      if (serviceNameAr && (sStr.includes(serviceNameAr) || serviceNameAr.includes(sStr))) return true;
+      if (serviceCategory && (sStr.includes(serviceCategory) || serviceCategory.includes(sStr))) return true;
+
+      return false;
+    });
+
+    if (matches) return true;
+  }
+
+  // 3. Check provider.specialty or provider.department matching category or service name
+  const specialty = (doctor.specialty || doctor.department || doctor.sub_specialty || "").toLowerCase().trim();
+  if (specialty) {
+    if (serviceCategory && (specialty.includes(serviceCategory) || serviceCategory.includes(specialty))) return true;
+    if (serviceNameEn && (specialty.includes(serviceNameEn) || serviceNameEn.includes(specialty))) return true;
+  }
+
+  // If doctor has no services or specialties configured at all, consider available by default
+  const hasConfiguredServices = (Array.isArray(providerServices) && providerServices.length > 0) || (Array.isArray(serviceIds) && serviceIds.length > 0);
+  if (!hasConfiguredServices && !specialty) {
+    return true;
+  }
+
+  return false;
+}
+
 export default function AdminNewBookingView({
   onClose,
   onBookingCreated,
@@ -287,6 +338,28 @@ export default function AdminNewBookingView({
       setSelectedDoctorId(String(dbDoctors[0].id));
     }
   }, [activeBranchId, dbBranches, dbServices, dbDoctors]);
+
+  // Selected service object for doctor filtering
+  const currentServiceObj = useMemo(() => {
+    return dbServices.find(s => String(s.id) === String(selectedServiceId));
+  }, [dbServices, selectedServiceId]);
+
+  // Filter doctors by selected service availability
+  const filteredDoctors = useMemo(() => {
+    if (!currentServiceObj) return dbDoctors;
+    const matched = dbDoctors.filter(d => isDoctorAvailableForService(d, currentServiceObj));
+    return matched.length > 0 ? matched : dbDoctors;
+  }, [dbDoctors, currentServiceObj]);
+
+  // Sync selectedDoctorId when filteredDoctors list changes
+  useEffect(() => {
+    if (filteredDoctors.length > 0) {
+      const isStillAvailable = filteredDoctors.some(d => String(d.id) === String(selectedDoctorId));
+      if (!isStillAvailable) {
+        setSelectedDoctorId(String(filteredDoctors[0].id));
+      }
+    }
+  }, [filteredDoctors, selectedDoctorId]);
 
   // Filter rooms by selected branch
   const filteredRooms = useMemo(() => {
@@ -856,7 +929,7 @@ export default function AdminNewBookingView({
                     onChange={(e) => setSelectedDoctorId(e.target.value)}
                     className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
                   >
-                    {dbDoctors.map(d => (
+                    {filteredDoctors.map(d => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
