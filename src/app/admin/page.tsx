@@ -16808,7 +16808,7 @@ export default function AdminPage() {
         let targetInvoiceTotal = baseAndAttachedTotal;
 
         if (viewingBooking.notes) {
-          const invMatch = String(viewingBooking.notes).match(/\[Invoice Total Updated\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+          const invMatch = String(viewingBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
           if (invMatch) {
             const notedTotal = Number(invMatch[1]);
             if (notedTotal > targetInvoiceTotal) {
@@ -16817,10 +16817,15 @@ export default function AdminPage() {
           }
         }
 
-        const rawPaid = Number(viewingBooking.amountPaid || 0);
-        const rawLeft = viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null
-          ? Number(viewingBooking.amountLeft)
-          : ((viewingBooking as any).amount_left !== undefined && (viewingBooking as any).amount_left !== null
+        const recordedTotalPrice = Number((viewingBooking as any).total_price || (viewingBooking as any).totalPrice || (viewingBooking as any).final_price || (viewingBooking as any).finalPrice || 0);
+        if (recordedTotalPrice > targetInvoiceTotal) {
+          targetInvoiceTotal = recordedTotalPrice;
+        }
+
+        const rawPaid = Number(viewingBooking.amountPaid || (viewingBooking as any).amount_paid || 0);
+        const rawLeft = (viewingBooking as any).amountLeft !== undefined && (viewingBooking as any).amountLeft !== null && (viewingBooking as any).amountLeft !== ""
+          ? Number((viewingBooking as any).amountLeft)
+          : ((viewingBooking as any).amount_left !== undefined && (viewingBooking as any).amount_left !== null && (viewingBooking as any).amount_left !== ""
               ? Number((viewingBooking as any).amount_left)
               : null);
 
@@ -16844,7 +16849,7 @@ export default function AdminPage() {
         const totalPrice = servicesCost + additionalServicesCost + productsCost;
 
         const sessionPaid = rawPaid;
-        const sessionLeft = (rawLeft !== null && rawLeft > 0)
+        const sessionLeft = (rawLeft !== null && rawLeft >= 0)
           ? rawLeft
           : Math.max(0, totalPrice - sessionPaid);
 
@@ -20087,7 +20092,7 @@ export default function AdminPage() {
           let targetInvoiceTotal = currentAttachedTotal;
 
           if (invoiceBooking.notes) {
-            const invMatch = String(invoiceBooking.notes).match(/\[Invoice Total Updated\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+            const invMatch = String(invoiceBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
             if (invMatch) {
               const notedTotal = Number(invMatch[1]);
               if (notedTotal > targetInvoiceTotal) {
@@ -20096,10 +20101,15 @@ export default function AdminPage() {
             }
           }
 
-          const rawPaid = Number(invoiceBooking.amountPaid || 0);
-          const rawLeft = invoiceBooking.amountLeft !== undefined && invoiceBooking.amountLeft !== null
-            ? Number(invoiceBooking.amountLeft)
-            : ((invoiceBooking as any).amount_left !== undefined && (invoiceBooking as any).amount_left !== null
+          const recordedTotalPrice = Number((invoiceBooking as any).total_price || (invoiceBooking as any).totalPrice || (invoiceBooking as any).final_price || (invoiceBooking as any).finalPrice || 0);
+          if (recordedTotalPrice > targetInvoiceTotal) {
+            targetInvoiceTotal = recordedTotalPrice;
+          }
+
+          const rawPaid = Number(invoiceBooking.amountPaid || (invoiceBooking as any).amount_paid || 0);
+          const rawLeft = (invoiceBooking as any).amountLeft !== undefined && (invoiceBooking as any).amountLeft !== null && (invoiceBooking as any).amountLeft !== ""
+            ? Number((invoiceBooking as any).amountLeft)
+            : ((invoiceBooking as any).amount_left !== undefined && (invoiceBooking as any).amount_left !== null && (invoiceBooking as any).amount_left !== ""
                 ? Number((invoiceBooking as any).amount_left)
                 : null);
 
