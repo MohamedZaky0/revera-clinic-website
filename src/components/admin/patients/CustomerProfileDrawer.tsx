@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
   ArrowLeft,
   Camera,
@@ -228,6 +228,143 @@ export default function CustomerProfileDrawer({
 
   const t = adminTranslations[lang].patients.customerProfileDrawer;
   const mf = adminTranslations[lang].patients.medicalFormModal;
+
+  const combinedPatientProductSales = useMemo(() => {
+    if (!viewingCustomerProfile) return [];
+    const sales: Array<{
+      id: string;
+      date: string;
+      product_name: string;
+      quantity: number;
+      unit_price: number;
+      total_amount: number;
+      source?: string;
+    }> = [];
+
+    const custId = viewingCustomerProfile.id;
+    const custCleanPhone = (viewingCustomerProfile.phone || '').trim().replace(/\D/g, '');
+
+    // 1. Include direct POS / product sales
+    if (Array.isArray(productSalesHistory)) {
+      for (const s of productSalesHistory) {
+        const sPhone = (s.customer_phone || s.phone || '').trim().replace(/\D/g, '');
+        if (s.customer_id === custId || (custCleanPhone && sPhone && sPhone === custCleanPhone)) {
+          sales.push({
+            id: String(s.id || Math.random()),
+            date: s.created_at || s.date || '',
+            product_name: s.product_name || s.name || 'Product',
+            quantity: Number(s.quantity) || 1,
+            unit_price: Number(s.unit_price) || 0,
+            total_amount: Number(s.total_amount) || (Number(s.quantity || 1) * Number(s.unit_price || 0)),
+            source: 'Direct Sale'
+          });
+        }
+      }
+    }
+
+    // 2. Include products purchased/consumed in past reservations
+    if (Array.isArray(allReservations)) {
+      for (const res of allReservations) {
+        const resCustId = res.customerId || res.customer_id;
+        const resPhone = (res.phone || res.customer_phone || '').trim().replace(/\D/g, '');
+        const isMatch = (custId && resCustId && resCustId === custId) || (custCleanPhone && resPhone && resPhone === custCleanPhone);
+
+        if (isMatch) {
+          const resDate = res.date || res.created_at || '';
+          const resLabel = res.id ? `Booking #${String(res.id).slice(0, 8).toUpperCase()}` : 'Booking';
+          const addedNames = new Set<string>();
+
+          // a) Structured attachedProducts
+          if (Array.isArray(res.attachedProducts)) {
+            for (const p of res.attachedProducts) {
+              const name = String(p.name || p.product_name || 'Product').replace(/^[,\s-]+/, '').trim();
+              const qty = Number(p.qty || p.quantity) || 1;
+              const unitPrice = Number(p.unitPrice || p.price || p.unit_price || 0);
+              const total = Number(p.total || p.total_price) || (qty * unitPrice);
+              const lineType = p.lineType || p.line_type || (p.serviceId ? 'additional_service' : 'product');
+
+              // Skip zero-cost pulses or additional services
+              const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
+              if (isPulse && (total === 0 || unitPrice === 0)) continue;
+              if (lineType === 'additional_service') continue;
+
+              addedNames.add(name.toLowerCase());
+              sales.push({
+                id: String(p.id || `${res.id}-${name}`),
+                date: p.created_at || resDate,
+                product_name: name,
+                quantity: qty,
+                unit_price: unitPrice,
+                total_amount: total,
+                source: resLabel
+              });
+            }
+          }
+
+          // b) Notes parsing (safety net for historical bookings)
+          if (res.notes) {
+            const notesStr = String(res.notes);
+            const prodBlockMatch = notesStr.match(/\[(?:Products|Consumables|Products \/ Consumables|Attached Products)(?: Used)?(?: During Session)?\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
+            if (prodBlockMatch) {
+              const rawBlock = prodBlockMatch[1];
+              const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
+              for (const item of items) {
+                const trimmed = item.trim();
+                if (!trimmed || trimmed.startsWith("[")) continue;
+                // Format: Name (Qty: 1 x 200 EGP = 200 EGP)
+                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m1) {
+                  const name = m1[1].replace(/^[,\s-]+/, '').trim();
+                  const qty = Number(m1[2]) || 1;
+                  const unitPrice = Number(m1[3]) || 0;
+                  const total = Number(m1[4]) || (qty * unitPrice);
+                  if (!addedNames.has(name.toLowerCase())) {
+                    addedNames.add(name.toLowerCase());
+                    sales.push({
+                      id: `${res.id}-note-${name}`,
+                      date: resDate,
+                      product_name: name,
+                      quantity: qty,
+                      unit_price: unitPrice,
+                      total_amount: total,
+                      source: resLabel
+                    });
+                  }
+                } else {
+                  // Format: Name (Qty: 1) or Name - 200 EGP
+                  const m2 = trimmed.match(/^(.+?)(?:\s*\(Qty:\s*(\d+)\))?(?:\s*[-–]\s*(\d+(?:\.\d+)?)\s*EGP)?$/i);
+                  if (m2) {
+                    const name = m2[1].replace(/^[,\s-]+/, '').trim();
+                    const qty = Number(m2[2]) || 1;
+                    const price = Number(m2[3]) || 0;
+                    if (!addedNames.has(name.toLowerCase()) && name.length > 1) {
+                      addedNames.add(name.toLowerCase());
+                      sales.push({
+                        id: `${res.id}-note-${name}`,
+                        date: resDate,
+                        product_name: name,
+                        quantity: qty,
+                        unit_price: price > 0 ? price / qty : 0,
+                        total_amount: price,
+                        source: resLabel
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Sort descending by date
+    return sales.sort((a, b) => {
+      const tA = a.date ? new Date(a.date).getTime() : 0;
+      const tB = b.date ? new Date(b.date).getTime() : 0;
+      return tB - tA;
+    });
+  }, [viewingCustomerProfile, productSalesHistory, allReservations]);
 
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="space-y-6 animate-fadeIn">
@@ -1067,8 +1204,15 @@ export default function CustomerProfileDrawer({
 
             {customerProductsSubTab === "history" && (
               <div className="bg-white rounded-2xl border border-[#414E36]/10 overflow-hidden shadow-sm p-6 space-y-4">
-                <h5 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">{t.recentSalesHeading}</h5>
-                {productSalesHistory.filter((s: any) => s.customer_id === viewingCustomerProfile.id).length === 0 ? (
+                <div className="flex items-center justify-between">
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-[#5A6A51]">{t.recentSalesHeading}</h5>
+                  {combinedPatientProductSales.length > 0 && (
+                    <span className="text-xs text-[#5A6A51] font-semibold bg-[#EDF1EC]/60 px-2.5 py-1 rounded-lg">
+                      {combinedPatientProductSales.length} {combinedPatientProductSales.length === 1 ? "Record" : "Records"}
+                    </span>
+                  )}
+                </div>
+                {combinedPatientProductSales.length === 0 ? (
                   <p className="text-xs text-[#8A9A81] italic text-center py-6">{t.noSalesHistory}</p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -1077,27 +1221,35 @@ export default function CustomerProfileDrawer({
                         <tr className="border-b border-[#414E36]/10 text-[#5A6A51] font-bold uppercase bg-[#FBFBF9]">
                           <th className="py-2.5 px-3">{t.colDate}</th>
                           <th className="py-2.5 px-3">{t.colProduct}</th>
+                          <th className="py-2.5 px-3">Channel / Source</th>
                           <th className="py-2.5 px-3 text-center">{t.colQty}</th>
                           <th className="py-2.5 px-3 text-end">{t.colUnitPrice}</th>
                           <th className="py-2.5 px-3 text-end">{t.colTotal}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#414E36]/5">
-                        {productSalesHistory
-                          .filter((s: any) => s.customer_id === viewingCustomerProfile.id)
-                          .map((sale: any, idx: number) => (
-                            <tr key={sale.id || idx} className="hover:bg-[#FBFBF9]">
-                              <td className="py-2.5 px-3 text-[#5A6A51]">
-                                {sale.created_at || sale.date
-                                  ? new Date(sale.created_at || sale.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
-                                  : "—"}
-                              </td>
-                              <td className="py-2.5 px-3 font-semibold text-[#1F251A]">{sale.product_name}</td>
-                              <td className="py-2.5 px-3 text-center font-semibold">{sale.quantity}</td>
-                              <td className="py-2.5 px-3 text-end">EGP {Number(sale.unit_price || 0).toLocaleString()}</td>
-                              <td className="py-2.5 px-3 text-end font-bold text-[#414E36]">EGP {Number(sale.total_amount || 0).toLocaleString()}</td>
-                            </tr>
-                          ))}
+                        {combinedPatientProductSales.map((sale: any, idx: number) => (
+                          <tr key={sale.id || idx} className="hover:bg-[#FBFBF9]/70 transition">
+                            <td className="py-2.5 px-3 text-[#5A6A51]">
+                              {sale.date
+                                ? new Date(sale.date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+                                : "—"}
+                            </td>
+                            <td className="py-2.5 px-3 font-semibold text-[#1F251A]">{sale.product_name}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                sale.source && sale.source.startsWith('Booking')
+                                  ? 'bg-[#414E36]/10 text-[#414E36]'
+                                  : 'bg-[#C4AE7C]/15 text-[#8C7643]'
+                              }`}>
+                                {sale.source || 'Direct Sale'}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-semibold">{sale.quantity}</td>
+                            <td className="py-2.5 px-3 text-end">EGP {Number(sale.unit_price || 0).toLocaleString()}</td>
+                            <td className="py-2.5 px-3 text-end font-bold text-[#414E36]">EGP {Number(sale.total_amount || 0).toLocaleString()}</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
