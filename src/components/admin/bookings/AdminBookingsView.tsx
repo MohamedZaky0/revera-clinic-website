@@ -902,14 +902,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       {/* ── CONTROLS BAR (DIRECTLY ABOVE CALENDAR & TABLE) ── */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
         {/* VIEW MODE TOGGLE */}
-        <div className="inline-flex items-center rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div className="inline-flex items-center rounded-2xl bg-white border border-[#414E36]/10 p-1 shadow-xs">
           <button
             type="button"
             onClick={() => setViewMode("pending")}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold cursor-pointer ${
               viewMode === "pending"
-                ? "bg-[#C4AE7C] text-[#414E36]"
-                : "text-[#374151] hover:bg-gray-50"
+                ? "bg-[#C4AE7C] text-[#414E36] shadow-xs"
+                : "text-[#5A6A51] hover:bg-[#F2EFE9] hover:text-[#1F251A]"
             }`}
           >
             <Clock size={15} />
@@ -920,14 +920,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
               </span>
             )}
           </button>
-          <div className="w-px h-8 bg-gray-200" />
           <button
             type="button"
             onClick={() => setViewMode("calendar")}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold cursor-pointer ${
               viewMode === "calendar"
-                ? "bg-[#C4AE7C] text-[#414E36]"
-                : "text-[#374151] hover:bg-gray-50"
+                ? "bg-[#C4AE7C] text-[#414E36] shadow-xs"
+                : "text-[#5A6A51] hover:bg-[#F2EFE9] hover:text-[#1F251A]"
             }`}
           >
             <CalendarIcon size={15} />
