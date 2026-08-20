@@ -224,10 +224,15 @@ export default function DoctorOngoingSessionTab({
       const headers = await getAuthHeaders();
       const payload = {
         booking_id: activeSessionBooking.id,
-        customer_name: activeSessionBooking.name || activeSessionBooking.customer_name,
+        customer_id: activeSessionBooking.customerId || (activeSessionBooking as any).customer_id || null,
+        patient_name: activeSessionBooking.name || (activeSessionBooking as any).customer_name || "Patient",
+        customer_name: activeSessionBooking.name || (activeSessionBooking as any).customer_name || "Patient",
+        doctor_name: activeSessionBooking.doctorName || null,
         diagnosis: rxDiagnosis,
         medications: rxMedications.filter((m) => m.name.trim()),
-        instructions: rxGeneralNotes
+        instructions: rxGeneralNotes,
+        general_notes: rxGeneralNotes,
+        date: activeSessionBooking.date || new Date().toISOString().slice(0, 10),
       };
 
       const res = await fetch("/api/prescriptions", {

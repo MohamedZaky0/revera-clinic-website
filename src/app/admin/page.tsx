@@ -13,7 +13,7 @@ import {
   LocalCategory 
 } from "@/lib/serviceStore";
 import { compressImage } from "@/lib/image";
-import { printInvoice } from "@/lib/printUtils";
+import { printInvoice, printPrescription } from "@/lib/printUtils";
 import { Branch } from "@/types";
 import { translations } from "@/lib/translations";
 import { CLIENT } from "@/config/client";
@@ -1392,33 +1392,92 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (viewingBooking) {
-      const custId = viewingBooking.customerId || viewingBooking.id;
-      if (custId) {
-        fetch(`/api/prescriptions?customerId=${encodeURIComponent(custId)}`, { headers: authenticatedJsonHeaders })
-          .then((res) => (res.ok ? res.json() : []))
-          .then((data) => setDrawerPrescriptions(Array.isArray(data) ? data : []))
-          .catch((err) => console.warn("Error fetching drawer prescriptions:", err));
-      }
+      const custId = viewingBooking.customerId || (viewingBooking as any).customer_id || "";
+      const bookId = viewingBooking.id || "";
+      const pName = viewingBooking.name || "";
+      const params = new URLSearchParams();
+      if (bookId) params.set("bookingId", String(bookId));
+      if (custId) params.set("customerId", String(custId));
+      if (pName) params.set("patientName", String(pName));
+
+      fetch(`/api/prescriptions?${params.toString()}`, { headers: authenticatedJsonHeaders })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => setDrawerPrescriptions(Array.isArray(data) ? data : []))
+        .catch((err) => console.warn("Error fetching drawer prescriptions:", err));
     } else {
       setDrawerPrescriptions([]);
     }
-  }, [viewingBooking]);
+  }, [viewingBooking?.id, (viewingBooking as any)?.customerId, (viewingBooking as any)?.customer_id]);
+
+  function handleSendPrescriptionWhatsApp(rx: any, booking: any) {
+    const rawPhone = String(booking?.phone || rx?.patient_phone || rx?.phone || '').trim();
+    if (!rawPhone) {
+      alert("No phone number found for this patient.");
+      return;
+    }
+    let cleanPhone = rawPhone.replace(/\D/g, '');
+    if (cleanPhone.startsWith('01')) {
+      cleanPhone = '20' + cleanPhone.slice(1);
+    } else if (cleanPhone.startsWith('00')) {
+      cleanPhone = cleanPhone.slice(2);
+    } else if (!cleanPhone.startsWith('20') && cleanPhone.length === 10) {
+      cleanPhone = '20' + cleanPhone;
+    }
+
+    const patientName = rx.patient_name || rx.customer_name || booking?.name || 'Patient';
+    const doctorName = rx.doctor_name || booking?.doctorName || 'Treating Doctor';
+    const rxDate = rx.date ? String(rx.date).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const diagnosis = rx.diagnosis || 'Clinical Consultation';
+    const notes = rx.general_notes || rx.instructions || rx.doctor_notes || rx.notes || '';
+
+    const medsList: any[] = Array.isArray(rx.medications) && rx.medications.length > 0
+      ? rx.medications
+      : (Array.isArray(rx.items) ? rx.items : []);
+
+    const medsText = medsList.length > 0
+      ? medsList.map((m: any, idx: number) => 
+          `${idx + 1}. *${m.name || m.medicine_name || m.medicine || 'Medication'}* ${m.dosage ? `(${m.dosage})` : ''}\n   ⏱️ التكرار / Frequency: ${m.frequency || 'حسب الإرشادات'}\n   ⏳ المدة / Duration: ${m.duration || 'حسب الحاجة'}`
+        ).join('\n\n')
+      : 'لا توجد أدوية مسجلة';
+
+    const msg = 
+`*REVERA CLINICS | روشتة طبية إلكترونية*
+━━━━━━━━━━━━━━━━━━━━
+👤 *المريض / Patient:* ${patientName}
+📅 *التاريخ / Date:* ${rxDate}
+👨‍⚕️ *الطبيب / Doctor:* ${doctorName}
+${diagnosis ? `🩺 *التشخيص / Diagnosis:* ${diagnosis}\n` : ''}━━━━━━━━━━━━━━━━━━━━
+💊 *الأدوية الموصوفة / Prescribed Medications:*
+
+${medsText}
+━━━━━━━━━━━━━━━━━━━━
+${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n━━━━━━━━━━━━━━━━━━━━\n` : ''}✨ مع تمنياتنا لكم بالشفاء العاجل ودوام الصحة والعافية.
+📍 *Revera Clinics* — Sheikh Zayed & New Cairo
+📞 (+20) 01035595691`;
+
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  }
 
   const handleSaveDrawerPrescription = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!viewingBooking) return;
     setSavingDrawerRx(true);
     try {
-      const custId = viewingBooking.customerId || viewingBooking.id;
+      const custId = viewingBooking.customerId || (viewingBooking as any).customer_id || null;
       const res = await fetch("/api/prescriptions", {
         method: "POST",
         headers: authenticatedJsonHeaders,
         body: JSON.stringify({
-          customer_id: String(custId),
+          booking_id: viewingBooking.id,
+          customer_id: custId ? String(custId) : null,
           patient_name: viewingBooking.name || "Patient",
-          date: new Date().toISOString().slice(0, 10),
+          customer_name: viewingBooking.name || "Patient",
+          doctor_name: viewingBooking.doctorName || null,
+          date: viewingBooking.date || new Date().toISOString().slice(0, 10),
           diagnosis: drawerRxDiagnosis,
           medications: drawerRxMeds.filter((m) => m.name.trim() !== ""),
+          instructions: drawerRxNotes,
           general_notes: drawerRxNotes,
           doctor_notes: viewingBooking.notes || ""
         })
@@ -1431,7 +1490,12 @@ export default function AdminPage() {
         setDrawerRxMeds([{ name: "", dosage: "", frequency: "", duration: "" }]);
         setDrawerRxNotes("");
 
-        const rxRes = await fetch(`/api/prescriptions?customerId=${encodeURIComponent(custId)}`, { headers: authenticatedJsonHeaders });
+        const params = new URLSearchParams();
+        if (viewingBooking.id) params.set("bookingId", String(viewingBooking.id));
+        if (custId) params.set("customerId", String(custId));
+        if (viewingBooking.name) params.set("patientName", String(viewingBooking.name));
+
+        const rxRes = await fetch(`/api/prescriptions?${params.toString()}`, { headers: authenticatedJsonHeaders });
         if (rxRes.ok) {
           const rxData = await rxRes.json();
           setDrawerPrescriptions(Array.isArray(rxData) ? rxData : []);
@@ -17293,10 +17357,14 @@ export default function AdminPage() {
 
                   {/* Prescriptions Card */}
                   <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-1 border-b border-[#414E36]/10 pb-3">
                       <div>
-                        <p className="text-sm font-bold text-[#1F251A]">Prescriptions</p>
-                        <p className="text-xs text-[#5A6A51]">Patient digital prescriptions record</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">Prescriptions</p>
+                        <p className="text-sm font-bold text-[#1F251A] mt-0.5">
+                          {drawerPrescriptions.length > 0
+                            ? `${drawerPrescriptions.length} Digital Prescription(s)`
+                            : "Patient digital prescriptions record"}
+                        </p>
                       </div>
                       <button
                         onClick={() => setShowDrawerPrescriptionModal(true)}
@@ -17307,30 +17375,98 @@ export default function AdminPage() {
                     </div>
 
                     {drawerPrescriptions.length > 0 ? (
-                      <div className="space-y-3 pt-2">
-                        {drawerPrescriptions.map((rx: any, rxIdx: number) => (
-                          <div key={rx.id || rxIdx} className="rounded-xl bg-[#FBFBF9] border border-[#414E36]/10 p-3 text-xs space-y-1.5">
-                            <div className="flex justify-between items-center font-bold text-[#1F251A]">
-                              <span>Diagnosis: {rx.diagnosis || "Medical Prescription"}</span>
-                              <span className="text-[10px] text-[#5A6A51] font-mono">{rx.date ? String(rx.date).slice(0, 10) : "Today"}</span>
-                            </div>
-                            {rx.medications && Array.isArray(rx.medications) && (
-                              <div className="space-y-1 pt-1 border-t border-[#414E36]/10">
-                                {rx.medications.map((m: any, mIdx: number) => (
-                                  <div key={mIdx} className="flex justify-between text-[11px] text-[#5A6A51]">
-                                    <span className="font-semibold text-[#1F251A]">• {m.name || m.medicine} ({m.dosage})</span>
-                                    <span>{m.frequency} - {m.duration}</span>
-                                  </div>
-                                ))}
+                      <div className="space-y-4 pt-1">
+                        {drawerPrescriptions.map((rx: any, rxIdx: number) => {
+                          const medsList: any[] = Array.isArray(rx.medications) && rx.medications.length > 0
+                            ? rx.medications
+                            : (Array.isArray(rx.items) ? rx.items : []);
+                          const rxDate = rx.date ? String(rx.date).slice(0, 10) : (rx.created_at ? new Date(rx.created_at).toLocaleDateString() : "Today");
+                          const docName = rx.doctor_name || viewingBooking.doctorName || "Treating Doctor";
+                          const notes = rx.general_notes || rx.instructions || rx.doctor_notes || rx.notes;
+
+                          return (
+                            <div key={rx.id || rxIdx} className="rounded-2xl bg-[#FBFBF9] border border-[#414E36]/15 p-4 text-xs space-y-3 shadow-sm">
+                              {/* Top Prescription Header */}
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#414E36]/10 pb-2.5">
+                                <div>
+                                  <span className="font-extrabold text-sm text-[#1F251A]">
+                                    {rx.diagnosis ? `Diagnosis: ${rx.diagnosis}` : "Clinical Prescription"}
+                                  </span>
+                                  <p className="text-[11px] text-[#5A6A51] mt-0.5">
+                                    <strong>Doctor:</strong> {docName}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <span className="rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-[10px] font-bold text-[#414E36]">
+                                    {rxDate}
+                                  </span>
+                                </div>
                               </div>
-                            )}
-                            {rx.general_notes && (
-                              <p className="text-[11px] text-[#5A6A51] italic pt-1 font-sans">
-                                Notes: {rx.general_notes}
-                              </p>
-                            )}
-                          </div>
-                        ))}
+
+                              {/* Medications Table */}
+                              {medsList.length > 0 && (
+                                <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+                                  <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                      <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-200 text-[11px]">
+                                        <th className="p-2 text-left">Medication</th>
+                                        <th className="p-2 text-left">Dosage</th>
+                                        <th className="p-2 text-left">Frequency</th>
+                                        <th className="p-2 text-left">Duration</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                      {medsList.map((m: any, mIdx: number) => (
+                                        <tr key={mIdx} className="hover:bg-gray-50/50">
+                                          <td className="p-2 font-bold text-[#1F251A]">{m.name || m.medicine_name || m.medicine || "—"}</td>
+                                          <td className="p-2 text-[#5A6A51] font-medium">{m.dosage || "—"}</td>
+                                          <td className="p-2 text-[#5A6A51]">{m.frequency || "—"}</td>
+                                          <td className="p-2 text-[#5A6A51]">{m.duration || "—"}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+
+                              {/* Doctor Instructions */}
+                              {notes && (
+                                <div className="rounded-xl bg-[#FAF5EB] border border-[#C4AE7C]/30 p-2.5 text-[11px] text-[#414E36]">
+                                  <strong className="block font-bold mb-0.5 text-[#1F251A]">Instructions / تعليمات:</strong>
+                                  <p className="whitespace-pre-line leading-relaxed">{notes}</p>
+                                </div>
+                              )}
+
+                              {/* Action Buttons: WhatsApp & Print */}
+                              <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[#414E36]/10">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendPrescriptionWhatsApp(rx, viewingBooking)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white px-3 py-1.5 text-xs font-bold transition shadow-sm"
+                                  title={`Send prescription to ${viewingBooking.phone || 'patient'} via WhatsApp`}
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.632.062-1.954-.476-1.579-.643-2.617-2.26-2.696-2.366-.079-.105-.644-.858-.644-1.636 0-.777.407-1.16.552-1.317.145-.157.316-.197.422-.197.105 0 .211.002.302.007.098.005.23-.037.36.275.144.348.492 1.2.535 1.288.043.088.072.19.014.307-.058.117-.087.19-.174.292-.087.102-.183.228-.261.306-.087.087-.179.182-.077.357.102.175.454.748.974 1.211.671.597 1.236.782 1.411.87.175.088.277.073.38-.044.103-.117.437-.509.554-.684.116-.175.233-.146.393-.088.16.059 1.018.48 1.193.568.175.088.291.131.334.205.044.073.044.423-.1.828z"/>
+                                  </svg>
+                                  Send via WhatsApp
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => printPrescription(rx, viewingBooking)}
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#414E36] hover:bg-[#323D2A] text-white px-3 py-1.5 text-xs font-bold transition shadow-sm"
+                                  title="Print or Save PDF of this prescription"
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="6 9 6 2 18 2 18 9" />
+                                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                                    <rect x="6" y="14" width="12" height="8" />
+                                  </svg>
+                                  Print / Save PDF
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-6 text-center text-[#5A6A51]">
@@ -18133,6 +18269,155 @@ export default function AdminPage() {
                 Add to Invoice
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Prescription Modal for Booking Drawer */}
+      {showDrawerPrescriptionModal && viewingBooking && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn overflow-y-auto">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 my-8 border border-[#414E36]/10">
+            <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Digital Rx</span>
+                <h3 className="text-base font-bold text-[#1F251A] mt-0.5">Add Prescription for {viewingBooking.name}</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowDrawerPrescriptionModal(false);
+                  setDrawerRxDiagnosis("");
+                  setDrawerRxMeds([{ name: "", dosage: "", frequency: "", duration: "" }]);
+                  setDrawerRxNotes("");
+                }}
+                className="rounded-full bg-gray-100 p-1.5 text-gray-500 hover:bg-gray-200 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDrawerPrescription} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-[#1F251A] mb-1">Clinical Diagnosis / التشخيص</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Skin rejuvenation, Acne treatment, Post-laser care"
+                  value={drawerRxDiagnosis}
+                  onChange={(e) => setDrawerRxDiagnosis(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#414E36]"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block font-bold text-[#1F251A]">Prescribed Medications / الأدوية</label>
+                  <button
+                    type="button"
+                    onClick={() => setDrawerRxMeds(prev => [...prev, { name: "", dosage: "", frequency: "", duration: "" }])}
+                    className="text-[11px] font-bold text-[#414E36] hover:underline"
+                  >
+                    + Add Medication
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {drawerRxMeds.map((med, mIdx) => (
+                    <div key={mIdx} className="p-2.5 rounded-xl bg-[#FBFBF9] border border-gray-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[11px] text-[#5A6A51]">Medication #{mIdx + 1}</span>
+                        {drawerRxMeds.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setDrawerRxMeds(prev => prev.filter((_, i) => i !== mIdx))}
+                            className="text-red-500 hover:text-red-700 font-bold text-xs"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Medication Name"
+                          value={med.name}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, name: val } : item));
+                          }}
+                          className="rounded-lg border border-gray-300 p-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#414E36]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Dosage (e.g. 500mg, 1 tab)"
+                          value={med.dosage}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, dosage: val } : item));
+                          }}
+                          className="rounded-lg border border-gray-300 p-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Frequency (e.g. Twice daily)"
+                          value={med.frequency}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, frequency: val } : item));
+                          }}
+                          className="rounded-lg border border-gray-300 p-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Duration (e.g. 7 days)"
+                          value={med.duration}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDrawerRxMeds(prev => prev.map((item, i) => i === mIdx ? { ...item, duration: val } : item));
+                          }}
+                          className="rounded-lg border border-gray-300 p-2 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#1F251A] mb-1">Doctor Instructions & Advice / تعليمات الطبيب</label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Avoid direct sunlight, apply sunscreen every 2 hours, drink plenty of water."
+                  value={drawerRxNotes}
+                  onChange={(e) => setDrawerRxNotes(e.target.value)}
+                  className="w-full rounded-xl border border-gray-300 p-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36]"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDrawerPrescriptionModal(false);
+                    setDrawerRxDiagnosis("");
+                    setDrawerRxMeds([{ name: "", dosage: "", frequency: "", duration: "" }]);
+                    setDrawerRxNotes("");
+                  }}
+                  className="w-1/2 rounded-xl border border-gray-300 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingDrawerRx}
+                  className="w-1/2 rounded-xl bg-[#414E36] py-2.5 text-xs font-bold text-white hover:bg-[#343F2B] transition disabled:opacity-50 shadow-sm"
+                >
+                  {savingDrawerRx ? "Saving..." : "Save Prescription"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
