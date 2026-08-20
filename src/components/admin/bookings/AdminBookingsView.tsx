@@ -837,12 +837,12 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                   <Coins size={18} />
                 </div>
               </div>
-              <div className="mt-3 flex items-baseline justify-between gap-1">
-                <span className="text-xl xl:text-2xl font-black text-[#111827] whitespace-nowrap leading-tight">
-                  EGP {stats.dayRevenue.toLocaleString()}
+              <div className="mt-3 flex items-baseline justify-between">
+                <span className="text-3xl font-black text-[#111827]">
+                  {stats.dayRevenue.toLocaleString()}
                 </span>
-                <span className="text-[11px] font-semibold text-emerald-700 whitespace-nowrap shrink-0">
-                  {tr.selectedDayLabel || "Selected day"}
+                <span className="text-xs font-bold text-emerald-700">
+                  EGP
                 </span>
               </div>
             </>
