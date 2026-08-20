@@ -149,6 +149,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [statusFilter, setStatusFilter] = useState<string>("All");
 
+  // Today's Schedule Inline Filter State (Inventory style)
+  const [showTodayFilters, setShowTodayFilters] = useState(false);
+  const [todayStatusFilter, setTodayStatusFilter] = useState("All");
+  const [todayDoctorFilter, setTodayDoctorFilter] = useState("All");
+  const [todayServiceFilter, setTodayServiceFilter] = useState("All");
+  const [todayPaymentFilter, setTodayPaymentFilter] = useState("All");
+
   // Direct Supabase database fallback state
   const [dbReservations, setDbReservations] = useState<any[]>([]);
   const [dbProviders, setDbProviders] = useState<any[]>(providers);
@@ -310,18 +317,77 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     no_show: 8
   };
 
-  // Filter & sort appointments strictly for the selected date according to Flow Order
+  // Unique doctors and services for dropdown filters
+  const uniqueDoctors = useMemo(() => {
+    const docSet = new Set<string>();
+    (providers || []).forEach((p: any) => {
+      if (p.name) docSet.add(p.name);
+    });
+    (dbProviders || []).forEach((p: any) => {
+      if (p.name) docSet.add(p.name);
+    });
+    mergedAppointments.forEach((a: any) => {
+      if (a.doctor_name && a.doctor_name !== "—" && a.doctor_name !== "-") {
+        docSet.add(a.doctor_name);
+      }
+    });
+    return Array.from(docSet).sort();
+  }, [providers, dbProviders, mergedAppointments]);
+
+  const uniqueServices = useMemo(() => {
+    const srvSet = new Set<string>();
+    (localServices || []).forEach((s: any) => {
+      if (s.en) srvSet.add(s.en);
+      else if (s.name) srvSet.add(s.name);
+    });
+    mergedAppointments.forEach((a: any) => {
+      if (a.service_name && a.service_name !== "—" && a.service_name !== "-") {
+        srvSet.add(a.service_name);
+      }
+    });
+    return Array.from(srvSet).sort();
+  }, [localServices, mergedAppointments]);
+
+  // Filter & sort appointments strictly for the selected date according to Flow Order & active filters
   const selectedDayAppointments = useMemo(() => {
     let dayList = mergedAppointments.filter(r => r.date === selectedDateStr);
-    if (statusFilter !== "All") {
+
+    // 1. Status filter
+    if (todayStatusFilter !== "All") {
       dayList = dayList.filter(r => {
         const st = (r.status || "").toLowerCase();
-        if (statusFilter === "pending") return ["pending", "waiting", "pending_deposit"].includes(st);
-        if (statusFilter === "confirmed") return ["confirmed", "approved"].includes(st);
-        if (statusFilter === "in_progress") return ["in_progress", "started"].includes(st);
-        if (statusFilter === "postponed") return ["postponed", "rescheduled"].includes(st);
-        if (statusFilter === "canceled") return ["canceled", "cancelled", "rejected"].includes(st);
-        return st === statusFilter.toLowerCase();
+        if (todayStatusFilter === "pending") return ["pending", "waiting", "pending_deposit"].includes(st);
+        if (todayStatusFilter === "confirmed") return ["confirmed", "approved"].includes(st);
+        if (todayStatusFilter === "in_progress") return ["in_progress", "started"].includes(st);
+        if (todayStatusFilter === "completed") return ["completed", "done"].includes(st);
+        if (todayStatusFilter === "postponed") return ["postponed", "rescheduled"].includes(st);
+        if (todayStatusFilter === "canceled") return ["canceled", "cancelled", "rejected"].includes(st);
+        return st === todayStatusFilter.toLowerCase();
+      });
+    }
+
+    // 2. Doctor filter
+    if (todayDoctorFilter !== "All") {
+      dayList = dayList.filter(r => {
+        return String(r.doctor_name || "").toLowerCase() === todayDoctorFilter.toLowerCase();
+      });
+    }
+
+    // 3. Service filter
+    if (todayServiceFilter !== "All") {
+      dayList = dayList.filter(r => {
+        const sName = (r.service_name || r.service || "").toLowerCase();
+        return sName.includes(todayServiceFilter.toLowerCase());
+      });
+    }
+
+    // 4. Payment filter
+    if (todayPaymentFilter !== "All") {
+      dayList = dayList.filter(r => {
+        const payStr = (r.paymentStatus || "").toLowerCase();
+        if (todayPaymentFilter === "paid") return payStr === "paid";
+        if (todayPaymentFilter === "outstanding") return payStr === "unpaid" || payStr === "partial" || payStr === "—";
+        return true;
       });
     }
 
@@ -332,7 +398,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       if (rankA !== rankB) return rankA - rankB;
       return (a.time || "").localeCompare(b.time || "");
     });
-  }, [mergedAppointments, selectedDateStr, statusFilter]);
+  }, [mergedAppointments, selectedDateStr, todayStatusFilter, todayDoctorFilter, todayServiceFilter, todayPaymentFilter]);
 
   // Pagination calculation
   const totalAppointments = selectedDayAppointments.length;
@@ -1619,14 +1685,126 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     <ArrowRight size={14} />
                   </button>
                   <button
-                    onClick={onFilterClick}
-                    title={tr.filterTitle}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#374151] hover:bg-gray-50 active:scale-95 cursor-pointer"
+                    type="button"
+                    onClick={() => setShowTodayFilters(prev => !prev)}
+                    title={tr.filterTitle || "Filter"}
+                    className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition cursor-pointer shadow-2xs ${
+                      showTodayFilters || todayStatusFilter !== "All" || todayDoctorFilter !== "All" || todayServiceFilter !== "All" || todayPaymentFilter !== "All"
+                        ? "border-[#C4AE7C] bg-[#EDE4C8] text-[#414E36]"
+                        : "border-gray-200 bg-white text-[#374151] hover:bg-gray-50 active:scale-95"
+                    }`}
                   >
                     <Filter size={15} />
+                    {(todayStatusFilter !== "All" || todayDoctorFilter !== "All" || todayServiceFilter !== "All" || todayPaymentFilter !== "All") && (
+                      <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#414E36] text-[9px] font-bold text-white">!</span>
+                    )}
                   </button>
                 </div>
               </div>
+
+              {/* Expandable Filter Panel (Inventory style) */}
+              {showTodayFilters && (
+                <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 rounded-2xl border border-[#414E36]/10 bg-[#F9F9F7] p-4 shadow-2xs animate-fadeIn">
+                  {/* Status Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                      {tr.colStatus || "Status"}
+                    </label>
+                    <select
+                      value={todayStatusFilter}
+                      onChange={(e) => {
+                        setTodayStatusFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                    >
+                      <option value="All">{tr.filterAllStatuses || "All Statuses"}</option>
+                      <option value="pending">{tr.statusPending || "Pending"}</option>
+                      <option value="confirmed">{tr.statusConfirmed || "Confirmed"}</option>
+                      <option value="in_progress">{tr.statusInProgress || "In Progress"}</option>
+                      <option value="completed">{tr.statusCompleted || "Completed"}</option>
+                      <option value="postponed">{tr.statusPostponed || "Postponed"}</option>
+                      <option value="canceled">{tr.statusCanceled || "Canceled"}</option>
+                    </select>
+                  </div>
+
+                  {/* Doctor Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                      {tr.colDoctor || "Doctor / Provider"}
+                    </label>
+                    <select
+                      value={todayDoctorFilter}
+                      onChange={(e) => {
+                        setTodayDoctorFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                    >
+                      <option value="All">{tr.filterAllDoctors || "All Doctors"}</option>
+                      {uniqueDoctors.map(doc => (
+                        <option key={doc} value={doc}>{doc}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Service Filter */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                      {tr.colService || "Service"}
+                    </label>
+                    <select
+                      value={todayServiceFilter}
+                      onChange={(e) => {
+                        setTodayServiceFilter(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                    >
+                      <option value="All">{tr.filterAllServices || "All Services"}</option>
+                      {uniqueServices.map(srv => (
+                        <option key={srv} value={srv}>{srv}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Payment Filter & Reset */}
+                  <div className="flex flex-col gap-1.5 justify-between">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51]">
+                      {tr.colPayment || "Payment"}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={todayPaymentFilter}
+                        onChange={(e) => {
+                          setTodayPaymentFilter(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                        className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-xs font-semibold text-[#1F251A] outline-none focus:border-[#C4AE7C] transition"
+                      >
+                        <option value="All">All Payments</option>
+                        <option value="paid">{tr.paymentPaid || "Paid"}</option>
+                        <option value="outstanding">{tr.paymentOutstanding || "Outstanding"}</option>
+                      </select>
+                      {(todayStatusFilter !== "All" || todayDoctorFilter !== "All" || todayServiceFilter !== "All" || todayPaymentFilter !== "All") && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTodayStatusFilter("All");
+                            setTodayDoctorFilter("All");
+                            setTodayServiceFilter("All");
+                            setTodayPaymentFilter("All");
+                            setCurrentPage(1);
+                          }}
+                          className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition cursor-pointer"
+                        >
+                          {tr.resetFilters || "Reset"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Table */}
               <div className="w-full overflow-hidden">
