@@ -1142,7 +1142,7 @@ export default function AdminNewBookingView({
 
       {/* ── BOOKING SUMMARY CONFIRMATION POPUP MODAL ── */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-[#414E36]/15 space-y-6 relative">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4">

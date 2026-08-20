@@ -341,7 +341,7 @@ export default function AdminDoctorsView({
                             </button>
 
                             {activeDoctorRowMenuId === docKey && (
-                              <div className="absolute end-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs animate-in fade-in duration-150 text-start dropdown-action-menu">
+                              <div className="absolute end-0 top-8 z-[9999] w-36 rounded-xl bg-white p-1 shadow-xl border border-[#414E36]/15 text-xs text-start dropdown-action-menu">
                                 {hasPermission("providers.edit") && (
                                   <button
                                     type="button"

@@ -20724,7 +20724,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
       {editingTargetEmployee && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-md rounded-3xl bg-[#FBFBF9] p-6 shadow-2xl border border-[#414E36]/10">
             <div className="mb-5 flex items-center justify-between border-b border-[#414E36]/10 pb-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C4AE7C]">Set Monthly Target</p>
@@ -20875,8 +20875,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
       )}
 
       {activeInfoFeature && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/60 backdrop-blur-sm p-4 transition-opacity duration-300">
-          <div className="bg-[#FBFBF9] rounded-[32px] border border-[#414E36]/10 p-6 max-w-md w-full shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/60 backdrop-blur-sm p-4">
+          <div className="bg-[#FBFBF9] rounded-[32px] border border-[#414E36]/10 p-6 max-w-md w-full shadow-2xl relative">
             <h4 className="text-lg font-bold text-[#1F251A] pr-8 mb-2 flex items-center gap-2">
               <Info className="text-[#C4AE7C] shrink-0" size={20} />
               {activeInfoFeature.title}

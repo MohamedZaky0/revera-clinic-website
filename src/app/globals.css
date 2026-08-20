@@ -933,7 +933,7 @@ body::-webkit-scrollbar-corner {
   animation: fadeIn 0.15s ease-out forwards;
 }
 
-/* ── Universal Disable of All Animations & Transitions across Admin View ── */
+/* ── Universal Disable of All Animations, Transitions & Blur Filters across Admin View ── */
 #admin-root,
 #admin-root *,
 #admin-root *::before,
@@ -942,6 +942,8 @@ body::-webkit-scrollbar-corner {
   animation-delay: 0s !important;
   transition-duration: 0s !important;
   transition-delay: 0s !important;
+  --tw-enter-blur: 0 !important;
+  --tw-exit-blur: 0 !important;
 }
 
 #admin-root .animate-fadeIn,
@@ -956,9 +958,11 @@ body::-webkit-scrollbar-corner {
 #admin-root .animate-ping,
 #admin-root [class*="animate-in"],
 #admin-root [class*="fade-in"],
-#admin-root [class*="zoom-in"] {
+#admin-root [class*="zoom-in"],
+#admin-root .dropdown-action-menu {
   opacity: 1 !important;
   transform: none !important;
+  filter: none !important;
   animation: none !important;
   transition: none !important;
   visibility: visible !important;
