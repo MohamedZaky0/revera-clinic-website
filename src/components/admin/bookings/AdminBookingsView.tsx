@@ -862,17 +862,17 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         </div>
         {/* Table Container */}
         <div className="overflow-x-auto scrollbar-none">
-          <table className="w-full text-start text-xs border-collapse">
+          <table className="w-full text-start text-xs border-collapse table-fixed">
             <thead>
               <tr className="border-b border-gray-100 text-[11px] font-bold text-[#6B7280]">
-                <th className="py-3 px-3 whitespace-nowrap">{tr.colPatient} ˅</th>
-                <th className="py-3 px-3 whitespace-nowrap">{tr.colService}</th>
-                <th className="py-3 px-3 whitespace-nowrap">{tr.colDoctor}</th>
-                <th className="py-3 px-3 whitespace-nowrap">{tr.colDateTime}</th>
-                <th className="py-3 px-3 whitespace-nowrap">{tr.colBranch}</th>
-                <th className="py-3 px-3 whitespace-nowrap">{tr.colStatus}</th>
-                <th className="py-3 px-3 whitespace-nowrap">{tr.colRequestedAt}</th>
-                <th className="py-3 px-3 whitespace-nowrap text-start">{tr.colActions}</th>
+                <th className="py-3 px-3 whitespace-nowrap text-start w-[16%]">{tr.colPatient} ˅</th>
+                <th className="py-3 px-3 whitespace-nowrap text-start w-[17%]">{tr.colService}</th>
+                <th className="py-3 px-3 whitespace-nowrap text-start w-[15%]">{tr.colDoctor}</th>
+                <th className="py-3 px-3 whitespace-nowrap text-start w-[15%]">{tr.colDateTime}</th>
+                <th className="py-3 px-3 whitespace-nowrap text-start w-[12%]">{tr.colBranch}</th>
+                <th className="py-3 px-3 whitespace-nowrap text-start w-[9%]">{tr.colStatus}</th>
+                <th className="py-3 px-3 whitespace-nowrap text-start w-[9%]">{tr.colRequestedAt}</th>
+                <th className="py-3 px-3 whitespace-nowrap text-start w-[7%]">{tr.colActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -1203,13 +1203,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 <table className="w-full text-start border-collapse text-xs table-fixed">
                   <thead>
                     <tr className="border-b border-gray-100 text-[10px] uppercase font-bold tracking-tight text-[#9CA3AF]">
-                      <th className="py-2.5 px-1 font-bold w-[11%]">{tr.colTime}</th>
-                      <th className="py-2.5 px-1 font-bold w-[19%]">{tr.colPatient}</th>
-                      <th className="py-2.5 px-1 font-bold w-[19%]">{tr.colService}</th>
-                      <th className="py-2.5 px-1 font-bold w-[16%]">{tr.colDoctor}</th>
-                      <th className="py-2.5 px-1 font-bold w-[9%]">{tr.colRoom}</th>
-                      <th className="py-2.5 px-1 font-bold w-[13%]">{tr.colStatus}</th>
-                      <th className="py-2.5 px-1 font-bold w-[13%]">{tr.colPayment}</th>
+                      <th className="py-2.5 px-2 text-start font-bold w-[12%]">{tr.colTime}</th>
+                      <th className="py-2.5 px-2 text-start font-bold w-[20%]">{tr.colPatient}</th>
+                      <th className="py-2.5 px-2 text-start font-bold w-[18%]">{tr.colService}</th>
+                      <th className="py-2.5 px-2 text-start font-bold w-[16%]">{tr.colDoctor}</th>
+                      <th className="py-2.5 px-2 text-start font-bold w-[10%]">{tr.colRoom}</th>
+                      <th className="py-2.5 px-2 text-start font-bold w-[12%]">{tr.colStatus}</th>
+                      <th className="py-2.5 px-2 text-start font-bold w-[12%]">{tr.colPayment}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -1245,26 +1245,31 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           <tr
                             key={row.id}
                             onClick={() => onViewBookingDetails && onViewBookingDetails(row)}
-                            className={`group cursor-pointer transition hover:bg-emerald-50/50 border-l-4 ${stConfig.border}`}
+                            className="group cursor-pointer transition hover:bg-emerald-50/50"
                           >
-                            <td className="py-2.5 px-1 font-bold text-[#111827] text-[11px] whitespace-nowrap">{displayTimeStr}</td>
-                            <td className="py-2.5 px-1">
+                            <td className="py-2.5 px-2 font-bold text-[#111827] text-[11px] whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`w-1 h-3.5 rounded-full shrink-0 ${stConfig.dot}`}></span>
+                                <span>{displayTimeStr}</span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-2">
                               <div className="min-w-0">
                                 <span className="font-semibold text-[#111827] block text-xs truncate">{row.customer_name}</span>
                                 <span className="text-[10px] font-mono text-gray-500 font-medium block truncate">{row.customer_phone}</span>
                               </div>
                             </td>
-                            <td className="py-2.5 px-1">
+                            <td className="py-2.5 px-2">
                               <div className="flex flex-col min-w-0">
                                 <span className="font-bold text-[#111827] text-xs truncate">{row.service_name}</span>
                                 <span className="text-[10px] font-medium text-[#9CA3AF] truncate">{row.service_variant}</span>
                               </div>
                             </td>
-                            <td className="py-2.5 px-1">
+                            <td className="py-2.5 px-2">
                               <span className="font-medium text-[#374151] text-xs truncate block">{row.doctor_name}</span>
                             </td>
-                            <td className="py-2.5 px-1 text-[#6B7280] font-medium text-xs truncate">{row.room}</td>
-                            <td className="py-2.5 px-1">
+                            <td className="py-2.5 px-2 text-[#6B7280] font-medium text-xs truncate">{row.room}</td>
+                            <td className="py-2.5 px-2">
                               <div className="flex flex-col items-start gap-0.5">
                                 <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${stConfig.bg} ${stConfig.text} whitespace-nowrap`}>
                                   <span className={`h-1.5 w-1.5 rounded-full ${stConfig.dot}`}></span>
@@ -1285,7 +1290,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                                 )}
                               </div>
                             </td>
-                            <td className="py-2.5 px-1">
+                            <td className="py-2.5 px-2">
                               <span className={`inline-flex items-center rounded-md border px-1 py-0.5 text-[9px] font-bold ${payStyle} whitespace-nowrap`}>
                                 {paymentStatusLabel(row.paymentStatus)}
                               </span>
