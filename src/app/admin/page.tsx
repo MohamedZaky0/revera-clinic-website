@@ -3789,21 +3789,23 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
   }, [activeNav, viewingCustomerProfile, fetchInventoryProducts]);
 
   useEffect(() => {
-    if (viewingBooking?.customerId) {
-      fetchCustomerPackagesInto(viewingBooking.customerId, setBookingCustomerPackages);
+    const custId = viewingBooking?.customerId || (viewingBooking as any)?.customer_id || (viewingBooking?.phone ? dbCustomers.find(c => c.phone && c.phone.trim().replace(/\D/g, '') === (viewingBooking.phone || '').trim().replace(/\D/g, ''))?.id : null);
+    if (custId) {
+      fetchCustomerPackagesInto(custId, setBookingCustomerPackages);
     } else {
       setBookingCustomerPackages([]);
     }
-  }, [viewingBooking?.customerId, fetchCustomerPackagesInto]);
+  }, [viewingBooking?.customerId, (viewingBooking as any)?.customer_id, viewingBooking?.phone, dbCustomers, fetchCustomerPackagesInto]);
 
   useEffect(() => {
-    if (checkoutBooking?.customerId) {
-      fetchCustomerPackagesInto(checkoutBooking.customerId, setCheckoutCustomerPackages);
+    const custId = checkoutBooking?.customerId || (checkoutBooking as any)?.customer_id || (checkoutBooking?.phone ? dbCustomers.find(c => c.phone && c.phone.trim().replace(/\D/g, '') === (checkoutBooking.phone || '').trim().replace(/\D/g, ''))?.id : null);
+    if (custId) {
+      fetchCustomerPackagesInto(custId, setCheckoutCustomerPackages);
     } else {
       setCheckoutCustomerPackages([]);
       setRedeemedPackageItems({});
     }
-  }, [checkoutBooking?.customerId, fetchCustomerPackagesInto]);
+  }, [checkoutBooking?.customerId, (checkoutBooking as any)?.customer_id, checkoutBooking?.phone, dbCustomers, fetchCustomerPackagesInto]);
 
   useEffect(() => {
     if (matchedCustomerId) {

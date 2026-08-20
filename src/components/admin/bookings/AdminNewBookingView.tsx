@@ -434,17 +434,23 @@ export default function AdminNewBookingView({
     try {
       const { data: pkgData } = await supabase
         .from("customer_packages")
-        .select("*, packages(name)")
+        .select("*, customer_package_items(*)")
         .eq("customer_id", cust.id)
-        .gt("remaining_sessions", 0)
-        .maybeSingle();
+        .eq("status", "active");
 
-      if (pkgData) {
-        setActivePackage({
-          name: pkgData.packages?.name || "Laser Hair Removal (Session Package)",
-          remaining: pkgData.remaining_sessions || 4,
-          expiresOn: pkgData.expires_at ? new Date(pkgData.expires_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "12 Dec 2026"
-        });
+      if (pkgData && pkgData.length > 0) {
+        const firstPkg = pkgData[0];
+        const items = firstPkg.customer_package_items || [];
+        const totalRemaining = items.reduce((sum: number, it: any) => sum + (it.qty_remaining || 0), 0);
+        if (totalRemaining > 0) {
+          setActivePackage({
+            name: firstPkg.package_name || "Session Package",
+            remaining: totalRemaining,
+            expiresOn: firstPkg.expires_at ? new Date(firstPkg.expires_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+          });
+        } else {
+          setActivePackage(null);
+        }
       } else {
         setActivePackage(null);
       }
