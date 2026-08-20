@@ -513,11 +513,17 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   // Pending Approvals List State & Pagination
   const [pendingPage, setPendingPage] = useState(1);
   const [pendingRowsPerPage, setPendingRowsPerPage] = useState(10);
+  const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
+  const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
 
   // Compute pending list items
   const pendingApprovalsList = useMemo(() => {
     const sourceList = (requests && requests.length > 0) ? requests : mergedAppointments;
-    const rawPending = sourceList.filter(r => ["pending", "waiting", "pending_deposit"].includes((r.status || "pending").toLowerCase()));
+    const rawPending = sourceList.filter(r => {
+      const idStr = String(r.id || "");
+      if (rejectedIds.has(idStr) || approvedIds.has(idStr)) return false;
+      return ["pending", "waiting", "pending_deposit"].includes((r.status || "pending").toLowerCase());
+    });
 
     return rawPending.map((item: any, idx: number) => {
       const code = item.bookingCode || item.code || item.id || `#BK-${idx + 1}`;
@@ -555,7 +561,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         raw: item
       };
     });
-  }, [requests, mergedAppointments, selectedDateStr]);
+  }, [requests, mergedAppointments, selectedDateStr, rejectedIds, approvedIds]);
 
   const startIndexPending = (pendingPage - 1) * pendingRowsPerPage;
   const paginatedPendingList = useMemo(() => {
@@ -564,8 +570,9 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   const handleApproveItem = async (item: any) => {
     try {
-      const targetId = item.raw?.id || item.id;
+      const targetId = String(item.raw?.id || item.id || "");
       if (targetId) {
+        setApprovedIds(prev => new Set(prev).add(targetId));
         await supabase.from("reservations").update({ status: "approved" }).eq("id", targetId);
       }
       setDbReservations(prev => {
@@ -585,8 +592,9 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   const handleRejectItem = async (item: any) => {
     try {
-      const targetId = item.raw?.id || item.id;
+      const targetId = String(item.raw?.id || item.id || "");
       if (targetId) {
+        setRejectedIds(prev => new Set(prev).add(targetId));
         await supabase.from("reservations").update({ status: "rejected" }).eq("id", targetId);
       }
       setDbReservations(prev => {

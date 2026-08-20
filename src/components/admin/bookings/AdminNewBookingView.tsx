@@ -947,8 +947,8 @@ export default function AdminNewBookingView({
                 </div>
               </div>
 
-              {/* REAL DYNAMIC TIME SLOTS MODERN CUSTOM DROPDOWN */}
-              <div className="relative z-30" ref={timeDropdownRef}>
+              {/* REAL DYNAMIC TIME SLOTS DROPDOWN */}
+              <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block font-bold text-[#1F251A]">{tr.availableTimeLabel}</label>
                   {loadingSlots && (
@@ -958,99 +958,46 @@ export default function AdminNewBookingView({
                   )}
                 </div>
 
-                {/* Custom Trigger Button */}
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowTimeDropdown((prev) => !prev);
-                  }}
-                  className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none transition flex items-center justify-between cursor-pointer focus:border-emerald-700 hover:bg-[#FBFBF9] shadow-xs select-none"
-                >
-                  <div className="flex items-center gap-2">
-                    <Clock size={16} className="text-emerald-700" />
-                    <span>{selectedTime || "Select Time"}</span>
+                <div className="relative">
+                  <select
+                    value={selectedTime}
+                    onChange={(e) => setSelectedTime(e.target.value)}
+                    className="w-full rounded-2xl border border-[#414E36]/20 bg-white ps-10 pe-10 py-3 font-extrabold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700 shadow-xs appearance-none"
+                  >
+                    {availableTimeSlots.map((tSlot) => {
+                      const normalized = normalizeTimeSlot(tSlot);
+                      const isBooked = bookedTimeSlots.includes(normalized);
+                      const isPast = isSlotInPast(tSlot, bookingDate);
+                      const isDisabled = isBooked || isPast;
+
+                      let statusText = "";
+                      if (isBooked) {
+                        statusText = ` ${tr.bookedSuffix || "(Booked)"}`;
+                      } else if (isPast) {
+                        statusText = ` ${tr.pastSuffix || "(Past)"}`;
+                      }
+
+                      return (
+                        <option
+                          key={tSlot}
+                          value={tSlot}
+                          disabled={isDisabled}
+                          className={isDisabled ? "text-gray-400 font-normal bg-gray-100" : "font-extrabold text-[#1F251A]"}
+                        >
+                          {tSlot}{statusText}
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  <div className="absolute start-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-700">
+                    <Clock size={16} />
                   </div>
-                  <ChevronDown
-                    size={16}
-                    className={`text-[#5A6A51] transition-transform duration-200 ${showTimeDropdown ? "rotate-180 text-emerald-700" : ""}`}
-                  />
+
+                  <div className="absolute end-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#5A6A51]">
+                    <ChevronDown size={16} />
+                  </div>
                 </div>
-
-                {/* Floating Modern Dropdown Menu */}
-                {showTimeDropdown && (
-                  <div className="absolute start-0 end-0 top-full mt-1.5 z-[200] max-h-72 overflow-y-auto bg-white rounded-3xl border border-[#414E36]/20 shadow-2xl p-2 space-y-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-3 py-2 text-[11px] font-extrabold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-2xl flex justify-between items-center mb-1">
-                      <span>Available Slots ({availableTimeSlots.filter(s => !bookedTimeSlots.includes(normalizeTimeSlot(s)) && !isSlotInPast(s, bookingDate)).length})</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowTimeDropdown(false);
-                        }}
-                        className="text-[#1F251A] font-bold text-xs hover:text-emerald-700 px-2 py-0.5 rounded-lg hover:bg-gray-200"
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    {availableTimeSlots.length === 0 ? (
-                      <div className="p-4 text-center text-xs font-semibold text-[#5A6A51]">
-                        No time slots available for this date.
-                      </div>
-                    ) : (
-                      availableTimeSlots.map((tSlot) => {
-                        const normalized = normalizeTimeSlot(tSlot);
-                        const isBooked = bookedTimeSlots.includes(normalized);
-                        const isPast = isSlotInPast(tSlot, bookingDate);
-                        const isDisabled = isBooked || isPast;
-                        const isSelected = selectedTime === tSlot;
-
-                        return (
-                          <div
-                            key={tSlot}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!isDisabled) {
-                                setSelectedTime(tSlot);
-                                setShowTimeDropdown(false);
-                              }
-                            }}
-                            className={`p-2.5 rounded-2xl transition flex items-center justify-between border ${
-                              isDisabled
-                                ? isBooked
-                                  ? "bg-rose-50/60 border-rose-100/80 opacity-70 cursor-not-allowed"
-                                  : "bg-gray-100/60 border-gray-200/80 opacity-60 cursor-not-allowed"
-                                : isSelected
-                                ? "bg-[#1E3A2B] text-white border-[#1E3A2B] shadow-sm font-black"
-                                : "bg-[#FBFBF9] border-[#414E36]/10 hover:bg-emerald-50/70 hover:border-emerald-300 cursor-pointer font-bold text-[#1F251A]"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <Clock size={14} className={isSelected ? "text-white" : isDisabled ? "text-gray-400" : "text-emerald-700"} />
-                              <span className={`text-xs ${isSelected ? "text-white" : isDisabled ? "line-through text-gray-400" : "text-[#1F251A]"}`}>
-                                {tSlot}
-                              </span>
-                            </div>
-
-                            {isBooked ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-700 border border-rose-200">
-                                {tr.bookedSuffix || "Reserved"}
-                              </span>
-                            ) : isPast ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-gray-200 text-gray-600 border border-gray-300">
-                                {tr.pastSuffix || "Past"}
-                              </span>
-                            ) : isSelected ? (
-                              <span className="flex items-center gap-1 text-[10px] font-extrabold text-white bg-emerald-900/50 px-2 py-0.5 rounded-full">
-                                <Check size={12} /> Selected
-                              </span>
-                            ) : null}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Session Type (In Person vs Online) */}
