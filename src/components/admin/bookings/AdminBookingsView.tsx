@@ -777,13 +777,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   };
 
   return (
-    <div dir={lang === "ar" ? "rtl" : "ltr"} className="w-full space-y-6 animate-fadeIn pb-12 text-[#1F251A] relative">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="w-full space-y-6 pb-12 text-[#1F251A] relative">
       
       {/* ── TOP HEADER BAR ── */}
       <div className="relative z-10 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2 sm:text-2xl">
-            {tr.greeting} {userName} <span className="inline-block animate-bounce">👋</span>
+            {tr.greeting} {userName} <span className="inline-block">👋</span>
           </h1>
           <p className="text-xs text-[#6B7280]">
             {tr.subtitle}

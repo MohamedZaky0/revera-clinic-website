@@ -6342,9 +6342,9 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
   if (authChecking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F2EFE9] text-[#414E36]">
+      <div id="admin-root" className="admin-view flex min-h-screen items-center justify-center bg-[#F2EFE9] text-[#414E36]">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#C4AE7C] border-t-transparent"></div>
+          <div className="h-10 w-10 rounded-full border-4 border-[#C4AE7C] border-t-transparent"></div>
           <p className="text-sm font-semibold tracking-wider">Verifying administrator session...</p>
         </div>
       </div>
@@ -6353,8 +6353,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
   if (!session || !adminRole) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F2EFE9] px-4">
-        <div className="w-full max-w-md rounded-[32px] bg-[#FBFBF9] p-8 shadow-[0_20px_60px_rgba(31,37,26,0.15)] animate-fadeIn">
+      <div id="admin-root" className="admin-view flex min-h-screen items-center justify-center bg-[#F2EFE9] px-4">
+        <div className="w-full max-w-md rounded-[32px] bg-[#FBFBF9] p-8 shadow-[0_20px_60px_rgba(31,37,26,0.15)]">
           <div className="mb-8 flex flex-col items-center">
             <div className="mb-4 relative h-16 w-16 overflow-hidden rounded-2xl bg-[#414E36] p-2.5 shadow-md">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -6408,7 +6408,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             <button
               type="submit"
               disabled={loginLoading}
-              className="w-full rounded-2xl bg-[#414E36] py-3.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full rounded-2xl bg-[#414E36] py-3.5 text-sm font-bold text-[#FBFBF9] hover:bg-[#2e3a26] disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loginLoading ? "Authenticating..." : "Access Dashboard"}
             </button>
@@ -6456,25 +6456,27 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
   if (isDoctorUserAccount && !forceAdminView) {
     return (
-      <DoctorAccountView
-        doctorDbId={loggedEmpAccount?.id || adminDbId}
-        doctorName={loggedEmpAccount?.name || adminEmail || "Doctor"}
-        doctorEmail={adminEmail}
-        doctorBranch={
-          branches.find((b) => b.id === loggedEmpAccount?.branch_id)?.name_en ||
-          loggedEmpAccount?.branch_id ||
-          "Main Branch"
-        }
-        branches={branches}
-        initialReservations={allReservations}
-        onLogout={handleLogout}
-        onSwitchToAdmin={(adminRole === "superadmin" || adminRole === "admin") ? () => setForceAdminView(true) : undefined}
-      />
+      <div id="admin-root" className="admin-view flex-1 min-h-screen">
+        <DoctorAccountView
+          doctorDbId={loggedEmpAccount?.id || adminDbId}
+          doctorName={loggedEmpAccount?.name || adminEmail || "Doctor"}
+          doctorEmail={adminEmail}
+          doctorBranch={
+            branches.find((b) => b.id === loggedEmpAccount?.branch_id)?.name_en ||
+            loggedEmpAccount?.branch_id ||
+            "Main Branch"
+          }
+          branches={branches}
+          initialReservations={allReservations}
+          onLogout={handleLogout}
+          onSwitchToAdmin={(adminRole === "superadmin" || adminRole === "admin") ? () => setForceAdminView(true) : undefined}
+        />
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F2EFE9] text-[#1F251A]">
+    <div id="admin-root" className="admin-view min-h-screen bg-[#F2EFE9] text-[#1F251A]">
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[220px_1fr]">
         {/* Backdrop for mobile sidebar */}
         {sidebarOpen && (
