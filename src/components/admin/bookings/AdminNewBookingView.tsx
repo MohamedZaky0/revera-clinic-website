@@ -110,6 +110,36 @@ function normalizeTimeSlot(t: string): string {
   return formatSlotTo12h(t).trim().toUpperCase();
 }
 
+function isSlotInPast(tSlot: string, bookingDateStr: string): boolean {
+  if (!bookingDateStr) return false;
+
+  const now = new Date();
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  if (bookingDateStr < todayISO) return true;
+  if (bookingDateStr > todayISO) return false;
+
+  // Same day: compare hour and minute with current time
+  const formatted = formatSlotTo12h(tSlot);
+  const match = formatted.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return false;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const ampm = match[3].toUpperCase();
+
+  if (ampm === "PM" && hours < 12) hours += 12;
+  if (ampm === "AM" && hours === 12) hours = 0;
+
+  const curHours = now.getHours();
+  const curMinutes = now.getMinutes();
+
+  if (hours < curHours) return true;
+  if (hours === curHours && minutes <= curMinutes) return true;
+
+  return false;
+}
+
 export default function AdminNewBookingView({
   onClose,
   onBookingCreated,
@@ -427,6 +457,24 @@ export default function AdminNewBookingView({
 
     fetchActualTimeSlots();
   }, [bookingDate, selectedDoctorId, selectedServiceId, selectedBranchId]);
+
+  // Auto-select the first valid (non-booked & non-past) slot
+  useEffect(() => {
+    if (availableTimeSlots.length > 0) {
+      const firstValid = availableTimeSlots.find((slot) => {
+        const norm = normalizeTimeSlot(slot);
+        const isBooked = bookedTimeSlots.includes(norm);
+        const isPast = isSlotInPast(slot, bookingDate);
+        return !isBooked && !isPast;
+      });
+
+      if (firstValid) {
+        setSelectedTime(firstValid);
+      } else if (!availableTimeSlots.includes(selectedTime)) {
+        setSelectedTime(availableTimeSlots[0]);
+      }
+    }
+  }, [availableTimeSlots, bookedTimeSlots, bookingDate]);
 
   const selectedServiceObj = dbServices.find(s => String(s.id) === String(selectedServiceId)) || dbServices[0];
   const selectedDoctorObj = dbDoctors.find(d => String(d.id) === String(selectedDoctorId)) || dbDoctors[0];
@@ -806,10 +854,10 @@ export default function AdminNewBookingView({
                 </div>
               </div>
 
-              {/* REAL DYNAMIC TIME SLOTS */}
+              {/* REAL DYNAMIC TIME SLOTS DROPDOWN */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="font-bold text-[#1F251A]">{tr.availableTimeLabel}</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block font-bold text-[#1F251A]">{tr.availableTimeLabel}</label>
                   {loadingSlots && (
                     <span className="flex items-center gap-1 text-[11px] text-[#5A6A51]">
                       <Loader2 size={12} className="animate-spin text-emerald-700" /> {tr.fetchingSlotsLabel}
@@ -817,32 +865,36 @@ export default function AdminNewBookingView({
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-2.5">
+                <select
+                  value={selectedTime}
+                  onChange={(e) => setSelectedTime(e.target.value)}
+                  className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                >
                   {availableTimeSlots.map((tSlot) => {
                     const normalized = normalizeTimeSlot(tSlot);
                     const isBooked = bookedTimeSlots.includes(normalized);
-                    const isSelected = selectedTime === tSlot;
+                    const isPast = isSlotInPast(tSlot, bookingDate);
+                    const isDisabled = isBooked || isPast;
+
+                    let statusText = "";
+                    if (isBooked) {
+                      statusText = ` ${tr.bookedSuffix || "(Booked)"}`;
+                    } else if (isPast) {
+                      statusText = ` ${tr.pastSuffix || "(Past)"}`;
+                    }
 
                     return (
-                      <button
+                      <option
                         key={tSlot}
-                        type="button"
-                        disabled={isBooked}
-                        onClick={() => setSelectedTime(tSlot)}
-                        className={`rounded-2xl px-4 py-2.5 text-xs font-bold transition ${
-                          isBooked
-                            ? "bg-rose-50 text-rose-400 border border-rose-200 line-through cursor-not-allowed opacity-60"
-                            : isSelected
-                            ? "bg-[#1E3A2B] text-white shadow-md scale-105"
-                            : "bg-[#FBFBF9] text-[#1F251A] border border-[#414E36]/15 hover:border-[#1E3A2B]"
-                        }`}
-                        title={isBooked ? tr.slotBookedTitle : `${tr.selectSlotTitlePrefix} ${tSlot}`}
+                        value={tSlot}
+                        disabled={isDisabled}
+                        className={isDisabled ? "text-gray-400 font-normal bg-gray-100" : "font-bold text-[#1F251A]"}
                       >
-                        {tSlot} {isBooked ? tr.bookedSuffix : ""}
-                      </button>
+                        {tSlot}{statusText}
+                      </option>
                     );
                   })}
-                </div>
+                </select>
               </div>
 
               {/* Session Type (In Person vs Online) */}
