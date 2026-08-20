@@ -16759,12 +16759,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           : [];
 
         const additionalServicesList: Array<{ name: string; qty: number; unitPrice: number; total: number; lineType: string }> = [];
-        const productsConsumablesList: Array<{ name: string; qty: number; unitPrice: number; total: number; lineType: string }> = [];
+        const productsConsumablesList: Array<{ name: string; qty: number; unitPrice: number; total: number; lineType: string; addedBy?: string }> = [];
         const existingNames = new Set<string>();
 
         // 1. Process structured attachedProducts
         for (const item of rawAttached) {
-          const name = String(item.name || 'Item').trim();
+          const name = String(item.name || 'Item').replace(/^[,\s-]+/, '').trim();
           const qty = Number(item.qty) || 1;
           const unitPrice = Number(item.unitPrice || item.price || 0);
           const total = Number(item.total) || (qty * unitPrice);
@@ -16781,12 +16781,18 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             if (lineType === 'additional_service') {
               additionalServicesList.push({ name, qty, unitPrice, total, lineType });
             } else {
-              productsConsumablesList.push({ name, qty, unitPrice, total, lineType });
+              productsConsumablesList.push({
+                name,
+                qty,
+                unitPrice,
+                total,
+                lineType,
+                addedBy: item.addedBy || (item.added_by_role === 'doctor_session' ? 'Doctor Session' : 'Receptionist')
+              });
             }
           }
         }
 
-        // 2. Parse from notes (safety net & historical support)
         // 2. Parse from notes (safety net & historical support)
         if (viewingBooking.notes) {
           const notesStr = String(viewingBooking.notes);
@@ -16803,7 +16809,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               // Format 1: Name (Qty: 1 x 200 EGP = 200 EGP)
               const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
               if (m1) {
-                const name = m1[1].trim();
+                const name = m1[1].replace(/^[,\s-]+/, '').trim();
                 const qty = Number(m1[2]) || 1;
                 const unitPrice = Number(m1[3]) || 0;
                 const total = Number(m1[4]) || (qty * unitPrice);
@@ -16816,7 +16822,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               // Format 2: Name (Qty: 1 x 200 EGP)
               const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
               if (m2) {
-                const name = m2[1].trim();
+                const name = m2[1].replace(/^[,\s-]+/, '').trim();
                 const qty = Number(m2[2]) || 1;
                 const unitPrice = Number(m2[3]) || 0;
                 const total = qty * unitPrice;
@@ -16829,7 +16835,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               // Format 3: Name - 200 EGP or Name (200 EGP) or Name: 200 EGP or Name @ 200 EGP
               const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
               if (m3) {
-                const name = m3[1].trim();
+                const name = m3[1].replace(/^[,\s-]+/, '').trim();
                 const qty = m3[2] ? Number(m3[2]) : 1;
                 const total = Number(m3[3]) || 0;
                 const unitPrice = qty > 0 ? total / qty : total;
@@ -16848,7 +16854,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             const rawLine = match[1].trim();
             const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
             if (m1) {
-              const name = m1[1].trim();
+              const name = m1[1].replace(/^[,\s-]+/, '').trim();
               const qty = Number(m1[2]) || 1;
               const unitPrice = Number(m1[3]) || 0;
               const total = Number(m1[4]) || (qty * unitPrice);
@@ -16860,7 +16866,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             }
             const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
             if (m2) {
-              const name = m2[1].trim();
+              const name = m2[1].replace(/^[,\s-]+/, '').trim();
               const qty = m2[2] ? Number(m2[2]) : 1;
               const total = Number(m2[3]);
               const unitPrice = qty > 0 ? total / qty : total;
@@ -16882,13 +16888,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               if (!trimmed || trimmed.startsWith("[")) continue;
               const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
               if (m1) {
-                const name = m1[1].trim();
+                const name = m1[1].replace(/^[,\s-]+/, '').trim();
                 const qty = Number(m1[2]) || 1;
                 const unitPrice = Number(m1[3]) || 0;
                 const total = Number(m1[4]) || (qty * unitPrice);
                 if (!existingNames.has(name.toLowerCase())) {
                   existingNames.add(name.toLowerCase());
-                  productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+                  productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product', addedBy: 'Doctor Session' });
                 }
                 continue;
               }
@@ -16898,26 +16904,37 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           // d) Receptionist Added Product: [Added Product]: Name (x2) - 1400 EGP
           const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/gi);
           for (const match of receptionistMatches) {
-            const name = match[1].trim();
+            const name = match[1].replace(/^[,\s-]+/, '').trim();
             const qty = match[2] ? Number(match[2]) : 1;
             const total = Number(match[3]);
             const unitPrice = qty > 0 ? total / qty : total;
             if (!existingNames.has(name.toLowerCase())) {
               existingNames.add(name.toLowerCase());
-              productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+              productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product', addedBy: 'Receptionist' });
+            }
+          }
+
+          // e) Extra Device Pulses matches
+          const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+          for (const match of pulseMatches) {
+            const name = "Extra Device Pulses";
+            const total = parseFloat(match[2]) || 0;
+            if (total > 0 && !existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              productsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses', addedBy: 'Doctor Session' });
             }
           }
 
           // f) Generic format: - Name (x2) @ 700 EGP
           const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/gi);
           for (const match of doctorMatches) {
-            const name = match[1].trim();
+            const name = match[1].replace(/^[,\s-]+/, '').trim();
             const qty = Number(match[2]);
             const unitPrice = Number(match[3]);
             const total = qty * unitPrice;
             if (!existingNames.has(name.toLowerCase())) {
               existingNames.add(name.toLowerCase());
-              productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+              productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product', addedBy: 'Doctor Session' });
             }
           }
         }
@@ -17230,81 +17247,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                    */}
                   {/* Products Card */}
                   {(() => {
-                    const list: any[] = Array.isArray((viewingBooking as any).attachedProducts)
-                      ? [...(viewingBooking as any).attachedProducts]
-                      : [];
-                    const existingNames = new Set(list.map((p: any) => (p.name || '').trim().toLowerCase()));
-
-                    if (viewingBooking.notes) {
-                      const notesStr = viewingBooking.notes;
-
-                      // Doctor session notes pattern: "- Product Name (xQty) @ Price EGP = Total EGP"
-                      const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
-                      for (const match of doctorMatches) {
-                        const name = match[1].trim();
-                        const qty = Number(match[2]);
-                        const unitPrice = Number(match[3]);
-                        if (!existingNames.has(name.toLowerCase())) {
-                          existingNames.add(name.toLowerCase());
-                          list.push({
-                            id: name,
-                            name,
-                            qty,
-                            unitPrice,
-                            total: qty * unitPrice,
-                            addedBy: 'Doctor Session'
-                          });
-                        }
-                      }
-
-                      // Receptionist notes pattern: "[Added Product]: Product Name (xQty) - Total EGP"
-                      const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)\s+\(x(\d+)\)\s+-\s+(\d+(?:\.\d+)?)\s+EGP/g);
-                      for (const match of receptionistMatches) {
-                        const name = match[1].trim();
-                        const qty = Number(match[2]);
-                        const total = Number(match[3]);
-                        const unitPrice = qty > 0 ? total / qty : total;
-                        if (!existingNames.has(name.toLowerCase())) {
-                          existingNames.add(name.toLowerCase());
-                          list.push({
-                            id: name,
-                            name,
-                            qty,
-                            unitPrice,
-                            total,
-                            addedBy: 'Receptionist'
-                          });
-                        }
-                      }
-
-                      // RISK-057: DoctorAccountView actually writes "[Products Used During
-                      // Session]: Name (Qty: N x UnitPrice EGP = Total EGP), ..." — a third,
-                      // independent copy of this same regex-reconstruction (this panel) missed the
-                      // same fix already applied to drawerAttachedList/invoiceAttachedList above.
-                      const doctorSessionMatches = notesStr.matchAll(
-                        /(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
-                      );
-                      for (const match of doctorSessionMatches) {
-                        const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
-                        const qty = Number(match[2]);
-                        const unitPrice = Number(match[3]);
-                        const total = Number(match[4]);
-                        if (!existingNames.has(name.toLowerCase())) {
-                          existingNames.add(name.toLowerCase());
-                          list.push({
-                            id: name,
-                            name,
-                            qty,
-                            unitPrice,
-                            total,
-                            addedBy: 'Doctor Session'
-                          });
-                        }
-                      }
-                    }
-
                     // Filter out zero-cost device pulses and additional services from retail & procedure products card
-                    const filteredProductsList = list.filter((prod: any) => {
+                    const filteredProductsList = productsConsumablesList.filter((prod: any) => {
                       const nameLower = String(prod.name || '').toLowerCase();
                       const isPulse = (prod.lineType === 'device_pulses') || nameLower.includes('pulse') || nameLower.includes('device —') || nameLower.includes('device -');
                       if (isPulse && (Number(prod.total || 0) === 0 || Number(prod.unitPrice || prod.price || 0) === 0)) {
