@@ -24,7 +24,9 @@ import {
   ChevronDown,
   Eye,
   Loader2,
-  List
+  List,
+  Coins,
+  DollarSign
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getSessionStaleness } from "@/lib/services";
@@ -495,6 +497,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
     };
 
     const todays = mergedAppointments.filter(r => r.date === selectedDateStr);
+    const dayRevenue = todays.reduce((sum, r) => {
+      const paid = Number(r.amountPaid ?? r.amount_paid ?? 0);
+      if (paid > 0) return sum + paid;
+      if (r.status === "completed") {
+        const total = Number(r.total_price ?? r.totalPrice ?? r.final_price ?? r.price ?? 0);
+        return sum + total;
+      }
+      return sum;
+    }, 0);
+
     const upcoming = mergedAppointments.filter(
       r =>
         ["confirmed", "approved", "pending", "waiting", "checked_in"].includes(r.status || "") &&
@@ -511,6 +523,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       todayCount: todays.length,
       nextTime: nextTime,
       upcomingCount: upcoming.length,
+      dayRevenue: dayRevenue,
       completedCount: completed.length,
       canceledCount: canceled.length,
       postponedCount: postponed.length
@@ -797,20 +810,43 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
         </div>
 
-        {/* Card 2: Upcoming */}
+        {/* Card 2: Day Revenue (Calendar/Pending view) or Upcoming (All Appointments view) */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              {tr.cardUpcoming}
-            </span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <Clock size={18} />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-[#111827]">{stats.upcomingCount}</span>
-            <span className="text-xs font-semibold text-blue-600">{tr.todayOnward}</span>
-          </div>
+          {viewMode === "all" ? (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+                  {tr.cardUpcoming}
+                </span>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <Clock size={18} />
+                </div>
+              </div>
+              <div className="mt-3 flex items-baseline justify-between">
+                <span className="text-3xl font-black text-[#111827]">{stats.upcomingCount}</span>
+                <span className="text-xs font-semibold text-blue-600">{tr.todayOnward}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+                  {tr.cardDayRevenue || "Day Revenue"}
+                </span>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                  <Coins size={18} />
+                </div>
+              </div>
+              <div className="mt-3 flex items-baseline justify-between gap-1.5">
+                <span className="text-2xl font-black text-[#111827] truncate">
+                  EGP {stats.dayRevenue.toLocaleString()}
+                </span>
+                <span className="text-xs font-semibold text-emerald-700 shrink-0">
+                  {tr.selectedDayLabel || "Selected day"}
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Card 3: Completed */}
