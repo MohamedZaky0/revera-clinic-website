@@ -831,22 +831,6 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             <CalendarIcon size={15} />
             <span>{tr.calendarViewToggle}</span>
           </button>
-          <div className="w-px h-8 bg-gray-200" />
-          <button
-            type="button"
-            onClick={() => setViewMode("all")}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
-              viewMode === "all"
-                ? "bg-[#C4AE7C] text-[#414E36]"
-                : "text-[#374151] hover:bg-gray-50"
-            }`}
-          >
-            <List size={15} />
-            <span>{tr.allAppointmentsToggle || "All Appointments"}</span>
-            <span className="inline-flex h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-bold bg-[#EDF1EC] text-[#414E36]">
-              {mergedAppointments.length}
-            </span>
-          </button>
         </div>
 
         {/* RIGHT ACTIONS: NEW BOOKING + 3 DOTS MENU */}
@@ -1166,11 +1150,21 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         <div id="all-appointments-section" className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
           {/* Top Header & Search Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
-            <div>
-              <h2 className="text-xl font-bold text-[#111827]">{tr.allAppointmentsHeading || "All Appointments Directory"}</h2>
-              <p className="text-xs text-[#5A6A51] mt-0.5">
-                {filteredAllAppointments.length} {filteredAllAppointments.length !== 1 ? tr.appointmentsSuffix || "appointments" : tr.bookingSingular || "booking"}
-              </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setViewMode("calendar")}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#414E36] hover:bg-[#EDF1EC] transition shadow-2xs cursor-pointer shrink-0"
+                title="Back to Calendar"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <div>
+                <h2 className="text-xl font-bold text-[#111827]">{tr.allAppointmentsHeading || "All Appointments Directory"}</h2>
+                <p className="text-xs text-[#5A6A51] mt-0.5">
+                  {filteredAllAppointments.length} {filteredAllAppointments.length !== 1 ? tr.appointmentsSuffix || "appointments" : tr.bookingSingular || "booking"}
+                </p>
+              </div>
             </div>
 
             {/* Search and Filters */}
