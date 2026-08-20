@@ -937,19 +937,29 @@ body::-webkit-scrollbar-corner {
 #admin-root,
 #admin-root *,
 #admin-root *::before,
-#admin-root *::after,
-.admin-view,
-.admin-view *,
-.admin-view *::before,
-.admin-view *::after,
-body:has(#admin-root) *,
-body:has(.admin-view) * {
-  animation: none !important;
+#admin-root *::after {
   animation-duration: 0s !important;
   animation-delay: 0s !important;
-  animation-iteration-count: 1 !important;
-  transition: none !important;
   transition-duration: 0s !important;
   transition-delay: 0s !important;
-  scroll-behavior: auto !important;
+}
+
+#admin-root .animate-fadeIn,
+#admin-root .animate-fade-in,
+#admin-root .animate-fade-in-up,
+#admin-root .animate-slide-in-left,
+#admin-root .animate-slide-in-right,
+#admin-root .animate-scale-in,
+#admin-root .animate-fadeInFast,
+#admin-root .animate-bounce,
+#admin-root .animate-pulse,
+#admin-root .animate-ping,
+#admin-root [class*="animate-in"],
+#admin-root [class*="fade-in"],
+#admin-root [class*="zoom-in"] {
+  opacity: 1 !important;
+  transform: none !important;
+  animation: none !important;
+  transition: none !important;
+  visibility: visible !important;
 }
