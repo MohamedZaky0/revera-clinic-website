@@ -301,13 +301,18 @@ export default function AdminNewBookingView({
     }
   }, [sameAsPhone, phone]);
 
+  const [showTimeDropdown, setShowTimeDropdown] = useState(false);
   const phoneDropdownRef = useRef<HTMLDivElement>(null);
+  const timeDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close customer dropdown on click outside
+  // Close customer dropdown & time dropdown on click outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (phoneDropdownRef.current && !phoneDropdownRef.current.contains(e.target as Node)) {
         setShowCustomerDropdown(false);
+      }
+      if (timeDropdownRef.current && !timeDropdownRef.current.contains(e.target as Node)) {
+        setShowTimeDropdown(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -385,9 +390,10 @@ export default function AdminNewBookingView({
         if (bookingDate) {
           let qRes = supabase
             .from("reservations")
-            .select("start_time, status, date, doctor_name, provider_id")
+            .select("*")
             .eq("date", bookingDate)
-            .neq("status", "cancelled");
+            .neq("status", "cancelled")
+            .neq("status", "rejected");
 
           if (selectedDoctorId) {
             qRes = qRes.eq("provider_id", selectedDoctorId);
@@ -395,7 +401,9 @@ export default function AdminNewBookingView({
 
           const { data: resData } = await qRes;
           if (resData) {
-            booked = resData.map((r: any) => normalizeTimeSlot(r.start_time || r.time)).filter(Boolean);
+            booked = resData
+              .map((r: any) => normalizeTimeSlot(r.time_slot || r.requested_time || r.start_time || r.time || r.timeSlot))
+              .filter(Boolean);
           }
         }
         setBookedTimeSlots(booked);
@@ -866,8 +874,8 @@ export default function AdminNewBookingView({
                 </div>
               </div>
 
-              {/* REAL DYNAMIC TIME SLOTS DROPDOWN */}
-              <div>
+              {/* REAL DYNAMIC TIME SLOTS MODERN CUSTOM DROPDOWN */}
+              <div className="relative" ref={timeDropdownRef}>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block font-bold text-[#1F251A]">{tr.availableTimeLabel}</label>
                   {loadingSlots && (
@@ -877,36 +885,81 @@ export default function AdminNewBookingView({
                   )}
                 </div>
 
-                <select
-                  value={selectedTime}
-                  onChange={(e) => setSelectedTime(e.target.value)}
-                  className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none cursor-pointer focus:border-emerald-700"
+                {/* Custom Trigger Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowTimeDropdown((prev) => !prev)}
+                  className="w-full rounded-2xl border border-[#414E36]/20 bg-white px-3.5 py-2.5 font-bold text-[#1F251A] outline-none transition flex items-center justify-between cursor-pointer focus:border-emerald-700 hover:bg-[#FBFBF9] shadow-xs"
                 >
-                  {availableTimeSlots.map((tSlot) => {
-                    const normalized = normalizeTimeSlot(tSlot);
-                    const isBooked = bookedTimeSlots.includes(normalized);
-                    const isPast = isSlotInPast(tSlot, bookingDate);
-                    const isDisabled = isBooked || isPast;
+                  <div className="flex items-center gap-2">
+                    <Clock size={16} className="text-emerald-700" />
+                    <span>{selectedTime || "Select Time"}</span>
+                  </div>
+                  <ChevronDown
+                    size={16}
+                    className={`text-[#5A6A51] transition-transform duration-200 ${showTimeDropdown ? "rotate-180 text-emerald-700" : ""}`}
+                  />
+                </button>
 
-                    let statusText = "";
-                    if (isBooked) {
-                      statusText = ` ${tr.bookedSuffix || "(Booked)"}`;
-                    } else if (isPast) {
-                      statusText = ` ${tr.pastSuffix || "(Past)"}`;
-                    }
+                {/* Floating Modern Dropdown Menu */}
+                {showTimeDropdown && (
+                  <div className="absolute start-0 end-0 top-full mt-1.5 z-[110] max-h-72 overflow-y-auto bg-white rounded-3xl border border-[#414E36]/20 shadow-2xl p-2 space-y-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3 py-2 text-[11px] font-extrabold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-2xl flex justify-between items-center mb-1">
+                      <span>Available Slots ({availableTimeSlots.filter(s => !bookedTimeSlots.includes(normalizeTimeSlot(s)) && !isSlotInPast(s, bookingDate)).length})</span>
+                      <button type="button" onClick={() => setShowTimeDropdown(false)} className="text-[#1F251A] font-bold text-xs hover:text-emerald-700">✕</button>
+                    </div>
 
-                    return (
-                      <option
-                        key={tSlot}
-                        value={tSlot}
-                        disabled={isDisabled}
-                        className={isDisabled ? "text-gray-400 font-normal bg-gray-100" : "font-bold text-[#1F251A]"}
-                      >
-                        {tSlot}{statusText}
-                      </option>
-                    );
-                  })}
-                </select>
+                    {availableTimeSlots.map((tSlot) => {
+                      const normalized = normalizeTimeSlot(tSlot);
+                      const isBooked = bookedTimeSlots.includes(normalized);
+                      const isPast = isSlotInPast(tSlot, bookingDate);
+                      const isDisabled = isBooked || isPast;
+                      const isSelected = selectedTime === tSlot;
+
+                      return (
+                        <div
+                          key={tSlot}
+                          onClick={() => {
+                            if (!isDisabled) {
+                              setSelectedTime(tSlot);
+                              setShowTimeDropdown(false);
+                            }
+                          }}
+                          className={`p-2.5 rounded-2xl transition flex items-center justify-between border ${
+                            isDisabled
+                              ? isBooked
+                                ? "bg-rose-50/60 border-rose-100/80 opacity-70 cursor-not-allowed"
+                                : "bg-gray-100/60 border-gray-200/80 opacity-60 cursor-not-allowed"
+                              : isSelected
+                              ? "bg-[#1E3A2B] text-white border-[#1E3A2B] shadow-sm font-black"
+                              : "bg-[#FBFBF9] border-[#414E36]/10 hover:bg-emerald-50/70 hover:border-emerald-300 cursor-pointer font-bold text-[#1F251A]"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Clock size={14} className={isSelected ? "text-white" : isDisabled ? "text-gray-400" : "text-emerald-700"} />
+                            <span className={`text-xs ${isSelected ? "text-white" : isDisabled ? "line-through text-gray-400" : "text-[#1F251A]"}`}>
+                              {tSlot}
+                            </span>
+                          </div>
+
+                          {isBooked ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-700 border border-rose-200">
+                              {tr.bookedSuffix || "Reserved"}
+                            </span>
+                          ) : isPast ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-gray-200 text-gray-600 border border-gray-300">
+                              {tr.pastSuffix || "Past"}
+                            </span>
+                          ) : isSelected ? (
+                            <span className="flex items-center gap-1 text-[10px] font-extrabold text-white bg-emerald-900/50 px-2 py-0.5 rounded-full">
+                              <Check size={12} /> Selected
+                            </span>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Session Type (In Person vs Online) */}
