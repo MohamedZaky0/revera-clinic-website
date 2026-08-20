@@ -195,12 +195,11 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       combinedMap.set(id, r);
     });
 
-    // Add items from dbReservations state
+    // Add/merge items from dbReservations state (local updates take priority)
     (dbReservations || []).forEach((r, idx) => {
       const id = String(r.id || `db-${idx}`);
-      if (!combinedMap.has(id)) {
-        combinedMap.set(id, r);
-      }
+      const existing = combinedMap.get(id) || {};
+      combinedMap.set(id, { ...existing, ...r });
     });
 
     const rawList = Array.from(combinedMap.values());
@@ -569,7 +568,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       if (targetId) {
         await supabase.from("reservations").update({ status: "approved" }).eq("id", targetId);
       }
-      setDbReservations(prev => prev.map(r => String(r.id) === String(targetId) ? { ...r, status: "approved" } : r));
+      setDbReservations(prev => {
+        const exists = prev.some(r => String(r.id) === String(targetId));
+        if (exists) {
+          return prev.map(r => String(r.id) === String(targetId) ? { ...r, status: "approved" } : r);
+        }
+        return [...prev, { ...(item.raw || item), id: targetId, status: "approved" }];
+      });
       if (onApproveBooking) {
         onApproveBooking({ ...(item.raw || item), id: targetId, status: "approved" });
       }
@@ -584,7 +589,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       if (targetId) {
         await supabase.from("reservations").update({ status: "rejected" }).eq("id", targetId);
       }
-      setDbReservations(prev => prev.map(r => String(r.id) === String(targetId) ? { ...r, status: "rejected" } : r));
+      setDbReservations(prev => {
+        const exists = prev.some(r => String(r.id) === String(targetId));
+        if (exists) {
+          return prev.map(r => String(r.id) === String(targetId) ? { ...r, status: "rejected" } : r);
+        }
+        return [...prev, { ...(item.raw || item), id: targetId, status: "rejected" }];
+      });
       if (onRejectBooking) {
         onRejectBooking({ ...(item.raw || item), id: targetId, status: "rejected" });
       }
