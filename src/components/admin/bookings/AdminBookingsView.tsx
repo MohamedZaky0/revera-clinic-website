@@ -1005,14 +1005,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           <table className="w-full text-start text-xs border-collapse table-fixed">
             <thead>
               <tr className="border-b border-gray-100 text-[11px] font-bold text-[#6B7280]">
-                <th className="py-3 px-3 whitespace-nowrap text-start w-[16%]">{tr.colPatient} ˅</th>
-                <th className="py-3 px-3 whitespace-nowrap text-start w-[17%]">{tr.colService}</th>
-                <th className="py-3 px-3 whitespace-nowrap text-start w-[15%]">{tr.colDoctor}</th>
-                <th className="py-3 px-3 whitespace-nowrap text-start w-[15%]">{tr.colDateTime}</th>
-                <th className="py-3 px-3 whitespace-nowrap text-start w-[12%]">{tr.colBranch}</th>
-                <th className="py-3 px-3 whitespace-nowrap text-start w-[9%]">{tr.colStatus}</th>
-                <th className="py-3 px-3 whitespace-nowrap text-start w-[9%]">{tr.colRequestedAt}</th>
-                <th className="py-3 px-3 whitespace-nowrap text-start w-[7%]">{tr.colActions}</th>
+                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[15%]">{tr.colPatient} ˅</th>
+                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[15%]">{tr.colService}</th>
+                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[13%]">{tr.colDoctor}</th>
+                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[14%]">{tr.colDateTime}</th>
+                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[15%]">{tr.colBranch}</th>
+                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[10%]">{tr.colStatus}</th>
+                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[13%]">{tr.colRequestedAt}</th>
+                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[5%]">{tr.colActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -1030,7 +1030,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     className="hover:bg-gray-50/70 transition cursor-pointer"
                   >
                     {/* 1. Patient */}
-                  <td className="py-3.5 px-3 whitespace-nowrap">
+                  <td className="py-3 px-2.5 whitespace-nowrap">
                     <div>
                       <span className="font-extrabold text-[#111827] text-xs block">{item.patientName}</span>
                       <span className="text-[11px] font-mono text-gray-500 font-medium block">{item.phone}</span>
@@ -1038,57 +1038,57 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     </div>
                   </td>
 
-                  {/* 4. Service */}
-                  <td className="py-3.5 px-3 whitespace-nowrap">
+                  {/* 2. Service */}
+                  <td className="py-3 px-2.5 whitespace-nowrap">
                     <span className="font-extrabold text-[#111827] text-xs block">{item.serviceName}</span>
                     <span className="text-[11px] text-gray-400 font-medium">{item.serviceVariant}</span>
                   </td>
 
-                  {/* 5. Doctor */}
-                  <td className="py-3.5 px-3 whitespace-nowrap">
+                  {/* 3. Doctor */}
+                  <td className="py-3 px-2.5 whitespace-nowrap">
                     <div>
                       <span className="font-extrabold text-[#111827] text-xs block">{item.doctorName}</span>
                       <span className="text-[11px] text-gray-400 font-medium">{item.doctorSpecialty}</span>
                     </div>
                   </td>
 
-                  {/* 6. Date & Time */}
-                  <td className="py-3.5 px-3 whitespace-nowrap">
+                  {/* 4. Date & Time */}
+                  <td className="py-3 px-2.5 whitespace-nowrap">
                     <span className="font-extrabold text-[#111827] text-xs block">{item.dateFormatted}</span>
                     <span className="text-[11px] font-bold text-emerald-800">{item.time}</span>
                   </td>
 
-                  {/* 7. Branch */}
-                  <td className="py-3.5 px-3 whitespace-nowrap">
+                  {/* 5. Branch */}
+                  <td className="py-3 px-2.5 whitespace-nowrap">
                     <span className="font-extrabold text-[#111827] text-xs block">{item.branchName}</span>
                   </td>
 
-                  {/* 8. Status */}
-                  <td className="py-3.5 px-3 whitespace-nowrap">
+                  {/* 6. Status */}
+                  <td className="py-3 px-2.5 whitespace-nowrap">
                     <span className="inline-flex items-center rounded-xl bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700 border border-orange-200">
                       {tr.statusLabels.pending}
                     </span>
                   </td>
 
-                  {/* 9. Requested At */}
-                  <td className="py-3.5 px-3 whitespace-nowrap text-[11px] font-medium text-gray-500">
+                  {/* 7. Requested At */}
+                  <td className="py-3 px-2.5 whitespace-nowrap text-[11px] font-medium text-gray-500">
                     <span className="font-extrabold text-[#111827] text-xs block">{item.requestedDate}</span>
                     <span>{item.requestedTime}</span>
                   </td>
 
-                  {/* 10. Actions */}
-                  <td className="py-3.5 px-3 whitespace-nowrap text-start">
-                    <div className="flex items-center justify-start gap-2">
+                  {/* 8. Actions */}
+                  <td className="py-3 px-2.5 whitespace-nowrap text-start">
+                    <div className="flex items-center justify-start gap-1.5">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleApproveItem(item);
                         }}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-600 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition active:scale-95 shadow-xs"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-emerald-600 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition active:scale-95 shadow-2xs"
                         title={tr.approveTitle}
                       >
-                        <Check size={16} strokeWidth={2.5} />
+                        <Check size={14} strokeWidth={2.5} />
                       </button>
                       <button
                         type="button"
@@ -1096,65 +1096,11 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           e.stopPropagation();
                           handleRejectItem(item);
                         }}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition active:scale-95 shadow-xs"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition active:scale-95 shadow-2xs"
                         title={tr.rejectTitle}
                       >
-                        <X size={16} strokeWidth={2.5} />
+                        <X size={14} strokeWidth={2.5} />
                       </button>
-                      <div className="relative dropdown-action-menu">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveMenuId((prev) => (prev === item.id ? null : item.id));
-                          }}
-                          className="p-1.5 rounded-lg hover:bg-gray-100 text-[#6B7280] transition dropdown-action-menu cursor-pointer"
-                          title={tr.moreActionsTitle}
-                        >
-                          <MoreVertical size={16} />
-                        </button>
-
-                        {activeMenuId === item.id && (
-                          <div className="absolute end-0 top-8 z-50 w-44 rounded-xl border border-gray-100 bg-white p-1 shadow-xl text-xs animate-in fade-in duration-150 dropdown-action-menu text-start">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMenuId(null);
-                                if (onViewBookingDetails) onViewBookingDetails(item.raw);
-                              }}
-                              className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition cursor-pointer"
-                            >
-                              <Eye size={14} className="text-gray-500" />
-                              <span>{tr.viewDetailsBtn}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMenuId(null);
-                                handleApproveItem(item);
-                              }}
-                              className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-emerald-50 font-semibold text-emerald-700 transition cursor-pointer"
-                            >
-                              <Check size={14} className="text-emerald-600" />
-                              <span>{tr.approveBookingBtn}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMenuId(null);
-                                handleRejectItem(item);
-                              }}
-                              className="flex w-full items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-rose-50 font-semibold text-rose-600 transition cursor-pointer"
-                            >
-                              <X size={14} className="text-rose-500" />
-                              <span>{tr.rejectBookingBtn}</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   </td>
                 </tr>
