@@ -1001,18 +1001,18 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
         </div>
         {/* Table Container */}
-        <div className="overflow-x-auto scrollbar-none">
+        <div className="w-full overflow-hidden">
           <table className="w-full text-start text-xs border-collapse table-fixed">
             <thead>
               <tr className="border-b border-gray-100 text-[11px] font-bold text-[#6B7280]">
-                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[15%]">{tr.colPatient} ˅</th>
-                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[15%]">{tr.colService}</th>
-                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[13%]">{tr.colDoctor}</th>
-                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[14%]">{tr.colDateTime}</th>
-                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[15%]">{tr.colBranch}</th>
-                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[10%]">{tr.colStatus}</th>
-                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[13%]">{tr.colRequestedAt}</th>
-                <th className="py-3 px-2.5 whitespace-nowrap text-start w-[5%]">{tr.colActions}</th>
+                <th className="py-3 px-2 text-start w-[16%]">{tr.colPatient} ˅</th>
+                <th className="py-3 px-2 text-start w-[15%]">{tr.colService}</th>
+                <th className="py-3 px-2 text-start w-[14%]">{tr.colDoctor}</th>
+                <th className="py-3 px-2 text-start w-[14%]">{tr.colDateTime}</th>
+                <th className="py-3 px-2 text-start w-[15%]">{tr.colBranch}</th>
+                <th className="py-3 px-2 text-start w-[10%]">{tr.colStatus}</th>
+                <th className="py-3 px-2 text-start w-[11%]">{tr.colRequestedAt}</th>
+                <th className="py-3 px-2 text-start w-[5%]">{tr.colActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -1030,62 +1030,62 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     className="hover:bg-gray-50/70 transition cursor-pointer"
                   >
                     {/* 1. Patient */}
-                  <td className="py-3 px-2.5 whitespace-nowrap">
-                    <div>
-                      <span className="font-extrabold text-[#111827] text-xs block">{item.patientName}</span>
-                      <span className="text-[11px] font-mono text-gray-500 font-medium block">{item.phone}</span>
-                      {item.patientAge && <span className="text-[11px] text-gray-400 font-medium">{item.patientAge} {tr.yearsSuffix}</span>}
+                  <td className="py-3 px-2">
+                    <div className="min-w-0">
+                      <span className="font-extrabold text-[#111827] text-xs block truncate">{item.patientName}</span>
+                      <span className="text-[11px] font-mono text-gray-500 font-medium block truncate">{item.phone}</span>
+                      {item.patientAge && <span className="text-[11px] text-gray-400 font-medium block truncate">{item.patientAge} {tr.yearsSuffix}</span>}
                     </div>
                   </td>
 
                   {/* 2. Service */}
-                  <td className="py-3 px-2.5 whitespace-nowrap">
-                    <span className="font-extrabold text-[#111827] text-xs block">{item.serviceName}</span>
-                    <span className="text-[11px] text-gray-400 font-medium">{item.serviceVariant}</span>
+                  <td className="py-3 px-2">
+                    <span className="font-extrabold text-[#111827] text-xs block truncate">{item.serviceName}</span>
+                    <span className="text-[11px] text-gray-400 font-medium block truncate">{item.serviceVariant}</span>
                   </td>
 
                   {/* 3. Doctor */}
-                  <td className="py-3 px-2.5 whitespace-nowrap">
-                    <div>
-                      <span className="font-extrabold text-[#111827] text-xs block">{item.doctorName}</span>
-                      <span className="text-[11px] text-gray-400 font-medium">{item.doctorSpecialty}</span>
+                  <td className="py-3 px-2">
+                    <div className="min-w-0">
+                      <span className="font-extrabold text-[#111827] text-xs block truncate">{item.doctorName}</span>
+                      <span className="text-[11px] text-gray-400 font-medium block truncate">{item.doctorSpecialty}</span>
                     </div>
                   </td>
 
                   {/* 4. Date & Time */}
-                  <td className="py-3 px-2.5 whitespace-nowrap">
-                    <span className="font-extrabold text-[#111827] text-xs block">{item.dateFormatted}</span>
-                    <span className="text-[11px] font-bold text-emerald-800">{item.time}</span>
+                  <td className="py-3 px-2">
+                    <span className="font-extrabold text-[#111827] text-xs block truncate">{item.dateFormatted}</span>
+                    <span className="text-[11px] font-bold text-emerald-800 block truncate">{item.time}</span>
                   </td>
 
                   {/* 5. Branch */}
-                  <td className="py-3 px-2.5 whitespace-nowrap">
-                    <span className="font-extrabold text-[#111827] text-xs block">{item.branchName}</span>
+                  <td className="py-3 px-2">
+                    <span className="font-extrabold text-[#111827] text-xs block truncate">{item.branchName}</span>
                   </td>
 
                   {/* 6. Status */}
-                  <td className="py-3 px-2.5 whitespace-nowrap">
-                    <span className="inline-flex items-center rounded-xl bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700 border border-orange-200">
+                  <td className="py-3 px-2">
+                    <span className="inline-flex items-center rounded-xl bg-orange-50 px-2 py-0.5 text-[11px] font-bold text-orange-700 border border-orange-200 truncate">
                       {tr.statusLabels.pending}
                     </span>
                   </td>
 
                   {/* 7. Requested At */}
-                  <td className="py-3 px-2.5 whitespace-nowrap text-[11px] font-medium text-gray-500">
-                    <span className="font-extrabold text-[#111827] text-xs block">{item.requestedDate}</span>
-                    <span>{item.requestedTime}</span>
+                  <td className="py-3 px-2 text-[11px] font-medium text-gray-500">
+                    <span className="font-extrabold text-[#111827] text-xs block truncate">{item.requestedDate}</span>
+                    <span className="block truncate">{item.requestedTime}</span>
                   </td>
 
                   {/* 8. Actions */}
-                  <td className="py-3 px-2.5 whitespace-nowrap text-start">
-                    <div className="flex items-center justify-start gap-1.5">
+                  <td className="py-3 px-2 text-start">
+                    <div className="flex items-center justify-start gap-1">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleApproveItem(item);
                         }}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-emerald-600 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition active:scale-95 shadow-2xs"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-emerald-600 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition active:scale-95 shadow-2xs cursor-pointer"
                         title={tr.approveTitle}
                       >
                         <Check size={14} strokeWidth={2.5} />
@@ -1096,7 +1096,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           e.stopPropagation();
                           handleRejectItem(item);
                         }}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition active:scale-95 shadow-2xs"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-rose-300 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition active:scale-95 shadow-2xs cursor-pointer"
                         title={tr.rejectTitle}
                       >
                         <X size={14} strokeWidth={2.5} />
@@ -1411,35 +1411,6 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                             >
                               <Eye size={14} />
                             </button>
-                            <div className="relative dropdown-action-menu">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMenuId((prev) => (prev === item.id ? null : item.id));
-                                }}
-                                className="p-1.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 transition shadow-2xs cursor-pointer"
-                              >
-                                <MoreVertical size={14} />
-                              </button>
-
-                              {activeMenuId === item.id && (
-                                <div className="absolute end-0 top-8 z-50 w-44 rounded-xl border border-gray-100 bg-white p-1 shadow-xl text-xs animate-in fade-in duration-150 dropdown-action-menu text-start">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveMenuId(null);
-                                      if (onViewBookingDetails) onViewBookingDetails(item.raw || item);
-                                    }}
-                                    className="flex w-full items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition cursor-pointer"
-                                  >
-                                    <Eye size={14} className="text-gray-500" />
-                                    <span>{tr.viewDetailsBtn || "View Details"}</span>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
                           </div>
                         </td>
                       </tr>
