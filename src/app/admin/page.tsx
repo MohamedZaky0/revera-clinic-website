@@ -20022,6 +20022,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   amountLeft: remainingAmount,
                   walletWithdrawal: walletDeduction,
                   walletDeposit: changeAmount > 0 && depositChangeToWallet ? changeAmount : 0,
+                  customerId: customerRecord?.id || (checkoutBooking as any).customerId || (checkoutBooking as any).customer_id,
                   redeemedServiceIds: Object.keys(redeemedPackageItems).map(Number)
                 })
               });
