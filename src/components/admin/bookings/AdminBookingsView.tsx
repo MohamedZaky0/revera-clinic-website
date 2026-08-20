@@ -23,7 +23,8 @@ import {
   Search,
   ChevronDown,
   Eye,
-  Loader2
+  Loader2,
+  List
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { getSessionStaleness } from "@/lib/services";
@@ -38,11 +39,13 @@ interface ReservationItem {
   service_name: string;
   service_variant?: string;
   doctor_name: string;
+  doctorSpecialty?: string;
   room?: string;
-  status: string; // checked_in, waiting, in_progress, confirmed, completed, canceled, no_show
-  paymentStatus?: string; // Paid, Deposit Paid, Unpaid
-  avatar_url?: string;
-  doctor_avatar?: string;
+  status: string;
+  paymentStatus: string;
+  isStaleSession?: boolean;
+  staleElapsedLabel?: string | null;
+  raw?: any;
 }
 
 interface AdminBookingsViewProps {
@@ -106,8 +109,16 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   t,
 }) => {
   const tr = t || adminTranslations[lang].bookings.adminBookingsView;
-  // View Mode State: 'calendar' (Default main view) vs 'pending'
-  const [viewMode, setViewMode] = useState<"pending" | "calendar">("calendar");
+  // View Mode State: 'calendar' (Default) vs 'pending' vs 'all'
+  const [viewMode, setViewMode] = useState<"pending" | "calendar" | "all">("calendar");
+  // All Appointments View Filter & Search State
+  const [allAppointmentsSearch, setAllAppointmentsSearch] = useState("");
+  const [allAppointmentsStatusFilter, setAllAppointmentsStatusFilter] = useState("All");
+  const [allAppointmentsDoctorFilter, setAllAppointmentsDoctorFilter] = useState("All");
+  const [allAppointmentsPage, setAllAppointmentsPage] = useState(1);
+  const [allAppointmentsPerPage, setAllAppointmentsPerPage] = useState(10);
+  const [showAllAppointmentsFilters, setShowAllAppointmentsFilters] = useState(false);
+
   // Mini calendar state - Default to REAL CURRENT DATE
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
@@ -332,6 +343,69 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   const paginatedAppointments = useMemo(() => {
     return selectedDayAppointments.slice(startIndex, startIndex + rowsPerPage);
   }, [selectedDayAppointments, startIndex, rowsPerPage]);
+
+  // Filter & sort for All Appointments Directory view
+  const filteredAllAppointments = useMemo(() => {
+    let list = [...mergedAppointments];
+
+    // 1. Search Query
+    if (allAppointmentsSearch.trim()) {
+      const q = allAppointmentsSearch.toLowerCase().trim();
+      list = list.filter((item) => {
+        const pName = String(item.customer_name || "").toLowerCase();
+        const phone = String(item.customer_phone || "").toLowerCase();
+        const sName = String(item.service_name || "").toLowerCase();
+        const dName = String(item.doctor_name || "").toLowerCase();
+        const aptId = String(item.id || "").toLowerCase();
+        const nationalId = String(item.national_id || item.nationalId || "").toLowerCase();
+        return (
+          pName.includes(q) ||
+          phone.includes(q) ||
+          sName.includes(q) ||
+          dName.includes(q) ||
+          aptId.includes(q) ||
+          nationalId.includes(q)
+        );
+      });
+    }
+
+    // 2. Status Filter
+    if (allAppointmentsStatusFilter !== "All") {
+      list = list.filter((item) => {
+        const st = (item.status || "").toLowerCase();
+        if (allAppointmentsStatusFilter === "pending") return ["pending", "waiting", "pending_deposit"].includes(st);
+        if (allAppointmentsStatusFilter === "confirmed") return ["confirmed", "approved"].includes(st);
+        if (allAppointmentsStatusFilter === "in_progress") return ["in_progress", "started"].includes(st);
+        if (allAppointmentsStatusFilter === "postponed") return ["postponed", "rescheduled"].includes(st);
+        if (allAppointmentsStatusFilter === "canceled") return ["canceled", "cancelled", "rejected"].includes(st);
+        return st === allAppointmentsStatusFilter.toLowerCase();
+      });
+    }
+
+    // 3. Doctor Filter
+    if (allAppointmentsDoctorFilter !== "All") {
+      list = list.filter((item) => {
+        return String(item.doctor_name || "").toLowerCase() === allAppointmentsDoctorFilter.toLowerCase();
+      });
+    }
+
+    // Sort by date (descending) then time
+    return list.sort((a, b) => {
+      const dateA = a.date || "";
+      const dateB = b.date || "";
+      if (dateA !== dateB) return dateB.localeCompare(dateA);
+      return (a.time || "").localeCompare(b.time || "");
+    });
+  }, [mergedAppointments, allAppointmentsSearch, allAppointmentsStatusFilter, allAppointmentsDoctorFilter]);
+
+  const totalAllAppointments = filteredAllAppointments.length;
+  const totalAllPages = Math.max(1, Math.ceil(totalAllAppointments / allAppointmentsPerPage));
+  const safeAllPage = Math.min(allAppointmentsPage, totalAllPages);
+  const allAppointmentsStartIndex = (safeAllPage - 1) * allAppointmentsPerPage;
+
+  const paginatedAllAppointments = useMemo(() => {
+    return filteredAllAppointments.slice(allAppointmentsStartIndex, allAppointmentsStartIndex + allAppointmentsPerPage);
+  }, [filteredAllAppointments, allAppointmentsStartIndex, allAppointmentsPerPage]);
 
   // Analytics counts calculation (Strict DB data)
   //
@@ -757,6 +831,22 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             <CalendarIcon size={15} />
             <span>{tr.calendarViewToggle}</span>
           </button>
+          <div className="w-px h-8 bg-gray-200" />
+          <button
+            type="button"
+            onClick={() => setViewMode("all")}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition ${
+              viewMode === "all"
+                ? "bg-[#C4AE7C] text-[#414E36]"
+                : "text-[#374151] hover:bg-gray-50"
+            }`}
+          >
+            <List size={15} />
+            <span>{tr.allAppointmentsToggle || "All Appointments"}</span>
+            <span className="inline-flex h-5 px-1.5 items-center justify-center rounded-full text-[11px] font-bold bg-[#EDF1EC] text-[#414E36]">
+              {mergedAppointments.length}
+            </span>
+          </button>
         </div>
 
         {/* RIGHT ACTIONS: NEW BOOKING + 3 DOTS MENU */}
@@ -1071,6 +1161,352 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
         </div>
       </div>
+      ) : viewMode === "all" ? (
+        /* ── ALL APPOINTMENTS DIRECTORY VIEW ── */
+        <div id="all-appointments-section" className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
+          {/* Top Header & Search Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+            <div>
+              <h2 className="text-xl font-bold text-[#111827]">{tr.allAppointmentsHeading || "All Appointments Directory"}</h2>
+              <p className="text-xs text-[#5A6A51] mt-0.5">
+                {filteredAllAppointments.length} {filteredAllAppointments.length !== 1 ? tr.appointmentsSuffix || "appointments" : tr.bookingSingular || "booking"}
+              </p>
+            </div>
+
+            {/* Search and Filters */}
+            <div className="flex items-center gap-2.5 flex-1 sm:max-w-md justify-end">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={allAppointmentsSearch}
+                  onChange={(e) => {
+                    setAllAppointmentsSearch(e.target.value);
+                    setAllAppointmentsPage(1);
+                  }}
+                  placeholder={tr.searchPlaceholder || "Search by name, phone, national ID..."}
+                  className="w-full rounded-2xl border border-gray-200 bg-[#FBFBF9] pl-10 pr-8 py-2.5 text-xs text-[#1F251A] outline-none focus:border-[#414E36] focus:bg-white transition"
+                />
+                {allAppointmentsSearch && (
+                  <button
+                    onClick={() => { setAllAppointmentsSearch(""); setAllAppointmentsPage(1); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Button */}
+              <button
+                type="button"
+                onClick={() => setShowAllAppointmentsFilters(prev => !prev)}
+                className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition shadow-xs cursor-pointer ${
+                  showAllAppointmentsFilters || allAppointmentsStatusFilter !== "All" || allAppointmentsDoctorFilter !== "All"
+                    ? "bg-[#414E36] text-white border-[#414E36]"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+                title={tr.filterTitle || "Filter"}
+              >
+                <Filter size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Expandable Filter Bar */}
+          {showAllAppointmentsFilters && (
+            <div className="p-4 rounded-2xl bg-[#FBFBF9] border border-[#414E36]/10 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs animate-fadeIn">
+              <div>
+                <label className="block font-bold text-[#1F251A] mb-1">{tr.colStatus || "Status"}</label>
+                <select
+                  value={allAppointmentsStatusFilter}
+                  onChange={(e) => { setAllAppointmentsStatusFilter(e.target.value); setAllAppointmentsPage(1); }}
+                  className="w-full rounded-xl border border-gray-200 bg-white p-2 text-xs font-semibold text-[#1F251A] outline-none"
+                >
+                  <option value="All">{tr.filterStatusAll || "All Statuses"}</option>
+                  <option value="pending">{tr.statusLabels?.pending || "Pending"}</option>
+                  <option value="confirmed">{tr.statusLabels?.confirmed || "Confirmed"}</option>
+                  <option value="checked_in">{tr.statusLabels?.checkedIn || "Checked In"}</option>
+                  <option value="in_progress">{tr.statusLabels?.inProgress || "In Progress"}</option>
+                  <option value="completed">{tr.statusLabels?.completed || "Completed"}</option>
+                  <option value="postponed">{tr.statusLabels?.postponed || "Postponed"}</option>
+                  <option value="canceled">{tr.statusLabels?.canceled || "Canceled"}</option>
+                  <option value="no_show">{tr.statusLabels?.noShow || "No Show"}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-bold text-[#1F251A] mb-1">{tr.colDoctor || "Doctor"}</label>
+                <select
+                  value={allAppointmentsDoctorFilter}
+                  onChange={(e) => { setAllAppointmentsDoctorFilter(e.target.value); setAllAppointmentsPage(1); }}
+                  className="w-full rounded-xl border border-gray-200 bg-white p-2 text-xs font-semibold text-[#1F251A] outline-none"
+                >
+                  <option value="All">{tr.filterDoctorAll || "All Doctors"}</option>
+                  {Array.from(new Set(mergedAppointments.map(r => r.doctor_name).filter(Boolean))).map((doc: any) => (
+                    <option key={doc} value={doc}>{doc}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAllAppointmentsSearch("");
+                    setAllAppointmentsStatusFilter("All");
+                    setAllAppointmentsDoctorFilter("All");
+                    setAllAppointmentsPage(1);
+                  }}
+                  className="w-full rounded-xl border border-gray-200 bg-white py-2 text-xs font-bold text-[#5A6A51] hover:bg-gray-100 transition"
+                >
+                  Reset Filters
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Table Container */}
+          <div className="overflow-x-auto scrollbar-none rounded-2xl border border-gray-100">
+            <table className="w-full text-start text-xs border-collapse table-fixed">
+              <thead>
+                <tr className="border-b border-gray-100 bg-[#F9F9F7] text-[10px] uppercase font-bold tracking-tight text-[#9CA3AF]">
+                  <th className="py-3 px-2.5 text-start font-bold w-[9%]">{tr.colAppointmentId || "APPOINTMENT ID"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[11%]">{tr.colDateTime || "DATE & TIME"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[16%]">{tr.colPatient || "PATIENT"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[11%]">{tr.colPhone || "PHONE"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[14%]">{tr.colService || "SERVICE"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[13%]">{tr.colDoctor || "DOCTOR"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[7%]">{tr.colRoom || "ROOM"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[10%]">{tr.colStatus || "STATUS"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[9%]">{tr.colPayment || "PAYMENT"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[9%]">{tr.colAmount || "AMOUNT"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[7%]">{tr.colAction || "ACTION"}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 bg-white">
+                {paginatedAllAppointments.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="py-14 text-center text-sm text-[#5A6A51]">
+                      {tr.noAllAppointmentsFound || "No appointments match your search or filter criteria."}
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedAllAppointments.map((item) => {
+                    const stConfig = getStatusConfig(item.status);
+                    const payStyle = getPaymentStyle(item.paymentStatus);
+                    const displayTimeStr = formatDisplayTime(item.time);
+                    const aptIdFormatted = String(item.id).length > 6 
+                      ? `APT-${String(item.id).slice(0, 6).toUpperCase()}` 
+                      : `APT-${String(item.id).padStart(5, '0')}`;
+                    const rawAmt = Number(item.total_price || item.totalPrice || item.final_price || item.price || (Number(item.amountPaid || 0) + Number(item.amountLeft || 0))) || 0;
+                    const initials = (item.customer_name || "P")
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase();
+                    const docInitials = (item.doctor_name || "D")
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase();
+
+                    return (
+                      <tr
+                        key={item.id}
+                        onClick={() => onViewBookingDetails ? onViewBookingDetails(item.raw || item) : null}
+                        className="hover:bg-[#FBFBF9] transition cursor-pointer group"
+                      >
+                        {/* 1. Appointment ID */}
+                        <td className="py-3 px-2.5 font-extrabold text-[#111827] text-xs font-mono whitespace-nowrap">
+                          {aptIdFormatted}
+                        </td>
+
+                        {/* 2. Date & Time */}
+                        <td className="py-3 px-2.5 whitespace-nowrap">
+                          <span className="font-extrabold text-[#111827] text-xs block">{item.date}</span>
+                          <span className="text-[11px] font-bold text-[#414E36]">{displayTimeStr}</span>
+                        </td>
+
+                        {/* 3. Patient */}
+                        <td className="py-3 px-2.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-7 h-7 rounded-full bg-[#EDF1EC] text-[#414E36] font-bold text-xs flex items-center justify-center shrink-0 border border-[#414E36]/15">
+                              {initials}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-[#111827] text-xs block truncate">{item.customer_name}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 4. Phone */}
+                        <td className="py-3 px-2.5 whitespace-nowrap font-mono text-[11px] text-gray-500 font-medium">
+                          {item.customer_phone}
+                        </td>
+
+                        {/* 5. Service */}
+                        <td className="py-3 px-2.5">
+                          <div className="min-w-0">
+                            <span className="font-extrabold text-[#111827] text-xs block truncate">{item.service_name}</span>
+                            <span className="text-[10px] text-gray-400 font-medium truncate block">{item.service_variant}</span>
+                          </div>
+                        </td>
+
+                        {/* 6. Doctor */}
+                        <td className="py-3 px-2.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-6 h-6 rounded-full bg-[#FAF5EB] text-[#C4AE7C] font-bold text-[10px] flex items-center justify-center shrink-0 border border-[#C4AE7C]/30">
+                              {docInitials}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-[#111827] text-xs block truncate">{item.doctor_name}</span>
+                              <span className="text-[10px] text-gray-400 block truncate">{item.doctorSpecialty || "Specialist"}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 7. Room */}
+                        <td className="py-3 px-2.5 text-[#6B7280] font-medium text-xs truncate whitespace-nowrap">
+                          {item.room}
+                        </td>
+
+                        {/* 8. Status */}
+                        <td className="py-3 px-2.5 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${stConfig.bg} ${stConfig.text}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${stConfig.dot}`}></span>
+                            {stConfig.label}
+                          </span>
+                        </td>
+
+                        {/* 9. Payment */}
+                        <td className="py-3 px-2.5 whitespace-nowrap">
+                          <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${payStyle}`}>
+                            {paymentStatusLabel(item.paymentStatus)}
+                          </span>
+                        </td>
+
+                        {/* 10. Amount */}
+                        <td className="py-3 px-2.5 whitespace-nowrap font-extrabold text-[#111827] text-xs">
+                          {rawAmt > 0 ? `EGP ${rawAmt.toLocaleString()}` : "—"}
+                        </td>
+
+                        {/* 11. Action */}
+                        <td className="py-3 px-2.5 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onViewBookingDetails) onViewBookingDetails(item.raw || item);
+                              }}
+                              className="p-1.5 rounded-xl border border-gray-200 text-gray-500 hover:text-[#414E36] hover:bg-[#EDF1EC] transition shadow-2xs cursor-pointer"
+                              title={tr.viewDetailsBtn || "View Details"}
+                            >
+                              <Eye size={14} />
+                            </button>
+                            <div className="relative dropdown-action-menu">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuId((prev) => (prev === item.id ? null : item.id));
+                                }}
+                                className="p-1.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 transition shadow-2xs cursor-pointer"
+                              >
+                                <MoreVertical size={14} />
+                              </button>
+
+                              {activeMenuId === item.id && (
+                                <div className="absolute end-0 top-8 z-50 w-44 rounded-xl border border-gray-100 bg-white p-1 shadow-xl text-xs animate-in fade-in duration-150 dropdown-action-menu text-start">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveMenuId(null);
+                                      if (onViewBookingDetails) onViewBookingDetails(item.raw || item);
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 font-semibold text-gray-700 transition cursor-pointer"
+                                  >
+                                    <Eye size={14} className="text-gray-500" />
+                                    <span>{tr.viewDetailsBtn || "View Details"}</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Footer */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-xs text-[#6B7280] border-t border-gray-100 pt-3">
+            <div>
+              {tr.showingPrefix || "Showing"} <span className="font-semibold text-[#111827]">{totalAllAppointments > 0 ? allAppointmentsStartIndex + 1 : 0}</span> {tr.toWord || "to"}{" "}
+              <span className="font-semibold text-[#111827]">{Math.min(allAppointmentsStartIndex + allAppointmentsPerPage, totalAllAppointments)}</span>{" "}
+              {tr.ofWord || "of"} <span className="font-semibold text-[#111827]">{totalAllAppointments}</span> {tr.appointmentsSuffix || "appointments"}
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span>{tr.rowsPerPageLabel || "Rows per page:"}</span>
+                <select
+                  value={allAppointmentsPerPage}
+                  onChange={(e) => { setAllAppointmentsPerPage(Number(e.target.value)); setAllAppointmentsPage(1); }}
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 font-semibold text-[#374151] outline-none"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={allAppointmentsPage <= 1}
+                  onClick={() => setAllAppointmentsPage(prev => Math.max(1, prev - 1))}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white font-semibold text-[#374151] hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  ‹
+                </button>
+                {Array.from({ length: Math.min(5, totalAllPages) }, (_, i) => {
+                  let pageNum = i + 1;
+                  if (totalAllPages > 5 && allAppointmentsPage > 3) {
+                    pageNum = Math.min(totalAllPages - 4 + i, allAppointmentsPage - 2 + i);
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => setAllAppointmentsPage(pageNum)}
+                      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition ${
+                        allAppointmentsPage === pageNum
+                          ? "bg-[#414E36] text-white shadow-xs"
+                          : "border border-gray-200 bg-white text-[#374151] hover:bg-gray-50"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  disabled={allAppointmentsPage >= totalAllPages}
+                  onClick={() => setAllAppointmentsPage(prev => Math.min(totalAllPages, prev + 1))}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white font-semibold text-[#374151] hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : (
         /* ── CALENDAR VIEW: MINI CALENDAR + TODAY'S SCHEDULE ── */
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -1182,8 +1618,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                 </div>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => setStatusFilter("All")}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#374151] hover:bg-gray-50 active:scale-95"
+                    onClick={() => setViewMode("all")}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#374151] hover:bg-gray-50 active:scale-95 cursor-pointer"
                   >
                     <span>{tr.allAppointmentsBtn}</span>
                     <ArrowRight size={14} />
