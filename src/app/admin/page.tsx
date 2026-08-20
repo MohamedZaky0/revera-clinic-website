@@ -17197,33 +17197,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                    * - Technical Caveat / Gap: Requires strict role permission audit checks (e.g. only 'finance' or 'superadmin' roles can apply adjustments).
                    *   All changes must write an audit trail log in a ledger table.
                    * - Last Updated: July 5, 2026 2:45 PM
-                   * - Milestone: Postponed / Phase 2
-                   * - Module: Bookings / Billing
-                   * - Parent Feature: Billing System
-                   * - Place: Booking Details drawer / Extra Adjustment Section
-                   * - End Dev: Pending DB Schema
-                   * - Priority: Medium
-                   * - Started Dev: July 5, 2026 2:00 PM
-                   * - Status: Locked
-                   * - Sub-Features: Empty
-                   * - User Role: Finance Manager / Superadmin
-                   * - What: Allows adding positive or negative financial adjustments to the base price of a booking.
-                   * - Where: Located inside the booking details drawer under 'Extra Adjustment'.
-                   * - Why: Handles manual discounts, on-the-fly custom service adjustments, or refunds without altering core service pricing.
-                   */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">EXTRA ADJUSTMENT</p>
-                      <p className="text-sm text-[#1F251A] mt-1 font-semibold">0.00 EGP</p>
-                    </div>
-                    <button
-                      disabled={true}
-                      className="rounded-2xl border border-[#414E36]/15 px-3 py-1.5 text-xs font-semibold text-gray-400 bg-gray-50 cursor-not-allowed opacity-50 flex items-center gap-1"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                      Adjustment
-                    </button>
-                  </div>
+
 
 
 
