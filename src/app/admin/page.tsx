@@ -1542,6 +1542,38 @@ export default function AdminPage() {
   const [isEditingService, setIsEditingService] = useState(false);
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
+
+  // Sync real-time reservation_products (products, additional services, pulses) on modal opens
+  useEffect(() => {
+    const activeId = viewingBooking?.id;
+    if (!activeId) return;
+
+    supabase
+      .from('reservation_products')
+      .select('*')
+      .eq('reservation_id', activeId)
+      .then((res: any) => {
+        const { data, error } = res || {};
+        if (!error && data && data.length > 0) {
+          const mapped = data.map((p: any) => ({
+            id: p.id,
+            name: p.description,
+            qty: Number(p.qty) || 1,
+            unitPrice: Number(p.unit_price) || 0,
+            total: Number(p.total) || (Number(p.qty || 1) * Number(p.unit_price || 0)),
+            addedBy: p.added_by_role === 'doctor_session' ? 'Doctor Session' : 'Receptionist',
+            lineType: p.line_type || (p.service_id ? 'additional_service' : 'product'),
+            serviceId: p.service_id ?? null,
+          }));
+          setViewingBooking((prev: any) => {
+            if (prev && String(prev.id) === String(activeId)) {
+              return { ...prev, attachedProducts: mapped };
+            }
+            return prev;
+          });
+        }
+      });
+  }, [viewingBooking?.id]);
   const [dayBookingsSelector, setDayBookingsSelector] = useState<{
     open: boolean;
     date: string;
@@ -1627,6 +1659,37 @@ export default function AdminPage() {
   const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(false);
   const [savingCheckout, setSavingCheckout] = useState<boolean>(false);
   const [invoiceBooking, setInvoiceBooking] = useState<any>(null);
+
+  useEffect(() => {
+    const activeId = invoiceBooking?.id;
+    if (!activeId) return;
+
+    supabase
+      .from('reservation_products')
+      .select('*')
+      .eq('reservation_id', activeId)
+      .then((res: any) => {
+        const { data, error } = res || {};
+        if (!error && data && data.length > 0) {
+          const mapped = data.map((p: any) => ({
+            id: p.id,
+            name: p.description,
+            qty: Number(p.qty) || 1,
+            unitPrice: Number(p.unit_price) || 0,
+            total: Number(p.total) || (Number(p.qty || 1) * Number(p.unit_price || 0)),
+            addedBy: p.added_by_role === 'doctor_session' ? 'Doctor Session' : 'Receptionist',
+            lineType: p.line_type || (p.service_id ? 'additional_service' : 'product'),
+            serviceId: p.service_id ?? null,
+          }));
+          setInvoiceBooking((prev: any) => {
+            if (prev && String(prev.id) === String(activeId)) {
+              return { ...prev, attachedProducts: mapped };
+            }
+            return prev;
+          });
+        }
+      });
+  }, [invoiceBooking?.id]);
 
   // Postpone modal state (RISK-029 follow-up) — two modes: reschedule now (real date/time known)
   // or follow-up later (status becomes 'postponed', no date/time change yet).
@@ -16626,57 +16689,122 @@ export default function AdminPage() {
         const serviceNames = bookingServices.map(bs => bs.name).join(", ");
         const servicesCost = bookingServices.reduce((sum, bs) => sum + bs.price, 0);
 
-        // Compute products cost from attachedProducts and notes
-        const drawerAttachedList: any[] = Array.isArray((viewingBooking as any).attachedProducts)
+        // Compute attached products and additional services from attachedProducts and notes
+        const rawAttached: any[] = Array.isArray((viewingBooking as any).attachedProducts)
           ? [...(viewingBooking as any).attachedProducts]
           : [];
-        const drawerExistingNames = new Set(drawerAttachedList.map((p: any) => (p.name || '').trim().toLowerCase()));
 
+        const additionalServicesList: Array<{ name: string; qty: number; unitPrice: number; total: number; lineType: string }> = [];
+        const productsConsumablesList: Array<{ name: string; qty: number; unitPrice: number; total: number; lineType: string }> = [];
+        const existingNames = new Set<string>();
+
+        // 1. Process structured attachedProducts
+        for (const item of rawAttached) {
+          const name = String(item.name || 'Item').trim();
+          const qty = Number(item.qty) || 1;
+          const unitPrice = Number(item.unitPrice || item.price || 0);
+          const total = Number(item.total) || (qty * unitPrice);
+          const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
+
+          if (!existingNames.has(name.toLowerCase())) {
+            existingNames.add(name.toLowerCase());
+            if (lineType === 'additional_service') {
+              additionalServicesList.push({ name, qty, unitPrice, total, lineType });
+            } else {
+              productsConsumablesList.push({ name, qty, unitPrice, total, lineType });
+            }
+          }
+        }
+
+        // 2. Parse from notes (safety net & historical support)
         if (viewingBooking.notes) {
-          const notesStr = viewingBooking.notes;
+          const notesStr = String(viewingBooking.notes);
+
+          // a) Additional Services in notes
+          const additionalServiceMatches = notesStr.matchAll(
+            /(?:\[Additional Services(?: Used)?(?: During Session)?\]:\s*|,\s*)(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
+          );
+          for (const match of additionalServiceMatches) {
+            const name = match[1].replace(/^\[Additional Services(?: Used)?(?: During Session)?\]:\s*/, "").trim();
+            const qty = Number(match[2]) || 1;
+            const unitPrice = Number(match[3]) || 0;
+            const total = Number(match[4]) || (qty * unitPrice);
+            if (!existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+            }
+          }
+
+          // b) Added Service format: [Added Service]: Name - 350 EGP
+          const addedServiceMatches = notesStr.matchAll(/\[Added Service\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+          for (const match of addedServiceMatches) {
+            const name = match[1].trim();
+            const qty = match[2] ? Number(match[2]) : 1;
+            const total = Number(match[3]);
+            const unitPrice = qty > 0 ? total / qty : total;
+            if (!existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+            }
+          }
+
+          // c) Products Used in notes
+          const doctorSessionMatches = notesStr.matchAll(
+            /(?:\[Products Used During Session\]:\s*|,\s*)(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
+          );
+          for (const match of doctorSessionMatches) {
+            const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
+            const qty = Number(match[2]) || 1;
+            const unitPrice = Number(match[3]) || 0;
+            const total = Number(match[4]) || (qty * unitPrice);
+            if (!existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+            }
+          }
+
+          // d) Receptionist Added Product: [Added Product]: Name (x2) - 1400 EGP
+          const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+          for (const match of receptionistMatches) {
+            const name = match[1].trim();
+            const qty = match[2] ? Number(match[2]) : 1;
+            const total = Number(match[3]);
+            const unitPrice = qty > 0 ? total / qty : total;
+            if (!existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+            }
+          }
+
+          // e) Extra Device Pulses: [Extra Device Pulses]: Device - 100 pulses @ 0 EGP = 0 EGP
+          const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+          for (const match of pulseMatches) {
+            const detail = match[1].trim();
+            const total = Number(match[2]);
+            const name = `Extra Device Pulses (${detail})`;
+            if (!existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              productsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses' });
+            }
+          }
+
+          // f) Generic format: - Name (x2) @ 700 EGP
           const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
           for (const match of doctorMatches) {
             const name = match[1].trim();
             const qty = Number(match[2]);
             const unitPrice = Number(match[3]);
-            if (!drawerExistingNames.has(name.toLowerCase())) {
-              drawerExistingNames.add(name.toLowerCase());
-              drawerAttachedList.push({ name, qty, unitPrice, total: qty * unitPrice });
-            }
-          }
-          const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)\s+\(x(\d+)\)\s+-\s+(\d+(?:\.\d+)?)\s+EGP/g);
-          for (const match of receptionistMatches) {
-            const name = match[1].trim();
-            const qty = Number(match[2]);
-            const total = Number(match[3]);
-            const unitPrice = qty > 0 ? total / qty : total;
-            if (!drawerExistingNames.has(name.toLowerCase())) {
-              drawerExistingNames.add(name.toLowerCase());
-              drawerAttachedList.push({ name, qty, unitPrice, total });
-            }
-          }
-
-          // RISK-057: DoctorAccountView writes "[Products Used During Session]: Name (Qty: N x
-          // UnitPrice EGP = Total EGP), ..." — neither pattern above matches it, so a product a
-          // doctor added during the session never showed up here ("No products added") even
-          // though amountPaid/amountLeft already reflected it correctly.
-          const doctorSessionMatches = notesStr.matchAll(
-            /(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
-          );
-          for (const match of doctorSessionMatches) {
-            const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
-            const qty = Number(match[2]);
-            const unitPrice = Number(match[3]);
-            const total = Number(match[4]);
-            if (!drawerExistingNames.has(name.toLowerCase())) {
-              drawerExistingNames.add(name.toLowerCase());
-              drawerAttachedList.push({ name, qty, unitPrice, total });
+            const total = qty * unitPrice;
+            if (!existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
             }
           }
         }
 
-        const productsCost = drawerAttachedList.reduce((sum, p) => sum + (Number(p.total) || (Number(p.qty || 1) * Number(p.unitPrice || p.price || 0))), 0);
-        const totalPrice = servicesCost + productsCost;
+        const additionalServicesCost = additionalServicesList.reduce((sum, s) => sum + s.total, 0);
+        const productsCost = productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
+        const totalPrice = servicesCost + additionalServicesCost + productsCost;
 
         const sessionPaid = Number(viewingBooking.amountPaid || 0);
         const rawLeft = viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null
@@ -16788,6 +16916,12 @@ export default function AdminPage() {
                         <span>Service Cost</span>
                         <span>{servicesCost} EGP</span>
                       </div>
+                      {additionalServicesCost > 0 && (
+                        <div className="flex justify-between font-semibold text-[#1F251A]">
+                          <span>Additional Services</span>
+                          <span>+{additionalServicesCost} EGP</span>
+                        </div>
+                      )}
                       {productsCost > 0 && (
                         <div className="flex justify-between font-semibold text-[#414E36]">
                           <span>Products & Consumables</span>
@@ -19746,38 +19880,116 @@ export default function AdminPage() {
             };
           });
 
-          // Extract attached products/consumables/add-ons
-          const invoiceAttachedList: Array<{ name: string; qty: number; unitPrice: number; total: number }> = [];
+          // Extract attached products/consumables/add-ons and additional services
+          const rawAttached: any[] = Array.isArray(invoiceBooking.attachedProducts)
+            ? [...invoiceBooking.attachedProducts]
+            : [];
+
+          const invoiceAdditionalServicesList: Array<{ name: string; nameAr: string; qty: number; unitPrice: number; price: number; total: number }> = [];
+          const invoiceProductsList: Array<{ name: string; nameAr: string; qty: number; unitPrice: number; price: number; total: number }> = [];
           const existingNames = new Set<string>();
 
-          if (Array.isArray(invoiceBooking.attachedProducts)) {
-            for (const prod of invoiceBooking.attachedProducts) {
-              const name = String(prod.name || 'Product / Consumable').trim();
-              const qty = Number(prod.qty) || 1;
-              const unitPrice = Number(prod.unitPrice || prod.price || (prod.total && qty ? prod.total / qty : 0));
-              const total = Number(prod.total) || (qty * unitPrice);
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                invoiceAttachedList.push({ name, qty, unitPrice, total });
+          // 1. Process structured attachedProducts
+          for (const item of rawAttached) {
+            const name = String(item.name || 'Item').trim();
+            const qty = Number(item.qty) || 1;
+            const unitPrice = Number(item.unitPrice || item.price || 0);
+            const total = Number(item.total) || (qty * unitPrice);
+            const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
+
+            if (!existingNames.has(name.toLowerCase())) {
+              existingNames.add(name.toLowerCase());
+              if (lineType === 'additional_service') {
+                invoiceAdditionalServicesList.push({
+                  name: `${name} (Additional Service)`,
+                  nameAr: `${name} (خدمة إضافية)`,
+                  qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
+              } else {
+                invoiceProductsList.push({
+                  name: `${name} (Add-on)`,
+                  nameAr: `${name} (إضافة)`,
+                  qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
               }
             }
           }
 
+          // 2. Parse from notes (safety net & historical support)
           if (invoiceBooking.notes) {
             const notesStr = String(invoiceBooking.notes);
 
-            const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
-            for (const match of doctorMatches) {
-              const name = match[1].trim();
-              const qty = Number(match[2]);
-              const unitPrice = Number(match[3]);
-              const total = qty * unitPrice;
+            // a) Additional Services in notes
+            const additionalServiceMatches = notesStr.matchAll(
+              /(?:\[Additional Services(?: Used)?(?: During Session)?\]:\s*|,\s*)(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
+            );
+            for (const match of additionalServiceMatches) {
+              const name = match[1].replace(/^\[Additional Services(?: Used)?(?: During Session)?\]:\s*/, "").trim();
+              const qty = Number(match[2]) || 1;
+              const unitPrice = Number(match[3]) || 0;
+              const total = Number(match[4]) || (qty * unitPrice);
               if (!existingNames.has(name.toLowerCase())) {
                 existingNames.add(name.toLowerCase());
-                invoiceAttachedList.push({ name, qty, unitPrice, total });
+                invoiceAdditionalServicesList.push({
+                  name: `${name} (Additional Service)`,
+                  nameAr: `${name} (خدمة إضافية)`,
+                  qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
               }
             }
 
+            // b) Added Service format: [Added Service]: Name - 350 EGP
+            const addedServiceMatches = notesStr.matchAll(/\[Added Service\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+            for (const match of addedServiceMatches) {
+              const name = match[1].trim();
+              const qty = match[2] ? Number(match[2]) : 1;
+              const total = Number(match[3]);
+              const unitPrice = qty > 0 ? total / qty : total;
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                invoiceAdditionalServicesList.push({
+                  name: `${name} (Additional Service)`,
+                  nameAr: `${name} (خدمة إضافية)`,
+                  qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
+              }
+            }
+
+            // c) Products Used in notes
+            const doctorSessionMatches = notesStr.matchAll(
+              /(?:\[Products Used During Session\]:\s*|,\s*)(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
+            );
+            for (const match of doctorSessionMatches) {
+              const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
+              const qty = Number(match[2]) || 1;
+              const unitPrice = Number(match[3]) || 0;
+              const total = Number(match[4]) || (qty * unitPrice);
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                invoiceProductsList.push({
+                  name: `${name} (Add-on)`,
+                  nameAr: `${name} (إضافة)`,
+                  qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
+              }
+            }
+
+            // d) Receptionist Added Product: [Added Product]: Name (x2) - 1400 EGP
             const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/g);
             for (const match of receptionistMatches) {
               const name = match[1].trim();
@@ -19786,53 +19998,58 @@ export default function AdminPage() {
               const unitPrice = qty > 0 ? total / qty : total;
               if (!existingNames.has(name.toLowerCase())) {
                 existingNames.add(name.toLowerCase());
-                invoiceAttachedList.push({ name, qty, unitPrice, total });
+                invoiceProductsList.push({
+                  name: `${name} (Add-on)`,
+                  nameAr: `${name} (إضافة)`,
+                  qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
               }
             }
 
-            const pulseMatches = notesStr.matchAll(/\[Extra Device Pulses\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+            // e) Extra Device Pulses: [Extra Device Pulses]: Device - 100 pulses @ 0 EGP = 0 EGP
+            const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
             for (const match of pulseMatches) {
               const detail = match[1].trim();
               const total = Number(match[2]);
               const name = `Extra Device Pulses (${detail})`;
               if (!existingNames.has(name.toLowerCase())) {
                 existingNames.add(name.toLowerCase());
-                invoiceAttachedList.push({ name, qty: 1, unitPrice: total, total });
+                invoiceProductsList.push({
+                  name: `${name} (Add-on)`,
+                  nameAr: `${name} (إضافة)`,
+                  qty: 1,
+                  unitPrice: total,
+                  price: total,
+                  total
+                });
               }
             }
 
-            // RISK-057: DoctorAccountView.handleCompleteTreatment/handleSaveClinicalNote write
-            // "[Products Used During Session]: Name (Qty: N x UnitPrice EGP = Total EGP), ..." —
-            // a fourth note format distinct from the three parsed above (none of which match it).
-            // Because it was never parsed, a doctor-added product correctly reached amountPaid/
-            // amountLeft (RISK-038) but never appeared as a line item on the printed invoice —
-            // the PDF showed only the base service subtotal while "Amount Paid" silently included
-            // the product cost, with nothing on the document explaining the difference.
-            const doctorSessionProductMatches = notesStr.matchAll(
-              /(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
-            );
-            for (const match of doctorSessionProductMatches) {
-              const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
+            // f) Generic format: - Name (x2) @ 700 EGP
+            const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
+            for (const match of doctorMatches) {
+              const name = match[1].trim();
               const qty = Number(match[2]);
               const unitPrice = Number(match[3]);
-              const total = Number(match[4]);
+              const total = qty * unitPrice;
               if (!existingNames.has(name.toLowerCase())) {
                 existingNames.add(name.toLowerCase());
-                invoiceAttachedList.push({ name, qty, unitPrice, total });
+                invoiceProductsList.push({
+                  name: `${name} (Add-on)`,
+                  nameAr: `${name} (إضافة)`,
+                  qty,
+                  unitPrice,
+                  price: unitPrice,
+                  total
+                });
               }
             }
           }
 
-          const invoiceProductsList = invoiceAttachedList.map((p) => ({
-            name: `${p.name} (Add-on)`,
-            nameAr: `${p.name} (إضافة)`,
-            qty: p.qty,
-            unitPrice: p.unitPrice,
-            price: p.unitPrice,
-            total: p.total
-          }));
-
-          const allInvoiceItems = [...baseServicesList, ...invoiceProductsList];
+          const allInvoiceItems = [...baseServicesList, ...invoiceAdditionalServicesList, ...invoiceProductsList];
           const totalCost = allInvoiceItems.reduce((sum: number, item: any) => sum + item.total, 0);
 
           // 2. Fetch customer and branch details

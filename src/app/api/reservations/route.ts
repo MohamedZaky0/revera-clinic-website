@@ -36,6 +36,8 @@ function mapReservationProduct(p: Record<string, any>) {
     unitPrice: Number(p.unit_price) || 0,
     total: Number(p.total) || 0,
     addedBy: p.added_by_role === 'doctor_session' ? 'Doctor Session' : 'Receptionist',
+    lineType: p.line_type || (p.service_id ? 'additional_service' : 'product'),
+    serviceId: p.service_id ?? null,
   };
 }
 
