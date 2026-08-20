@@ -1392,13 +1392,11 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (viewingBooking) {
-      const custId = viewingBooking.customerId || (viewingBooking as any).customer_id || "";
       const bookId = viewingBooking.id || "";
-      const pName = viewingBooking.name || "";
       const params = new URLSearchParams();
-      if (bookId) params.set("bookingId", String(bookId));
-      if (custId) params.set("customerId", String(custId));
-      if (pName) params.set("patientName", String(pName));
+      if (bookId) {
+        params.set("bookingId", String(bookId));
+      }
 
       fetch(`/api/prescriptions?${params.toString()}`, { headers: authenticatedJsonHeaders })
         .then((res) => (res.ok ? res.json() : []))
@@ -1407,7 +1405,7 @@ export default function AdminPage() {
     } else {
       setDrawerPrescriptions([]);
     }
-  }, [viewingBooking?.id, (viewingBooking as any)?.customerId, (viewingBooking as any)?.customer_id]);
+  }, [viewingBooking?.id]);
 
   function handleSendPrescriptionWhatsApp(rx: any, booking: any) {
     const rawPhone = String(booking?.phone || rx?.patient_phone || rx?.phone || '').trim();
@@ -1492,8 +1490,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
         const params = new URLSearchParams();
         if (viewingBooking.id) params.set("bookingId", String(viewingBooking.id));
-        if (custId) params.set("customerId", String(custId));
-        if (viewingBooking.name) params.set("patientName", String(viewingBooking.name));
 
         const rxRes = await fetch(`/api/prescriptions?${params.toString()}`, { headers: authenticatedJsonHeaders });
         if (rxRes.ok) {
