@@ -17366,12 +17366,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                             : "Patient digital prescriptions record"}
                         </p>
                       </div>
-                      <button
-                        onClick={() => setShowDrawerPrescriptionModal(true)}
-                        className="rounded-2xl bg-[#414E36] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#343F2B] transition flex items-center gap-1.5 shadow-sm"
-                      >
-                        + Add Prescription
-                      </button>
+                      {drawerPrescriptions.length > 0 && (
+                        <span className="rounded-full bg-[#EDF1EC] px-2.5 py-0.5 text-[10px] font-bold text-[#414E36] border border-[#414E36]/15">
+                          Recorded in Session
+                        </span>
+                      )}
                     </div>
 
                     {drawerPrescriptions.length > 0 ? (
@@ -17477,13 +17476,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                           <line x1="16" y1="17" x2="8" y2="17" />
                           <polyline points="10 9 9 9 8 9" />
                         </svg>
-                        <p className="text-xs font-semibold text-[#1F251A]">No prescriptions recorded yet</p>
-                        <button
-                          onClick={() => setShowDrawerPrescriptionModal(true)}
-                          className="mt-2 text-xs font-bold text-[#414E36] hover:underline flex items-center gap-1"
-                        >
-                          + Create First Prescription
-                        </button>
+                        <p className="text-xs font-semibold text-[#1F251A]">No prescription recorded yet</p>
+                        <p className="text-[11px] text-[#5A6A51] mt-0.5">No prescription was written by the doctor for this session.</p>
                       </div>
                     )}
                   </div>
