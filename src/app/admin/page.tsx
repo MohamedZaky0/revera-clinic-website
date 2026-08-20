@@ -20310,30 +20310,76 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           if (invoiceBooking.notes) {
             const notesStr = String(invoiceBooking.notes);
 
-            // a) Additional Services in notes
-            const additionalServiceMatches = notesStr.matchAll(
-              /(?:\[Additional Services(?: Used)?(?: During Session)?\]:\s*|,\s*)(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
-            );
-            for (const match of additionalServiceMatches) {
-              const name = match[1].replace(/^\[Additional Services(?: Used)?(?: During Session)?\]:\s*/, "").trim();
-              const qty = Number(match[2]) || 1;
-              const unitPrice = Number(match[3]) || 0;
-              const total = Number(match[4]) || (qty * unitPrice);
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                invoiceAdditionalServicesList.push({
-                  name: `${name} (Additional Service)`,
-                  nameAr: `${name} (خدمة إضافية)`,
-                  qty,
-                  unitPrice,
-                  price: unitPrice,
-                  total
-                });
+            // a) Check for [Additional Services Used] or [Additional Services]
+            const addSvcBlockMatch = notesStr.match(/\[Additional Services(?: Used)?(?: During Session)?\]:\s*([^\n\[]+)/i);
+            if (addSvcBlockMatch) {
+              const rawBlock = addSvcBlockMatch[1];
+              const items = rawBlock.split(/,(?![^(]*\))/);
+              for (const item of items) {
+                const trimmed = item.trim();
+                if (!trimmed) continue;
+                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m1) {
+                  const name = m1[1].trim();
+                  const qty = Number(m1[2]) || 1;
+                  const unitPrice = Number(m1[3]) || 0;
+                  const total = Number(m1[4]) || (qty * unitPrice);
+                  if (!existingNames.has(name.toLowerCase())) {
+                    existingNames.add(name.toLowerCase());
+                    invoiceAdditionalServicesList.push({
+                      name: `${name} (Additional Service)`,
+                      nameAr: `${name} (خدمة إضافية)`,
+                      qty,
+                      unitPrice,
+                      price: unitPrice,
+                      total
+                    });
+                  }
+                  continue;
+                }
+                const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m2) {
+                  const name = m2[1].trim();
+                  const qty = Number(m2[2]) || 1;
+                  const unitPrice = Number(m2[3]) || 0;
+                  const total = qty * unitPrice;
+                  if (!existingNames.has(name.toLowerCase())) {
+                    existingNames.add(name.toLowerCase());
+                    invoiceAdditionalServicesList.push({
+                      name: `${name} (Additional Service)`,
+                      nameAr: `${name} (خدمة إضافية)`,
+                      qty,
+                      unitPrice,
+                      price: unitPrice,
+                      total
+                    });
+                  }
+                  continue;
+                }
+                const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+)\s*(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+                if (m3) {
+                  const name = m3[1].trim();
+                  const qty = m3[2] ? Number(m3[2]) : 1;
+                  const total = Number(m3[3]) || 0;
+                  const unitPrice = qty > 0 ? total / qty : total;
+                  if (!existingNames.has(name.toLowerCase())) {
+                    existingNames.add(name.toLowerCase());
+                    invoiceAdditionalServicesList.push({
+                      name: `${name} (Additional Service)`,
+                      nameAr: `${name} (خدمة إضافية)`,
+                      qty,
+                      unitPrice,
+                      price: unitPrice,
+                      total
+                    });
+                  }
+                  continue;
+                }
               }
             }
 
             // b) Added Service format: [Added Service]: Name - 350 EGP
-            const addedServiceMatches = notesStr.matchAll(/\[Added Service\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+            const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service)\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/gi);
             for (const match of addedServiceMatches) {
               const name = match[1].trim();
               const qty = match[2] ? Number(match[2]) : 1;
@@ -20353,29 +20399,37 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             }
 
             // c) Products Used in notes
-            const doctorSessionMatches = notesStr.matchAll(
-              /(?:\[Products Used During Session\]:\s*|,\s*)(\S[^,\n]*?)\s+\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/g
-            );
-            for (const match of doctorSessionMatches) {
-              const name = match[1].replace(/^\[Products Used During Session\]:\s*/, "").trim();
-              const qty = Number(match[2]) || 1;
-              const unitPrice = Number(match[3]) || 0;
-              const total = Number(match[4]) || (qty * unitPrice);
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                invoiceProductsList.push({
-                  name: `${name} (Add-on)`,
-                  nameAr: `${name} (إضافة)`,
-                  qty,
-                  unitPrice,
-                  price: unitPrice,
-                  total
-                });
+            const prodBlockMatch = notesStr.match(/\[Products Used During Session\]:\s*([^\n\[]+)/i);
+            if (prodBlockMatch) {
+              const rawProdBlock = prodBlockMatch[1];
+              const items = rawProdBlock.split(/,(?![^(]*\))/);
+              for (const item of items) {
+                const trimmed = item.trim();
+                if (!trimmed) continue;
+                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m1) {
+                  const name = m1[1].trim();
+                  const qty = Number(m1[2]) || 1;
+                  const unitPrice = Number(m1[3]) || 0;
+                  const total = Number(m1[4]) || (qty * unitPrice);
+                  if (!existingNames.has(name.toLowerCase())) {
+                    existingNames.add(name.toLowerCase());
+                    invoiceProductsList.push({
+                      name: `${name} (Add-on)`,
+                      nameAr: `${name} (إضافة)`,
+                      qty,
+                      unitPrice,
+                      price: unitPrice,
+                      total
+                    });
+                  }
+                  continue;
+                }
               }
             }
 
             // d) Receptionist Added Product: [Added Product]: Name (x2) - 1400 EGP
-            const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/g);
+            const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/gi);
             for (const match of receptionistMatches) {
               const name = match[1].trim();
               const qty = match[2] ? Number(match[2]) : 1;
@@ -20395,7 +20449,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             }
 
             // e) Generic format: - Name (x2) @ 700 EGP
-            const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
+            const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/gi);
             for (const match of doctorMatches) {
               const name = match[1].trim();
               const qty = Number(match[2]);
@@ -20447,7 +20501,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             targetInvoiceTotal = rawPaid + rawLeft;
           }
 
-          if (targetInvoiceTotal > currentAttachedTotal) {
+          if (invoiceAdditionalServicesList.length === 0 && targetInvoiceTotal > currentAttachedTotal) {
             const diff = targetInvoiceTotal - currentAttachedTotal;
             invoiceAdditionalServicesList.push({
               name: "Additional Clinical Services (Additional Service)",
@@ -20479,11 +20533,11 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
 
           return (
             <div 
-              className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-fadeIn"
+              className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto"
               onClick={() => setInvoiceBooking(null)}
             >
               <div 
-                className="relative w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl bg-white p-5 sm:p-6 shadow-2xl border border-[#414E36]/10 animate-in fade-in zoom-in-95 duration-150"
+                className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl bg-white p-5 sm:p-6 shadow-2xl border border-[#414E36]/10 my-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 
@@ -20495,7 +20549,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   </div>
                   <button
                     onClick={() => setInvoiceBooking(null)}
-                    className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200 transition"
+                    className="rounded-full bg-gray-100 p-2 text-gray-500 hover:bg-gray-200 transition cursor-pointer"
                   >
                     <X size={18} />
                   </button>
@@ -20594,13 +20648,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 <div className="flex items-center justify-end gap-3 mt-3 border-t border-gray-100 pt-3 shrink-0">
                   <button
                     onClick={() => setInvoiceBooking(null)}
-                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
+                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition cursor-pointer"
                   >
                     Close
                   </button>
                   <button
                     onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName)}
-                    className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md"
+                    className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md cursor-pointer"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="6 9 6 2 18 2 18 9" />
