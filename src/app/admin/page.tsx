@@ -16792,14 +16792,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const notesStr = String(viewingBooking.notes);
 
           // a) Check for [Additional Services Used] or [Additional Services]
-          const addSvcBlockMatch = notesStr.match(/\[Additional Services(?: Used)?(?: During Session)?\]:\s*([^\n\[]+)/i);
+          const addSvcBlockMatch = notesStr.match(/\[(?:Additional Services|Extra Services|Services Used|Added Services)(?: Used)?(?: During Session)?\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
           if (addSvcBlockMatch) {
             const rawBlock = addSvcBlockMatch[1];
-            // Split by comma outside parentheses
-            const items = rawBlock.split(/,(?![^(]*\))/);
+            // Split by comma or newline outside parentheses
+            const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
             for (const item of items) {
               const trimmed = item.trim();
-              if (!trimmed) continue;
+              if (!trimmed || trimmed.startsWith("[")) continue;
               // Format 1: Name (Qty: 1 x 200 EGP = 200 EGP)
               const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
               if (m1) {
@@ -16826,8 +16826,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                 }
                 continue;
               }
-              // Format 3: Name - 200 EGP or Name (200 EGP)
-              const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+)\s*(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+              // Format 3: Name - 200 EGP or Name (200 EGP) or Name: 200 EGP or Name @ 200 EGP
+              const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
               if (m3) {
                 const name = m3[1].trim();
                 const qty = m3[2] ? Number(m3[2]) : 1;
@@ -16842,27 +16842,44 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             }
           }
 
-          // b) Added Service format: [Added Service]: Name - 350 EGP
-          const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service)\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/gi);
+          // b) Added Service format: [Added Service]: Name - 350 EGP or [Additional Service]: Name - 200 EGP
+          const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
           for (const match of addedServiceMatches) {
-            const name = match[1].trim();
-            const qty = match[2] ? Number(match[2]) : 1;
-            const total = Number(match[3]);
-            const unitPrice = qty > 0 ? total / qty : total;
-            if (!existingNames.has(name.toLowerCase())) {
-              existingNames.add(name.toLowerCase());
-              additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+            const rawLine = match[1].trim();
+            const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+            if (m1) {
+              const name = m1[1].trim();
+              const qty = Number(m1[2]) || 1;
+              const unitPrice = Number(m1[3]) || 0;
+              const total = Number(m1[4]) || (qty * unitPrice);
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+              }
+              continue;
+            }
+            const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+            if (m2) {
+              const name = m2[1].trim();
+              const qty = m2[2] ? Number(m2[2]) : 1;
+              const total = Number(m2[3]);
+              const unitPrice = qty > 0 ? total / qty : total;
+              if (!existingNames.has(name.toLowerCase())) {
+                existingNames.add(name.toLowerCase());
+                additionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+              }
+              continue;
             }
           }
 
           // c) Products Used in notes
-          const prodBlockMatch = notesStr.match(/\[Products Used During Session\]:\s*([^\n\[]+)/i);
+          const prodBlockMatch = notesStr.match(/\[Products Used During Session\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
           if (prodBlockMatch) {
             const rawProdBlock = prodBlockMatch[1];
-            const items = rawProdBlock.split(/,(?![^(]*\))/);
+            const items = rawProdBlock.split(/(?:,|\n)(?![^(]*\))/);
             for (const item of items) {
               const trimmed = item.trim();
-              if (!trimmed) continue;
+              if (!trimmed || trimmed.startsWith("[")) continue;
               const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
               if (m1) {
                 const name = m1[1].trim();
@@ -20311,13 +20328,13 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             const notesStr = String(invoiceBooking.notes);
 
             // a) Check for [Additional Services Used] or [Additional Services]
-            const addSvcBlockMatch = notesStr.match(/\[Additional Services(?: Used)?(?: During Session)?\]:\s*([^\n\[]+)/i);
+            const addSvcBlockMatch = notesStr.match(/\[(?:Additional Services|Extra Services|Services Used|Added Services)(?: Used)?(?: During Session)?\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
             if (addSvcBlockMatch) {
               const rawBlock = addSvcBlockMatch[1];
-              const items = rawBlock.split(/,(?![^(]*\))/);
+              const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
               for (const item of items) {
                 const trimmed = item.trim();
-                if (!trimmed) continue;
+                if (!trimmed || trimmed.startsWith("[")) continue;
                 const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
                 if (m1) {
                   const name = m1[1].trim();
@@ -20356,7 +20373,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   }
                   continue;
                 }
-                const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+)\s*(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+                const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
                 if (m3) {
                   const name = m3[1].trim();
                   const qty = m3[2] ? Number(m3[2]) : 1;
@@ -20378,34 +20395,58 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               }
             }
 
-            // b) Added Service format: [Added Service]: Name - 350 EGP
-            const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service)\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/gi);
+            // b) Added Service format: [Added Service]: Name - 350 EGP or [Additional Service]: Name - 200 EGP
+            const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
             for (const match of addedServiceMatches) {
-              const name = match[1].trim();
-              const qty = match[2] ? Number(match[2]) : 1;
-              const total = Number(match[3]);
-              const unitPrice = qty > 0 ? total / qty : total;
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                invoiceAdditionalServicesList.push({
-                  name: `${name} (Additional Service)`,
-                  nameAr: `${name} (خدمة إضافية)`,
-                  qty,
-                  unitPrice,
-                  price: unitPrice,
-                  total
-                });
+              const rawLine = match[1].trim();
+              const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+              if (m1) {
+                const name = m1[1].trim();
+                const qty = Number(m1[2]) || 1;
+                const unitPrice = Number(m1[3]) || 0;
+                const total = Number(m1[4]) || (qty * unitPrice);
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  invoiceAdditionalServicesList.push({
+                    name: `${name} (Additional Service)`,
+                    nameAr: `${name} (خدمة إضافية)`,
+                    qty,
+                    unitPrice,
+                    price: unitPrice,
+                    total
+                  });
+                }
+                continue;
+              }
+              const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+              if (m2) {
+                const name = m2[1].trim();
+                const qty = m2[2] ? Number(m2[2]) : 1;
+                const total = Number(m2[3]);
+                const unitPrice = qty > 0 ? total / qty : total;
+                if (!existingNames.has(name.toLowerCase())) {
+                  existingNames.add(name.toLowerCase());
+                  invoiceAdditionalServicesList.push({
+                    name: `${name} (Additional Service)`,
+                    nameAr: `${name} (خدمة إضافية)`,
+                    qty,
+                    unitPrice,
+                    price: unitPrice,
+                    total
+                  });
+                }
+                continue;
               }
             }
 
             // c) Products Used in notes
-            const prodBlockMatch = notesStr.match(/\[Products Used During Session\]:\s*([^\n\[]+)/i);
+            const prodBlockMatch = notesStr.match(/\[Products Used During Session\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
             if (prodBlockMatch) {
               const rawProdBlock = prodBlockMatch[1];
-              const items = rawProdBlock.split(/,(?![^(]*\))/);
+              const items = rawProdBlock.split(/(?:,|\n)(?![^(]*\))/);
               for (const item of items) {
                 const trimmed = item.trim();
-                if (!trimmed) continue;
+                if (!trimmed || trimmed.startsWith("[")) continue;
                 const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
                 if (m1) {
                   const name = m1[1].trim();
