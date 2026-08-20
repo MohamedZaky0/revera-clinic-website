@@ -37,6 +37,17 @@ export function printInvoice(
   const invoiceNo = `INV-${booking.id.slice(0, 8).toUpperCase()}`;
 
   const serviceRows = servicesList
+    .filter((s) => {
+      const name = String(s.name || '').toLowerCase();
+      const isPulse = name.includes('pulse') || name.includes('device —') || name.includes('device -');
+      const qty = Number(s.qty) || 1;
+      const uPrice = Number(s.unitPrice !== undefined ? s.unitPrice : (s.price !== undefined ? s.price : 0));
+      const itemTotal = Number(s.total !== undefined ? s.total : (qty * uPrice));
+      if (isPulse && (itemTotal === 0 || uPrice === 0)) {
+        return false;
+      }
+      return true;
+    })
     .map(
       (s) => {
         const qty = Number(s.qty) || 1;

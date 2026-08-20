@@ -19933,6 +19933,12 @@ export default function AdminPage() {
             const total = Number(item.total) || (qty * unitPrice);
             const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
 
+            // Skip device pulses counters from customer invoice
+            const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
+            if (isPulse && (total === 0 || unitPrice === 0)) {
+              continue;
+            }
+
             if (!existingNames.has(name.toLowerCase())) {
               existingNames.add(name.toLowerCase());
               if (lineType === 'additional_service') {
@@ -20045,26 +20051,7 @@ export default function AdminPage() {
               }
             }
 
-            // e) Extra Device Pulses: [Extra Device Pulses]: Device - 100 pulses @ 0 EGP = 0 EGP
-            const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
-            for (const match of pulseMatches) {
-              const detail = match[1].trim();
-              const total = Number(match[2]);
-              const name = `Extra Device Pulses (${detail})`;
-              if (!existingNames.has(name.toLowerCase())) {
-                existingNames.add(name.toLowerCase());
-                invoiceProductsList.push({
-                  name: `${name} (Add-on)`,
-                  nameAr: `${name} (إضافة)`,
-                  qty: 1,
-                  unitPrice: total,
-                  price: total,
-                  total
-                });
-              }
-            }
-
-            // f) Generic format: - Name (x2) @ 700 EGP
+            // e) Generic format: - Name (x2) @ 700 EGP
             const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/g);
             for (const match of doctorMatches) {
               const name = match[1].trim();
@@ -20129,7 +20116,14 @@ export default function AdminPage() {
             });
           }
 
-          const allInvoiceItems = [...baseServicesList, ...invoiceAdditionalServicesList, ...invoiceProductsList];
+          const allInvoiceItems = [...baseServicesList, ...invoiceAdditionalServicesList, ...invoiceProductsList].filter((item: any) => {
+            const nameLower = String(item.name || '').toLowerCase();
+            const isPulse = nameLower.includes('pulse') || nameLower.includes('device —') || nameLower.includes('device -');
+            if (isPulse && (item.total === 0 || item.unitPrice === 0 || item.price === 0)) {
+              return false;
+            }
+            return true;
+          });
           const totalCost = allInvoiceItems.reduce((sum: number, item: any) => sum + item.total, 0);
 
           // 2. Fetch customer and branch details
@@ -20139,14 +20133,14 @@ export default function AdminPage() {
           const invoiceNo = `REV-INV-${invoiceBooking.id.slice(0, 8).toUpperCase()}`;
 
           return (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-              <div className="w-full max-w-3xl rounded-[32px] bg-white p-8 shadow-2xl border border-[#414E36]/10 my-8">
+            <div className="fixed inset-0 z-[9999] flex justify-center items-start overflow-y-auto p-4 sm:p-6 md:p-8 bg-black/60 backdrop-blur-sm">
+              <div className="w-full max-w-2xl rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-[#414E36]/10 my-4 sm:my-6 animate-in fade-in zoom-in-95 duration-150">
                 
                 {/* Header Actions */}
-                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4 mb-6">
+                <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-3 mb-4">
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#C4AE7C]">Invoice Preview</span>
-                    <h3 className="text-lg font-bold text-[#1F251A] mt-0.5 font-sans">Booking Invoice Details</h3>
+                    <h3 className="text-base font-bold text-[#1F251A] mt-0.5 font-sans">Booking Invoice Details</h3>
                   </div>
                   <button
                     onClick={() => setInvoiceBooking(null)}
@@ -20157,32 +20151,32 @@ export default function AdminPage() {
                 </div>
 
                 {/* Printable Invoice Container */}
-                <div className="border border-gray-100 rounded-3xl p-6 sm:p-8 bg-[#FBFBF9]/30">
+                <div className="border border-gray-100 rounded-2xl p-5 sm:p-6 bg-[#FBFBF9]/40">
                   {/* Top Header */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-[#414E36]/20">
+                  <div className="flex justify-between items-start gap-4 pb-4 border-b border-[#414E36]/20">
                     <div>
-                      <h1 className="text-xl font-bold tracking-wider text-[#414E36]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
-                      <p className="text-xs text-[#5A6A51] mt-1 font-semibold">Sheikh Zayed / New Cairo</p>
+                      <h1 className="text-lg sm:text-xl font-bold tracking-wider text-[#414E36]" style={{ fontFamily: "Marcellus, serif" }}>REVERA CLINICS</h1>
+                      <p className="text-xs text-[#5A6A51] mt-0.5 font-semibold">Sheikh Zayed / New Cairo</p>
                       <p className="text-[11px] text-gray-400 mt-0.5">Phone: (+20) 01035595691</p>
                       <p className="text-[11px] text-gray-400">Email: inquiries@reveraclinics.com</p>
                     </div>
-                    <div className="sm:text-right">
-                      <h2 className="text-2xl font-bold tracking-wide text-[#C4AE7C]" style={{ fontFamily: "Marcellus, serif" }}>INVOICE</h2>
-                      <p className="text-xs text-[#1F251A] mt-1.5 font-bold">No: {invoiceNo}</p>
+                    <div className="text-right">
+                      <h2 className="text-xl sm:text-2xl font-bold tracking-wide text-[#C4AE7C]" style={{ fontFamily: "Marcellus, serif" }}>INVOICE</h2>
+                      <p className="text-xs text-[#1F251A] mt-1 font-bold">No: {invoiceNo}</p>
                       <p className="text-[11px] text-[#5A6A51] mt-0.5">Date: {invoiceBooking.date}</p>
                     </div>
                   </div>
 
                   {/* Customer / Billing Info */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 my-6 text-xs leading-relaxed">
-                    <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2 border-b pb-1">Billed To</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-4 text-xs leading-relaxed">
+                    <div className="bg-white rounded-xl border border-gray-100 p-3.5 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Billed To</p>
                       <p className="font-bold text-[#1F251A] text-sm">{invoiceBooking.name}</p>
-                      <p className="text-[#5A6A51] mt-1"><strong>Phone:</strong> {invoiceBooking.phone}</p>
+                      <p className="text-[#5A6A51] mt-0.5"><strong>Phone:</strong> {invoiceBooking.phone}</p>
                       <p className="text-[#5A6A51]"><strong>Email:</strong> {invoiceBooking.email || "—"}</p>
                     </div>
-                    <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-2 border-b pb-1">Booking Details</p>
+                    <div className="bg-white rounded-xl border border-gray-100 p-3.5 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#5A6A51] mb-1.5 border-b border-gray-100 pb-1">Booking Details</p>
                       <p className="text-[#5A6A51]"><strong>Doctor:</strong> {invoiceBooking.doctorName || "—"}</p>
                       <p className="text-[#5A6A51] mt-0.5"><strong>Time Slot:</strong> {invoiceBooking.timeSlot || "—"}</p>
                       <p className="text-[#5A6A51] mt-0.5"><strong>Branch:</strong> {branchName}</p>
@@ -20190,23 +20184,23 @@ export default function AdminPage() {
                   </div>
 
                   {/* Table of Services & Add-ons */}
-                  <div className="overflow-x-auto my-6 border border-gray-100 rounded-2xl bg-white">
+                  <div className="overflow-x-auto my-4 border border-gray-100 rounded-xl bg-white shadow-sm">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-[#EDF1EC] text-[#414E36] font-bold border-b border-gray-100">
-                          <th className="p-3 text-left">Service / Item Rendered</th>
-                          <th className="p-3 text-center w-16">Qty</th>
-                          <th className="p-3 text-right w-24">Unit Price</th>
-                          <th className="p-3 text-right w-24">Total</th>
+                          <th className="p-2.5 sm:p-3 text-left">Service / Item Rendered</th>
+                          <th className="p-2.5 sm:p-3 text-center w-14">Qty</th>
+                          <th className="p-2.5 sm:p-3 text-right w-24">Unit Price</th>
+                          <th className="p-2.5 sm:p-3 text-right w-24">Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {allInvoiceItems.map((item: any, idx: number) => (
                           <tr key={idx} className="hover:bg-gray-50/50">
-                            <td className="p-3 font-semibold text-[#1F251A]">{item.name}</td>
-                            <td className="p-3 text-center text-gray-500">{item.qty}</td>
-                            <td className="p-3 text-right text-gray-600">EGP {item.unitPrice.toLocaleString()}</td>
-                            <td className="p-3 text-right font-bold text-[#1F251A]">EGP {item.total.toLocaleString()}</td>
+                            <td className="p-2.5 sm:p-3 font-semibold text-[#1F251A]">{item.name}</td>
+                            <td className="p-2.5 sm:p-3 text-center text-gray-500">{item.qty}</td>
+                            <td className="p-2.5 sm:p-3 text-right text-gray-600">EGP {item.unitPrice.toLocaleString()}</td>
+                            <td className="p-2.5 sm:p-3 text-right font-bold text-[#1F251A]">EGP {item.total.toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -20214,8 +20208,8 @@ export default function AdminPage() {
                   </div>
 
                   {/* Pricing Summary */}
-                  <div className="flex justify-end text-xs my-6">
-                    <div className="w-64 space-y-2.5">
+                  <div className="flex justify-end text-xs my-4">
+                    <div className="w-60 space-y-2">
                       <div className="flex justify-between text-gray-500">
                         <span>Subtotal:</span>
                         <span className="font-semibold text-[#1F251A]">EGP {totalCost.toLocaleString()}</span>
@@ -20226,7 +20220,7 @@ export default function AdminPage() {
                           <span className="font-bold">- EGP {walletUsed.toLocaleString()}</span>
                         </div>
                       )}
-                      <div className="flex justify-between border-t border-[#414E36] pt-2 text-sm font-bold text-[#414E36]">
+                      <div className="flex justify-between border-t border-[#414E36] pt-1.5 text-sm font-bold text-[#414E36]">
                         <span>Amount Paid:</span>
                         <span>EGP {invoiceBooking.amountPaid.toLocaleString()}</span>
                       </div>
@@ -20240,22 +20234,22 @@ export default function AdminPage() {
                   </div>
 
                   {/* Thank you */}
-                  <div className="text-center text-[10px] text-gray-400 mt-6 pt-4 border-t border-dashed border-gray-200">
+                  <div className="text-center text-[10px] text-gray-400 mt-4 pt-3 border-t border-dashed border-gray-200">
                     <p>Thank you for choosing Revera Clinics!</p>
                   </div>
                 </div>
 
                 {/* Bottom Buttons */}
-                <div className="flex items-center justify-end gap-3 mt-6 border-t border-gray-100 pt-4">
+                <div className="flex items-center justify-end gap-3 mt-4 border-t border-gray-100 pt-3">
                   <button
                     onClick={() => setInvoiceBooking(null)}
-                    className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
+                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition"
                   >
                     Close
                   </button>
                   <button
                     onClick={() => handlePrintInvoice(invoiceBooking, allInvoiceItems, totalCost, walletUsed, branchName)}
-                    className="rounded-xl bg-[#414E36] px-5 py-2.5 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md"
+                    className="rounded-xl bg-[#414E36] px-4 py-2 text-xs font-bold text-[#FBFBF9] hover:bg-[#2e3a26] transition flex items-center gap-1.5 shadow-md"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="6 9 6 2 18 2 18 9" />
