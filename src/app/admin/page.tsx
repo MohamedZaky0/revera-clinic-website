@@ -16969,9 +16969,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         const totalPrice = servicesCost + additionalServicesCost + productsCost;
 
         const sessionPaid = rawPaid;
-        const sessionLeft = (rawLeft !== null && rawLeft >= 0)
-          ? rawLeft
-          : Math.max(0, totalPrice - sessionPaid);
+        const sessionLeft = Math.max(0, totalPrice - sessionPaid);
 
         const isInvoicePaid = sessionLeft <= 0 || (sessionPaid >= totalPrice && totalPrice > 0);
 
@@ -19830,15 +19828,223 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
             0
           );
 
-          // Calculate extra session add-ons (products added during doctor session / extra pulses / custom products)
-          let extraAddonsCost = 0;
-          const leftVal = Number(checkoutBooking.amountLeft !== undefined ? checkoutBooking.amountLeft : (checkoutBooking.amount_left || 0));
-          const totalExpectedOnBooking = leftVal + depositAlreadyPaid;
-          if (totalExpectedOnBooking > baseServicesTotal) {
-            extraAddonsCost = totalExpectedOnBooking - baseServicesTotal;
+          // Compute attached products and additional services from attachedProducts and notes
+          const rawAttached: any[] = Array.isArray((checkoutBooking as any).attachedProducts)
+            ? [...(checkoutBooking as any).attachedProducts]
+            : [];
+
+          const checkoutAdditionalServicesList: Array<{ name: string; qty: number; unitPrice: number; total: number; lineType: string }> = [];
+          const checkoutProductsConsumablesList: Array<{ name: string; qty: number; unitPrice: number; total: number; lineType: string }> = [];
+          const existingCheckoutNames = new Set<string>();
+
+          // 1. Process structured attachedProducts
+          for (const item of rawAttached) {
+            const name = String(item.name || 'Item').trim();
+            const qty = Number(item.qty) || 1;
+            const unitPrice = Number(item.unitPrice || item.price || 0);
+            const total = Number(item.total) || (qty * unitPrice);
+            const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
+
+            const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
+            if (isPulse && (total === 0 || unitPrice === 0)) {
+              continue;
+            }
+
+            if (!existingCheckoutNames.has(name.toLowerCase())) {
+              existingCheckoutNames.add(name.toLowerCase());
+              if (lineType === 'additional_service') {
+                checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType });
+              } else {
+                checkoutProductsConsumablesList.push({ name, qty, unitPrice, total, lineType });
+              }
+            }
           }
 
-          const totalCost = baseServicesTotal + extraAddonsCost;
+          // 2. Parse from notes (safety net & historical support)
+          if (checkoutBooking.notes) {
+            const notesStr = String(checkoutBooking.notes);
+
+            // a) [Additional Services Used] / [Additional Services]
+            const addSvcBlockMatch = notesStr.match(/\[(?:Additional Services|Extra Services|Services Used|Added Services)(?: Used)?(?: During Session)?\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
+            if (addSvcBlockMatch) {
+              const rawBlock = addSvcBlockMatch[1];
+              const items = rawBlock.split(/(?:,|\n)(?![^(]*\))/);
+              for (const item of items) {
+                const trimmed = item.trim();
+                if (!trimmed || trimmed.startsWith("[")) continue;
+                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m1) {
+                  const name = m1[1].trim();
+                  const qty = Number(m1[2]) || 1;
+                  const unitPrice = Number(m1[3]) || 0;
+                  const total = Number(m1[4]) || (qty * unitPrice);
+                  if (!existingCheckoutNames.has(name.toLowerCase())) {
+                    existingCheckoutNames.add(name.toLowerCase());
+                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                  }
+                  continue;
+                }
+                const m2 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m2) {
+                  const name = m2[1].trim();
+                  const qty = Number(m2[2]) || 1;
+                  const unitPrice = Number(m2[3]) || 0;
+                  const total = qty * unitPrice;
+                  if (!existingCheckoutNames.has(name.toLowerCase())) {
+                    existingCheckoutNames.add(name.toLowerCase());
+                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                  }
+                  continue;
+                }
+                const m3 = trimmed.match(/^(.+?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+                if (m3) {
+                  const name = m3[1].trim();
+                  const qty = m3[2] ? Number(m3[2]) : 1;
+                  const total = Number(m3[3]) || 0;
+                  const unitPrice = qty > 0 ? total / qty : total;
+                  if (!existingCheckoutNames.has(name.toLowerCase())) {
+                    existingCheckoutNames.add(name.toLowerCase());
+                    checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                  }
+                  continue;
+                }
+              }
+            }
+
+            // b) Added Service matches
+            const addedServiceMatches = notesStr.matchAll(/\[(?:Added Service|Additional Service|Extra Service)\]:\s+(.*?)(?=\n|$)/gi);
+            for (const match of addedServiceMatches) {
+              const rawLine = match[1].trim();
+              const m1 = rawLine.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+              if (m1) {
+                const name = m1[1].trim();
+                const qty = Number(m1[2]) || 1;
+                const unitPrice = Number(m1[3]) || 0;
+                const total = Number(m1[4]) || (qty * unitPrice);
+                if (!existingCheckoutNames.has(name.toLowerCase())) {
+                  existingCheckoutNames.add(name.toLowerCase());
+                  checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                }
+                continue;
+              }
+              const m2 = rawLine.match(/^(.*?)(?:\s*\(x(\d+)\))?\s*(?:-|\(|\s+at\s+|:\s*|@\s*)(\d+(?:\.\d+)?)\s*(?:EGP|\))/i);
+              if (m2) {
+                const name = m2[1].trim();
+                const qty = m2[2] ? Number(m2[2]) : 1;
+                const total = Number(m2[3]);
+                const unitPrice = qty > 0 ? total / qty : total;
+                if (!existingCheckoutNames.has(name.toLowerCase())) {
+                  existingCheckoutNames.add(name.toLowerCase());
+                  checkoutAdditionalServicesList.push({ name, qty, unitPrice, total, lineType: 'additional_service' });
+                }
+                continue;
+              }
+            }
+
+            // c) Products Used in notes
+            const prodBlockMatch = notesStr.match(/\[Products Used During Session\]:\s*([\s\S]*?)(?=\n\s*\[|$)/i);
+            if (prodBlockMatch) {
+              const rawProdBlock = prodBlockMatch[1];
+              const items = rawProdBlock.split(/(?:,|\n)(?![^(]*\))/);
+              for (const item of items) {
+                const trimmed = item.trim();
+                if (!trimmed || trimmed.startsWith("[")) continue;
+                const m1 = trimmed.match(/^(.+?)\s*\(Qty:\s*(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*EGP\s*=\s*(\d+(?:\.\d+)?)\s*EGP\)/i);
+                if (m1) {
+                  const name = m1[1].trim();
+                  const qty = Number(m1[2]) || 1;
+                  const unitPrice = Number(m1[3]) || 0;
+                  const total = Number(m1[4]) || (qty * unitPrice);
+                  if (!existingCheckoutNames.has(name.toLowerCase())) {
+                    existingCheckoutNames.add(name.toLowerCase());
+                    checkoutProductsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+                  }
+                  continue;
+                }
+              }
+            }
+
+            // d) Added Product matches
+            const receptionistMatches = notesStr.matchAll(/\[Added Product\]:\s+(.*?)(?:\s*\(x(\d+)\))?\s*-\s+(\d+(?:\.\d+)?)\s+EGP/gi);
+            for (const match of receptionistMatches) {
+              const name = match[1].trim();
+              const qty = match[2] ? Number(match[2]) : 1;
+              const total = Number(match[3]);
+              const unitPrice = qty > 0 ? total / qty : total;
+              if (!existingCheckoutNames.has(name.toLowerCase())) {
+                existingCheckoutNames.add(name.toLowerCase());
+                checkoutProductsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+              }
+            }
+
+            // e) Extra Device Pulses matches
+            const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
+            for (const match of pulseMatches) {
+              const name = "Extra Device Pulses";
+              const total = parseFloat(match[2]) || 0;
+              if (total > 0 && !existingCheckoutNames.has(name.toLowerCase())) {
+                existingCheckoutNames.add(name.toLowerCase());
+                checkoutProductsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses' });
+              }
+            }
+
+            // f) Generic format: - Name (x2) @ 700 EGP
+            const doctorMatches = notesStr.matchAll(/-\s+(.*?)\s+\(x(\d+)\)\s+@\s+(\d+(?:\.\d+)?)\s+EGP/gi);
+            for (const match of doctorMatches) {
+              const name = match[1].trim();
+              const qty = Number(match[2]);
+              const unitPrice = Number(match[3]);
+              const total = qty * unitPrice;
+              if (!existingCheckoutNames.has(name.toLowerCase())) {
+                existingCheckoutNames.add(name.toLowerCase());
+                checkoutProductsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
+              }
+            }
+          }
+
+          // 3. Fallback reconciliation if note or DB has higher total
+          const baseAndAttachedTotal = baseServicesTotal + checkoutAdditionalServicesList.reduce((sum, s) => sum + s.total, 0) + checkoutProductsConsumablesList.reduce((sum, p) => sum + p.total, 0);
+          let targetCheckoutTotal = baseAndAttachedTotal;
+
+          if (checkoutBooking.notes) {
+            const invMatch = String(checkoutBooking.notes).match(/\[(?:Invoice Total Updated|Total Invoice|Final Invoice|Updated Invoice Total|Total Price|Invoice Total)\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+            if (invMatch) {
+              const notedTotal = Number(invMatch[1]);
+              if (notedTotal > targetCheckoutTotal) {
+                targetCheckoutTotal = notedTotal;
+              }
+            }
+          }
+
+          const recordedCheckoutTotal = Number((checkoutBooking as any).total_price || (checkoutBooking as any).totalPrice || (checkoutBooking as any).final_price || (checkoutBooking as any).finalPrice || 0);
+          if (recordedCheckoutTotal > targetCheckoutTotal) {
+            targetCheckoutTotal = recordedCheckoutTotal;
+          }
+
+          const rawCheckoutLeft = (checkoutBooking as any).amountLeft !== undefined && (checkoutBooking as any).amountLeft !== null && (checkoutBooking as any).amountLeft !== ""
+            ? Number((checkoutBooking as any).amountLeft)
+            : ((checkoutBooking as any).amount_left !== undefined && (checkoutBooking as any).amount_left !== null && (checkoutBooking as any).amount_left !== ""
+                ? Number((checkoutBooking as any).amount_left)
+                : null);
+
+          if (rawCheckoutLeft !== null && (depositAlreadyPaid + rawCheckoutLeft) > targetCheckoutTotal) {
+            targetCheckoutTotal = depositAlreadyPaid + rawCheckoutLeft;
+          }
+
+          if (checkoutAdditionalServicesList.length === 0 && targetCheckoutTotal > baseAndAttachedTotal) {
+            const diff = targetCheckoutTotal - baseAndAttachedTotal;
+            checkoutAdditionalServicesList.push({
+              name: "Additional Clinical Services",
+              qty: 1,
+              unitPrice: diff,
+              total: diff,
+              lineType: "additional_service"
+            });
+          }
+
+          const checkoutAdditionalServicesCost = checkoutAdditionalServicesList.reduce((sum, s) => sum + s.total, 0);
+          const checkoutProductsCost = checkoutProductsConsumablesList.reduce((sum, p) => sum + p.total, 0);
+          const totalCost = baseServicesTotal + checkoutAdditionalServicesCost + checkoutProductsCost;
           const balanceDue = Math.max(0, totalCost - depositAlreadyPaid);
 
           // 2. Fetch customer details
@@ -20006,113 +20212,53 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         Package redemption is unavailable — a deposit was already paid on this booking.
                       </p>
                     )}
-                    {(() => {
-                      if (extraAddonsCost <= 0) return null;
 
-                      const attached = Array.isArray((checkoutBooking as any).attachedProducts) ? (checkoutBooking as any).attachedProducts : [];
-                      const notesStr = String(checkoutBooking.notes || "");
-
-                      const parsedItems: Array<{ title: string; subtitle?: string; cost?: number; icon: string }> = [];
-                      let accountedCost = 0;
-
-                      attached.forEach((prod: any) => {
-                        const qty = Number(prod.qty) || 1;
-                        const price = Number(prod.unitPrice || prod.price || 0);
-                        const itemCost = Number(prod.total) || (qty * price);
-                        parsedItems.push({
-                          title: prod.name || "Product Consumable",
-                          subtitle: `Qty: ${qty}${price ? ` × ${price} EGP` : ''}`,
-                          cost: itemCost,
-                          icon: "📦"
-                        });
-                        accountedCost += itemCost;
-                      });
-
-                      if (notesStr) {
-                        const lines = notesStr.split('\n');
-                        lines.forEach(l => {
-                          const trimmed = l.trim();
-                          if (!trimmed) return;
-
-                          if (trimmed.includes('[Extra Device Pulses]:')) {
-                            const pulseMatch = trimmed.match(/\[Extra Device Pulses\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/i);
-                            if (pulseMatch) {
-                              const detailText = pulseMatch[1].trim();
-                              const itemCost = parseFloat(pulseMatch[2]) || 0;
-                              if (!parsedItems.some(i => i.title === "Extra Device Pulses")) {
-                                parsedItems.push({
-                                  title: "Extra Device Pulses",
-                                  subtitle: detailText,
-                                  cost: itemCost,
-                                  icon: "⚡"
-                                });
-                                accountedCost += itemCost;
-                              }
-                            } else if (!parsedItems.some(i => i.title === "Extra Device Pulses")) {
-                              parsedItems.push({
-                                title: "Extra Device Pulses",
-                                subtitle: trimmed.replace('[Extra Device Pulses]:', '').trim(),
-                                icon: "⚡"
-                              });
-                            }
-                          } else if (trimmed.includes('[Added Product]:')) {
-                            const prodMatch = trimmed.match(/\[Added Product\]:\s*(.*?)(?:\s*\(x(\d+)\))?\s*-\s*(\d+(?:\.\d+)?)\s*EGP/i);
-                            if (prodMatch) {
-                              const pName = prodMatch[1].trim();
-                              const pQty = prodMatch[2] || "1";
-                              const itemCost = parseFloat(prodMatch[3]) || 0;
-                              if (!parsedItems.some(i => i.title.toLowerCase().includes(pName.toLowerCase()))) {
-                                parsedItems.push({
-                                  title: pName,
-                                  subtitle: `Qty: ${pQty}`,
-                                  cost: itemCost,
-                                  icon: "📦"
-                                });
-                                accountedCost += itemCost;
-                              }
-                            }
-                          }
-                        });
-                      }
-
-                      // 3. Fallback or remaining unaccounted amount
-                      const remainingCost = Math.max(0, extraAddonsCost - accountedCost);
-
-                      return (
-                        <div className="mt-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 space-y-2 text-xs">
-                          <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-1.5">
-                            <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                              <span>✨</span> Session Add-ons & Consumables / المستلزمات والإضافات
-                            </span>
-                            <span className="font-bold text-[#414E36]">+{extraAddonsCost} EGP</span>
-                          </div>
-
-                          <div className="space-y-1.5 pt-0.5">
-                            {parsedItems.map((item, iIdx) => (
-                              <div key={iIdx} className="flex items-start justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 shadow-2xs">
-                                <div className="flex items-start gap-2">
-                                  <span className="text-sm mt-0.5">{item.icon}</span>
-                                  <div>
-                                    <p className="font-bold text-[#1F251A]">{item.title}</p>
-                                    {item.subtitle && <p className="text-[11px] text-[#5A6A51]">{item.subtitle}</p>}
-                                  </div>
-                                </div>
-                                {item.cost !== undefined && item.cost > 0 && (
-                                  <span className="font-extrabold text-[#414E36] mt-0.5">+{item.cost} EGP</span>
-                                )}
-                              </div>
-                            ))}
-
-                            {remainingCost > 0 && parsedItems.length > 0 && (
-                              <div className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 text-[11px] text-[#5A6A51]">
-                                <span>Other Session Add-ons / إضافات أخرى</span>
-                                <span className="font-bold text-[#414E36]">+{remainingCost} EGP</span>
-                              </div>
-                            )}
-                          </div>
+                    {/* Additional Services */}
+                    {checkoutAdditionalServicesList.length > 0 && (
+                      <div className="mt-2.5 rounded-xl border border-[#C4AE7C]/30 bg-[#FAF5EB]/50 p-3 space-y-2 text-xs">
+                        <div className="flex items-center justify-between border-b border-[#C4AE7C]/20 pb-1.5">
+                          <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                            <span>✨</span> Additional Services / الخدمات الإضافية
+                          </span>
+                          <span className="font-bold text-[#C4AE7C]">+{checkoutAdditionalServicesCost} EGP</span>
                         </div>
-                      );
-                    })()}
+                        <div className="space-y-1.5 pt-0.5">
+                          {checkoutAdditionalServicesList.map((item, iIdx) => (
+                            <div key={`chk-as-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#C4AE7C]/20 shadow-2xs">
+                              <div>
+                                <p className="font-bold text-[#1F251A]">{item.name}</p>
+                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
+                              </div>
+                              <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Products & Session Consumables */}
+                    {checkoutProductsConsumablesList.length > 0 && (
+                      <div className="mt-2.5 rounded-xl border border-[#414E36]/15 bg-[#FBFBF9] p-3 space-y-2 text-xs">
+                        <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-1.5">
+                          <span className="font-bold text-[#414E36] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                            <span>📦</span> Session Consumables & Products / المستلزمات والمنتجات
+                          </span>
+                          <span className="font-bold text-[#414E36]">+{checkoutProductsCost} EGP</span>
+                        </div>
+                        <div className="space-y-1.5 pt-0.5">
+                          {checkoutProductsConsumablesList.map((item, iIdx) => (
+                            <div key={`chk-p-${iIdx}`} className="flex items-center justify-between bg-white p-2 rounded-lg border border-[#414E36]/10 shadow-2xs">
+                              <div>
+                                <p className="font-bold text-[#1F251A]">{item.name}</p>
+                                <p className="text-[11px] text-[#5A6A51]">Qty: {item.qty} {item.qty > 1 ? `× ${item.unitPrice} EGP` : ''}</p>
+                              </div>
+                              <span className="font-extrabold text-[#414E36]">+{item.total} EGP</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="border-t border-[#414E36]/10 pt-2 flex justify-between font-bold text-[#1F251A] text-base">
                       <span>Total Cost / الإجمالي</span>
                       <span>{totalCost} EGP</span>
