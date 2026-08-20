@@ -27,6 +27,7 @@ import { getAuthHeaders } from "../utils";
 
 export interface AdditionalServiceItem {
   id: string | number;
+  serviceId?: number | string;
   name: string;
   price: number;
   deviceId?: string;
@@ -192,6 +193,7 @@ export default function DoctorOngoingSessionTab({
 
     const newItem: AdditionalServiceItem = {
       id: Date.now(),
+      serviceId: srv.id,
       name: srvName,
       price: srvPrice,
       deviceId: devObj?.id,

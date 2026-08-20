@@ -16802,17 +16802,48 @@ export default function AdminPage() {
           }
         }
 
-        const additionalServicesCost = additionalServicesList.reduce((sum, s) => sum + s.total, 0);
-        const productsCost = productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
-        const totalPrice = servicesCost + additionalServicesCost + productsCost;
+        // 3. Fallback reconciliation: If notes or booking balance recorded a higher invoice total than the sum of parsed lines,
+        // recover the missing additional services / session adjustments difference!
+        const baseAndAttachedTotal = servicesCost + additionalServicesList.reduce((sum, s) => sum + s.total, 0) + productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
+        let targetInvoiceTotal = baseAndAttachedTotal;
 
-        const sessionPaid = Number(viewingBooking.amountPaid || 0);
+        if (viewingBooking.notes) {
+          const invMatch = String(viewingBooking.notes).match(/\[Invoice Total Updated\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+          if (invMatch) {
+            const notedTotal = Number(invMatch[1]);
+            if (notedTotal > targetInvoiceTotal) {
+              targetInvoiceTotal = notedTotal;
+            }
+          }
+        }
+
+        const rawPaid = Number(viewingBooking.amountPaid || 0);
         const rawLeft = viewingBooking.amountLeft !== undefined && viewingBooking.amountLeft !== null
           ? Number(viewingBooking.amountLeft)
           : ((viewingBooking as any).amount_left !== undefined && (viewingBooking as any).amount_left !== null
               ? Number((viewingBooking as any).amount_left)
               : null);
 
+        if (rawLeft !== null && (rawPaid + rawLeft) > targetInvoiceTotal) {
+          targetInvoiceTotal = rawPaid + rawLeft;
+        }
+
+        if (targetInvoiceTotal > baseAndAttachedTotal) {
+          const diff = targetInvoiceTotal - baseAndAttachedTotal;
+          additionalServicesList.push({
+            name: "Additional Clinical Services",
+            qty: 1,
+            unitPrice: diff,
+            total: diff,
+            lineType: "additional_service"
+          });
+        }
+
+        const additionalServicesCost = additionalServicesList.reduce((sum, s) => sum + s.total, 0);
+        const productsCost = productsConsumablesList.reduce((sum, p) => sum + p.total, 0);
+        const totalPrice = servicesCost + additionalServicesCost + productsCost;
+
+        const sessionPaid = rawPaid;
         const sessionLeft = (rawLeft !== null && rawLeft > 0)
           ? rawLeft
           : Math.max(0, totalPrice - sessionPaid);
@@ -20047,6 +20078,45 @@ export default function AdminPage() {
                 });
               }
             }
+          }
+
+          // 3. Fallback reconciliation: If notes or booking balance recorded a higher invoice total than the sum of parsed lines,
+          // recover the missing additional services / session adjustments difference!
+          const baseCost = baseServicesList.reduce((sum: number, s: any) => sum + s.total, 0);
+          const currentAttachedTotal = baseCost + invoiceAdditionalServicesList.reduce((sum: number, s: any) => sum + s.total, 0) + invoiceProductsList.reduce((sum: number, p: any) => sum + p.total, 0);
+          let targetInvoiceTotal = currentAttachedTotal;
+
+          if (invoiceBooking.notes) {
+            const invMatch = String(invoiceBooking.notes).match(/\[Invoice Total Updated\]:\s*(\d+(?:\.\d+)?)\s*EGP/i);
+            if (invMatch) {
+              const notedTotal = Number(invMatch[1]);
+              if (notedTotal > targetInvoiceTotal) {
+                targetInvoiceTotal = notedTotal;
+              }
+            }
+          }
+
+          const rawPaid = Number(invoiceBooking.amountPaid || 0);
+          const rawLeft = invoiceBooking.amountLeft !== undefined && invoiceBooking.amountLeft !== null
+            ? Number(invoiceBooking.amountLeft)
+            : ((invoiceBooking as any).amount_left !== undefined && (invoiceBooking as any).amount_left !== null
+                ? Number((invoiceBooking as any).amount_left)
+                : null);
+
+          if (rawLeft !== null && (rawPaid + rawLeft) > targetInvoiceTotal) {
+            targetInvoiceTotal = rawPaid + rawLeft;
+          }
+
+          if (targetInvoiceTotal > currentAttachedTotal) {
+            const diff = targetInvoiceTotal - currentAttachedTotal;
+            invoiceAdditionalServicesList.push({
+              name: "Additional Clinical Services (Additional Service)",
+              nameAr: "خدمات سريرية إضافية (خدمة إضافية)",
+              qty: 1,
+              unitPrice: diff,
+              price: diff,
+              total: diff
+            });
           }
 
           const allInvoiceItems = [...baseServicesList, ...invoiceAdditionalServicesList, ...invoiceProductsList];

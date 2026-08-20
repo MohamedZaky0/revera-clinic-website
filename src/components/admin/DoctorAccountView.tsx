@@ -813,6 +813,7 @@ export default function DoctorAccountView({
       );
     }
     for (const s of additionalServices) {
+      const realServiceId = s.serviceId || (typeof s.id === 'number' && s.id < 1000000 ? s.id : null);
       writes.push(
         fetch("/api/reservation-products", {
           method: "POST",
@@ -820,7 +821,7 @@ export default function DoctorAccountView({
           body: JSON.stringify({
             reservationId,
             lineType: "additional_service",
-            serviceId: s.id,
+            serviceId: realServiceId ? Number(realServiceId) : null,
             description: s.name,
             qty: 1,
             unitPrice: s.price,
