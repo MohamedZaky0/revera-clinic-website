@@ -1162,21 +1162,11 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         <div id="all-appointments-section" className="rounded-3xl border border-[#414E36]/10 bg-white p-6 shadow-sm space-y-5">
           {/* Top Header & Search Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setViewMode("calendar")}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-[#414E36] hover:bg-[#EDF1EC] transition shadow-2xs cursor-pointer shrink-0"
-                title="Back to Calendar"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <div>
-                <h2 className="text-xl font-bold text-[#111827]">{tr.allAppointmentsHeading || "All Appointments Directory"}</h2>
-                <p className="text-xs text-[#5A6A51] mt-0.5">
-                  {filteredAllAppointments.length} {filteredAllAppointments.length !== 1 ? tr.appointmentsSuffix || "appointments" : tr.bookingSingular || "booking"}
-                </p>
-              </div>
+            <div>
+              <h2 className="text-xl font-bold text-[#111827]">{tr.allAppointmentsHeading || "All Appointments Directory"}</h2>
+              <p className="text-xs text-[#5A6A51] mt-0.5">
+                {filteredAllAppointments.length} {filteredAllAppointments.length !== 1 ? tr.appointmentsSuffix || "appointments" : tr.bookingSingular || "booking"}
+              </p>
             </div>
 
             {/* Search and Filters */}
@@ -1271,27 +1261,24 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           )}
 
           {/* Table Container */}
-          <div className="overflow-x-auto scrollbar-none rounded-2xl border border-gray-100">
+          <div className="w-full overflow-hidden rounded-2xl border border-gray-100">
             <table className="w-full text-start text-xs border-collapse table-fixed">
               <thead>
                 <tr className="border-b border-gray-100 bg-[#F9F9F7] text-[10px] uppercase font-bold tracking-tight text-[#9CA3AF]">
-                  <th className="py-3 px-2.5 text-start font-bold w-[9%]">{tr.colAppointmentId || "APPOINTMENT ID"}</th>
-                  <th className="py-3 px-2.5 text-start font-bold w-[11%]">{tr.colDateTime || "DATE & TIME"}</th>
-                  <th className="py-3 px-2.5 text-start font-bold w-[16%]">{tr.colPatient || "PATIENT"}</th>
-                  <th className="py-3 px-2.5 text-start font-bold w-[11%]">{tr.colPhone || "PHONE"}</th>
-                  <th className="py-3 px-2.5 text-start font-bold w-[14%]">{tr.colService || "SERVICE"}</th>
-                  <th className="py-3 px-2.5 text-start font-bold w-[13%]">{tr.colDoctor || "DOCTOR"}</th>
-                  <th className="py-3 px-2.5 text-start font-bold w-[7%]">{tr.colRoom || "ROOM"}</th>
-                  <th className="py-3 px-2.5 text-start font-bold w-[10%]">{tr.colStatus || "STATUS"}</th>
-                  <th className="py-3 px-2.5 text-start font-bold w-[9%]">{tr.colPayment || "PAYMENT"}</th>
-                  <th className="py-3 px-2.5 text-start font-bold w-[9%]">{tr.colAmount || "AMOUNT"}</th>
-                  <th className="py-3 px-2.5 text-start font-bold w-[7%]">{tr.colAction || "ACTION"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[14%]">{tr.colDateTime || "DATE & TIME"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[20%]">{tr.colPatient || "PATIENT"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[18%]">{tr.colService || "SERVICE"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[16%]">{tr.colDoctor || "DOCTOR"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[8%]">{tr.colRoom || "ROOM"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[12%]">{tr.colStatus || "STATUS"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[10%]">{tr.colPayment || "PAYMENT"}</th>
+                  <th className="py-3 px-2.5 text-start font-bold w-[12%]">{tr.colAmount || "AMOUNT"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 bg-white">
                 {paginatedAllAppointments.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-14 text-center text-sm text-[#5A6A51]">
+                    <td colSpan={8} className="py-14 text-center text-sm text-[#5A6A51]">
                       {tr.noAllAppointmentsFound || "No appointments match your search or filter criteria."}
                     </td>
                   </tr>
@@ -1300,22 +1287,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                     const stConfig = getStatusConfig(item.status);
                     const payStyle = getPaymentStyle(item.paymentStatus);
                     const displayTimeStr = formatDisplayTime(item.time);
-                    const aptIdFormatted = String(item.id).length > 6 
-                      ? `APT-${String(item.id).slice(0, 6).toUpperCase()}` 
-                      : `APT-${String(item.id).padStart(5, '0')}`;
                     const rawAmt = Number(item.total_price || item.totalPrice || item.final_price || item.price || (Number(item.amountPaid || 0) + Number(item.amountLeft || 0))) || 0;
-                    const initials = (item.customer_name || "P")
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase();
-                    const docInitials = (item.doctor_name || "D")
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase();
 
                     return (
                       <tr
@@ -1323,35 +1295,21 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                         onClick={() => onViewBookingDetails ? onViewBookingDetails(item.raw || item) : null}
                         className="hover:bg-[#FBFBF9] transition cursor-pointer group"
                       >
-                        {/* 1. Appointment ID */}
-                        <td className="py-3 px-2.5 font-extrabold text-[#111827] text-xs font-mono whitespace-nowrap">
-                          {aptIdFormatted}
-                        </td>
-
-                        {/* 2. Date & Time */}
-                        <td className="py-3 px-2.5 whitespace-nowrap">
-                          <span className="font-extrabold text-[#111827] text-xs block">{item.date}</span>
-                          <span className="text-[11px] font-bold text-[#414E36]">{displayTimeStr}</span>
-                        </td>
-
-                        {/* 3. Patient */}
+                        {/* 1. Date & Time */}
                         <td className="py-3 px-2.5">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-7 h-7 rounded-full bg-[#EDF1EC] text-[#414E36] font-bold text-xs flex items-center justify-center shrink-0 border border-[#414E36]/15">
-                              {initials}
-                            </div>
-                            <div className="min-w-0">
-                              <span className="font-bold text-[#111827] text-xs block truncate">{item.customer_name}</span>
-                            </div>
+                          <span className="font-extrabold text-[#111827] text-xs block truncate">{item.date}</span>
+                          <span className="text-[11px] font-bold text-[#414E36] block truncate">{displayTimeStr}</span>
+                        </td>
+
+                        {/* 2. Patient & Phone */}
+                        <td className="py-3 px-2.5">
+                          <div className="min-w-0">
+                            <span className="font-extrabold text-[#111827] text-xs block truncate">{item.customer_name}</span>
+                            <span className="text-[11px] font-mono text-gray-500 font-medium block truncate">{item.customer_phone}</span>
                           </div>
                         </td>
 
-                        {/* 4. Phone */}
-                        <td className="py-3 px-2.5 whitespace-nowrap font-mono text-[11px] text-gray-500 font-medium">
-                          {item.customer_phone}
-                        </td>
-
-                        {/* 5. Service */}
+                        {/* 3. Service */}
                         <td className="py-3 px-2.5">
                           <div className="min-w-0">
                             <span className="font-extrabold text-[#111827] text-xs block truncate">{item.service_name}</span>
@@ -1359,59 +1317,37 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
                           </div>
                         </td>
 
-                        {/* 6. Doctor */}
+                        {/* 4. Doctor */}
                         <td className="py-3 px-2.5">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-6 h-6 rounded-full bg-[#FAF5EB] text-[#C4AE7C] font-bold text-[10px] flex items-center justify-center shrink-0 border border-[#C4AE7C]/30">
-                              {docInitials}
-                            </div>
-                            <div className="min-w-0">
-                              <span className="font-bold text-[#111827] text-xs block truncate">{item.doctor_name}</span>
-                              <span className="text-[10px] text-gray-400 block truncate">{item.doctorSpecialty || "Specialist"}</span>
-                            </div>
+                          <div className="min-w-0">
+                            <span className="font-extrabold text-[#111827] text-xs block truncate">{item.doctor_name}</span>
+                            <span className="text-[10px] text-gray-400 font-medium block truncate">{item.doctorSpecialty || "Specialist"}</span>
                           </div>
                         </td>
 
-                        {/* 7. Room */}
-                        <td className="py-3 px-2.5 text-[#6B7280] font-medium text-xs truncate whitespace-nowrap">
+                        {/* 5. Room */}
+                        <td className="py-3 px-2.5 text-[#6B7280] font-medium text-xs truncate">
                           {item.room}
                         </td>
 
-                        {/* 8. Status */}
-                        <td className="py-3 px-2.5 whitespace-nowrap">
+                        {/* 6. Status */}
+                        <td className="py-3 px-2.5">
                           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${stConfig.bg} ${stConfig.text}`}>
                             <span className={`h-1.5 w-1.5 rounded-full ${stConfig.dot}`}></span>
                             {stConfig.label}
                           </span>
                         </td>
 
-                        {/* 9. Payment */}
-                        <td className="py-3 px-2.5 whitespace-nowrap">
+                        {/* 7. Payment */}
+                        <td className="py-3 px-2.5">
                           <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${payStyle}`}>
                             {paymentStatusLabel(item.paymentStatus)}
                           </span>
                         </td>
 
-                        {/* 10. Amount */}
-                        <td className="py-3 px-2.5 whitespace-nowrap font-extrabold text-[#111827] text-xs">
+                        {/* 8. Amount */}
+                        <td className="py-3 px-2.5 font-extrabold text-[#111827] text-xs">
                           {rawAmt > 0 ? `EGP ${rawAmt.toLocaleString()}` : "—"}
-                        </td>
-
-                        {/* 11. Action */}
-                        <td className="py-3 px-2.5 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onViewBookingDetails) onViewBookingDetails(item.raw || item);
-                              }}
-                              className="p-1.5 rounded-xl border border-gray-200 text-gray-500 hover:text-[#414E36] hover:bg-[#EDF1EC] transition shadow-2xs cursor-pointer"
-                              title={tr.viewDetailsBtn || "View Details"}
-                            >
-                              <Eye size={14} />
-                            </button>
-                          </div>
                         </td>
                       </tr>
                     );
