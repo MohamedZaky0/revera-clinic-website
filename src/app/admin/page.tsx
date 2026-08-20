@@ -16706,6 +16706,12 @@ export default function AdminPage() {
           const total = Number(item.total) || (qty * unitPrice);
           const lineType = item.lineType || (item.serviceId ? 'additional_service' : 'product');
 
+          // Skip zero-cost device pulse counter tracking from billing products list
+          const isPulse = lineType === 'device_pulses' || name.toLowerCase().includes('pulse');
+          if (isPulse && (total === 0 || unitPrice === 0)) {
+            continue;
+          }
+
           if (!existingNames.has(name.toLowerCase())) {
             existingNames.add(name.toLowerCase());
             if (lineType === 'additional_service') {
@@ -16773,18 +16779,6 @@ export default function AdminPage() {
             if (!existingNames.has(name.toLowerCase())) {
               existingNames.add(name.toLowerCase());
               productsConsumablesList.push({ name, qty, unitPrice, total, lineType: 'product' });
-            }
-          }
-
-          // e) Extra Device Pulses: [Extra Device Pulses]: Device - 100 pulses @ 0 EGP = 0 EGP
-          const pulseMatches = notesStr.matchAll(/\[(?:Extra Device Pulses|Device Pulses Deducted)\]:\s*(.*?)=\s*(\d+(?:\.\d+)?)\s*EGP/gi);
-          for (const match of pulseMatches) {
-            const detail = match[1].trim();
-            const total = Number(match[2]);
-            const name = `Extra Device Pulses (${detail})`;
-            if (!existingNames.has(name.toLowerCase())) {
-              existingNames.add(name.toLowerCase());
-              productsConsumablesList.push({ name, qty: 1, unitPrice: total, total, lineType: 'device_pulses' });
             }
           }
 
@@ -17002,7 +16996,7 @@ export default function AdminPage() {
 
                     <div className="flex flex-wrap gap-2">
                       {bookingServices.map((bs, index) => (
-                        <div key={`${bs.id}-${index}`} className="flex items-center gap-2 bg-[#EDF1EC] rounded-xl px-3 py-1.5 text-sm font-semibold text-[#1F251A] shadow-sm">
+                        <div key={`base-${bs.id}-${index}`} className="flex items-center gap-2 bg-[#EDF1EC] rounded-xl px-3 py-1.5 text-sm font-semibold text-[#1F251A] shadow-sm">
                           <span>{bs.name}</span>
                           <span className="text-xs font-medium text-[#5A6A51]">({bs.price} EGP)</span>
                           {bookingServices.length > 1 && hasPermission("bookings.edit") && viewingBooking.status !== 'completed' && (
@@ -17034,6 +17028,17 @@ export default function AdminPage() {
                               &times;
                             </button>
                           )}
+                        </div>
+                      ))}
+
+                      {/* Additional Added Services */}
+                      {additionalServicesList.map((as, asIdx) => (
+                        <div key={`add-${asIdx}`} className="flex items-center gap-2 bg-[#FAF5EB] border border-[#C4AE7C]/40 rounded-xl px-3 py-1.5 text-sm font-semibold text-[#414E36] shadow-sm">
+                          <span>{as.name}</span>
+                          <span className="text-xs font-bold text-[#C4AE7C]">({as.total || (as.qty * as.unitPrice)} EGP)</span>
+                          <span className="rounded-full bg-[#C4AE7C]/20 px-2 py-0.5 text-[10px] font-bold text-[#414E36]">
+                            Additional Service
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -17220,14 +17225,27 @@ export default function AdminPage() {
                       }
                     }
 
+                    // Filter out zero-cost device pulses and additional services from retail & procedure products card
+                    const filteredProductsList = list.filter((prod: any) => {
+                      const nameLower = String(prod.name || '').toLowerCase();
+                      const isPulse = (prod.lineType === 'device_pulses') || nameLower.includes('pulse') || nameLower.includes('device —') || nameLower.includes('device -');
+                      if (isPulse && (Number(prod.total || 0) === 0 || Number(prod.unitPrice || prod.price || 0) === 0)) {
+                        return false;
+                      }
+                      if (prod.lineType === 'additional_service' || nameLower.includes('additional clinical services') || nameLower.includes('additional service')) {
+                        return false;
+                      }
+                      return true;
+                    });
+
                     return (
                       <div className="rounded-2xl border border-[#414E36]/10 bg-white p-5 space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#414E36]/10 pb-3">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#5A6A51]">PRODUCTS & SESSION CONSUMABLES</p>
                             <p className="text-sm font-bold text-[#1F251A] mt-0.5">
-                              {list.length > 0
-                                ? `${list.length} Product(s) Attached`
+                              {filteredProductsList.length > 0
+                                ? `${filteredProductsList.length} Product(s) Attached`
                                 : "No products added"}
                             </p>
                           </div>
@@ -17245,9 +17263,9 @@ export default function AdminPage() {
                           </button>
                         </div>
 
-                        {list.length > 0 ? (
+                        {filteredProductsList.length > 0 ? (
                           <div className="space-y-2">
-                            {list.map((prod: any, pIdx: number) => (
+                            {filteredProductsList.map((prod: any, pIdx: number) => (
                               <div key={pIdx} className="flex items-center justify-between p-2.5 rounded-xl bg-[#FBFBF9] border border-[#414E36]/10 text-xs">
                                 <div>
                                   <div className="flex items-center gap-2">
