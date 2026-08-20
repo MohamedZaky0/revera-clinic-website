@@ -902,14 +902,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
       {/* ── CONTROLS BAR (DIRECTLY ABOVE CALENDAR & TABLE) ── */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
         {/* VIEW MODE TOGGLE */}
-        <div className="inline-flex items-center rounded-2xl bg-white border border-[#414E36]/10 p-1 shadow-xs">
+        <div className="inline-flex items-center rounded-2xl bg-[#F2EFE9] border border-[#414E36]/10 p-1 gap-1 shadow-2xs">
           <button
             type="button"
             onClick={() => setViewMode("pending")}
             className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold cursor-pointer ${
               viewMode === "pending"
                 ? "bg-[#C4AE7C] text-[#414E36] shadow-xs"
-                : "text-[#5A6A51] hover:bg-[#F2EFE9] hover:text-[#1F251A]"
+                : "text-[#5A6A51] hover:bg-white/80 hover:text-[#1F251A]"
             }`}
           >
             <Clock size={15} />
@@ -926,7 +926,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
             className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold cursor-pointer ${
               viewMode === "calendar"
                 ? "bg-[#C4AE7C] text-[#414E36] shadow-xs"
-                : "text-[#5A6A51] hover:bg-[#F2EFE9] hover:text-[#1F251A]"
+                : "text-[#5A6A51] hover:bg-white/80 hover:text-[#1F251A]"
             }`}
           >
             <CalendarIcon size={15} />
