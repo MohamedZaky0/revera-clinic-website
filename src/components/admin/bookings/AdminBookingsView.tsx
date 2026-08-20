@@ -517,9 +517,8 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   // Compute pending list items
   const pendingApprovalsList = useMemo(() => {
-    const rawPending = (requests && requests.length > 0)
-      ? requests
-      : mergedAppointments.filter(r => ["pending", "waiting", "pending_deposit"].includes((r.status || "").toLowerCase()));
+    const sourceList = (requests && requests.length > 0) ? requests : mergedAppointments;
+    const rawPending = sourceList.filter(r => ["pending", "waiting", "pending_deposit"].includes((r.status || "pending").toLowerCase()));
 
     return rawPending.map((item: any, idx: number) => {
       const code = item.bookingCode || item.code || item.id || `#BK-${idx + 1}`;
@@ -566,12 +565,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   const handleApproveItem = async (item: any) => {
     try {
-      if (item.raw?.id) {
-        await supabase.from("reservations").update({ status: "approved" }).eq("id", item.raw.id);
+      const targetId = item.raw?.id || item.id;
+      if (targetId) {
+        await supabase.from("reservations").update({ status: "approved" }).eq("id", targetId);
       }
-      setDbReservations(prev => prev.map(r => String(r.id) === String(item.raw?.id) ? { ...r, status: "approved" } : r));
+      setDbReservations(prev => prev.map(r => String(r.id) === String(targetId) ? { ...r, status: "approved" } : r));
       if (onApproveBooking) {
-        onApproveBooking(item.raw);
+        onApproveBooking({ ...(item.raw || item), id: targetId, status: "approved" });
       }
     } catch (e) {
       console.error("Approve error:", e);
@@ -580,12 +580,13 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   const handleRejectItem = async (item: any) => {
     try {
-      if (item.raw?.id) {
-        await supabase.from("reservations").update({ status: "rejected" }).eq("id", item.raw.id);
+      const targetId = item.raw?.id || item.id;
+      if (targetId) {
+        await supabase.from("reservations").update({ status: "rejected" }).eq("id", targetId);
       }
-      setDbReservations(prev => prev.map(r => String(r.id) === String(item.raw?.id) ? { ...r, status: "rejected" } : r));
+      setDbReservations(prev => prev.map(r => String(r.id) === String(targetId) ? { ...r, status: "rejected" } : r));
       if (onRejectBooking) {
-        onRejectBooking(item.raw);
+        onRejectBooking({ ...(item.raw || item), id: targetId, status: "rejected" });
       }
     } catch (e) {
       console.error("Reject error:", e);
