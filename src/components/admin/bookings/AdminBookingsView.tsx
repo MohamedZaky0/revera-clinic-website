@@ -515,13 +515,18 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
   const [pendingRowsPerPage, setPendingRowsPerPage] = useState(10);
   const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
   const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
+  const [rejectedObjects, setRejectedObjects] = useState<Set<any>>(new Set());
+  const [approvedObjects, setApprovedObjects] = useState<Set<any>>(new Set());
 
   // Compute pending list items
   const pendingApprovalsList = useMemo(() => {
     const sourceList = (requests && requests.length > 0) ? requests : mergedAppointments;
     const rawPending = sourceList.filter(r => {
+      if (rejectedObjects.has(r) || approvedObjects.has(r)) return false;
+
       const idStr = String(r.id || "");
-      if (rejectedIds.has(idStr) || approvedIds.has(idStr)) return false;
+      if (idStr && (rejectedIds.has(idStr) || approvedIds.has(idStr))) return false;
+
       return ["pending", "waiting", "pending_deposit"].includes((r.status || "pending").toLowerCase());
     });
 
@@ -561,7 +566,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         raw: item
       };
     });
-  }, [requests, mergedAppointments, selectedDateStr, rejectedIds, approvedIds]);
+  }, [requests, mergedAppointments, selectedDateStr, rejectedIds, approvedIds, rejectedObjects, approvedObjects]);
 
   const startIndexPending = (pendingPage - 1) * pendingRowsPerPage;
   const paginatedPendingList = useMemo(() => {
@@ -570,7 +575,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   const handleApproveItem = async (item: any) => {
     try {
-      const targetId = String(item.raw?.id || item.id || "");
+      const rawObj = item.raw || item;
+      const targetId = String(rawObj?.id || item.id || "");
+
+      setApprovedObjects(prev => new Set(prev).add(rawObj));
       if (targetId) {
         setApprovedIds(prev => new Set(prev).add(targetId));
         await supabase.from("reservations").update({ status: "approved" }).eq("id", targetId);
@@ -580,10 +588,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         if (exists) {
           return prev.map(r => String(r.id) === String(targetId) ? { ...r, status: "approved" } : r);
         }
-        return [...prev, { ...(item.raw || item), id: targetId, status: "approved" }];
+        return [...prev, { ...rawObj, id: targetId, status: "approved" }];
       });
       if (onApproveBooking) {
-        onApproveBooking({ ...(item.raw || item), id: targetId, status: "approved" });
+        onApproveBooking({ ...rawObj, id: targetId, status: "approved" });
       }
     } catch (e) {
       console.error("Approve error:", e);
@@ -592,7 +600,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   const handleRejectItem = async (item: any) => {
     try {
-      const targetId = String(item.raw?.id || item.id || "");
+      const rawObj = item.raw || item;
+      const targetId = String(rawObj?.id || item.id || "");
+
+      setRejectedObjects(prev => new Set(prev).add(rawObj));
       if (targetId) {
         setRejectedIds(prev => new Set(prev).add(targetId));
         await supabase.from("reservations").update({ status: "rejected" }).eq("id", targetId);
@@ -602,10 +613,10 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         if (exists) {
           return prev.map(r => String(r.id) === String(targetId) ? { ...r, status: "rejected" } : r);
         }
-        return [...prev, { ...(item.raw || item), id: targetId, status: "rejected" }];
+        return [...prev, { ...rawObj, id: targetId, status: "rejected" }];
       });
       if (onRejectBooking) {
-        onRejectBooking({ ...(item.raw || item), id: targetId, status: "rejected" });
+        onRejectBooking({ ...rawObj, id: targetId, status: "rejected" });
       }
     } catch (e) {
       console.error("Reject error:", e);
