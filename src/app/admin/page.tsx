@@ -19938,7 +19938,12 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const balanceDue = Math.max(0, totalCost - depositAlreadyPaid);
 
           // 2. Fetch customer details
-          const customerRecord = dbCustomers.find(c => c.id === checkoutBooking.customerId || c.phone === checkoutBooking.phone);
+          const targetCustId = checkoutBooking.customerId || (checkoutBooking as any).customer_id;
+          const rawCustPhone = (checkoutBooking.phone || checkoutBooking.customer_phone || '').trim().replace(/\D/g, '');
+          const customerRecord = dbCustomers.find(c => 
+            (targetCustId && c.id === targetCustId) ||
+            (rawCustPhone && c.phone && c.phone.trim().replace(/\D/g, '') === rawCustPhone)
+          );
           const walletBalance = customerRecord ? Number(customerRecord.wallet || customerRecord.wallet_balance || 0) : 0;
 
           // 3. Math calculation
@@ -19951,10 +19956,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           const changeAmount = diff > 0 ? diff : 0;
           const remainingAmount = diff < 0 ? -diff : 0;
 
-          // computeSettledBalances (src/lib/billing.ts) treats amountPaid on the completing PATCH
-          // as the booking's final total paid, not a delta for just this step — it must include
-          // the deposit already collected, or that deposit silently never reaches
-          const totalPaidIncludingDeposit = depositAlreadyPaid + amountPaidNum;
+          // Total paid on this reservation is the previous deposit + cash/card paid now + wallet balance applied!
+          const totalPaidIncludingDeposit = depositAlreadyPaid + amountPaidNum + walletDeduction;
 
           const handleConfirmCheckout = async () => {
             setSavingCheckout(true);
