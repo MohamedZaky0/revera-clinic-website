@@ -330,6 +330,9 @@ export default function AdminNewBookingView({
     });
 
     setCustomerList(filtered);
+    if (filtered.length === 0) {
+      setShowCustomerDropdown(false);
+    }
   }, [phone, allCustomers]);
 
   // Handle Select Customer from List
@@ -637,7 +640,14 @@ export default function AdminNewBookingView({
                   <label className="block font-bold text-[#1F251A]">{tr.phoneLabel}</label>
                   <button
                     type="button"
-                    onClick={() => setShowCustomerDropdown(prev => !prev)}
+                    onClick={() => {
+                      if (showCustomerDropdown) {
+                        setShowCustomerDropdown(false);
+                      } else {
+                        setCustomerList(allCustomers);
+                        setShowCustomerDropdown(true);
+                      }
+                    }}
                     className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
                   >
                     <Users size={13} />
@@ -664,10 +674,12 @@ export default function AdminNewBookingView({
                     type="tel"
                     required
                     value={phone}
-                    onFocus={() => setShowCustomerDropdown(true)}
+                    onFocus={() => {
+                      if (customerList.length > 0) setShowCustomerDropdown(true);
+                    }}
                     onChange={(e) => {
                       setPhone(e.target.value);
-                      setShowCustomerDropdown(true);
+                      if (customerList.length > 0) setShowCustomerDropdown(true);
                     }}
                     placeholder={tr.phonePlaceholder}
                     className="w-full px-3.5 py-2.5 font-mono text-[#1F251A] outline-none font-bold placeholder:text-gray-400 placeholder:font-sans"
@@ -679,7 +691,7 @@ export default function AdminNewBookingView({
                         setPhone("");
                         setFoundCustomer(null);
                         setPatientFound(null);
-                        setShowCustomerDropdown(true);
+                        setShowCustomerDropdown(false);
                       }}
                       className="pe-3 text-[#5A6A51] hover:text-[#1F251A]"
                     >
@@ -689,7 +701,7 @@ export default function AdminNewBookingView({
                 </div>
 
                 {/* Scrollable Floating Customer List Dropdown */}
-                {showCustomerDropdown && (
+                {showCustomerDropdown && customerList.length > 0 && (
                   <div className="absolute start-0 end-0 top-full mt-1 z-[100] max-h-64 overflow-y-auto bg-white rounded-2xl border border-[#414E36]/20 shadow-2xl p-2 space-y-1">
                     <div className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-[#5A6A51] bg-[#FBFBF9] rounded-xl flex justify-between items-center mb-1">
                       <span>{tr.databasePatientsPrefix} ({customerList.length})</span>
