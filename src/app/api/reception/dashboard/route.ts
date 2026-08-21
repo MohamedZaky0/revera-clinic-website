@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { requireStaffAccess } from "@/lib/access";
+import { getDistanceInMeters, resolveBranchCoordinates } from "@/lib/geo";
 
 const ALLOWED_ROLES = ["receptionist", "hr", "admin", "superadmin"];
 
@@ -219,7 +220,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { action, employeeId } = body;
+    const { action, employeeId, latitude, longitude, accuracy } = body;
 
     if (!action || (action !== "start_shift" && action !== "end_shift")) {
       return NextResponse.json(
@@ -228,10 +229,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Resolve the employee from the authenticated session, never by guessing a Reception-dept
-    // row — with more than one receptionist on shift that guess can silently record the wrong
-    // person's attendance (RISK-059). A receptionist can only clock themselves in/out; HR/admin/
-    // superadmin may pass an explicit target `employeeId` to act on another employee's behalf.
     const role = auth.access.role;
     let empId: string | null = auth.access.employee.id;
     if (role !== "receptionist" && employeeId) {
@@ -244,6 +241,15 @@ export async function POST(req: Request) {
         { status: 404 }
       );
     }
+
+    // Fetch employee details to check role and branch assignment
+    const { data: employeeRecord } = await supabaseServer
+      .from("employee_accounts")
+      .select("id, branch_id, role_name")
+      .eq("id", empId)
+      .maybeSingle();
+
+    const isSuperadmin = (employeeRecord?.role_name || role || "").toLowerCase() === "superadmin";
 
     const todayStr = new Date().toISOString().split("T")[0];
     const nowIso = new Date().toISOString();
@@ -258,8 +264,6 @@ export async function POST(req: Request) {
 
       if (fetchError) throw fetchError;
 
-      // Idempotency (RISK-059/F-3): re-firing start_shift after today's shift already ended must
-      // not wipe check_out_time and reopen it. A start while already in progress is a no-op.
       if (existing?.check_out_time) {
         return NextResponse.json(
           { success: false, error: "Today's shift has already ended and cannot be restarted." },
@@ -270,6 +274,81 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, action: "start_shift", attendance: existing });
       }
 
+      let parsedLat: number | null = null;
+      let parsedLng: number | null = null;
+
+      // Superadmin without branch bypasses location check
+      if (!isSuperadmin || employeeRecord?.branch_id) {
+        if (latitude === undefined || longitude === undefined || latitude === null || longitude === null) {
+          return NextResponse.json(
+            { success: false, error: "location_permission_denied", message: "Location permission is required to start your shift." },
+            { status: 400 }
+          );
+        }
+
+        parsedLat = Number(latitude);
+        parsedLng = Number(longitude);
+
+        if (
+          !Number.isFinite(parsedLat) ||
+          !Number.isFinite(parsedLng) ||
+          parsedLat < -90 ||
+          parsedLat > 90 ||
+          parsedLng < -180 ||
+          parsedLng > 180
+        ) {
+          return NextResponse.json(
+            { success: false, error: "invalid_coordinates", message: "Location permission is required to start your shift." },
+            { status: 400 }
+          );
+        }
+
+        // Fetch clinic branch(es) to check distance
+        let branchesQuery = supabaseServer.from("branches").select("id, name_en, latitude, longitude, maps_embed, maps_link");
+        if (employeeRecord?.branch_id) {
+          branchesQuery = branchesQuery.eq("id", employeeRecord.branch_id);
+        }
+
+        const { data: branchRows } = await branchesQuery;
+        const validBranches = Array.isArray(branchRows) && branchRows.length > 0 ? branchRows : [];
+
+        // If no specific branch matched, try all branches
+        let candidateBranches = validBranches;
+        if (candidateBranches.length === 0) {
+          const { data: allBranches } = await supabaseServer
+            .from("branches")
+            .select("id, name_en, latitude, longitude, maps_embed, maps_link");
+          if (Array.isArray(allBranches)) candidateBranches = allBranches;
+        }
+
+        let isInsideLocation = false;
+        let minimumDistance = Infinity;
+
+        for (const branch of candidateBranches) {
+          const coords = await resolveBranchCoordinates(branch);
+          if (coords) {
+            const dist = getDistanceInMeters(parsedLat, parsedLng, coords.latitude, coords.longitude);
+            if (dist < minimumDistance) minimumDistance = dist;
+            if (dist <= 800) {
+              isInsideLocation = true;
+              break;
+            }
+          }
+        }
+
+        // If clinic branches exist and employee is outside allowed 800m working location:
+        if (candidateBranches.length > 0 && !isInsideLocation && minimumDistance !== Infinity) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "out_of_location",
+              message: "You must be in a working location to start your shift."
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       const { data, error } = await supabaseServer
         .from("hr_attendance")
         .upsert(
@@ -278,6 +357,8 @@ export async function POST(req: Request) {
             date: todayStr,
             check_in_time: nowIso,
             check_out_time: null,
+            latitude: parsedLat,
+            longitude: parsedLng,
             status: "Present"
           },
           { onConflict: "employee_id,date" }

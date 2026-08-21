@@ -48,6 +48,9 @@ export default function ReceptionDashboardView({
   const [loading, setLoading] = useState(true);
   const [shiftProcessing, setShiftProcessing] = useState(false);
   const [liveElapsedSeconds, setLiveElapsedSeconds] = useState(0);
+  const [showStartShiftPopup, setShowStartShiftPopup] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [hasAutoPrompted, setHasAutoPrompted] = useState(false);
 
   // Fetch Reception Dashboard data from backend API
   const fetchDashboardData = async () => {
@@ -66,6 +69,10 @@ export default function ReceptionDashboardView({
         setDashboardData(data);
         if (data.shift?.elapsedSeconds) {
           setLiveElapsedSeconds(data.shift.elapsedSeconds);
+        }
+        if (!hasAutoPrompted && data.shift?.status === "not_started") {
+          setShowStartShiftPopup(true);
+          setHasAutoPrompted(true);
         }
       }
     } catch (err) {
@@ -91,12 +98,81 @@ export default function ReceptionDashboardView({
     return () => clearInterval(interval);
   }, [dashboardData?.shift?.status]);
 
+  // Execute Start Shift with geolocation check
+  const handleStartShiftWithLocation = () => {
+    setLocationError(null);
+
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setLocationError("Location permission is required to start your shift.");
+      return;
+    }
+
+    setShiftProcessing(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude, accuracy } = position.coords;
+          const res = await fetch("/api/reception/dashboard", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+            },
+            body: JSON.stringify({
+              action: "start_shift",
+              employeeId,
+              email,
+              latitude,
+              longitude,
+              accuracy
+            })
+          });
+
+          const result = await res.json();
+          if (result.success) {
+            setShowStartShiftPopup(false);
+            setLocationError(null);
+            await fetchDashboardData();
+          } else {
+            if (result.error === "out_of_location" || (result.message && result.message.includes("working location"))) {
+              setLocationError("You must be in a working location to start your shift.");
+            } else if (result.error === "location_permission_denied" || (result.message && result.message.includes("permission"))) {
+              setLocationError("Location permission is required to start your shift.");
+            } else {
+              setLocationError(result.message || result.error || "You must be in a working location to start your shift.");
+            }
+          }
+        } catch (err: any) {
+          console.error("Start shift network/server error:", err);
+          setLocationError("You must be in a working location to start your shift.");
+        } finally {
+          setShiftProcessing(false);
+        }
+      },
+      (geoErr) => {
+        setShiftProcessing(false);
+        if (geoErr.code === geoErr.PERMISSION_DENIED || geoErr.code === 1) {
+          setLocationError("Location permission is required to start your shift.");
+        } else {
+          setLocationError("Location permission is required to start your shift.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
   const handleShiftAction = async () => {
+    const currentStatus = dashboardData?.shift?.status;
+    if (currentStatus !== "started") {
+      setLocationError(null);
+      setShowStartShiftPopup(true);
+      return;
+    }
+
+    // Ending active shift
     try {
       setShiftProcessing(true);
-      const currentStatus = dashboardData?.shift?.status;
-      const targetAction = currentStatus === "started" ? "end_shift" : "start_shift";
-
       const res = await fetch("/api/reception/dashboard", {
         method: "POST",
         headers: {
@@ -104,7 +180,7 @@ export default function ReceptionDashboardView({
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
         },
         body: JSON.stringify({
-          action: targetAction,
+          action: "end_shift",
           employeeId,
           email
         })
@@ -115,7 +191,7 @@ export default function ReceptionDashboardView({
         await fetchDashboardData();
       }
     } catch (err) {
-      console.error("Shift action failed:", err);
+      console.error("End shift failed:", err);
     } finally {
       setShiftProcessing(false);
     }
@@ -240,7 +316,7 @@ export default function ReceptionDashboardView({
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className={`h-2.5 w-2.5 rounded-full ${shiftInfo.status === "started" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
                   <p className={`text-sm font-bold ${shiftInfo.status === "started" ? "text-emerald-700" : "text-amber-700"}`}>
-                    {shiftInfo.status === "started" ? "Shift Started" : shiftInfo.status === "ended" ? "Shift Ended" : "Not Started"}
+                    {shiftInfo.status === "started" ? "On Shift" : shiftInfo.status === "ended" ? "Shift Ended" : "Not Started"}
                   </p>
                 </div>
               </div>
@@ -324,46 +400,60 @@ export default function ReceptionDashboardView({
             </button>
           </div>
 
-          {/* Badges Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Today's Bookings Card */}
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#F7F9F5] border border-[#E4EBE0]">
-              <div className="h-12 w-12 rounded-xl bg-[#45523A] text-white flex items-center justify-center shrink-0">
-                <Calendar size={22} />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-[#788272]">Today's Bookings</p>
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-2">
+            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Total Bookings</p>
+              <div className="flex items-center justify-between mt-2">
                 <p className="text-2xl font-black text-[#1F251A]">{bookingsInfo.todayCount}</p>
+                <Calendar size={18} className="text-[#8C9686]" />
               </div>
             </div>
 
-            {/* Pending Approval Card */}
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-[#FFF9F0] border border-[#FEEBD0]">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-xl bg-[#D97706] text-white flex items-center justify-center shrink-0">
-                  <Clock size={22} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-[#854D0E]">Pending Approval</p>
-                  <p className="text-2xl font-black text-[#B45309]">{bookingsInfo.pendingCount}</p>
-                </div>
+            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Pending Approval</p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-2xl font-black text-[#1F251A]">{bookingsInfo.pendingCount}</p>
+                <Clock size={18} className="text-[#D97706]" />
               </div>
-              <button
-                type="button"
-                onClick={() => onNavigateTab && onNavigateTab("Bookings")}
-                className="text-xs font-bold text-[#D97706] hover:underline flex items-center gap-1"
-              >
-                <span>Review Pending Approval</span>
-                <ArrowRight size={13} />
-              </button>
+            </div>
+
+            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Confirmed</p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-2xl font-black text-[#1F251A]">
+                  {bookingsInfo.list.filter((b: any) => String(b.status).toLowerCase() === "confirmed" || String(b.status).toLowerCase() === "checked_in").length}
+                </p>
+                <CheckCircle2 size={18} className="text-[#1E7E34]" />
+              </div>
+            </div>
+
+            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Completed</p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-2xl font-black text-[#1F251A]">
+                  {bookingsInfo.list.filter((b: any) => String(b.status).toLowerCase() === "completed").length}
+                </p>
+                <UserCheck size={18} className="text-[#45523A]" />
+              </div>
+            </div>
+
+            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Cancelled</p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-2xl font-black text-[#1F251A]">
+                  {bookingsInfo.list.filter((b: any) => String(b.status).toLowerCase() === "cancelled" || String(b.status).toLowerCase() === "rejected").length}
+                </p>
+                <AlertCircle size={18} className="text-[#DC2626]" />
+              </div>
             </div>
           </div>
 
-          {/* Bookings Table */}
-          <div className="overflow-x-auto rounded-2xl border border-[#EBE8E0]">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#FAF8F5] text-[#8C9686] font-semibold border-b border-[#EBE8E0]">
-                <tr>
+          {/* Today's Table */}
+          <div className="overflow-x-auto pt-2">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-[#F0EEE6] text-[#8C9686] uppercase text-[10px] font-extrabold tracking-wider">
                   <th className="py-3 px-4">Time</th>
                   <th className="py-3 px-4">Patient</th>
                   <th className="py-3 px-4">Doctor</th>
@@ -371,29 +461,20 @@ export default function ReceptionDashboardView({
                   <th className="py-3 px-4">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F3F0E8] text-[#1F251A] font-medium">
+              <tbody className="divide-y divide-[#F7F5F0]">
                 {bookingsInfo.list.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-xs text-[#8C9686]">
+                    <td colSpan={5} className="py-8 text-center text-[#8C9686] italic">
                       No bookings scheduled for today.
                     </td>
                   </tr>
                 ) : (
-                  bookingsInfo.list.map((row: any) => {
-                    const isConfirmed = String(row.status).toLowerCase() === "confirmed" || String(row.status).toLowerCase() === "approved";
+                  bookingsInfo.list.map((row: any, idx: number) => {
+                    const isConfirmed = String(row.status || "").toLowerCase() === "confirmed";
                     return (
-                      <tr
-                        key={row.id}
-                        onClick={() => onNavigateTab && onNavigateTab("Bookings")}
-                        className="hover:bg-[#F9F8F5] transition cursor-pointer"
-                      >
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2 text-[#55634B]">
-                            <Clock size={14} />
-                            <span>{row.time}</span>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 font-bold">
+                      <tr key={`book-row-${idx}`} className="hover:bg-[#FAF9F5] transition">
+                        <td className="py-3.5 px-4 font-bold text-[#1F251A]">{row.time}</td>
+                        <td className="py-3.5 px-4 font-bold text-[#1F251A]">
                           <div className="flex items-center gap-2">
                             <User size={14} className="text-[#8C9686]" />
                             <span>{row.patientName}</span>
@@ -430,6 +511,67 @@ export default function ReceptionDashboardView({
             </table>
           </div>
         </div>
+
+      {/* ── START SHIFT POPUP MODAL WITH FADED BACKGROUND ── */}
+      {showStartShiftPopup && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="relative w-full max-w-sm rounded-[32px] bg-white p-8 shadow-2xl text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            {/* Waving Hand Emoji Circle */}
+            <div className="h-20 w-20 rounded-full bg-[#EBF0E6] flex items-center justify-center mx-auto text-4xl shadow-inner select-none">
+              👋
+            </div>
+
+            {/* Title and Subtitle */}
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-[#1F251A] flex items-center justify-center gap-1.5">
+                Hi, {receptionistName} <span className="inline-block text-xl">👋</span>
+              </h3>
+              <p className="text-xs sm:text-sm text-[#5A6A51] leading-relaxed max-w-[260px] mx-auto">
+                Start your shift now to track your work and stay organized.
+              </p>
+            </div>
+
+            {/* Error Message Box */}
+            {locationError && (
+              <div className="rounded-2xl bg-amber-50 border border-amber-200/80 p-3.5 text-left flex items-start gap-2.5 text-xs text-amber-900 animate-in fade-in duration-150">
+                <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <p className="font-semibold leading-snug">{locationError}</p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="space-y-2.5 pt-1">
+              <button
+                type="button"
+                disabled={shiftProcessing}
+                onClick={handleStartShiftWithLocation}
+                className="w-full flex items-center justify-center gap-3 bg-[#414E36] hover:bg-[#323D2A] text-white py-3.5 px-6 rounded-2xl font-bold text-sm shadow-md transition disabled:opacity-60 cursor-pointer"
+              >
+                {shiftProcessing ? (
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center">
+                    <Play size={12} fill="white" className="ml-0.5" />
+                  </div>
+                )}
+                <span>{shiftProcessing ? "Verifying Location..." : "Start Shift"}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={shiftProcessing}
+                onClick={() => {
+                  setShowStartShiftPopup(false);
+                  setLocationError(null);
+                }}
+                className="w-full py-3 px-6 rounded-2xl font-bold text-sm text-[#1F251A] border border-[#E6E9EB] hover:bg-[#F2EFE9] transition cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
