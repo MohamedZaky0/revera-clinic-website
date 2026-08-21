@@ -16444,8 +16444,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           {/* ── RECEPTION DASHBOARD VIEW ── */}
           {activeNav === "Dashboard" && (
             <ReceptionDashboardView
-              receptionistName={loggedEmpAccount?.name || adminEmail || "Zaki Mohamed"}
-              receptionistRole={loggedEmpAccount?.role_name || adminRole || "Receptionist"}
+              receptionistName={loggedEmpAccount?.name || (adminEmail ? adminEmail.split("@")[0] : "Employee")}
+              receptionistRole={loggedEmpAccount?.role_name || adminRole || "Staff"}
               employeeId={loggedEmpAccount?.id || adminDbId}
               email={adminEmail}
               accessToken={session?.access_token}

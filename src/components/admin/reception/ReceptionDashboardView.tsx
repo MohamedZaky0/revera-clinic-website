@@ -43,8 +43,8 @@ interface ReceptionDashboardViewProps {
 }
 
 export default function ReceptionDashboardView({
-  receptionistName = "Zaki Mohamed",
-  receptionistRole = "Receptionist",
+  receptionistName = "",
+  receptionistRole = "",
   employeeId,
   email,
   accessToken,
@@ -53,6 +53,7 @@ export default function ReceptionDashboardView({
 }: ReceptionDashboardViewProps) {
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const effectiveName = dashboardData?.receptionist?.name || receptionistName || "Employee";
   const [loading, setLoading] = useState(true);
   const [shiftProcessing, setShiftProcessing] = useState(false);
   const [liveElapsedSeconds, setLiveElapsedSeconds] = useState(0);
@@ -259,18 +260,11 @@ export default function ReceptionDashboardView({
   ];
 
   const shiftInfo = dashboardData?.shift || {
-    scheduleHours: "8 Hours",
-    shiftFromTo: "09:00 AM – 05:00 PM",
+    scheduleHours: "—",
+    shiftFromTo: "—",
     actualStartingTime: "--:--",
-    elapsedTime: "0h 0m",
+    elapsedTime: "00h 00m",
     status: "not_started"
-  };
-
-  const targetInfo = dashboardData?.target || {
-    targetAmount: 0,
-    achievedAmount: 0,
-    progressPercentage: 0,
-    remainingAmount: 0
   };
 
   const bookingsInfo = dashboardData?.bookings || {
@@ -279,48 +273,7 @@ export default function ReceptionDashboardView({
     list: []
   };
 
-  const notificationsList = dashboardData?.notifications || [
-    {
-      id: "alert-default-1",
-      type: "low_stock",
-      title: "Low Stock",
-      message: "Botox – Only 5 units remaining",
-      time: "10 min ago",
-      severity: "danger",
-      status: "active",
-      targetTab: "Inventory"
-    },
-    {
-      id: "alert-default-2",
-      type: "maintenance_due",
-      title: "Maintenance Due",
-      message: "Laser Device #03 requires maintenance",
-      time: "1 hr ago",
-      severity: "warning",
-      status: "active",
-      targetTab: "Inventory"
-    },
-    {
-      id: "alert-default-3",
-      type: "expired_item",
-      title: "Expired Item",
-      message: "Product XYZ expired on 18 Aug 2026",
-      time: "2 hrs ago",
-      severity: "danger",
-      status: "active",
-      targetTab: "Inventory"
-    },
-    {
-      id: "alert-default-4",
-      type: "maintenance_completed",
-      title: "Maintenance Completed",
-      message: "Laser Device #02 maintenance completed",
-      time: "Today, 09:15 AM",
-      severity: "success",
-      status: "resolved",
-      targetTab: "Inventory"
-    }
-  ];
+  const notificationsList = Array.isArray(dashboardData?.notifications) ? dashboardData.notifications : [];
 
   const filteredAlerts = notificationsList.filter((a: any) => {
     if (alertFilter === "low_stock") return a.type === "low_stock";
@@ -779,7 +732,7 @@ export default function ReceptionDashboardView({
             {/* Title and Subtitle */}
             <div className="space-y-2">
               <h3 className="text-xl font-bold text-[#1F251A] flex items-center justify-center gap-1.5">
-                Hi, {receptionistName} <span className="inline-block text-xl">👋</span>
+                Hi, {effectiveName} <span className="inline-block text-xl">👋</span>
               </h3>
               <p className="text-xs sm:text-sm text-[#5A6A51] leading-relaxed max-w-[260px] mx-auto">
                 Start your shift now to track your work and stay organized.

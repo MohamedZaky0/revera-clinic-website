@@ -19,6 +19,27 @@ async function requireReceptionAccess(req: Request) {
   return result;
 }
 
+function formatRelativeTime(dateInput: string | Date | undefined): string {
+  if (!dateInput) return "Recently";
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return "Recently";
+  const now = Date.now();
+  const diffSec = Math.floor((now - d.getTime()) / 1000);
+
+  if (diffSec < 0) return "Just now";
+  if (diffSec < 60) return "Just now";
+  if (diffSec < 3600) {
+    const mins = Math.max(1, Math.floor(diffSec / 60));
+    return `${mins} min ago`;
+  }
+  if (diffSec < 86400) {
+    const hours = Math.floor(diffSec / 3600);
+    return `${hours} ${hours === 1 ? "hr" : "hrs"} ago`;
+  }
+  if (diffSec < 172800) return "Yesterday";
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export async function GET(req: Request) {
   const auth = await requireReceptionAccess(req);
   if ("error" in auth) {
@@ -45,10 +66,10 @@ export async function GET(req: Request) {
     const { data: employeeData } = await employeeQuery.limit(1);
     const emp = Array.isArray(employeeData) && employeeData.length > 0 ? employeeData[0] : null;
 
-    const receptionistName = emp?.name || emp?.email || "Receptionist";
+    const receptionistName = emp?.name || emp?.email || "Employee";
     const receptionistRole = emp?.role_name || emp?.department || "Receptionist";
     const empId = emp?.id || null;
-    const shiftSchedule = emp?.shift || "09:00 AM – 05:00 PM";
+    const shiftSchedule = emp?.shift || "—";
     const targetAmount = emp?.required_target_amount !== null && emp?.required_target_amount !== undefined
       ? Number(emp.required_target_amount)
       : 0;
@@ -66,7 +87,7 @@ export async function GET(req: Request) {
     }
 
     let actualStartingTime = "--:--";
-    let elapsedTime = "0h 0m";
+    let elapsedTime = "00h 00m";
     let elapsedSeconds = 0;
     let shiftStatus: "not_started" | "started" | "ended" = "not_started";
 
@@ -85,7 +106,9 @@ export async function GET(req: Request) {
       elapsedSeconds = Math.max(0, Math.floor((endDate.getTime() - checkInDate.getTime()) / 1000));
       const hours = Math.floor(elapsedSeconds / 3600);
       const mins = Math.floor((elapsedSeconds % 3600) / 60);
-      elapsedTime = `${hours}h ${mins}m`;
+      const paddedHours = hours.toString().padStart(2, "0");
+      const paddedMins = mins.toString().padStart(2, "0");
+      elapsedTime = `${paddedHours}h ${paddedMins}m`;
 
       if (attendanceRecord.check_out_time) {
         shiftStatus = "ended";
@@ -184,7 +207,7 @@ export async function GET(req: Request) {
 
       const products = Array.isArray(productsData) ? productsData : [];
       
-      // Check low stock & expired items
+      // Check real low stock & expired items
       products.forEach((p: any) => {
         const stock = Number(p.stock_quantity ?? 0);
         const minStock = Number(p.min_stock_level ?? 5);
@@ -194,7 +217,7 @@ export async function GET(req: Request) {
             type: "low_stock",
             title: "Low Stock",
             message: `${p.name} – Only ${stock} ${p.unit || "units"} remaining`,
-            time: "10 min ago",
+            time: formatRelativeTime(p.updated_at),
             severity: "danger",
             status: "active",
             targetTab: "Inventory",
@@ -211,7 +234,7 @@ export async function GET(req: Request) {
               type: "expired_item",
               title: "Expired Item",
               message: `${p.name} expired on ${formattedExp}`,
-              time: "2 hrs ago",
+              time: formatRelativeTime(p.expiry_date || p.updated_at),
               severity: "danger",
               status: "active",
               targetTab: "Inventory",
@@ -242,7 +265,7 @@ export async function GET(req: Request) {
             type: "maintenance_overdue",
             title: "Maintenance Overdue",
             message: `${d.name} maintenance is overdue (${current.toLocaleString()} pulses)`,
-            time: "Yesterday",
+            time: formatRelativeTime(d.updated_at || d.last_maintenance_date),
             severity: "danger",
             status: "active",
             targetTab: "Inventory",
@@ -254,7 +277,7 @@ export async function GET(req: Request) {
             type: "maintenance_due",
             title: "Maintenance Due",
             message: `${d.name} requires maintenance`,
-            time: "1 hr ago",
+            time: formatRelativeTime(d.updated_at || d.last_maintenance_date),
             severity: "warning",
             status: "active",
             targetTab: "Inventory",
@@ -263,68 +286,24 @@ export async function GET(req: Request) {
         }
       });
 
-      // Recent completed maintenance
-      devHistory.slice(0, 2).forEach((h: any) => {
-        notifications.push({
-          id: `alert-maint-done-${h.id}`,
-          type: "maintenance_completed",
-          title: "Maintenance Completed",
-          message: `${h.device_name || "Laser Device"} maintenance completed`,
-          time: "Today, 09:15 AM",
-          severity: "success",
-          status: "resolved",
-          targetTab: "Inventory",
-          createdAt: h.created_at || new Date().toISOString()
-        });
+      // Recent completed maintenance (strictly from real records)
+      devHistory.slice(0, 3).forEach((h: any) => {
+        if (h.device_name || h.reason) {
+          notifications.push({
+            id: `alert-maint-done-${h.id}`,
+            type: "maintenance_completed",
+            title: "Maintenance Completed",
+            message: `${h.device_name || "Equipment"} maintenance completed${h.reason ? ` (${h.reason})` : ""}`,
+            time: formatRelativeTime(h.reset_date || h.created_at),
+            severity: "success",
+            status: "resolved",
+            targetTab: "Inventory",
+            createdAt: h.created_at || h.reset_date || new Date().toISOString()
+          });
+        }
       });
     } catch (e) {
       console.warn("Failed to aggregate dynamic alerts:", e);
-    }
-
-    // Fallback default notifications if database is fresh / empty
-    if (notifications.length === 0) {
-      notifications.push(
-        {
-          id: "alert-default-1",
-          type: "low_stock",
-          title: "Low Stock",
-          message: "Botox – Only 5 units remaining",
-          time: "10 min ago",
-          severity: "danger",
-          status: "active",
-          targetTab: "Inventory"
-        },
-        {
-          id: "alert-default-2",
-          type: "maintenance_due",
-          title: "Maintenance Due",
-          message: "Laser Device #03 requires maintenance",
-          time: "1 hr ago",
-          severity: "warning",
-          status: "active",
-          targetTab: "Inventory"
-        },
-        {
-          id: "alert-default-3",
-          type: "expired_item",
-          title: "Expired Item",
-          message: "Product XYZ expired on 18 Aug 2026",
-          time: "2 hrs ago",
-          severity: "danger",
-          status: "active",
-          targetTab: "Inventory"
-        },
-        {
-          id: "alert-default-4",
-          type: "maintenance_completed",
-          title: "Maintenance Completed",
-          message: "Laser Device #02 maintenance completed",
-          time: "Today, 09:15 AM",
-          severity: "success",
-          status: "resolved",
-          targetTab: "Inventory"
-        }
-      );
     }
 
     return NextResponse.json({
