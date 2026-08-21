@@ -8925,19 +8925,19 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                     </div>
 
                     {/* Language Tab Switcher */}
-                    <div className="flex border-b border-[#F2EFE9] bg-white px-8 pt-4 rounded-t-[40px] shadow-[0_10px_30px_rgba(47,61,41,0.02)]">
+                    <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs w-fit">
                       <button
                         onClick={() => setPageSettingsLangTab("en")}
-                        className={`pb-4 px-6 text-sm font-bold transition-all duration-200 border-b-2 ${
-                          pageSettingsLangTab === "en" ? "border-[#414E36] text-[#414E36]" : "border-transparent text-[#5A6A51]/70 hover:text-[#414E36]"
+                        className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-150 ${
+                          pageSettingsLangTab === "en" ? "bg-[#414E36] text-[#FBFBF9] shadow-xs" : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
                         }`}
                       >
                         English Version
                       </button>
                       <button
                         onClick={() => setPageSettingsLangTab("ar")}
-                        className={`pb-4 px-6 text-sm font-bold transition-all duration-200 border-b-2 ${
-                          pageSettingsLangTab === "ar" ? "border-[#414E36] text-[#414E36]" : "border-transparent text-[#5A6A51]/70 hover:text-[#414E36]"
+                        className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-150 ${
+                          pageSettingsLangTab === "ar" ? "bg-[#414E36] text-[#FBFBF9] shadow-xs" : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
                         }`}
                       >
                         Arabic Version (العربية)
@@ -14026,7 +14026,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                   </div>
 
                   {/* Profile Sub-navigation Tabs */}
-                  <div className="flex border-b border-[#414E36]/10 gap-6 overflow-x-auto pb-px scrollbar-none shrink-0">
+                  <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar shrink-0">
                     {([
                       { id: "basic", label: "Basic Info" },
                       { id: "work", label: "Work Details" },
@@ -14039,10 +14039,10 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                       <button
                         key={tab.id}
                         onClick={() => setEmployeeProfileActiveTab(tab.id)}
-                        className={`pb-3 text-sm font-bold capitalize transition-all border-b-2 -mb-[2px] outline-none whitespace-nowrap ${
+                        className={`px-4 py-2 text-xs sm:text-sm font-semibold capitalize transition-all rounded-xl outline-none whitespace-nowrap ${
                           employeeProfileActiveTab === tab.id
-                            ? "border-[#414E36] text-[#414E36]"
-                            : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                            ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+                            : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
                         }`}
                       >
                         {tab.label}
@@ -14825,15 +14825,15 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
               </div>
 
               {/* Sub-navigation Tabs */}
-              <div className="flex border-b border-[#414E36]/10 gap-6">
+              <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar">
                 {(["overview", "payroll", "doctor-payroll", "leaves", "performance", "attendance", "targets"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setHrActiveSubTab(tab)}
-                    className={`pb-3 text-sm font-bold capitalize transition-all border-b-2 -mb-[2px] ${
+                    className={`px-4 py-2 text-xs sm:text-sm font-semibold capitalize transition-all rounded-xl outline-none whitespace-nowrap ${
                       hrActiveSubTab === tab
-                        ? "border-[#414E36] text-[#414E36]"
-                        : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+                        ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+                        : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
                     }`}
                   >
                     {tab === "doctor-payroll" ? "Doctor Payroll" : tab === "targets" ? "Targets" : tab}

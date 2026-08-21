@@ -13,6 +13,7 @@ import {
   Trash2,
   Printer,
   Calendar,
+  User,
 } from "lucide-react";
 import MedicalFormModal from "@/components/admin/patients/MedicalFormModal";
 import MedicalReportModal from "@/components/admin/patients/MedicalReportModal";
@@ -447,43 +448,46 @@ export default function CustomerProfileDrawer({
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex border-b border-[#414E36]/10 bg-white rounded-t-2xl px-6 gap-6">
+      <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar">
         <button
           onClick={() => setCustomerProfileTab("info")}
-          className={`pb-3.5 pt-4 text-sm font-semibold border-b-2 transition-all outline-none ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
             customerProfileTab === "info"
-              ? "border-[#414E36] text-[#414E36] font-bold"
-              : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+              ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+              : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
           }`}
         >
+          <User size={15} />
           {t.tabInfo}
         </button>
         <button
           onClick={() => setCustomerProfileTab("history")}
-          className={`pb-3.5 pt-4 text-sm font-semibold border-b-2 transition-all outline-none ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
             customerProfileTab === "history"
-              ? "border-[#414E36] text-[#414E36] font-bold"
-              : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+              ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+              : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
           }`}
         >
+          <Calendar size={15} />
           {t.tabHistory}
         </button>
         <button
           onClick={() => setCustomerProfileTab("prescription")}
-          className={`pb-3.5 pt-4 text-sm font-semibold border-b-2 transition-all outline-none ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
             customerProfileTab === "prescription"
-              ? "border-[#414E36] text-[#414E36] font-bold"
-              : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+              ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+              : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
           }`}
         >
+          <FileText size={15} />
           {t.tabPrescription}
         </button>
         <button
           onClick={() => setCustomerProfileTab("products")}
-          className={`pb-3.5 pt-4 text-sm font-semibold border-b-2 transition-all outline-none flex items-center gap-1.5 ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
             customerProfileTab === "products"
-              ? "border-[#414E36] text-[#414E36] font-bold"
-              : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+              ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+              : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
           }`}
         >
           <ShoppingBag size={15} />
@@ -494,10 +498,10 @@ export default function CustomerProfileDrawer({
             setCustomerProfileTab("packages");
             fetchAvailablePackageOffers();
           }}
-          className={`pb-3.5 pt-4 text-sm font-semibold border-b-2 transition-all outline-none flex items-center gap-1.5 ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
             customerProfileTab === "packages"
-              ? "border-[#414E36] text-[#414E36] font-bold"
-              : "border-transparent text-[#5A6A51] hover:text-[#414E36]"
+              ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+              : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
           }`}
         >
           <Package size={15} />
@@ -690,13 +694,13 @@ export default function CustomerProfileDrawer({
           <div className="space-y-6">
             {/* Sub-tab Navigation Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#414E36]/10">
-              <div className="flex items-center gap-1.5 bg-[#F4F6F3] p-1 rounded-xl">
+              <div className="flex items-center gap-1 bg-[#F2EFE9] p-1 rounded-xl">
                 <button
                   type="button"
                   onClick={() => setCustomerRecordsSubTab("intake")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
                     customerRecordsSubTab === "intake"
-                      ? "bg-[#414E36] text-white shadow-sm font-bold"
+                      ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
                       : "text-[#5A6A51] hover:text-[#414E36]"
                   }`}
                 >
@@ -707,7 +711,7 @@ export default function CustomerProfileDrawer({
                   onClick={() => setCustomerRecordsSubTab("prescriptions")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
                     customerRecordsSubTab === "prescriptions"
-                      ? "bg-[#414E36] text-white shadow-sm font-bold"
+                      ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
                       : "text-[#5A6A51] hover:text-[#414E36]"
                   }`}
                 >
@@ -718,7 +722,7 @@ export default function CustomerProfileDrawer({
                   onClick={() => setCustomerRecordsSubTab("reports")}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
                     customerRecordsSubTab === "reports"
-                      ? "bg-[#414E36] text-white shadow-sm font-bold"
+                      ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
                       : "text-[#5A6A51] hover:text-[#414E36]"
                   }`}
                 >
@@ -1068,18 +1072,26 @@ export default function CustomerProfileDrawer({
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-[#414E36]/10">
               <div className="flex items-center gap-3">
-                <div className="flex bg-[#EDF1EC] p-1 rounded-xl gap-1 text-xs font-semibold">
+                <div className="flex bg-[#F2EFE9] p-1 rounded-xl gap-1 text-xs font-semibold">
                   <button
                     type="button"
                     onClick={() => setCustomerProductsSubTab("current")}
-                    className={`px-3 py-1 rounded-lg transition ${customerProductsSubTab === "current" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
+                    className={`px-3.5 py-1.5 rounded-lg transition ${
+                      customerProductsSubTab === "current"
+                        ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
+                        : "text-[#5A6A51] hover:text-[#414E36]"
+                    }`}
                   >
                     {t.activeBalancesTab}
                   </button>
                   <button
                     type="button"
                     onClick={() => setCustomerProductsSubTab("history")}
-                    className={`px-3 py-1 rounded-lg transition ${customerProductsSubTab === "history" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
+                    className={`px-3.5 py-1.5 rounded-lg transition ${
+                      customerProductsSubTab === "history"
+                        ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
+                        : "text-[#5A6A51] hover:text-[#414E36]"
+                    }`}
                   >
                     {t.purchaseHistoryTab}
                   </button>
@@ -1264,18 +1276,26 @@ export default function CustomerProfileDrawer({
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-[#414E36]/10">
               <div className="flex items-center gap-3">
-                <div className="flex bg-[#EDF1EC] p-1 rounded-xl gap-1 text-xs font-semibold">
+                <div className="flex bg-[#F2EFE9] p-1 rounded-xl gap-1 text-xs font-semibold">
                   <button
                     type="button"
                     onClick={() => setCustomerPackagesSubTab("current")}
-                    className={`px-3 py-1 rounded-lg transition ${customerPackagesSubTab === "current" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
+                    className={`px-3.5 py-1.5 rounded-lg transition ${
+                      customerPackagesSubTab === "current"
+                        ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
+                        : "text-[#5A6A51] hover:text-[#414E36]"
+                    }`}
                   >
                     {t.activePackagesTab}
                   </button>
                   <button
                     type="button"
                     onClick={() => setCustomerPackagesSubTab("history")}
-                    className={`px-3 py-1 rounded-lg transition ${customerPackagesSubTab === "history" ? "bg-white text-[#414E36] shadow-sm font-bold" : "text-[#5A6A51] hover:text-[#414E36]"}`}
+                    className={`px-3.5 py-1.5 rounded-lg transition ${
+                      customerPackagesSubTab === "history"
+                        ? "bg-[#414E36] text-[#FBFBF9] shadow-xs font-bold"
+                        : "text-[#5A6A51] hover:text-[#414E36]"
+                    }`}
                   >
                     {t.historyTab}
                   </button>

@@ -83,45 +83,49 @@ export default function AdminInventoryView({
       </div>
 
       {/* Sub-Navigation Tabs */}
-      <div className="flex items-center border-b border-[#E6E9EB] gap-8">
+      <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-[#414E36]/10 shadow-xs overflow-x-auto no-scrollbar">
         <button
           type="button"
           onClick={() => setInventorySubTab("devices")}
-          className={`flex items-center gap-2 py-3 text-sm font-semibold border-b-2 transition ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
             inventorySubTab === "devices"
-              ? "border-[#414E36] text-[#414E36]"
-              : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
+              ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+              : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
           }`}
         >
-          <Gauge size={16} /> Clinic Devices &amp; Pulse Track
-          <span className="ml-1.5 rounded-full bg-[#EBF0E6] px-2 py-0.5 text-xs text-[#414E36] font-bold">
+          <Gauge size={15} /> Clinic Devices &amp; Pulse Track
+          <span className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            inventorySubTab === "devices" ? "bg-white/20 text-[#FBFBF9]" : "bg-[#EDF1EC] text-[#414E36]"
+          }`}>
             {deviceCount}
           </span>
         </button>
         <button
           type="button"
           onClick={() => setInventorySubTab("products")}
-          className={`flex items-center gap-2 py-3 text-sm font-semibold border-b-2 transition ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
             inventorySubTab === "products"
-              ? "border-[#414E36] text-[#414E36]"
-              : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
+              ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+              : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
           }`}
         >
-          <ShoppingBag size={16} /> Products &amp; Supplies
-          <span className="ml-1.5 rounded-full bg-[#EBF0E6] px-2 py-0.5 text-xs text-[#414E36] font-bold">
+          <ShoppingBag size={15} /> Products &amp; Supplies
+          <span className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            inventorySubTab === "products" ? "bg-white/20 text-[#FBFBF9]" : "bg-[#EDF1EC] text-[#414E36]"
+          }`}>
             {productCount}
           </span>
         </button>
         <button
           type="button"
           onClick={() => setInventorySubTab("suppliers")}
-          className={`flex items-center gap-2 py-3 text-sm font-semibold border-b-2 transition ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-150 outline-none shrink-0 ${
             inventorySubTab === "suppliers"
-              ? "border-[#414E36] text-[#414E36]"
-              : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
+              ? "bg-[#414E36] text-[#FBFBF9] font-bold shadow-xs"
+              : "text-[#5A6A51] hover:text-[#414E36] hover:bg-[#F2EFE9]/60"
           }`}
         >
-          <Truck size={16} /> Suppliers
+          <Truck size={15} /> Suppliers
         </button>
       </div>
 
