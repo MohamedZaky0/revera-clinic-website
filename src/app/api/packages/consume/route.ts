@@ -87,8 +87,16 @@ export async function POST(req: Request) {
     const reservationServiceIds = Array.isArray(reservation.service_ids) && reservation.service_ids.length > 0
       ? reservation.service_ids.map(Number)
       : reservation.service_id === null ? [] : [Number(reservation.service_id)];
-    if (!reservationServiceIds.includes(Number(item.service_id))) {
-      return NextResponse.json({ error: 'Reservation does not include this package service.' }, { status: 409 });
+    let hasService = reservationServiceIds.includes(Number(item.service_id));
+    if (!hasService) {
+      const { data: rpRows } = await supabaseServer
+        .from('reservation_products')
+        .select('service_id')
+        .eq('reservation_id', reservationId);
+      const rpServiceIds = (rpRows || []).map((rp: any) => Number(rp.service_id)).filter(Boolean);
+      if (rpServiceIds.includes(Number(item.service_id))) {
+        hasService = true;
+      }
     }
 
     let consumptionData = null;

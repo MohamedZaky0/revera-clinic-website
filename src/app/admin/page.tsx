@@ -19714,24 +19714,14 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
           // is already stored on the booking as amountPaid — checkout must charge only what's
           // left of the service price, not the full price again. RISK-029.
           const depositAlreadyPaid = Number(checkoutBooking.amountPaid) || 0;
-          // Package redemption is disabled once a deposit has been collected on this booking:
-          // deposits are booking-level, not per-service, so waiving a service's price after cash
-          // was already taken against it would need refund/reversal logic this feature doesn't
-          // build. Staff can still redeem on any booking with no deposit collected.
-          const redemptionAllowed = depositAlreadyPaid === 0;
           const activeCustomerPackageItems = checkoutCustomerPackages
             .filter((pkg: any) => pkg.status === "active" && (!pkg.expiresAt || new Date(pkg.expiresAt) >= new Date()))
             .flatMap((pkg: any) => (pkg.items || []).map((it: any) => ({ ...it, packageName: pkg.packageName })));
           const bookingServicesList = svcIds.map((id: number) => {
             const s = localServices.find(srv => srv.id === id);
             const details = s ? getServicePriceDetails(s, checkoutBooking.branchId, branches) : null;
-            // Number(...) on both sides — service_id is a bigint column and Supabase/PostgREST
-            // does not consistently return bigint values as JS numbers across every query shape
-            // (flat select vs. embedded/joined select); packages/route.ts already established
-            // this defensive-coercion pattern for the same column.
-            const redeemableItem = redemptionAllowed
-              ? activeCustomerPackageItems.find((it: any) => Number(it.serviceId) === Number(id) && it.qtyRemaining > 0) || null
-              : null;
+            // Match service with active package item
+            const redeemableItem = activeCustomerPackageItems.find((it: any) => Number(it.serviceId) === Number(id) && it.qtyRemaining > 0) || null;
             return {
               serviceId: id,
               name: s?.en || `Service #${id}`,
@@ -20103,11 +20093,6 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
                         </div>
                       );
                     })}
-                    {!redemptionAllowed && activeCustomerPackageItems.length > 0 && (
-                      <p className="text-[11px] text-amber-700 italic">
-                        Package redemption is unavailable — a deposit was already paid on this booking.
-                      </p>
-                    )}
 
                     {/* Additional Services */}
                     {checkoutAdditionalServicesList.length > 0 && (
