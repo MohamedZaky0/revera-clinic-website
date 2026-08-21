@@ -477,56 +477,44 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
 
   // Analytics counts calculation (Strict DB data)
   //
-  // RISK-044: these counts used to run over every reservation ever created, with no date bound —
-  // "Completed" and "Canceled" were lifetime totals that only ever grew, and "Upcoming" counted
-  // bookings whose date had long passed. Each card now states a period it can actually be read
-  // against: Upcoming looks forward from today, Completed/Canceled/Postponed cover the current
-  // month. Postponed is also split out of Canceled — per RISK-029 it is a non-terminal state that
-  // moves no money and will still happen, so folding it into cancellations overstated lost work.
+  // Analytics counts calculation (Daily Only across all views)
   const stats = useMemo(() => {
-    const now = new Date();
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-    const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-      new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-    ).padStart(2, "0")}`;
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-
-    const inThisMonth = (r: any) => {
-      const d = String(r.date || "");
-      return d >= monthStart && d <= monthEnd;
-    };
-
     const todays = mergedAppointments.filter(r => r.date === selectedDateStr);
+
+    const upcomingToday = todays.filter(r =>
+      ["confirmed", "approved", "pending", "waiting", "checked_in", "in_progress", "started"].includes(
+        (r.status || "").toLowerCase()
+      )
+    );
+    // Sort upcoming today chronologically by time to find the next appointment
+    const sortedUpcoming = [...upcomingToday].sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+    const nextTime = sortedUpcoming.length > 0 ? (sortedUpcoming[0].time || "—") : "—";
+
+    const completedToday = todays.filter(r =>
+      ["completed", "done"].includes((r.status || "").toLowerCase())
+    );
+
+    const canceledToday = todays.filter(r =>
+      ["canceled", "cancelled", "rejected"].includes((r.status || "").toLowerCase())
+    );
+
     const dayRevenue = todays.reduce((sum, r) => {
       const paid = Number(r.amountPaid ?? r.amount_paid ?? 0);
       if (paid > 0) return sum + paid;
-      if (r.status === "completed") {
+      if (["completed", "done"].includes((r.status || "").toLowerCase())) {
         const total = Number(r.total_price ?? r.totalPrice ?? r.final_price ?? r.price ?? 0);
         return sum + total;
       }
       return sum;
     }, 0);
 
-    const upcoming = mergedAppointments.filter(
-      r =>
-        ["confirmed", "approved", "pending", "waiting", "checked_in"].includes(r.status || "") &&
-        String(r.date || "") >= todayStr
-    );
-    const completed = mergedAppointments.filter(r => r.status === "completed" && inThisMonth(r));
-    const canceled = mergedAppointments.filter(r => ["canceled", "cancelled"].includes(r.status || "") && inThisMonth(r));
-    const postponed = mergedAppointments.filter(r => r.status === "postponed" && inThisMonth(r));
-
-    const upcomingToday = todays.filter(r => ["confirmed", "approved", "pending", "waiting", "checked_in"].includes(r.status || ""));
-    const nextTime = upcomingToday.length > 0 ? (upcomingToday[0].time || "09:30 AM") : "—";
-
     return {
       todayCount: todays.length,
       nextTime: nextTime,
-      upcomingCount: upcoming.length,
+      upcomingCount: upcomingToday.length,
       dayRevenue: dayRevenue,
-      completedCount: completed.length,
-      canceledCount: canceled.length,
-      postponedCount: postponed.length
+      completedCount: completedToday.length,
+      canceledCount: canceledToday.length
     };
   }, [mergedAppointments, selectedDateStr]);
 
@@ -791,14 +779,14 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         </div>
       </div>
 
-      {/* ── 5 ANALYTIC SUMMARY CARDS ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* ── 4 ANALYTIC SUMMARY CARDS (DAILY) ── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         
-        {/* Card 1: Today's Appointments */}
+        {/* Card 1: Today's Appointments with (next appointment) */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              {tr.cardTodayAppointments}
+              {tr.cardTodayAppointments || "Today's Appointments"}
             </span>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-[#1E3A2B]">
               <CalendarIcon size={18} />
@@ -806,54 +794,33 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#111827]">{stats.todayCount}</span>
-            <span className="text-xs font-medium text-[#6B7280]">{tr.nextPrefix} {stats.nextTime}</span>
+            <span className="text-xs font-medium text-[#6B7280]">
+              {tr.nextPrefix || "Next:"} {stats.nextTime}
+            </span>
           </div>
         </div>
 
-        {/* Card 2: Day Revenue (Calendar/Pending view) or Upcoming (All Appointments view) */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          {viewMode === "all" ? (
-            <>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-                  {tr.cardUpcoming}
-                </span>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                  <Clock size={18} />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline justify-between">
-                <span className="text-3xl font-black text-[#111827]">{stats.upcomingCount}</span>
-                <span className="text-xs font-semibold text-blue-600">{tr.todayOnward}</span>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-                  {tr.cardDayRevenue || "Day Revenue"}
-                </span>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                  <Coins size={18} />
-                </div>
-              </div>
-              <div className="mt-3 flex items-baseline justify-between">
-                <span className="text-3xl font-black text-[#111827]">
-                  {stats.dayRevenue.toLocaleString()}
-                </span>
-                <span className="text-xs font-bold text-emerald-700">
-                  EGP
-                </span>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Card 3: Completed */}
+        {/* Card 2: Upcoming */}
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              {tr.cardCompleted}
+              {tr.cardUpcoming || "Upcoming"}
+            </span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Clock size={18} />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-3xl font-black text-[#111827]">{stats.upcomingCount}</span>
+            <span className="text-xs font-semibold text-blue-600">{tr.todayLabel || "Today"}</span>
+          </div>
+        </div>
+
+        {/* Card 3: Complete with (revenue) */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+              {tr.cardCompleted || "Completed"}
             </span>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
               <CheckCircle2 size={18} />
@@ -861,7 +828,9 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#111827]">{stats.completedCount}</span>
-            <span className="text-xs font-semibold text-teal-600">{tr.thisMonth}</span>
+            <span className="text-xs font-bold text-emerald-700">
+              EGP {stats.dayRevenue.toLocaleString()}
+            </span>
           </div>
         </div>
 
@@ -869,7 +838,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              {tr.cardCanceled}
+              {tr.cardCanceled || "Canceled"}
             </span>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
               <XCircle size={18} />
@@ -877,24 +846,7 @@ export const AdminBookingsView: React.FC<AdminBookingsViewProps> = ({
           </div>
           <div className="mt-3 flex items-baseline justify-between">
             <span className="text-3xl font-black text-[#111827]">{stats.canceledCount}</span>
-            <span className="text-xs font-semibold text-rose-600">{tr.thisMonth}</span>
-          </div>
-        </div>
-
-        {/* Card 5: Postponed — kept separate from Canceled: a postponed booking still happens
-            and moves no money (RISK-029), so counting it as a cancellation overstated lost work. */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
-              {tr.cardPostponed}
-            </span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-              <AlertCircle size={18} />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <span className="text-3xl font-black text-[#111827]">{stats.postponedCount}</span>
-            <span className="text-xs font-semibold text-violet-600">{tr.thisMonth}</span>
+            <span className="text-xs font-semibold text-rose-600">{tr.todayLabel || "Today"}</span>
           </div>
         </div>
       </div>
