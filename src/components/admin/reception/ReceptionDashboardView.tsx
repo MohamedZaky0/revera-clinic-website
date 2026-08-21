@@ -57,7 +57,6 @@ export default function ReceptionDashboardView({
 
   // Accordion open/close states matching design
   const [isShiftExpanded, setIsShiftExpanded] = useState(true);
-  const [isTargetExpanded, setIsTargetExpanded] = useState(false);
   const [isBookingsExpanded, setIsBookingsExpanded] = useState(false);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [isActivitiesExpanded, setIsActivitiesExpanded] = useState(false);
@@ -356,73 +355,7 @@ export default function ReceptionDashboardView({
         )}
       </div>
 
-      {/* ── 2. My Personal Target Card ── */}
-      <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="h-11 w-11 rounded-full bg-[#F0F4EC] text-[#45523A] flex items-center justify-center shrink-0">
-              <Target size={20} />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-[#1F251A]">My Personal Target</h3>
-              <p className="text-xs text-[#788272]">Track your target progress this month</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => onNavigateTab && onNavigateTab("HR")}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-[#45523A] border border-[#D5DDD0] hover:bg-[#F0F4EC] transition"
-            >
-              <span>View My Target</span>
-              <ArrowRight size={14} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsTargetExpanded(!isTargetExpanded)}
-              className="p-2 text-[#45523A] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
-              title={isTargetExpanded ? "Collapse section" : "Expand section"}
-            >
-              {isTargetExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-            </button>
-          </div>
-        </div>
-
-        {isTargetExpanded && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center pt-4 border-t border-[#F3F0E8] animate-in fade-in duration-200">
-            {/* Left: Target */}
-            <div>
-              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Target</p>
-              <p className="text-2xl font-black text-[#1F251A] mt-1">EGP {targetInfo.targetAmount?.toLocaleString()}</p>
-            </div>
-
-            {/* Middle: Progress Bar */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-[#8C9686]">Progress</span>
-                <span className="text-[#45523A]">{targetInfo.progressPercentage}%</span>
-              </div>
-              <div className="h-3 w-full bg-[#F3F0E8] rounded-full overflow-hidden p-0.5">
-                <div
-                  className="h-full bg-[#526346] rounded-full transition-all duration-500"
-                  style={{ width: `${targetInfo.progressPercentage}%` }}
-                />
-              </div>
-              <p className="text-xs text-[#788272] font-medium">EGP {targetInfo.achievedAmount?.toLocaleString()} achieved</p>
-            </div>
-
-            {/* Right: Remaining */}
-            <div>
-              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Remaining</p>
-              <p className="text-2xl font-black text-[#45523A] mt-1">EGP {targetInfo.remainingAmount?.toLocaleString()}</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── 3. Bookings Section ── */}
+      {/* ── 2. Bookings Section ── */}
       <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3.5">
@@ -610,8 +543,10 @@ export default function ReceptionDashboardView({
               </p>
             </div>
             <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
-              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Target Achieved</p>
-              <p className="text-2xl font-black text-[#45523A] mt-1">{targetInfo.progressPercentage}%</p>
+              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Completed</p>
+              <p className="text-2xl font-black text-[#45523A] mt-1">
+                {bookingsInfo.list.filter((b: any) => String(b.status).toLowerCase() === "completed").length}
+              </p>
             </div>
             <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
               <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Current Status</p>
@@ -623,7 +558,7 @@ export default function ReceptionDashboardView({
         )}
       </div>
 
-      {/* ── 5. Recent Activities Card ── */}
+      {/* ── 4. Recent Activities Card ── */}
       <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3.5">
