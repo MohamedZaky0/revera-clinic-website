@@ -20,8 +20,11 @@ import {
   Sparkles,
   Stethoscope,
   ChevronDown,
+  ChevronUp,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  PieChart,
+  History
 } from "lucide-react";
 
 interface ReceptionDashboardViewProps {
@@ -51,6 +54,13 @@ export default function ReceptionDashboardView({
   const [showStartShiftPopup, setShowStartShiftPopup] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [hasAutoPrompted, setHasAutoPrompted] = useState(false);
+
+  // Accordion open/close states matching design
+  const [isShiftExpanded, setIsShiftExpanded] = useState(true);
+  const [isTargetExpanded, setIsTargetExpanded] = useState(false);
+  const [isBookingsExpanded, setIsBookingsExpanded] = useState(false);
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
+  const [isActivitiesExpanded, setIsActivitiesExpanded] = useState(false);
 
   // Fetch Reception Dashboard data from backend API
   const fetchDashboardData = async () => {
@@ -87,16 +97,38 @@ export default function ReceptionDashboardView({
     fetchDashboardData();
   }, [employeeId, email, accessToken]);
 
-  // Live timer for elapsed shift time ticker when shift is active
+  // Real-time live timer calculated strictly from the recorded check-in timestamp
+  // Works seamlessly when switching tabs, minimizing browser, or refreshing page
   useEffect(() => {
-    if (dashboardData?.shift?.status !== "started") return;
+    const checkInTimeIso = dashboardData?.shift?.checkInTime;
+    if (dashboardData?.shift?.status !== "started" || !checkInTimeIso) return;
 
-    const interval = setInterval(() => {
-      setLiveElapsedSeconds((prev) => prev + 1);
-    }, 1000);
+    const calculateElapsed = () => {
+      const checkInMs = new Date(checkInTimeIso).getTime();
+      if (isNaN(checkInMs)) return;
+      const nowMs = Date.now();
+      const elapsedSec = Math.max(0, Math.floor((nowMs - checkInMs) / 1000));
+      setLiveElapsedSeconds(elapsedSec);
+    };
 
-    return () => clearInterval(interval);
-  }, [dashboardData?.shift?.status]);
+    calculateElapsed();
+    const interval = setInterval(calculateElapsed, 1000);
+
+    const handleSync = () => {
+      calculateElapsed();
+    };
+
+    window.addEventListener("focus", handleSync);
+    window.addEventListener("pageshow", handleSync);
+    document.addEventListener("visibilitychange", handleSync);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleSync);
+      window.removeEventListener("pageshow", handleSync);
+      document.removeEventListener("visibilitychange", handleSync);
+    };
+  }, [dashboardData?.shift?.status, dashboardData?.shift?.checkInTime]);
 
   // Execute Start Shift with geolocation check
   const handleStartShiftWithLocation = () => {
@@ -197,11 +229,13 @@ export default function ReceptionDashboardView({
     }
   };
 
-  // Helper to format live elapsed time
+  // Helper to format live elapsed time as 02h 37m
   const formatElapsedTime = (totalSecs: number) => {
     const hours = Math.floor(totalSecs / 3600);
     const mins = Math.floor((totalSecs % 3600) / 60);
-    return `${hours}h ${mins}m`;
+    const paddedHours = hours.toString().padStart(2, "0");
+    const paddedMins = mins.toString().padStart(2, "0");
+    return `${paddedHours}h ${paddedMins}m`;
   };
 
   const navItems = [
@@ -237,106 +271,105 @@ export default function ReceptionDashboardView({
   };
 
   return (
-    <div className="space-y-6 pb-8">
-        {/* ── 1. Today's Shift Card ── */}
-        <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-2xl bg-[#F0F4EC] text-[#45523A] flex items-center justify-center">
-                <Calendar size={20} />
-              </div>
-              <div>
-                <h3 className="text-lg font-extrabold text-[#1F251A]">Today's Shift</h3>
-                <p className="text-xs text-[#788272]">Your scheduled working hours</p>
-              </div>
+    <div className="space-y-4 pb-8">
+      {/* ── 1. Today's Shift Card ── */}
+      <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-full bg-[#F0F4EC] text-[#45523A] flex items-center justify-center shrink-0">
+              <Calendar size={20} />
             </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#1F251A]">Today's Shift</h3>
+              <p className="text-xs text-[#788272]">Your scheduled working hours</p>
+            </div>
+          </div>
 
+          <div className="flex items-center gap-3">
             <button
               type="button"
               disabled={shiftProcessing}
               onClick={handleShiftAction}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-sm ${
                 shiftInfo.status === "started"
-                  ? "bg-[#26331E] text-white hover:bg-[#35452C]"
+                  ? "bg-[#1E2918] text-white hover:bg-[#2F3D27]"
                   : "bg-[#45523A] text-white hover:bg-[#35452C]"
-              } disabled:opacity-50`}
+              } disabled:opacity-50 cursor-pointer`}
             >
               <LogOut size={15} />
               <span>{shiftProcessing ? "Updating..." : shiftInfo.status === "started" ? "End Shift" : "Start Shift"}</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setIsShiftExpanded(!isShiftExpanded)}
+              className="p-2 text-[#45523A] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
+              title={isShiftExpanded ? "Collapse section" : "Expand section"}
+            >
+              {isShiftExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            </button>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-2 border-t border-[#F3F0E8]">
-            {/* Metric 1: Shift From - To */}
-            <div className="flex items-start gap-3">
-              <div className="h-9 w-9 rounded-xl bg-[#F7F5F0] text-[#55634B] flex items-center justify-center shrink-0 mt-0.5">
-                <Clock size={18} />
+        {isShiftExpanded && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-[#F3F0E8] animate-in fade-in duration-200">
+            {/* Metric 1: Actual Starting Time */}
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-[#F0F4EC] text-[#45523A] flex items-center justify-center shrink-0">
+                <Play size={18} fill="#45523A" className="ml-0.5" />
               </div>
               <div>
-                <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Shift From – To</p>
-                <p className="text-sm font-bold text-[#1F251A] mt-0.5">{shiftInfo.shiftFromTo}</p>
-                <p className="text-xs text-[#8C9686]">({shiftInfo.scheduleHours})</p>
+                <p className="text-[11px] font-bold text-[#8C9686] uppercase tracking-wider">Actual Starting Time</p>
+                <p className="text-2xl font-black text-[#1F251A] mt-1">{shiftInfo.actualStartingTime}</p>
               </div>
             </div>
 
-            {/* Metric 2: Actual Starting Time */}
-            <div className="flex items-start gap-3">
-              <div className="h-9 w-9 rounded-xl bg-[#F7F5F0] text-[#55634B] flex items-center justify-center shrink-0 mt-0.5">
-                <Play size={18} />
+            {/* Metric 2: Elapsed Time */}
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-[#F0F4EC] text-[#45523A] flex items-center justify-center shrink-0">
+                <Clock size={20} />
               </div>
               <div>
-                <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Actual Starting Time</p>
-                <p className="text-sm font-bold text-[#1F251A] mt-0.5">{shiftInfo.actualStartingTime}</p>
-              </div>
-            </div>
-
-            {/* Metric 3: Elapsed Time */}
-            <div className="flex items-start gap-3">
-              <div className="h-9 w-9 rounded-xl bg-[#F7F5F0] text-[#55634B] flex items-center justify-center shrink-0 mt-0.5">
-                <Timer size={18} />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Elapsed Time</p>
-                <p className="text-sm font-bold text-[#1F251A] mt-0.5">
+                <p className="text-[11px] font-bold text-[#8C9686] uppercase tracking-wider">Elapsed Time</p>
+                <p className="text-2xl font-black text-[#1F251A] mt-1">
                   {shiftInfo.status === "started" ? formatElapsedTime(liveElapsedSeconds) : shiftInfo.elapsedTime}
                 </p>
-                <p className="text-xs text-[#8C9686]">
-                  {shiftInfo.actualStartingTime !== "--:--" ? `Since ${shiftInfo.actualStartingTime}` : "Shift Not Started"}
-                </p>
               </div>
             </div>
 
-            {/* Metric 4: Status */}
-            <div className="flex items-start gap-3">
-              <div className="h-9 w-9 rounded-xl bg-[#F0F4EC] text-[#3B662C] flex items-center justify-center shrink-0 mt-0.5">
-                <CheckCircle2 size={18} />
+            {/* Metric 3: Status */}
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-[#F0F4EC] text-[#45523A] flex items-center justify-center shrink-0">
+                <CheckCircle2 size={20} />
               </div>
               <div>
-                <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Status</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`h-2.5 w-2.5 rounded-full ${shiftInfo.status === "started" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                  <p className={`text-sm font-bold ${shiftInfo.status === "started" ? "text-emerald-700" : "text-amber-700"}`}>
-                    {shiftInfo.status === "started" ? "On Shift" : shiftInfo.status === "ended" ? "Shift Ended" : "Not Started"}
+                <p className="text-[11px] font-bold text-[#8C9686] uppercase tracking-wider">Status</p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className={`h-2.5 w-2.5 rounded-full ${shiftInfo.status === "started" ? "bg-emerald-600 animate-pulse" : "bg-amber-500"}`} />
+                  <p className={`text-base font-extrabold ${shiftInfo.status === "started" ? "text-emerald-700" : "text-amber-700"}`}>
+                    {shiftInfo.status === "started" ? "Shift Started" : shiftInfo.status === "ended" ? "Shift Ended" : "Not Started"}
                   </p>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* ── 2. My Personal Target Card ── */}
-        <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-2xl bg-[#F0F4EC] text-[#45523A] flex items-center justify-center">
-                <Target size={20} />
-              </div>
-              <div>
-                <h3 className="text-lg font-extrabold text-[#1F251A]">My Personal Target</h3>
-                <p className="text-xs text-[#788272]">Track your target progress this month</p>
-              </div>
+      {/* ── 2. My Personal Target Card ── */}
+      <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-full bg-[#F0F4EC] text-[#45523A] flex items-center justify-center shrink-0">
+              <Target size={20} />
             </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#1F251A]">My Personal Target</h3>
+              <p className="text-xs text-[#788272]">Track your target progress this month</p>
+            </div>
+          </div>
 
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => onNavigateTab && onNavigateTab("HR")}
@@ -345,9 +378,20 @@ export default function ReceptionDashboardView({
               <span>View My Target</span>
               <ArrowRight size={14} />
             </button>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center pt-2">
+            <button
+              type="button"
+              onClick={() => setIsTargetExpanded(!isTargetExpanded)}
+              className="p-2 text-[#45523A] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
+              title={isTargetExpanded ? "Collapse section" : "Expand section"}
+            >
+              {isTargetExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            </button>
+          </div>
+        </div>
+
+        {isTargetExpanded && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center pt-4 border-t border-[#F3F0E8] animate-in fade-in duration-200">
             {/* Left: Target */}
             <div>
               <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Target</p>
@@ -375,21 +419,23 @@ export default function ReceptionDashboardView({
               <p className="text-2xl font-black text-[#45523A] mt-1">EGP {targetInfo.remainingAmount?.toLocaleString()}</p>
             </div>
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* ── 3. Bookings Section ── */}
-        <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-2xl bg-[#F0F4EC] text-[#45523A] flex items-center justify-center">
-                <Calendar size={20} />
-              </div>
-              <div>
-                <h3 className="text-lg font-extrabold text-[#1F251A]">Bookings</h3>
-                <p className="text-xs text-[#788272]">Quick overview of today's bookings</p>
-              </div>
+      {/* ── 3. Bookings Section ── */}
+      <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-full bg-[#F0F4EC] text-[#45523A] flex items-center justify-center shrink-0">
+              <Calendar size={20} />
             </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#1F251A]">Bookings</h3>
+              <p className="text-xs text-[#788272]">Quick overview of today's bookings</p>
+            </div>
+          </div>
 
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => onNavigateTab && onNavigateTab("Bookings")}
@@ -398,119 +444,229 @@ export default function ReceptionDashboardView({
               <span>View All Bookings</span>
               <ArrowRight size={14} />
             </button>
-          </div>
 
-          {/* Quick Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-2">
-            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
-              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Total Bookings</p>
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-2xl font-black text-[#1F251A]">{bookingsInfo.todayCount}</p>
-                <Calendar size={18} className="text-[#8C9686]" />
-              </div>
-            </div>
-
-            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
-              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Pending Approval</p>
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-2xl font-black text-[#1F251A]">{bookingsInfo.pendingCount}</p>
-                <Clock size={18} className="text-[#D97706]" />
-              </div>
-            </div>
-
-            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
-              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Confirmed</p>
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-2xl font-black text-[#1F251A]">
-                  {bookingsInfo.list.filter((b: any) => String(b.status).toLowerCase() === "confirmed" || String(b.status).toLowerCase() === "checked_in").length}
-                </p>
-                <CheckCircle2 size={18} className="text-[#1E7E34]" />
-              </div>
-            </div>
-
-            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
-              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Completed</p>
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-2xl font-black text-[#1F251A]">
-                  {bookingsInfo.list.filter((b: any) => String(b.status).toLowerCase() === "completed").length}
-                </p>
-                <UserCheck size={18} className="text-[#45523A]" />
-              </div>
-            </div>
-
-            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
-              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Cancelled</p>
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-2xl font-black text-[#1F251A]">
-                  {bookingsInfo.list.filter((b: any) => String(b.status).toLowerCase() === "cancelled" || String(b.status).toLowerCase() === "rejected").length}
-                </p>
-                <AlertCircle size={18} className="text-[#DC2626]" />
-              </div>
-            </div>
-          </div>
-
-          {/* Today's Table */}
-          <div className="overflow-x-auto pt-2">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-[#F0EEE6] text-[#8C9686] uppercase text-[10px] font-extrabold tracking-wider">
-                  <th className="py-3 px-4">Time</th>
-                  <th className="py-3 px-4">Patient</th>
-                  <th className="py-3 px-4">Doctor</th>
-                  <th className="py-3 px-4">Service</th>
-                  <th className="py-3 px-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#F7F5F0]">
-                {bookingsInfo.list.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-8 text-center text-[#8C9686] italic">
-                      No bookings scheduled for today.
-                    </td>
-                  </tr>
-                ) : (
-                  bookingsInfo.list.map((row: any, idx: number) => {
-                    const isConfirmed = String(row.status || "").toLowerCase() === "confirmed";
-                    return (
-                      <tr key={`book-row-${idx}`} className="hover:bg-[#FAF9F5] transition">
-                        <td className="py-3.5 px-4 font-bold text-[#1F251A]">{row.time}</td>
-                        <td className="py-3.5 px-4 font-bold text-[#1F251A]">
-                          <div className="flex items-center gap-2">
-                            <User size={14} className="text-[#8C9686]" />
-                            <span>{row.patientName}</span>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2">
-                            <Stethoscope size={14} className="text-[#8C9686]" />
-                            <span>{row.doctorName}</span>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2">
-                            <Sparkles size={14} className="text-[#8C9686]" />
-                            <span>{row.service}</span>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold ${
-                              isConfirmed
-                                ? "bg-[#E6F4EA] text-[#1E7E34]"
-                                : "bg-[#FEF3C7] text-[#D97706]"
-                            }`}
-                          >
-                            {isConfirmed ? "Confirmed" : "Pending Approval"}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+            <button
+              type="button"
+              onClick={() => setIsBookingsExpanded(!isBookingsExpanded)}
+              className="p-2 text-[#45523A] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
+              title={isBookingsExpanded ? "Collapse section" : "Expand section"}
+            >
+              {isBookingsExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            </button>
           </div>
         </div>
+
+        {isBookingsExpanded && (
+          <div className="space-y-4 pt-4 border-t border-[#F3F0E8] animate-in fade-in duration-200">
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+                <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Total Bookings</p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-2xl font-black text-[#1F251A]">{bookingsInfo.todayCount}</p>
+                  <Calendar size={18} className="text-[#8C9686]" />
+                </div>
+              </div>
+
+              <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+                <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Pending Approval</p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-2xl font-black text-[#1F251A]">{bookingsInfo.pendingCount}</p>
+                  <Clock size={18} className="text-[#D97706]" />
+                </div>
+              </div>
+
+              <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+                <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Confirmed</p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-2xl font-black text-[#1F251A]">
+                    {bookingsInfo.list.filter((b: any) => String(b.status).toLowerCase() === "confirmed" || String(b.status).toLowerCase() === "checked_in").length}
+                  </p>
+                  <CheckCircle2 size={18} className="text-[#1E7E34]" />
+                </div>
+              </div>
+
+              <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+                <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Completed</p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-2xl font-black text-[#1F251A]">
+                    {bookingsInfo.list.filter((b: any) => String(b.status).toLowerCase() === "completed").length}
+                  </p>
+                  <UserCheck size={18} className="text-[#45523A]" />
+                </div>
+              </div>
+
+              <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+                <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Cancelled</p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-2xl font-black text-[#1F251A]">
+                    {bookingsInfo.list.filter((b: any) => String(b.status).toLowerCase() === "cancelled" || String(b.status).toLowerCase() === "rejected").length}
+                  </p>
+                  <AlertCircle size={18} className="text-[#DC2626]" />
+                </div>
+              </div>
+            </div>
+
+            {/* Today's Table */}
+            <div className="overflow-x-auto pt-2">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-[#F0EEE6] text-[#8C9686] uppercase text-[10px] font-extrabold tracking-wider">
+                    <th className="py-3 px-4">Time</th>
+                    <th className="py-3 px-4">Patient</th>
+                    <th className="py-3 px-4">Doctor</th>
+                    <th className="py-3 px-4">Service</th>
+                    <th className="py-3 px-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F7F5F0]">
+                  {bookingsInfo.list.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-[#8C9686] italic">
+                        No bookings scheduled for today.
+                      </td>
+                    </tr>
+                  ) : (
+                    bookingsInfo.list.map((row: any, idx: number) => {
+                      const isConfirmed = String(row.status || "").toLowerCase() === "confirmed";
+                      return (
+                        <tr key={`book-row-${idx}`} className="hover:bg-[#FAF9F5] transition">
+                          <td className="py-3.5 px-4 font-bold text-[#1F251A]">{row.time}</td>
+                          <td className="py-3.5 px-4 font-bold text-[#1F251A]">
+                            <div className="flex items-center gap-2">
+                              <User size={14} className="text-[#8C9686]" />
+                              <span>{row.patientName}</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-2">
+                              <Stethoscope size={14} className="text-[#8C9686]" />
+                              <span>{row.doctorName}</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-2">
+                              <Sparkles size={14} className="text-[#8C9686]" />
+                              <span>{row.service}</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold ${
+                                isConfirmed
+                                  ? "bg-[#E6F4EA] text-[#1E7E34]"
+                                  : "bg-[#FEF3C7] text-[#D97706]"
+                              }`}
+                            >
+                              {isConfirmed ? "Confirmed" : "Pending Approval"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── 4. Today's Summary Card ── */}
+      <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-full bg-[#F0F4EC] text-[#45523A] flex items-center justify-center shrink-0">
+              <PieChart size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#1F251A]">Today's Summary</h3>
+              <p className="text-xs text-[#788272]">Overview of your daily performance</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
+            className="p-2 text-[#45523A] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
+            title={isSummaryExpanded ? "Collapse section" : "Expand section"}
+          >
+            {isSummaryExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </button>
+        </div>
+
+        {isSummaryExpanded && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-[#F3F0E8] animate-in fade-in duration-200">
+            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Scheduled Today</p>
+              <p className="text-2xl font-black text-[#1F251A] mt-1">{bookingsInfo.todayCount}</p>
+            </div>
+            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Confirmed Rate</p>
+              <p className="text-2xl font-black text-emerald-700 mt-1">
+                {bookingsInfo.todayCount > 0
+                  ? `${Math.round((bookingsInfo.list.filter((b: any) => b.status === "confirmed").length / bookingsInfo.todayCount) * 100)}%`
+                  : "100%"}
+              </p>
+            </div>
+            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Target Achieved</p>
+              <p className="text-2xl font-black text-[#45523A] mt-1">{targetInfo.progressPercentage}%</p>
+            </div>
+            <div className="bg-[#FAF9F5] p-4 rounded-2xl border border-[#EBE8E0]">
+              <p className="text-[11px] font-semibold text-[#8C9686] uppercase tracking-wider">Current Status</p>
+              <p className="text-2xl font-black text-[#1F251A] mt-1 capitalize">
+                {shiftInfo.status === "started" ? "Active" : "Idle"}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── 5. Recent Activities Card ── */}
+      <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-full bg-[#F0F4EC] text-[#45523A] flex items-center justify-center shrink-0">
+              <History size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#1F251A]">Recent Activities</h3>
+              <p className="text-xs text-[#788272]">Your latest actions and updates</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsActivitiesExpanded(!isActivitiesExpanded)}
+            className="p-2 text-[#45523A] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
+            title={isActivitiesExpanded ? "Collapse section" : "Expand section"}
+          >
+            {isActivitiesExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </button>
+        </div>
+
+        {isActivitiesExpanded && (
+          <div className="pt-4 border-t border-[#F3F0E8] animate-in fade-in duration-200">
+            {bookingsInfo.list.length === 0 ? (
+              <p className="text-xs text-[#8C9686] italic py-4 text-center">No recent actions recorded today.</p>
+            ) : (
+              <div className="space-y-3">
+                {bookingsInfo.list.slice(0, 5).map((b: any, bIdx: number) => (
+                  <div key={`act-${bIdx}`} className="flex items-center justify-between bg-[#FAF9F5] p-3 rounded-2xl border border-[#EBE8E0] text-xs">
+                    <div className="flex items-center gap-3">
+                      <span className="h-2 w-2 rounded-full bg-[#45523A]" />
+                      <span className="font-bold text-[#1F251A]">{b.patientName}</span>
+                      <span className="text-[#8C9686]">— {b.service}</span>
+                    </div>
+                    <span className="font-semibold text-[#5A6A51]">{b.time}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── START SHIFT POPUP MODAL WITH FADED BACKGROUND ── */}
       {showStartShiftPopup && (
