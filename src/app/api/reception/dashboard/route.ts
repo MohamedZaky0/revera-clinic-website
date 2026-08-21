@@ -94,6 +94,7 @@ export async function GET(req: Request) {
     if (attendanceRecord?.check_in_time) {
       const checkInDate = new Date(attendanceRecord.check_in_time);
       actualStartingTime = checkInDate.toLocaleTimeString("en-US", {
+        timeZone: "Africa/Cairo",
         hour: "2-digit",
         minute: "2-digit",
         hour12: true

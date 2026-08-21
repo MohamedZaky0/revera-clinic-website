@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   LayoutGrid,
   Calendar,
@@ -275,6 +275,22 @@ export default function ReceptionDashboardView({
 
   const notificationsList = Array.isArray(dashboardData?.notifications) ? dashboardData.notifications : [];
 
+  const formattedActualStartingTime = useMemo(() => {
+    const rawCheckIn = dashboardData?.shift?.checkInTime;
+    if (!rawCheckIn) return shiftInfo.actualStartingTime || "--:--";
+    try {
+      const d = new Date(rawCheckIn);
+      if (isNaN(d.getTime())) return shiftInfo.actualStartingTime || "--:--";
+      return d.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      });
+    } catch {
+      return shiftInfo.actualStartingTime || "--:--";
+    }
+  }, [dashboardData?.shift?.checkInTime, shiftInfo.actualStartingTime]);
+
   const filteredAlerts = notificationsList.filter((a: any) => {
     if (alertFilter === "low_stock") return a.type === "low_stock";
     if (alertFilter === "maintenance") return a.type?.includes("maintenance");
@@ -332,7 +348,7 @@ export default function ReceptionDashboardView({
               </div>
               <div>
                 <p className="text-[11px] font-bold text-[#8C9686] uppercase tracking-wider">Actual Starting Time</p>
-                <p className="text-2xl font-black text-[#1F251A] mt-1">{shiftInfo.actualStartingTime}</p>
+                <p className="text-2xl font-black text-[#1F251A] mt-1">{formattedActualStartingTime}</p>
               </div>
             </div>
 
