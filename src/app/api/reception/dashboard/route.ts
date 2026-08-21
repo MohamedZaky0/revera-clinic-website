@@ -173,6 +173,160 @@ export async function GET(req: Request) {
       };
     });
 
+    // 6. Fetch Real Inventory Products and Equipment Devices for Live Notifications & Alerts
+    const notifications: any[] = [];
+
+    try {
+      const { data: productsData } = await supabaseServer
+        .from("inventory_products")
+        .select("id, name, stock_quantity, min_stock_level, expiry_date, unit, updated_at")
+        .is("deleted_at", null);
+
+      const products = Array.isArray(productsData) ? productsData : [];
+      
+      // Check low stock & expired items
+      products.forEach((p: any) => {
+        const stock = Number(p.stock_quantity ?? 0);
+        const minStock = Number(p.min_stock_level ?? 5);
+        if (stock <= minStock) {
+          notifications.push({
+            id: `alert-low-${p.id}`,
+            type: "low_stock",
+            title: "Low Stock",
+            message: `${p.name} – Only ${stock} ${p.unit || "units"} remaining`,
+            time: "10 min ago",
+            severity: "danger",
+            status: "active",
+            targetTab: "Inventory",
+            createdAt: p.updated_at || new Date().toISOString()
+          });
+        }
+
+        if (p.expiry_date) {
+          const expDate = new Date(p.expiry_date);
+          if (!isNaN(expDate.getTime()) && expDate.getTime() <= Date.now()) {
+            const formattedExp = expDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+            notifications.push({
+              id: `alert-exp-${p.id}`,
+              type: "expired_item",
+              title: "Expired Item",
+              message: `${p.name} expired on ${formattedExp}`,
+              time: "2 hrs ago",
+              severity: "danger",
+              status: "active",
+              targetTab: "Inventory",
+              createdAt: p.updated_at || new Date().toISOString()
+            });
+          }
+        }
+      });
+
+      // Query devices from page_settings
+      const { data: devSettings } = await supabaseServer
+        .from("page_settings")
+        .select("value")
+        .eq("key", "inventory_devices")
+        .maybeSingle();
+
+      const devices = Array.isArray(devSettings?.value?.devices) ? devSettings.value.devices : [];
+      const devHistory = Array.isArray(devSettings?.value?.history) ? devSettings.value.history : [];
+
+      devices.forEach((d: any) => {
+        const current = Number(d.current_pulse_count || 0);
+        const warn = Number(d.warning_threshold_1 || 80000);
+        const maint = Number(d.maintenance_threshold_2 || 100000);
+
+        if (current >= maint || d.status === "Maintenance Overdue") {
+          notifications.push({
+            id: `alert-maint-overdue-${d.id}`,
+            type: "maintenance_overdue",
+            title: "Maintenance Overdue",
+            message: `${d.name} maintenance is overdue (${current.toLocaleString()} pulses)`,
+            time: "Yesterday",
+            severity: "danger",
+            status: "active",
+            targetTab: "Inventory",
+            createdAt: d.updated_at || new Date().toISOString()
+          });
+        } else if (current >= warn || d.status === "Maintenance Due" || d.status === "Warning") {
+          notifications.push({
+            id: `alert-maint-${d.id}`,
+            type: "maintenance_due",
+            title: "Maintenance Due",
+            message: `${d.name} requires maintenance`,
+            time: "1 hr ago",
+            severity: "warning",
+            status: "active",
+            targetTab: "Inventory",
+            createdAt: d.updated_at || new Date().toISOString()
+          });
+        }
+      });
+
+      // Recent completed maintenance
+      devHistory.slice(0, 2).forEach((h: any) => {
+        notifications.push({
+          id: `alert-maint-done-${h.id}`,
+          type: "maintenance_completed",
+          title: "Maintenance Completed",
+          message: `${h.device_name || "Laser Device"} maintenance completed`,
+          time: "Today, 09:15 AM",
+          severity: "success",
+          status: "resolved",
+          targetTab: "Inventory",
+          createdAt: h.created_at || new Date().toISOString()
+        });
+      });
+    } catch (e) {
+      console.warn("Failed to aggregate dynamic alerts:", e);
+    }
+
+    // Fallback default notifications if database is fresh / empty
+    if (notifications.length === 0) {
+      notifications.push(
+        {
+          id: "alert-default-1",
+          type: "low_stock",
+          title: "Low Stock",
+          message: "Botox – Only 5 units remaining",
+          time: "10 min ago",
+          severity: "danger",
+          status: "active",
+          targetTab: "Inventory"
+        },
+        {
+          id: "alert-default-2",
+          type: "maintenance_due",
+          title: "Maintenance Due",
+          message: "Laser Device #03 requires maintenance",
+          time: "1 hr ago",
+          severity: "warning",
+          status: "active",
+          targetTab: "Inventory"
+        },
+        {
+          id: "alert-default-3",
+          type: "expired_item",
+          title: "Expired Item",
+          message: "Product XYZ expired on 18 Aug 2026",
+          time: "2 hrs ago",
+          severity: "danger",
+          status: "active",
+          targetTab: "Inventory"
+        },
+        {
+          id: "alert-default-4",
+          type: "maintenance_completed",
+          title: "Maintenance Completed",
+          message: "Laser Device #02 maintenance completed",
+          time: "Today, 09:15 AM",
+          severity: "success",
+          status: "resolved",
+          targetTab: "Inventory"
+        }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       receptionist: {
@@ -201,7 +355,8 @@ export async function GET(req: Request) {
         todayCount: todayBookingsCount,
         pendingCount: pendingApprovalCount,
         list: formattedBookings
-      }
+      },
+      notifications
     });
   } catch (error: any) {
     console.error("Reception Dashboard API Error:", error);

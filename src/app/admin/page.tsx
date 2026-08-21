@@ -3474,7 +3474,8 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
     { id: 'TC-029', name: 'Doctor Portal Patient Full Visit History Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies Patient Full Visit History Right Drawer, listing all historical visits, dates, services, and doctor clinical notes.', status: 'idle' },
     { id: 'TC-030', name: 'Admin Bookings View & Schedule UI Engine', category: 'Services & Bookings', endpoint: '/api/reservations', description: 'Verifies the redesigned Admin Bookings View, 4 analytic cards (without percentages), mini calendar date grid, and today schedule table.', status: 'idle' },
     { id: 'TC-031', name: 'Reception Dashboard & Shift Metrics Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies receptionist shift tracking, personal target calculations, and today bookings summary.', status: 'idle' },
-    { id: 'TC-032', name: 'Employee Shift Start & Geofence Verification Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies employee shift start geolocation verification, branch radius check, and attendance clock-in.', status: 'idle' }
+    { id: 'TC-032', name: 'Employee Shift Start & Geofence Verification Engine', category: 'HR & Payroll', endpoint: '/api/reception/dashboard', description: 'Verifies employee shift start geolocation verification, branch radius check, and attendance clock-in.', status: 'idle' },
+    { id: 'TC-033', name: 'Dashboard Notifications & Inventory Alerts Engine', category: 'Inventory & Equipment', endpoint: '/api/reception/dashboard', description: 'Verifies real-time system alerts for low stock, expired items, maintenance due, and overdue devices.', status: 'idle' }
   ];
 
   const [systemTestSuites, setSystemTestSuites] = useState<SystemTestCase[]>(INITIAL_SYSTEM_TEST_SUITES);

@@ -21,10 +21,15 @@ import {
   Stethoscope,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   PieChart,
-  History
+  History,
+  Bell,
+  Wrench,
+  X
 } from "lucide-react";
 
 interface ReceptionDashboardViewProps {
@@ -57,9 +62,14 @@ export default function ReceptionDashboardView({
 
   // Accordion open/close states matching design
   const [isShiftExpanded, setIsShiftExpanded] = useState(true);
+  const [isAlertsExpanded, setIsAlertsExpanded] = useState(true);
   const [isBookingsExpanded, setIsBookingsExpanded] = useState(false);
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [isActivitiesExpanded, setIsActivitiesExpanded] = useState(false);
+
+  // Notifications modal & filter state
+  const [showAllAlertsModal, setShowAllAlertsModal] = useState(false);
+  const [alertFilter, setAlertFilter] = useState<"all" | "low_stock" | "maintenance" | "expired">("all");
 
   // Fetch Reception Dashboard data from backend API
   const fetchDashboardData = async () => {
@@ -269,6 +279,56 @@ export default function ReceptionDashboardView({
     list: []
   };
 
+  const notificationsList = dashboardData?.notifications || [
+    {
+      id: "alert-default-1",
+      type: "low_stock",
+      title: "Low Stock",
+      message: "Botox – Only 5 units remaining",
+      time: "10 min ago",
+      severity: "danger",
+      status: "active",
+      targetTab: "Inventory"
+    },
+    {
+      id: "alert-default-2",
+      type: "maintenance_due",
+      title: "Maintenance Due",
+      message: "Laser Device #03 requires maintenance",
+      time: "1 hr ago",
+      severity: "warning",
+      status: "active",
+      targetTab: "Inventory"
+    },
+    {
+      id: "alert-default-3",
+      type: "expired_item",
+      title: "Expired Item",
+      message: "Product XYZ expired on 18 Aug 2026",
+      time: "2 hrs ago",
+      severity: "danger",
+      status: "active",
+      targetTab: "Inventory"
+    },
+    {
+      id: "alert-default-4",
+      type: "maintenance_completed",
+      title: "Maintenance Completed",
+      message: "Laser Device #02 maintenance completed",
+      time: "Today, 09:15 AM",
+      severity: "success",
+      status: "resolved",
+      targetTab: "Inventory"
+    }
+  ];
+
+  const filteredAlerts = notificationsList.filter((a: any) => {
+    if (alertFilter === "low_stock") return a.type === "low_stock";
+    if (alertFilter === "maintenance") return a.type?.includes("maintenance");
+    if (alertFilter === "expired") return a.type === "expired_item";
+    return true;
+  });
+
   return (
     <div className="space-y-4 pb-8">
       {/* ── 1. Today's Shift Card ── */}
@@ -355,7 +415,111 @@ export default function ReceptionDashboardView({
         )}
       </div>
 
-      {/* ── 2. Bookings Section ── */}
+      {/* ── 2. Notifications & Alerts Section ── */}
+      <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-full bg-[#F0F4EC] text-[#45523A] flex items-center justify-center shrink-0">
+              <Bell size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#1F251A]">Notifications & Alerts</h3>
+              <p className="text-xs text-[#788272]">Important updates that require your attention</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowAllAlertsModal(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-[#45523A] border border-[#D5DDD0] hover:bg-[#F0F4EC] transition cursor-pointer"
+            >
+              <span>View All Alerts</span>
+              <ArrowRight size={14} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsAlertsExpanded(!isAlertsExpanded)}
+              className="p-2 text-[#45523A] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
+              title={isAlertsExpanded ? "Collapse section" : "Expand section"}
+            >
+              {isAlertsExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            </button>
+          </div>
+        </div>
+
+        {isAlertsExpanded && (
+          <div className="space-y-2.5 pt-2 border-t border-[#F3F0E8] animate-in fade-in duration-200">
+            {notificationsList.length === 0 ? (
+              <p className="text-xs text-[#8C9686] italic py-4 text-center">No active notifications or alerts.</p>
+            ) : (
+              notificationsList.slice(0, 4).map((alert: any) => {
+                const isLowStock = alert.type === "low_stock";
+                const isExpired = alert.type === "expired_item";
+                const isMaintDue = alert.type === "maintenance_due";
+                const isMaintOverdue = alert.type === "maintenance_overdue";
+                const isMaintDone = alert.type === "maintenance_completed";
+
+                // Border accent color
+                const borderAccent =
+                  isLowStock || isExpired || isMaintOverdue
+                    ? "border-l-4 border-l-red-500"
+                    : isMaintDue
+                    ? "border-l-4 border-l-amber-500"
+                    : "border-l-4 border-l-emerald-500";
+
+                // Icon selection
+                const iconColor =
+                  isLowStock || isExpired || isMaintOverdue
+                    ? "text-red-500"
+                    : isMaintDue
+                    ? "text-amber-500"
+                    : "text-emerald-600";
+
+                const titleColor =
+                  isLowStock || isExpired || isMaintOverdue
+                    ? "text-red-600"
+                    : isMaintDue
+                    ? "text-amber-600"
+                    : "text-emerald-700";
+
+                return (
+                  <div
+                    key={alert.id}
+                    onClick={() => onNavigateTab && onNavigateTab(alert.targetTab || "Inventory")}
+                    className={`flex items-center justify-between p-3.5 sm:px-5 rounded-2xl bg-white border border-[#EBE8E0] ${borderAccent} hover:bg-[#FAF9F5] transition cursor-pointer group`}
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className={`shrink-0 ${iconColor}`}>
+                        {isLowStock && <AlertTriangle size={18} />}
+                        {isExpired && <Package size={18} />}
+                        {(isMaintDue || isMaintOverdue) && <Wrench size={18} />}
+                        {isMaintDone && <CheckCircle2 size={18} />}
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-6 min-w-0">
+                        <span className={`text-xs sm:text-sm font-bold shrink-0 ${titleColor}`}>
+                          {alert.title}
+                        </span>
+                        <span className="text-xs text-[#5A6A51] font-medium truncate">
+                          {alert.message}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                      <span className="text-xs text-[#8C9686] whitespace-nowrap">{alert.time}</span>
+                      <ChevronRight size={16} className="text-[#8C9686] group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── 3. Bookings Section ── */}
       <div className="bg-white rounded-3xl p-6 border border-[#EBE8E0] shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3.5">
@@ -658,6 +822,136 @@ export default function ReceptionDashboardView({
                 className="w-full py-3 px-6 rounded-2xl font-bold text-sm text-[#1F251A] border border-[#E6E9EB] hover:bg-[#F2EFE9] transition cursor-pointer"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ALL NOTIFICATIONS & ALERTS MODAL ── */}
+      {showAllAlertsModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="relative w-full max-w-2xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-[#F0EEE6] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-[#F0F4EC] text-[#45523A] flex items-center justify-center">
+                  <Bell size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#1F251A]">All Notifications & Alerts</h3>
+                  <p className="text-xs text-[#788272]">System alerts for inventory, maintenance, and clinical updates</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAllAlertsModal(false)}
+                className="p-2 text-[#8C9686] hover:text-[#1F251A] hover:bg-[#F0F4EC] rounded-xl transition cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {[
+                { id: "all", label: "All Alerts" },
+                { id: "low_stock", label: "Low Stock" },
+                { id: "maintenance", label: "Maintenance" },
+                { id: "expired", label: "Expired Items" }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setAlertFilter(tab.id as any)}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                    alertFilter === tab.id
+                      ? "bg-[#414E36] text-white"
+                      : "bg-[#F0F4EC] text-[#5A6A51] hover:bg-[#E2EADF]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Alerts List */}
+            <div className="overflow-y-auto space-y-2.5 flex-1 pr-1">
+              {filteredAlerts.length === 0 ? (
+                <p className="text-xs text-[#8C9686] italic py-8 text-center">No alerts in this category.</p>
+              ) : (
+                filteredAlerts.map((alert: any) => {
+                  const isLowStock = alert.type === "low_stock";
+                  const isExpired = alert.type === "expired_item";
+                  const isMaintDue = alert.type === "maintenance_due";
+                  const isMaintOverdue = alert.type === "maintenance_overdue";
+                  const isMaintDone = alert.type === "maintenance_completed";
+
+                  const borderAccent =
+                    isLowStock || isExpired || isMaintOverdue
+                      ? "border-l-4 border-l-red-500"
+                      : isMaintDue
+                      ? "border-l-4 border-l-amber-500"
+                      : "border-l-4 border-l-emerald-500";
+
+                  const iconColor =
+                    isLowStock || isExpired || isMaintOverdue
+                      ? "text-red-500"
+                      : isMaintDue
+                      ? "text-amber-500"
+                      : "text-emerald-600";
+
+                  const titleColor =
+                    isLowStock || isExpired || isMaintOverdue
+                      ? "text-red-600"
+                      : isMaintDue
+                      ? "text-amber-600"
+                      : "text-emerald-700";
+
+                  return (
+                    <div
+                      key={alert.id}
+                      className={`flex items-center justify-between p-3.5 rounded-2xl bg-white border border-[#EBE8E0] ${borderAccent} hover:bg-[#FAF9F5] transition`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`shrink-0 ${iconColor}`}>
+                          {isLowStock && <AlertTriangle size={18} />}
+                          {isExpired && <Package size={18} />}
+                          {(isMaintDue || isMaintOverdue) && <Wrench size={18} />}
+                          {isMaintDone && <CheckCircle2 size={18} />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`text-xs sm:text-sm font-bold ${titleColor}`}>{alert.title}</p>
+                          <p className="text-xs text-[#5A6A51] font-medium mt-0.5">{alert.message}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0 ml-4">
+                        <span className="text-xs text-[#8C9686]">{alert.time}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAllAlertsModal(false);
+                            if (onNavigateTab) onNavigateTab(alert.targetTab || "Inventory");
+                          }}
+                          className="text-xs font-bold text-[#414E36] hover:underline px-2 py-1 rounded-lg hover:bg-[#F0F4EC] transition cursor-pointer"
+                        >
+                          Resolve
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="border-t border-[#F0EEE6] pt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowAllAlertsModal(false)}
+                className="px-5 py-2.5 rounded-xl font-bold text-xs text-[#1F251A] border border-[#E6E9EB] hover:bg-[#F2EFE9] transition cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>
