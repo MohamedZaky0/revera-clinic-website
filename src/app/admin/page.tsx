@@ -1593,6 +1593,7 @@ ${notes ? `📝 *تعليمات الطبيب / Doctor Instructions:*\n${notes}\n
         setSelectedDrawerProductId("");
         setSelectedDrawerProductQty(1);
         fetchAllReservations();
+        fetchInventoryProducts();
         alert(`Product "${prod.name}" added to booking invoice!`);
       }
     } catch (err) {

@@ -255,11 +255,14 @@ export async function saveProductsData(payload: { products: ProductItem[] }) {
 // Helper to deduct stock when a product is sold or assigned to a customer
 export async function deductInventoryStock(productIdOrName: string, quantityToDeduct: number) {
   try {
-    const { products } = await getStoredProductsData();
-    if (!products || products.length === 0 || !quantityToDeduct || quantityToDeduct <= 0) return;
+    if (!productIdOrName || !quantityToDeduct || quantityToDeduct <= 0) return;
 
+    const { products } = await getStoredProductsData();
+    if (!products || products.length === 0) return;
+
+    const queryStr = String(productIdOrName).trim();
     const targetIndex = products.findIndex(
-      (p) => p.id === productIdOrName || p.name.toLowerCase() === productIdOrName.toLowerCase()
+      (p) => String(p.id) === queryStr || p.name.toLowerCase() === queryStr.toLowerCase()
     );
 
     if (targetIndex >= 0) {
