@@ -108,3 +108,30 @@ cmd /c "npm run build"
 - Mechanical extraction completed.
 - Build/TS/lint verified.
 - Core browser paths verified; remaining items (edit save, notes, avatar, print/export, delete/resend) require normal manual QA but are not blocked by the extraction.
+
+---
+
+## Independent re-verification — 2026-08-22 (Mohamed's session)
+
+Re-run rather than trusted, per standing project rule.
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` (whole project) | PASS — 0 errors |
+| `npx eslint` on both touched files | PASS — 0 errors, 267 warnings, none new/blocking |
+| `npx vitest run` (full suite) | PASS — 618 passed / 9 expected fail, unchanged from pre-extraction baseline |
+| Diff-traced every state/handler category the brief specified | PASS — every "moves in" identifier fully absent from `page.tsx`, zero in `AdminEmployeesView.tsx`; every "must stay a prop" identifier single-sourced in `page.tsx` and destructured as a prop, not forked |
+| `handleCreateEmployee`/`handleUpdateEmployeeRole`/`handleSaveDepartments` (explicitly out of scope) | PASS — 0 occurrences in `AdminEmployeesView.tsx`, untouched |
+| Permission gate | PASS — still exactly `activeNav === "Employees" && adminRole === "superadmin"` at the call site, zero `hasPermission`/`adminRole` checks invented inside the component |
+| Value/label-separation bugs (department/role `.includes("doc")`, shift `.includes("night")`) | PASS — moved verbatim, not silently fixed |
+| Duplicate `checkShiftOverlaps`/schedule editor vs. `ProviderFormFields.tsx` | PASS — moved verbatim, not deduplicated, per the brief's explicit instruction |
+| `DoctorServiceCommissionEditor` | PASS — imported and used as the 4th call site, same pattern as `AdminDoctorsView` |
+| Browser: login as `finance-test@revera.com`, Employees list | PASS — real data (5 employees), search/filter controls present |
+| Browser: employee profile drawer → Attendance Insights tab | PASS — renders, no crash |
+| Browser: Role Management → Provision Employee Credentials form | PASS — typed into the Full Name field and it reflected live, confirming `newEmployeeName` is still correctly shared (single source of truth in `page.tsx`), not forked |
+| Browser: HR → Overview → Workforce Directory | PASS — renders real `employeesList` data, confirming the 3-way share (Employees/Role Management/HR) survived the extraction |
+| Console errors during the above | 3 unrelated 401s (`fetchCustomers`/`fetchRequests`/`fetchAllReservations`) — pre-existing session/env issue, nothing referencing employees/HR, not caused by this extraction |
+
+One deviation from the brief's literal text confirmed as the *correct* call, not a bug: `viewingEmployee` itself (not just its notes/bookings) stayed lifted in `page.tsx` rather than moving fully into the component. This is necessary — HR's own Payroll tab "View Details" button calls `setViewingEmployee` directly (a real cross-section dependency the original brief's investigation missed and Brief 22's investigation later caught). Keeping it lifted is exactly what Brief 22 now assumes when it says to pass `setViewingEmployee` into the future `AdminHrView` too.
+
+**Verdict: PASS. Archived. Safe to start Brief 22.**

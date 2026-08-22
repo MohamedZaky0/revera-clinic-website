@@ -21,10 +21,14 @@
 > "Reception-first" and the plan should add it as the next Phase 2-only target (no extraction
 > needed).
 >
-> **Componentization (DEC-027) next targets, unchanged by the above:** Employees (~2,200 lines) and
-> HR (~1,625 lines) are the two largest reachable-but-still-inline sections left in `page.tsx`,
-> both superadmin-gated. Below those: Pages Settings (~1,800), Role Management (~365), System Test
-> Suite (~220), and a cluster of Settings-submenu screens each under 220 lines.
+> **Componentization (DEC-027), updated 2026-08-22:** Employees is done — Brief 21 extracted it into
+> `src/components/admin/employees/AdminEmployeesView.tsx` (independently verified: static checks,
+> full test suite unchanged, and live in the browser). **Brief 22 (HR, ~1,568 + a 151-line detached
+> Edit Target modal) is now active**, queued to start once picked up — it shares real state with
+> Employees (`attendanceList`, `employeesList`, a direct `setViewingEmployee` call from HR's own
+> Payroll tab), so it was written only after Brief 21 landed and was verified, not before. Below
+> that: Pages Settings (~1,800), Role Management (~365), System Test Suite (~220), and a cluster of
+> Settings-submenu screens each under 220 lines.
 >
 > ---
 >
