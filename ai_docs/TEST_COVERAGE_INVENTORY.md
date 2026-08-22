@@ -8,11 +8,25 @@ not by reading feature docs.
 ~31,500 lines of components (of which `src/app/admin/page.tsx` alone is 26,807 lines with 401
 `onClick` handlers).
 
-**Covered today:** 7 of 26 lib modules; **8 of 153 handlers** have a real route-level test
+**Covered today:** 7 of 26 lib modules; **9 of 153 handlers** have a real route-level test
 (`/api/hr/doctor-payroll` GET/POST/PATCH, `/api/reservations` PATCH fully + GET/POST auth-shape,
-`/api/reception/dashboard` GET/POST), plus auth-shape-only assertions on 4 more routes. Component
-tests: 7 of the P0 money components (module 12) have real render/interaction tests as of this sweep.
-No E2E.
+`/api/reception/dashboard` GET/POST, `/api/packages/consume` POST), plus auth-shape-only assertions
+on 4 more routes. Component tests: 7 of the P0 money components (module 12) have real
+render/interaction tests as of this sweep. No E2E.
+
+**Update 2026-08-22** — a 58-commit non-Windsurf merge landed feature work (bookings, billing,
+checkout, reception, attendance) straight onto `dev`, outside this test net. Re-running the suite
+against it surfaced 7 hard failures. What that pass changed:
+- **RISK-012 regressed and was re-fixed** (`05c5136` → `8f8c2dd`): the wallet double-application
+  guard in `computeSettledBalances`. Caught only by the existing pure-function test; there was no
+  route-level equivalent, so one was added and verified by inverting the fix (reverting `billing.ts`
+  and confirming the new test goes red).
+- **Geofenced Start Shift** (`e5e788a`) had zero coverage despite being the only start-shift path
+  the live UI calls. 5 real tests added + 2 `it.fails` gaps pinned (see module 2).
+- **`/api/packages/consume`** endpoint wiring covered for the first time (15 tests), which is how
+  **RISK-065** was found — `e79a691` silently dropped the "service must be on the booking" guard.
+- 4 new `it.fails` markers total, all naming a RISK id and source line. Suite: **617 passing,
+  10 expected fail, 0 failures.**
 
 ## How to read this
 
@@ -182,8 +196,9 @@ Then the UI separately fires `POST /api/packages/consume` per redeemed package i
 - Change given back to wallet → `wallet_balance` up, ledger row written.
 - Deposit already collected is included in the total paid, not dropped
   (`admin/page.tsx:25985` — the comment there is truncated mid-sentence, worth re-reading).
-- Re-firing completion does not double-count anything (RISK-012 — covered at the pure-function
-  level in `tests/lib/billing.test.ts`, **not** at the route level).
+- Re-firing completion does not double-count anything (RISK-012) — **now covered at the route level
+  too** (`tests/routes/reservations-patch.test.ts`), including the wallet movement specifically,
+  which is the half that actually regressed in `05c5136`. Verified by inverting the fix.
 - Consumables are deducted from `inventory_products` and a `stock_movements` row is written.
 - Device pulse counters increment.
 - Completion still succeeds when the costing/invoice step fails (it is deliberately non-fatal) —
@@ -203,8 +218,22 @@ first, then these become straightforward.
 | **Start shift** | `POST /api/reception/dashboard` | `hr_attendance` |
 | **End shift** | `POST /api/reception/dashboard` | `hr_attendance` |
 
-**Covered** — `tests/routes/reception-dashboard.test.ts` (14 tests). F-1/F-2/F-3 fixed 2026-08-19,
-see RISK-059. Manual click-through: `ai_docs/manual_tests/RISK_059_MANUAL_TESTS.md`.
+**Covered** — `tests/routes/reception-dashboard.test.ts` (19 tests + 2 `it.fails`). F-1/F-2/F-3
+fixed 2026-08-19, see RISK-059. Manual click-through: `ai_docs/manual_tests/RISK_059_MANUAL_TESTS.md`.
+
+**Geofence, added 2026-08-22.** `e5e788a` made this route the only start-shift path the UI calls —
+the older `POST /api/hr/attendance` that RISK-006 documents is no longer invoked from the frontend
+at all. Now covered: inside-radius check-in records its coordinates; outside-radius is refused with
+no row written; missing and out-of-range coordinates are each refused distinctly; a branchless
+superadmin bypasses the check by design. Two gaps pinned as `it.fails`:
+- **GPS `accuracy` is never validated** (RISK-006) — destructured at `route.ts:358` and never read,
+  so a check-in reporting a 5km error radius is accepted like a 5m one, which makes the 800m radius
+  meaningless on coarse (wifi/cell) positioning. RISKS.md claims a 100m ceiling is enforced; it is
+  not, on either route. Left unfixed on 2026-08-22 — the real threshold is a product decision.
+- **No branch coordinates configured → check-in accepted from anywhere.** The older route was
+  deliberately changed to block this (`dd600cd`, "fail check-in and block if branch location
+  coordinates are not configured in db"); this one guards its refusal behind
+  `candidateBranches.length > 0` and so does the opposite.
 
 **Scenarios to test:**
 - **No token → 401.** ✅ Fixed — see F-1/RISK-059.
@@ -261,7 +290,15 @@ and notes; the money is settled by Reception.
 - Consuming an **expired** package is rejected.
 - Consuming the same `customerPackageItemId` twice for the same reservation does not double-decrement.
 - Revenue is recognised as sessions are consumed — `recognisedRevenueSoFar` / `deferredBalance` are
-  already unit-tested in `tests/lib/packages.test.ts`, but the **endpoint wiring is not**.
+  already unit-tested in `tests/lib/packages.test.ts`. **Endpoint wiring now covered for
+  `/api/packages/consume`** — `tests/routes/packages-consume.test.ts` (14 tests + 1 `it.fails`):
+  auth, both id validations, exact-one decrement, exhausted-item refusal, non-completed-reservation
+  refusal, package auto-close on last session, cross-patient refusal, phone-match fallback with
+  `customer_id` backfill, the RPC-succeeds branch (asserting it does *not* also apply the fallback
+  and double-spend), and the `reservation_products` fallback for mid-visit additional services.
+  `/api/packages/sell` and `/api/packages/extend` remain uncovered.
+- **RISK-065 (found by the above):** `e79a691` dropped the "service must be on the booking" guard —
+  a session can be burned for a service never delivered on that visit. Pinned as `it.fails`.
 - Extending expiry does not change remaining session counts or recognised revenue.
 
 ---

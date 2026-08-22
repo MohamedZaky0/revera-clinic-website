@@ -2608,6 +2608,52 @@ are missing.
 
 ---
 
+## RISK-065: `POST /api/packages/consume` Burns A Pre-Paid Session For A Service That Isn't On The Booking
+
+**Severity:** High · **Type:** Financial data integrity / patient entitlement
+**Found:** 2026-08-22, while writing the endpoint-wiring tests
+`TEST_COVERAGE_INVENTORY.md` module 4 had flagged as missing — not user-reported.
+**Status:** Open. One-line fix identified, deliberately not applied (see below).
+
+**What it is:** the guard that required a package's service to actually be part of the reservation
+was added with the feature (`bcb4c0a`) as an early return:
+
+```js
+if (!reservationServiceIds.includes(Number(item.service_id))) {
+  return NextResponse.json({ error: 'Reservation does not include this package service.' }, { status: 409 });
+}
+```
+
+Commit `e79a691` (2026-08-21, part of the 58-commit non-Windsurf pull merged 2026-08-22) refactored
+that early return into a `let hasService = ...` flag so a `reservation_products` fallback lookup
+could be added for services attached mid-visit as additional services — a legitimate fix. But the
+`return` was never restored. `src/app/api/packages/consume/route.ts:90-100` now computes
+`hasService`, runs the fallback query, and **discards the result**: execution falls straight through
+to the consume RPC regardless. The fallback lookup that same commit added is itself dead code as a
+consequence, which is the clearest evidence the drop was accidental rather than a deliberate
+loosening.
+
+**Consequence:** any staff member can burn any of a patient's remaining pre-paid sessions against
+any completed booking of theirs, including one where that service was never delivered. The clinic
+already collected the money for that session and the patient loses the visit; there is no UI
+anywhere in the product to credit one back. The other ownership guards still hold (the package must
+belong to the same patient, the booking must be `completed`), so this is not cross-patient — it is
+wrong-service within one patient's own history, which is exactly the kind of error that surfaces
+weeks later as a disputed balance.
+
+**Test:** `tests/routes/packages-consume.test.ts` → *"refuses to burn a session for a service that
+is not on the booking at all"*, marked `it.fails` per the repo's testing convention. Its sibling
+test (*"accepts a service attached to the booking as an additional service"*) passes and pins the
+legitimate behaviour `e79a691` was actually trying to add, so restoring the guard must not break it.
+
+**Fix:** restore the guard after the fallback block —
+`if (!hasService) return NextResponse.json({ error: 'Reservation does not include this package service.' }, { status: 409 });`
+Not applied in the same pass that found it: this changes money-adjacent behaviour on a live flow,
+and the deliberate call on 2026-08-22 was to surface it as a visible failing spec first rather than
+silently re-tighten a rule while the surrounding redemption logic is still being reworked.
+
+---
+
 ## PROPOSALS.md Reference
 
 See `PROPOSALS.md` for:

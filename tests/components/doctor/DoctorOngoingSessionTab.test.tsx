@@ -233,20 +233,34 @@ describe('additional services — money math', () => {
 });
 
 describe('inline prescription', () => {
-  it('POSTs diagnosis, non-empty medications only, and instructions for the active booking', async () => {
+  // Business rule (TEST_COVERAGE_INVENTORY.md module 3): "Prescription is linked to the right
+  // reservation and patient." The booking fixture here deliberately carries a real customerId,
+  // doctorName and date so this asserts those are actually forwarded — a fixture without them
+  // would only prove the null-fallbacks fire, which is not the rule worth guarding.
+  it('POSTs diagnosis, non-empty medications only, and instructions, linked to the active booking/patient/doctor', async () => {
     fetchFake.on('POST', '/api/prescriptions', (call) => {
       expect(call.body).toEqual({
         booking_id: 'res-1',
+        customer_id: 'cust-9',
+        patient_name: 'Mona Ali',
         customer_name: 'Mona Ali',
+        doctor_name: 'Dr. Salma',
         diagnosis: 'Acne Vulgaris',
         medications: [{ name: 'Retin-A', dosage: '0.05%', frequency: 'Nightly', duration: '4 weeks' }],
         instructions: 'Avoid sun exposure',
+        general_notes: 'Avoid sun exposure',
+        date: '2026-08-21',
       });
       return { status: 200, body: { id: 'rx-1' } };
     });
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const user = userEvent.setup();
-    render(<DoctorOngoingSessionTab {...baseProps()} />);
+    render(<DoctorOngoingSessionTab {...baseProps({
+      activeSessionBooking: {
+        id: 'res-1', name: 'Mona Ali', service: 'Botox', price: 800, status: 'started',
+        customerId: 'cust-9', doctorName: 'Dr. Salma', date: '2026-08-21',
+      },
+    })} />);
 
     await user.type(screen.getByPlaceholderText(/Post-laser inflammation/), 'Acne Vulgaris');
     await user.type(screen.getByPlaceholderText('medicationNamePlaceholder'), 'Retin-A');

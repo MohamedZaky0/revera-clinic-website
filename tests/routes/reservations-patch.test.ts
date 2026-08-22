@@ -551,6 +551,58 @@ describe('settlement — customer balances on completion', () => {
     expect(customer.outstanding).toBe(0);
   });
 
+  // The gap TEST_COVERAGE_INVENTORY.md module 1 names explicitly: "Re-firing completion does not
+  // double-count anything (RISK-012 — covered at the pure-function level in
+  // tests/lib/billing.test.ts, **not** at the route level)." The wallet half is the part that
+  // actually regressed: commit 05c5136 dropped the `wasCompleted` guard in computeSettledBalances,
+  // and because the checkout modal always sends walletDeposit/walletWithdrawal together with
+  // status:"completed" in one PATCH, a retried or re-submitted checkout moved real money a second
+  // time and wrote a duplicate ledger row. The pure-function test caught it; nothing at this level
+  // would have. Restored in 8f8c2dd.
+  it('re-firing completion does not apply the wallet movement a second time or duplicate its ledger row', async () => {
+    fake.seed('reservations', [baseReservation({ status: 'completed', amount_paid: 500, amount_left: 0 })]);
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 100, spent_amount: 500, outstanding: 0 }]);
+
+    await PATCH(staffReq({
+      id: RES_ID,
+      body: { status: 'completed', amountPaid: 500, amountLeft: 0, walletDeposit: 20, walletWithdrawal: 0 },
+    }));
+
+    const customer = fake.rows('customers').find((c) => c.id === CUSTOMER_ID)!;
+    expect(customer.wallet_balance).toBe(100); // not 120 — the deposit was already applied
+    expect(fake.rows('wallet_txns')).toHaveLength(0);
+  });
+
+  // RISK-031. Commit e79a691 removed the guard that blocked package redemption on a booking with a
+  // deposit already collected. Its own deleted comment gave the reason: "deposits are booking-level,
+  // not per-service, so waiving a service's price after cash was already taken against it would need
+  // refund/reversal logic this feature doesn't build." No such logic was added.
+  //
+  // Mohamed's call 2026-08-22: redemption stays allowed, but the money that moves as a result must
+  // leave an explicit reconciliation trail — right now the deposit simply resurfaces as generic
+  // `changeAmount` and, if credited to the wallet, is logged with the same
+  // "Change deposited into wallet from settlement" reason as any ordinary over-payment. Nothing
+  // distinguishes "the patient overpaid" from "we took a deposit for a service a package then
+  // covered", so it cannot be audited or explained to a patient later.
+  it.fails('records a package-redemption reconciliation, distinct from ordinary over-payment change', async () => {
+    // Deposit of 200 already taken; the service it was taken against is then covered by a package,
+    // so the whole 200 comes back as change and is credited to the wallet.
+    fake.seed('reservations', [baseReservation({ status: 'confirmed', amount_paid: 200, amount_left: null })]);
+    fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, spent_amount: 0, outstanding: 0 }]);
+
+    await PATCH(staffReq({
+      id: RES_ID,
+      body: {
+        status: 'completed', amountPaid: 200, amountLeft: 0,
+        walletDeposit: 200, redeemedServiceIds: [SERVICE_ID],
+      },
+    }));
+
+    const walletTxns = fake.rows('wallet_txns');
+    expect(walletTxns).toHaveLength(1);
+    expect(walletTxns[0].reason).toMatch(/package/i);
+  });
+
   it('paying down outstanding debt later moves only the delta, not the full new amount again', async () => {
     fake.seed('reservations', [baseReservation({ status: 'completed', amount_paid: 300, amount_left: 200 })]);
     fake.seed('customers', [{ id: CUSTOMER_ID, wallet_balance: 0, spent_amount: 300, outstanding: 200 }]);

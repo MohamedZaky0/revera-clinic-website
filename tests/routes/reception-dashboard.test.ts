@@ -78,10 +78,27 @@ function seedDoctorAuth() {
 beforeEach(() => {
   vi.clearAllMocks();
   fake.reset();
-  for (const t of ['employee_accounts', 'hr_attendance', 'reservations', 'services']) {
+  for (const t of ['employee_accounts', 'hr_attendance', 'reservations', 'services', 'branches']) {
     fake.seed(t, []);
   }
 });
+
+// ── Geofence fixtures ─────────────────────────────────────────────────────────
+// Branch sits in downtown Cairo. INSIDE_* is the same point (0m). OUTSIDE_* is ~1.7km north
+// (0.0156° latitude ≈ 1736m), comfortably past the route's 800m radius without being so far
+// that a future radius change silently turns this into a false pass.
+const BRANCH_LAT = 30.0444;
+const BRANCH_LNG = 31.2357;
+const INSIDE_LAT = 30.0444;
+const INSIDE_LNG = 31.2357;
+const OUTSIDE_LAT = 30.0600;
+const OUTSIDE_LNG = 31.2357;
+
+function seedBranch(overrides: Record<string, any> = {}) {
+  mockDb.branches.push({
+    id: 'branch-1', name_en: 'Downtown', latitude: BRANCH_LAT, longitude: BRANCH_LNG, ...overrides,
+  });
+}
 
 // ── Auth guard (F-1) ──────────────────────────────────────────────────────────
 
@@ -239,5 +256,116 @@ describe('F-2 — employee resolution', () => {
 
     const row = mockDb.hr_attendance.find((r) => r.employee_id === EMP_RECEPTION_A && r.date === TODAY);
     expect(row).toBeDefined();
+  });
+});
+
+// ── Geofenced Start Shift ─────────────────────────────────────────────────────
+// Added by commit e5e788a (2026-08-21), outside the brief/test-net process — this route is now
+// the ONLY start-shift path wired into the live UI (ReceptionDashboardView.tsx). The older
+// POST /api/hr/attendance that RISK-006 documents is no longer called from the frontend at all,
+// so this block is where the geofence's real behaviour has to be pinned down.
+
+describe('geofenced start_shift', () => {
+  it('a receptionist inside the branch radius may start their shift, and the coordinates are recorded', async () => {
+    seedReceptionAuth();
+    seedBranch();
+
+    const res = await POST(authedReq('reception-token', {
+      body: { action: 'start_shift', latitude: INSIDE_LAT, longitude: INSIDE_LNG },
+    }));
+    expect(res.status).toBe(200);
+
+    // The recorded position is what makes an attendance row auditable after the fact — a check-in
+    // saved without it cannot be disputed or verified later.
+    const row = mockDb.hr_attendance.find((r) => r.employee_id === EMP_RECEPTION_A && r.date === TODAY);
+    expect(row!.latitude).toBe(INSIDE_LAT);
+    expect(row!.longitude).toBe(INSIDE_LNG);
+    expect(row!.status).toBe('Present');
+  });
+
+  it('a receptionist outside the branch radius is refused, and no attendance row is written', async () => {
+    seedReceptionAuth();
+    seedBranch();
+
+    const res = await POST(authedReq('reception-token', {
+      body: { action: 'start_shift', latitude: OUTSIDE_LAT, longitude: OUTSIDE_LNG },
+    }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('out_of_location');
+
+    // A refused check-in must leave no trace — a row written here would later read as a real shift.
+    expect(mockDb.hr_attendance).toHaveLength(0);
+  });
+
+  it('start_shift with no coordinates at all is refused rather than silently clocking in', async () => {
+    seedReceptionAuth();
+    seedBranch();
+
+    const res = await POST(authedReq('reception-token', { body: { action: 'start_shift' } }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('location_permission_denied');
+    expect(mockDb.hr_attendance).toHaveLength(0);
+  });
+
+  it('start_shift with out-of-range coordinates is refused as invalid, not treated as a real position', async () => {
+    seedReceptionAuth();
+    seedBranch();
+
+    const res = await POST(authedReq('reception-token', {
+      body: { action: 'start_shift', latitude: 999, longitude: 31.2357 },
+    }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('invalid_coordinates');
+    expect(mockDb.hr_attendance).toHaveLength(0);
+  });
+
+  it('a superadmin with no assigned branch bypasses the location check entirely', async () => {
+    // Deliberate product behaviour, not a hole: an owner/superadmin is not tied to one branch and
+    // is expected to be able to record presence from anywhere.
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_HR } }, error: null });
+    mockDb.employee_accounts.push({ id: EMP_HR, role_name: 'superadmin', auth_user_id: USER_HR, branch_id: null });
+    seedBranch();
+
+    const res = await POST(authedReq('superadmin-token', { body: { action: 'start_shift' } }));
+    expect(res.status).toBe(200);
+
+    const row = mockDb.hr_attendance.find((r) => r.employee_id === EMP_HR && r.date === TODAY);
+    expect(row).toBeDefined();
+  });
+
+  // RISK-006. `accuracy` is destructured at src/app/api/reception/dashboard/route.ts:358 and then
+  // never read again — a check-in reporting a 5km error radius is accepted exactly like a 5m one,
+  // which makes the 800m radius check above meaningless for anyone whose device reports coarse
+  // (wifi/cell-tower) positioning. RISKS.md claims a 100m ceiling is enforced; it is not, on this
+  // route or the older /api/hr/attendance one (whose own `parsedAccuracy` at route.ts:262 is
+  // likewise computed and never compared). Mohamed's call 2026-08-22: document, do not fix yet —
+  // the real threshold is a product decision, so this stays a visible gap rather than an
+  // invented constant.
+  it.fails('rejects a check-in whose reported GPS accuracy is worse than 100m (RISK-006)', async () => {
+    seedReceptionAuth();
+    seedBranch();
+
+    const res = await POST(authedReq('reception-token', {
+      body: { action: 'start_shift', latitude: INSIDE_LAT, longitude: INSIDE_LNG, accuracy: 5000 },
+    }));
+    expect(res.status).toBe(400);
+  });
+
+  // The older /api/hr/attendance route was deliberately changed to block check-in when a branch
+  // has no usable coordinates (commit dd600cd, "fail check-in and block if branch location
+  // coordinates are not configured in db"). This route inverts that: `candidateBranches.length > 0`
+  // guards the refusal, so a clinic with no branch rows — or branches whose lat/lng were never
+  // filled in — silently accepts a check-in from anywhere on earth. Same intent, opposite outcome.
+  it.fails('refuses to clock in when no branch has usable coordinates, instead of accepting any position', async () => {
+    seedReceptionAuth();
+    // No seedBranch() — nothing configured to measure against.
+
+    const res = await POST(authedReq('reception-token', {
+      body: { action: 'start_shift', latitude: OUTSIDE_LAT, longitude: OUTSIDE_LNG },
+    }));
+    expect(res.status).toBe(400);
   });
 });
