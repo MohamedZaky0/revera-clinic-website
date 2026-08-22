@@ -118,6 +118,160 @@ upload/remove, attendance insights export.
 ---
 ---
 
+# QUEUED BRIEFS
+
+## Brief 22 — Phase 1: extract the HR admin section from `page.tsx`
+
+**Do not start until Brief 21 (Employees) is committed and independently verified.** HR shares
+real state with the Employees component Brief 21 just created (`attendanceList`, `employeesList`,
+and a direct cross-section call into Employees' own `setViewingEmployee`) — writing this against a
+still-moving target risks grounding it in numbers that shift under you. Re-verify every line number
+below against the actual file before starting; they were captured 2026-08-22 immediately after
+Brief 21's extraction landed on disk (uncommitted at the time), and this file has a history of
+drifting between when a brief is written and when it's picked up.
+
+**Scope: mechanical extraction only. Zero behavior change, no translation, no dedup, no bug
+fixes.** Same pattern as Brief 21. HR is smaller (1,568 + 151 lines vs. Employees' 2,225) but has
+one structural trap Employees didn't: **its state and one of its own UI pieces are not contiguous
+in the file.** Read this whole brief before starting.
+
+**Target file:** new `src/components/admin/hr/AdminHrView.tsx`, following the
+`AdminEmployeesView.tsx`/`AdminDoctorsView.tsx` naming convention.
+
+**Block boundaries — TWO separate spans, both must move together:**
+1. Main block: `{activeNav === "HR" && (` at `page.tsx:10295` through its matching `)}` at
+   `page.tsx:11862` — 1,568 lines. Immediately before it: the `<AdminEmployeesView .../>` call
+   (10245–10285). Immediately after its closing `)}` (11862) are **two unrelated modals that are
+   NOT part of HR and must not be touched or moved**: the Presence Activity Check overlay
+   (`presenceModalOpen &&`, 11865–11889) and the Location Warning modal (`locationWarningOpen &&`,
+   11892–11917) — these belong to the global inactivity-monitoring system used by every logged-in
+   staff role, not just HR. `Dashboard`'s block starts right after them at `page.tsx:11920`.
+2. **Detached "Edit Target" modal, `page.tsx:16190–16340` (151 lines)** — triggered by the Targets
+   sub-tab's "Edit Target" button (main block, 11840–11846), gated only by
+   `{editingTargetEmployee && (...)}`, sitting ~4,300 lines away near the end of the file next to
+   unrelated modals (`activeInfoFeature` starts right after it at 16342). **This must move into the
+   same new component as the main block.** If it's left behind, the Targets tab's Edit button will
+   set state a orphaned modal was reading, and editing a target/bonus will silently stop working.
+
+**Permission gating — confirmed, looser than Employees, preserve exactly as-is.** Zero
+`hasPermission(...)` calls and zero `adminRole` checks anywhere inside either span — the content
+gate is just `activeNav === "HR"`, nothing else. The only role check that exists is one level up,
+at the sidebar-visibility layer (`permittedSidebarItems`, `page.tsx:872–897`): superadmin sees
+everything; `admin`/`HR` roles see the HR nav item via an explicit `item.label === 'HR'` check; a
+custom `adminPermissions` array containing the literal string `"HR"` also grants it (no
+`hr.xxx`-prefixed fine-grained permission works here, unlike Inventory's `canManage*` pattern).
+**Do not invent a `hasPermission` check that doesn't exist today** — this is intentionally
+different from Employees' section-level `adminRole === "superadmin"` gate, not an oversight to fix.
+
+**State — 27 HR-exclusive `useState` declarations, all clustered at `page.tsx:944–985`
+(comment-labeled "HR Module states" / "Targets sub-tab states" / "Doctor payroll states" /
+"Attendance and Activity Monitoring states"). Moves in whole:**
+`hrActiveSubTab`, `payrollList`/`loadingPayroll`, `leavesList`/`loadingLeaves`,
+`performanceReviews`/`loadingPerformance`, `doctorPayrollList`/`loadingDoctorPayroll`,
+`selectedDoctorPayrollMonth`/`doctorPayrollSearchQuery`/`doctorPayrollFilterStatus`/
+`doctorPayrollCurrentPage`, `selectedPayrollMonth`/`payrollSearchQuery`/
+`payrollFilterDepartment`/`payrollFilterStatus`/`payrollCurrentPage`, `newLeaveEmployeeId`/
+`newLeaveType`/`newLeaveStartDate`/`newLeaveEndDate`/`newLeaveReason`, `newReviewEmployeeId`/
+`newReviewRating`/`newReviewComments`/`newReviewGoals`, and — because it's read by both spans —
+`editingTargetEmployee`/`targetAmountInput`/`bonusPercentageInput`/`targetTypeInput`/
+`bonusTypeInput` (set in the main block at 11840–11846, read by the detached modal at
+16190–16340 — both pieces of state and the modal that reads it move together into the same file).
+
+**Dead state — move it, but flag it, don't fix it.** `loadingPayroll`, `loadingDoctorPayroll`,
+`loadingLeaves`, `loadingPerformance` are all set by their fetchers but never read anywhere in the
+JSX — no spinner exists for those 4 tabs (unlike Attendance, which does check `loadingAttendance`).
+Same "declared and abandoned" shape already flagged elsewhere in this project; not this brief's job
+to add UI for it.
+
+**Must be passed as props, not moved (shared with Employees and/or global, confirmed by file-wide
+grep):**
+- `attendanceList`/`loadingAttendance` (944, "Attendance and Activity Monitoring states" — 983–984
+  by original numbering) — populated by `fetchHrAttendance()`, which is **not called from inside
+  the HR JSX at all**; it only runs via the `fetchHrData()` orchestrator (see below) and is also
+  passed down to `AdminEmployeesView` for its own Attendance Insights tab. HR's Attendance sub-tab
+  just reads the resulting list — pass it as a prop, do not re-fetch inside the new component.
+- `activeMissingAlerts` — **not HR-exclusive despite the name.** Rendered inside HR's Attendance
+  sub-tab as an "Inactivity Alerts" table (11687–11743) AND separately as a global dismissible
+  banner in the main admin shell (`page.tsx:6247–6284`, shown above whichever section is active,
+  visible to superadmin/admin/HR regardless of `activeNav`). Pass as a prop; do not fork it into a
+  component-local copy.
+- `employeesList` — shared with Employees/Role Management per Brief 21; also used here (Workforce
+  Directory table, Leave-request employee picker, Review employee picker, Targets tab rows).
+- **`setViewingEmployee`** — the Payroll tab's "View Details" row action (10789–10793) calls this
+  directly. It's Employees' own drawer-opening setter. Pass it into the new HR component the same
+  way `AdminEmployeesView` already receives it, or "View Details" silently breaks.
+- `session`, `adminEmail`, `branches`, `localServices`, `allReservations` — global, pass down as
+  already done for every other extracted section.
+
+**Latent drift, worth a one-line flag in the extracted file, not a fix here:** HR's own Payroll
+department filter (10560–10565) is a hardcoded literal option list (`Doctors`/`Nursing`/`Admin`/
+`Reception`/`Lab`), not sourced from the dynamic `departmentsList` that Role Management manages and
+Employees consumes — it can silently drift if departments are renamed or added elsewhere.
+
+**Handler functions — all hoisted, all defined OUTSIDE the JSX block, `page.tsx:2066–2211`. None
+of them move; pass them down as props exactly like Brief 21 did for `fetchRolesAndEmployees`
+etc.:**
+`fetchHrPayroll`, `fetchDoctorPayroll`, `fetchHrLeaves`, `fetchHrPerformance` — each called from
+inside the HR JSX (refresh actions) but defined outside it. `fetchHrAttendance` is defined outside
+and **never called from inside the HR JSX** (only via the orchestrator below). `fetchHrAlerts` is
+called from inside HR (the "Resolve" button) but also from the global 30-second polling effect and
+the global alerts banner's own dismiss button — not HR-exclusive, pass down. `fetchHrData` is a
+`useCallback` orchestrator that `Promise.all`s all of the above plus `fetchRolesAndEmployees()`,
+fired by a `useEffect` keyed on `activeNav === "HR"` (2207–2211). **Keep this `useEffect` in
+`page.tsx`, same as Brief 21 kept the Employees/HR attendance effect** — don't try to move it into
+the new component, just let it keep populating the state that gets passed down as props.
+
+**Structure to preserve exactly — one component, 7 inline sub-tabs, no existing sub-components to
+reuse (no `hr/` folder exists yet; everything is hand-rolled, even less hoisted than Employees
+was):**
+
+| Sub-tab | Lines | API calls inside |
+|---|---|---|
+| Overview | 10323–10416 | none (read-only Workforce Directory) |
+| Payroll | 10419–10882 | `POST /api/hr/payroll` (10494, run), `PATCH` ×3 (10699 bonus, 10723 deduction, 10805 mark paid) |
+| Doctor Payroll | 10885–11216 | `POST /api/hr/doctor-payroll` (10947, run), `PATCH /api/hr/doctor-payroll` (11136, mark paid) |
+| Leaves | 11219–11439 | `PATCH /api/hr/leaves` ×2 (11281 approve, 11299 reject), `POST /api/hr/leaves` (11338, submit) |
+| Performance | 11442–11604 | `DELETE /api/hr/performance` (11457), `POST /api/hr/performance` (11515) |
+| Attendance | 11607–11745 | `PATCH /api/hr/alerts` (11722, resolve) |
+| Targets | 11747–11860 | none directly (opens the detached Edit Target modal, which does `PATCH /api/employees` at 16209 — note this reuses the Employees endpoint, not an `/api/hr/*` one, since target/bonus fields live on the employee record) |
+
+**Do NOT do any of the following in this brief:**
+- Do not translate anything — future Phase 2 brief.
+- Do not deduplicate the Payroll and Doctor Payroll tabs against each other. They're structurally
+  similar (search → filter → paginate → table → status badge → Pay action, same visual language)
+  but genuinely diverge in columns and are already cleanly non-overlapping in data (Payroll's
+  filter explicitly excludes doctors, 10425). Same call as Brief 21 made for the schedule editor —
+  this needs a product decision about a canonical shared table component, not a silent merge inside
+  an extraction brief.
+- Do not fix the Payroll status filter bug found during investigation: selecting "Overdue" and
+  selecting "Pending" currently return the exact same rows (both conditions check
+  `status === "Paid"` and nothing else, 10451–10453) — only the *badge* color actually distinguishes
+  them (10649). Real bug, out of scope for a zero-behavior-change extraction. Flag it in the PR
+  description; do not silently correct it.
+- Do not touch the value/label-separation sites found during investigation (leave status, payroll
+  status, attendance status, shift substring-matching, leave type, target/bonus type) — move them
+  as-is. They're documented here for whoever writes the eventual HR translation brief:
+  leave status (`"Pending"`/`"Approved"`/`"Rejected"`, compared 11268–11276, displayed raw 11272),
+  payroll status (derived label, compared via `isPaid`/date math 10649, displayed raw 10778),
+  doctor payroll status (same shape, 11115–11123), attendance status (`rec.status`, 3-way ternary
+  11672–11676), shift free-text `.includes("night"/"pm")` matching (10681, 11643–11648 — same class
+  of risk Brief 21 already logged for Employees' own `emp.shift`), leave type (dropdown literals,
+  11390–11393, no comparison logic but raw display at 11260), target/bonus type (`"reservations"`/
+  `"revenue"`, `"percentage"`/`"fixed"`, compared throughout, hardcoded English button labels in the
+  detached modal at 16250/16261/16287/16303).
+
+**Method / exit criteria:** identical shape to Brief 21. Pure structural move, no behavior change.
+`tsc`/`eslint` clean, `vitest` unchanged, diff on `page.tsx` should be almost entirely deletions
+(both spans) plus a single `<AdminHrView .../>` call with props. Manual test checklist per
+CLAUDE.md, covering all 7 sub-tabs: Overview directory, Payroll run/edit-bonus/edit-deduction/
+mark-paid/filter/search, Doctor Payroll same set, Leaves submit/approve/reject, Performance
+create/delete, Attendance log + inactivity alerts resolve, Targets edit (confirming the detached
+modal still opens and saves correctly after the move — this is the one thing most likely to break
+if the two spans were extracted independently instead of together).
+
+---
+---
+
 # ARCHIVE — completed briefs
 
 Kept as a short record only. Full detail of what was found and fixed lives in `ai_docs/RISKS.md`
