@@ -22,6 +22,7 @@ import {
   X,
   Archive,
 } from "lucide-react";
+import { adminTranslations } from "../translations";
 
 type Branch = { id: string; name_en: string };
 
@@ -48,6 +49,8 @@ type Props = {
   onRefreshProducts: () => Promise<void> | void;
   onProductCountChange?: (count: number) => void;
   onCustomerSpentChange?: (customerId: string, newSpentAmount: number) => void;
+  lang: "en" | "ar";
+  t: typeof adminTranslations["en"]["inventory"]["products"];
 };
 
 const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
@@ -62,6 +65,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
       onRefreshProducts,
       onProductCountChange,
       onCustomerSpentChange,
+      lang,
+      t,
     },
     ref
   ) {
@@ -208,7 +213,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
     const handleSaveProduct = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!prodName.trim()) {
-        alert("Product name is required.");
+        alert(t.nameRequired);
         return;
       }
       setSavingProduct(true);
@@ -239,11 +244,11 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
           resetProductForm();
           await onRefreshProducts();
         } else {
-          alert("Failed to save product.");
+          alert(t.saveFailed);
         }
       } catch (err) {
         console.error("Error saving product:", err);
-        alert("Error saving product.");
+        alert(t.saveError);
       } finally {
         setSavingProduct(false);
       }
@@ -270,11 +275,11 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
           await onRefreshProducts();
           setProductPendingDelete(null);
         } else {
-          setProductDeleteError(resBody?.error || "Failed to delete product.");
+          setProductDeleteError(resBody?.error || t.deleteFailed);
         }
       } catch (err) {
         console.error("Error deleting product:", err);
-        setProductDeleteError("Error deleting product.");
+        setProductDeleteError(t.deleteError);
       } finally {
         setDeletingProduct(false);
       }
@@ -282,7 +287,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
 
     const handleOpenSellProductModal = (prod: any) => {
       if (prod?.role === "consumable") {
-        alert("Consumable products are reserved for clinic service usage and cannot be sold to patients.");
+        alert(t.consumableAlert);
         return;
       }
       setSelectedSellProduct(prod);
@@ -312,11 +317,11 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
       if (e) e.preventDefault();
       const targetPatient = searchedPatient || customers.find((c) => c.id === sellCustomerId);
       if (!selectedSellProduct || !targetPatient || sellQuantity <= 0) {
-        alert("Please select a valid patient and product quantity.");
+        alert(t.invalidPatientQty);
         return;
       }
       if (sellQuantity > selectedSellProduct.stock_quantity) {
-        alert(`Cannot sell ${sellQuantity} items. Only ${selectedSellProduct.stock_quantity} available in stock.`);
+        alert(t.cannotSellQty(sellQuantity, selectedSellProduct.stock_quantity));
         return;
       }
 
@@ -358,17 +363,17 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
         await onRefreshProducts();
         setShowSellProductModal(false);
         setSelectedSellProduct(null);
-        alert(`Sale confirmed! ${sellQuantity} x ${selectedSellProduct.name} recorded for ${targetPatient.name}.`);
+        alert(t.saleConfirmed(sellQuantity, selectedSellProduct.name, targetPatient.name));
       } catch (err: any) {
         console.error("Error completing product sale:", err);
-        alert(err.message || "An error occurred while confirming the sale.");
+        alert(err.message || t.saleError);
       } finally {
         setSubmittingSellProduct(false);
       }
     };
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
         {/* Stats Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="rounded-[28px] bg-white p-5 border border-[#E6E9EB] shadow-sm flex items-center gap-4">
@@ -376,7 +381,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               <ShoppingBag size={22} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">Total Products</p>
+              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">{t.totalProducts}</p>
               <p className="text-2xl font-bold text-[#1F251A]">{products.length}</p>
             </div>
           </div>
@@ -386,7 +391,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               <CheckCircle size={22} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">Active Catalog</p>
+              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">{t.activeCatalog}</p>
               <p className="text-2xl font-bold text-[#1F251A]">
                 {products.filter((p) => p.status === "Active").length}
               </p>
@@ -398,7 +403,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               <AlertTriangle size={22} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">Low Stock Alerts</p>
+              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">{t.lowStockAlerts}</p>
               <p className="text-2xl font-bold text-amber-700">
                 {products.filter((p) => p.stock_quantity <= p.min_reorder_quantity).length}
               </p>
@@ -410,9 +415,9 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               <Package size={22} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">Stock Valuation</p>
+              <p className="text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">{t.stockValuation}</p>
               <p className="text-xl font-bold text-[#1F251A]">
-                EGP {products.reduce((sum, p) => sum + (p.stock_quantity * p.purchase_price), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                EGP {products.reduce((sum, p) => sum + (p.stock_quantity * p.purchase_price), 0).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -431,7 +436,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                   : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
               }`}
             >
-              Products Catalog ({filteredInventoryProducts.length})
+              {t.catalogTab(filteredInventoryProducts.length)}
             </button>
             <button
               type="button"
@@ -442,7 +447,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                   : "border-transparent text-[#5A6A51] hover:text-[#1F251A]"
               }`}
             >
-              <Receipt size={14} /> Product Sales History ({productSalesHistory.length})
+              <Receipt size={14} /> {t.salesHistoryTab(productSalesHistory.length)}
             </button>
           </div>
 
@@ -450,20 +455,20 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
             <>
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-xl font-bold text-[#1F251A]">Medical Consumables &amp; Products</h3>
-                  <p className="text-xs text-[#5A6A51]">Manage injectable stock, skincare supplies, cost price, selling price, and sell products directly to patients.</p>
+                  <h3 className="text-xl font-bold text-[#1F251A]">{t.heading}</h3>
+                  <p className="text-xs text-[#5A6A51]">{t.subtitle}</p>
                 </div>
 
                 {/* Search & Filter controls */}
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                   <div className="relative flex-1 md:w-64">
-                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+                    <Search size={16} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
                     <input
                       type="text"
-                      placeholder="Search by name, SKU..."
+                      placeholder={t.searchPlaceholder}
                       value={productSearchQuery}
                       onChange={(e) => setProductSearchQuery(e.target.value)}
-                      className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 pl-9 pr-4 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
+                      className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 ps-9 pe-4 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
                     />
                   </div>
 
@@ -472,12 +477,12 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     onChange={(e) => setProductCategoryFilter(e.target.value)}
                     className="rounded-2xl border border-[#E6E9EB] bg-white py-2 px-3 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
                   >
-                    <option value="All">All Categories</option>
-                    <option value="Injectables">Injectables</option>
-                    <option value="Skincare">Skincare</option>
-                    <option value="Supplies">Supplies</option>
-                    <option value="Equipment">Equipment</option>
-                    <option value="General">General</option>
+                    <option value="All">{t.allCategories}</option>
+                    <option value="Injectables">{t.catInjectables}</option>
+                    <option value="Skincare">{t.catSkincare}</option>
+                    <option value="Supplies">{t.catSupplies}</option>
+                    <option value="Equipment">{t.catEquipment}</option>
+                    <option value="General">{t.catGeneral}</option>
                   </select>
 
                   <select
@@ -485,11 +490,11 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     onChange={(e) => setProductStatusFilter(e.target.value)}
                     className="rounded-2xl border border-[#E6E9EB] bg-white py-2 px-3 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
                   >
-                    <option value="All">All Statuses</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                    <option value="Out of Stock">Out of Stock</option>
-                    <option value="Discontinued">Discontinued</option>
+                    <option value="All">{t.allStatuses}</option>
+                    <option value="Active">{t.statusActive}</option>
+                    <option value="Inactive">{t.statusInactive}</option>
+                    <option value="Out of Stock">{t.statusOutOfStock}</option>
+                    <option value="Discontinued">{t.statusDiscontinued}</option>
                   </select>
 
                   <button
@@ -500,7 +505,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     }}
                     className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]`}
                   >
-                    <Plus size={14} /> Add Item
+                    <Plus size={14} /> {t.addItemBtn}
                   </button>
                 </div>
               </div>
@@ -510,13 +515,13 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                 <table className="w-full min-w-[900px] text-sm">
                   <thead>
                     <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                      <th className="px-6 py-4 text-left">Product Item &amp; SKU</th>
-                      <th className="px-6 py-4 text-left">Category &amp; Unit</th>
-                      <th className="px-6 py-4 text-right">Cost Price</th>
-                      <th className="px-6 py-4 text-right">Selling Price</th>
-                      <th className="px-6 py-4 text-center">Stock Level</th>
-                      <th className="px-6 py-4 text-left">Status</th>
-                      <th className="px-6 py-4 text-right">Actions</th>
+                      <th className="px-6 py-4 text-start">{t.thProductSku}</th>
+                      <th className="px-6 py-4 text-start">{t.thCategoryUnit}</th>
+                      <th className="px-6 py-4 text-end">{t.thCostPrice}</th>
+                      <th className="px-6 py-4 text-end">{t.thSellingPrice}</th>
+                      <th className="px-6 py-4 text-center">{t.thStockLevel}</th>
+                      <th className="px-6 py-4 text-start">{t.thStatus}</th>
+                      <th className="px-6 py-4 text-end">{t.thActions}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
@@ -525,8 +530,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                         <td colSpan={7} className="px-6 py-12 text-center text-[#5A6A51]">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <ShoppingBag size={32} className="text-[#A3B19B]" />
-                            <p className="font-semibold text-[#1F251A]">No products found</p>
-                            <p className="text-xs text-[#5A6A51]">Try adjusting your search query or add a new product item.</p>
+                            <p className="font-semibold text-[#1F251A]">{t.emptyTitle}</p>
+                            <p className="text-xs text-[#5A6A51]">{t.emptyDesc}</p>
                             <button
                               type="button"
                               onClick={() => {
@@ -535,7 +540,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                               }}
                               className={`mt-2 ${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26] cursor-pointer`}
                             >
-                              <Plus size={14} /> Add Item
+                              <Plus size={14} /> {t.addItemBtn}
                             </button>
                           </div>
                         </td>
@@ -557,7 +562,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                                   )}
                                   {prod.sku && (
                                     <span className="inline-block mt-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-mono text-gray-600">
-                                      SKU: {prod.sku}
+                                      {t.skuLabel} {prod.sku}
                                     </span>
                                   )}
                                 </div>
@@ -567,12 +572,12 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                               <span className="inline-flex items-center rounded-full bg-[#EBF0E6] px-2.5 py-0.5 text-xs font-medium text-[#414E36]">
                                 {prod.category}
                               </span>
-                              <p className="text-xs text-[#5A6A51] mt-1 font-mono">Unit: {prod.unit}</p>
+                              <p className="text-xs text-[#5A6A51] mt-1 font-mono">{t.unitLabel} {prod.unit}</p>
                             </td>
-                            <td className="px-6 py-4 text-right font-mono font-semibold text-[#1F251A]">
+                            <td className="px-6 py-4 text-end font-mono font-semibold text-[#1F251A]">
                               EGP {prod.purchase_price.toFixed(2)}
                             </td>
-                            <td className="px-6 py-4 text-right font-mono font-semibold text-[#414E36]">
+                            <td className="px-6 py-4 text-end font-mono font-semibold text-[#414E36]">
                               EGP {prod.selling_price.toFixed(2)}
                             </td>
                             <td className="px-6 py-4 text-center">
@@ -582,7 +587,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                                 </span>
                                 {isLowStock && (
                                   <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">
-                                    <AlertTriangle size={10} /> Reorder (Min {prod.min_reorder_quantity})
+                                    <AlertTriangle size={10} /> {t.reorderMin(prod.min_reorder_quantity)}
                                   </span>
                                 )}
                               </div>
@@ -597,25 +602,25 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                                     : "bg-gray-100 text-gray-600 border border-gray-200"
                                 }`}
                               >
-                                {prod.status}
+                                {prod.status === "Active" ? t.statusActive : prod.status === "Out of Stock" ? t.statusOutOfStock : prod.status === "Inactive" ? t.statusInactive : prod.status === "Discontinued" ? t.statusDiscontinued : prod.status}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-6 py-4 text-end">
                               <div className="flex items-center justify-end gap-2">
                                 <button
                                   type="button"
                                   onClick={() => handleOpenSellProductModal(prod)}
                                   disabled={prod.stock_quantity <= 0 || prod.role === "consumable"}
                                   className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1 rounded-xl bg-[#414E36] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2e3a26] disabled:opacity-40 disabled:cursor-not-allowed`}
-                                  title={prod.role === "consumable" ? "Consumable Only (Used in services only, not for retail sale)" : prod.stock_quantity <= 0 ? "Out of Stock" : "Sell Product"}
+                                  title={prod.role === "consumable" ? t.consumableTitle : prod.stock_quantity <= 0 ? t.outOfStockTitle : t.sellProductTitle}
                                 >
-                                  <Tag size={13} /> {prod.role === "consumable" ? "Consumable Only" : "Sell Product"}
+                                  <Tag size={13} /> {prod.role === "consumable" ? t.consumableOnly : t.sellProductTitle}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => openEditProductModal(prod)}
                                   className={`${canManage ? "inline-flex" : "hidden"} rounded-xl border border-[#E6E9EB] p-2 text-[#5A6A51] transition hover:bg-[#EBF0E6] hover:text-[#414E36]`}
-                                  title="Edit Product"
+                                  title={t.editProductTitle}
                                 >
                                   <Pencil size={15} />
                                 </button>
@@ -626,7 +631,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                                       data-testid={`soft-delete-product-${prod.id}`}
                                       onClick={() => requestDeleteProduct(prod.id, prod.name, "soft")}
                                       className="inline-flex rounded-xl border border-amber-200 p-2 text-amber-600 transition hover:bg-amber-50 hover:text-amber-700"
-                                      title="Soft Delete (hide, reversible)"
+                                      title={t.softDeleteTitle}
                                     >
                                       <Archive size={15} />
                                     </button>
@@ -635,7 +640,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                                       data-testid={`hard-delete-product-${prod.id}`}
                                       onClick={() => requestDeleteProduct(prod.id, prod.name, "hard")}
                                       className="inline-flex rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
-                                      title="Permanently Delete (superadmin only)"
+                                      title={t.hardDeleteTitle}
                                     >
                                       <Trash2 size={15} />
                                     </button>
@@ -646,7 +651,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                                     data-testid={`soft-delete-product-${prod.id}`}
                                     onClick={() => requestDeleteProduct(prod.id, prod.name, "soft")}
                                     className="inline-flex rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"
-                                    title="Delete Product"
+                                    title={t.deleteProductTitle}
                                   >
                                     <Trash2 size={15} />
                                   </button>
@@ -666,8 +671,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-bold text-[#1F251A]">Product Sales History</h3>
-                  <p className="text-xs text-[#5A6A51]">Complete log of all products sold to clinic patients.</p>
+                  <h3 className="text-xl font-bold text-[#1F251A]">{t.salesHeading}</h3>
+                  <p className="text-xs text-[#5A6A51]">{t.salesSubtitle}</p>
                 </div>
               </div>
 
@@ -675,12 +680,12 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                 <table className="w-full min-w-[800px] text-sm">
                   <thead>
                     <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-                      <th className="px-6 py-4 text-left">Date &amp; Time</th>
-                      <th className="px-6 py-4 text-left">Product</th>
-                      <th className="px-6 py-4 text-left">Patient Details</th>
-                      <th className="px-6 py-4 text-center">Qty</th>
-                      <th className="px-6 py-4 text-right">Unit Price</th>
-                      <th className="px-6 py-4 text-right">Total Amount</th>
+                      <th className="px-6 py-4 text-start">{t.thDateTime}</th>
+                      <th className="px-6 py-4 text-start">{t.thProduct}</th>
+                      <th className="px-6 py-4 text-start">{t.thPatient}</th>
+                      <th className="px-6 py-4 text-center">{t.thQty}</th>
+                      <th className="px-6 py-4 text-end">{t.thUnitPrice}</th>
+                      <th className="px-6 py-4 text-end">{t.thTotalAmount}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
@@ -689,8 +694,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                         <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Receipt size={32} className="text-[#A3B19B]" />
-                            <p className="font-semibold text-[#1F251A]">No sales recorded yet</p>
-                            <p className="text-xs text-[#5A6A51]">Products sold to patients will appear here automatically.</p>
+                            <p className="font-semibold text-[#1F251A]">{t.noSalesTitle}</p>
+                            <p className="text-xs text-[#5A6A51]">{t.noSalesDesc}</p>
                           </div>
                         </td>
                       </tr>
@@ -698,7 +703,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                       productSalesHistory.map((sale) => (
                         <tr key={sale.id} className="transition hover:bg-[#F9F9F7]">
                           <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">
-                            {new Date(sale.created_at).toLocaleString(undefined, {
+                            {new Date(sale.created_at).toLocaleString("en-GB", {
                               dateStyle: "medium",
                               timeStyle: "short",
                             })}
@@ -718,10 +723,10 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                           <td className="px-6 py-4 text-center font-bold font-mono text-[#1F251A]">
                             {sale.quantity}
                           </td>
-                          <td className="px-6 py-4 text-right font-mono text-xs text-[#5A6A51]">
+                          <td className="px-6 py-4 text-end font-mono text-xs text-[#5A6A51]">
                             EGP {(sale.unit_price || 0).toFixed(2)}
                           </td>
-                          <td className="px-6 py-4 text-right font-mono font-bold text-[#414E36]">
+                          <td className="px-6 py-4 text-end font-mono font-bold text-[#414E36]">
                             EGP {(sale.total_amount || 0).toFixed(2)}
                           </td>
                         </tr>
@@ -741,10 +746,10 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
                 <div>
                   <h3 className="text-2xl font-bold text-[#1F251A]">
-                    {editingProduct ? "Edit Product Item" : "Add New Product Item"}
+                    {editingProduct ? t.editModalTitle : t.addModalTitle}
                   </h3>
                   <p className="text-xs text-[#5A6A51] mt-1">
-                    Manage item details, pricing, unit of measurement, stock levels, and reorder warnings.
+                    {t.modalSubtitle}
                   </p>
                 </div>
                 <button
@@ -759,21 +764,21 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
               <form onSubmit={handleSaveProduct} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Product Name (English) *</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.nameEnLabel}</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Botox Type A (100U)"
+                      placeholder={t.nameEnPlaceholder}
                       value={prodName}
                       onChange={(e) => setProdName(e.target.value)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Product Name (Arabic)</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.nameArLabel}</label>
                     <input
                       type="text"
-                      placeholder="e.g. بوتوكس نوع أ"
+                      placeholder={t.nameArPlaceholder}
                       value={prodNameAr}
                       onChange={(e) => setProdNameAr(e.target.value)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36] dir-rtl font-sans"
@@ -783,34 +788,34 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">SKU / Item Code</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.skuCodeLabel}</label>
                     <input
                       type="text"
-                      placeholder="e.g. BTX-100U"
+                      placeholder={t.skuCodePlaceholder}
                       value={prodSku}
                       onChange={(e) => setProdSku(e.target.value)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Category</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.categoryLabel}</label>
                     <select
                       value={prodCategory}
                       onChange={(e) => setProdCategory(e.target.value)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
                     >
-                      <option value="Injectables">Injectables</option>
-                      <option value="Skincare">Skincare</option>
-                      <option value="Supplies">Supplies</option>
-                      <option value="Equipment">Equipment</option>
-                      <option value="General">General</option>
+                      <option value="Injectables">{t.catInjectables}</option>
+                      <option value="Skincare">{t.catSkincare}</option>
+                      <option value="Supplies">{t.catSupplies}</option>
+                      <option value="Equipment">{t.catEquipment}</option>
+                      <option value="General">{t.catGeneral}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Unit of Measure</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.unitMeasureLabel}</label>
                     <input
                       type="text"
-                      placeholder="vial, box, ml, piece"
+                      placeholder={t.unitMeasurePlaceholder}
                       value={prodUnit}
                       onChange={(e) => setProdUnit(e.target.value)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
@@ -820,25 +825,25 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Cost Price (EGP) *</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.costPriceLabel}</label>
                     <input
                       type="number"
                       step="0.01"
                       min="0"
                       required
-                      placeholder="0.00"
+                      placeholder={t.pricePlaceholder}
                       value={prodPurchasePrice}
                       onChange={(e) => setProdPurchasePrice(e.target.value)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Selling / Retail Price (EGP)</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.sellingPriceLabel}</label>
                     <input
                       type="number"
                       step="0.01"
                       min="0"
-                      placeholder="0.00"
+                      placeholder={t.pricePlaceholder}
                       value={prodSellingPrice}
                       onChange={(e) => setProdSellingPrice(e.target.value)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm font-mono text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
@@ -848,7 +853,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Stock Quantity</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.stockQtyLabel}</label>
                     <input
                       type="number"
                       min="0"
@@ -859,7 +864,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Min Reorder Level</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.minReorderLabel}</label>
                     <input
                       type="number"
                       min="0"
@@ -870,29 +875,29 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Status</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.statusLabel}</label>
                     <select
                       value={prodStatus}
                       onChange={(e) => setProdStatus(e.target.value as any)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
                     >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                      <option value="Out of Stock">Out of Stock</option>
-                      <option value="Discontinued">Discontinued</option>
+                      <option value="Active">{t.statusActive}</option>
+                      <option value="Inactive">{t.statusInactive}</option>
+                      <option value="Out of Stock">{t.statusOutOfStock}</option>
+                      <option value="Discontinued">{t.statusDiscontinued}</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Assigned Branch</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.branchLabel}</label>
                     <select
                       value={prodBranchId}
                       onChange={(e) => setProdBranchId(e.target.value)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
                     >
-                      <option value="">All Branches / Central Warehouse</option>
+                      <option value="">{t.allBranchesWarehouse}</option>
                       {branches.map((b) => (
                         <option key={b.id} value={b.id}>
                           {b.name_en}
@@ -901,24 +906,24 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Role</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.roleLabel}</label>
                     <select
                       value={prodRole}
                       onChange={(e) => setProdRole(e.target.value as any)}
                       className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
                     >
-                      <option value="retail">Retail (sold to patients only)</option>
-                      <option value="consumable">Consumable (used in services only)</option>
-                      <option value="both">Both</option>
+                      <option value="retail">{t.roleRetail}</option>
+                      <option value="consumable">{t.roleConsumable}</option>
+                      <option value="both">{t.roleBoth}</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">Description &amp; Storage Notes</label>
+                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.descStorageLabel}</label>
                   <textarea
                     rows={2}
-                    placeholder="e.g. Keep refrigerated between 2-8°C."
+                    placeholder={t.descStoragePlaceholder}
                     value={prodNotes}
                     onChange={(e) => setProdNotes(e.target.value)}
                     className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
@@ -931,14 +936,14 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     onClick={() => setShowAddProductModal(false)}
                     className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] hover:bg-gray-50 transition"
                   >
-                    Cancel
+                    {t.cancelBtn}
                   </button>
                   <button
                     type="submit"
                     disabled={savingProduct}
                     className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm disabled:opacity-50"
                   >
-                    {savingProduct ? "Saving..." : editingProduct ? "Save Changes" : "Create Product"}
+                    {savingProduct ? t.savingBtn : editingProduct ? t.saveChangesBtn : t.createProductBtn}
                   </button>
                 </div>
               </form>
@@ -965,19 +970,16 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-[#1F251A]">
-                    {productPendingDelete.mode === "hard" ? "Permanently delete this product?" : "Delete this product?"}
+                    {productPendingDelete.mode === "hard" ? t.hardDeleteTitleModal : t.softDeleteTitleModal}
                   </h3>
                   <p className="mt-1.5 text-sm text-[#5A6A51]">
                     {productPendingDelete.mode === "hard" ? (
                       <>
-                        This will permanently erase <strong>&quot;{productPendingDelete.name}&quot;</strong> from the
-                        database. This cannot be undone, and will be rejected if it has sales, purchase, or
-                        consumption history attached — use soft delete for those.
+                        {t.hardDeleteText(productPendingDelete.name)}
                       </>
                     ) : (
                       <>
-                        <strong>&quot;{productPendingDelete.name}&quot;</strong> will be hidden from the catalog and
-                        every report. Its sales, stock, and consumption history are preserved.
+                        {t.softDeleteText(productPendingDelete.name)}
                       </>
                     )}
                   </p>
@@ -997,7 +999,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                   disabled={deletingProduct}
                   className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] transition hover:bg-gray-50 disabled:opacity-50"
                 >
-                  Cancel
+                  {t.cancelBtn}
                 </button>
                 <button
                   type="button"
@@ -1008,7 +1010,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     productPendingDelete.mode === "hard" ? "bg-rose-600 hover:bg-rose-700" : "bg-[#414E36] hover:bg-[#2e3a26]"
                   }`}
                 >
-                  {deletingProduct ? "Deleting..." : productPendingDelete.mode === "hard" ? "Permanently Delete" : "Delete (Soft)"}
+                  {deletingProduct ? t.deletingBtn : productPendingDelete.mode === "hard" ? t.permanentlyDeleteBtn : t.deleteSoftBtn}
                 </button>
               </div>
             </div>
@@ -1021,8 +1023,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
             <div className="w-full max-w-lg rounded-[36px] bg-white p-6 sm:p-8 shadow-2xl border border-[#E6E9EB] space-y-6">
               <div className="flex items-center justify-between border-b border-[#E6E9EB] pb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-[#1F251A]">Sell Product to Patient</h3>
-                  <p className="text-xs text-[#5A6A51] mt-1">{selectedSellProduct.name} — Stock: {selectedSellProduct.stock_quantity} {selectedSellProduct.unit}s</p>
+                  <h3 className="text-xl font-bold text-[#1F251A]">{t.sellModalTitle}</h3>
+                  <p className="text-xs text-[#5A6A51] mt-1">{t.sellModalSubtitle(selectedSellProduct.name, selectedSellProduct.stock_quantity, selectedSellProduct.unit)}</p>
                 </div>
                 <button
                   type="button"
@@ -1038,14 +1040,14 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
 
               <form onSubmit={handleConfirmSellProduct} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">Select Patient *</label>
+                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.selectPatientLabel}</label>
                   <select
                     required
                     value={sellCustomerId}
                     onChange={(e) => setSellCustomerId(e.target.value)}
                     className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
                   >
-                    <option value="">-- Choose Patient --</option>
+                    <option value="">{t.choosePatientOption}</option>
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name} {c.mobile ? `(${c.mobile})` : ""}
@@ -1056,7 +1058,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Unit Selling Price</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.unitSellingPriceLabel}</label>
                     <input
                       type="text"
                       disabled
@@ -1065,7 +1067,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">Quantity *</label>
+                    <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.quantityLabel}</label>
                     <input
                       type="number"
                       min="1"
@@ -1080,8 +1082,8 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
 
                 <div className="rounded-2xl bg-[#F7F7F9] p-4 border border-[#E6E9EB] flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-[#5A6A51]">Total Amount Due</p>
-                    <p className="text-xs font-medium text-[#1F251A]">{sellQuantity} x EGP {selectedSellProduct.selling_price.toFixed(2)}</p>
+                    <p className="text-xs text-[#5A6A51]">{t.totalAmountDueLabel}</p>
+                    <p className="text-xs font-medium text-[#1F251A]">{t.totalAmountDueCalc(sellQuantity, selectedSellProduct.selling_price)}</p>
                   </div>
                   <p className="text-xl font-bold font-mono text-[#414E36]">
                     EGP {(sellQuantity * selectedSellProduct.selling_price).toFixed(2)}
@@ -1089,24 +1091,24 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">Payment Method</label>
+                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.paymentMethodLabel}</label>
                   <select
                     value={sellPaymentMethod}
                     onChange={(e) => setSellPaymentMethod(e.target.value)}
                     className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2.5 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
                   >
-                    <option value="Cash">Cash</option>
-                    <option value="Visa / Card">Visa / Card</option>
-                    <option value="InstaPay">InstaPay</option>
-                    <option value="Vodafone Cash">Vodafone Cash</option>
+                    <option value="Cash">{t.pmCash}</option>
+                    <option value="Visa / Card">{t.pmVisa}</option>
+                    <option value="InstaPay">{t.pmInstaPay}</option>
+                    <option value="Vodafone Cash">{t.pmVodafone}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">Notes / Instructions</label>
+                  <label className="block text-xs font-semibold text-[#1F251A] mb-1">{t.notesInstructionsLabel}</label>
                   <input
                     type="text"
-                    placeholder="e.g. Recommended usage twice daily after cleansing"
+                    placeholder={t.notesInstructionsPlaceholder}
                     value={sellNotes}
                     onChange={(e) => setSellNotes(e.target.value)}
                     className="w-full rounded-xl border border-[#E6E9EB] bg-white px-3.5 py-2 text-sm text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
@@ -1122,14 +1124,14 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                     }}
                     className="rounded-2xl border border-[#E6E9EB] px-5 py-2.5 text-sm font-semibold text-[#5A6A51] hover:bg-gray-50 transition"
                   >
-                    Cancel
+                    {t.cancelBtn}
                   </button>
                   <button
                     type="submit"
                     disabled={submittingSellProduct}
                     className="rounded-2xl bg-[#414E36] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#2e3a26] transition shadow-sm disabled:opacity-50"
                   >
-                    {submittingSellProduct ? "Recording Sale..." : "Confirm & Sell"}
+                    {submittingSellProduct ? t.recordingSaleBtn : t.confirmSellBtn}
                   </button>
                 </div>
               </form>

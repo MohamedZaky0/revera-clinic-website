@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, X, Search, PackageCheck, AlertTriangle, Trash2 } from "lucide-react";
+import { adminTranslations } from "../translations";
 
 type Supplier = {
   id: string;
@@ -37,13 +38,15 @@ type Purchase = {
 type Props = {
   authHeaders: Record<string, string>;
   canManage?: boolean;
+  lang: "en" | "ar";
+  t: typeof adminTranslations["en"]["inventory"]["purchases"];
 };
 
 type FormLine = { productId: string; qty: string; unitCost: string };
 
 const EMPTY_LINE: FormLine = { productId: "", qty: "", unitCost: "" };
 
-export default function PurchasesScreen({ authHeaders, canManage = true }: Props) {
+export default function PurchasesScreen({ authHeaders, canManage = true, lang, t }: Props) {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -76,16 +79,16 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
       const suppliersJson = await suppliersRes.json();
       const productsJson = await productsRes.json();
 
-      if (!purchasesRes.ok) throw new Error(purchasesJson.error || "Failed to load purchases.");
-      if (!suppliersRes.ok) throw new Error(suppliersJson.error || "Failed to load suppliers.");
-      if (!productsRes.ok) throw new Error(productsJson.error || "Failed to load products.");
+      if (!purchasesRes.ok) throw new Error(purchasesJson.error || t.errLoadPurchases);
+      if (!suppliersRes.ok) throw new Error(suppliersJson.error || t.errLoadSuppliers);
+      if (!productsRes.ok) throw new Error(productsJson.error || t.errLoadProducts);
 
       setPurchases(purchasesJson.purchases || []);
       setSuppliers(suppliersJson.suppliers || []);
       setProducts(productsJson.products || []);
       setError(null);
     } catch (e: any) {
-      setError(e.message || "Failed to load purchases.");
+      setError(e.message || t.errLoadPurchases);
     } finally {
       setLoading(false);
     }
@@ -131,15 +134,15 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
       }));
 
     if (cleanLines.length === 0) {
-      setFormError("Add at least one product line.");
+      setFormError(t.errNoLines);
       return;
     }
     if (cleanLines.some((line) => !Number.isFinite(line.qty) || line.qty <= 0)) {
-      setFormError("Every line needs a quantity greater than 0.");
+      setFormError(t.errInvalidQty);
       return;
     }
     if (cleanLines.some((line) => !Number.isFinite(line.unitCost) || line.unitCost < 0)) {
-      setFormError("Every line needs a non-negative unit cost.");
+      setFormError(t.errNegativeCost);
       return;
     }
 
@@ -156,12 +159,12 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to record purchase.");
+      if (!res.ok) throw new Error(json.error || t.errRecordFailed);
 
       setModalOpen(false);
       await loadAll();
     } catch (e: any) {
-      setFormError(e.message || "Failed to record purchase.");
+      setFormError(e.message || t.errRecordFailed);
     } finally {
       setSaving(false);
     }
@@ -176,22 +179,22 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold text-[#1F251A]">Purchases</h3>
-          <p className="text-xs text-[#5A6A51]">Record stock received from suppliers and review purchase history.</p>
+          <h3 className="text-xl font-bold text-[#1F251A]">{t.heading}</h3>
+          <p className="text-xs text-[#5A6A51]">{t.subtitle}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-64">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
+            <Search size={16} className="absolute start-3.5 top-1/2 -translate-y-1/2 text-[#5A6A51]" />
             <input
               type="text"
-              placeholder="Search by supplier, product..."
+              placeholder={t.searchPlaceholder}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 pl-9 pr-4 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
+              className="w-full rounded-2xl border border-[#E6E9EB] bg-white py-2 ps-9 pe-4 text-xs text-[#1F251A] focus:border-[#414E36] focus:outline-none"
             />
           </div>
           <button
@@ -199,7 +202,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
             onClick={openModal}
             className={`${canManage ? "inline-flex" : "hidden"} items-center gap-1.5 rounded-2xl bg-[#414E36] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2e3a26]`}
           >
-            <Plus size={14} /> Record Purchase
+            <Plus size={14} /> {t.recordPurchaseBtn}
           </button>
         </div>
       </div>
@@ -214,26 +217,26 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
         <table className="w-full min-w-[800px] text-sm">
           <thead>
             <tr className="border-b border-[#E6E9EB] bg-[#F7F7F9] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5A6A51]">
-              <th className="px-6 py-4 text-left">Date</th>
-              <th className="px-6 py-4 text-left">Supplier</th>
-              <th className="px-6 py-4 text-left">Items</th>
-              <th className="px-6 py-4 text-right">Total</th>
-              <th className="px-6 py-4 text-right">Paid</th>
-              <th className="px-6 py-4 text-left">Status</th>
+              <th className="px-6 py-4 text-start">{t.thDate}</th>
+              <th className="px-6 py-4 text-start">{t.thSupplier}</th>
+              <th className="px-6 py-4 text-start">{t.thItems}</th>
+              <th className="px-6 py-4 text-end">{t.thTotal}</th>
+              <th className="px-6 py-4 text-end">{t.thPaid}</th>
+              <th className="px-6 py-4 text-start">{t.thStatus}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#E6E9EB] text-[#414E36]">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">Loading purchases...</td>
+                <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">{t.loading}</td>
               </tr>
             ) : filteredPurchases.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center text-[#5A6A51]">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <PackageCheck size={32} className="text-[#A3B19B]" />
-                    <p className="font-semibold text-[#1F251A]">No purchases recorded yet</p>
-                    <p className="text-xs text-[#5A6A51]">Record a purchase to restock products and log a supplier bill.</p>
+                    <p className="font-semibold text-[#1F251A]">{t.emptyTitle}</p>
+                    <p className="text-xs text-[#5A6A51]">{t.emptyDesc}</p>
                   </div>
                 </td>
               </tr>
@@ -244,18 +247,18 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
                 return (
                   <tr key={p.id} className="transition hover:bg-[#F9F9F7]">
                     <td className="px-6 py-4 font-mono text-xs text-[#5A6A51]">
-                      {new Date(p.purchased_at).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                      {new Date(p.purchased_at).toLocaleDateString("en-GB", { dateStyle: "medium" })}
                     </td>
                     <td className="px-6 py-4 font-semibold text-[#1F251A]">{p.suppliers?.name || "—"}</td>
                     <td className="px-6 py-4 text-xs text-[#5A6A51]">
                       {(p.purchase_lines || [])
-                        .map((l) => `${l.inventory_products?.name || "Unknown item"} (${l.qty})`)
+                        .map((l) => `${l.inventory_products?.name || t.unknownItem} (${l.qty})`)
                         .join(", ")}
                     </td>
-                    <td className="px-6 py-4 text-right font-mono font-semibold text-[#1F251A]">
+                    <td className="px-6 py-4 text-end font-mono font-semibold text-[#1F251A]">
                       EGP {Number(p.total).toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 text-right font-mono text-xs text-[#5A6A51]">
+                    <td className="px-6 py-4 text-end font-mono text-xs text-[#5A6A51]">
                       EGP {Number(p.paid).toFixed(2)}
                     </td>
                     <td className="px-6 py-4">
@@ -268,7 +271,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
                             : "bg-gray-100 text-gray-600 border border-gray-200"
                         }`}
                       >
-                        {isPaid ? "Paid" : isPartial ? "Partially Paid" : "Unpaid"}
+                        {isPaid ? t.paid : isPartial ? t.partiallyPaid : t.unpaid}
                       </span>
                     </td>
                   </tr>
@@ -283,7 +286,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl border border-[#414E36]/10 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#414E36]/10 pb-4 mb-4">
-              <h3 className="text-xl font-bold text-[#1F251A]">Record Purchase</h3>
+              <h3 className="text-xl font-bold text-[#1F251A]">{t.modalTitle}</h3>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
@@ -295,13 +298,13 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">Supplier</label>
+                <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">{t.supplierLabel}</label>
                 <select
                   value={supplierId}
                   onChange={(e) => setSupplierId(e.target.value)}
                   className="w-full rounded-xl border border-[#414E36]/15 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#414E36]"
                 >
-                  <option value="">No supplier / one-off</option>
+                  <option value="">{t.noSupplierOption}</option>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -309,7 +312,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">Lines *</label>
+                <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider">{t.linesLabel}</label>
                 {lines.map((line, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <select
@@ -318,7 +321,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
                       onChange={(e) => updateLine(index, { productId: e.target.value })}
                       className="flex-1 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#414E36]"
                     >
-                      <option value="" disabled>Select product</option>
+                      <option value="" disabled>{t.selectProductOption}</option>
                       {products.map((p) => (
                         <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
                       ))}
@@ -328,7 +331,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
                       min="0.01"
                       step="any"
                       required
-                      placeholder="Qty"
+                      placeholder={t.qtyPlaceholder}
                       value={line.qty}
                       onChange={(e) => updateLine(index, { qty: e.target.value })}
                       className="w-24 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#414E36]"
@@ -338,7 +341,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
                       min="0"
                       step="any"
                       required
-                      placeholder="Unit cost"
+                      placeholder={t.unitCostPlaceholder}
                       value={line.unitCost}
                       onChange={(e) => updateLine(index, { unitCost: e.target.value })}
                       className="w-28 rounded-xl border border-[#414E36]/15 bg-white px-3 py-2 text-sm outline-none focus:border-[#414E36]"
@@ -348,7 +351,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
                       onClick={() => removeLine(index)}
                       disabled={lines.length === 1}
                       className="rounded-xl border border-rose-100 p-2 text-rose-600 transition hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30 disabled:cursor-not-allowed"
-                      title="Remove line"
+                      title={t.removeLineTitle}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -359,18 +362,18 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
                   onClick={addLine}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-[#414E36]/20 px-3 py-1.5 text-xs font-semibold text-[#414E36] transition hover:bg-[#EBF0E6]"
                 >
-                  <Plus size={13} /> Add Line
+                  <Plus size={13} /> {t.addLineBtn}
                 </button>
               </div>
 
               <div className="flex items-center justify-between rounded-xl bg-[#F7F7F9] px-4 py-2.5 text-sm">
-                <span className="text-[#5A6A51]">Estimated total</span>
+                <span className="text-[#5A6A51]">{t.estimatedTotalLabel}</span>
                 <span className="font-mono font-bold text-[#1F251A]">EGP {previewTotal.toFixed(2)}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">Paid Now (EGP)</label>
+                  <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">{t.paidNowLabel}</label>
                   <input
                     type="number"
                     min="0"
@@ -382,7 +385,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">Due Date</label>
+                  <label className="block text-xs font-semibold text-[#5A6A51] uppercase tracking-wider mb-1">{t.dueDateLabel}</label>
                   <input
                     type="date"
                     value={dueDate}
@@ -403,7 +406,7 @@ export default function PurchasesScreen({ authHeaders, canManage = true }: Props
                 disabled={saving}
                 className="w-full rounded-3xl bg-[#414E36] py-3 text-sm font-semibold text-[#FBFBF9] transition hover:bg-[#2e3a26] disabled:opacity-50 mt-2"
               >
-                {saving ? "Recording..." : "Record Purchase"}
+                {saving ? t.recordingBtn : t.recordPurchaseBtn}
               </button>
             </form>
           </div>

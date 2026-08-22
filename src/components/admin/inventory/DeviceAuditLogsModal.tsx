@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Gauge, RotateCcw, Search, X } from "lucide-react";
+import { adminTranslations } from "../translations";
 
 type DeviceAuditLog = {
   id: string;
@@ -29,9 +30,11 @@ type Props = {
   onClose: () => void;
   authHeaders: Record<string, string>;
   devices: Device[];
+  lang: "en" | "ar";
+  t: typeof adminTranslations["en"]["inventory"]["auditLogs"];
 };
 
-export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devices }: Props) {
+export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devices, lang, t }: Props) {
   const [auditLogs, setAuditLogs] = useState<DeviceAuditLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -80,14 +83,14 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F251A]/50 p-4 animate-fadeIn" dir={lang === "ar" ? "rtl" : "ltr"}>
       <div className="w-full max-w-5xl rounded-[32px] bg-[#FBFBF9] p-6 shadow-[0_20px_60px_rgba(31,37,26,0.25)] max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="mb-4 flex items-center justify-between border-b border-[#414E36]/10 pb-4 shrink-0">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-[#5A6A51] font-bold">Inventory Audit History</p>
+            <p className="text-xs uppercase tracking-[0.35em] text-[#5A6A51] font-bold">{t.headerLabel}</p>
             <h3 className="mt-1 text-2xl font-semibold text-[#1F251A] flex items-center gap-2">
-              <Gauge size={22} className="text-[#414E36]" /> Clinic Device Audit &amp; Maintenance Logs
+              <Gauge size={22} className="text-[#414E36]" /> {t.title}
             </h3>
           </div>
           <div className="flex items-center gap-2">
@@ -95,7 +98,7 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
               type="button"
               onClick={fetchLogs}
               className="rounded-full bg-[#EBF0E6] p-2.5 text-[#414E36] transition hover:bg-[#d8e3d2]"
-              title="Refresh Audit Logs"
+              title={t.refreshTitle}
             >
               <RotateCcw size={18} className={loading ? "animate-spin" : ""} />
             </button>
@@ -111,13 +114,13 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
         {/* Filter controls bar */}
         <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-[#E6E9EB]">
           <div className="relative flex-1">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8C9A84]" />
+            <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-[#8C9A84]" />
             <input
               type="text"
-              placeholder="Search logs by device, serial number, reason, performed by..."
+              placeholder={t.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-[#E6E9EB] bg-[#FBFBF9] pl-9 pr-3 py-2 text-xs text-[#1F251A] placeholder-[#8C9A84] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
+              className="w-full rounded-xl border border-[#E6E9EB] bg-[#FBFBF9] ps-9 pe-3 py-2 text-xs text-[#1F251A] placeholder-[#8C9A84] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -126,7 +129,7 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
               onChange={(e) => setFilterDevice(e.target.value)}
               className="rounded-xl border border-[#E6E9EB] bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
             >
-              <option value="all">All Devices</option>
+              <option value="all">{t.allDevices}</option>
               {devices.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -139,25 +142,25 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
               onChange={(e) => setFilterType(e.target.value)}
               className="rounded-xl border border-[#E6E9EB] bg-[#FBFBF9] px-3 py-2 text-xs font-semibold text-[#1F251A] focus:outline-none focus:ring-2 focus:ring-[#414E36]"
             >
-              <option value="all">All Action Types</option>
-              <option value="Pulse Reset">Pulse Reset / Maintenance</option>
-              <option value="Device Created">Device Created</option>
-              <option value="Device Updated">Device Updated</option>
-              <option value="Status Changed">Status Changed</option>
+              <option value="all">{t.allActionTypes}</option>
+              <option value="Pulse Reset">{t.typePulseReset}</option>
+              <option value="Device Created">{t.typeDeviceCreated}</option>
+              <option value="Device Updated">{t.typeDeviceUpdated}</option>
+              <option value="Status Changed">{t.typeStatusChanged}</option>
             </select>
           </div>
         </div>
 
         {/* Logs List Content */}
-        <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto pe-1 custom-scrollbar">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <span className="h-8 w-8 animate-spin rounded-full border-4 border-[#414E36] border-t-transparent" />
-              <p className="text-xs text-[#5A6A51] font-semibold">Loading Device Audit Logs...</p>
+              <p className="text-xs text-[#5A6A51] font-semibold">{t.loading}</p>
             </div>
           ) : filteredLogs.length === 0 ? (
             <div className="text-center py-20 text-[#5A6A51] italic text-sm bg-white rounded-2xl border border-[#E6E9EB]">
-              No device audit logs found matching your filters.
+              {t.empty}
             </div>
           ) : (
             <div className="space-y-3">
@@ -187,7 +190,7 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
                       </div>
                       <div className="flex items-center gap-2 text-xs text-[#5A6A51]">
                         <span className="font-mono text-[11px] bg-[#F7F7F9] px-2 py-0.5 rounded-md border border-[#E6E9EB]">
-                          {new Date(log.date || log.created_at).toLocaleString()}
+                          {new Date(log.date || log.created_at).toLocaleString("en-GB")}
                         </span>
                       </div>
                     </div>
@@ -195,33 +198,33 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
                     {/* Card Details Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                       <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#E6E9EB]">
-                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Pulses &amp; Counter</p>
+                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.pulsesCounter}</p>
                         {log.starting_pulse_count !== undefined || log.ending_pulse_count !== undefined ? (
                           <p className="font-mono text-[#1F251A]">
-                            {Number(log.starting_pulse_count || 0).toLocaleString()} → <strong className="text-[#414E36]">{Number(log.ending_pulse_count || 0).toLocaleString()}</strong>
+                            {Number(log.starting_pulse_count || 0).toLocaleString("en-GB")} → <strong className="text-[#414E36]">{Number(log.ending_pulse_count || 0).toLocaleString("en-GB")}</strong>
                             {log.pulses_delivered !== undefined && log.pulses_delivered > 0 && (
-                              <span className="ml-1 text-[11px] text-indigo-600 font-semibold">({log.pulses_delivered.toLocaleString()} delivered)</span>
+                              <span className="ms-1 text-[11px] text-indigo-600 font-semibold">({log.pulses_delivered.toLocaleString("en-GB")} delivered)</span>
                             )}
                           </p>
                         ) : (
-                          <p className="text-[#5A6A51] italic text-[11px]">N/A or Configuration update</p>
+                          <p className="text-[#5A6A51] italic text-[11px]">{t.naConfigUpdate}</p>
                         )}
                       </div>
 
                       <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#E6E9EB]">
-                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Reason / Action Summary</p>
-                        <p className="font-medium text-[#1F251A]">{log.reason || log.notes || "Routine Operation"}</p>
+                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.reasonSummary}</p>
+                        <p className="font-medium text-[#1F251A]">{log.reason || log.notes || t.routineOperation}</p>
                       </div>
 
                       <div className="bg-[#FBFBF9] p-2.5 rounded-xl border border-[#E6E9EB]">
-                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">Performed By</p>
-                        <p className="font-semibold text-[#414E36]">{log.performed_by || "Clinic Admin"}</p>
+                        <p className="text-[10px] font-bold text-[#5A6A51] uppercase tracking-wider mb-1">{t.performedBy}</p>
+                        <p className="font-semibold text-[#414E36]">{log.performed_by || t.clinicAdmin}</p>
                       </div>
                     </div>
 
                     {log.notes && log.notes !== log.reason && (
                       <div className="text-[11px] text-[#5A6A51] bg-[#EDF1EC]/40 p-2.5 rounded-xl border border-[#414E36]/10">
-                        <strong className="text-[#414E36]">Notes:</strong> {log.notes}
+                        <strong className="text-[#414E36]">{t.notesLabel}</strong> {log.notes}
                       </div>
                     )}
                   </div>
@@ -234,13 +237,13 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
         {/* Footer */}
         <div className="border-t border-[#414E36]/10 pt-4 mt-4 shrink-0 flex items-center justify-between">
           <span className="text-xs text-[#5A6A51] font-medium">
-            Total Audit Log Entries: <strong>{auditLogs.length}</strong>
+            {t.totalEntries} <strong>{auditLogs.length}</strong>
           </span>
           <button
             onClick={onClose}
             className="rounded-3xl border border-[#414E36]/20 bg-[#fff] px-8 py-2.5 text-xs font-bold text-[#414E36] hover:bg-[#f7f6f2] transition"
           >
-            Close Audit Logs
+            {t.closeBtn}
           </button>
         </div>
       </div>

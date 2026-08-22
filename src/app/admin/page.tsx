@@ -12387,6 +12387,8 @@ export default function AdminPage() {
                 setDbCustomers((prev) => prev.map((c) => (c.id === customerId ? { ...c, spent_amount: newSpentAmount } : c)));
               }}
               productsTabRef={productsTabRef}
+              lang={lang}
+              t={adminTranslations[lang].inventory}
             />
           )}
 
