@@ -187,6 +187,29 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
       return true;
     });
 
+    const categoryLabel = (cat?: string) => {
+      switch (cat) {
+        case "Laser Hair Removal": return t.catLaser;
+        case "Facial & Skincare": return t.catFacial;
+        case "Body Contouring": return t.catBody;
+        case "Dermatology": return t.catDermatology;
+        case "General Equipment": return t.catGeneral;
+        default: return cat;
+      }
+    };
+
+    const reasonLabel = (reason?: string) => {
+      switch (reason) {
+        case "Routine Maintenance": return t.reasonRoutine;
+        case "Flashlamp Replacement": return t.reasonFlashlamp;
+        case "Handpiece Diode Stack Service": return t.reasonDiodeStack;
+        case "Vortex Tip & Filter Replacement": return t.reasonVortexTip;
+        case "Calibration & Sensor Alignment": return t.reasonCalibration;
+        case "Other Service": return t.reasonOther;
+        default: return reason;
+      }
+    };
+
     return (
       <div className="space-y-6" dir={lang === "ar" ? "rtl" : "ltr"}>
         {/* Stats Summary Cards */}
@@ -403,7 +426,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
 
                         {/* Category & Branch */}
                         <td className="px-6 py-5">
-                          <div className="text-sm font-semibold text-[#1F251A]">{dev.category}</div>
+                          <div className="text-sm font-semibold text-[#1F251A]">{categoryLabel(dev.category)}</div>
                           <div className="text-xs text-[#5A6A51] mt-0.5">
                             {branchObj ? branchObj.name_en : t.allBranches}
                           </div>
@@ -1111,7 +1134,7 @@ const InventoryDevicesTab = forwardRef<InventoryDevicesTabRef, Props>(
                     .map((log) => (
                       <div key={log.id} className="rounded-2xl border border-[#E6E9EB] bg-[#FBFBF9] p-4 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-[#1F251A]">{log.reason}</span>
+                          <span className="text-sm font-bold text-[#1F251A]">{reasonLabel(log.reason)}</span>
                           <span className="text-xs text-[#5A6A51] font-mono">
                             {new Date(log.reset_date).toLocaleDateString("en-US", {
                               month: "short",

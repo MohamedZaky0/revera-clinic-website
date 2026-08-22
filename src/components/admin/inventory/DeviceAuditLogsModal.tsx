@@ -176,6 +176,14 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
                 else if (isStatus) badgeClass = "bg-rose-100 text-rose-700 border-rose-200";
                 else badgeClass = "bg-amber-100 text-amber-700 border-amber-200";
 
+                const actionTypeLabel = isReset
+                  ? t.typePulseReset
+                  : isCreated
+                  ? t.typeDeviceCreated
+                  : isStatus
+                  ? t.typeStatusChanged
+                  : t.typeDeviceUpdated;
+
                 return (
                   <div key={log.id} className="rounded-2xl border border-[#414E36]/15 bg-white p-4 shadow-sm hover:border-[#414E36]/30 transition space-y-3">
                     {/* Card Header */}
@@ -185,7 +193,7 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
                           <Gauge size={14} className="text-[#414E36]" /> {log.device_name}
                         </span>
                         <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${badgeClass}`}>
-                          {actionType}
+                          {actionTypeLabel}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-[#5A6A51]">
@@ -203,7 +211,7 @@ export default function DeviceAuditLogsModal({ open, onClose, authHeaders, devic
                           <p className="font-mono text-[#1F251A]">
                             {Number(log.starting_pulse_count || 0).toLocaleString("en-GB")} → <strong className="text-[#414E36]">{Number(log.ending_pulse_count || 0).toLocaleString("en-GB")}</strong>
                             {log.pulses_delivered !== undefined && log.pulses_delivered > 0 && (
-                              <span className="ms-1 text-[11px] text-indigo-600 font-semibold">({log.pulses_delivered.toLocaleString("en-GB")} delivered)</span>
+                              <span className="ms-1 text-[11px] text-indigo-600 font-semibold">({log.pulses_delivered.toLocaleString("en-GB")} {t.deliveredSuffix})</span>
                             )}
                           </p>
                         ) : (

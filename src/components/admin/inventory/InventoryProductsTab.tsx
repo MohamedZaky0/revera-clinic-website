@@ -167,6 +167,17 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
       });
     }, [products, productSearchQuery, productCategoryFilter, productStatusFilter, productBranchFilter]);
 
+    const categoryLabel = (cat?: string) => {
+      switch (cat) {
+        case "Injectables": return t.catInjectables;
+        case "Skincare": return t.catSkincare;
+        case "Supplies": return t.catSupplies;
+        case "Equipment": return t.catEquipment;
+        case "General": return t.catGeneral;
+        default: return cat;
+      }
+    };
+
     const resetProductForm = () => {
       setEditingProduct(null);
       setProdName("");
@@ -570,7 +581,7 @@ const InventoryProductsTab = forwardRef<InventoryProductsTabRef, Props>(
                             </td>
                             <td className="px-6 py-4">
                               <span className="inline-flex items-center rounded-full bg-[#EBF0E6] px-2.5 py-0.5 text-xs font-medium text-[#414E36]">
-                                {prod.category}
+                                {categoryLabel(prod.category)}
                               </span>
                               <p className="text-xs text-[#5A6A51] mt-1 font-mono">{t.unitLabel} {prod.unit}</p>
                             </td>
