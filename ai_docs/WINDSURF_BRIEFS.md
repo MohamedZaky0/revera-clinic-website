@@ -10,7 +10,110 @@ Standing rules live in `.windsurf/rules/*.md` (loaded automatically) and `.winds
 
 # ACTIVE BRIEF
 
-_None — Brief 21 queued below, not yet handed to Windsurf._
+## Brief 21 — Phase 1: extract the Employees admin section from `page.tsx`
+
+**Scope: mechanical extraction only. Zero behavior change, no translation, no dedup.** Same
+pattern-proving shape as Brief 4 (Clinic Profile), 15 (Doctors), 16 (Services), 17 Part 2
+(Inventory). This is the largest section extracted so far — read this brief fully before starting,
+it is denser than the others because the section itself is more entangled.
+
+**Target file:** new `src/components/admin/employees/AdminEmployeesView.tsx`, following the naming
+convention of `AdminDoctorsView.tsx`/`AdminServicesView.tsx`/`AdminInventoryView.tsx`.
+
+**Block boundaries (verified 2026-08-22, re-check before starting — line numbers drift):**
+`{activeNav === "Employees" && adminRole === "superadmin" && (` at `page.tsx:10970` through its
+matching `)}` at `page.tsx:13194` — 2,225 lines. Immediately before it: Role Management
+(10364–10728). Immediately after it: HR (13204+). **Move only this span. Do not touch Role
+Management or HR** — they share state with this section (see below) and are out of scope.
+
+**Permission gating — confirmed, don't invent anything finer.** The only gate is the outer
+`activeNav === "Employees" && adminRole === "superadmin"` check. Zero `hasPermission(...)` calls
+exist inside the block — unlike Inventory (Brief 17/20), there is no per-button `canManage`
+pattern here. Every write action (add/edit/delete/resend invite/print/notes) is available to any
+superadmin. Preserve this exactly — pass `adminRole` (or a derived `isSuperadmin` boolean, your
+call, but keep the semantics identical) into the new component; do not add or remove any gate.
+
+**State — what moves into the new component vs. what must stay a prop, confirmed by reading every
+use site file-wide (not just the block):**
+
+*Moves in (Employees-only, ~35 `useState` declarations)*: all `newEmployee*` form fields (name,
+email, phone, role, branch, department, salary, national ID, address, contract fields, shift
+times, target amount, commission fields, schedule-branch-tab selector — declared 920–1082),
+`employeeFilterDepartment`/`employeeFilterShift`/`employeeSearchQuery` (1044–1046),
+`viewingEmployee`/`employeeProfileActiveTab`/`editingEmployee`/`isEditingEmployeeModalOpen`
+(1047–1050), `viewingEmployeeNotes`/`loadingEmployeeNotes`/`newEmployeeNoteText` (1234/1235/1238),
+`viewingEmployeeBookings`/`loadingEmployeeBookings` (1236–1237).
+
+*Must be passed as props, not moved (shared with Role Management and/or HR — moving these would
+break those sections)*:
+- `rolesList`, `loadingRolesAndEmployees`, `employeesList` — also rendered by Role Management's own
+  table (10606–10664) and HR's Workforce Directory (13291–13320). **`employeesList` is used by 3
+  sections; do not fork it into a local copy.**
+- `departmentsList` — owned/edited by Role Management's Department Management card
+  (10670–10725), only consumed (read-only) inside Employees.
+- `attendanceList`/`loadingAttendance` — populated by HR's `fetchHrAttendance()`, consumed by
+  Employees' Attendance Insights tab (12762+). Keep the existing cross-section
+  `useEffect` (page.tsx 1270–1308, fires `fetchHrAttendance()` when `viewingEmployee` changes) where
+  it is; pass the resulting list down as a prop rather than duplicating the fetch inside the new
+  component.
+- `providers`/`fetchProviders` (from the `useProviderForm()` hook, not local state) — Employees
+  reads `providers.find(...)` to hydrate doctor fields on edit and calls `fetchProviders()` after
+  every create/edit. Pass both down the same way `AdminDoctorsView` already receives them.
+- `customerAvatars`, `handleAvatarUpload`, `handleAvatarRemove` — generic id-keyed avatar plumbing
+  shared with `CustomerProfileDrawer` and the Profile section. Pass down, do not duplicate.
+- `branches`, `allServicesList`, `allReservations`, `session`, `adminDbId`, `adminEmail` — global,
+  pass down as already done for every other extracted section.
+- `handleDeleteEmployee`, `handleResendInvitation`, `fetchRolesAndEmployees` — called from inside
+  Employees but ALSO from Role Management and (for `fetchRolesAndEmployees`) several unrelated
+  bootstrap/save paths. Pass down as props, do not move their definitions.
+
+*Explicitly NOT Employees dependencies — do not move, do not touch*: `handleCreateEmployee`
+(Role Management's invite form only), `handleUpdateEmployeeRole` (Role Management only),
+`handleSaveDepartments` (Role Management only), `employeeCreateError`/`employeeCreateSuccess`
+(Role Management only).
+
+*Moves in (Employees-only handlers)*: `handlePrintEmployeeProfile` (2863),
+`handleExportAttendanceInsights` (1241), `handleEmployeeBranchScheduleTabChange` (1201),
+`checkShiftOverlaps` (1084), `updateShiftState`/`handleShiftStartChange`/`handleShiftEndChange`
+(978/985/992), `buildAddress`/`applyAddressToState`/`commitAddressState` (1000/1013/1024) — verify
+each has zero call sites outside 10970–13194 before moving (true as of this writing; re-confirm,
+since this file keeps shifting).
+
+**Structure to preserve exactly (3 sub-views, all currently inline, all move together as one
+component with the same internal gating)**:
+1. Employees list + filters/table (default view) — 11069–11291
+2. Add/Edit Employee form (full-width replacement view, not an overlay) — 11296–12333, containing
+   a conditional "Doctor & Medical Configuration" sub-panel (11579–11892, shown when
+   department/role contains "doc") with its own weekly shift-editor grid, live overlap-warning
+   banner, and a `DoctorServiceCommissionEditor` call (already a shared component — becomes its
+   4th call site, import it the same way `AdminDoctorsView` does)
+3. View Employee Details (inline profile, 7 tabs: basic/work/payroll/performance/attendance/
+   contact/documents) — 12336–13192
+
+**API calls physically inside the block** (move as-is, no changes): `PATCH /api/employees` (save,
+11365), `POST /api/employees` (invite, 11418), `DELETE /api/employees/notes` (12984),
+`POST /api/employees/notes` (13023).
+
+**Do NOT do any of the following in this brief:**
+- Do not translate anything (no `t.*`, no `lang`/`dir` prop) — that's a future Phase 2 brief.
+- Do not deduplicate the doctor-schedule editor or `checkShiftOverlaps` against
+  `ProviderFormFields.tsx`/`useProviderForm.ts`, even though they are genuinely similar. **This is
+  not a Brief-18-style byte-identical duplicate** — the Employees version has a live overlap-warning
+  banner and per-branch schedule tabs that the canonical Doctors form does not have. Collapsing them
+  requires a product decision about which UX becomes canonical across both surfaces; that decision
+  has not been made yet and is out of scope here. Move the Employees version verbatim, duplication
+  and all.
+- Do not fix the 3 value/label-separation risks found during investigation (department/role
+  substring-matching via `.includes("doc")` used for both logic and display; `emp.shift` free-text
+  string compared via `.includes("night"/"day")` while also rendered raw) — these are real latent
+  bugs for a future Arabic pass, not this brief's job. Move them as-is.
+
+**Method / exit criteria:** identical shape to every prior Phase 1 brief — pure structural move, no
+behavior change. `tsc`/`eslint` clean, `vitest` unchanged, diff on `page.tsx` should be almost
+entirely deletions plus a `<AdminEmployeesView .../>` call with props. Manual test checklist written
+per CLAUDE.md, covering: list/filter/search, add employee (both doctor and non-doctor roles),
+edit employee, delete, resend invite, print profile, all 7 profile tabs, notes add/delete, avatar
+upload/remove, attendance insights export.
 
 ---
 ---
